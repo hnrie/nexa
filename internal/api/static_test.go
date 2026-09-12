@@ -1,0 +1,70 @@
+package api
+
+import (
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestStaticServing(t *testing.T) {
+	srv, ts := newTestServer(t)
+	dist := t.TempDir()
+	os.MkdirAll(filepath.Join(dist, "assets"), 0o755)
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><title>Evilion Chat</title>"), 0o644)
+	os.WriteFile(filepath.Join(dist, "assets", "app-abc123.js"), []byte("console.log(1)"), 0o644)
+	os.WriteFile(filepath.Join(dist, "manifest.webmanifest"), []byte("{}"), 0o644)
+	os.WriteFile(filepath.Join(dist, "sw.js"), []byte("self.x=1"), 0o644)
+	srv.Cfg.WebDist = dist
+	ts2 := newHTTPTestServer(t, srv)
+	get := func(p string) (*http.Response, string) {
+		res, err := http.Get(ts2.URL + p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res, string(b)
+	}
+	res, body := get("/")
+	if res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") || res.Header.Get("Cache-Control") != "no-cache" || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+		t.Errorf("index: %d %q %v", res.StatusCode, body, res.Header)
+	}
+	if res, body = get("/channels/@me/123"); res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") {
+		t.Errorf("spa fallback: %d", res.StatusCode)
+	}
+	res, body = get("/assets/app-abc123.js")
+	if res.StatusCode != 200 || body != "console.log(1)" || res.Header.Get("Cache-Control") != "public, max-age=31536000, immutable" || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/javascript") {
+		t.Errorf("asset: %d %q %v", res.StatusCode, body, res.Header)
+	}
+	if res, _ = get("/manifest.webmanifest"); res.Header.Get("Content-Type") != "application/manifest+json" {
+		t.Errorf("manifest type: %s", res.Header.Get("Content-Type"))
+	}
+	if res, _ = get("/sw.js"); res.Header.Get("Service-Worker-Allowed") != "/" {
+		t.Error("service worker header")
+	}
+	if res, body = get("/../../etc/passwd"); res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") {
+		t.Errorf("traversal must fall back to index: %d", res.StatusCode)
+	}
+	if res, body = get("/api/v1/nope"); res.StatusCode != 404 || !strings.Contains(body, "not_found") {
+		t.Errorf("api 404 stays json: %d %s", res.StatusCode, body)
+	}
+	if res, _ = get("/media/avatar/1"); res.StatusCode != 404 {
+		t.Error("media 404")
+	}
+	_ = ts
+	// missing dist → 503 with explanation
+	srv.Cfg.WebDist = filepath.Join(dist, "missing")
+	ts3 := newHTTPTestServer(t, srv)
+	res2, err := http.Get(ts3.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res2.Body)
+	res2.Body.Close()
+	if res2.StatusCode != 503 || !strings.Contains(string(b), "not been built") {
+		t.Errorf("missing dist: %d %s", res2.StatusCode, b)
+	}
+}

@@ -166,3 +166,11 @@ func (g *gw) next(t string, timeout time.Duration) map[string]any {
 		}
 	}
 }
+
+// newHTTPTestServer starts another listener over the same Server (after config changes).
+func newHTTPTestServer(t *testing.T, srv *Server) *httptest.Server {
+	t.Helper()
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	return ts
+}

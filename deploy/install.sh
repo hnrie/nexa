@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+#
+# Installs Evilion Chat as a macOS LaunchDaemon and wires it into the existing
+# Cloudflare tunnel. Safe to run repeatedly; every step checks before changing.
+#
+#   sudo bash deploy/install.sh            install, configure, start
+#   bash deploy/install.sh --check         print what it would do, change nothing
+#   sudo bash deploy/install.sh --no-start set up but leave the daemon stopped
+#
+set -euo pipefail
+
+CHECK=0; START=1
+for a in "$@"; do case "$a" in --check) CHECK=1;; --no-start) START=0;; *) echo "unknown option $a" >&2; exit 2;; esac; done
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+LABEL="xyz.evilion.chat"
+PLIST="/Library/LaunchDaemons/$LABEL.plist"
+TUNNEL_CFG="$ROOT/../server/tunnel/config.yml"
+SITE_LABEL="xyz.evilion.evilionxyz"
+
+if [ -t 1 ]; then G=$'\033[32m'; Y=$'\033[33m'; R=$'\033[31m'; N=$'\033[0m'; else G=; Y=; R=; N=; fi
+ok()   { echo "${G}ok${N}    $*"; }
+todo() { echo "${Y}todo${N}  $*"; }
+die()  { echo "${R}error${N} $*" >&2; exit 1; }
+doit() { if [ "$CHECK" = 1 ]; then echo "      would: $*"; else "$@"; fi; }
+
+# --- settings from chatd.env (defaults match config.go) ---------------------
+env_get() { local k="$1" d="$2"; local v; v="$(grep -E "^${k}=" "$ROOT/chatd.env" 2>/dev/null | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")"; echo "${v:-$d}"; }
+LISTEN="$(env_get LISTEN 127.0.0.1:8090)"
+PUBLIC_URL="$(env_get PUBLIC_URL https://chat.evilion.xyz)"
+HOSTNAME_="${PUBLIC_URL#https://}"; HOSTNAME_="${HOSTNAME_#http://}"; HOSTNAME_="${HOSTNAME_%%/*}"
+
+# --- who runs it ------------------------------------------------------------
+OWNER="$(stat -f %Su "$ROOT")"
+GROUP="$(id -gn "$OWNER")"
+OWNER_HOME="$(dscl . -read "/Users/$OWNER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+[ -n "$OWNER_HOME" ] || OWNER_HOME="/Users/$OWNER"
+BASH_BIN="$(command -v bash)"
+DAEMON_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+echo "Evilion Chat installer — root: $ROOT, user: $OWNER, listen: $LISTEN, host: $HOSTNAME_"
+
+# 1. config file
+if [ -f "$ROOT/chatd.env" ]; then ok "chatd.env present"; else
+  todo "creating chatd.env from chatd.env.example (edit it if you want other settings)"
+  doit cp "$ROOT/chatd.env.example" "$ROOT/chatd.env"; doit chmod 600 "$ROOT/chatd.env"; doit chown "$OWNER:$GROUP" "$ROOT/chatd.env"
+fi
+
+# 2. directories
+for d in data logs; do
+  if [ -d "$ROOT/$d" ]; then ok "$d/ present"; else todo "creating $d/"; doit mkdir -p "$ROOT/$d"; doit chown "$OWNER:$GROUP" "$ROOT/$d"; fi
+done
+doit chmod 700 "$ROOT/data" 2>/dev/null || true
+
+# 3. binary
+if [ -x "$ROOT/bin/chatd" ]; then ok "bin/chatd built"; else die "bin/chatd is missing — run 'make build' first"; fi
+[ -f "$ROOT/web/dist/index.html" ] && ok "web/dist built" || todo "web/dist missing — run 'make web' (the server starts but serves a 503 page until then)"
+
+# 4. launchd plist (needs root)
+render() { sed -e "s|@ROOT@|$ROOT|g" -e "s|@USER@|$OWNER|g" -e "s|@GROUP@|$GROUP|g" -e "s|@HOME@|$OWNER_HOME|g" -e "s|@BASH@|$BASH_BIN|g" -e "s|@PATH@|$DAEMON_PATH|g" "$ROOT/deploy/$LABEL.plist.in"; }
+if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then die "installing the LaunchDaemon needs root: sudo bash deploy/install.sh"; fi
+if [ -f "$PLIST" ] && diff -q <(render) "$PLIST" >/dev/null 2>&1; then ok "$PLIST up to date"; else
+  todo "writing $PLIST"
+  if [ "$CHECK" = 0 ]; then render > "$PLIST"; chown root:wheel "$PLIST"; chmod 644 "$PLIST"; fi
+fi
+
+# 5. start / restart
+if [ "$START" = 1 ]; then
+  if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+    todo "restarting $LABEL"
+    doit launchctl bootout "system/$LABEL" || true
+  else
+    todo "starting $LABEL"
+  fi
+  if [ "$CHECK" = 0 ]; then
+    launchctl bootstrap system "$PLIST"
+    for i in $(seq 1 30); do
+      if curl -sf "http://$LISTEN/api/health" >/dev/null 2>&1; then ok "chatd answers on http://$LISTEN/api/health"; break; fi
+      sleep 1
+      [ "$i" = 30 ] && die "chatd did not come up — see $ROOT/logs/chatd.log"
+    done
+  fi
+else
+  ok "not starting (--no-start)"
+fi
+
+# 6. tunnel ingress
+if [ -f "$TUNNEL_CFG" ]; then
+  if grep -q "hostname: $HOSTNAME_" "$TUNNEL_CFG"; then ok "tunnel ingress for $HOSTNAME_ present"; else
+    todo "adding ingress $HOSTNAME_ -> http://$LISTEN to $TUNNEL_CFG"
+    if [ "$CHECK" = 0 ]; then
+      python3 - "$TUNNEL_CFG" "$HOSTNAME_" "http://$LISTEN" <<'PY'
+import sys, re
+path, host, svc = sys.argv[1:4]
+lines = open(path).read().split("\n")
+out, done = [], False
+for i, line in enumerate(lines):
+    if not done and re.match(r"\s*-\s*service:\s*http_status:404", line):
+        indent = re.match(r"(\s*)", line).group(1)
+        out += [f"{indent}- hostname: {host}", f"{indent}  service: {svc}", ""]
+        done = True
+    out.append(line)
+if not done:
+    sys.exit("catch-all rule not found in tunnel config")
+open(path, "w").write("\n".join(out))
+PY
+      if launchctl print "system/$SITE_LABEL" >/dev/null 2>&1; then
+        todo "restarting $SITE_LABEL so cloudflared reloads its ingress"
+        launchctl kickstart -k "system/$SITE_LABEL"
+      else
+        todo "$SITE_LABEL is not installed on this box — restart cloudflared yourself"
+      fi
+    fi
+  fi
+else
+  todo "no tunnel config at $TUNNEL_CFG — add an ingress rule '$HOSTNAME_ -> http://$LISTEN' to your cloudflared config"
+fi
+
+# 7. DNS
+TUNNEL_ID="$(grep -E '^tunnel:' "$TUNNEL_CFG" 2>/dev/null | awk '{print $2}')"
+if dig +short "$HOSTNAME_" 2>/dev/null | grep -q .; then
+  ok "DNS: $HOSTNAME_ resolves"
+  if [ "$CHECK" = 0 ] && [ "$START" = 1 ]; then
+    if curl -sf -m 15 "$PUBLIC_URL/api/health" >/dev/null 2>&1; then ok "$PUBLIC_URL/api/health answers through the tunnel"; else todo "$PUBLIC_URL does not answer yet (tunnel restarting or DNS propagating) — retry in a minute"; fi
+  fi
+else
+  todo "DNS: no record for $HOSTNAME_. Either of these creates it:
+        a) cloudflared tunnel login   (once, opens a browser)   then   bash deploy/route-dns.sh
+        b) Cloudflare dashboard -> DNS -> add CNAME  $(echo "$HOSTNAME_" | cut -d. -f1)  ->  ${TUNNEL_ID:-<tunnel-uuid>}.cfargotunnel.com  (proxied / orange cloud)"
+fi
+echo "done."

@@ -4,17 +4,26 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/coder/websocket"
+
+	"evilion.xyz/chat/internal/api"
 	"evilion.xyz/chat/internal/config"
+	"evilion.xyz/chat/internal/db"
+	"evilion.xyz/chat/internal/gateway"
+	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/store"
+	"evilion.xyz/chat/internal/unfurl"
 )
 
 // version is set at build time: -ldflags "-X main.version=…".
@@ -40,40 +49,126 @@ func main() {
 		slog.Error("config", "err", err)
 		os.Exit(2)
 	}
-	setupLogging(cfg.LogLevel)
+	log := setupLogging(cfg.LogLevel)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "version": version})
-	})
+	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
+		log.Error("data dir", "err", err)
+		os.Exit(1)
+	}
+	database, err := db.Open(filepath.Join(cfg.DataDir, "chat.db"))
+	if err != nil {
+		log.Error("open database", "err", err)
+		os.Exit(1)
+	}
+	if err := database.Migrate(context.Background()); err != nil {
+		log.Error("migrate", "err", err)
+		os.Exit(1)
+	}
+	st := store.New(database)
+	mediaStore, err := media.New(filepath.Join(cfg.DataDir, "media"), st)
+	if err != nil {
+		log.Error("media dir", "err", err)
+		os.Exit(1)
+	}
+	secret, err := loadOrCreateSecret(filepath.Join(cfg.DataDir, "server.secret"))
+	if err != nil {
+		log.Error("server secret", "err", err)
+		os.Exit(1)
+	}
 
-	srv := &http.Server{Addr: cfg.Listen, Handler: mux, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
+	srv := api.NewServer(cfg, st, log, nil)
+	srv.Version = version
+	srv.Secret = secret
+	srv.Media = mediaStore
+	srv.Unfurl = unfurl.NewService()
+	hub := gateway.New(st, srv.Auth, log, cfg.PublicURL)
+	srv.Bcast = hub
+	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go hub.Run(ctx)
+	go maintenance(ctx, log, st, mediaStore, cfg.SessionTTL)
+
+	httpSrv := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 	errc := make(chan error, 1)
 	go func() {
-		slog.Info("listening", "addr", cfg.Listen, "version", version)
-		errc <- srv.ListenAndServe()
+		log.Info("listening", "addr", cfg.Listen, "public_url", cfg.PublicURL, "version", version, "web_dist", cfg.WebDist)
+		errc <- httpSrv.ListenAndServe()
 	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	select {
 	case sig := <-stop:
-		slog.Info("shutting down", "signal", sig.String())
+		log.Info("shutting down", "signal", sig.String())
 	case err := <-errc:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("serve", "err", err)
+			log.Error("serve", "err", err)
 			os.Exit(1)
 		}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		slog.Warn("shutdown", "err", err)
+	cancel()
+	hub.CloseAll(websocket.StatusGoingAway, "server restarting")
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelShutdown()
+	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
+		log.Warn("http shutdown", "err", err)
+	}
+	if err := database.Close(); err != nil {
+		log.Warn("database close", "err", err)
+	}
+	log.Info("stopped")
+}
+
+// maintenance runs periodic cleanups: unreferenced blobs and expired sessions.
+func maintenance(ctx context.Context, log *slog.Logger, st *store.Store, m *media.Store, sessionTTL time.Duration) {
+	run := func() {
+		if n, err := m.GC(ctx, time.Now().Add(-24*time.Hour).UnixMilli()); err != nil {
+			log.Warn("blob gc", "err", err)
+		} else if n > 0 {
+			log.Info("blob gc", "removed", n)
+		}
+		if n, err := st.DeleteExpiredSessions(ctx, time.Now().Add(-sessionTTL).UnixMilli()); err != nil {
+			log.Warn("session sweep", "err", err)
+		} else if n > 0 {
+			log.Info("session sweep", "removed", n)
+		}
+	}
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(time.Minute):
+		run()
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			run()
+		}
 	}
 }
 
-func setupLogging(level string) {
+// loadOrCreateSecret returns a stable random secret persisted at path.
+func loadOrCreateSecret(path string) ([]byte, error) {
+	if b, err := os.ReadFile(path); err == nil && len(b) >= 32 {
+		return b, nil
+	}
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func setupLogging(level string) *slog.Logger {
 	var lv slog.Level
 	switch level {
 	case "debug":
@@ -85,5 +180,7 @@ func setupLogging(level string) {
 	default:
 		lv = slog.LevelInfo
 	}
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lv})))
+	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lv}))
+	slog.SetDefault(log)
+	return log
 }

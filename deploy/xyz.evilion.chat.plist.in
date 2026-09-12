@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template. deploy/install.sh substitutes @ROOT@, @USER@, @GROUP@, @HOME@,
+  @BASH@ and @PATH@ and installs the result to
+  /Library/LaunchDaemons/xyz.evilion.chat.plist — edit this file, not that copy.
+
+  Evilion Chat (chat.evilion.xyz): one Go process serving the API, the
+  WebSocket gateway, media and the web app on 127.0.0.1:8090. The Cloudflare
+  tunnel (run by xyz.evilion.evilionxyz) forwards the hostname to it. A
+  LaunchDaemon so it starts at boot with nobody logged in; runs as the folder's
+  owner, never root.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>xyz.evilion.chat</string>
+
+  <key>UserName</key>
+  <string>@USER@</string>
+  <key>GroupName</key>
+  <string>@GROUP@</string>
+
+  <key>WorkingDirectory</key>
+  <string>@ROOT@</string>
+
+  <!-- run.sh execs bin/chatd, so chatd is the process launchd tracks and a
+       SIGTERM reaches it directly: it closes the gateway, finishes in-flight
+       requests and checkpoints SQLite before exiting. -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>@BASH@</string>
+    <string>@ROOT@/run.sh</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>@PATH@</string>
+    <key>HOME</key>
+    <string>@HOME@</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+  <key>ExitTimeOut</key>
+  <integer>30</integer>
+
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>8192</integer>
+  </dict>
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>NumberOfFiles</key>
+    <integer>8192</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>@ROOT@/logs/chatd.log</string>
+  <key>StandardErrorPath</key>
+  <string>@ROOT@/logs/chatd.log</string>
+</dict>
+</plist>

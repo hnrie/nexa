@@ -180,7 +180,7 @@ type Message struct {
 	Attachments     []Attachment      `json:"attachments"`
 	Reactions       []ReactionSummary `json:"reactions"`
 	Flags           int64             `json:"flags"`
-	Nonce           string            `json:"-"`
+	Nonce           string            `json:"nonce,omitempty"`
 	EditedAt        *int64            `json:"edited_at"`
 	CreatedAt       int64             `json:"created_at"`
 }

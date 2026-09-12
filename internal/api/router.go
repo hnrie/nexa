@@ -14,6 +14,7 @@ import (
 	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/store"
+	"evilion.xyz/chat/internal/unfurl"
 )
 
 // Broadcaster is how handlers push realtime events; the gateway implements it.
@@ -55,6 +56,10 @@ type Server struct {
 	limReg     *ratelimit.Limiter
 	limMsg     *ratelimit.Limiter
 	limUpload  *ratelimit.Limiter
+	limUnfurl  *ratelimit.Limiter
+
+	// Unfurl produces link previews for senders (nil disables the route body).
+	Unfurl *unfurl.Service
 
 	// ChannelAccess decides server-channel access (Phase 2). DM access is built in.
 	ChannelAccess func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error)
