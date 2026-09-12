@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode, type TouchEvent } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
 import { ModalHost } from "@/components/modals/ModalHost";
@@ -15,7 +15,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const setRightOpen = useUI((u) => u.setRightOpen);
   const connection = useUI((u) => u.connection);
   const loc = useLocation();
+  const [params, setParams] = useSearchParams();
+  const openModal = useUI((u) => u.openModal);
   const touch = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+
+  useEffect(() => {
+    const page = params.get("settings");
+    if (page) {
+      openModal("settings", { page });
+      params.delete("settings");
+      setParams(params, { replace: true });
+    }
+  }, [params, setParams, openModal]);
 
   useEffect(() => {
     setLeftOpen(false);

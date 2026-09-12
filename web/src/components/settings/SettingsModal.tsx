@@ -1,10 +1,62 @@
-import { Modal } from "@/components/common/Modal";
+import { X } from "lucide-react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAuth } from "@/stores/auth";
+import s from "./Settings.module.css";
 
-/** Placeholder; the full settings layer arrives with the profile/settings step. */
-export default function SettingsModal({ onClose, page }: { onClose: () => void; page: string }) {
-  return (
-    <Modal open onClose={onClose} title="Settings">
-      <p style={{ color: "var(--text-muted)" }}>Settings ({page}) coming next.</p>
-    </Modal>
+const AccountPage = lazy(() => import("./AccountPage"));
+const ProfilePage = lazy(() => import("./ProfilePage"));
+const PrivacyPage = lazy(() => import("./PrivacyPage"));
+const DevicesPage = lazy(() => import("./DevicesPage"));
+const AppearancePage = lazy(() => import("./AppearancePage"));
+const NotificationsPage = lazy(() => import("./NotificationsPage"));
+
+const NAV: { head: string; items: { id: string; label: string }[] }[] = [
+  { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "devices", label: "Devices" }] },
+  { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "notifications", label: "Notifications" }] },
+];
+
+export default function SettingsModal({ onClose, page: initial }: { onClose: () => void; page: string }) {
+  const [page, setPage] = useState(initial);
+  const logout = useAuth((a) => a.logout);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const body =
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : <AccountPage onClose={onClose} />;
+  return createPortal(
+    <div className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings">
+      <div className={s.navWrap}>
+        <nav className={s.nav}>
+          {NAV.map((g) => (
+            <div key={g.head}>
+              <div className={s.navHead}>{g.head}</div>
+              {g.items.map((it) => (
+                <button key={it.id} className={s.navItem} data-selected={page === it.id} onClick={() => setPage(it.id)}>{it.label}</button>
+              ))}
+            </div>
+          ))}
+          <div className={s.navSep} />
+          <button className={[s.navItem, s.danger].join(" ")} onClick={() => void logout()}>Log Out</button>
+        </nav>
+      </div>
+      <div className={s.contentWrap}>
+        <div className={s.content}>
+          <Suspense fallback={null}>{body}</Suspense>
+        </div>
+        <div className={s.closeCol}>
+          <button className={s.close} aria-label="Close settings" onClick={onClose}><X size={20} /></button>
+          <span className={s.esc}>ESC</span>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

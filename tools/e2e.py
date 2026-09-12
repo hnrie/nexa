@@ -238,6 +238,8 @@ def main():
             browser.close()
     finally:
         srv.stop()
+    if args.keep:
+        print("kept data dir:", srv.dir)
     print("E2E", "PASSED" if ok else "FAILED")
     sys.exit(0 if ok else 1)
 

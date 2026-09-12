@@ -1,0 +1,17 @@
+.card { width: 600px; max-width: 100%; background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
+.banner { height: 120px; background: var(--brand); background-size: cover; background-position: center; }
+.head { position: relative; padding: 0 16px 12px; }
+.avatar { position: absolute; top: -50px; left: 16px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); }
+.actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; min-height: 52px; }
+.names { margin-top: 12px; }
+.display { font-size: 20px; font-weight: 700; color: var(--text-strong); display: flex; align-items: center; gap: 8px; }
+.user { font-size: 14px; color: var(--text); }
+.pronouns { font-size: 14px; color: var(--text-muted); }
+.status { margin-top: 8px; font-size: 14px; color: var(--text); }
+.body { margin: 0 16px 16px; padding: 12px; background: var(--bg-raised); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto; }
+.section h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
+.section p { margin: 0; font-size: 14px; color: var(--text); }
+.about { font-size: 14px; color: var(--text); }
+.mutual { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--bg-active); color: var(--text-subtle); text-transform: uppercase; }
+.small { font-size: 13px; color: var(--text-muted); }
