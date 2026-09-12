@@ -1,3 +1,4 @@
+import { shortcodeToEmoji } from "@/lib/shortcodes";
 import type { Node } from "./ast";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,7 @@ const RE_USER = /<@!?(\d{1,32})>/y;
 const RE_CHANNEL = /<#(\d{1,32})>/y;
 const RE_ROLE = /<@&(\d{1,32})>/y;
 const RE_CUSTOM_EMOJI = /<(a)?:([a-zA-Z0-9_]{2,32}):(\d{1,32})>/y;
+const RE_SHORTCODE = /:([a-z0-9_+-]{1,60}):/y;
 const RE_TIMESTAMP = /<t:(-?\d{1,19})(?::([tTdDfFR]))?>/y;
 const RE_ANGLE_URL = /<(https?:\/\/[^\s>]+)>/iy;
 const RE_URL = /https?:\/\/[^\s<]+/iy;
@@ -317,6 +319,21 @@ function parseLine(line: string, depth: number): Node[] {
         out.push(node.node);
         i = node.end;
         continue;
+      }
+    }
+
+    // :shortcode: names, the ones people type everywhere else -----------------
+    if (c === ":") {
+      RE_SHORTCODE.lastIndex = i;
+      const m = RE_SHORTCODE.exec(line);
+      if (m) {
+        const emoji = shortcodeToEmoji(m[1]!);
+        if (emoji) {
+          flush();
+          out.push({ type: "unicodeEmoji", text: emoji });
+          i = RE_SHORTCODE.lastIndex;
+          continue;
+        }
       }
     }
 

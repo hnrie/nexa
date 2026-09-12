@@ -138,7 +138,18 @@ func (s *Server) handleFriendAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.emitRelationship(r, me, target)
-	WriteJSON(w, http.StatusOK, map[string]any{"type": "friend", "user": target.Public()})
+	// Becoming friends opens the conversation straight away, so neither of you
+	// has to go looking for a way to start it.
+	resp := map[string]any{"type": "friend", "user": target.Public()}
+	if ch, created, err := s.Store.CreateDM(r.Context(), me.ID, target.ID); err == nil {
+		if created {
+			s.Bcast.EmitUsers(ch.Recipients, "channel_create", ch)
+		} else if unhidden, err := s.Store.UnhideDM(r.Context(), ch.ID); err == nil && len(unhidden) > 0 {
+			s.Bcast.EmitUsers(unhidden, "channel_create", ch)
+		}
+		resp["channel"] = ch
+	}
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 func (s *Server) handleRelationshipDelete(w http.ResponseWriter, r *http.Request) {

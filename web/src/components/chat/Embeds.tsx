@@ -1,6 +1,8 @@
 import { Play, Star } from "lucide-react";
 import { useState } from "react";
 import type { UnfurlResult } from "@/api/types";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/common/Button";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Embeds.module.css";
@@ -100,9 +102,44 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
         if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
         if (e.type === "video") return imagePreviews ? <video key={i} className={s.videoDirect} src={e.url} controls preload="metadata" /> : null;
         if (e.type === "youtube") return <YouTubeEmbed key={i} e={e} />;
+        if (e.type === "invite") return <InviteEmbed key={i} e={e} />;
         if (e.title || e.description) return <LinkEmbed key={i} e={e} />;
         return null;
       })}
+    </div>
+  );
+}
+
+/** An invite to somewhere on this instance, with a way in. */
+function InviteEmbed({ e }: { e: UnfurlResult }) {
+  const nav = useNavigate();
+  const open = () => {
+    try {
+      const u = new URL(e.url, window.location.origin);
+      // Keep the fragment: it carries the key that unlocks the history.
+      if (u.origin === window.location.origin) nav(u.pathname + u.search + u.hash);
+      else window.open(e.url, "_blank", "noopener");
+    } catch {
+      window.open(e.url, "_blank", "noopener");
+    }
+  };
+  const members = typeof e.member_count === "number" ? `${e.member_count} member${e.member_count === 1 ? "" : "s"}` : "";
+  const online = typeof e.online_count === "number" && e.online_count > 0 ? `${e.online_count} online` : "";
+  return (
+    <div className={s.invite} data-testid="invite-embed">
+      <div className={s.inviteHead}>You have been invited to join</div>
+      <div className={s.inviteBody}>
+        {e.image ? (
+          <img className={s.inviteIcon} src={e.image} alt="" loading="lazy" />
+        ) : (
+          <span className={s.inviteIcon} data-blank="true">{(e.title ?? "?").slice(0, 1).toUpperCase()}</span>
+        )}
+        <div className={s.inviteText}>
+          <span className={s.inviteName}>{e.title}</span>
+          <span className={s.inviteSub}>{[online, members].filter(Boolean).join(" · ") || e.description}</span>
+        </div>
+        <Button size="sm" variant="positive" onClick={open} data-testid="invite-join">Join</Button>
+      </div>
     </div>
   );
 }

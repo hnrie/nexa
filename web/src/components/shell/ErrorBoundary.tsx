@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { reportCrash } from "@/lib/crashReport";
 import { storage } from "@/lib/storage";
 import s from "./ErrorBoundary.module.css";
 
@@ -39,6 +40,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("render crash", error, info.componentStack);
+    reportCrash({ kind: "render", message: `${error.name}: ${error.message}`, stack: error.stack ?? "", component: info.componentStack ?? "" });
     this.setState({ info: (info.componentStack ?? "").split("\n").slice(0, 8).join("\n") });
     const count = recentReloads();
     if (count < MAX_AUTO_RELOADS) {

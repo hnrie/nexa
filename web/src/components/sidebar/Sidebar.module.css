@@ -25,3 +25,8 @@
 .close { display: none; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-xs); color: var(--text-muted); flex: none; cursor: pointer; }
 .item:hover .close { display: flex; }
 .close:hover { color: var(--text-strong); background: var(--bg-active); }
+.subItem { display: flex; align-items: center; gap: 8px; width: calc(100% - 16px); margin-left: 16px; height: 30px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-muted); font-size: 14px; text-align: left; }
+.subItem:hover { background: var(--bg-hover); color: var(--text); }
+.subItem[data-selected="true"] { background: var(--bg-active); color: var(--text-strong); }
+.subItem[data-unread="true"] { color: var(--text-strong); font-weight: 600; }
+.item[data-parent-selected="true"] { background: var(--bg-hover); }

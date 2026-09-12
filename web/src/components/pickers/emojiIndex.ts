@@ -38,13 +38,26 @@ let byUnicode = new Map<string, EmojiEntry>();
 /** Loads the dataset once (separate chunk, ~700 KB before compression). */
 export function loadEmoji(): Promise<EmojiEntry[]> {
   if (loaded) return loaded;
-  loaded = Promise.all([import("emojibase-data/en/compact.json"), import("emojibase-data/en/shortcodes/emojibase.json")]).then(([data, sc]) => {
+  loaded = Promise.all([
+    import("emojibase-data/en/compact.json"),
+    // iamcal is the naming Slack and Discord use, so :heart_eyes: means here
+    // what it means everywhere else; emojibase's names stay searchable behind it
+    import("emojibase-data/en/shortcodes/iamcal.json"),
+    import("emojibase-data/en/shortcodes/emojibase.json"),
+  ]).then(([data, primary, secondary]) => {
     const list = (data.default as unknown as CompactEmoji[]).filter((e) => e.group !== undefined && e.group !== 2);
-    const codes = sc.default as unknown as Record<string, string | string[]>;
+    const first = primary.default as unknown as Record<string, string | string[]>;
+    const second = secondary.default as unknown as Record<string, string | string[]>;
+    const codes: Record<string, string[]> = {};
+    for (const [hex, raw] of Object.entries(first)) codes[hex] = Array.isArray(raw) ? [...raw] : [raw];
+    for (const [hex, raw] of Object.entries(second)) {
+      const extra = Array.isArray(raw) ? raw : [raw];
+      const have = codes[hex] ?? [];
+      codes[hex] = [...have, ...extra.filter((n) => !have.includes(n))];
+    }
     list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     all = list.map((e) => {
-      const raw = codes[e.hexcode];
-      const shortcodes = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+      const shortcodes = codes[e.hexcode] ?? [];
       const entry: EmojiEntry = { unicode: e.unicode, hexcode: e.hexcode, label: e.label, group: e.group ?? 0, tags: e.tags ?? [], shortcodes };
       if (e.skins?.length) entry.skins = e.skins.filter((s) => s.tone !== undefined).map((s) => ({ tone: s.tone as number | number[], unicode: s.unicode }));
       return entry;

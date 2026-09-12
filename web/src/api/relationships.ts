@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { PublicUser, Relationship, Snowflake } from "./types";
+import type { Channel, PublicUser, Relationship, Snowflake } from "./types";
 
 export const relationships = {
   list(): Promise<Relationship[]> {
@@ -8,7 +8,7 @@ export const relationships = {
   request(username: string): Promise<{ type: string; user: PublicUser }> {
     return api.request("POST", "/users/@me/relationships", { username });
   },
-  accept(id: Snowflake): Promise<{ type: string; user: PublicUser }> {
+  accept(id: Snowflake): Promise<{ type: string; user: PublicUser; channel?: Channel }> {
     return api.request("PUT", `/users/@me/relationships/${id}`);
   },
   remove(id: Snowflake): Promise<void> {

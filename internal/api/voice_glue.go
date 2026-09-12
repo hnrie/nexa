@@ -201,6 +201,9 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 
 // canJoinVoice checks channel type, membership, Connect, timeouts and the user limit.
 func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Channel) (bool, string, string) {
+	if ch.Type == "subchat" {
+		return false, "no_call", "A subchat has no call of its own. Use the conversation it belongs to."
+	}
 	if s.isDM(ch) {
 		for _, id := range ch.Recipients {
 			if id == me.ID {

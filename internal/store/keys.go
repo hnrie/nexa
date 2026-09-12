@@ -194,7 +194,7 @@ func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 	if err != nil {
 		return nil, err
 	}
-	if typ == "dm" || typ == "group_dm" {
+	if IsDMLike(typ) {
 		return s.Participants(ctx, conv)
 	}
 	if serverID.Valid {

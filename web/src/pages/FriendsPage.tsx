@@ -120,6 +120,11 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
     try {
       const res = await relApi.accept(rel.user.id);
       setRel({ user: res.user, type: "friend", nickname: rel.nickname, created_at: Date.now() });
+      // the server opens the conversation as part of accepting; go straight to it
+      if (res.channel) {
+        useChannels.getState().upsert([res.channel]);
+        nav(`/channels/@me/${res.channel.id}`);
+      }
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not accept.", "error");
     }

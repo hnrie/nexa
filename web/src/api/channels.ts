@@ -40,6 +40,13 @@ export const channels = {
     return api.request<void>("DELETE", `/channels/${id}/recipients/${uid}`);
   },
   /** Closes a DM for you; a new message brings it back. */
+  /** The side conversations of a DM or group. */
+  subchats(id: Snowflake): Promise<Channel[]> {
+    return api.request<Channel[]>("GET", `/channels/${id}/subchats`);
+  },
+  createSubchat(id: Snowflake, name: string): Promise<Channel> {
+    return api.request<Channel>("POST", `/channels/${id}/subchats`, { name });
+  },
   close(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${id}`);
   },

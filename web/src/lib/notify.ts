@@ -41,8 +41,11 @@ function onMessage(m: Message, mine: boolean): void {
   const mentioned = m.mention_everyone || m.mentions.includes(me.id);
   if (level === "mentions" && !mentioned) return;
   const ui = useUI.getState();
-  const visible = ui.activeChannelId === m.channel_id && ui.focused && document.visibilityState === "visible";
-  if (visible) return;
+  // Ask the browser rather than trusting a stored flag: a window can regain
+  // focus without firing the event we listen for, and a chat you are looking
+  // at should never make a noise.
+  const looking = ui.activeChannelId === m.channel_id && document.visibilityState === "visible" && document.hasFocus();
+  if (looking) return;
   const myPresence = usePresence.getState().byUser[me.id];
   if (myPresence?.status === "dnd") return;
   if (settings.notifications.sounds) playSound(mentioned ? "mention" : "message");

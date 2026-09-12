@@ -54,7 +54,7 @@ func (s *Server) channel(w http.ResponseWriter, r *http.Request, need string) (*
 
 // canAccess resolves access for any channel type.
 func (s *Server) canAccess(r *http.Request, u *store.User, ch *store.Channel, need string) (bool, error) {
-	if ch.Type == "dm" || ch.Type == "group_dm" {
+	if store.IsDMLike(ch.Type) {
 		for _, id := range ch.Recipients {
 			if id == u.ID {
 				return true, nil
@@ -68,4 +68,9 @@ func (s *Server) canAccess(r *http.Request, u *store.User, ch *store.Channel, ne
 	return false, nil
 }
 
-func (s *Server) isDM(ch *store.Channel) bool { return ch.Type == "dm" || ch.Type == "group_dm" }
+// isDM covers every conversation that is not part of a server, subchats
+// included: they share the same membership rules.
+func (s *Server) isDM(ch *store.Channel) bool { return store.IsDMLike(ch.Type) }
+
+// isCallable excludes subchats, which ride on their parent's call.
+func (s *Server) isCallable(ch *store.Channel) bool { return ch.Type == "dm" || ch.Type == "group_dm" }

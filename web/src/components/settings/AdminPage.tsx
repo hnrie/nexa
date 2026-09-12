@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { admin as adminApi } from "@/api/admin";
+import { admin as adminApi, type ClientErrorReport } from "@/api/admin";
 import { ApiError } from "@/api/client";
 import type { AdminSettings, AdminStats, AdminUser } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -128,6 +128,54 @@ export default function AdminPage() {
               <Button size="sm" variant={u.disabled ? "positive" : "danger"} disabled={busy === u.id} onClick={() => (u.disabled ? void patchUser(u, { disabled: false }) : openModal("confirm", { title: `Disable @${u.username}`, body: "They are logged out everywhere and cannot log in until re-enabled. Their messages stay.", confirmLabel: "Disable", danger: true, onConfirm: () => patchUser(u, { disabled: true }) }))}>{u.disabled ? "Enable" : "Disable"}</Button>
             </div>
           ) : <span className={s.memberSub}>you</span>}
+        </div>
+      ))}
+      <CrashLog />
+    </>
+  );
+}
+
+/** What has been breaking, for whoever runs this instance. */
+function CrashLog() {
+  const [list, setList] = useState<ClientErrorReport[] | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const toast = useUI((u) => u.toast);
+  const load = () => adminApi.errors(100).then(setList).catch(() => setList([]));
+  useEffect(() => {
+    void load();
+  }, []);
+  const clear = async () => {
+    try {
+      await adminApi.clearErrors();
+      setList([]);
+      toast("Crash log cleared.", "success");
+    } catch {
+      toast("Could not clear the log.", "error");
+    }
+  };
+  return (
+    <>
+      <h5 className={st.h5}>Crashes</h5>
+      <p className={st.hint}>
+        What the app reported from people's browsers: the error, where in the code it happened and which build it was. Nothing from a conversation is sent. The newest {list?.length ?? 0} are kept.
+      </p>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <Button size="sm" variant="secondary" onClick={() => void load()}>Refresh</Button>
+        {list?.length ? <Button size="sm" variant="danger" onClick={() => void clear()}>Clear</Button> : null}
+      </div>
+      {list === null ? <Spinner /> : null}
+      {list?.length === 0 ? <p className={st.hint}>Nothing has crashed. Good.</p> : null}
+      {list?.map((e) => (
+        <div key={e.id} className={s.memberRow} style={{ alignItems: "flex-start", cursor: "pointer" }} onClick={() => setOpen(open === e.id ? null : e.id)}>
+          <div className={s.memberText}>
+            <span className={s.memberName} style={{ color: "var(--danger)" }}>{e.message}</span>
+            <span className={s.memberSub}>{e.kind} · {e.path || "/"} · build {e.version || "unknown"} · {formatFull(e.created_at)}</span>
+            {open === e.id ? (
+              <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 11, lineHeight: 1.5, color: "var(--text-muted)", margin: "8px 0 0", maxHeight: 260, overflow: "auto" }}>
+                {e.stack || "(no stack)"}{e.component ? `\n\ncomponents:${e.component}` : ""}{`\n\n${e.user_agent}`}
+              </pre>
+            ) : null}
+          </div>
         </div>
       ))}
     </>

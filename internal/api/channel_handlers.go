@@ -171,6 +171,10 @@ func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
 		s.ServerChannelPatch(w, r, ch, me)
 		return
 	}
+	if ch.Type == "subchat" {
+		s.handleSubchatPatch(w, r, ch, me)
+		return
+	}
 	if ch.Type != "group_dm" {
 		WriteError(w, E(http.StatusBadRequest, "not_group", "Only group DMs can be edited."))
 		return

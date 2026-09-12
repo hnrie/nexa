@@ -11,6 +11,13 @@ import (
 
 const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at`
 
+// MaxSubchats caps how many side conversations one DM can carry.
+const MaxSubchats = 50
+
+// IsDMLike reports whether a channel type is a conversation between people
+// rather than part of a server: a DM, a group, or a subchat inside one.
+func IsDMLike(t string) bool { return t == "dm" || t == "group_dm" || t == "subchat" }
+
 func scanChannel(r rowScanner) (*Channel, error) {
 	var c Channel
 	var server, parent, owner, icon, last sql.NullInt64
@@ -109,7 +116,7 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 	if err != nil {
 		return nil, err
 	}
-	if c.Type == "dm" || c.Type == "group_dm" {
+	if IsDMLike(c.Type) {
 		if c.Recipients, err = s.Participants(ctx, c.ID); err != nil {
 			return nil, err
 		}
@@ -133,7 +140,7 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 
 // DMChannelsForUser lists the DMs and group DMs the user is in.
 func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels c WHERE c.type IN ('dm','group_dm') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ? AND p.hidden = 0) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels c WHERE c.type IN ('dm','group_dm','subchat') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ? AND p.hidden = 0) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -175,6 +182,61 @@ func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, 
 		}
 	}
 	return out, prow.Err()
+}
+
+// CreateSubchat opens a side conversation inside a DM or group, with the same
+// people in it. It gets its own key conversation, so its messages are sealed
+// separately from the parent's.
+func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID, name string) (*Channel, error) {
+	ch := &Channel{Type: "subchat", Name: name, ParentID: &parent.ID, OwnerID: &owner}
+	err := s.Tx(ctx, func(tx *sql.Tx) error {
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM channels WHERE parent_id = ? AND type = 'subchat'`, int64(parent.ID)).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxSubchats {
+			return ErrTooMany
+		}
+		if err := s.insertChannel(ctx, tx, ch); err != nil {
+			return err
+		}
+		now := nowMs()
+		for _, uid := range parent.Recipients {
+			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dm_participants (channel_id, user_id, added_by, added_at, hidden) VALUES (?,?,?,?,0)`,
+				int64(ch.ID), int64(uid), int64(owner), now); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	ch.Recipients = append([]ids.ID{}, parent.Recipients...)
+	ch.KeyConvID = ch.ID
+	return ch, nil
+}
+
+// SubchatsFor lists the side conversations of one DM, newest activity first.
+func (s *Store) SubchatsFor(ctx context.Context, parentID ids.ID) ([]*Channel, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels WHERE parent_id = ? AND type = 'subchat' ORDER BY coalesce(last_message_id, id) DESC`, int64(parentID))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Channel{}
+	for rows.Next() {
+		c, err := scanChannel(rows)
+		if err != nil {
+			return nil, err
+		}
+		c.KeyConvID = c.ID
+		if c.Recipients, err = s.Participants(ctx, c.ID); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
 }
 
 // IsParticipant reports whether uid is in the DM channel.

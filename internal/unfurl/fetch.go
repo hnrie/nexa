@@ -46,6 +46,11 @@ type Result struct {
 	VideoID     string `json:"video_id,omitempty"`
 	Mime        string `json:"mime,omitempty"`
 	Color       string `json:"color,omitempty"`
+	// InviteCode is set when the link is an invite to this instance, so the
+	// client can offer to join instead of opening a page.
+	InviteCode  string `json:"invite_code,omitempty"`
+	MemberCount int    `json:"member_count,omitempty"`
+	OnlineCount int    `json:"online_count,omitempty"`
 }
 
 // Fetcher fetches previews with SSRF protection.

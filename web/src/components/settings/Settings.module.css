@@ -17,7 +17,7 @@
 .title { margin: 0 0 20px; font-size: 20px; font-weight: 600; color: var(--text-strong); }
 .h5 { margin: 24px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
 .card { background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
-.cardBanner { height: 100px; background: var(--brand); background-size: cover; background-position: center; }
+.cardBanner { aspect-ratio: 5 / 2; background: var(--brand); background-size: cover; background-position: center; }
 .cardHead { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 0 16px 16px 120px; min-height: 70px; }
 .cardAvatar { position: absolute; left: 16px; top: -40px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); }
 .cardName { font-size: 20px; font-weight: 600; color: var(--text-strong); padding-top: 16px; }
@@ -35,7 +35,7 @@
 .twoCol { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
 .preview { align-self: start; position: sticky; top: 60px; }
 .uploadRow { display: flex; align-items: center; gap: 12px; }
-.bannerPick { height: 100px; border-radius: var(--radius-sm); background: var(--brand); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 8px; }
+.bannerPick { aspect-ratio: 5 / 2; border-radius: var(--radius-sm); background: var(--brand); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 8px; }
 .themePreview { height: 56px; border-radius: var(--radius-sm); margin-top: 12px; }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .swatch { width: 40px; height: 40px; border-radius: var(--radius-xs); border: 2px solid transparent; position: relative; }
@@ -78,3 +78,6 @@
   .twoCol { grid-template-columns: 1fr; }
   .preview { position: static; }
 }
+.hex { width: 88px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); border: 1px solid transparent; font-family: var(--font-mono); font-size: 13px; text-transform: lowercase; }
+.hex:focus { border-color: var(--brand); outline: none; }
+.hex:disabled { opacity: 0.4; }

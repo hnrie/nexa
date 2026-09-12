@@ -1,11 +1,11 @@
-import { Plus, Users, X } from "lucide-react";
+import { MessageCircle, Plus, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { UserPanel } from "@/components/shell/UserPanel";
 import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
-import { selectDMs, useChannels } from "@/stores/channels";
+import { selectDMs, selectSubchats, useChannels } from "@/stores/channels";
 import { customStatus, statusOf, usePresence } from "@/stores/presence";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI } from "@/stores/ui";
@@ -13,6 +13,7 @@ import { useUsers } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
 import { useMemo } from "react";
 import { iconUrl } from "@/api/users";
+import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { closeDM, dmMenuItems } from "./dmMenu";
 import s from "./Sidebar.module.css";
 
@@ -31,6 +32,10 @@ export function DMSidebar() {
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const dms = selectDMs(channels);
   const active = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
+  // A subchat keeps its conversation highlighted, with its siblings listed
+  // underneath, so you can see where you are.
+  const activeChannel = active ? channels[active] : undefined;
+  const activeConvo = activeChannel?.type === "subchat" ? (activeChannel.parent_id ?? undefined) : active;
 
   return (
     <div className={s.sidebar}>
@@ -67,11 +72,13 @@ export function DMSidebar() {
             const url = iconUrl(ch.icon_id);
             avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} /> : <span className={s.groupIcon}><Users size={18} /></span>;
           }
+          const subs = activeConvo === ch.id ? selectSubchats(channels, ch.id) : [];
           return (
+            <div key={ch.id}>
             <button
-              key={ch.id}
               className={s.item}
               data-selected={active === ch.id}
+              data-parent-selected={activeConvo === ch.id && active !== ch.id}
               data-unread={unread && active !== ch.id}
               data-channel={ch.id}
               onClick={() => nav(`/channels/@me/${ch.id}`)}
@@ -100,6 +107,28 @@ export function DMSidebar() {
                 <X size={16} />
               </span>
             </button>
+            {subs.map((sub) => {
+              const srs = reads[sub.id];
+              return (
+                <button
+                  key={sub.id}
+                  className={s.subItem}
+                  data-selected={active === sub.id}
+                  data-unread={isUnread(srs, sub.last_message_id) && active !== sub.id}
+                  data-channel={sub.id}
+                  onClick={() => nav(`/channels/@me/${sub.id}`)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    openContextMenu({ x: e.clientX, y: e.clientY, items: subchatMenuItems(sub, { openModal, nav }) });
+                  }}
+                >
+                  <MessageCircle size={15} />
+                  <span className={s.name}>{sub.name}</span>
+                  {(srs?.mentions ?? 0) > 0 ? <span className={s.mention}>{srs?.mentions}</span> : null}
+                </button>
+              );
+            })}
+            </div>
           );
         })}
       </div>

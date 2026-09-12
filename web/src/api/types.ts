@@ -56,7 +56,7 @@ export interface Session {
 export interface Channel {
   id: Snowflake;
   server_id: Snowflake | null;
-  type: "text" | "voice" | "category" | "dm" | "group_dm";
+  type: "text" | "voice" | "category" | "dm" | "group_dm" | "subchat";
   name: string;
   topic: string;
   position: number;
@@ -426,7 +426,7 @@ export interface ReadyPayload {
 
 export interface UnfurlResult {
   url: string;
-  type: "link" | "image" | "gif" | "video" | "youtube";
+  type: "link" | "image" | "gif" | "video" | "youtube" | "invite";
   title?: string;
   description?: string;
   site_name?: string;
@@ -436,6 +436,10 @@ export interface UnfurlResult {
   video_id?: string;
   mime?: string;
   color?: string;
+  /** Set when the link invites you somewhere on this instance. */
+  invite_code?: string;
+  member_count?: number;
+  online_count?: number;
 }
 
 export interface KdfParamsJson {

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
+import { ensureShortcodes, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import type { Node, RenderCtx } from "./ast";
 import { parse } from "./parse";
 
@@ -15,8 +16,23 @@ import { parse } from "./parse";
 /** Renders a raw message. `parse` is memoised on the source and the mode. */
 export function Markdown(props: { source: string; ctx: RenderCtx; inline?: boolean; jumbo?: boolean }): JSX.Element {
   const { source, ctx, inline, jumbo } = props;
-  const nodes = useMemo(() => parse(source, { inline: inline === true }), [source, inline]);
+  // `:shortcode:` names need a table that arrives on demand; once it does,
+  // everything already on screen parses again and the names turn into emoji.
+  const codes = useShortcodes(source);
+  const nodes = useMemo(() => parse(source, { inline: inline === true }), [source, inline, codes]);
   return <RenderNodes nodes={nodes} ctx={ctx} jumbo={jumbo} />;
+}
+
+/** Loads the shortcode table when some text might need it, and re-renders once it lands. */
+function useShortcodes(source: string): number {
+  const [version, setVersion] = useState(() => shortcodeVersion());
+  const wants = source.includes(":");
+  useEffect(() => {
+    if (!wants || shortcodesReady()) return;
+    ensureShortcodes();
+    return onShortcodesReady(() => setVersion(shortcodeVersion()));
+  }, [wants]);
+  return version;
 }
 
 /** Renders an already parsed list of nodes. */

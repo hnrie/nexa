@@ -26,6 +26,7 @@ import { Autocomplete, type AcItem } from "./Autocomplete";
 import { COMMANDS, applyCommand } from "./commands";
 import { sendMessage, type SendOptions } from "./send";
 import { useAutosize } from "./useAutosize";
+import type { RefObject } from "react";
 import s from "./Composer.module.css";
 
 const MAX_LEN = 4000;
@@ -120,6 +121,7 @@ export function Composer({ channel }: { channel: Channel }) {
     return () => window.removeEventListener("ec:insert-text", onInsert);
   });
   useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
+  useKeepFocused(taRef);
 
   const name = channelDisplayName(channel, users, me?.id);
   const placeholder = channel.type === "dm" ? `Message @${name}` : isServer ? `Message #${name}` : `Message ${name}`;
@@ -404,4 +406,55 @@ export function Composer({ channel }: { channel: Channel }) {
       ) : null}
     </div>
   );
+}
+
+/** True for anything that wants the keyboard for itself. */
+function wantsKeyboard(el: Element | null): boolean {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (el as HTMLElement).isContentEditable;
+}
+
+/** Somewhere else on the page is holding the keyboard on purpose. */
+function inOwnLayer(el: Element | null): boolean {
+  return !!el?.closest("[role=dialog], [data-modal-layer], [role=menu], [role=listbox]");
+}
+
+/**
+ * Keeps the message box ready to type in. Clicking around the app puts the
+ * caret back, and a key pressed with nothing else focused lands in the box
+ * rather than nowhere. Another text field, a dialog or a picker keeps what it
+ * takes until you click away from it.
+ */
+function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>): void {
+  useEffect(() => {
+    // On a touch screen this would summon the keyboard over and over.
+    if (typeof window === "undefined" || !window.matchMedia?.("(pointer: fine)").matches) return;
+    const focus = () => {
+      const ta = ref.current;
+      if (!ta || ta.disabled || document.activeElement === ta) return;
+      ta.focus({ preventScroll: true });
+    };
+    const onPointerUp = (e: globalThis.PointerEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as Element | null;
+      if (wantsKeyboard(target) || inOwnLayer(target)) return;
+      if (document.getSelection()?.toString()) return;
+      if (wantsKeyboard(document.activeElement) && inOwnLayer(document.activeElement)) return;
+      focus();
+    };
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length !== 1 && e.key !== "Backspace") return;
+      if (wantsKeyboard(document.activeElement) || inOwnLayer(document.activeElement)) return;
+      if (document.querySelector("[role=dialog], [data-modal-layer]")) return;
+      focus();
+    };
+    document.addEventListener("pointerup", onPointerUp);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [ref]);
 }

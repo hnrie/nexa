@@ -250,7 +250,7 @@ func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) er
 		return err
 	}
 	args := append([]any{int64(forUser)}, idArgs(list)...)
-	rrows, err := s.db.R.QueryContext(ctx, `SELECT message_id, emoji, count(*), max(user_id = ?) FROM reactions WHERE message_id IN (`+ph+`) GROUP BY message_id, emoji ORDER BY min(created_at)`, args...)
+	rrows, err := s.db.R.QueryContext(ctx, `SELECT message_id, emoji, count(*), max(user_id = ?) FROM reactions WHERE message_id IN (`+ph+`) GROUP BY message_id, emoji ORDER BY min(created_at), min(rowid)`, args...)
 	if err != nil {
 		return err
 	}
@@ -352,7 +352,7 @@ func (s *Store) Reactors(ctx context.Context, msgID ids.ID, emoji string, limit 
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
-	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM reactions WHERE message_id = ? AND emoji = ? ORDER BY created_at LIMIT ?`, int64(msgID), emoji, limit)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM reactions WHERE message_id = ? AND emoji = ? ORDER BY created_at, rowid LIMIT ?`, int64(msgID), emoji, limit)
 	if err != nil {
 		return nil, err
 	}

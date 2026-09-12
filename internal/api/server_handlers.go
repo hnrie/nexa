@@ -699,6 +699,14 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 		WriteError(w, ErrNotFound)
 		return
 	}
+	if ch.Type == "subchat" {
+		if !hasID(ch.Recipients, me.ID) {
+			WriteError(w, ErrNotFound)
+			return
+		}
+		s.handleSubchatDelete(w, r, ch, me)
+		return
+	}
 	if s.isDM(ch) {
 		// the same verb closes or deletes a conversation
 		s.handleDMDelete(w, r)

@@ -8,6 +8,7 @@ import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { useRelationships } from "@/stores/relationships";
 import { useUsers, displayName } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
@@ -84,6 +85,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const color = serverState ? memberColor(serverState, msg.author_id) : undefined;
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const friendNickname = useRelationships((r) => r.byUser[msg.author_id]?.nickname);
   const row = useRef<HTMLDivElement>(null);
   const [tuck, setTuck] = useState(false);
   // The toolbar normally hangs above the row, into the gap between messages.
@@ -123,7 +125,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   if (msg.type.startsWith("system_")) return <SystemMessage msg={msg} />;
 
   const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : "Unknown User");
-  const name = member?.nickname || baseName;
+  // A nickname you gave a friend applies everywhere their name appears, not
+  // just in the sidebar; a server nickname wins inside that server.
+  const name = member?.nickname || friendNickname || baseName;
   const isReply = !!msg.reply_to_id;
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
 

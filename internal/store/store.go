@@ -18,6 +18,7 @@ var (
 	ErrUsernameTaken = errors.New("username taken")
 	ErrConflict      = errors.New("conflict")
 	ErrAlreadyExists = errors.New("already exists")
+	ErrTooMany       = errors.New("too many")
 )
 
 // Store wraps the database pools.

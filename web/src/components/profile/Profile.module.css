@@ -1,5 +1,5 @@
 .card { width: 600px; max-width: 100%; background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
-.banner { height: 120px; background: var(--brand); background-size: cover; background-position: center; }
+.banner { aspect-ratio: 5 / 2; background: var(--brand); background-size: cover; background-position: center; }
 .head { position: relative; padding: 0 16px 12px; }
 .avatar { position: absolute; top: -50px; left: 16px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); }
 .actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; min-height: 52px; }

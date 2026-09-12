@@ -147,6 +147,12 @@ class Session:
         row = p.locator(f"div:has(> div > span:has-text('{display}'))").first
         p.wait_for_selector("button[aria-label=Accept]", timeout=15000)
         p.click("button[aria-label=Accept]")
+        # accepting opens the new conversation, so come back for the list
+        for _ in range(20):
+            p.wait_for_timeout(300)
+            if "/channels/@me/" in p.url:
+                break
+        p.goto(self.base + "/channels/@me", wait_until="networkidle")
         p.click("button:has-text('All')")
         p.wait_for_selector(f"text={display}", timeout=15000)
         _ = row
@@ -175,7 +181,11 @@ class Session:
         box = self.composer()
         box.wait_for(timeout=15000)
         box.fill(text)
-        box.press("Enter")
+        # a phone keyboard's Enter makes a new line, so it has a send button
+        if self.page.viewport_size["width"] < 768:
+            self.page.click("button[aria-label='Send message']")
+        else:
+            box.press("Enter")
 
     def wait_text(self, text, timeout=20000):
         self.page.wait_for_selector(f"text={text}", timeout=timeout)
@@ -742,7 +752,6 @@ def main():
             # carol on a phone opens a DM with alice and sends from mobile
             phone.open_dm_with("Alice")
             phone.send("yo from the phone")
-            phone.page.locator("button[aria-label='Send message']").click()
             phone.page.wait_for_selector("text=yo from the phone", timeout=20000)
             alice.open_dm_from_sidebar("Carol")
             alice.page.wait_for_selector("text=yo from the phone", timeout=20000)

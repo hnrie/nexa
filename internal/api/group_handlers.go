@@ -30,7 +30,7 @@ func (s *Server) dmChannel(w http.ResponseWriter, r *http.Request) (*store.Chann
 		return nil, nil
 	}
 	ch, err := s.Store.ChannelByID(r.Context(), id)
-	if err != nil || !s.isDM(ch) || !hasID(ch.Recipients, me.ID) {
+	if err != nil || !s.isCallable(ch) || !hasID(ch.Recipients, me.ID) {
 		WriteError(w, ErrNotFound)
 		return nil, nil
 	}

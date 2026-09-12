@@ -12,6 +12,7 @@ import { useReadStates } from "@/stores/readStates";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import s from "./Chat.module.css";
 
@@ -58,6 +59,7 @@ function pendingToMessage(p: PendingMessage): DecryptedMessage {
 export function MessageList({ channel }: { channel: Channel }) {
   const me = useAuth((a) => a.me);
   const users = useUsers((u) => u.byId);
+  const byIdChannels = useChannels((c) => c.byId);
   const state = useMessages((m) => m.channels[channel.id]);
   const loadOlder = useMessages((m) => m.loadOlder);
   const loadInitial = useMessages((m) => m.loadInitial);
@@ -113,15 +115,26 @@ export function MessageList({ channel }: { channel: Channel }) {
 
   const newest = ids[ids.length - 1];
   const prevNewest = useRef<string | undefined>(undefined);
+  const prevPending = useRef(0);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (prepend.current) {
-      el.scrollTop = el.scrollHeight - prepend.current.height + prepend.current.top;
+    const pre = prepend.current;
+    if (pre) {
       prepend.current = null;
-      return;
+      const grew = el.scrollHeight - pre.height;
+      // Only hold the reading position when older messages really did arrive.
+      // The list can change height for other reasons, and treating that as a
+      // prepend would throw the reader back up to where the page begins.
+      if (grew > 0) {
+        el.scrollTop = pre.top + grew;
+        return;
+      }
     }
+    // Your own message always gets shown, wherever you were reading.
+    if (pending.length > prevPending.current) atBottom.current = true;
+    prevPending.current = pending.length;
     if (atBottom.current) {
       el.scrollTop = el.scrollHeight;
       setNewBelow(false);
@@ -129,7 +142,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       setNewBelow(true);
     }
     prevNewest.current = newest;
-  }, [rows, newest, byId, me?.id]);
+  }, [rows, newest, byId, me?.id, pending.length]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -137,7 +150,11 @@ export function MessageList({ channel }: { channel: Channel }) {
     const ro = new ResizeObserver(() => {
       if (atBottom.current) el.scrollTop = el.scrollHeight;
     });
-    ro.observe(el.firstElementChild ?? el);
+    // Watch the list itself as well as its contents: the composer growing a
+    // line shrinks this box without changing what is in it, and the newest
+    // message would otherwise slide out of sight behind the box.
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    ro.observe(el);
     return () => ro.disconnect();
   }, [channel.id]);
 
@@ -199,13 +216,23 @@ export function MessageList({ channel }: { channel: Channel }) {
         </div>
       );
     }
+    if (channel.type === "subchat") {
+      const parent = channel.parent_id ? byIdChannels[channel.parent_id] : undefined;
+      const where = parent ? channelDisplayName(parent, users, me?.id) : "this conversation";
+      return (
+        <div className={s.empty}>
+          <h2 className={s.emptyName}>{name}</h2>
+          <p className={s.emptyText}>A subchat inside <b>{where}</b>, for everyone already in it. It has its own key, so what is said here is encrypted separately.</p>
+        </div>
+      );
+    }
     return (
       <div className={s.empty}>
         <h2 className={s.emptyName}>{channel.server_id ? `Welcome to #${name}!` : name}</h2>
         <p className={s.emptyText}>{channel.server_id ? <>This is the start of the <b>#{name}</b> channel.{channel.topic ? ` ${channel.topic}` : ""}</> : <>Welcome to the beginning of the <b>{name}</b> group.</>} Messages here are end-to-end encrypted.</p>
       </div>
     );
-  }, [channel, users, me?.id]);
+  }, [channel, users, me?.id, byIdChannels]);
 
   useEffect(() => {
     if (!loaded && !loading) void loadInitial(channel.id);

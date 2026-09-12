@@ -240,7 +240,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
               <button className={s.ctl} data-on={!!localVideo} aria-label="Camera" onClick={() => void toggleCamera()}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</button>
             </Tooltip>
             <Tooltip text={localScreen ? "Stop sharing" : "Share your screen"} side="top">
-              <button className={s.ctl} data-on={!!localScreen} aria-label="Share screen" onClick={() => void toggleScreen()}>{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</button>
+              <button className={s.ctl} data-on={!!localScreen} aria-label={localScreen ? "Stop sharing your screen" : "Share your screen"} data-testid="screen-share" onClick={() => void toggleScreen()}>{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</button>
             </Tooltip>
             <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
               <button className={s.ctl} aria-label="Full screen" onClick={() => toggleFull()}>{full ? <Minimize2 size={22} /> : <Maximize2 size={22} />}</button>

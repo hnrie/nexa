@@ -72,9 +72,24 @@ export function channelTree(byId: Record<string, Channel>, serverId: string): Ch
 
 /** DM and group DM channels, most recent activity first. */
 export function selectDMs(byId: Record<string, Channel>): Channel[] {
+  // subchats are listed under the conversation they belong to, not beside it
   return Object.values(byId)
     .filter((c) => c.type === "dm" || c.type === "group_dm")
     .sort((a, b) => compareIds(b.last_message_id ?? b.id, a.last_message_id ?? a.id));
+}
+
+/** The side conversations inside one DM or group, newest activity first. */
+export function selectSubchats(byId: Record<string, Channel>, parentId: string | undefined): Channel[] {
+  if (!parentId) return [];
+  return Object.values(byId)
+    .filter((c) => c.type === "subchat" && c.parent_id === parentId)
+    .sort((a, b) => compareIds(b.last_message_id ?? b.id, a.last_message_id ?? a.id));
+}
+
+/** The conversation a channel belongs to: itself, or a subchat's parent. */
+export function conversationOf(byId: Record<string, Channel>, ch: Channel | undefined): Channel | undefined {
+  if (!ch) return undefined;
+  return ch.type === "subchat" && ch.parent_id ? byId[ch.parent_id] : ch;
 }
 
 /** The other participant of a 1:1 DM. */

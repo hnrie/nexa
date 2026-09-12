@@ -126,6 +126,7 @@ export default function ProfilePage() {
               <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} style={{ background: accent && !PRESETS.includes(accent) ? accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }} title="Custom">
                 <input type="color" value={accent ?? "#5865f2"} onChange={(e) => setAccent(e.target.value)} />
               </label>
+              <HexInput value={accent} fallback="#5865f2" label="Primary colour hex" onChange={setAccent} />
             </div>
             <p className={s.hint} style={{ margin: "12px 0 6px" }}>Second colour — set one to make the banner a gradient</p>
             <div className={s.swatches}>
@@ -134,6 +135,7 @@ export default function ProfilePage() {
               <label className={s.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ background: accent2 && !PRESETS.includes(accent2) ? accent2 : "linear-gradient(135deg,#f00,#0f0,#00f)", opacity: accent ? 1 : 0.4 }} title="Custom">
                 <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} onChange={(e) => setAccent2(e.target.value)} />
               </label>
+              <HexInput value={accent2} fallback="#eb459e" label="Second colour hex" disabled={!accent} onChange={setAccent2} />
             </div>
             <div className={s.themePreview} style={{ background: themeCss }} aria-hidden="true" />
           </div>
@@ -179,5 +181,44 @@ export default function ProfilePage() {
         </div>
       ) : null}
     </>
+  );
+}
+
+/** A hex field for people who know the colour they want. */
+function HexInput({ value, fallback, label, disabled, onChange }: { value: string | null; fallback: string; label: string; disabled?: boolean; onChange: (v: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? value ?? "";
+  const commit = (raw: string) => {
+    const hex = raw.trim().replace(/^#?/, "#").toLowerCase();
+    const short = /^#([0-9a-f]{3})$/.exec(hex);
+    const full = /^#([0-9a-f]{6})$/.exec(hex);
+    if (short) {
+      const [r, g, b] = short[1]!.split("");
+      onChange(`#${r}${r}${g}${g}${b}${b}`);
+    } else if (full) {
+      onChange(hex);
+    }
+    setDraft(null);
+  };
+  return (
+    <input
+      className={s.hex}
+      value={shown}
+      disabled={disabled}
+      spellCheck={false}
+      maxLength={7}
+      placeholder={fallback}
+      aria-label={label}
+      data-testid={label.startsWith("Primary") ? "accent-hex" : "accent2-hex"}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={(e) => commit(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit(e.currentTarget.value);
+          e.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
