@@ -44,7 +44,8 @@ export interface AttachmentMeta {
 export interface MessagePayload {
   t?: string;
   att?: AttachmentMeta[];
-  sticker?: { id: string };
+  /** A sticker reference: enough to render it without owning the pack. */
+  sticker?: { id: string; blob?: string; name?: string; w?: number; h?: number; animated?: boolean };
   embeds?: unknown[];
   flags?: number;
 }

@@ -4,6 +4,7 @@ import { messages as messagesApi } from "@/api/messages";
 import { emojiUrl } from "@/api/users";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { useAuth } from "@/stores/auth";
+import { emojiReactionKey } from "@/stores/expressions";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
@@ -67,7 +68,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
       {msg.reactions.length > 0 ? (
         <button className={s.addReact} aria-label="Add reaction" onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={16} /></button>
       ) : null}
-      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, e.unicode); }} /> : null}
+      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, e.custom ? emojiReactionKey(e.custom) : e.unicode); }} /> : null}
     </div>
   );
 }

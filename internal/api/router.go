@@ -84,12 +84,12 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 	return &Server{
 		Cfg: cfg, Store: st, Log: log, Bcast: bc, Version: "dev", Secret: secret,
 		Auth:       &auth.Authenticator{Store: st, TTL: cfg.SessionTTL},
-		limGeneric: ratelimit.New(ratelimit.Every(60, time.Minute), 60, 10*time.Minute),
+		limGeneric: ratelimit.New(ratelimit.Every(600, time.Minute), 300, 10*time.Minute),
 		limAuthIP:  ratelimit.New(ratelimit.Every(20, time.Minute), 20, 10*time.Minute),
 		limAuthUsr: ratelimit.New(ratelimit.Every(5, time.Minute), 5, 10*time.Minute),
 		limReg:     ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
 		limMsg:     ratelimit.New(ratelimit.Every(5, 5*time.Second), 5, 5*time.Minute),
-		limUpload:  ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
+		limUpload:  ratelimit.New(ratelimit.Every(60, time.Minute), 60, time.Hour),
 	}
 }
 

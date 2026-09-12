@@ -13,6 +13,8 @@ interface Props {
   stickers?: React.ReactNode;
   /** When given, the picker is portalled to the body and placed next to this rect. */
   anchor?: DOMRect | null;
+  /** The server whose custom emoji lead the list. */
+  serverId?: string | null | undefined;
 }
 
 const W = 498;
@@ -30,7 +32,7 @@ function anchoredStyle(a: DOMRect): CSSProperties {
 }
 
 /** Tabbed popover above the composer (or anchored anywhere); closes on outside click or Escape. */
-export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null }: Props) {
+export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId }: Props) {
   const [active, setActive] = useState<PickerTab>(tab);
   const ref = useRef<HTMLDivElement>(null);
   const mobile = typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches;
@@ -58,7 +60,7 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
         <button className={s.tab} data-selected={active === "sticker"} disabled={!stickers} onClick={() => setActive("sticker")}>Stickers</button>
         <button className={s.tab} data-selected={active === "emoji"} onClick={() => setActive("emoji")}>Emoji</button>
       </div>
-      {active === "emoji" ? <EmojiPicker onPick={onEmoji} /> : active === "gif" ? gifs : stickers}
+      {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} /> : active === "gif" ? gifs : stickers}
     </div>
   );
   return anchor ? createPortal(body, document.body) : body;

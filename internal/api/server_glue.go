@@ -177,6 +177,12 @@ func (s *Server) WireServers(hub *gateway.Hub) {
 		if err != nil {
 			return err
 		}
+		if p.Emojis, err = s.Store.EmojisForUser(ctx, u.ID); err != nil {
+			return err
+		}
+		if p.StickerPacks, err = s.Store.PacksForUser(ctx, u.ID); err != nil {
+			return err
+		}
 		seen := map[ids.ID]bool{u.ID: true}
 		for _, usr := range p.Users {
 			seen[usr.ID] = true

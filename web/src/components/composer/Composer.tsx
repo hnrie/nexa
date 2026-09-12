@@ -14,7 +14,9 @@ import { canI, useServers } from "@/stores/servers";
 import { slowmodeRemaining, useSlowmode } from "@/stores/slowmode";
 import { P } from "@/lib/perms";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
-import { GifFavorites } from "@/components/pickers/GifFavorites";
+import { GifPicker } from "@/components/pickers/GifPicker";
+import { StickerPicker } from "@/components/pickers/StickerPicker";
+import { emojiToken, searchCustomEmoji, useExpressions } from "@/stores/expressions";
 import { unfurl as unfurlApi } from "@/api/unfurl";
 import type { UnfurlResult } from "@/api/types";
 import { extractUrls } from "@/markdown";
@@ -158,7 +160,8 @@ export function Composer({ channel }: { channel: Channel }) {
       if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: "Notify everyone online in this channel" });
     } else if (tok.kind === "emoji") {
       if (!emojiLoaded()) void loadEmoji().then(() => refreshAc(value, caret));
-      items = searchEmoji(tok.query, 8).map((e) => ({ kind: "emoji", entry: e }));
+      const custom = searchCustomEmoji(useExpressions.getState().emojis, tok.query, 4).map((e) => ({ kind: "customEmoji" as const, emoji: e }));
+      items = [...custom, ...searchEmoji(tok.query, 8 - custom.length).map((e) => ({ kind: "emoji" as const, entry: e }))];
     } else {
       items = COMMANDS.filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
     }
@@ -199,6 +202,7 @@ export function Composer({ channel }: { channel: Channel }) {
     if (it.kind === "user") insertAt(ac.start, caret, `@${it.user.username} `);
     else if (it.kind === "command" && ac.kind === "user") insertAt(ac.start, caret, `@${it.name} `);
     else if (it.kind === "emoji") insertAt(ac.start, caret, `${withTone(it.entry, tone)} `);
+    else if (it.kind === "customEmoji") insertAt(ac.start, caret, `${emojiToken(it.emoji)} `);
     else insertAt(ac.start, caret, `/${it.name} `);
   };
 
@@ -314,7 +318,9 @@ export function Composer({ channel }: { channel: Channel }) {
             const caret = taRef.current?.selectionStart ?? text.length;
             insertAt(caret, taRef.current?.selectionEnd ?? caret, em.unicode + " ");
           }}
-          gifs={<GifFavorites onPick={(url) => { setPicker(false); void sendMessage(channel.id, url, { embeds: [{ url, type: "gif", image: url }] }); }} />}
+          serverId={channel.server_id}
+          gifs={<GifPicker onPick={(g) => { setPicker(false); void sendMessage(channel.id, g.url, { embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] }); }} />}
+          stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => { setPicker(false); void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated } }); }} />}
         />
       ) : null}
       {replyTarget ? (

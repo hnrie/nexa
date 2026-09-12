@@ -100,6 +100,8 @@ type ReadyPayload struct {
 	KeyGrants     []*store.KeyGrant        `json:"key_grants"`
 	Settings      *store.Settings          `json:"settings"`
 	Servers       []any                    `json:"servers"`
+	Emojis        []*store.Emoji           `json:"emojis"`
+	StickerPacks  []*store.StickerPack     `json:"sticker_packs"`
 	VoiceStates   []any                    `json:"voice_states"`
 	Extra         map[string]any           `json:"-"`
 }

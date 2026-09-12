@@ -167,6 +167,59 @@ export interface AuditEntry {
   created_at: number;
 }
 
+export interface Emoji {
+  id: Snowflake;
+  server_id: Snowflake;
+  name: string;
+  blob_id: Snowflake;
+  animated: boolean;
+  creator_id: Snowflake;
+  created_at: number;
+}
+
+export interface Sticker {
+  id: Snowflake;
+  pack_id: Snowflake;
+  name: string;
+  tags: string;
+  blob_id: Snowflake;
+  format: "png" | "apng" | "gif" | "webp";
+  position: number;
+  creator_id: Snowflake;
+  created_at: number;
+  width?: number;
+  height?: number;
+  animated: boolean;
+}
+
+export interface StickerPack {
+  id: Snowflake;
+  owner_user_id: Snowflake | null;
+  server_id: Snowflake | null;
+  name: string;
+  description: string;
+  cover_sticker_id: Snowflake | null;
+  public: boolean;
+  created_at: number;
+  updated_at: number;
+  stickers: Sticker[];
+  installed: boolean;
+}
+
+export interface GifResult {
+  id: string;
+  url: string;
+  preview: string;
+  w: number;
+  h: number;
+  title: string;
+}
+
+export interface GifPage {
+  results: GifResult[];
+  next: string;
+}
+
 export interface ServerKeyInfo {
   conv_id: Snowflake;
   name: string;
@@ -290,6 +343,8 @@ export interface ReadyPayload {
   key_grants: KeyGrant[];
   settings: SettingsBlob | null;
   servers: ServerView[];
+  emojis: Emoji[];
+  sticker_packs: StickerPack[];
   voice_states: unknown[];
 }
 

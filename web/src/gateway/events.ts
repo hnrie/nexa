@@ -1,5 +1,6 @@
 import type {
   Channel,
+  Emoji,
   Invite,
   KeyGrant,
   KeyNeed,
@@ -14,6 +15,7 @@ import type {
   Server,
   ServerView,
   Snowflake,
+  StickerPack,
 } from "@/api/types";
 
 export type GatewayEvent =
@@ -44,7 +46,8 @@ export type GatewayEvent =
   | { t: "key_grant"; d: KeyGrant }
   | { t: "keys_needed"; d: KeyNeed }
   | { t: "key_rotation_needed"; d: { conv_id: Snowflake } }
-  | { t: "emoji_update" | "sticker_update"; d: unknown }
+  | { t: "emoji_update"; d: { server_id: Snowflake; emojis: Emoji[] } }
+  | { t: "sticker_update"; d: { pack_id: Snowflake; deleted: boolean; pack?: StickerPack } }
   | { t: "pin_update"; d: { channel_id: Snowflake; message_id: Snowflake; pinned: boolean } }
   | { t: "ban_add"; d: { server_id: Snowflake; user_id: Snowflake; reason: string } }
   | { t: "ban_remove"; d: { server_id: Snowflake; user_id: Snowflake } }

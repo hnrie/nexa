@@ -19,7 +19,7 @@ export interface SendOptions {
   ping?: boolean;
   attachments?: { meta: AttachmentMeta; blob_id: string; size: number }[];
   embeds?: unknown[];
-  sticker?: { id: string };
+  sticker?: MessagePayload["sticker"];
   flags?: number;
 }
 

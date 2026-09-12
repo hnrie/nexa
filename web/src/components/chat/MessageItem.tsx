@@ -11,6 +11,8 @@ import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
+import { stickerUrl } from "@/api/users";
+import type { MessagePayload } from "@/crypto/message";
 import { Attachments } from "./Attachments";
 import { Embeds } from "./Embeds";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
@@ -130,6 +132,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
               {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>(edited)</span> : null}
             </>
           )}
+          {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
           {msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
           {msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? <Embeds list={msg.payload.embeds as UnfurlResult[]} /> : null}
           {pending === "failed" ? <div className={s.edited} style={{ color: "var(--danger)" }}>Failed to send.</div> : null}
@@ -150,3 +153,10 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     </div>
   );
 });
+
+/** A sticker in a message: 160 px, keeps its aspect, named on hover. */
+function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
+  if (!sticker.blob) return <span className={s.edited}>[sticker]</span>;
+  const w = sticker.w && sticker.h ? Math.round((160 * sticker.w) / sticker.h) : 160;
+  return <img className={s.sticker} src={stickerUrl(sticker.blob)} alt={sticker.name ?? "sticker"} title={sticker.name} width={Math.min(160, w)} height={160} loading="lazy" draggable={false} />;
+}

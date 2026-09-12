@@ -7,6 +7,7 @@ import { usePresence } from "@/stores/presence";
 import { useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
+import { useExpressions } from "@/stores/expressions";
 import { useSettings } from "@/stores/settings";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
@@ -32,6 +33,7 @@ function resetAll(): void {
   useRelationships.getState().clear();
   useTyping.getState().clear();
   useServers.getState().clear();
+  useExpressions.getState().clear();
 }
 
 function ingestServerView(view: ServerView): void {
@@ -65,6 +67,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useReadStates.getState().setMany(d.read_states);
       usePresence.getState().setMany(d.presences);
       for (const view of d.servers ?? []) ingestServerView(view);
+      useExpressions.getState().setAllEmojis(d.emojis ?? []);
+      useExpressions.getState().setPacks(d.sticker_packs ?? []);
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
       await useKeys.getState().ingestGrants(d.key_grants);
@@ -144,9 +148,17 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         }
       }
       useServers.getState().remove(e.d.id);
+      useExpressions.getState().removeServer(e.d.id);
       for (const h of dispatchHooks.onUnhandled) h(e);
       return;
     }
+    case "emoji_update":
+      useExpressions.getState().setEmojis(e.d.server_id, e.d.emojis);
+      return;
+    case "sticker_update":
+      if (e.d.deleted || !e.d.pack) useExpressions.getState().removePack(e.d.pack_id);
+      else useExpressions.getState().upsertPack(e.d.pack);
+      return;
     case "member_add":
       useUsers.getState().upsert(e.d.user);
       useServers.getState().upsertMember(e.d.member);
@@ -211,8 +223,6 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "voice_signal":
     case "call_ring":
     case "call_end":
-    case "emoji_update":
-    case "sticker_update":
     case "ban_add":
     case "ban_remove":
     case "invite_create":

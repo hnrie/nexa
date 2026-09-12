@@ -127,3 +127,4 @@
 .compact .content { display: inline; }
 .compact .gutterTime { opacity: 1; top: 4px; }
 @media (max-width: 767px) { .msg { padding: 2px 16px 2px 64px; } .avatar { left: 12px; } .gutterTime { display: none; } .members { display: none; } .file { width: 100%; } .toolbar { right: 8px; } }
+.sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; }

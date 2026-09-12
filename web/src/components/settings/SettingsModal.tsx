@@ -11,13 +11,14 @@ const PrivacyPage = lazy(() => import("./PrivacyPage"));
 const DevicesPage = lazy(() => import("./DevicesPage"));
 const AppearancePage = lazy(() => import("./AppearancePage"));
 const NotificationsPage = lazy(() => import("./NotificationsPage"));
+const StickersPage = lazy(() => import("./StickersPage"));
 
 const NAV: { head: string; items: { id: string; label: string }[] }[] = [
   { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "devices", label: "Devices" }] },
-  { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "notifications", label: "Notifications" }] },
+  { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "notifications", label: "Notifications" }, { id: "stickers", label: "Sticker Packs" }] },
 ];
 
-export default function SettingsModal({ onClose, page: initial }: { onClose: () => void; page: string }) {
+export default function SettingsModal({ onClose, page: initial, packId }: { onClose: () => void; page: string; packId?: string | undefined }) {
   const [page, setPage] = useState(initial);
   const logout = useAuth((a) => a.logout);
   const ref = useRef<HTMLDivElement>(null);
@@ -32,7 +33,7 @@ export default function SettingsModal({ onClose, page: initial }: { onClose: () 
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const body =
-    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : <AccountPage onClose={onClose} />;
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : <AccountPage onClose={onClose} />;
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings" data-modal-layer="">
       <div className={s.navWrap}>

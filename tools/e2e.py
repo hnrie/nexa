@@ -77,6 +77,7 @@ class Session:
 
     def shot(self, label):
         path = self.out / f"{label}-{self.name}-{self.page.viewport_size['width']}.png"
+        time.sleep(0.25)  # let enter animations finish
         self.page.screenshot(path=str(path))
         print("  wrote", path)
 
@@ -262,6 +263,71 @@ def server_flow(srv, alice, bob, phone):
     phone.page.click("button[aria-label='Open navigation']")
     time.sleep(0.4)
     phone.shot("server-drawer")
+    return server_id, link
+
+
+def expressions_flow(srv, alice, bob, server_id, link):
+    a, b = alice.page, bob.page
+    # bob was kicked (not banned): he rejoins through the same link
+    b.goto(link, wait_until="networkidle")
+    b.click("button:has-text('Accept Invite')")
+    b.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
+    # alice uploads a custom emoji in server settings
+    a.click("button:has-text('Test Server')")
+    a.click("text=Server Settings")
+    a.click("[data-nav=emoji]")
+    a.set_input_files("[data-testid=emoji-file]", {"name": "party.png", "mimeType": "image/png", "buffer": png_bytes(64, 64, (80, 200, 120))})
+    a.wait_for_selector("text=:party:", timeout=20000)
+    alice.shot("server-emoji")
+    a.keyboard.press("Escape")
+    # she sends it from the picker; bob sees the image
+    a.locator("[data-channel]:has-text('general') button").first.click()
+    a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
+    a.click("button[aria-label='Select emoji']")
+    a.fill("input[aria-label='Search emoji']", "party")
+    a.locator("[role=dialog][aria-label='Expression picker'] button[data-custom]").first.click()
+    a.keyboard.press("Escape")
+    alice.composer().press("End")
+    alice.composer().type(" custom emoji test")
+    alice.composer().press("Enter")
+    b.wait_for_selector("[data-id]:has-text('custom emoji test') img.md-emoji[alt=':party:']", timeout=20000)
+    # :party autocomplete offers the custom emoji
+    alice.composer().type(":par")
+    a.wait_for_selector("[role=listbox] >> text=:party:", timeout=10000)
+    a.keyboard.press("Escape")
+    alice.composer().fill("")
+    # a personal sticker pack, created in user settings, with one sticker
+    a.click("button[aria-label='User Settings']")
+    a.click("[data-nav=stickers], button:has-text('Sticker Packs')")
+    a.once("dialog", lambda d: d.accept("Test pack"))
+    a.click("[data-testid=create-pack]")
+    a.wait_for_selector("[data-testid=pack-name]", timeout=15000)
+    a.set_input_files("[data-testid=sticker-file]", {"name": "wave.png", "mimeType": "image/png", "buffer": png_bytes(96, 96, (250, 180, 60))})
+    a.wait_for_selector("[data-testid=sticker-name]", timeout=10000)
+    a.fill("[data-testid=sticker-name]", "Wave")
+    a.click("[data-testid=upload-stickers]")
+    try:
+        a.wait_for_selector("text=Sticker added.", timeout=20000)
+    except Exception:
+        alice.shot("sticker-upload-failed")
+        print("toasts:", a.locator("[role=status], [class*=toast]").all_inner_texts())
+        print("browser errors:", alice.errors)
+        raise
+    alice.shot("sticker-pack")
+    a.keyboard.press("Escape")
+    # send the sticker from the picker
+    a.click("button[aria-label='Select emoji']")
+    a.click("[role=dialog][aria-label='Expression picker'] button:has-text('Stickers')")
+    a.locator("[role=dialog][aria-label='Expression picker'] button[data-sticker]").first.click()
+    b.wait_for_selector("[data-id] img[alt='Wave']", timeout=20000)
+    a.wait_for_selector("[data-id] img[alt='Wave']", timeout=20000)
+    alice.shot("sticker-sent")
+    # the picker shows GIF search is off (no Tenor key) but favourites still exist
+    a.click("button[aria-label='Select emoji']")
+    a.click("[role=dialog][aria-label='Expression picker'] button:has-text('GIFs')")
+    a.wait_for_selector("text=/GIF search is off|No favorite GIFs/", timeout=10000)
+    alice.shot("gif-tab")
+    a.keyboard.press("Escape")
 
 
 def main():
@@ -341,12 +407,20 @@ def main():
             time.sleep(0.4)
             phone.shot("drawer")
             print("servers")
-            server_flow(srv, alice, bob, phone)
+            server_id, link = server_flow(srv, alice, bob, phone)
+            print("expressions")
+            expressions_flow(srv, alice, bob, server_id, link)
             errors = alice.errors + bob.errors + phone.errors
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))
             ok = not errors
             browser.close()
+    except Exception:
+        try:
+            print("browser errors so far:\n  " + "\n  ".join(alice.errors + bob.errors + phone.errors))
+        except Exception:
+            pass
+        raise
     finally:
         srv.stop()
     if args.keep:

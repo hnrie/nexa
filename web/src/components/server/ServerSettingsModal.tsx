@@ -12,6 +12,8 @@ const BansPage = lazy(() => import("./pages/BansPage"));
 const InvitesPage = lazy(() => import("./pages/InvitesPage"));
 const AuditLogPage = lazy(() => import("./pages/AuditLogPage"));
 const EncryptionPage = lazy(() => import("./pages/EncryptionPage"));
+const EmojiPage = lazy(() => import("./pages/EmojiPage"));
+const ServerStickersPage = lazy(() => import("./pages/ServerStickersPage"));
 const DeleteServerPage = lazy(() => import("./pages/DeleteServerPage"));
 
 export default function ServerSettingsModal({ onClose, serverId, page: initial }: { onClose: () => void; serverId: string; page?: string | undefined }) {
@@ -22,6 +24,8 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
   const pages: { id: string; label: string; ok: boolean; group: number; danger?: boolean }[] = [
     { id: "overview", label: "Overview", ok: canI(st, P.MANAGE_SERVER), group: 0 },
     { id: "roles", label: "Roles", ok: canI(st, P.MANAGE_ROLES), group: 0 },
+    { id: "emoji", label: "Emoji", ok: true, group: 0 },
+    { id: "stickers", label: "Stickers", ok: true, group: 0 },
     { id: "encryption", label: "Encryption", ok: true, group: 0 },
     { id: "members", label: "Members", ok: true, group: 1 },
     { id: "invites", label: "Invites", ok: canI(st, P.MANAGE_SERVER), group: 1 },
@@ -47,6 +51,8 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     page === "bans" ? <BansPage serverId={serverId} /> :
     page === "invites" ? <InvitesPage serverId={serverId} /> :
     page === "audit" ? <AuditLogPage serverId={serverId} /> :
+    page === "emoji" ? <EmojiPage serverId={serverId} /> :
+    page === "stickers" ? <ServerStickersPage serverId={serverId} /> :
     page === "delete" ? <DeleteServerPage serverId={serverId} onDone={() => { onClose(); nav("/channels/@me"); }} /> :
     <EncryptionPage serverId={serverId} />;
   return (
