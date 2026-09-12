@@ -1,5 +1,6 @@
 @import "./fonts.css";
 @import "./tokens.css";
+@import "./markdown.css";
 
 *, *::before, *::after { box-sizing: border-box; }
 html { font-size: calc(16px * var(--font-scale, 1)); -webkit-text-size-adjust: 100%; height: 100%; }

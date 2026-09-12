@@ -6,11 +6,16 @@ import (
 	"evilion.xyz/chat/internal/ids"
 )
 
-// Ack records that uid has read up to msgID in chID (never moving backwards).
-func (s *Store) Ack(ctx context.Context, uid, chID, msgID ids.ID) error {
-	_, err := s.db.W.ExecContext(ctx, `INSERT INTO read_states (user_id, channel_id, last_read_message_id, last_ack_at) VALUES (?,?,?,?)
-		ON CONFLICT(user_id, channel_id) DO UPDATE SET last_read_message_id = max(coalesce(last_read_message_id, 0), excluded.last_read_message_id), last_ack_at = excluded.last_ack_at`,
-		int64(uid), int64(chID), int64(msgID), nowMs())
+// Ack records that uid has read up to msgID in chID. Without force the marker
+// never moves backwards; force is used by "mark as unread".
+func (s *Store) Ack(ctx context.Context, uid, chID, msgID ids.ID, force bool) error {
+	q := `INSERT INTO read_states (user_id, channel_id, last_read_message_id, last_ack_at) VALUES (?,?,?,?)
+		ON CONFLICT(user_id, channel_id) DO UPDATE SET last_read_message_id = max(coalesce(last_read_message_id, 0), excluded.last_read_message_id), last_ack_at = excluded.last_ack_at`
+	if force {
+		q = `INSERT INTO read_states (user_id, channel_id, last_read_message_id, last_ack_at) VALUES (?,?,?,?)
+		ON CONFLICT(user_id, channel_id) DO UPDATE SET last_read_message_id = excluded.last_read_message_id, last_ack_at = excluded.last_ack_at`
+	}
+	_, err := s.db.W.ExecContext(ctx, q, int64(uid), int64(chID), int64(msgID), nowMs())
 	return err
 }
 

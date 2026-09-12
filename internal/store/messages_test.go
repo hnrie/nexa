@@ -213,17 +213,22 @@ func TestReadStatesAndMentions(t *testing.T) {
 	if err != nil || len(states) != 2 || states[0].MentionCount != 2 || states[0].LastReadMessageID != nil || states[1].MentionCount != 0 {
 		t.Fatalf("states: %v %+v", err, states)
 	}
-	if err := s.Ack(ctx, b.ID, dm.ID, m2.ID); err != nil {
+	if err := s.Ack(ctx, b.ID, dm.ID, m2.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	states, _ = s.ReadStatesFor(ctx, b.ID, []ids.ID{dm.ID})
 	if *states[0].LastReadMessageID != m2.ID || states[0].MentionCount != 1 {
 		t.Errorf("after ack m2: %+v", states[0])
 	}
-	_ = s.Ack(ctx, b.ID, dm.ID, m1.ID) // never moves backwards
+	_ = s.Ack(ctx, b.ID, dm.ID, m1.ID, false) // never moves backwards
 	states, _ = s.ReadStatesFor(ctx, b.ID, []ids.ID{dm.ID})
 	if *states[0].LastReadMessageID != m2.ID {
 		t.Error("ack must not move backwards")
+	}
+	_ = s.Ack(ctx, b.ID, dm.ID, m1.ID, true) // mark as unread moves it back
+	states, _ = s.ReadStatesFor(ctx, b.ID, []ids.ID{dm.ID})
+	if *states[0].LastReadMessageID != m1.ID || states[0].MentionCount != 2 {
+		t.Errorf("forced ack: %+v", states[0])
 	}
 	n, _ := s.CountMentionsAfter(ctx, dm.ID, b.ID, m1.ID)
 	if n != 2 {

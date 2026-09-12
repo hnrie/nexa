@@ -362,7 +362,13 @@ func (s *Server) handleAck(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	if err := s.Store.Ack(r.Context(), me.ID, ch.ID, mid); err != nil {
+	var body struct {
+		Manual bool `json:"manual"`
+	}
+	if r.ContentLength > 0 {
+		_ = ReadJSON(w, r, &body, 1<<10)
+	}
+	if err := s.Store.Ack(r.Context(), me.ID, ch.ID, mid, body.Manual); err != nil {
 		WriteError(w, err)
 		return
 	}

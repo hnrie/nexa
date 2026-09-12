@@ -1,0 +1,38 @@
+/* Rendered markdown (classes emitted by src/markdown/render.tsx). */
+.md-paragraph { white-space: pre-wrap; overflow-wrap: anywhere; }
+.md-inline-code { padding: 0.2em 0.35em; border-radius: 4px; background: var(--code-bg); border: 1px solid var(--code-border); font-size: 0.875em; white-space: pre-wrap; }
+.md-codeblock { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--code-bg); border: 1px solid var(--code-border); font-size: 0.875em; line-height: 1.35; overflow-x: auto; white-space: pre; max-width: 90%; }
+.md-codeblock code { font-family: var(--font-mono); }
+.md-spoiler { border-radius: 4px; background: var(--spoiler); color: transparent; cursor: pointer; padding: 0 2px; transition: color var(--transition), background-color var(--transition); }
+.md-spoiler[data-revealed="true"] { background: var(--spoiler-revealed); color: inherit; cursor: text; }
+.md-spoiler[data-revealed="false"] * { visibility: hidden; }
+.md-spoiler[data-revealed="false"] img { visibility: hidden; }
+.md-quote { margin: 2px 0; padding: 0 8px 0 12px; border-left: 4px solid var(--border-strong); border-radius: 2px; color: var(--text); }
+.md-h1 { font-size: 1.5em; font-weight: 700; margin: 16px 0 8px; line-height: 1.25; }
+.md-h2 { font-size: 1.25em; font-weight: 700; margin: 16px 0 8px; line-height: 1.25; }
+.md-h3 { font-size: 1em; font-weight: 700; margin: 16px 0 4px; line-height: 1.25; }
+.md-h1:first-child, .md-h2:first-child, .md-h3:first-child { margin-top: 4px; }
+.md-subtext { display: block; font-size: 0.8125em; color: var(--text-muted); }
+.md-link { color: var(--link); }
+.md-link:hover { text-decoration: underline; }
+[data-underline-links="true"] .md-link { text-decoration: underline; }
+.md-mention { display: inline; padding: 0 2px; border-radius: 3px; background: var(--mention-bg); color: var(--mention-fg); font-weight: 500; cursor: pointer; unicode-bidi: plaintext; }
+.md-mention:hover { background: var(--mention-bg-hover); color: #fff; }
+.md-emoji { display: inline-block; width: 1.375em; height: 1.375em; vertical-align: bottom; object-fit: contain; margin: 0 0.05em; }
+.md-emoji-unicode { font-size: 1.15em; line-height: 1; vertical-align: -0.1em; }
+.md-emoji-jumbo, .md-emoji-unicode.md-emoji-jumbo { font-size: 3em; line-height: 1.1; width: auto; height: auto; }
+img.md-emoji-jumbo { width: 3em; height: 3em; }
+.md-timestamp { padding: 0 2px; border-radius: 3px; background: var(--bg-active); }
+.md-list { margin: 4px 0; padding-left: 24px; }
+.md-list-item { margin: 2px 0; }
+/* highlight.js theme, kept minimal and tied to the palette */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-name { color: #c678dd; }
+.hljs-string, .hljs-attr, .hljs-symbol, .hljs-addition { color: #98c379; }
+.hljs-number, .hljs-regexp, .hljs-link { color: #d19a66; }
+.hljs-comment, .hljs-quote, .hljs-meta { color: #7f848e; font-style: italic; }
+.hljs-title, .hljs-section, .hljs-function { color: #61afef; }
+.hljs-type, .hljs-built_in, .hljs-class .hljs-title { color: #e5c07b; }
+.hljs-variable, .hljs-template-variable, .hljs-attribute { color: #e06c75; }
+.hljs-deletion { color: #e06c75; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }

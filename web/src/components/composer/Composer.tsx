@@ -1,0 +1,289 @@
+import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from "react";
+import type { Channel } from "@/api/types";
+import { gateway } from "@/gateway/session";
+import { formatBytes } from "@/lib/time";
+import { MAX_UPLOAD, stage, uploadStaged, type Staged } from "@/lib/attachments";
+import { useAuth } from "@/stores/auth";
+import { useMessages } from "@/stores/messages";
+import { useRelationships } from "@/stores/relationships";
+import { useSettings } from "@/stores/settings";
+import { useUI } from "@/stores/ui";
+import { useUsers } from "@/stores/users";
+import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
+import { emojiLoaded, loadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
+import { channelDisplayName } from "@/lib/names";
+import { Autocomplete, type AcItem } from "./Autocomplete";
+import { COMMANDS, applyCommand } from "./commands";
+import { sendMessage, type SendOptions } from "./send";
+import { useAutosize } from "./useAutosize";
+import s from "./Composer.module.css";
+
+const MAX_LEN = 4000;
+const TYPING_INTERVAL = 8000;
+
+function acToken(text: string, caret: number): { kind: "user" | "emoji" | "command"; query: string; start: number } | null {
+  const before = text.slice(0, caret);
+  const m = /(?:^|\s)(@[a-z0-9_.]*|:[\w+-]{2,}|^\/\w*)$/i.exec(before);
+  if (!m) return null;
+  const token = m[1]!;
+  const start = caret - token.length;
+  if (token.startsWith("@")) return { kind: "user", query: token.slice(1).toLowerCase(), start };
+  if (token.startsWith(":")) return { kind: "emoji", query: token.slice(1).toLowerCase(), start };
+  if (start === 0 && token.startsWith("/")) return { kind: "command", query: token.slice(1).toLowerCase(), start };
+  return null;
+}
+
+export function Composer({ channel }: { channel: Channel }) {
+  const me = useAuth((a) => a.me);
+  const users = useUsers((u) => u.byId);
+  const rels = useRelationships((r) => r.byUser);
+  const replyTo = useUI((u) => u.replyTo);
+  const setReplyTo = useUI((u) => u.setReplyTo);
+  const setEditing = useUI((u) => u.setEditing);
+  const toast = useUI((u) => u.toast);
+  const drafts = useSettings((st) => st.settings.drafts);
+  const setDraft = useSettings((st) => st.setDraft);
+  const tone = useSettings((st) => st.settings.skinTone);
+  const msgs = useMessages((m) => m.channels[channel.id]);
+  const [text, setText] = useState(() => drafts[channel.id] ?? "");
+  const [files, setFiles] = useState<Staged[]>([]);
+  const [sending, setSending] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const [drag, setDrag] = useState(false);
+  const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: "user" | "emoji" | "command" } | null>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const lastTyping = useRef(0);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
+
+  const name = channelDisplayName(channel, users, me?.id);
+  const placeholder = channel.type === "dm" ? `Message @${name}` : `Message ${name}`;
+
+  useEffect(() => {
+    setText(useSettings.getState().settings.drafts[channel.id] ?? "");
+    setFiles([]);
+    setAc(null);
+    setTimeout(() => taRef.current?.focus(), 0);
+    return () => {
+      for (const f of files) if (f.preview) URL.revokeObjectURL(f.preview);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.id]);
+
+  const persistDraft = useCallback((value: string) => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => setDraft(channel.id, value), 600);
+  }, [channel.id, setDraft]);
+
+  const refreshAc = useCallback((value: string, caret: number) => {
+    const tok = acToken(value, caret);
+    if (!tok) return setAc(null);
+    let items: AcItem[] = [];
+    if (tok.kind === "user") {
+      const pool = new Map<string, typeof users[string]>();
+      for (const id of channel.recipient_ids) if (users[id]) pool.set(id, users[id]!);
+      for (const r of Object.values(rels)) if (r.type === "friend") pool.set(r.user.id, users[r.user.id] ?? r.user);
+      items = [...pool.values()].filter((u) => !tok.query || u.username.includes(tok.query) || u.display_name.toLowerCase().includes(tok.query)).slice(0, 8).map((u) => ({ kind: "user", user: u }));
+    } else if (tok.kind === "emoji") {
+      if (!emojiLoaded()) void loadEmoji().then(() => refreshAc(value, caret));
+      items = searchEmoji(tok.query, 8).map((e) => ({ kind: "emoji", entry: e }));
+    } else {
+      items = COMMANDS.filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
+    }
+    setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind } : null);
+  }, [users, rels, channel.recipient_ids]);
+
+  const onChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setText(value);
+    persistDraft(value);
+    refreshAc(value, e.target.selectionStart ?? value.length);
+    const now = Date.now();
+    if (value.trim() && now - lastTyping.current > TYPING_INTERVAL) {
+      lastTyping.current = now;
+      gateway()?.sendTyping(channel.id);
+    }
+  };
+
+  const insertAt = (start: number, end: number, insert: string) => {
+    const next = text.slice(0, start) + insert + text.slice(end);
+    setText(next);
+    persistDraft(next);
+    setAc(null);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (!el) return;
+      el.focus();
+      const pos = start + insert.length;
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const pickAc = (i: number) => {
+    if (!ac) return;
+    const it = ac.items[i];
+    if (!it) return;
+    const caret = taRef.current?.selectionStart ?? text.length;
+    if (it.kind === "user") insertAt(ac.start, caret, `@${it.user.username} `);
+    else if (it.kind === "emoji") insertAt(ac.start, caret, `${withTone(it.entry, tone)} `);
+    else insertAt(ac.start, caret, `/${it.name} `);
+  };
+
+  const addFiles = (list: FileList | File[]) => {
+    const staged: Staged[] = [];
+    for (const f of Array.from(list)) {
+      if (f.size > MAX_UPLOAD) {
+        toast(`${f.name} is over the 100 MB limit.`, "error");
+        continue;
+      }
+      staged.push(stage(f));
+    }
+    if (staged.length) setFiles((cur) => [...cur, ...staged].slice(0, 10));
+  };
+
+  const send = async () => {
+    if (sending) return;
+    let body = text.trim();
+    if (body.length > MAX_LEN) return toast(`Messages are limited to ${MAX_LEN} characters.`, "error");
+    const expanded = applyCommand(body);
+    if (expanded !== null) body = expanded;
+    if (!body && files.length === 0) return;
+    setSending(true);
+    const opts: SendOptions = {};
+    if (replyTo && replyTo.channelId === channel.id) {
+      opts.replyTo = replyTo.messageId;
+      opts.ping = replyTo.ping;
+    }
+    try {
+      if (files.length) {
+        const uploaded = [];
+        for (const f of files) {
+          const up = await uploadStaged(channel.id, f, (p) => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: p } : x))));
+          uploaded.push(up);
+        }
+        opts.attachments = uploaded;
+      }
+      setText("");
+      setDraft(channel.id, "");
+      setReplyTo(null);
+      for (const f of files) if (f.preview) URL.revokeObjectURL(f.preview);
+      setFiles([]);
+      await sendMessage(channel.id, body, opts);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed.";
+      setFiles((cur) => cur.map((x) => ({ ...x, error: x.progress < 1 ? msg : x.error })));
+      if (files.length) toast(msg, "error");
+    } finally {
+      setSending(false);
+      taRef.current?.focus();
+    }
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (ac) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setAc({ ...ac, index: (ac.index + 1) % ac.items.length }); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setAc({ ...ac, index: (ac.index - 1 + ac.items.length) % ac.items.length }); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickAc(ac.index); return; }
+      if (e.key === "Escape") { e.preventDefault(); setAc(null); return; }
+    }
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      const touch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+      if (!touch) {
+        e.preventDefault();
+        void send();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      if (replyTo) setReplyTo(null);
+      else if (picker) setPicker(false);
+      return;
+    }
+    if (e.key === "ArrowUp" && text === "" && me && msgs) {
+      const mine = [...msgs.ids].reverse().find((id) => msgs.byId[id]?.author_id === me.id && (msgs.byId[id]?.type === "default" || msgs.byId[id]?.type === "reply"));
+      if (mine) {
+        e.preventDefault();
+        setEditing({ channelId: channel.id, messageId: mine });
+      }
+    }
+  };
+
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setDrag(false);
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
+  };
+
+  const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
+  const counterOn = text.length > MAX_LEN - 200;
+
+  return (
+    <div className={s.wrap} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={onDrop}>
+      {drag ? <div className={s.drop}>Drop to upload to {name}</div> : null}
+      {ac ? <Autocomplete items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
+      {picker ? (
+        <ExpressionPicker
+          onClose={() => setPicker(false)}
+          onEmoji={(em) => {
+            const caret = taRef.current?.selectionStart ?? text.length;
+            insertAt(caret, taRef.current?.selectionEnd ?? caret, em.unicode + " ");
+          }}
+        />
+      ) : null}
+      {replyTarget ? (
+        <div className={s.replyBar}>
+          <span>Replying to <b>{users[replyTarget.author_id]?.display_name ?? "Unknown"}</b></span>
+          <span className={s.replyBtns}>
+            {replyTarget.author_id !== me?.id ? (
+              <button className={s.pingBtn} data-on={replyTo?.ping} onClick={() => replyTo && setReplyTo({ ...replyTo, ping: !replyTo.ping })}>@ {replyTo?.ping ? "ON" : "OFF"}</button>
+            ) : null}
+            <button className={s.closeBtn} aria-label="Cancel reply" onClick={() => setReplyTo(null)}><X size={16} /></button>
+          </span>
+        </div>
+      ) : null}
+      {files.length ? (
+        <div className={s.tray}>
+          {files.map((f) => (
+            <div key={f.id} className={s.card}>
+              <div className={s.thumb} data-spoiler={f.spoiler}>
+                {f.preview && f.file.type.startsWith("image/") ? <img src={f.preview} alt="" /> : f.preview ? <video src={f.preview} muted /> : <span>{f.file.type.split("/")[0] || "file"}</span>}
+              </div>
+              <div className={s.fname} title={f.name}>{f.name}</div>
+              <div className={s.fsize}>{formatBytes(f.file.size)}</div>
+              {f.progress > 0 && f.progress < 1 ? <div className={s.bar}><i style={{ width: `${Math.round(f.progress * 100)}%` }} /></div> : null}
+              {f.error ? <div className={s.err}>{f.error}</div> : null}
+              <div className={s.cardBtns}>
+                <button className={s.cardBtn} data-on={f.spoiler} title="Spoiler" onClick={() => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, spoiler: !x.spoiler } : x)))}>{f.spoiler ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                <button className={[s.cardBtn, s.del].join(" ")} title="Remove" onClick={() => setFiles((cur) => cur.filter((x) => x.id !== f.id))}><Trash2 size={16} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className={s.box}>
+        <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
+        <button className={s.attach} aria-label="Upload a file" onClick={() => fileRef.current?.click()} disabled={sending}><CirclePlus size={24} /></button>
+        <textarea
+          ref={taRef}
+          className={s.ta}
+          value={text}
+          onChange={onChange}
+          onKeyDown={onKeyDown}
+          onPaste={(e) => { if (e.clipboardData.files.length) { e.preventDefault(); addFiles(e.clipboardData.files); } }}
+          placeholder={placeholder}
+          rows={1}
+          maxLength={MAX_LEN + 500}
+          aria-label={placeholder}
+          disabled={sending}
+        />
+        <div className={s.btns}>
+          <button className={s.iconBtn} data-on={picker} aria-label="Select emoji" onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
+          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label="Send message" onClick={() => void send()} disabled={sending || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
+        </div>
+      </div>
+      {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
+    </div>
+  );
+}

@@ -152,7 +152,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   };
 
   return (
-    <div className={s.row} onContextMenu={more}>
+    <div className={s.row} data-user={rel.user.username} onContextMenu={more}>
       <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={presenceUser.display_name} size={32} status={rel.type === "friend" ? status : null} />
       <div className={s.rowText}>
         <span className={s.rowName}>

@@ -1,0 +1,73 @@
+import { SmilePlus } from "lucide-react";
+import { useState } from "react";
+import { messages as messagesApi } from "@/api/messages";
+import { emojiUrl } from "@/api/users";
+import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
+import { useAuth } from "@/stores/auth";
+import { useMessages, type DecryptedMessage } from "@/stores/messages";
+import { useUI } from "@/stores/ui";
+import { useUsers, displayName } from "@/stores/users";
+import s from "./Chat.module.css";
+
+function isCustom(emoji: string): { id: string; animated: boolean } | null {
+  const m = /^(a?):?([\w]+):(\d+)$/.exec(emoji);
+  if (!m) return null;
+  return { id: m[3]!, animated: m[1] === "a" };
+}
+
+/** Toggles a reaction with optimistic UI; reverts on failure. */
+export async function toggleReaction(msg: DecryptedMessage, emoji: string): Promise<void> {
+  const me = useAuth.getState().me;
+  if (!me) return;
+  const has = msg.reactions.some((r) => r.emoji === emoji && r.me);
+  const store = useMessages.getState();
+  store.setReaction(msg.channel_id, msg.id, emoji, me.id, !has, true);
+  try {
+    if (has) await messagesApi.unreact(msg.channel_id, msg.id, emoji);
+    else await messagesApi.react(msg.channel_id, msg.id, emoji);
+  } catch (err) {
+    store.setReaction(msg.channel_id, msg.id, emoji, me.id, has, true);
+    useUI.getState().toast(err instanceof Error ? err.message : "Could not react.", "error");
+  }
+}
+
+interface Props {
+  msg: DecryptedMessage;
+  pickerAnchor: DOMRect | null;
+  onOpenPicker: (anchor: DOMRect) => void;
+  onPickerClose: () => void;
+}
+
+export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Props) {
+  const users = useUsers((u) => u.byId);
+  const [who, setWho] = useState<Record<string, string>>({});
+  const closePicker = onPickerClose;
+  if (msg.reactions.length === 0 && !pickerAnchor) return null;
+  const hover = async (emoji: string) => {
+    if (who[emoji]) return;
+    try {
+      const ids = await messagesApi.reactors(msg.channel_id, msg.id, emoji, 20);
+      const names = ids.map((id) => displayName(users[id])).join(", ");
+      setWho((w) => ({ ...w, [emoji]: names }));
+    } catch {
+      /* tooltip stays generic */
+    }
+  };
+  return (
+    <div className={s.reactions}>
+      {msg.reactions.map((r) => {
+        const custom = isCustom(r.emoji);
+        return (
+          <button key={r.emoji} className={s.pill} data-me={r.me} title={who[r.emoji] ? `${who[r.emoji]} reacted with ${r.emoji}` : `React with ${r.emoji}`} onMouseEnter={() => void hover(r.emoji)} onClick={() => void toggleReaction(msg, r.emoji)}>
+            {custom ? <img src={emojiUrl(custom.id, custom.animated)} alt={r.emoji} /> : <span className={s.pillEmoji}>{r.emoji}</span>}
+            <span>{r.count}</span>
+          </button>
+        );
+      })}
+      {msg.reactions.length > 0 ? (
+        <button className={s.addReact} aria-label="Add reaction" onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={16} /></button>
+      ) : null}
+      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, e.unicode); }} /> : null}
+    </div>
+  );
+}
