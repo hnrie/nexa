@@ -695,7 +695,16 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ch, err := s.Store.ChannelByID(r.Context(), id)
-	if err != nil || ch.ServerID == nil {
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if s.isDM(ch) {
+		// the same verb closes or deletes a conversation
+		s.handleDMDelete(w, r)
+		return
+	}
+	if ch.ServerID == nil {
 		WriteError(w, ErrNotFound)
 		return
 	}
@@ -1483,18 +1492,29 @@ func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ch, err := s.Store.ChannelByID(r.Context(), id)
-	if err != nil || ch.ServerID == nil {
+	if err != nil {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)
-	if err != nil || p == 0 {
+	if ch.Type == "group_dm" {
+		// every member of a group can hand out a link to it
+		if !hasID(ch.Recipients, me.ID) {
+			WriteError(w, ErrNotFound)
+			return
+		}
+	} else if ch.ServerID == nil {
 		WriteError(w, ErrNotFound)
 		return
-	}
-	if !p.Has(perms.CreateInstantInvite) {
-		WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot create invites here."))
-		return
+	} else {
+		p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)
+		if err != nil || p == 0 {
+			WriteError(w, ErrNotFound)
+			return
+		}
+		if !p.Has(perms.CreateInstantInvite) {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot create invites here."))
+			return
+		}
 	}
 	var req struct {
 		MaxAge  int64 `json:"max_age"`
@@ -1510,13 +1530,17 @@ func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_invite", "max_age is 0–30 days in seconds and max_uses is 0–1000."))
 		return
 	}
-	in, err := s.Store.CreateInvite(r.Context(), *ch.ServerID, &ch.ID, me.ID, req.MaxAge, req.MaxUses)
+	in, err := s.Store.CreateInvite(r.Context(), ch.ServerID, &ch.ID, me.ID, req.MaxAge, req.MaxUses)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
-	s.audit(r, *ch.ServerID, me.ID, "invite_create", "invite", nil, map[string]any{"code": in.Code, "max_age": req.MaxAge, "max_uses": req.MaxUses}, "")
-	s.emitServer(r.Context(), *ch.ServerID, "invite_create", in)
+	if ch.ServerID == nil {
+		s.Bcast.EmitUsers(ch.Recipients, "invite_create", in)
+	} else {
+		s.audit(r, *ch.ServerID, me.ID, "invite_create", "invite", nil, map[string]any{"code": in.Code, "max_age": req.MaxAge, "max_uses": req.MaxUses}, "")
+		s.emitServer(r.Context(), *ch.ServerID, "invite_create", in)
+	}
 	WriteJSON(w, http.StatusCreated, in)
 }
 
@@ -1526,7 +1550,11 @@ func (s *Server) handleInvitePreview(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	}
-	srv, err := s.Store.ServerByID(r.Context(), in.ServerID)
+	if in.ServerID == nil {
+		s.groupInvitePreview(w, r, in)
+		return
+	}
+	srv, err := s.Store.ServerByID(r.Context(), *in.ServerID)
 	if err != nil {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
@@ -1560,7 +1588,11 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	}
-	srv, err := s.Store.ServerByID(r.Context(), in.ServerID)
+	if in.ServerID == nil {
+		s.groupInviteJoin(w, r, in, me)
+		return
+	}
+	srv, err := s.Store.ServerByID(r.Context(), *in.ServerID)
 	if err != nil {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
@@ -1604,7 +1636,26 @@ func (s *Server) handleInviteDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	p, err := s.Store.ServerPerms(r.Context(), in.ServerID, me.ID)
+	if in.ServerID == nil {
+		// a group DM invite: any member of that group may revoke it
+		if in.ChannelID == nil {
+			WriteError(w, ErrNotFound)
+			return
+		}
+		ch, err := s.Store.ChannelByID(r.Context(), *in.ChannelID)
+		if err != nil || !hasID(ch.Recipients, me.ID) {
+			WriteError(w, ErrNotFound)
+			return
+		}
+		if err := s.Store.DeleteInvite(r.Context(), in.Code); err != nil {
+			WriteError(w, err)
+			return
+		}
+		s.Bcast.EmitUsers(ch.Recipients, "invite_delete", map[string]any{"channel_id": ch.ID, "code": in.Code})
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	p, err := s.Store.ServerPerms(r.Context(), *in.ServerID, me.ID)
 	if err != nil || p == 0 {
 		WriteError(w, ErrNotFound)
 		return
@@ -1617,8 +1668,8 @@ func (s *Server) handleInviteDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.audit(r, in.ServerID, me.ID, "invite_delete", "invite", nil, map[string]any{"code": in.Code}, "")
-	s.emitServer(r.Context(), in.ServerID, "invite_delete", map[string]any{"server_id": in.ServerID, "code": in.Code})
+	s.audit(r, *in.ServerID, me.ID, "invite_delete", "invite", nil, map[string]any{"code": in.Code}, "")
+	s.emitServer(r.Context(), *in.ServerID, "invite_delete", map[string]any{"server_id": *in.ServerID, "code": in.Code})
 	w.WriteHeader(http.StatusNoContent)
 }
 

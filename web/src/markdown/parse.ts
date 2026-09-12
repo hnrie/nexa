@@ -613,6 +613,19 @@ export function isEmojiOnly(nodes: Node[]): boolean {
   return ok && count >= 1 && count <= MAX_JUMBO_EMOJI;
 }
 
+/** How many emoji a jumbo message holds, so the renderer can shrink big walls of them. */
+export function emojiCount(nodes: Node[]): number {
+  let count = 0;
+  const walk = (list: Node[]): void => {
+    for (const node of list) {
+      if (node.type === "emoji" || node.type === "unicodeEmoji") count += 1;
+      else if (node.type === "paragraph") walk(node.children);
+    }
+  };
+  walk(nodes);
+  return count;
+}
+
 function nodeText(node: Node): string {
   switch (node.type) {
     case "text":

@@ -26,7 +26,7 @@ export type GatewayEvent =
   | { t: "message_delete"; d: { id: Snowflake; channel_id: Snowflake } }
   | { t: "message_delete_bulk"; d: { ids: Snowflake[]; channel_id: Snowflake } }
   | { t: "reaction_add" | "reaction_remove"; d: { channel_id: Snowflake; message_id: Snowflake; user_id: Snowflake; emoji: string } }
-  | { t: "typing"; d: { channel_id: Snowflake; user_id: Snowflake; ts: number } }
+  | { t: "typing"; d: { channel_id: Snowflake; user_id: Snowflake; ts: number; stop?: boolean } }
   | { t: "channel_create" | "channel_update"; d: Channel }
   | { t: "channel_delete"; d: { id: Snowflake; server_id?: Snowflake | null } }
   | { t: "channel_positions"; d: { server_id: Snowflake; channels: { id: Snowflake; position: number; parent_id: Snowflake | null }[] } }

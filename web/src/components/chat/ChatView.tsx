@@ -120,9 +120,10 @@ export function ChatView({ channel }: { channel: Channel }) {
         <MessageList channel={channel} />
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
-        {isServer && membersOpen && serverId ? <MemberList serverId={serverId} channelId={channel.id} /> : null}
-        {channel.type === "group_dm" && membersOpen ? (
-          <aside className={s.members}>
+        {isServer && serverId && (mobile || membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={mobile} open={membersOpen} /> : null}
+        {mobile && membersOpen && (isServer || channel.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
+        {channel.type === "group_dm" && (mobile || membersOpen) ? (
+          <aside className={s.members} data-open={mobile ? membersOpen : undefined}>
             <div className={s.mHead}>Members — {channel.recipient_ids.length}</div>
             {channel.recipient_ids.map((id) => {
               const u = users[id];

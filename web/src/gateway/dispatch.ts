@@ -120,7 +120,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useMessages.getState().setReaction(e.d.channel_id, e.d.message_id, e.d.emoji, e.d.user_id, e.t === "reaction_add", e.d.user_id === meId);
       return;
     case "typing":
-      if (e.d.user_id !== meId) useTyping.getState().add(e.d.channel_id, e.d.user_id, e.d.ts);
+      if (e.d.user_id === meId) return;
+      if (e.d.stop) useTyping.getState().remove(e.d.channel_id, e.d.user_id);
+      else useTyping.getState().add(e.d.channel_id, e.d.user_id, e.d.ts);
       return;
     case "channel_create":
     case "channel_update":

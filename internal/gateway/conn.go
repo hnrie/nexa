@@ -234,6 +234,16 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		if err := json.Unmarshal(f.D, &d); err != nil || d.ChannelID.IsZero() {
 			return
 		}
+		if d.Stop {
+			c.typMu.Lock()
+			_, seen := c.typing[d.ChannelID]
+			delete(c.typing, d.ChannelID)
+			c.typMu.Unlock()
+			if seen {
+				h.TypingStop(ctx, c.user.ID, d.ChannelID)
+			}
+			return
+		}
 		c.typMu.Lock()
 		last, seen := c.typing[d.ChannelID]
 		now := time.Now()
@@ -249,6 +259,25 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 			h.VoiceOp(ctx, &Conn{c: c}, f.Op, f.D)
 		}
 	}
+}
+
+// TypingStop clears a typing indicator immediately (the author sent or cleared the box).
+func (h *Hub) TypingStop(ctx context.Context, uid, channelID ids.ID) {
+	ok, err := h.CanAccess(ctx, uid, channelID)
+	if err != nil || !ok {
+		return
+	}
+	viewers, err := h.Viewers(ctx, channelID)
+	if err != nil {
+		return
+	}
+	others := make([]ids.ID, 0, len(viewers))
+	for _, v := range viewers {
+		if v != uid {
+			others = append(others, v)
+		}
+	}
+	h.EmitUsers(others, EvTyping, map[string]any{"channel_id": channelID, "user_id": uid, "ts": time.Now().UnixMilli(), "stop": true})
 }
 
 // Typing broadcasts a typing indicator after checking access.

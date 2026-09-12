@@ -11,6 +11,7 @@ function fit(w: number | undefined, h: number | undefined, maxW = 400, maxH = 30
   return { width: Math.round(w * r), height: Math.round(h * r) };
 }
 
+/** Saves the proxied URL, so favourites load through this server too. */
 export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: number }) {
   const favs = useSettings((st) => st.settings.favoriteGifs);
   const patch = useSettings((st) => st.patch);
@@ -42,7 +43,7 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
     <div className={s.imageWrap} style={dims}>
       <img className={s.image} src={src} alt="" loading="lazy" style={dims} onClick={() => setOpen(true)} referrerPolicy="no-referrer" />
       {e.type === "gif" ? <span className={s.gifBadge}>GIF</span> : null}
-      <FavoriteButton url={e.url} {...(e.image_w ? { w: e.image_w } : {})} {...(e.image_h ? { h: e.image_h } : {})} />
+      <FavoriteButton url={src} {...(e.image_w ? { w: e.image_w } : {})} {...(e.image_h ? { h: e.image_h } : {})} />
       {open ? (
         <div className={s.lightbox} onClick={() => setOpen(false)}>
           <img src={src} alt="" referrerPolicy="no-referrer" />

@@ -127,6 +127,10 @@ export function Composer({ channel }: { channel: Channel }) {
   useEffect(() => {
     if (draftTimer.current) clearTimeout(draftTimer.current);
     draftTimer.current = null;
+    if (lastTyping.current) {
+      lastTyping.current = 0;
+      gateway()?.sendTypingStop(channel.id);
+    }
     setText(useSettings.getState().settings.drafts[channel.id] ?? "");
     setFiles([]);
     setAc(null);
@@ -179,6 +183,10 @@ export function Composer({ channel }: { channel: Channel }) {
     if (value.trim() && now - lastTyping.current > TYPING_INTERVAL) {
       lastTyping.current = now;
       gateway()?.sendTyping(channel.id);
+    } else if (!value.trim() && lastTyping.current) {
+      // clearing the box stops the indicator for everyone else at once
+      lastTyping.current = 0;
+      gateway()?.sendTypingStop(channel.id);
     }
   };
 
@@ -248,6 +256,10 @@ export function Composer({ channel }: { channel: Channel }) {
         opts.attachments = uploaded;
       }
       setText("");
+      if (lastTyping.current) {
+        lastTyping.current = 0;
+        gateway()?.sendTypingStop(channel.id);
+      }
       if (draftTimer.current) clearTimeout(draftTimer.current); // a pending save must not resurrect the sent text
       draftTimer.current = null;
       setDraft(channel.id, "");
@@ -261,7 +273,8 @@ export function Composer({ channel }: { channel: Channel }) {
         if (files.length) toast(msg, "error");
     } finally {
       setSending(false);
-      taRef.current?.focus();
+      // the box keeps focus through the round trip; restore it if an upload dialog stole it
+      requestAnimationFrame(() => taRef.current?.focus({ preventScroll: true }));
     }
   };
 
@@ -371,7 +384,6 @@ export function Composer({ channel }: { channel: Channel }) {
           rows={1}
           maxLength={MAX_LEN + 500}
           aria-label={placeholder}
-          disabled={sending}
         />
         <div className={s.btns}>
           <button className={s.iconBtn} data-on={picker} aria-label="Select emoji" onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>

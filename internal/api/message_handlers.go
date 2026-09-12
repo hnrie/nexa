@@ -234,6 +234,10 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if s.isDM(ch) {
+		// a conversation someone closed comes back when it has something new in it
+		_ = s.Store.UnhideDM(ctx, ch.ID)
+	}
 	m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
 		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: dedupeIDs(body.MentionRoles, maxMentions), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds}
 	if body.ReplyToID != nil {

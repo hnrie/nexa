@@ -212,7 +212,7 @@ func TestInvitesBansAudit(t *testing.T) {
 	ctx := context.Background()
 	owner, u := mkUser(t, s, "owner"), mkUser(t, s, "u")
 	srv, _ := s.CreateServer(ctx, owner.ID, "S")
-	in, err := s.CreateInvite(ctx, srv.ID, srv.SystemChannelID, owner.ID, 0, 2)
+	in, err := s.CreateInvite(ctx, &srv.ID, srv.SystemChannelID, owner.ID, 0, 2)
 	if err != nil || len(in.Code) != 8 {
 		t.Fatalf("invite: %v %+v", err, in)
 	}
@@ -232,13 +232,13 @@ func TestInvitesBansAudit(t *testing.T) {
 	if _, err := s.InviteByCode(ctx, in.Code); !errors.Is(err, ErrNotFound) {
 		t.Error("exhausted invite hidden")
 	}
-	expired, _ := s.CreateInvite(ctx, srv.ID, nil, owner.ID, 1, 0)
+	expired, _ := s.CreateInvite(ctx, &srv.ID, nil, owner.ID, 1, 0)
 	exp := nowMs() - 5000
 	_, _ = s.db.W.Exec(`UPDATE invites SET expires_at = ? WHERE code = ?`, exp, expired.Code)
 	if _, err := s.InviteByCode(ctx, expired.Code); !errors.Is(err, ErrNotFound) {
 		t.Error("expired invite hidden")
 	}
-	live, _ := s.CreateInvite(ctx, srv.ID, nil, owner.ID, 3600, 0)
+	live, _ := s.CreateInvite(ctx, &srv.ID, nil, owner.ID, 3600, 0)
 	list, _ := s.InvitesForServer(ctx, srv.ID)
 	if len(list) != 1 || list[0].Code != live.Code {
 		t.Errorf("live invites: %+v", list)

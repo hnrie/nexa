@@ -154,6 +154,11 @@ export class GatewayClient {
     this.send("typing", { channel_id: channelId });
   }
 
+  /** Ends our typing indicator for everyone else immediately. */
+  sendTypingStop(channelId: string): void {
+    this.send("typing", { channel_id: channelId, stop: true });
+  }
+
   sendPresence(p: {
     status?: Presence["status"];
     status_text?: string;

@@ -43,7 +43,9 @@
 .msg[data-pending="true"] { opacity: 0.55; }
 .msg[data-failed="true"] .content { color: var(--danger); }
 .avatar { position: absolute; left: 16px; top: 2px; cursor: pointer; }
-.avatar[data-group-start="true"] { top: 2px; }
+/* a reply preview occupies the first line, so the avatar drops to the author row */
+.msg[data-reply="true"] .avatar { top: 26px; }
+.msg[data-reply="true"] .replyLine::before { bottom: auto; height: 15px; }
 .gutterTime { position: absolute; left: 0; width: 72px; top: 4px; font-size: 11px; color: var(--text-muted); text-align: center; opacity: 0; user-select: none; }
 .msg:hover .gutterTime { opacity: 1; }
 .headerRow { display: flex; align-items: baseline; gap: 6px; line-height: 22px; min-height: 22px; }
@@ -54,12 +56,19 @@
 .edited { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
 .content > :global(.md-paragraph):last-of-type { display: inline; }
 .waiting { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }
-.replyLine { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; font-size: 14px; color: var(--text-muted); position: relative; cursor: pointer; }
-.replyLine::before { content: ""; position: absolute; left: -36px; top: 50%; width: 30px; height: 12px; border-left: 2px solid var(--border-strong); border-top: 2px solid var(--border-strong); border-top-left-radius: 6px; }
+.replyLine { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; height: 22px; font-size: 14px; color: var(--text-muted); position: relative; cursor: pointer; }
+/* the spine hooks up from the avatar column into this line; the avatar sits below it */
+.replyLine::before { content: ""; position: absolute; left: -38px; top: 11px; bottom: -6px; width: 32px; border-left: 2px solid var(--border-strong); border-top: 2px solid var(--border-strong); border-top-left-radius: 6px; pointer-events: none; }
+.replyLine > span:first-of-type { flex: none; }
 .replyName { font-weight: 500; color: var(--text); }
 .replyText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .replyLine:hover .replyText { color: var(--text); }
 .toolbar { position: absolute; right: 16px; top: -16px; display: none; align-items: center; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-xs); box-shadow: var(--shadow-low); z-index: 2; }
+/* the top rows have nothing to overhang into, so the toolbar tucks inside instead of being clipped */
+.msg[data-first="true"] .toolbar { top: 2px; }
+.toolbar[data-shift="true"] { border-color: var(--brand); }
+.tDanger { color: var(--danger); }
+.tDanger:hover { color: #fff; background: var(--danger); }
 .msg:hover .toolbar, .msg[data-menu="true"] .toolbar { display: flex; }
 .tBtn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--icon); }
 .tBtn:hover { color: var(--text); background: var(--bg-hover); }
@@ -81,7 +90,9 @@
 .editTa { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-composer); color: var(--text); border: 0; outline: none; resize: none; font: inherit; font-size: 16px; line-height: 22px; }
 .editHint { font-size: 12px; color: var(--text-muted); }
 .editHint b { color: var(--link); cursor: pointer; font-weight: 400; }
-.jumbo { font-size: 48px; line-height: 1.1; }
+/* the emoji themselves scale from --jumbo-size; the block keeps the normal text size
+   so a stray character next to them is not enormous too */
+.jumbo { line-height: 1.15; }
 .att { margin-top: 4px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .imgWrap { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-input); cursor: pointer; max-width: 100%; }
 .imgWrap img, .imgWrap video { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -126,5 +137,15 @@
 .compact .headerRow { display: inline; margin-right: 6px; }
 .compact .content { display: inline; }
 .compact .gutterTime { opacity: 1; top: 4px; }
-@media (max-width: 767px) { .msg { padding: 2px 16px 2px 64px; } .avatar { left: 12px; } .gutterTime { display: none; } .members { display: none; } .file { width: 100%; } .toolbar { right: 8px; } }
+.membersBackdrop { position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.5); }
+@media (max-width: 767px) {
+  .msg { padding: 2px 16px 2px 64px; }
+  .avatar { left: 12px; }
+  .msg[data-reply="true"] .avatar { top: 26px; }
+  .gutterTime { display: none; }
+  .file { width: 100%; }
+  .toolbar { right: 8px; }
+  .members { position: fixed; top: 0; right: 0; bottom: 0; z-index: 40; width: min(300px, 84vw); border-left: 1px solid var(--border); box-shadow: var(--shadow-high); transform: translateX(100%); transition: transform 200ms ease; }
+  .members[data-open="true"] { transform: none; }
+}
 .sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; }

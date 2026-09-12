@@ -100,6 +100,21 @@ func NewService() *Service {
 	return &Service{Fetcher: &Fetcher{Timeout: 6 * time.Second, MaxBytes: 2 << 20, UserAgent: defaultUserAgent}, Cache: NewCache(2000, time.Hour)}
 }
 
+// MediaFetcher is a looser fetcher for streaming media through the proxy: the
+// same SSRF guard, but a longer timeout and no small byte budget.
+func (s *Service) MediaFetcher() *Fetcher {
+	base := s.Fetcher
+	f := &Fetcher{Timeout: 20 * time.Second, MaxBytes: 25 << 20, UserAgent: defaultUserAgent}
+	if base != nil {
+		f.Resolver = base.Resolver
+		f.Transport = base.Transport
+		if base.UserAgent != "" {
+			f.UserAgent = base.UserAgent
+		}
+	}
+	return f
+}
+
 // Lookup returns the cached outcome for rawURL or fetches it.
 func (s *Service) Lookup(ctx context.Context, rawURL string) (*Result, error) {
 	if s.Cache != nil {

@@ -122,4 +122,6 @@ type presenceData struct {
 
 type typingData struct {
 	ChannelID ids.ID `json:"channel_id"`
+	// Stop ends the indicator at once instead of waiting for it to expire.
+	Stop bool `json:"stop"`
 }

@@ -260,6 +260,7 @@ func (s *Server) handlePackCreate(w http.ResponseWriter, r *http.Request) {
 		Name        string  `json:"name"`
 		Description string  `json:"description"`
 		ServerID    *ids.ID `json:"server_id"`
+		Kind        string  `json:"kind"`
 	}
 	if err := ReadJSON(w, r, &req, 8<<10); err != nil {
 		WriteError(w, err)
@@ -270,7 +271,10 @@ func (s *Server) handlePackCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, apiErr)
 		return
 	}
-	p := &store.StickerPack{Name: name, Description: desc}
+	if req.Kind != "emoji" {
+		req.Kind = "sticker"
+	}
+	p := &store.StickerPack{Name: name, Description: desc, Kind: req.Kind}
 	if req.ServerID != nil {
 		perm, err := s.Store.ServerPerms(r.Context(), *req.ServerID, me.ID)
 		if err != nil || perm == 0 {
@@ -466,18 +470,33 @@ func (s *Server) handleStickerCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_tags", "Tags are at most 200 characters."))
 		return
 	}
-	lim := s.limitsFor("sticker")
+	kind := "sticker"
+	if p.Kind == "emoji" {
+		kind = "emoji"
+	}
+	lim := s.limitsFor(kind)
 	r.Body = http.MaxBytesReader(w, r.Body, lim.MaxBytes+1)
-	b, err := s.Media.PutPublic(r.Context(), "sticker", r.Body, lim, me.ID)
+	b, err := s.Media.PutPublic(r.Context(), kind, r.Body, lim, me.ID)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 	format := stickerFormat(b.Mime, b.Animated)
+	if format == "" && kind == "emoji" && b.Mime == "image/jpeg" {
+		format = "jpeg"
+	}
 	if format == "" {
 		_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)
-		WriteError(w, E(http.StatusBadRequest, "unsupported_format", "Stickers must be PNG, APNG, GIF or WebP."))
+		WriteError(w, E(http.StatusBadRequest, "unsupported_format", "Images must be PNG, APNG, GIF or WebP."))
 		return
+	}
+	if kind == "emoji" && !reEmojiName.MatchString(strings.ReplaceAll(name, " ", "_")) {
+		_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)
+		WriteError(w, E(http.StatusBadRequest, "invalid_name", "Emoji names are 2–32 letters, numbers or underscores."))
+		return
+	}
+	if kind == "emoji" {
+		name = strings.ReplaceAll(name, " ", "_")
 	}
 	st := &store.Sticker{PackID: p.ID, Name: name, Tags: tags, BlobID: b.ID, Format: format, CreatorID: me.ID, Width: b.Width, Height: b.Height, Animated: b.Animated}
 	if err := s.Store.AddSticker(r.Context(), st); err != nil {
@@ -753,12 +772,12 @@ func (s *Server) gifProxy(w http.ResponseWriter, r *http.Request, endpoint strin
 		if !ok || gif.URL == "" {
 			continue
 		}
-		out := gifResult{ID: item.ID, URL: gif.URL, Preview: gif.URL, Title: item.ContentDescription}
+		out := gifResult{ID: item.ID, URL: s.ProxyURL(gif.URL), Preview: s.ProxyURL(gif.URL), Title: item.ContentDescription}
 		if len(gif.Dims) == 2 {
 			out.W, out.H = gif.Dims[0], gif.Dims[1]
 		}
 		if tiny, ok := item.MediaFormats["tinygif"]; ok && tiny.URL != "" {
-			out.Preview = tiny.URL
+			out.Preview = s.ProxyURL(tiny.URL)
 		}
 		page.Results = append(page.Results, out)
 	}

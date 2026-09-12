@@ -246,8 +246,9 @@ type ChannelPosition struct {
 
 // Invite is a server invite link.
 type Invite struct {
-	Code      string  `json:"code"`
-	ServerID  ids.ID  `json:"server_id"`
+	Code string `json:"code"`
+	// ServerID is nil for a group DM invite, where ChannelID carries the group.
+	ServerID  *ids.ID `json:"server_id"`
 	ChannelID *ids.ID `json:"channel_id"`
 	InviterID ids.ID  `json:"inviter_id"`
 	MaxUses   int     `json:"max_uses"`

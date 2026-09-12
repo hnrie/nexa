@@ -25,25 +25,25 @@ const inviteCols = `code, server_id, channel_id, inviter_id, max_uses, uses, exp
 
 func scanInvite(r rowScanner) (*Invite, error) {
 	var in Invite
-	var ch, exp sql.NullInt64
-	if err := r.Scan(&in.Code, &in.ServerID, &ch, &in.InviterID, &in.MaxUses, &in.Uses, &exp, &in.CreatedAt); err != nil {
+	var srv, ch, exp sql.NullInt64
+	if err := r.Scan(&in.Code, &srv, &ch, &in.InviterID, &in.MaxUses, &in.Uses, &exp, &in.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
 		return nil, err
 	}
-	in.ChannelID, in.ExpiresAt = idPtr(ch), int64Ptr(exp)
+	in.ServerID, in.ChannelID, in.ExpiresAt = idPtr(srv), idPtr(ch), int64Ptr(exp)
 	return &in, nil
 }
 
 // CreateInvite makes a new invite; maxAge is seconds (0 = never), maxUses 0 = unlimited.
-func (s *Store) CreateInvite(ctx context.Context, serverID ids.ID, channelID *ids.ID, inviter ids.ID, maxAge int64, maxUses int) (*Invite, error) {
+func (s *Store) CreateInvite(ctx context.Context, serverID *ids.ID, channelID *ids.ID, inviter ids.ID, maxAge int64, maxUses int) (*Invite, error) {
 	in := &Invite{Code: newInviteCode(), ServerID: serverID, ChannelID: channelID, InviterID: inviter, MaxUses: maxUses, CreatedAt: nowMs()}
 	if maxAge > 0 {
 		exp := in.CreatedAt + maxAge*1000
 		in.ExpiresAt = &exp
 	}
-	_, err := s.db.W.ExecContext(ctx, `INSERT INTO invites (`+inviteCols+`) VALUES (?,?,?,?,?,?,?,?)`, in.Code, int64(serverID), nullID(channelID), int64(inviter), in.MaxUses, 0, nullInt64(in.ExpiresAt), in.CreatedAt)
+	_, err := s.db.W.ExecContext(ctx, `INSERT INTO invites (`+inviteCols+`) VALUES (?,?,?,?,?,?,?,?)`, in.Code, nullID(serverID), nullID(channelID), int64(inviter), in.MaxUses, 0, nullInt64(in.ExpiresAt), in.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +191,24 @@ func (s *Store) AuditEntries(ctx context.Context, serverID, before ids.ID, limit
 		e.TargetID = idPtr(target)
 		e.Changes = json.RawMessage(changes)
 		out = append(out, &e)
+	}
+	return out, rows.Err()
+}
+
+// InvitesForChannel lists the live invites of one group DM.
+func (s *Store) InvitesForChannel(ctx context.Context, channelID ids.ID) ([]*Invite, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+inviteCols+` FROM invites WHERE channel_id = ? AND server_id IS NULL AND (expires_at IS NULL OR expires_at > ?) AND (max_uses = 0 OR uses < max_uses) ORDER BY created_at DESC`, int64(channelID), nowMs())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Invite{}
+	for rows.Next() {
+		in, err := scanInvite(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, in)
 	}
 	return out, rows.Err()
 }

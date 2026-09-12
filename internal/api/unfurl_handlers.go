@@ -46,6 +46,13 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadGateway, "fetch_failed", "That link could not be fetched."))
 		return
 	}
+	// every remote image the client loads goes through our proxy, so opening a
+	// chat never hands the reader's address to whoever hosts the picture
+	out := *res
+	if out.Image == "" && (out.Type == "image" || out.Type == "gif" || out.Type == "video") {
+		out.Image = out.URL
+	}
+	out.Image = s.ProxyURL(out.Image)
 	w.Header().Set("Cache-Control", "private, max-age=3600")
-	WriteJSON(w, http.StatusOK, res)
+	WriteJSON(w, http.StatusOK, &out)
 }

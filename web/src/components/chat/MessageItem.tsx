@@ -1,7 +1,7 @@
-import { Lock, MoreHorizontal, Pencil, Reply, SmilePlus } from "lucide-react";
+import { Link2, Lock, MailOpen, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
-import { Markdown, isEmojiOnly, parse, plainText } from "@/markdown";
+import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { formatFull, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
@@ -11,6 +11,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
+import { useShiftHeld } from "@/hooks/useShiftHeld";
 import { stickerUrl } from "@/api/users";
 import type { MessagePayload } from "@/crypto/message";
 import { Attachments } from "./Attachments";
@@ -20,7 +21,7 @@ import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
 import { Reactions } from "./Reactions";
 import { SystemMessage } from "./SystemMessage";
-import { buildMessageMenu, canEdit } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, copyMessageLink, deleteMessageNow, markUnread } from "./messageMenu";
 import s from "./Chat.module.css";
 
 interface Props {
@@ -28,6 +29,8 @@ interface Props {
   groupStart: boolean;
   pending?: "sending" | "failed";
   highlight?: boolean;
+  /** The topmost row in the list; its hover toolbar must not overhang out of view. */
+  first?: boolean;
 }
 
 function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
@@ -48,7 +51,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   );
 }
 
-export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, highlight }: Props) {
+export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
   const author = useUsers((u) => u.byId[msg.author_id]);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
@@ -64,11 +67,18 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const color = serverState ? memberColor(serverState, msg.author_id) : undefined;
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const shift = useShiftHeld();
 
   const mentioned = !!me && (msg.mention_everyone || msg.mentions.includes(me.id)) && msg.author_id !== me.id;
   const text = msg.payload?.t ?? "";
   const nodes = useMemo(() => (text ? parse(text) : []), [text]);
   const jumbo = useMemo(() => nodes.length > 0 && isEmojiOnly(nodes), [nodes]);
+  // one to three emoji get the big treatment; a wall of them shrinks so it still fits a line
+  const jumboSize = useMemo(() => {
+    if (!jumbo) return undefined;
+    const n = emojiCount(nodes);
+    return n <= 3 ? 48 : n <= 8 ? 36 : 28;
+  }, [jumbo, nodes]);
 
   const openMenu = useCallback((x: number, y: number) => {
     setMenuOpen(true);
@@ -95,6 +105,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       data-group-start={showHeader}
       data-mentioned={mentioned}
       data-highlight={highlight}
+      data-first={first}
+      data-reply={isReply}
       data-pending={pending === "sending"}
       data-failed={pending === "failed"}
       data-menu={menuOpen}
@@ -121,7 +133,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {editing ? (
         <EditMessage msg={msg} />
       ) : (
-        <div className={[s.content, jumbo ? s.jumbo : ""].join(" ")}>
+        <div className={[s.content, jumbo ? s.jumbo : ""].join(" ")} style={jumboSize ? ({ "--jumbo-size": `${jumboSize}px` } as React.CSSProperties) : undefined}>
           {msg.decryptError === "no_key" ? (
             <span className={s.waiting}><Lock size={14} /> Waiting for the encryption key…</span>
           ) : msg.decryptError === "bad" ? (
@@ -140,12 +152,24 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       )}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {!pending && !editing ? (
-        <div className={s.toolbar} role="toolbar">
-          <button className={s.tBtn} title="Add Reaction" aria-label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={20} /></button>
-          {canEdit(msg) ? (
-            <button className={s.tBtn} title="Edit" aria-label="Edit" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={20} /></button>
-          ) : null}
-          <button className={s.tBtn} title="Reply" aria-label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={20} /></button>
+        <div className={s.toolbar} role="toolbar" data-shift={shift}>
+          {shift ? (
+            <>
+              <button className={s.tBtn} title="Mark Unread" aria-label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={20} /></button>
+              <button className={s.tBtn} title="Copy Message Link" aria-label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={20} /></button>
+              {canDelete(msg) ? (
+                <button className={[s.tBtn, s.tDanger].join(" ")} title="Delete (no confirmation while Shift is held)" aria-label="Delete Message" onClick={() => void deleteMessageNow(msg)}><Trash2 size={20} /></button>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <button className={s.tBtn} title="Add Reaction" aria-label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={20} /></button>
+              {canEdit(msg) ? (
+                <button className={s.tBtn} title="Edit" aria-label="Edit" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={20} /></button>
+              ) : null}
+              <button className={s.tBtn} title="Reply" aria-label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={20} /></button>
+            </>
+          )}
           <button className={s.tBtn} title="More" aria-label="More" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={20} /></button>
         </div>
       ) : null}

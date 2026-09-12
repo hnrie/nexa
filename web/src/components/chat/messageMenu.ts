@@ -51,26 +51,12 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks): Conte
       p.catch((err: unknown) => ui.toast(err instanceof Error ? err.message : "Could not update the pin.", "error"));
     },
   });
-  items.push({
-    id: "unread",
-    label: "Mark Unread",
-    onSelect: () => {
-      const ch = useMessages.getState().channels[msg.channel_id];
-      const ids = ch?.ids ?? [];
-      const idx = ids.indexOf(msg.id);
-      const prev = idx > 0 ? ids[idx - 1]! : "0";
-      useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: 0 });
-      void messagesApi.ack(msg.channel_id, prev === "0" ? msg.id : prev);
-      void fetchForcedAck(msg.channel_id, prev);
-    },
-  });
+  items.push({ id: "unread", label: "Mark Unread", onSelect: () => markUnread(msg) });
   if (msg.payload?.embeds?.length && useAuth.getState().me?.id === msg.author_id) {
     const suppressed = (msg.flags & 4) !== 0;
     items.push({ id: "embeds", label: suppressed ? "Show Embeds" : "Remove Embeds", onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast("Could not update embeds.", "error")) });
   }
-  const chan = useChannels.getState().byId[msg.channel_id];
-  const linkBase = chan?.server_id ? `/channels/${chan.server_id}` : "/channels/@me";
-  items.push({ id: "link", label: "Copy Message Link", onSelect: () => void navigator.clipboard?.writeText(`${location.origin}${linkBase}/${msg.channel_id}/${msg.id}`), separatorAfter: dev || canDelete(msg) });
+  items.push({ id: "link", label: "Copy Message Link", onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
   if (dev) items.push({ id: "id", label: "Copy Message ID", onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
   if (canDelete(msg)) {
     items.push({
@@ -98,4 +84,32 @@ async function fetchForcedAck(channelId: string, prev: string): Promise<void> {
 
 export function sortIds(a: string, b: string): number {
   return compareIds(a, b);
+}
+
+/** Marks the channel unread from this message down. */
+export function markUnread(msg: DecryptedMessage): void {
+  const ch = useMessages.getState().channels[msg.channel_id];
+  const ids = ch?.ids ?? [];
+  const idx = ids.indexOf(msg.id);
+  const prev = idx > 0 ? ids[idx - 1]! : "0";
+  useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: 0 });
+  void messagesApi.ack(msg.channel_id, prev === "0" ? msg.id : prev);
+  void fetchForcedAck(msg.channel_id, prev);
+}
+
+/** Copies a permalink that opens the message in its channel. */
+export function copyMessageLink(msg: DecryptedMessage): void {
+  const chan = useChannels.getState().byId[msg.channel_id];
+  const base = chan?.server_id ? `/channels/${chan.server_id}` : "/channels/@me";
+  void navigator.clipboard?.writeText(`${location.origin}${base}/${msg.channel_id}/${msg.id}`).then(() => useUI.getState().toast("Link copied.", "success"));
+}
+
+/** Deletes without the confirmation dialog (the Shift shortcut). */
+export async function deleteMessageNow(msg: DecryptedMessage): Promise<void> {
+  try {
+    await messagesApi.remove(msg.channel_id, msg.id);
+    useMessages.getState().remove(msg.channel_id, msg.id);
+  } catch (err) {
+    useUI.getState().toast(err instanceof Error ? err.message : "Could not delete the message.", "error");
+  }
 }

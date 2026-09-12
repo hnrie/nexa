@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	maxGroupMembers = 25
-	maxChannelName  = 100
+	// only the one-shot create call is capped, and only to keep the request small;
+	// a group grows without limit through invites and adds
+	maxGroupCreate = 50
+	maxChannelName = 100
 )
 
 func (s *Server) channelRoutes(mux *http.ServeMux) {
@@ -109,8 +111,8 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		WriteJSON(w, http.StatusOK, ch)
 	default:
-		if len(recipients) > maxGroupMembers-1 {
-			WriteError(w, E(http.StatusBadRequest, "group_full", "Group DMs hold up to 25 people."))
+		if len(recipients) > maxGroupCreate {
+			WriteError(w, E(http.StatusBadRequest, "too_many", "Start with fewer people and invite the rest."))
 			return
 		}
 		for _, id := range recipients {
@@ -284,10 +286,6 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 	uid, err := ids.Parse(r.PathValue("uid"))
 	if err != nil {
 		WriteError(w, ErrNotFound)
-		return
-	}
-	if len(ch.Recipients) >= maxGroupMembers {
-		WriteError(w, E(http.StatusBadRequest, "group_full", "Group DMs hold up to 25 people."))
 		return
 	}
 	ok, err := s.Store.AreFriends(r.Context(), me.ID, uid)

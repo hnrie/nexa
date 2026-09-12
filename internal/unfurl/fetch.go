@@ -101,6 +101,27 @@ func (f *Fetcher) validate(ctx context.Context, u *url.URL) error {
 	return err
 }
 
+// Client returns an http.Client that refuses private addresses and redirects
+// away from them, for callers that need the raw bytes (the media proxy).
+func (f *Fetcher) Client() *http.Client {
+	return &http.Client{
+		Transport: f.transport(),
+		Timeout:   f.timeout(),
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) > maxRedirects {
+				return errors.New("too many redirects")
+			}
+			return checkURL(req.URL)
+		},
+	}
+}
+
+// Validate reports whether a URL is safe to fetch (public host, http(s) only).
+func (f *Fetcher) Validate(ctx context.Context, u *url.URL) error { return f.validate(ctx, u) }
+
+// UA is the user agent the fetcher presents.
+func (f *Fetcher) UA() string { return f.userAgent() }
+
 // Fetch retrieves a preview for rawURL.
 func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Result, error) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))

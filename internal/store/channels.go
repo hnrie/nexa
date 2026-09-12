@@ -133,7 +133,7 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 
 // DMChannelsForUser lists the DMs and group DMs the user is in.
 func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels c WHERE c.type IN ('dm','group_dm') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ?) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels c WHERE c.type IN ('dm','group_dm') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ? AND p.hidden = 0) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -295,4 +295,28 @@ func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 		}
 		return nil
 	})
+}
+
+// HideDM closes (or reopens) a DM for one participant. A hidden DM stays out
+// of their sidebar until it has something new in it.
+func (s *Store) HideDM(ctx context.Context, chID, uid ids.ID, hidden bool) error {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE dm_participants SET hidden = ? WHERE channel_id = ? AND user_id = ?`, boolInt(hidden), int64(chID), int64(uid))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UnhideDM reopens a conversation for everyone in it (a new message arrived).
+func (s *Store) UnhideDM(ctx context.Context, chID ids.ID) error {
+	_, err := s.db.W.ExecContext(ctx, `UPDATE dm_participants SET hidden = 0 WHERE channel_id = ? AND hidden = 1`, int64(chID))
+	return err
+}
+
+// DeleteChannel removes a channel and everything hanging off it.
+func (s *Store) DeleteDMChannel(ctx context.Context, chID ids.ID) error {
+	return s.DeleteChannel(ctx, chID)
 }

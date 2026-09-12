@@ -228,11 +228,11 @@ export function MessageList({ channel }: { channel: Channel }) {
       <div className={s.scroll} ref={scrollRef} onScroll={onScroll}>
         <div className={s.inner}>
           {!hasOlder ? intro : loading || !loaded ? <div className={s.loader}><Spinner size={24} /></div> : <div style={{ height: 24 }} />}
-          {rows.map((row) => {
+          {rows.map((row, i) => {
             if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
             if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>New</span></div>;
             if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={true} pending={row.p.status} />;
-            return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} />;
+            return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
           })}
         </div>
       </div>

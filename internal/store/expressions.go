@@ -22,7 +22,10 @@ type Emoji struct {
 
 // StickerPack is a user- or server-owned collection of stickers.
 type StickerPack struct {
-	ID             ids.ID     `json:"id"`
+	ID ids.ID `json:"id"`
+	// Kind is "sticker" or "emoji": an emoji pack holds small images you type
+	// as :name:, a sticker pack holds the big ones you post on their own.
+	Kind           string     `json:"kind"`
 	OwnerUserID    *ids.ID    `json:"owner_user_id"`
 	ServerID       *ids.ID    `json:"server_id"`
 	Name           string     `json:"name"`
@@ -162,13 +165,13 @@ func (s *Store) DeleteEmoji(ctx context.Context, id ids.ID) error {
 
 // --- sticker packs -------------------------------------------------------
 
-const packCols = `id, owner_user_id, server_id, name, description, cover_sticker_id, public, created_at, updated_at`
+const packCols = `id, kind, owner_user_id, server_id, name, description, cover_sticker_id, public, created_at, updated_at`
 
 func scanPack(r rowScanner) (*StickerPack, error) {
 	var p StickerPack
 	var owner, server, cover sql.NullInt64
 	var public int64
-	if err := r.Scan(&p.ID, &owner, &server, &p.Name, &p.Description, &cover, &public, &p.CreatedAt, &p.UpdatedAt); err != nil {
+	if err := r.Scan(&p.ID, &p.Kind, &owner, &server, &p.Name, &p.Description, &cover, &public, &p.CreatedAt, &p.UpdatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -186,7 +189,10 @@ func (s *Store) CreatePack(ctx context.Context, p *StickerPack) error {
 	p.CreatedAt = nowMs()
 	p.UpdatedAt = p.CreatedAt
 	p.Stickers = []*Sticker{}
-	_, err := s.db.W.ExecContext(ctx, `INSERT INTO sticker_packs (`+packCols+`) VALUES (?,?,?,?,?,?,?,?,?)`, int64(p.ID), nullID(p.OwnerUserID), nullID(p.ServerID), p.Name, p.Description, nullID(p.CoverStickerID), boolInt(p.Public), p.CreatedAt, p.UpdatedAt)
+	if p.Kind != "emoji" {
+		p.Kind = "sticker"
+	}
+	_, err := s.db.W.ExecContext(ctx, `INSERT INTO sticker_packs (`+packCols+`) VALUES (?,?,?,?,?,?,?,?,?,?)`, int64(p.ID), p.Kind, nullID(p.OwnerUserID), nullID(p.ServerID), p.Name, p.Description, nullID(p.CoverStickerID), boolInt(p.Public), p.CreatedAt, p.UpdatedAt)
 	return err
 }
 

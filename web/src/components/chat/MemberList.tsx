@@ -22,7 +22,7 @@ const HEAD_H = 40;
 const VIRTUAL_FROM = 200;
 
 /** Members grouped by hoisted roles, then online, then offline; windowed past 200 rows. */
-export function MemberList({ serverId, channelId }: { serverId: string; channelId: string }) {
+export function MemberList({ serverId, channelId, drawer, open }: { serverId: string; channelId: string; drawer?: boolean; open?: boolean }) {
   const st = useServers((x) => x.byId[serverId]);
   const upsertMembers = useServers((x) => x.upsertMembers);
   const users = useUsers((u) => u.byId);
@@ -126,7 +126,7 @@ export function MemberList({ serverId, channelId }: { serverId: string; channelI
   };
 
   return (
-    <aside className={s.list} ref={ref} onScroll={(e) => virtual && setScrollTop(e.currentTarget.scrollTop)} data-testid="member-list">
+    <aside className={s.list} ref={ref} onScroll={(e) => virtual && setScrollTop(e.currentTarget.scrollTop)} data-testid="member-list" data-open={drawer ? !!open : undefined} aria-hidden={drawer && !open}>
       {padTop ? <div style={{ height: padTop }} /> : null}
       {rows.slice(start, end).map((row) => {
         if (row.kind === "head") {
