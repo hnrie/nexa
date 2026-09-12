@@ -1,0 +1,12 @@
+# runtime
+/data/
+/logs/
+/bin/
+/chatd.env
+# web
+/web/node_modules/
+/web/dist/
+# tooling
+/.tools/
+*.log
+.DS_Store
