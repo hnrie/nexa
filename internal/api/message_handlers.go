@@ -203,6 +203,18 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if ch.SlowmodeSeconds > 0 && !s.isDM(ch) && s.ChannelAccess != nil {
+		if ok, _ := s.ChannelAccess(ctx, me, ch, NeedManage); !ok {
+			if last, err := s.Store.LastMessageAt(ctx, ch.ID, me.ID); err == nil && last > 0 {
+				wait := time.Duration(ch.SlowmodeSeconds)*time.Second - time.Since(time.UnixMilli(last))
+				if wait > 0 {
+					w.Header().Set("Retry-After", retryAfter(wait))
+					WriteError(w, E(http.StatusTooManyRequests, "slowmode", "Slow mode is on: wait before sending another message."))
+					return
+				}
+			}
+		}
+	}
 	env, ok := s.checkEnvelope(w, r, ch, &body)
 	if !ok {
 		return

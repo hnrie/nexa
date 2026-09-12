@@ -185,6 +185,13 @@ func (s *Server) handleKeyEpochCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusConflict, "epoch_race", "Someone else just rotated this key; reload."))
 		return
 	}
+	if epoch.Epoch == 0 {
+		// a server channel that just got its own first epoch now encrypts under
+		// itself; viewers must learn the new key_conv_id before they send
+		if ch, err := s.Store.ChannelByID(ctx, epoch.ConvID); err == nil && ch.ServerID != nil {
+			s.Bcast.EmitChannel(ch.ID, "channel_update", ch)
+		}
+	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"conv_id": epoch.ConvID, "epoch": epoch.Epoch, "user_ids": entitled})
 }
 

@@ -462,3 +462,13 @@ func (s *Store) DeleteMessagesByUserSince(ctx context.Context, serverID, uid ids
 	}
 	return out, nil
 }
+
+// LastMessageAt returns the creation time of the newest user-authored message by uid in a channel (0 when none); system messages do not count.
+func (s *Store) LastMessageAt(ctx context.Context, chID, uid ids.ID) (int64, error) {
+	var t sql.NullInt64
+	err := s.db.R.QueryRowContext(ctx, `SELECT max(created_at) FROM messages WHERE channel_id = ? AND author_id = ? AND type IN ('default', 'reply')`, int64(chID), int64(uid)).Scan(&t)
+	if err != nil {
+		return 0, err
+	}
+	return t.Int64, nil
+}

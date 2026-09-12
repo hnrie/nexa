@@ -575,6 +575,20 @@ func TestChannelPositionsAndSettings(t *testing.T) {
 	if res, _ = do(t, ts, "PATCH", "/api/v1/channels/"+general["id"].(string), tokA, map[string]any{"slowmode_seconds": 99999}); res.StatusCode != 400 {
 		t.Error("slowmode bounds")
 	}
+	// slow mode applies to members without Manage Messages
+	epoch := createEpoch(t, ts, tokA, sid)
+	if res, body = sendMsg(t, ts, tokB, general["id"].(string), sid, epoch, "one", "", nil); res.StatusCode != 201 {
+		t.Fatalf("first send: %d %v", res.StatusCode, body)
+	}
+	if res, body = sendMsg(t, ts, tokB, general["id"].(string), sid, epoch, "two", "", nil); res.StatusCode != 429 || errCode(body) != "slowmode" || res.Header.Get("Retry-After") == "" {
+		t.Errorf("slowmode: %d %v", res.StatusCode, body)
+	}
+	if res, _ = sendMsg(t, ts, tokA, general["id"].(string), sid, epoch, "mod", "", nil); res.StatusCode != 201 {
+		t.Error("owner bypasses slowmode")
+	}
+	if res, _ = sendMsg(t, ts, tokA, general["id"].(string), sid, epoch, "mod2", "", nil); res.StatusCode != 201 {
+		t.Error("owner bypasses slowmode twice")
+	}
 	// deleting a category unparents its children
 	if res, _ = do(t, ts, "DELETE", "/api/v1/channels/"+projects, tokA, nil); res.StatusCode != 204 {
 		t.Fatal("delete category")
