@@ -14,6 +14,7 @@ func (s *Server) relationshipRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/users/@me/relationships", s.authed(s.handleFriendRequest))
 	mux.Handle("PUT /api/v1/users/@me/relationships/{id}", s.authed(s.handleFriendAccept))
 	mux.Handle("DELETE /api/v1/users/@me/relationships/{id}", s.authed(s.handleRelationshipDelete))
+	mux.Handle("PATCH /api/v1/users/@me/relationships/{id}", s.authed(s.handleRelationshipNickname))
 	mux.Handle("PUT /api/v1/users/@me/blocks/{id}", s.authed(s.handleBlock))
 	mux.Handle("DELETE /api/v1/users/@me/blocks/{id}", s.authed(s.handleUnblock))
 	s.Profile.MutualFriends = func(r *http.Request, me, other ids.ID) ([]ids.ID, error) {
@@ -206,4 +207,43 @@ func (s *Server) handleUnblock(w http.ResponseWriter, r *http.Request) {
 		s.emitRelationship(r, me, target)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleRelationshipNickname sets a private nickname for a friend.
+func (s *Server) handleRelationshipNickname(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	other, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	var req struct {
+		Nickname string `json:"nickname"`
+	}
+	if err := ReadJSON(w, r, &req, 2<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	nick, ok := CleanText(strings.Join(strings.Fields(req.Nickname), " "), 32)
+	if !ok {
+		WriteError(w, E(http.StatusBadRequest, "invalid_nickname", "Nicknames are at most 32 characters."))
+		return
+	}
+	if err := s.Store.SetRelationshipNickname(r.Context(), me.ID, other, nick); err != nil {
+		WriteError(w, err)
+		return
+	}
+	rel, err := s.Store.Relationship(r.Context(), me.ID, other)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	u, err := s.Store.UserByID(r.Context(), other)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	view := store.RelationshipView{User: u.Public(), Type: rel.Type, Nickname: rel.Nickname, CreatedAt: rel.CreatedAt}
+	s.Bcast.EmitUsers([]ids.ID{me.ID}, "relationship_add", view)
+	WriteJSON(w, http.StatusOK, view)
 }

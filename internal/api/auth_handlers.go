@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
@@ -95,12 +96,13 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-	switch s.Cfg.Registration {
+	mode, regKey := s.registrationPolicy(ctx)
+	switch mode {
 	case "closed":
 		WriteError(w, E(http.StatusForbidden, "registration_closed", "This server is not accepting new accounts."))
 		return
 	case "invite":
-		keyOK := s.Cfg.RegistrationKey != "" && hmac.Equal([]byte(req.RegistrationKey), []byte(s.Cfg.RegistrationKey))
+		keyOK := regKey != "" && hmac.Equal([]byte(req.RegistrationKey), []byte(regKey))
 		inviteOK := req.InviteCode != "" && s.InviteCheck != nil && s.InviteCheck(ctx, req.InviteCode)
 		if !keyOK && !inviteOK {
 			WriteError(w, E(http.StatusForbidden, "invite_required", "You need an invite to register here."))
@@ -467,4 +469,16 @@ func (s *Server) handleSessionDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// registrationPolicy is the config default, overridden by what an admin set at runtime.
+func (s *Server) registrationPolicy(ctx context.Context) (mode, key string) {
+	mode, key = s.Cfg.Registration, s.Cfg.RegistrationKey
+	if v, err := s.Store.InstanceSetting(ctx, "registration"); err == nil && v != "" {
+		mode = v
+	}
+	if v, err := s.Store.InstanceSetting(ctx, "registration_key"); err == nil && v != "" {
+		key = v
+	}
+	return mode, key
 }
