@@ -10,10 +10,14 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"golang.org/x/time/rate"
 
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -43,6 +47,10 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 		t.Fatal(err)
 	}
 	srv.Media = m
+	// Tests hammer the API from one loopback address; keep only the per-username limiter meaningful.
+	srv.limReg = ratelimit.New(rate.Inf, 1000, time.Hour)
+	srv.limAuthIP = ratelimit.New(rate.Inf, 1000, time.Hour)
+	srv.limGeneric = ratelimit.New(rate.Inf, 1000, time.Hour)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { ts.Close(); d.Close() })
 	return srv, ts

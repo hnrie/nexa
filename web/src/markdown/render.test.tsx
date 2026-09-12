@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { RenderCtx } from "./ast";
 import { Markdown, parseHighlightHtml, RenderNodes } from "./render";
@@ -141,6 +141,15 @@ describe("code", () => {
     expect(code.className).toBe("hljs language-notalang");
     expect(code.textContent).toBe("let x = 1");
     expect(code.querySelector("span")).toBeNull();
+  });
+
+  it("highlights a known language once highlight.js has loaded", async () => {
+    const { container } = render(<Markdown source={"```js\nconst a = 1;\n```"} ctx={makeCtx()} />);
+    expect(container.querySelector("pre.md-codeblock code")?.textContent).toBe("const a = 1;");
+    await waitFor(() => {
+      expect(container.querySelector("code .hljs-keyword")?.textContent).toBe("const");
+    });
+    expect(container.querySelector("pre.md-codeblock code")?.textContent).toBe("const a = 1;");
   });
 
   it("renders a fence without a language", () => {

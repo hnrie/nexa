@@ -23,7 +23,12 @@ var (
 // Store wraps the database pools.
 type Store struct {
 	db *db.DB
+	// EntitledHook resolves key entitlement for conversations the DM layer
+	// does not know (servers and private channels); set by the server layer.
+	EntitledHook func(ctx context.Context, conv ids.ID) ([]ids.ID, error)
 }
+
+type sqlNullInt = sql.NullInt64
 
 // New returns a Store over d.
 func New(d *db.DB) *Store { return &Store{db: d} }

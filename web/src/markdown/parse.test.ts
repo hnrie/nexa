@@ -333,6 +333,7 @@ describe("plainText", () => {
     expect(plainText(parse("a\nb"))).toBe("a\nb");
     expect(plainText(parse("# h\ntext"))).toBe("h\ntext");
     expect(plainText(parse("- a\n- b"))).toBe("a\nb");
+    expect(plainText(parse("- a\n  - b\n- c"))).toBe("a\nb\nc");
   });
   it("returns an empty string for an empty message", () => {
     expect(plainText(parse(""))).toBe("");

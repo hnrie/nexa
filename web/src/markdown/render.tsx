@@ -1,0 +1,404 @@
+import { Fragment, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import type { Node, RenderCtx } from "./ast";
+import { parse } from "./parse";
+
+// ---------------------------------------------------------------------------
+// React renderer for the markdown AST.
+//
+// Everything here builds real React elements; no HTML string ever reaches the
+// DOM, including the syntax highlighting, which is converted from highlight.js'
+// output by `parseHighlightHtml` below.
+// ---------------------------------------------------------------------------
+
+/** Renders a raw message. `parse` is memoised on the source and the mode. */
+export function Markdown(props: { source: string; ctx: RenderCtx; inline?: boolean; jumbo?: boolean }): JSX.Element {
+  const { source, ctx, inline, jumbo } = props;
+  const nodes = useMemo(() => parse(source, { inline: inline === true }), [source, inline]);
+  return <RenderNodes nodes={nodes} ctx={ctx} jumbo={jumbo} />;
+}
+
+/** Renders an already parsed list of nodes. */
+export function RenderNodes(props: { nodes: Node[]; ctx: RenderCtx; jumbo?: boolean }): JSX.Element {
+  const { nodes, ctx, jumbo } = props;
+  return (
+    <>
+      {nodes.map((node, i) => (
+        <Fragment key={i}>{renderNode(node, ctx, jumbo === true)}</Fragment>
+      ))}
+    </>
+  );
+}
+
+function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
+  switch (node.type) {
+    case "text":
+      return node.text;
+    case "br":
+      return <br />;
+    case "strong":
+      return (
+        <strong>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </strong>
+      );
+    case "em":
+      return (
+        <em>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </em>
+      );
+    case "u":
+      return (
+        <u>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </u>
+      );
+    case "s":
+      return (
+        <s>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </s>
+      );
+    case "spoiler":
+      return (
+        <Spoiler ctx={ctx}>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </Spoiler>
+      );
+    case "paragraph":
+      return (
+        <div className="md-paragraph">
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </div>
+      );
+    case "quote":
+      return (
+        <blockquote className="md-quote">
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </blockquote>
+      );
+    case "heading": {
+      const Tag = (node.level === 1 ? "h1" : node.level === 2 ? "h2" : "h3") as "h1" | "h2" | "h3";
+      return (
+        <Tag className={"md-h" + String(node.level)}>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </Tag>
+      );
+    }
+    case "subtext":
+      return (
+        <small className="md-subtext">
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </small>
+      );
+    case "list": {
+      const items = node.items.map((item, i) => (
+        <li key={i} className="md-list-item">
+          <RenderNodes nodes={item} ctx={ctx} jumbo={jumbo} />
+        </li>
+      ));
+      return node.ordered ? (
+        <ol className="md-list" start={node.start}>
+          {items}
+        </ol>
+      ) : (
+        <ul className="md-list">{items}</ul>
+      );
+    }
+    case "code":
+      return <code className="md-inline-code">{node.text}</code>;
+    case "codeblock":
+      return <CodeBlock lang={node.lang} text={node.text} />;
+    case "link":
+      return (
+        <a
+          href={node.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="md-link"
+          title={node.masked ? node.url : undefined}
+        >
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </a>
+      );
+    case "mention":
+      switch (node.kind) {
+        case "everyone":
+          return <span className="md-mention">@everyone</span>;
+        case "here":
+          return <span className="md-mention">@here</span>;
+        case "user":
+          return <UserMention id={node.id} ctx={ctx} />;
+        case "channel":
+          return <ChannelMention id={node.id} ctx={ctx} />;
+        default:
+          return <RoleMention id={node.id} ctx={ctx} />;
+      }
+    case "emoji":
+      return (
+        <img
+          className={jumbo ? "md-emoji md-emoji-jumbo" : "md-emoji"}
+          src={ctx.emojiUrl(node.id, node.animated)}
+          alt={":" + node.name + ":"}
+          title={":" + node.name + ":"}
+          draggable={false}
+        />
+      );
+    case "unicodeEmoji":
+      return (
+        <span className={jumbo ? "md-emoji-unicode md-emoji-jumbo" : "md-emoji-unicode"}>{node.text}</span>
+      );
+    case "timestamp":
+      return <Timestamp unix={node.unix} style={node.style} />;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// spoilers
+// ---------------------------------------------------------------------------
+
+function Spoiler(props: { ctx: RenderCtx; children: ReactNode }): JSX.Element {
+  const [revealed, setRevealed] = useState(false);
+  const open = props.ctx.revealSpoilers === true || revealed;
+  return (
+    <span
+      className="md-spoiler"
+      data-revealed={open}
+      role="button"
+      tabIndex={0}
+      onClick={() => setRevealed(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") setRevealed(true);
+      }}
+    >
+      {props.children}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// mentions
+// ---------------------------------------------------------------------------
+
+function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
+  const user = props.ctx.users[props.id];
+  const name = user ? user.display_name || user.username || "unknown-user" : "unknown-user";
+  return (
+    <span
+      className="md-mention"
+      role="button"
+      tabIndex={0}
+      onClick={(e) => props.ctx.onUserClick?.(props.id, e.currentTarget)}
+    >
+      {"@" + name}
+    </span>
+  );
+}
+
+function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
+  const channel = props.ctx.channels[props.id];
+  const name = channel ? channel.name || "deleted-channel" : "deleted-channel";
+  return (
+    <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)}>
+      {"#" + name}
+    </span>
+  );
+}
+
+function RoleMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
+  const role = props.ctx.roles?.[props.id];
+  const name = role ? role.name || "unknown-role" : "unknown-role";
+  const style = role ? { color: hexColor(role.color), backgroundColor: rgbaColor(role.color, 0.1) } : undefined;
+  return (
+    <span className="md-mention" style={style}>
+      {"@" + name}
+    </span>
+  );
+}
+
+function clampColor(color: number): number {
+  return Number.isFinite(color) ? Math.max(0, Math.min(0xffffff, Math.trunc(color))) : 0;
+}
+
+function hexColor(color: number): string {
+  return "#" + clampColor(color).toString(16).padStart(6, "0");
+}
+
+function rgbaColor(color: number, alpha: number): string {
+  const value = clampColor(color);
+  const r = (value >> 16) & 0xff;
+  const g = (value >> 8) & 0xff;
+  const b = value & 0xff;
+  return "rgba(" + String(r) + ", " + String(g) + ", " + String(b) + ", " + String(alpha) + ")";
+}
+
+// ---------------------------------------------------------------------------
+// timestamps
+// ---------------------------------------------------------------------------
+
+type TimestampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R";
+
+const DATE_FORMATS: Record<Exclude<TimestampStyle, "R">, Intl.DateTimeFormatOptions> = {
+  t: { hour: "numeric", minute: "2-digit" },
+  T: { hour: "numeric", minute: "2-digit", second: "2-digit" },
+  d: { year: "numeric", month: "2-digit", day: "2-digit" },
+  D: { year: "numeric", month: "long", day: "numeric" },
+  f: { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
+  F: { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
+};
+
+const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 31557600],
+  ["month", 2629800],
+  ["week", 604800],
+  ["day", 86400],
+  ["hour", 3600],
+  ["minute", 60],
+  ["second", 1],
+];
+
+function formatRelative(unix: number): string {
+  const delta = unix - Date.now() / 1000;
+  const abs = Math.abs(delta);
+  for (const [unit, seconds] of RELATIVE_UNITS) {
+    if (abs >= seconds || unit === "second") {
+      return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(Math.round(delta / seconds), unit);
+    }
+  }
+  return "";
+}
+
+function formatStyle(date: Date, style: TimestampStyle): string {
+  if (style === "R") return formatRelative(date.getTime() / 1000);
+  return new Intl.DateTimeFormat(undefined, DATE_FORMATS[style]).format(date);
+}
+
+function Timestamp(props: { unix: number; style: TimestampStyle }): JSX.Element {
+  const date = new Date(props.unix * 1000);
+  if (Number.isNaN(date.getTime())) {
+    return <time className="md-timestamp">{String(props.unix)}</time>;
+  }
+  return (
+    <time className="md-timestamp" dateTime={date.toISOString()} title={formatStyle(date, "F")}>
+      {formatStyle(date, props.style)}
+    </time>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// code blocks + the highlight.js html -> react bridge
+// ---------------------------------------------------------------------------
+
+export type HlNode = { type: "text"; text: string } | { type: "span"; className: string; children: HlNode[] };
+
+const RE_SPAN_OPEN = /<span class="([^"]*)">/y;
+
+/**
+ * Minimal parser for the HTML highlight.js emits. It understands exactly
+ * `<span class="...">`, `</span>` and text with the five escapes hljs writes;
+ * anything else is kept as literal text, so no markup can ever be injected.
+ */
+export function parseHighlightHtml(html: string): HlNode[] {
+  const root: HlNode[] = [];
+  const stack: HlNode[][] = [root];
+  let buf = "";
+  const top = (): HlNode[] => stack[stack.length - 1] ?? root;
+  const flush = (): void => {
+    if (buf === "") return;
+    top().push({ type: "text", text: unescapeHtml(buf) });
+    buf = "";
+  };
+
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf("<", i);
+    if (lt < 0) {
+      buf += html.slice(i);
+      break;
+    }
+    buf += html.slice(i, lt);
+    RE_SPAN_OPEN.lastIndex = lt;
+    const open = RE_SPAN_OPEN.exec(html);
+    if (open) {
+      flush();
+      const node: HlNode = { type: "span", className: open[1] ?? "", children: [] };
+      top().push(node);
+      stack.push(node.children);
+      i = RE_SPAN_OPEN.lastIndex;
+      continue;
+    }
+    if (html.startsWith("</span>", lt) && stack.length > 1) {
+      flush();
+      stack.pop();
+      i = lt + 7;
+      continue;
+    }
+    buf += "<";
+    i = lt + 1;
+  }
+  flush();
+  return root;
+}
+
+function unescapeHtml(text: string): string {
+  if (!text.includes("&")) return text;
+  return text.replace(/&(?:lt|gt|amp|quot|#x27|#39);/g, (entity) => {
+    switch (entity) {
+      case "&lt;":
+        return "<";
+      case "&gt;":
+        return ">";
+      case "&amp;":
+        return "&";
+      case "&quot;":
+        return '"';
+      default:
+        return "'";
+    }
+  });
+}
+
+function renderHl(nodes: HlNode[]): ReactNode {
+  return nodes.map((node, i) =>
+    node.type === "text" ? (
+      <Fragment key={i}>{node.text}</Fragment>
+    ) : (
+      <span key={i} className={node.className}>
+        {renderHl(node.children)}
+      </span>
+    ),
+  );
+}
+
+function CodeBlock(props: { lang: string | null; text: string }): JSX.Element {
+  const { lang, text } = props;
+  const [highlighted, setHighlighted] = useState<HlNode[] | null>(null);
+
+  useEffect(() => {
+    setHighlighted(null);
+    if (lang === null) return;
+    let alive = true;
+    void import("highlight.js/lib/common")
+      .then((mod) => {
+        if (!alive) return;
+        const hljs = mod.default;
+        if (!hljs.getLanguage(lang)) return;
+        setHighlighted(parseHighlightHtml(hljs.highlight(text, { language: lang }).value));
+      })
+      .catch(() => {
+        /* highlighting is a nicety; plain text is a fine fallback */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [lang, text]);
+
+  return (
+    <pre className="md-codeblock">
+      <code className={lang === null ? "hljs" : "hljs language-" + lang}>
+        {highlighted ? renderHl(highlighted) : text}
+      </code>
+    </pre>
+  );
+}

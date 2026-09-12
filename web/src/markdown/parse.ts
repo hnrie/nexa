@@ -633,13 +633,22 @@ function nodeText(node: Node): string {
     case "subtext":
       return node.children.map(nodeText).join("");
     case "list":
-      return node.items.map((item) => item.map(nodeText).join("")).join("\n");
+      return node.items
+        .map((item) => item.map((child) => (child.type === "list" ? "\n" + nodeText(child) : nodeText(child))).join(""))
+        .join("\n");
     case "link":
       return node.url;
     case "mention":
-      if (node.kind === "everyone") return "@everyone";
-      if (node.kind === "here") return "@here";
-      return (node.kind === "channel" ? "#" : "@") + node.id;
+      switch (node.kind) {
+        case "everyone":
+          return "@everyone";
+        case "here":
+          return "@here";
+        case "channel":
+          return "#" + node.id;
+        default:
+          return "@" + node.id;
+      }
     case "emoji":
       return ":" + node.name + ":";
     case "unicodeEmoji":

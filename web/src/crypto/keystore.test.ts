@@ -10,6 +10,43 @@ function freshUser(): string {
   return `user-${counter}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+describe("keystore schema", () => {
+  it("provisions the documented database layout", async () => {
+    // Force the keystore to create the database before inspecting it.
+    const userId = freshUser();
+    await keystore.saveIdentity(userId, generateIdentity());
+    await keystore.saveRoot(userId, "conv-a", 2, newRootKey());
+
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open("evilion-chat");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error ?? new Error("open failed"));
+    });
+    try {
+      expect(db.version).toBe(1);
+      expect([...db.objectStoreNames].sort()).toEqual(["identity", "roots"]);
+
+      const tx = db.transaction(["identity", "roots"], "readonly");
+      const identity = tx.objectStore("identity");
+      const roots = tx.objectStore("roots");
+      // Both stores use out-of-line keys supplied by the caller.
+      expect(identity.keyPath).toBeNull();
+      expect(roots.keyPath).toBeNull();
+      expect([...roots.indexNames]).toEqual(["byUser"]);
+      expect(roots.index("byUser").keyPath).toBe("userId");
+
+      const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
+        const req = roots.index("byUser").getAllKeys(userId);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error ?? new Error("getAllKeys failed"));
+      });
+      expect(keys).toEqual([`${userId}:conv-a:2`]);
+    } finally {
+      db.close();
+    }
+  });
+});
+
 describe("keystore identity", () => {
   it("round trips an identity", async () => {
     const userId = freshUser();
