@@ -1,0 +1,84 @@
+import { Hash, Lock, Volume2 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ApiError } from "@/api/client";
+import { servers as serversApi } from "@/api/servers";
+import { Button } from "@/components/common/Button";
+import { Modal } from "@/components/common/Modal";
+import { Field, TextInput } from "@/components/common/TextInput";
+import { Toggle } from "@/components/common/Toggle";
+import { P, permString } from "@/lib/perms";
+import { useChannels } from "@/stores/channels";
+import { useKeys } from "@/stores/keys";
+import { useUI } from "@/stores/ui";
+import s from "./ServerModals.module.css";
+
+function slug(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: () => void; serverId: string; parentId?: string | undefined }) {
+  const nav = useNavigate();
+  const parent = useChannels((c) => (parentId ? c.byId[parentId] : undefined));
+  const upsert = useChannels((c) => c.upsert);
+  const toast = useUI((u) => u.toast);
+  const [type, setType] = useState<"text" | "voice">("text");
+  const [name, setName] = useState("");
+  const [priv, setPriv] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    const clean = type === "text" ? slug(name) : name.trim();
+    if (!clean || busy) return;
+    setBusy(true);
+    try {
+      const body: { type: "text" | "voice"; name: string; parent_id?: string | null } = { type, name: clean };
+      if (parentId) body.parent_id = parentId;
+      const ch = await serversApi.createChannel(serverId, body);
+      upsert(ch);
+      if (priv) {
+        // deny @everyone view, then give the channel its own key so members outside it never hold one
+        const res = await serversApi.putOverwrite(ch.id, serverId, { type: "role", allow: "0", deny: permString(P.VIEW_CHANNEL) });
+        upsert(await serversApi.channels(serverId));
+        if (res.key_actions?.needs_own_key) await useKeys.getState().ensureConvKey(ch.id);
+        upsert(await serversApi.channels(serverId));
+      }
+      onClose();
+      nav(`/channels/${serverId}/${ch.id}`);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not create the channel.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Create Channel" width={460} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>Create Channel</Button></>}>
+      <div className={s.form}>
+        {parent ? <p className={s.hint}>in {parent.name}</p> : null}
+        <Field label="Channel type">
+          <div className={s.types}>
+            <label className={s.type} data-on={type === "text"}>
+              <span className={s.typeIcon}><Hash size={22} /></span>
+              <span className={s.typeText}><span className={s.typeLabel}>Text</span><span className={s.typeDesc}>Send messages, images, GIFs, emoji, opinions and puns</span></span>
+              <input type="radio" name="type" checked={type === "text"} onChange={() => setType("text")} />
+            </label>
+            <label className={s.type} data-on={type === "voice"}>
+              <span className={s.typeIcon}><Volume2 size={22} /></span>
+              <span className={s.typeText}><span className={s.typeLabel}>Voice</span><span className={s.typeDesc}>Hang out together with voice, video, and screen share</span></span>
+              <input type="radio" name="type" checked={type === "voice"} onChange={() => setType("voice")} />
+            </label>
+          </div>
+        </Field>
+        <Field label="Channel name" required>
+          <div className={s.hashInput}>
+            {type === "text" ? <Hash size={16} /> : <Volume2 size={16} />}
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="new-channel" maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
+          </div>
+        </Field>
+        <Toggle checked={priv} onChange={setPriv} label="Private Channel" description="Only selected members and roles will be able to view this channel. It gets its own encryption key." />
+        {priv ? <p className={s.fine}><Lock size={12} /> Add roles or members from the channel's permission settings after creating it.</p> : null}
+      </div>
+    </Modal>
+  );
+}

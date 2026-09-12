@@ -34,8 +34,10 @@ function onMessage(m: Message, mine: boolean): void {
   const me = useAuth.getState().me;
   if (!me) return;
   const settings = useSettings.getState().settings;
-  const level = settings.notifications.perChannel[m.channel_id] ?? "all";
-  if (settings.notifications.muted.includes(m.channel_id) || level === "none") return;
+  const chan = useChannels.getState().byId[m.channel_id];
+  const serverId = chan?.server_id ?? null;
+  const level = settings.notifications.perChannel[m.channel_id] ?? (serverId ? settings.notifications.perChannel[serverId] : undefined) ?? (serverId ? "mentions" : "all");
+  if (settings.notifications.muted.includes(m.channel_id) || (serverId && settings.notifications.muted.includes(serverId)) || level === "none") return;
   const mentioned = m.mention_everyone || m.mentions.includes(me.id);
   if (level === "mentions" && !mentioned) return;
   const ui = useUI.getState();
@@ -48,12 +50,12 @@ function onMessage(m: Message, mine: boolean): void {
   const users = useUsers.getState().byId;
   const ch = useChannels.getState().byId[m.channel_id];
   const author = displayName(users[m.author_id]);
-  const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : author;
+  const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (#${ch.name})` : author;
   try {
     const n = new Notification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null) ?? "/icons/icon-192.png", silent: true });
     n.onclick = () => {
       window.focus();
-      navigateTo?.(`/channels/@me/${m.channel_id}`);
+      navigateTo?.(ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`);
       n.close();
     };
   } catch {

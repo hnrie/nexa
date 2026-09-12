@@ -5,7 +5,8 @@ import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { channelDisplayName } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
-import { selectDMs, useChannels } from "@/stores/channels";
+import { selectDMs, selectServerChannels, useChannels } from "@/stores/channels";
+import { useServers } from "@/stores/servers";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -13,7 +14,7 @@ import s from "./QuickSwitcher.module.css";
 
 interface Item {
   id: string;
-  kind: "dm" | "friend";
+  kind: "dm" | "friend" | "channel" | "server";
   label: string;
   sub: string;
   avatarId: string | null;
@@ -40,6 +41,7 @@ export function QuickSwitcher() {
   const upsert = useChannels((c) => c.upsert);
   const users = useUsers((u) => u.byId);
   const rels = useRelationships((r) => r.byUser);
+  const servers = useServers((st) => st.byId);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -72,19 +74,28 @@ export function QuickSwitcher() {
       if (other) dmUsers.add(other);
       out.push({ id: ch.id, kind: "dm", label, sub: ch.type === "dm" ? `@${users[other]?.username ?? ""}` : `${ch.recipient_ids.length} members`, avatarId: ch.type === "dm" ? (users[other]?.avatar_id ?? null) : ch.icon_id, userId: other || ch.id, go: () => nav(`/channels/@me/${ch.id}`) });
     }
+    for (const st of Object.values(servers)) {
+      out.push({ id: "s" + st.server.id, kind: "server", label: st.server.name, sub: "Server", avatarId: null, userId: st.server.id, go: () => nav(`/channels/${st.server.id}`) });
+      for (const ch of selectServerChannels(channels, st.server.id)) {
+        if (ch.type !== "text") continue;
+        out.push({ id: ch.id, kind: "channel", label: `#${ch.name}`, sub: st.server.name, avatarId: null, userId: ch.id, go: () => nav(`/channels/${st.server.id}/${ch.id}`) });
+      }
+    }
     for (const r of Object.values(rels)) {
       if (r.type !== "friend" || dmUsers.has(r.user.id)) continue;
       out.push({ id: "u" + r.user.id, kind: "friend", label: r.user.display_name, sub: `@${r.user.username}`, avatarId: r.user.avatar_id, userId: r.user.id, go: () => void channelsApi.createDM([r.user.id]).then((ch) => { upsert(ch); nav(`/channels/@me/${ch.id}`); }) });
     }
-    const query = q.trim().toLowerCase().replace(/^@/, "");
+    const query = q.trim().toLowerCase().replace(/^[@#]/, "");
     if (!query) return out.slice(0, 10);
+    const onlyChannels = q.trim().startsWith("#");
     return out
-      .map((it) => ({ it, sc: Math.max(score(it.label, query), score(it.sub.replace(/^@/, ""), query)) }))
+      .filter((it) => !onlyChannels || it.kind === "channel")
+      .map((it) => ({ it, sc: Math.max(score(it.label.replace(/^#/, ""), query), score(it.sub.replace(/^@/, ""), query)) }))
       .filter((x) => x.sc >= 0)
       .sort((a, b) => b.sc - a.sc)
       .slice(0, 10)
       .map((x) => x.it);
-  }, [channels, users, rels, meId, q, nav, upsert]);
+  }, [channels, users, rels, servers, meId, q, nav, upsert]);
 
   if (!open) return null;
   const choose = (it: Item | undefined) => {
@@ -111,8 +122,8 @@ export function QuickSwitcher() {
           {items.length === 0 ? <div className={s.empty}>No matches.</div> : null}
           {items.map((it, i) => (
             <button key={it.id} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
-              <Avatar id={it.userId} avatarId={it.avatarId} name={it.label} size={24} />
-              <span className={s.label}>{it.label}</span>
+              {it.kind === "channel" ? <span className={s.hash}>#</span> : <Avatar id={it.userId} avatarId={it.avatarId} name={it.label.replace(/^#/, "")} size={24} />}
+              <span className={s.label}>{it.kind === "channel" ? it.label.slice(1) : it.label}</span>
               <span className={s.sub}>{it.sub}</span>
             </button>
           ))}

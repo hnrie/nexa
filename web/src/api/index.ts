@@ -11,3 +11,5 @@ export { relationships } from "./relationships";
 export { keys } from "./keys";
 export type { GrantUpload } from "./keys";
 export { unfurl } from "./unfurl";
+export { servers } from "./servers";
+export type { ServerPatch, ChannelPatch, ChannelPositionPatch, RoleBody, MemberPatch } from "./servers";

@@ -14,3 +14,9 @@ export function channelDisplayName(ch: Channel, users: Record<string, PublicUser
   }
   return ch.name;
 }
+
+/** A member's name in a server: nickname, else display name, else username. */
+export function memberName(nickname: string | undefined, u: PublicUser | undefined, fallback = "Unknown User"): string {
+  if (nickname) return nickname;
+  return displayName(u, fallback);
+}

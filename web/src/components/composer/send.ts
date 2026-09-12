@@ -11,6 +11,7 @@ import { useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { useSlowmode } from "@/stores/slowmode";
 import { extractMentions } from "./mentions";
 
 export interface SendOptions {
@@ -22,10 +23,11 @@ export interface SendOptions {
   flags?: number;
 }
 
-/** The conversation whose keys encrypt a channel: itself for DMs, the server for server channels. */
+/** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
 export function convForChannel(channelId: string): string {
   const ch = useChannels.getState().byId[channelId];
-  if (ch?.server_id && !ch.type.startsWith("dm") && ch.type !== "group_dm") return ch.server_id;
+  if (ch?.key_conv_id) return ch.key_conv_id;
+  if (ch?.server_id && ch.type !== "dm" && ch.type !== "group_dm") return ch.server_id;
   return channelId;
 }
 
@@ -66,11 +68,16 @@ export async function sendMessage(channelId: string, rawText: string, opts: Send
     useMessages.getState().insert(channelId, [decrypted]);
     useChannels.getState().setLastMessage(channelId, sent.id);
     useMessages.getState().removePending(channelId, tmp);
+    useSlowmode.getState().markSent(channelId);
   } catch (err) {
     useMessages.getState().failPending(channelId, tmp);
     const ui = useUI.getState();
     if (err instanceof Error && err.message === "waiting_for_key") ui.toast("Waiting for the encryption key for this conversation. Someone who has it needs to be online.", "error");
-    else if (err instanceof ApiError) ui.toast(err.code === "rate_limited" ? "You are sending messages too quickly." : err.message, "error");
+    else if (err instanceof ApiError && err.code === "slowmode") {
+      const secs = Number(err.retryAfter ?? 0) || 5;
+      useSlowmode.getState().setUntil(channelId, Date.now() + secs * 1000);
+      ui.toast(`Slow mode is on. Try again in ${secs}s.`, "error");
+    } else if (err instanceof ApiError) ui.toast(err.code === "rate_limited" ? "You are sending messages too quickly." : err.message, "error");
     else ui.toast("Your message could not be sent.", "error");
     throw err;
   }

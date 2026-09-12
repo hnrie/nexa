@@ -9,6 +9,8 @@ import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
+import { memberColor, useServers } from "@/stores/servers";
+import { useChannels } from "@/stores/channels";
 import { Attachments } from "./Attachments";
 import { Embeds } from "./Embeds";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
@@ -54,6 +56,10 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const setEditing = useUI((u) => u.setEditing);
   const dev = useSettings((st) => st.settings.developerMode);
   const ctx = useRenderCtx();
+  const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
+  const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
+  const member = serverState?.members[msg.author_id];
+  const color = serverState ? memberColor(serverState, msg.author_id) : undefined;
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -75,7 +81,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 
   if (msg.type.startsWith("system_")) return <SystemMessage msg={msg} />;
 
-  const name = displayName(author, msg.author_id === me?.id ? me.display_name : "Unknown User");
+  const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : "Unknown User");
+  const name = member?.nickname || baseName;
   const isReply = !!msg.reply_to_id;
   const showHeader = groupStart || isReply;
 
@@ -102,7 +109,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             <Avatar id={msg.author_id} avatarId={author?.avatar_id ?? null} name={name} size={40} />
           </div>
           <div className={s.headerRow}>
-            <span className={s.author} onClick={() => openModal("profile", { userId: msg.author_id })}>{name}</span>
+            <span className={s.author} style={color ? { color } : undefined} onClick={() => openModal("profile", { userId: msg.author_id })}>{name}</span>
             <time className={s.time} title={formatFull(msg.created_at)} dateTime={new Date(msg.created_at).toISOString()}>{formatTimestamp(msg.created_at)}</time>
           </div>
         </>

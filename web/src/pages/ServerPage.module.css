@@ -1,0 +1,7 @@
+.empty { display: flex; flex-direction: column; height: 100%; }
+.header { flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.hIcon { color: var(--text-muted); }
+.hName { font-size: 16px; font-weight: 600; color: var(--text-strong); }
+.emptyBody { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; color: var(--text-muted); }
+.emptyBody h2 { margin: 0; font-size: 20px; color: var(--text-strong); }
+.emptyBody p { margin: 0; max-width: 420px; font-size: 16px; }

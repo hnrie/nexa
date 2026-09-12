@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Channel } from "@/api/types";
+import type { Channel, Snowflake } from "@/api/types";
 import { compareIds } from "@/lib/ids";
 
 interface ChannelsState {
@@ -7,6 +7,7 @@ interface ChannelsState {
   upsert: (c: Channel | Channel[]) => void;
   remove: (id: string) => void;
   setLastMessage: (channelId: string, messageId: string) => void;
+  applyPositions: (list: { id: string; position: number; parent_id: Snowflake | null }[]) => void;
   clear: () => void;
 }
 
@@ -34,8 +35,40 @@ export const useChannels = create<ChannelsState>()((set) => ({
       if (ch.last_message_id && compareIds(ch.last_message_id, messageId) >= 0) return s;
       return { byId: { ...s.byId, [channelId]: { ...ch, last_message_id: messageId } } };
     }),
+  applyPositions: (list) =>
+    set((s) => {
+      const byId = { ...s.byId };
+      for (const p of list) {
+        const ch = byId[p.id];
+        if (ch) byId[p.id] = { ...ch, position: p.position, parent_id: p.parent_id };
+      }
+      return { byId };
+    }),
   clear: () => set({ byId: {} }),
 }));
+
+/** Channels of a server in display order: position, then id. */
+export function selectServerChannels(byId: Record<string, Channel>, serverId: string): Channel[] {
+  return Object.values(byId)
+    .filter((c) => c.server_id === serverId)
+    .sort((a, b) => a.position - b.position || compareIds(a.id, b.id));
+}
+
+export interface ChannelTree {
+  /** Channels with no category, in order. */
+  loose: Channel[];
+  categories: { category: Channel; children: Channel[] }[];
+}
+
+/** Groups a server's channels into categories the way the sidebar draws them. */
+export function channelTree(byId: Record<string, Channel>, serverId: string): ChannelTree {
+  const all = selectServerChannels(byId, serverId);
+  const cats = all.filter((c) => c.type === "category");
+  const catIds = new Set(cats.map((c) => c.id));
+  const loose = all.filter((c) => c.type !== "category" && (!c.parent_id || !catIds.has(c.parent_id)));
+  const categories = cats.map((category) => ({ category, children: all.filter((c) => c.type !== "category" && c.parent_id === category.id) }));
+  return { loose, categories };
+}
 
 /** DM and group DM channels, most recent activity first. */
 export function selectDMs(byId: Record<string, Channel>): Channel[] {

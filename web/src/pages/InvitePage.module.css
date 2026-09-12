@@ -1,0 +1,15 @@
+.page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg-base); }
+.card { width: 100%; max-width: 440px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.kicker { margin: 0; font-size: 14px; color: var(--text-muted); }
+.iconBox { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); font-size: 24px; font-weight: 600; overflow: hidden; margin: 8px 0; }
+.iconBox img { width: 100%; height: 100%; object-fit: cover; }
+.iconBox[data-invalid="true"] { background: var(--danger); color: #fff; font-size: 40px; }
+.title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); }
+.sub { margin: 0; font-size: 16px; color: var(--text-muted); }
+.counts { display: flex; gap: 16px; margin: 4px 0 16px; font-size: 14px; color: var(--text-muted); }
+.counts i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.online { background: var(--status-online); }
+.offline { background: var(--status-offline); }
+.authRow { width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.link { color: var(--link); font-size: 14px; }
+.note { margin: 12px 0 0; font-size: 13px; color: var(--text-muted); }

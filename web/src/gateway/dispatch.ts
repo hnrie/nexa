@@ -6,6 +6,7 @@ import { useMessages } from "@/stores/messages";
 import { usePresence } from "@/stores/presence";
 import { useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
+import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
@@ -13,7 +14,7 @@ import { useUsers } from "@/stores/users";
 import { decryptForStore } from "@/lib/decrypt";
 import { users as usersApi } from "@/api/users";
 import { ring } from "@/lib/keyring";
-import type { Message } from "@/api/types";
+import type { Message, ServerView } from "@/api/types";
 
 /** Hooks other layers register: notifications, voice, servers (later phases). */
 export const dispatchHooks: {
@@ -30,6 +31,12 @@ function resetAll(): void {
   useReadStates.getState().clear();
   useRelationships.getState().clear();
   useTyping.getState().clear();
+  useServers.getState().clear();
+}
+
+function ingestServerView(view: ServerView): void {
+  useChannels.getState().upsert(view.channels);
+  useServers.getState().setFromView(view);
 }
 
 async function ensureUser(id: string): Promise<void> {
@@ -57,6 +64,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useRelationships.getState().setMany(d.relationships);
       useReadStates.getState().setMany(d.read_states);
       usePresence.getState().setMany(d.presences);
+      for (const view of d.servers ?? []) ingestServerView(view);
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
       await useKeys.getState().ingestGrants(d.key_grants);
@@ -117,6 +125,45 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useChannels.getState().remove(e.d.id);
       useMessages.getState().clearChannel(e.d.id);
       return;
+    case "channel_positions":
+      useChannels.getState().applyPositions(e.d.channels);
+      return;
+    case "server_create":
+      ingestServerView(e.d);
+      for (const h of dispatchHooks.onUnhandled) h(e);
+      return;
+    case "server_update":
+      useServers.getState().updateServer(e.d);
+      return;
+    case "server_delete": {
+      const chans = useChannels.getState();
+      for (const ch of Object.values(chans.byId)) {
+        if (ch.server_id === e.d.id) {
+          chans.remove(ch.id);
+          useMessages.getState().clearChannel(ch.id);
+        }
+      }
+      useServers.getState().remove(e.d.id);
+      for (const h of dispatchHooks.onUnhandled) h(e);
+      return;
+    }
+    case "member_add":
+      useUsers.getState().upsert(e.d.user);
+      useServers.getState().upsertMember(e.d.member);
+      return;
+    case "member_update":
+      useServers.getState().upsertMember(e.d);
+      return;
+    case "member_remove":
+      useServers.getState().removeMember(e.d.server_id, e.d.user_id);
+      return;
+    case "role_create":
+    case "role_update":
+      useServers.getState().upsertRole(e.d);
+      return;
+    case "role_delete":
+      useServers.getState().removeRole(e.d.server_id, e.d.id);
+      return;
     case "presence":
       usePresence.getState().set(e.d);
       return;
@@ -160,16 +207,6 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "heartbeat_ack":
       return;
-    case "channel_positions":
-    case "server_create":
-    case "server_update":
-    case "server_delete":
-    case "member_add":
-    case "member_update":
-    case "member_remove":
-    case "role_create":
-    case "role_update":
-    case "role_delete":
     case "voice_state":
     case "voice_signal":
     case "call_ring":

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -16,7 +16,10 @@ export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [inviteKey, setInviteKey] = useState("");
+  const loc = useLocation();
+  const params = new URLSearchParams(loc.search);
+  const next = params.get("next") || "/channels/@me";
+  const [inviteKey, setInviteKey] = useState(params.get("invite") ?? "");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +88,7 @@ export default function RegisterPage() {
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
           <span>I have saved my recovery key somewhere safe.</span>
         </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav("/channels/@me", { replace: true })}>Continue to Evilion Chat</Button>
+        <Button size="lg" block disabled={!saved} onClick={() => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true })}>Continue to Evilion Chat</Button>
       </AuthLayout>
     );
   }

@@ -12,3 +12,11 @@
 .add .btn { color: var(--positive); }
 .sep { width: 32px; height: 2px; border-radius: 1px; background: var(--border); margin: 2px 0; }
 .badge { position: absolute; right: 8px; bottom: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; border: 3px solid var(--bg-base); box-sizing: content-box; }
+.server .btn { font-size: 16px; font-weight: 600; color: var(--text-strong); }
+.server .btn.hasIcon { background: transparent; }
+.initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.server[data-muted="true"] .btn { opacity: 0.6; }
+.server[data-dragging="true"] { opacity: 0.4; }
+.server[data-drop="before"]::before, .server[data-drop="after"]::after { content: ""; position: absolute; left: 12px; right: 12px; height: 2px; background: var(--brand); border-radius: 1px; }
+.server[data-drop="before"]::before { top: -5px; }
+.server[data-drop="after"]::after { bottom: -5px; }

@@ -1,4 +1,4 @@
-import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2 } from "lucide-react";
+import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent } from "react";
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
@@ -10,6 +10,9 @@ import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { canI, useServers } from "@/stores/servers";
+import { slowmodeRemaining, useSlowmode } from "@/stores/slowmode";
+import { P } from "@/lib/perms";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { GifFavorites } from "@/components/pickers/GifFavorites";
 import { unfurl as unfurlApi } from "@/api/unfurl";
@@ -50,6 +53,20 @@ export function Composer({ channel }: { channel: Channel }) {
   const setDraft = useSettings((st) => st.setDraft);
   const tone = useSettings((st) => st.settings.skinTone);
   const msgs = useMessages((m) => m.channels[channel.id]);
+  const serverState = useServers((st) => (channel.server_id ? st.byId[channel.server_id] : undefined));
+  const isServer = !!channel.server_id;
+  const canSend = !isServer || canI(serverState, P.SEND_MESSAGES, channel.id);
+  const canAttach = !isServer || canI(serverState, P.ATTACH_FILES, channel.id);
+  const canEveryone = !isServer || canI(serverState, P.MENTION_EVERYONE, channel.id);
+  const bypassSlowmode = isServer && canI(serverState, P.MANAGE_MESSAGES, channel.id);
+  const slow = useSlowmode();
+  const [now, setNow] = useState(() => Date.now());
+  const remaining = channel.slowmode_seconds > 0 && !bypassSlowmode ? slowmodeRemaining(slow, channel.id, channel.slowmode_seconds, now) : 0;
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [remaining]);
   const [text, setText] = useState(() => drafts[channel.id] ?? "");
   const [files, setFiles] = useState<Staged[]>([]);
   const [sending, setSending] = useState(false);
@@ -82,10 +99,28 @@ export function Composer({ channel }: { channel: Channel }) {
     window.addEventListener("ec:open-emoji", open);
     return () => window.removeEventListener("ec:open-emoji", open);
   }, []);
+  useEffect(() => {
+    const onInsert = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (typeof detail !== "string") return;
+      const ta = taRef.current;
+      const caret = ta?.selectionStart ?? text.length;
+      const end = ta?.selectionEnd ?? caret;
+      const next = text.slice(0, caret) + detail + text.slice(end);
+      setText(next);
+      persistDraft(next);
+      setTimeout(() => {
+        ta?.focus();
+        ta?.setSelectionRange(caret + detail.length, caret + detail.length);
+      }, 0);
+    };
+    window.addEventListener("ec:insert-text", onInsert);
+    return () => window.removeEventListener("ec:insert-text", onInsert);
+  });
   useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
 
   const name = channelDisplayName(channel, users, me?.id);
-  const placeholder = channel.type === "dm" ? `Message @${name}` : `Message ${name}`;
+  const placeholder = channel.type === "dm" ? `Message @${name}` : isServer ? `Message #${name}` : `Message ${name}`;
 
   useEffect(() => {
     setText(useSettings.getState().settings.drafts[channel.id] ?? "");
@@ -109,9 +144,18 @@ export function Composer({ channel }: { channel: Channel }) {
     let items: AcItem[] = [];
     if (tok.kind === "user") {
       const pool = new Map<string, typeof users[string]>();
-      for (const id of channel.recipient_ids) if (users[id]) pool.set(id, users[id]!);
-      for (const r of Object.values(rels)) if (r.type === "friend") pool.set(r.user.id, users[r.user.id] ?? r.user);
-      items = [...pool.values()].filter((u) => !tok.query || u.username.includes(tok.query) || u.display_name.toLowerCase().includes(tok.query)).slice(0, 8).map((u) => ({ kind: "user", user: u }));
+      if (serverState) {
+        for (const id of Object.keys(serverState.members)) if (users[id]) pool.set(id, users[id]!);
+      } else {
+        for (const id of channel.recipient_ids) if (users[id]) pool.set(id, users[id]!);
+        for (const r of Object.values(rels)) if (r.type === "friend") pool.set(r.user.id, users[r.user.id] ?? r.user);
+      }
+      items = [...pool.values()]
+        .filter((u) => !tok.query || u.username.includes(tok.query) || u.display_name.toLowerCase().includes(tok.query) || (serverState?.members[u.id]?.nickname ?? "").toLowerCase().includes(tok.query))
+        .slice(0, 8)
+        .map((u) => ({ kind: "user", user: u }));
+      if (canEveryone && isServer && "everyone".startsWith(tok.query)) items.unshift({ kind: "command", name: "everyone", desc: "Notify everyone who can see this channel" });
+      if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: "Notify everyone online in this channel" });
     } else if (tok.kind === "emoji") {
       if (!emojiLoaded()) void loadEmoji().then(() => refreshAc(value, caret));
       items = searchEmoji(tok.query, 8).map((e) => ({ kind: "emoji", entry: e }));
@@ -153,6 +197,7 @@ export function Composer({ channel }: { channel: Channel }) {
     if (!it) return;
     const caret = taRef.current?.selectionStart ?? text.length;
     if (it.kind === "user") insertAt(ac.start, caret, `@${it.user.username} `);
+    else if (it.kind === "command" && ac.kind === "user") insertAt(ac.start, caret, `@${it.name} `);
     else if (it.kind === "emoji") insertAt(ac.start, caret, `${withTone(it.entry, tone)} `);
     else insertAt(ac.start, caret, `/${it.name} `);
   };
@@ -171,6 +216,7 @@ export function Composer({ channel }: { channel: Channel }) {
 
   const send = async () => {
     if (sending) return;
+    if (remaining > 0) return toast(`Slow mode is on. You can send again in ${remaining}s.`, "error");
     let body = text.trim();
     if (body.length > MAX_LEN) return toast(`Messages are limited to ${MAX_LEN} characters.`, "error");
     const expanded = applyCommand(body);
@@ -249,6 +295,14 @@ export function Composer({ channel }: { channel: Channel }) {
   const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
   const counterOn = text.length > MAX_LEN - 200;
 
+  if (!canSend) {
+    return (
+      <div className={s.wrap}>
+        <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">You do not have permission to send messages in this channel.</div>
+      </div>
+    );
+  }
+
   return (
     <div className={s.wrap} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={onDrop}>
       {drag ? <div className={s.drop}>Drop to upload to {name}</div> : null}
@@ -295,7 +349,7 @@ export function Composer({ channel }: { channel: Channel }) {
       ) : null}
       <div className={s.box}>
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
-        <button className={s.attach} aria-label="Upload a file" onClick={() => fileRef.current?.click()} disabled={sending}><CirclePlus size={24} /></button>
+        {canAttach ? <button className={s.attach} aria-label="Upload a file" onClick={() => fileRef.current?.click()} disabled={sending}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
         <textarea
           ref={taRef}
           className={s.ta}
@@ -311,10 +365,15 @@ export function Composer({ channel }: { channel: Channel }) {
         />
         <div className={s.btns}>
           <button className={s.iconBtn} data-on={picker} aria-label="Select emoji" onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
-          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label="Send message" onClick={() => void send()} disabled={sending || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
+          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label="Send message" onClick={() => void send()} disabled={sending || remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
         </div>
       </div>
       {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
+      {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
+        <span className={s.slowmode} data-active={remaining > 0} title="Slow mode is enabled">
+          <Timer size={14} /> {remaining > 0 ? `${remaining}s` : "Slowmode is enabled"}
+        </span>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,11 @@
 .hIcon { color: var(--text-muted); display: flex; flex: none; }
 .hName { font-size: 16px; font-weight: 600; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hSub { font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 8px; }
+.hTopic { text-align: left; min-width: 0; flex: 0 1 auto; color: var(--text-muted); border-left: 1px solid var(--border); padding-left: 8px; }
+.hTopic:hover { color: var(--text); }
+.lockHash { position: relative; display: flex; }
+.lock { position: absolute; right: -5px; bottom: -3px; background: var(--bg-raised); border-radius: 2px; }
+.authorNick { font-weight: 500; }
 .hSpacer { flex: 1; }
 .hBtn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--icon); border-radius: var(--radius-xs); flex: none; }
 .hBtn:hover { color: var(--text); }

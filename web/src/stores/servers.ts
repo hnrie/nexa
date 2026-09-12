@@ -1,0 +1,196 @@
+import { create } from "zustand";
+import type { Member, Role, Server, ServerView } from "@/api/types";
+import { ALL, compute, has, highestPosition, P, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
+import { useChannels } from "./channels";
+
+export interface ServerState {
+  server: Server;
+  roles: Record<string, Role>;
+  members: Record<string, Member>;
+  memberCount: number;
+  me: Member;
+  /** Server-level permissions of the current user as the server computed them. */
+  myPermissions: bigint;
+  /** The server's members are complete (small servers ship them in ready). */
+  membersComplete: boolean;
+}
+
+interface ServersState {
+  byId: Record<string, ServerState>;
+  /** Join order, so the rail has a stable default ordering. */
+  order: string[];
+  setFromView: (view: ServerView) => void;
+  updateServer: (server: Server) => void;
+  remove: (id: string) => void;
+  upsertRole: (role: Role) => void;
+  upsertRoles: (serverId: string, roles: Role[]) => void;
+  removeRole: (serverId: string, roleId: string) => void;
+  upsertMember: (member: Member) => void;
+  upsertMembers: (serverId: string, members: Member[], complete?: boolean) => void;
+  removeMember: (serverId: string, userId: string) => void;
+  setMemberCount: (serverId: string, count: number) => void;
+  clear: () => void;
+}
+
+function stripView(view: ServerView): Server {
+  const { channels: _c, roles: _r, members: _m, member_count: _mc, me: _me, my_permissions: _mp, ...server } = view;
+  void _c;
+  void _r;
+  void _m;
+  void _mc;
+  void _me;
+  void _mp;
+  return server;
+}
+
+export const useServers = create<ServersState>()((set) => ({
+  byId: {},
+  order: [],
+  setFromView: (view) =>
+    set((s) => {
+      const roles: Record<string, Role> = {};
+      for (const r of view.roles) roles[r.id] = r;
+      const members: Record<string, Member> = {};
+      for (const m of view.members) members[m.user_id] = m;
+      members[view.me.user_id] = view.me;
+      const st: ServerState = {
+        server: stripView(view),
+        roles,
+        members,
+        memberCount: view.member_count,
+        me: view.me,
+        myPermissions: BigInt(view.my_permissions),
+        membersComplete: view.members.length >= view.member_count,
+      };
+      const order = s.order.includes(view.id) ? s.order : [...s.order, view.id];
+      return { byId: { ...s.byId, [view.id]: st }, order };
+    }),
+  updateServer: (server) =>
+    set((s) => {
+      const cur = s.byId[server.id];
+      if (!cur) return s;
+      return { byId: { ...s.byId, [server.id]: { ...cur, server } } };
+    }),
+  remove: (id) =>
+    set((s) => {
+      if (!(id in s.byId)) return s;
+      const byId = { ...s.byId };
+      delete byId[id];
+      return { byId, order: s.order.filter((x) => x !== id) };
+    }),
+  upsertRole: (role) =>
+    set((s) => {
+      const cur = s.byId[role.server_id];
+      if (!cur) return s;
+      const roles = { ...cur.roles, [role.id]: role };
+      return { byId: { ...s.byId, [role.server_id]: { ...cur, roles, myPermissions: recomputeMine({ ...cur, roles }) } } };
+    }),
+  upsertRoles: (serverId, list) =>
+    set((s) => {
+      const cur = s.byId[serverId];
+      if (!cur) return s;
+      const roles: Record<string, Role> = {};
+      for (const r of list) roles[r.id] = r;
+      return { byId: { ...s.byId, [serverId]: { ...cur, roles, myPermissions: recomputeMine({ ...cur, roles }) } } };
+    }),
+  removeRole: (serverId, roleId) =>
+    set((s) => {
+      const cur = s.byId[serverId];
+      if (!cur || !(roleId in cur.roles)) return s;
+      const roles = { ...cur.roles };
+      delete roles[roleId];
+      const members: Record<string, Member> = {};
+      for (const [uid, m] of Object.entries(cur.members)) members[uid] = m.role_ids.includes(roleId) ? { ...m, role_ids: m.role_ids.filter((r) => r !== roleId) } : m;
+      const me = members[cur.me.user_id] ?? cur.me;
+      const next = { ...cur, roles, members, me };
+      return { byId: { ...s.byId, [serverId]: { ...next, myPermissions: recomputeMine(next) } } };
+    }),
+  upsertMember: (member) =>
+    set((s) => {
+      const cur = s.byId[member.server_id];
+      if (!cur) return s;
+      const known = member.user_id in cur.members;
+      const members = { ...cur.members, [member.user_id]: member };
+      const me = member.user_id === cur.me.user_id ? member : cur.me;
+      const next = { ...cur, members, me, memberCount: known ? cur.memberCount : cur.memberCount + 1 };
+      return { byId: { ...s.byId, [member.server_id]: { ...next, myPermissions: recomputeMine(next) } } };
+    }),
+  upsertMembers: (serverId, list, complete) =>
+    set((s) => {
+      const cur = s.byId[serverId];
+      if (!cur) return s;
+      const members = { ...cur.members };
+      for (const m of list) members[m.user_id] = m;
+      return { byId: { ...s.byId, [serverId]: { ...cur, members, membersComplete: complete ?? cur.membersComplete } } };
+    }),
+  removeMember: (serverId, userId) =>
+    set((s) => {
+      const cur = s.byId[serverId];
+      if (!cur) return s;
+      const members = { ...cur.members };
+      const known = userId in members;
+      delete members[userId];
+      return { byId: { ...s.byId, [serverId]: { ...cur, members, memberCount: Math.max(0, cur.memberCount - (known ? 1 : 0)) } } };
+    }),
+  setMemberCount: (serverId, count) =>
+    set((s) => {
+      const cur = s.byId[serverId];
+      if (!cur) return s;
+      return { byId: { ...s.byId, [serverId]: { ...cur, memberCount: count } } };
+    }),
+  clear: () => set({ byId: {}, order: [] }),
+}));
+
+function recomputeMine(st: ServerState): bigint {
+  return serverPerms(st, st.me.user_id);
+}
+
+/** Server-level permissions of a user from local state. */
+export function serverPerms(st: ServerState, userId: string): bigint {
+  if (st.server.owner_id === userId) return ALL;
+  const m = st.members[userId];
+  return compute(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(m, userId), false, undefined);
+}
+
+/** A user's permissions in a channel of the server, from local state. */
+export function channelPerms(st: ServerState, channelId: string, userId: string): bigint {
+  const ch = useChannels.getState().byId[channelId];
+  const isOwner = st.server.owner_id === userId;
+  return compute(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(st.members[userId], userId), isOwner, ch?.overwrites);
+}
+
+export function memberHighest(st: ServerState, userId: string): { highest: number; isOwner: boolean } {
+  const isOwner = st.server.owner_id === userId;
+  return { highest: highestPosition(toPermRoles(Object.values(st.roles)), toPermMember(st.members[userId], userId)), isOwner };
+}
+
+/** Roles sorted top (highest position) first. */
+export function rolesByPosition(st: ServerState | undefined): Role[] {
+  if (!st) return [];
+  return Object.values(st.roles).sort((a, b) => b.position - a.position || (a.id < b.id ? -1 : 1));
+}
+
+/** The colour of the member's highest coloured role, as a CSS colour, or undefined. */
+export function memberColor(st: ServerState | undefined, userId: string): string | undefined {
+  if (!st) return undefined;
+  const m = st.members[userId];
+  if (!m) return undefined;
+  let best: Role | undefined;
+  for (const id of m.role_ids) {
+    const r = st.roles[id];
+    if (r && r.color !== 0 && (!best || r.position > best.position)) best = r;
+  }
+  return best ? `#${best.color.toString(16).padStart(6, "0")}` : undefined;
+}
+
+export function permRolesOf(st: ServerState): PermRole[] {
+  return toPermRoles(Object.values(st.roles));
+}
+
+export function canI(st: ServerState | undefined, need: bigint, channelId?: string): boolean {
+  if (!st) return false;
+  const p = channelId ? channelPerms(st, channelId, st.me.user_id) : st.myPermissions;
+  return has(p, need);
+}
+
+export { P };

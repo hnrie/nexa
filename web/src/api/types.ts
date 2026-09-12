@@ -64,6 +64,114 @@ export interface Channel {
   last_message_id: Snowflake | null;
   created_at: number;
   recipient_ids: Snowflake[];
+  /** The conversation whose keys encrypt this channel: itself for DMs and private channels, the server otherwise. */
+  key_conv_id: Snowflake;
+  /** Permission overwrites; only present on server channels. */
+  overwrites?: Overwrite[];
+}
+
+/** Permission bits travel as decimal strings; `lib/perms` turns them into BigInt. */
+export type PermString = string;
+
+export interface Overwrite {
+  channel_id: Snowflake;
+  target_id: Snowflake;
+  target_type: "role" | "member";
+  allow: PermString;
+  deny: PermString;
+}
+
+export interface Server {
+  id: Snowflake;
+  name: string;
+  icon_id: Snowflake | null;
+  banner_id: Snowflake | null;
+  owner_id: Snowflake;
+  description: string;
+  system_channel_id: Snowflake | null;
+  default_notifications: number;
+  flags: number;
+  created_at: number;
+}
+
+export interface Member {
+  server_id: Snowflake;
+  user_id: Snowflake;
+  nickname: string;
+  avatar_id: Snowflake | null;
+  joined_at: number;
+  timeout_until: number | null;
+  flags: number;
+  role_ids: Snowflake[];
+}
+
+export interface Role {
+  id: Snowflake;
+  server_id: Snowflake;
+  name: string;
+  color: number;
+  hoist: boolean;
+  mentionable: boolean;
+  position: number;
+  permissions: PermString;
+  icon_id: Snowflake | null;
+  created_at: number;
+}
+
+/** A server as the ready payload, create and join responses carry it. */
+export interface ServerView extends Server {
+  channels: Channel[];
+  roles: Role[];
+  members: Member[];
+  member_count: number;
+  me: Member;
+  my_permissions: PermString;
+}
+
+export interface Invite {
+  code: string;
+  server_id: Snowflake;
+  channel_id: Snowflake | null;
+  inviter_id: Snowflake;
+  max_uses: number;
+  uses: number;
+  expires_at: number | null;
+  created_at: number;
+}
+
+export interface InvitePreview {
+  code: string;
+  server: { id: Snowflake; name: string; icon_id: Snowflake | null; banner_id: Snowflake | null; description: string; member_count: number; online_count: number };
+  channel?: { id: Snowflake; name: string; type: Channel["type"] };
+  inviter?: PublicUser;
+  expires_at: number | null;
+}
+
+export interface Ban {
+  server_id: Snowflake;
+  user_id: Snowflake;
+  reason: string;
+  banned_by: Snowflake;
+  created_at: number;
+}
+
+export interface AuditEntry {
+  id: Snowflake;
+  server_id: Snowflake;
+  actor_id: Snowflake;
+  action: string;
+  target_type: string;
+  target_id: Snowflake | null;
+  changes: unknown;
+  reason: string;
+  created_at: number;
+}
+
+export interface ServerKeyInfo {
+  conv_id: Snowflake;
+  name: string;
+  epochs: KeyEpoch[];
+  flags: KeyFlags | null;
 }
 
 export interface Attachment {
@@ -181,7 +289,7 @@ export interface ReadyPayload {
   presences: Presence[];
   key_grants: KeyGrant[];
   settings: SettingsBlob | null;
-  servers: unknown[];
+  servers: ServerView[];
   voice_states: unknown[];
 }
 

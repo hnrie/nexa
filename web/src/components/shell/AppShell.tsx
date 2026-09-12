@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode, type TouchEvent } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
+import { ServerSidebar } from "@/components/sidebar/ServerSidebar";
 import { ModalHost } from "@/components/modals/ModalHost";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -19,6 +20,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const openModal = useUI((u) => u.openModal);
   const touch = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+  const serverId = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
+  const sidebar = serverId ? <ServerSidebar serverId={serverId} /> : <DMSidebar />;
 
   useEffect(() => {
     const page = params.get("settings");
@@ -66,13 +69,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className={s.backdrop} data-open={leftOpen} onClick={() => setLeftOpen(false)} />
           <div className={s.drawer} data-open={leftOpen}>
             <div className={s.rail}><Rail /></div>
-            <div className={s.sidebar}><DMSidebar /></div>
+            <div className={s.sidebar}>{sidebar}</div>
           </div>
         </>
       ) : (
         <>
           <div className={s.rail}><Rail /></div>
-          <div className={s.sidebar}><DMSidebar /></div>
+          <div className={s.sidebar}>{sidebar}</div>
         </>
       )}
       <div className={s.main}>
