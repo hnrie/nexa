@@ -31,7 +31,9 @@ class Server:
         self.port = free_port()
         self.base = f"http://127.0.0.1:{self.port}"
         self.keep = keep
-        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=str(ROOT / "web/dist"), PUBLIC_URL=self.base, LOG_LEVEL="warn")
+        # STUN_URLS=none keeps ICE to host candidates: both browsers are on this
+        # machine, and a public STUN server that times out only adds flakiness.
+        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=str(ROOT / "web/dist"), PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS="none")
         self.log = open(self.dir / "chatd.log", "w")
         self.proc = subprocess.Popen([str(ROOT / "bin/chatd")], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.dir))
         for _ in range(50):
@@ -72,8 +74,10 @@ class Session:
         self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"])
         self.page = self.ctx.new_page()
         self.errors = []
+        self.trace = []
         self.page.on("pageerror", lambda e: self.errors.append(f"{name}: {e}"))
         self.page.on("console", lambda m: self.errors.append(f"{name}: {m.text}") if m.type == "error" else None)
+        self.page.on("console", lambda m: self.trace.append(f"{name} {m.type}: {m.text[:300]}") if "voice" in m.text else None)
 
     def shot(self, label):
         path = self.out / f"{label}-{self.name}-{self.page.viewport_size['width']}.png"
@@ -108,7 +112,8 @@ class Session:
 
     def logout(self):
         p = self.page
-        p.click("button[aria-label='User Settings']")
+        if p.locator("[role=dialog][aria-label='User Settings']").count() == 0:
+            p.click("button[aria-label='User Settings']")
         p.click("nav button:has-text('Log Out')")
         p.wait_for_url("**/login**", timeout=30000)
 
@@ -118,6 +123,14 @@ class Session:
             p.click("button[aria-label='User Settings']")
         p.click(f"[data-nav={nav}]")
         p.wait_for_timeout(300)
+
+    def close_settings(self):
+        p = self.page
+        for _ in range(3):
+            if p.locator("[role=dialog][aria-label='User Settings']").count() == 0:
+                return
+            p.keyboard.press("Escape")
+            p.wait_for_timeout(250)
 
     def add_friend(self, username):
         p = self.page
@@ -347,6 +360,17 @@ def expressions_flow(srv, alice, bob, server_id, link):
 
 def voice_flow(srv, alice, bob, server_id):
     a, b = alice.page, bob.page
+    # the mesh reports trouble through console.warn, which the session filter drops
+    chatter = []
+    frames = []
+
+    def watch_ws(ws, name):
+        ws.on("framesent", lambda payload: frames.append(f"{name} -> {payload[:220]}") if "voice" in payload else None)
+        ws.on("framereceived", lambda payload: frames.append(f"{name} <- {payload[:220]}") if "voice" in payload else None)
+
+    for sess in (alice, bob):
+        sess.page.on("console", lambda m, n=sess.name: chatter.append(f"{n} {m.type}: {m.text[:300]}"))
+        sess.page.on("websocket", lambda ws, n=sess.name: watch_ws(ws, n))
     alice_id = a.evaluate("() => JSON.parse(localStorage.getItem('ec:me') || 'null')")  # may be null; not needed
     _ = alice_id
     # both join the server's voice channel from the sidebar
@@ -357,10 +381,29 @@ def voice_flow(srv, alice, bob, server_id):
     a.wait_for_selector("[data-testid=voice-participants] [data-user]", timeout=20000)
     for sess in (alice, bob):
         sess.page.wait_for_function("() => document.querySelectorAll('[data-testid=voice-participants] [data-user]').length === 2", timeout=20000)
-    # peers connect directly (fake devices, loopback ICE)
+    # peers connect directly (fake devices, loopback ICE). Your own tile counts
+    # as connected from the start, so wait for both rather than for any one.
     for sess in (alice, bob):
-        sess.page.wait_for_selector("[data-peer-state=connected][data-user]", timeout=40000)
-    assert a.locator("[data-peer-state=connected]").count() == 2, "both tiles connected on alice's side"
+        try:
+            sess.page.wait_for_function("() => document.querySelectorAll('[data-peer-state=connected][data-user]').length === 2", timeout=60000)
+        except Exception:
+            for other in (alice, bob):
+                tiles = other.page.evaluate("() => Array.from(document.querySelectorAll('[data-peer-state]')).map(e => e.getAttribute('data-user') + ':' + e.getAttribute('data-peer-state') + ':' + e.getAttribute('data-kind'))")
+                members = other.page.evaluate("() => Array.from(document.querySelectorAll('[data-testid=voice-participants] [data-user]')).map(e => e.getAttribute('data-user'))")
+                toasts = other.page.evaluate("() => Array.from(document.querySelectorAll('[role=status], [class*=toast]')).map(e => e.textContent)")
+                mic = other.page.evaluate("""async () => {
+                    try {
+                        const st = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        const n = st.getAudioTracks().length;
+                        st.getTracks().forEach((t) => t.stop());
+                        return 'ok:' + n;
+                    } catch (e) { return 'failed:' + e.name + ':' + e.message; }
+                }""")
+                print(f"  {other.name}: tiles={tiles} participants={members} toasts={toasts} mic={mic}")
+                other.shot("voice-stuck")
+            print("  console:\n    " + "\n    ".join((alice.trace + bob.trace)[-60:]))
+            print("  frames:\n    " + "\n    ".join(frames[-40:]))
+            raise
     alice.shot("voice-room")
     # mute shows up on the other side
     a.click("[data-testid=voice-mute]")
@@ -555,7 +598,7 @@ def security_flow(srv, out, browser):
     dave.shot("security-backup-codes")
     p.click("[role=dialog] button:has-text('Done')")
     p.wait_for_selector("[data-testid=mfa-row]:has-text('Authenticator app is on')", timeout=15000)
-    p.keyboard.press("Escape")
+    dave.close_settings()
 
     # --- the password alone no longer gets in -------------------------------
     dave.logout()
@@ -595,7 +638,7 @@ def security_flow(srv, out, browser):
     p.click("[data-testid=passcode-save]")
     p.wait_for_selector("[data-testid=lock-row]:has-text('Passcode is on')", timeout=30000)
     dave.shot("security-app-lock")
-    p.keyboard.press("Escape")
+    dave.close_settings()
 
     # a reload now stops at the passcode, and a wrong one is refused
     p.reload(wait_until="domcontentloaded")
@@ -622,7 +665,7 @@ def security_flow(srv, out, browser):
     p.click("[data-testid=lock-remove]")
     p.click("[role=dialog] button:has-text('Remove it')")
     p.wait_for_selector("[data-testid=lock-row]:has-text('No passcode')", timeout=20000)
-    p.keyboard.press("Escape")
+    dave.close_settings()
     p.reload(wait_until="domcontentloaded")
     p.wait_for_selector("text=Friends", timeout=45000)
     assert p.locator("[data-testid=passcode-input]").count() == 0, "removing the passcode should stop the lock screen"
@@ -635,9 +678,12 @@ def main():
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--serve", action="store_true", help="keep the server running afterwards and print its URL")
+    ap.add_argument("--flows", default="all", help="comma-separated subset: server,expressions,voice,polish,groups,security (register/friends/dm always run)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    chosen = {f.strip() for f in args.flows.split(",") if f.strip()}
+    want = lambda name: "all" in chosen or name in chosen  # noqa: E731
     srv = Server(keep=args.keep)
     ok = False
     try:
@@ -708,17 +754,23 @@ def main():
             phone.shot("drawer")
             print("servers")
             server_id, link = server_flow(srv, alice, bob, phone)
-            print("expressions")
-            expressions_flow(srv, alice, bob, server_id, link)
-            print("voice")
-            voice_flow(srv, alice, bob, server_id)
-            print("polish")
-            polish_flow(srv, alice, bob, server_id)
-            print("groups + packs")
-            groups_flow(srv, alice, bob, phone)
-            print("security: authenticator + app lock")
-            dave = security_flow(srv, out, browser)
-            errors = alice.errors + bob.errors + phone.errors + dave.errors
+            dave = None
+            if want("expressions"):
+                print("expressions")
+                expressions_flow(srv, alice, bob, server_id, link)
+            if want("voice"):
+                print("voice")
+                voice_flow(srv, alice, bob, server_id)
+            if want("polish"):
+                print("polish")
+                polish_flow(srv, alice, bob, server_id)
+            if want("groups"):
+                print("groups + packs")
+                groups_flow(srv, alice, bob, phone)
+            if want("security"):
+                print("security: authenticator + app lock")
+                dave = security_flow(srv, out, browser)
+            errors = alice.errors + bob.errors + phone.errors + (dave.errors if dave else [])
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))
             ok = not errors

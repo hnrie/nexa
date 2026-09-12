@@ -24,12 +24,15 @@ type Config struct {
 	Registration    string // open | invite | closed
 	RegistrationKey string // when Registration == "invite": a shared key accepted at register time
 	AdminUsername   string
-	TurnURLs        []string
-	TurnUsername    string
-	TurnCredential  string
-	TenorAPIKey     string
-	LogLevel        string
-	SessionTTL      time.Duration
+	// StunURLs are the STUN servers handed to clients. "none" in STUN_URLS
+	// turns them off, which is what a LAN-only instance wants.
+	StunURLs       []string
+	TurnURLs       []string
+	TurnUsername   string
+	TurnCredential string
+	TenorAPIKey    string
+	LogLevel       string
+	SessionTTL     time.Duration
 }
 
 // Load builds a Config from getenv, applying defaults and validating values.
@@ -90,6 +93,17 @@ func Load(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("SESSION_TTL_DAYS: expected a positive integer, got %q", v)
 		}
 		c.SessionTTL = time.Duration(n) * 24 * time.Hour
+	}
+	c.StunURLs = []string{"stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"}
+	if v := strings.TrimSpace(getenv("STUN_URLS")); v != "" {
+		c.StunURLs = nil
+		if !strings.EqualFold(v, "none") {
+			for _, u := range strings.Split(v, ",") {
+				if u = strings.TrimSpace(u); u != "" {
+					c.StunURLs = append(c.StunURLs, u)
+				}
+			}
+		}
 	}
 	if v := getenv("TURN_URLS"); v != "" {
 		for _, u := range strings.Split(v, ",") {

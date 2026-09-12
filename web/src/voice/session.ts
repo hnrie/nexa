@@ -98,7 +98,15 @@ export async function joinVoice(channelId: string): Promise<void> {
   store.setRinging(channelId, null);
   const ice = await iceServers();
   const transport = new MeshTransport(myId, ice, {
-    onSignal: (to, payload) => gateway()?.send("voice_signal", { to, payload }),
+    onSignal: (to, payload) => {
+      const gw = gateway();
+      // Losing the socket mid-call would otherwise strand the peer silently.
+      if (!gw) {
+        console.warn("voice: no gateway to signal through");
+        return;
+      }
+      gw.send("voice_signal", { to, payload });
+    },
     onPeerState: (uid, state) => useVoice.getState().setPeer(uid, state),
     onRemoteStream: (uid, kind, stream) => useVoice.getState().setRemote(uid, kind, stream),
     onSpeaking: (uid, on) => useVoice.getState().setSpeaking(uid, on),
@@ -306,7 +314,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
           }
           if (session) {
             for (const p of participantsOf(useVoice.getState().byChannel, vs.channel_id)) {
-              if (p.user_id !== myId) session.transport.addPeer(p.user_id, true);
+              if (p.user_id !== myId) session.transport.addPeer(p.user_id);
             }
           }
           applyTransmit();
@@ -319,7 +327,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       if (!session) return;
       if (vs.channel_id === session.channelId) {
         if (!session.transport.peerIds().includes(vs.user_id)) {
-          session.transport.addPeer(vs.user_id, false);
+          session.transport.addPeer(vs.user_id);
           playSound("join");
         }
       } else if (before === session.channelId || vs.old_channel_id === session.channelId) {
@@ -331,7 +339,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       return;
     }
     case "voice_signal":
-      if (session && e.d.channel_id === session.channelId) void session.transport.handleSignal(e.d.from, e.d.payload as SignalPayload);
+      if (session && e.d.channel_id === session.channelId) session.transport.handleSignal(e.d.from, e.d.payload as SignalPayload);
       return;
     case "voice_error":
       store.setJoining(null);

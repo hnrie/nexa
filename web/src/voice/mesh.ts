@@ -37,12 +37,26 @@ interface Peer {
   playback: { source: MediaStreamAudioSourceNode; gain: GainNode; el: HTMLAudioElement; meter: LevelMeter; timer: ReturnType<typeof setInterval> } | null;
   speaking: boolean;
   restartTimer: ReturnType<typeof setTimeout> | null;
+  /** A negotiation we had to skip because the exchange was mid-flight. */
+  renegotiate: boolean;
+  /** Fires if the connection never comes up, so the peer can be rebuilt. */
+  watchdog: ReturnType<typeof setTimeout> | null;
+  attempts: number;
+  /** Every description this peer touches runs through here, one at a time. */
+  ops: Promise<void>;
 }
 
 function lower(a: string, b: string): boolean {
   if (a.length !== b.length) return a.length < b.length;
   return a < b;
 }
+
+/** How many early signals to hold for a peer we have not been told about yet. */
+const EARLY_SIGNAL_LIMIT = 32;
+/** How long to give a peer to come up before rebuilding it from scratch. */
+const CONNECT_DEADLINE_MS = 12_000;
+/** How many rebuilds before leaving the tile showing trouble. */
+const MAX_REBUILDS = 3;
 
 export class MeshTransport {
   private peers = new Map<string, Peer>();
@@ -56,6 +70,8 @@ export class MeshTransport {
   /** Master output level, 0–200 %, from settings. */
   private masterVolume = 100;
   private volumes = new Map<string, number>();
+  /** Signals that beat the roster: an offer can arrive before we know the sender. */
+  private early = new Map<string, SignalPayload[]>();
   private localMutes = new Set<string>();
   private screenBitrate = 5_000_000;
   private closed = false;
@@ -89,14 +105,23 @@ export class MeshTransport {
 
   // --- peers -------------------------------------------------------------
 
-  addPeer(userId: string, initiator: boolean): void {
+  /**
+   * Starts a connection to one peer. Who offers first does not matter: both
+   * sides offer as soon as they have media and the politeness rule settles
+   * the collision.
+   */
+  addPeer(userId: string, attempts = 0): void {
     if (this.closed || this.peers.has(userId) || userId === this.meId) return;
     const pc = new RTCPeerConnection({ iceServers: this.ice, bundlePolicy: "max-bundle" });
-    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], playback: null, speaking: false, restartTimer: null };
+    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], playback: null, speaking: false, restartTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
     this.peers.set(userId, peer);
     pc.onicecandidate = (e) => this.events.onSignal(userId, { candidate: e.candidate ? e.candidate.toJSON() : null });
-    pc.onnegotiationneeded = () => void this.negotiate(peer);
+    pc.onnegotiationneeded = () => this.enqueue(peer, () => this.negotiate(peer));
     pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "connected" && peer.watchdog) {
+        clearTimeout(peer.watchdog);
+        peer.watchdog = null;
+      }
       this.events.onPeerState(userId, pc.connectionState);
       if (pc.connectionState === "failed" && !peer.restartTimer) {
         peer.restartTimer = setTimeout(() => {
@@ -106,13 +131,37 @@ export class MeshTransport {
       }
     };
     pc.ontrack = (e) => this.onTrack(peer, e);
-    // receive-only transceivers so the remote can send even before we do
-    if (initiator) {
-      this.syncSenders(peer);
-    } else {
-      this.syncSenders(peer);
-    }
+    this.syncSenders(peer);
     this.events.onPeerState(userId, pc.connectionState);
+    peer.watchdog = setTimeout(() => this.rebuild(userId, attempts), CONNECT_DEADLINE_MS);
+    this.drainEarly(userId);
+  }
+
+  /**
+   * A peer that has not connected by the deadline is thrown away and made
+   * again. Signalling can stall in ways neither side notices: a lost offer, a
+   * collision resolved the wrong way, a socket that dropped mid-exchange.
+   */
+  private rebuild(userId: string, attempts: number): void {
+    const peer = this.peers.get(userId);
+    if (!peer || this.closed) return;
+    peer.watchdog = null;
+    if (peer.pc.connectionState === "connected") return;
+    if (attempts + 1 >= MAX_REBUILDS) {
+      console.warn("voice: giving up on", userId, "after", attempts + 1, "attempts");
+      return;
+    }
+    console.warn("voice: rebuilding the connection to", userId);
+    this.removePeer(userId);
+    this.addPeer(userId, attempts + 1);
+  }
+
+  /** Replays, in order, anything this peer sent before we knew about them. */
+  private drainEarly(userId: string): void {
+    const waiting = this.early.get(userId);
+    if (!waiting?.length) return;
+    this.early.delete(userId);
+    for (const payload of waiting) this.handleSignal(userId, payload);
   }
 
   removePeer(userId: string): void {
@@ -125,7 +174,9 @@ export class MeshTransport {
     p.pc.onnegotiationneeded = null;
     p.pc.ontrack = null;
     p.pc.onconnectionstatechange = null;
+    if (p.watchdog) clearTimeout(p.watchdog);
     p.pc.close();
+    this.early.delete(userId);
     for (const kind of ["audio", "video", "screen"] as const) this.events.onRemoteStream(userId, kind, null);
   }
 
@@ -135,14 +186,39 @@ export class MeshTransport {
 
   close(): void {
     this.closed = true;
+    this.early.clear();
     for (const id of [...this.peers.keys()]) this.removePeer(id);
   }
 
   // --- signalling --------------------------------------------------------
 
-  async handleSignal(from: string, payload: SignalPayload): Promise<void> {
+  /**
+   * Runs one description-touching step at a time per peer. Two of them
+   * interleaved leave the connection in a state neither expects, which is how
+   * a call ends up stuck with both sides waiting for the other.
+   */
+  private enqueue(peer: Peer, step: () => Promise<void>): void {
+    peer.ops = peer.ops.then(step).catch((err: unknown) => console.warn("voice: signalling", peer.userId, err));
+  }
+
+  handleSignal(from: string, payload: SignalPayload): void {
     const peer = this.peers.get(from);
-    if (!peer) return;
+    if (!peer) {
+      // Whoever joins second offers immediately, which can outrun the roster
+      // update that introduces them. Dropping that offer deadlocks the call:
+      // we would offer in turn and the other side, being impolite, would
+      // ignore it. So hold onto it until the peer exists.
+      if (this.closed || from === this.meId) return;
+      const queued = this.early.get(from) ?? [];
+      queued.push(payload);
+      this.early.set(from, queued.slice(-EARLY_SIGNAL_LIMIT));
+      return;
+    }
+    this.enqueue(peer, () => this.applySignal(peer, payload));
+  }
+
+  private async applySignal(peer: Peer, payload: SignalPayload): Promise<void> {
+    const from = peer.userId;
     if (payload.streams) peer.remoteStreams = { ...peer.remoteStreams, ...payload.streams };
     const pc = peer.pc;
     try {
@@ -157,6 +233,7 @@ export class MeshTransport {
           await pc.setLocalDescription();
           this.events.onSignal(from, { description: pc.localDescription!.toJSON(), streams: this.streamIds() });
         }
+        if (peer.renegotiate && pc.signalingState === "stable") this.enqueue(peer, () => this.negotiate(peer));
       } else if (payload.candidate !== undefined) {
         const c = payload.candidate;
         if (!pc.remoteDescription) {
@@ -180,6 +257,14 @@ export class MeshTransport {
 
   private async negotiate(peer: Peer): Promise<void> {
     const pc = peer.pc;
+    // Mid-exchange the other side's description is already on its way; a
+    // second offer now would talk over it, so it waits for the lull.
+    if (this.closed) return;
+    if (pc.signalingState !== "stable") {
+      peer.renegotiate = true;
+      return;
+    }
+    peer.renegotiate = false;
     try {
       peer.makingOffer = true;
       await pc.setLocalDescription();

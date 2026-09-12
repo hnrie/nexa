@@ -229,7 +229,10 @@ func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Cha
 }
 
 func (s *Server) handleVoiceICE(w http.ResponseWriter, r *http.Request) {
-	servers := []map[string]any{{"urls": []string{"stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"}}}
+	servers := []map[string]any{}
+	if len(s.Cfg.StunURLs) > 0 {
+		servers = append(servers, map[string]any{"urls": s.Cfg.StunURLs})
+	}
 	if len(s.Cfg.TurnURLs) > 0 {
 		entry := map[string]any{"urls": s.Cfg.TurnURLs}
 		if s.Cfg.TurnUsername != "" {
