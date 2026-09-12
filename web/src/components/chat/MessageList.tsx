@@ -211,6 +211,17 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (!loaded && !loading) void loadInitial(channel.id);
   }, [channel.id, loaded, loading, loadInitial]);
 
+  useEffect(() => {
+    const onScrollKey = (e: Event) => {
+      const el = scrollRef.current;
+      if (!el) return;
+      const dir = (e as CustomEvent<number>).detail;
+      el.scrollBy({ top: dir * el.clientHeight * 0.9, behavior: "smooth" });
+    };
+    window.addEventListener("ec:scroll", onScrollKey);
+    return () => window.removeEventListener("ec:scroll", onScrollKey);
+  }, []);
+
   return (
     <div className={[s.listWrap, compact ? s.compact : ""].join(" ")}>
       {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>New messages</span><span>Jump to present</span></div> : null}

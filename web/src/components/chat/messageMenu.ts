@@ -64,6 +64,10 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks): Conte
       void fetchForcedAck(msg.channel_id, prev);
     },
   });
+  if (msg.payload?.embeds?.length && useAuth.getState().me?.id === msg.author_id) {
+    const suppressed = (msg.flags & 4) !== 0;
+    items.push({ id: "embeds", label: suppressed ? "Show Embeds" : "Remove Embeds", onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast("Could not update embeds.", "error")) });
+  }
   items.push({ id: "link", label: "Copy Message Link", onSelect: () => void navigator.clipboard?.writeText(`${location.origin}/channels/@me/${msg.channel_id}/${msg.id}`), separatorAfter: dev || canDelete(msg) });
   if (dev) items.push({ id: "id", label: "Copy Message ID", onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
   if (canDelete(msg)) {

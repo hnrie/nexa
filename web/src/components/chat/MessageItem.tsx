@@ -10,6 +10,9 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { Attachments } from "./Attachments";
+import { Embeds } from "./Embeds";
+import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
+import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
 import { Reactions } from "./Reactions";
 import { SystemMessage } from "./SystemMessage";
@@ -121,6 +124,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             </>
           )}
           {msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
+          {msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? <Embeds list={msg.payload.embeds as UnfurlResult[]} /> : null}
           {pending === "failed" ? <div className={s.edited} style={{ color: "var(--danger)" }}>Failed to send.</div> : null}
         </div>
       )}

@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [react()],
+  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     port: 5173,
@@ -17,10 +18,13 @@ export default defineConfig({
     target: "es2022",
     sourcemap: false,
     rollupOptions: {
+      input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), sw: fileURLToPath(new URL("./src/sw.ts", import.meta.url)) },
       output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          crypto: ["@noble/curves", "@noble/hashes", "hash-wasm"],
+        entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
+        manualChunks: (id) => {
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) return "react";
+          if (id.includes("@noble") || id.includes("hash-wasm")) return "crypto";
+          return undefined;
         },
       },
     },

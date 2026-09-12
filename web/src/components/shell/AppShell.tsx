@@ -3,6 +3,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
 import { ModalHost } from "@/components/modals/ModalHost";
+import { Shortcuts } from "@/components/shell/Shortcuts";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useUI } from "@/stores/ui";
 import s from "./AppShell.module.css";
@@ -81,6 +82,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </div>
       <ModalHost />
+      <Shortcuts />
     </div>
   );
 }
