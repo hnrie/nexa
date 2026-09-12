@@ -94,10 +94,13 @@ import sys, re
 path, host, svc = sys.argv[1:4]
 lines = open(path).read().split("\n")
 out, done = [], False
-for i, line in enumerate(lines):
+for line in lines:
     if not done and re.match(r"\s*-\s*service:\s*http_status:404", line):
         indent = re.match(r"(\s*)", line).group(1)
-        out += [f"{indent}- hostname: {host}", f"{indent}  service: {svc}", ""]
+        comments = []  # keep the catch-all's own comment block attached to it
+        while out and out[-1].strip().startswith("#"):
+            comments.insert(0, out.pop())
+        out += [f"{indent}- hostname: {host}", f"{indent}  service: {svc}", ""] + comments
         done = True
     out.append(line)
 if not done:
