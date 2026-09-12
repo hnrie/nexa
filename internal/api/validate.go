@@ -1,0 +1,62 @@
+package api
+
+import (
+	"regexp"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
+
+var usernameRe = regexp.MustCompile(`^[a-z0-9_.]{2,32}$`)
+
+// ValidUsername reports whether s is an acceptable unique username.
+func ValidUsername(s string) bool {
+	if !usernameRe.MatchString(s) {
+		return false
+	}
+	if strings.HasPrefix(s, ".") || strings.HasSuffix(s, ".") || strings.Contains(s, "..") {
+		return false
+	}
+	return true
+}
+
+// CleanText trims, strips control characters (keeping \n and \t) and
+// enforces a maximum rune count. ok is false when the result is too long.
+func CleanText(s string, max int) (out string, ok bool) {
+	if !utf8.ValidString(s) {
+		return "", false
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r == '\n' || r == '\t' {
+			b.WriteRune(r)
+			continue
+		}
+		if unicode.IsControl(r) || r == '‎' || r == '‏' || r == '‮' {
+			continue
+		}
+		b.WriteRune(r)
+	}
+	out = strings.TrimSpace(b.String())
+	return out, utf8.RuneCountInString(out) <= max
+}
+
+// CleanDisplayName returns a one-line display name of 1–32 runes.
+func CleanDisplayName(s string) (string, bool) {
+	out, ok := CleanText(strings.ReplaceAll(strings.ReplaceAll(s, "\n", " "), "\t", " "), 32)
+	if !ok || out == "" {
+		return "", false
+	}
+	return out, true
+}
+
+// OneOf reports whether v is in allowed.
+func OneOf(v string, allowed ...string) bool {
+	for _, a := range allowed {
+		if v == a {
+			return true
+		}
+	}
+	return false
+}

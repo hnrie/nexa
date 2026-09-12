@@ -77,3 +77,11 @@ func (s *Store) DeleteBlob(ctx context.Context, id ids.ID) error {
 	_, err := s.db.W.ExecContext(ctx, `DELETE FROM blobs WHERE id = ?`, int64(id))
 	return err
 }
+
+// CountBlobsByContent counts rows that share the same bytes: exact sha matches
+// (public kinds) plus encrypted rows whose sha carries a uniqueness suffix.
+func (s *Store) CountBlobsByContent(ctx context.Context, sha string) (int, error) {
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM blobs WHERE sha256 = ? OR sha256 LIKE ? ESCAPE '\'`, sha, escapeLike(sha)+"-%").Scan(&n)
+	return n, err
+}

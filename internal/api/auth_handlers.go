@@ -1,0 +1,470 @@
+package api
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/json"
+	"net/http"
+	"strings"
+	"time"
+
+	"evilion.xyz/chat/internal/auth"
+	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/store"
+)
+
+const (
+	minLoginTime  = 300 * time.Millisecond
+	defaultKDF    = `{"m":65536,"t":3,"p":1,"v":1}`
+	maxWrappedKey = 512
+	maxUserAgent  = 256
+)
+
+type kdfParams struct {
+	M int `json:"m"`
+	T int `json:"t"`
+	P int `json:"p"`
+	V int `json:"v"`
+}
+
+func validKDF(raw json.RawMessage) bool {
+	var p kdfParams
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return false
+	}
+	return p.V == 1 && p.M >= 32768 && p.M <= 1<<20 && p.T >= 2 && p.T <= 20 && p.P >= 1 && p.P <= 4
+}
+
+// MeUser is the authenticated user's own view.
+type MeUser struct {
+	store.PublicUser
+	Flags        int64  `json:"flags"`
+	PresencePref string `json:"presence_pref"`
+	DMPrivacy    string `json:"dm_privacy"`
+	HasRecovery  bool   `json:"has_recovery"`
+}
+
+func meView(u *store.User) MeUser {
+	return MeUser{PublicUser: u.Public(), Flags: u.Flags, PresencePref: u.PresencePref, DMPrivacy: u.DMPrivacy, HasRecovery: u.RecoveryAuthHash != ""}
+}
+
+func (s *Server) authRoutes(mux *http.ServeMux) {
+	mux.Handle("POST /api/v1/auth/register", ipLimited(s.limReg, s.handleRegister))
+	mux.Handle("GET /api/v1/auth/kdf", ipLimited(s.limGeneric, s.handleKDF))
+	mux.Handle("POST /api/v1/auth/login", ipLimited(s.limAuthIP, s.handleLogin))
+	mux.Handle("POST /api/v1/auth/recover/begin", ipLimited(s.limAuthIP, s.handleRecoverBegin))
+	mux.Handle("POST /api/v1/auth/recover/finish", ipLimited(s.limAuthIP, s.handleRecoverFinish))
+	mux.Handle("POST /api/v1/auth/password", s.authed(s.handlePasswordChange))
+	mux.Handle("POST /api/v1/auth/recovery", s.authed(s.handleRecoveryReplace))
+	mux.Handle("POST /api/v1/auth/logout", s.authed(s.handleLogout))
+	mux.Handle("GET /api/v1/auth/sessions", s.authed(s.handleSessions))
+	mux.Handle("DELETE /api/v1/auth/sessions/{id}", s.authed(s.handleSessionDelete))
+}
+
+func (s *Server) newSession(r *http.Request, userID ids.ID) (string, error) {
+	token, hash := auth.NewToken()
+	ua := r.UserAgent()
+	if len(ua) > maxUserAgent {
+		ua = ua[:maxUserAgent]
+	}
+	se := &store.Session{UserID: userID, TokenHash: hash, UserAgent: ua, IP: auth.ClientIP(r)}
+	if err := s.Store.CreateSession(r.Context(), se); err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+type registerReq struct {
+	Username              string          `json:"username"`
+	DisplayName           string          `json:"display_name"`
+	AuthKey               []byte          `json:"auth_key"`
+	KDFSalt               []byte          `json:"kdf_salt"`
+	KDFParams             json.RawMessage `json:"kdf_params"`
+	PublicKey             []byte          `json:"public_key"`
+	EncPrivateKey         []byte          `json:"enc_private_key"`
+	EncPrivateKeyRecovery []byte          `json:"enc_private_key_recovery"`
+	RecoveryAuthKey       []byte          `json:"recovery_auth_key"`
+	InviteCode            string          `json:"invite_code"`
+	RegistrationKey       string          `json:"registration_key"`
+}
+
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	var req registerReq
+	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	ctx := r.Context()
+	switch s.Cfg.Registration {
+	case "closed":
+		WriteError(w, E(http.StatusForbidden, "registration_closed", "This server is not accepting new accounts."))
+		return
+	case "invite":
+		keyOK := s.Cfg.RegistrationKey != "" && hmac.Equal([]byte(req.RegistrationKey), []byte(s.Cfg.RegistrationKey))
+		inviteOK := req.InviteCode != "" && s.InviteCheck != nil && s.InviteCheck(ctx, req.InviteCode)
+		if !keyOK && !inviteOK {
+			WriteError(w, E(http.StatusForbidden, "invite_required", "You need an invite to register here."))
+			return
+		}
+	}
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+	if !ValidUsername(req.Username) {
+		WriteError(w, E(http.StatusBadRequest, "invalid_username", "Usernames are 2–32 characters of a-z, 0-9, _ and . (no leading, trailing or double dots)."))
+		return
+	}
+	display, ok := CleanDisplayName(req.DisplayName)
+	if !ok {
+		WriteError(w, E(http.StatusBadRequest, "invalid_display_name", "Display names are 1–32 characters."))
+		return
+	}
+	if len(req.AuthKey) != 32 || len(req.PublicKey) != 32 || len(req.KDFSalt) < 16 || len(req.KDFSalt) > 64 || len(req.EncPrivateKey) == 0 || len(req.EncPrivateKey) > maxWrappedKey || !validKDF(req.KDFParams) {
+		WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The key material is malformed."))
+		return
+	}
+	hasRecovery := len(req.RecoveryAuthKey) > 0 || len(req.EncPrivateKeyRecovery) > 0
+	if hasRecovery && (len(req.RecoveryAuthKey) != 32 || len(req.EncPrivateKeyRecovery) == 0 || len(req.EncPrivateKeyRecovery) > maxWrappedKey) {
+		WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The recovery key material is malformed."))
+		return
+	}
+	authHash, err := auth.HashAuthKey(req.AuthKey)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	u := &store.User{Username: req.Username, DisplayName: display, AuthHash: authHash, KDFSalt: req.KDFSalt, KDFParams: string(req.KDFParams),
+		PublicKey: req.PublicKey, EncPrivateKey: req.EncPrivateKey}
+	if hasRecovery {
+		rh, err := auth.HashAuthKey(req.RecoveryAuthKey)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		u.RecoveryAuthHash = rh
+		u.EncPrivateKeyRecovery = req.EncPrivateKeyRecovery
+	}
+	count, err := s.Store.CountUsers(ctx)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if count == 0 || (s.Cfg.AdminUsername != "" && req.Username == s.Cfg.AdminUsername) {
+		u.Flags |= store.FlagAdmin
+	}
+	if err := s.Store.CreateUser(ctx, u); err != nil {
+		WriteError(w, err)
+		return
+	}
+	token, err := s.newSession(r, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusCreated, map[string]any{"user": meView(u), "token": token})
+}
+
+func (s *Server) fakeSalt(username string) []byte {
+	mac := hmac.New(sha256.New, s.Secret)
+	mac.Write([]byte("kdf:" + username))
+	return mac.Sum(nil)[:16]
+}
+
+func (s *Server) handleKDF(w http.ResponseWriter, r *http.Request) {
+	username := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("username")))
+	if username == "" {
+		WriteError(w, E(http.StatusBadRequest, "missing_username", "username is required"))
+		return
+	}
+	u, err := s.Store.UserByUsername(r.Context(), username)
+	if err != nil || u.Flags&store.FlagDeleted != 0 {
+		WriteJSON(w, http.StatusOK, map[string]any{"salt": s.fakeSalt(username), "params": json.RawMessage(defaultKDF)})
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"salt": u.KDFSalt, "params": json.RawMessage(u.KDFParams)})
+}
+
+func keyBundle(u *store.User) map[string]any {
+	return map[string]any{"public_key": u.PublicKey, "enc_private_key": u.EncPrivateKey, "kdf_salt": u.KDFSalt, "kdf_params": json.RawMessage(u.KDFParams)}
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	fail := func() {
+		if d := time.Since(start); d < minLoginTime {
+			time.Sleep(minLoginTime - d)
+		}
+		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "Username or password is wrong."))
+	}
+	var req struct {
+		Username string `json:"username"`
+		AuthKey  []byte `json:"auth_key"`
+	}
+	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+	if ok, retry := s.limAuthUsr.Allow("login:" + req.Username); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+		return
+	}
+	u, err := s.Store.UserByUsername(r.Context(), req.Username)
+	if err != nil || u.Flags&(store.FlagDeleted|store.FlagDisabled) != 0 || len(req.AuthKey) != 32 {
+		fail()
+		return
+	}
+	ok, err := auth.VerifyAuthKey(req.AuthKey, u.AuthHash)
+	if err != nil || !ok {
+		fail()
+		return
+	}
+	token, err := s.newSession(r, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.limAuthUsr.Reset("login:" + req.Username)
+	if d := time.Since(start); d < minLoginTime {
+		time.Sleep(minLoginTime - d)
+	}
+	resp := keyBundle(u)
+	resp["user"] = meView(u)
+	resp["token"] = token
+	WriteJSON(w, http.StatusOK, resp)
+}
+
+func retryAfter(d time.Duration) string {
+	secs := int(d.Seconds() + 0.999)
+	if secs < 1 {
+		secs = 1
+	}
+	return time.Duration(secs).String()[:0] + itoa(secs)
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var b [20]byte
+	i := len(b)
+	for n > 0 {
+		i--
+		b[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(b[i:])
+}
+
+// verifyRecovery loads the user and checks the recovery auth key, with the same
+// timing floor as login.
+func (s *Server) verifyRecovery(w http.ResponseWriter, r *http.Request, username string, key []byte) (*store.User, bool) {
+	start := time.Now()
+	username = strings.ToLower(strings.TrimSpace(username))
+	if ok, retry := s.limAuthUsr.Allow("recover:" + username); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+		return nil, false
+	}
+	u, err := s.Store.UserByUsername(r.Context(), username)
+	valid := err == nil && u.Flags&(store.FlagDeleted|store.FlagDisabled) == 0 && len(key) == 32 && u.RecoveryAuthHash != ""
+	if valid {
+		ok, verr := auth.VerifyAuthKey(key, u.RecoveryAuthHash)
+		valid = verr == nil && ok
+	}
+	if d := time.Since(start); d < minLoginTime {
+		time.Sleep(minLoginTime - d)
+	}
+	if !valid {
+		if err == nil && u != nil && u.RecoveryAuthHash == "" {
+			WriteError(w, E(http.StatusBadRequest, "no_recovery_key", "This account has no recovery key."))
+			return nil, false
+		}
+		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "Username or recovery key is wrong."))
+		return nil, false
+	}
+	return u, true
+}
+
+func (s *Server) handleRecoverBegin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username        string `json:"username"`
+		RecoveryAuthKey []byte `json:"recovery_auth_key"`
+	}
+	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	u, ok := s.verifyRecovery(w, r, req.Username, req.RecoveryAuthKey)
+	if !ok {
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"public_key": u.PublicKey, "enc_private_key_recovery": u.EncPrivateKeyRecovery})
+}
+
+func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username                 string          `json:"username"`
+		RecoveryAuthKey          []byte          `json:"recovery_auth_key"`
+		NewAuthKey               []byte          `json:"new_auth_key"`
+		NewKDFSalt               []byte          `json:"new_kdf_salt"`
+		NewKDFParams             json.RawMessage `json:"new_kdf_params"`
+		NewEncPrivateKey         []byte          `json:"new_enc_private_key"`
+		NewRecoveryAuthKey       []byte          `json:"new_recovery_auth_key"`
+		NewEncPrivateKeyRecovery []byte          `json:"new_enc_private_key_recovery"`
+	}
+	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	u, ok := s.verifyRecovery(w, r, req.Username, req.RecoveryAuthKey)
+	if !ok {
+		return
+	}
+	if len(req.NewAuthKey) != 32 || len(req.NewKDFSalt) < 16 || len(req.NewKDFSalt) > 64 || !validKDF(req.NewKDFParams) || len(req.NewEncPrivateKey) == 0 || len(req.NewEncPrivateKey) > maxWrappedKey {
+		WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The key material is malformed."))
+		return
+	}
+	upd := store.AuthUpdate{KDFSalt: req.NewKDFSalt, KDFParams: string(req.NewKDFParams), EncPrivateKey: req.NewEncPrivateKey}
+	var err error
+	if upd.AuthHash, err = auth.HashAuthKey(req.NewAuthKey); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if len(req.NewRecoveryAuthKey) > 0 || len(req.NewEncPrivateKeyRecovery) > 0 {
+		if len(req.NewRecoveryAuthKey) != 32 || len(req.NewEncPrivateKeyRecovery) == 0 || len(req.NewEncPrivateKeyRecovery) > maxWrappedKey {
+			WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The recovery key material is malformed."))
+			return
+		}
+		if upd.RecoveryAuthHash, err = auth.HashAuthKey(req.NewRecoveryAuthKey); err != nil {
+			WriteError(w, err)
+			return
+		}
+		upd.EncPrivateKeyRecovery = req.NewEncPrivateKeyRecovery
+	}
+	if err := s.Store.UpdateAuth(r.Context(), u.ID, upd); err != nil {
+		WriteError(w, err)
+		return
+	}
+	_ = s.Store.DeleteUserSessions(r.Context(), u.ID, 0)
+	token, err := s.newSession(r, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	u, _ = s.Store.UserByID(r.Context(), u.ID)
+	resp := keyBundle(u)
+	resp["user"] = meView(u)
+	resp["token"] = token
+	WriteJSON(w, http.StatusOK, resp)
+}
+
+func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	var req struct {
+		AuthKey          []byte          `json:"auth_key"`
+		NewAuthKey       []byte          `json:"new_auth_key"`
+		NewKDFSalt       []byte          `json:"new_kdf_salt"`
+		NewKDFParams     json.RawMessage `json:"new_kdf_params"`
+		NewEncPrivateKey []byte          `json:"new_enc_private_key"`
+	}
+	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	ok, err := auth.VerifyAuthKey(req.AuthKey, u.AuthHash)
+	if err != nil || !ok || len(req.AuthKey) != 32 {
+		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The current password is wrong."))
+		return
+	}
+	if len(req.NewAuthKey) != 32 || len(req.NewEncPrivateKey) == 0 || len(req.NewEncPrivateKey) > maxWrappedKey || (len(req.NewKDFSalt) > 0 && (len(req.NewKDFSalt) < 16 || len(req.NewKDFSalt) > 64 || !validKDF(req.NewKDFParams))) {
+		WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The key material is malformed."))
+		return
+	}
+	upd := store.AuthUpdate{EncPrivateKey: req.NewEncPrivateKey, KDFSalt: req.NewKDFSalt, KDFParams: string(req.NewKDFParams)}
+	if upd.AuthHash, err = auth.HashAuthKey(req.NewAuthKey); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if err := s.Store.UpdateAuth(r.Context(), u.ID, upd); err != nil {
+		WriteError(w, err)
+		return
+	}
+	_ = s.Store.DeleteUserSessions(r.Context(), u.ID, auth.SessionFrom(r.Context()).ID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleRecoveryReplace(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	var req struct {
+		AuthKey               []byte `json:"auth_key"`
+		RecoveryAuthKey       []byte `json:"recovery_auth_key"`
+		EncPrivateKeyRecovery []byte `json:"enc_private_key_recovery"`
+	}
+	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	ok, err := auth.VerifyAuthKey(req.AuthKey, u.AuthHash)
+	if err != nil || !ok || len(req.AuthKey) != 32 {
+		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The current password is wrong."))
+		return
+	}
+	if len(req.RecoveryAuthKey) != 32 || len(req.EncPrivateKeyRecovery) == 0 || len(req.EncPrivateKeyRecovery) > maxWrappedKey {
+		WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The recovery key material is malformed."))
+		return
+	}
+	rh, err := auth.HashAuthKey(req.RecoveryAuthKey)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if err := s.Store.UpdateRecovery(r.Context(), u.ID, rh, req.EncPrivateKeyRecovery); err != nil {
+		WriteError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	se := auth.SessionFrom(r.Context())
+	_ = s.Store.DeleteSession(r.Context(), se.ID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	cur := auth.SessionFrom(r.Context())
+	list, err := s.Store.SessionsByUser(r.Context(), u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	type sessionView struct {
+		*store.Session
+		Current bool `json:"current"`
+	}
+	out := make([]sessionView, 0, len(list))
+	for _, se := range list {
+		out = append(out, sessionView{Session: se, Current: se.ID == cur.ID})
+	}
+	WriteJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSessionDelete(w http.ResponseWriter, r *http.Request) {
+	u := auth.UserFrom(r.Context())
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	se, err := s.Store.SessionByID(r.Context(), id)
+	if err != nil || se.UserID != u.ID {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if err := s.Store.DeleteSession(r.Context(), id); err != nil {
+		WriteError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

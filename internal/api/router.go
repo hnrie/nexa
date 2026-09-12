@@ -2,6 +2,8 @@
 package api
 
 import (
+	"context"
+	"crypto/rand"
 	"log/slog"
 	"net/http"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/store"
 )
@@ -38,6 +41,11 @@ type Server struct {
 	Auth    *auth.Authenticator
 	Version string
 	Extra   []func(mux *http.ServeMux) // routes registered by other packages (gateway, media, static)
+	Secret  []byte                     // server secret for fake KDF salts (never leaves the box)
+	Media   *media.Store
+	Profile ProfileExtras
+	// InviteCheck reports whether an invite code allows registration (set by the server layer).
+	InviteCheck func(ctx context.Context, code string) bool
 
 	limGeneric *ratelimit.Limiter
 	limAuthIP  *ratelimit.Limiter
@@ -53,8 +61,10 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 	if log == nil {
 		log = slog.Default()
 	}
+	secret := make([]byte, 32)
+	_, _ = rand.Read(secret)
 	return &Server{
-		Cfg: cfg, Store: st, Log: log, Bcast: bc, Version: "dev",
+		Cfg: cfg, Store: st, Log: log, Bcast: bc, Version: "dev", Secret: secret,
 		Auth:       &auth.Authenticator{Store: st, TTL: cfg.SessionTTL},
 		limGeneric: ratelimit.New(ratelimit.Every(60, time.Minute), 60, 10*time.Minute),
 		limAuthIP:  ratelimit.New(ratelimit.Every(5, time.Minute), 5, 10*time.Minute),

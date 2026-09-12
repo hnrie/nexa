@@ -19,14 +19,14 @@ export const TAG_LEN = 16;
  * `Uint8Array` may in principle be backed by a `SharedArrayBuffer`. Re-view it
  * without copying in the common case, and copy in the shared case.
  */
-function src(u: Uint8Array): Uint8Array<ArrayBuffer> {
+export function bufferSource(u: Uint8Array): Uint8Array<ArrayBuffer> {
   return u.buffer instanceof ArrayBuffer
     ? new Uint8Array(u.buffer, u.byteOffset, u.byteLength)
     : new Uint8Array(u);
 }
 
 function importKey(key: Uint8Array, usage: KeyUsage): Promise<CryptoKey> {
-  return crypto.subtle.importKey("raw", src(key), ALGO, false, [usage]);
+  return crypto.subtle.importKey("raw", bufferSource(key), ALGO, false, [usage]);
 }
 
 export async function gcmEncrypt(
@@ -36,8 +36,8 @@ export async function gcmEncrypt(
   aad: Uint8Array,
 ): Promise<Uint8Array> {
   const k = await importKey(key, "encrypt");
-  const params: AesGcmParams = { name: ALGO, iv: src(iv), additionalData: src(aad) };
-  return new Uint8Array(await crypto.subtle.encrypt(params, k, src(plaintext)));
+  const params: AesGcmParams = { name: ALGO, iv: bufferSource(iv), additionalData: bufferSource(aad) };
+  return new Uint8Array(await crypto.subtle.encrypt(params, k, bufferSource(plaintext)));
 }
 
 export async function gcmDecrypt(
@@ -47,6 +47,6 @@ export async function gcmDecrypt(
   aad: Uint8Array,
 ): Promise<Uint8Array> {
   const k = await importKey(key, "decrypt");
-  const params: AesGcmParams = { name: ALGO, iv: src(iv), additionalData: src(aad) };
-  return new Uint8Array(await crypto.subtle.decrypt(params, k, src(ciphertext)));
+  const params: AesGcmParams = { name: ALGO, iv: bufferSource(iv), additionalData: bufferSource(aad) };
+  return new Uint8Array(await crypto.subtle.decrypt(params, k, bufferSource(ciphertext)));
 }

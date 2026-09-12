@@ -18,9 +18,9 @@ func TestHealthAnd404(t *testing.T) {
 	if res.StatusCode != 404 || errCode(body) != "not_found" {
 		t.Errorf("404: %d %v", res.StatusCode, body)
 	}
-	res, _ = do(t, ts, "GET", "/api/v1/users/@me", "", nil)
-	if res.StatusCode != 404 {
-		t.Errorf("unregistered authed route should 404 for now, got %d", res.StatusCode)
+	res, body = do(t, ts, "GET", "/api/v1/users/@me", "", nil)
+	if res.StatusCode != 401 || errCode(body) != "unauthorized" {
+		t.Errorf("authed route without token: %d %v", res.StatusCode, body)
 	}
 }
 

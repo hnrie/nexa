@@ -204,16 +204,44 @@ func (s *Store) UpdateProfile(ctx context.Context, id ids.ID, p ProfilePatch) er
 	return nil
 }
 
-// UpdateAuth replaces the password-derived credentials. Recovery fields are
-// replaced only when recoveryHash is non-empty.
-func (s *Store) UpdateAuth(ctx context.Context, id ids.ID, authHash string, encPriv []byte, encPrivRecovery []byte, recoveryHash string) error {
-	var res sql.Result
-	var err error
-	if recoveryHash != "" {
-		res, err = s.db.W.ExecContext(ctx, `UPDATE users SET auth_hash = ?, enc_private_key = ?, enc_private_key_recovery = ?, recovery_auth_hash = ?, updated_at = ? WHERE id = ?`, authHash, encPriv, encPrivRecovery, recoveryHash, nowMs(), int64(id))
-	} else {
-		res, err = s.db.W.ExecContext(ctx, `UPDATE users SET auth_hash = ?, enc_private_key = ?, updated_at = ? WHERE id = ?`, authHash, encPriv, nowMs(), int64(id))
+// AuthUpdate carries replacement credentials. AuthHash and EncPrivateKey are
+// required; KDFSalt/KDFParams replace the stretch parameters when set; the
+// recovery pair is replaced when RecoveryAuthHash is non-empty.
+type AuthUpdate struct {
+	AuthHash              string
+	KDFSalt               []byte
+	KDFParams             string
+	EncPrivateKey         []byte
+	RecoveryAuthHash      string
+	EncPrivateKeyRecovery []byte
+}
+
+// UpdateAuth replaces the password-derived credentials.
+func (s *Store) UpdateAuth(ctx context.Context, id ids.ID, a AuthUpdate) error {
+	sets := []string{"auth_hash = ?", "enc_private_key = ?", "updated_at = ?"}
+	args := []any{a.AuthHash, a.EncPrivateKey, nowMs()}
+	if len(a.KDFSalt) > 0 && a.KDFParams != "" {
+		sets = append(sets, "kdf_salt = ?", "kdf_params = ?")
+		args = append(args, a.KDFSalt, a.KDFParams)
 	}
+	if a.RecoveryAuthHash != "" {
+		sets = append(sets, "recovery_auth_hash = ?", "enc_private_key_recovery = ?")
+		args = append(args, a.RecoveryAuthHash, a.EncPrivateKeyRecovery)
+	}
+	args = append(args, int64(id))
+	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateRecovery replaces only the recovery pair.
+func (s *Store) UpdateRecovery(ctx context.Context, id ids.ID, recoveryHash string, encPrivRecovery []byte) error {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET recovery_auth_hash = ?, enc_private_key_recovery = ?, updated_at = ? WHERE id = ?`, recoveryHash, encPrivRecovery, nowMs(), int64(id))
 	if err != nil {
 		return err
 	}

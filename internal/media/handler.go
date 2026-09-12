@@ -1,0 +1,50 @@
+package media
+
+import (
+	"net/http"
+	"strconv"
+	"time"
+
+	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/store"
+)
+
+// PublicKinds are the blob kinds anyone may fetch by id.
+var PublicKinds = map[string]bool{"avatar": true, "banner": true, "icon": true, "emoji": true, "sticker": true}
+
+// ServePublic writes a public blob with immutable caching. The kind in the
+// URL must match the stored kind so an attachment can never be fetched here.
+func (m *Store) ServePublic(w http.ResponseWriter, r *http.Request, kind string, id ids.ID) bool {
+	f, b, err := m.Open(r.Context(), id)
+	if err != nil || b.Kind != kind || b.Encrypted || !PublicKinds[kind] {
+		if f != nil {
+			f.Close()
+		}
+		return false
+	}
+	defer f.Close()
+	h := w.Header()
+	h.Set("Content-Type", b.Mime)
+	h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	h.Set("ETag", `"`+b.SHA256+`"`)
+	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+	h.Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, "", time.UnixMilli(b.CreatedAt), f)
+	return true
+}
+
+// ServeEncrypted writes attachment ciphertext; the caller has already checked access.
+func (m *Store) ServeEncrypted(w http.ResponseWriter, r *http.Request, b *store.Blob) {
+	f, _, err := m.Open(r.Context(), b.ID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	defer f.Close()
+	h := w.Header()
+	h.Set("Content-Type", "application/octet-stream")
+	h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	h.Set("Content-Length", strconv.FormatInt(b.Size, 10))
+	h.Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, "", time.UnixMilli(b.CreatedAt), f)
+}

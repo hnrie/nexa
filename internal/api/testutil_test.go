@@ -13,6 +13,7 @@ import (
 
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
+	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -35,7 +36,13 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 		}
 		return ""
 	})
-	srv := NewServer(cfg, store.New(d), slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	st := store.New(d)
+	srv := NewServer(cfg, st, slog.New(slog.NewTextHandler(io.Discard, nil)), nil)
+	m, err := media.New(filepath.Join(dir, "media"), st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.Media = m
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { ts.Close(); d.Close() })
 	return srv, ts

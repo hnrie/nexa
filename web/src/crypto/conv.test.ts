@@ -101,12 +101,15 @@ describe("KeyRing", () => {
     expect(ring.latest("conv-b")).toBeUndefined();
   });
 
-  it("keeps stored roots isolated from later mutation of the caller's array", () => {
-    const ring = new KeyRing();
+  it("keeps separate instances independent", () => {
+    const a = new KeyRing();
+    const b = new KeyRing();
     const root = randomBytes(32);
-    ring.set("conv-a", 0, root);
-    const stored = ring.get("conv-a", 0);
-    expect(stored).toBeDefined();
-    expect(equal(stored ?? new Uint8Array(0), root)).toBe(true);
+    a.set("conv-a", 0, root);
+    expect(b.has("conv-a")).toBe(false);
+    expect(b.convs()).toEqual([]);
+    expect(b.get("conv-a", 0)).toBeUndefined();
+    b.clear();
+    expect(equal(a.get("conv-a", 0) ?? new Uint8Array(0), root)).toBe(true);
   });
 });

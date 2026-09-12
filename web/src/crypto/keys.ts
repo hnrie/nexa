@@ -47,7 +47,7 @@ export async function wrapPrivateKey(priv: Uint8Array, encKey: Uint8Array): Prom
 }
 
 export async function unwrapPrivateKey(blob: Uint8Array, encKey: Uint8Array): Promise<Uint8Array> {
-  if (blob.length <= IV_LEN + TAG_LEN) throw new DecryptError("wrapped private key is too short");
+  if (blob.length < IV_LEN + TAG_LEN) throw new DecryptError("wrapped private key is too short");
   try {
     return await gcmDecrypt(encKey, blob.subarray(0, IV_LEN), blob.subarray(IV_LEN), AAD_PRIVKEY);
   } catch {

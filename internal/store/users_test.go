@@ -89,19 +89,26 @@ func TestUpdateAuthAndFlagsAndDelete(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	u := mkUser(t, s, "carol")
-	if err := s.UpdateAuth(ctx, u.ID, "h2", []byte{2}, []byte{3}, "rh"); err != nil {
+	if err := s.UpdateAuth(ctx, u.ID, AuthUpdate{AuthHash: "h2", EncPrivateKey: []byte{2}, EncPrivateKeyRecovery: []byte{3}, RecoveryAuthHash: "rh", KDFSalt: []byte{7}, KDFParams: "{p}"}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.UserByID(ctx, u.ID)
-	if got.AuthHash != "h2" || string(got.EncPrivateKey) != "\x02" || string(got.EncPrivateKeyRecovery) != "\x03" || got.RecoveryAuthHash != "rh" {
+	if got.AuthHash != "h2" || string(got.EncPrivateKey) != "\x02" || string(got.EncPrivateKeyRecovery) != "\x03" || got.RecoveryAuthHash != "rh" || string(got.KDFSalt) != "\x07" || got.KDFParams != "{p}" {
 		t.Errorf("auth not updated: %+v", got)
 	}
-	if err := s.UpdateAuth(ctx, u.ID, "h3", []byte{4}, nil, ""); err != nil {
+	if err := s.UpdateAuth(ctx, u.ID, AuthUpdate{AuthHash: "h3", EncPrivateKey: []byte{4}}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ = s.UserByID(ctx, u.ID)
-	if got.AuthHash != "h3" || got.RecoveryAuthHash != "rh" {
-		t.Error("recovery must be kept when not provided")
+	if got.AuthHash != "h3" || got.RecoveryAuthHash != "rh" || string(got.KDFSalt) != "\x07" {
+		t.Error("recovery and kdf must be kept when not provided")
+	}
+	if err := s.UpdateRecovery(ctx, u.ID, "rh2", []byte{8}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = s.UserByID(ctx, u.ID)
+	if got.RecoveryAuthHash != "rh2" || string(got.EncPrivateKeyRecovery) != "\x08" {
+		t.Error("UpdateRecovery")
 	}
 	if err := s.SetUserFlags(ctx, u.ID, FlagAdmin); err != nil {
 		t.Fatal(err)

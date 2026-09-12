@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -44,6 +45,12 @@ func WriteError(w http.ResponseWriter, err error) {
 		apiErr = E(http.StatusConflict, "conflict", "The resource changed underneath you; reload and retry.")
 	case errors.Is(err, store.ErrAlreadyExists):
 		apiErr = E(http.StatusConflict, "already_exists", "That already exists.")
+	case errors.Is(err, media.ErrTooLarge):
+		apiErr = E(http.StatusRequestEntityTooLarge, "too_large", "That file is too large.")
+	case errors.Is(err, media.ErrUnsupported):
+		apiErr = E(http.StatusBadRequest, "unsupported_type", "That file type is not supported; use PNG, JPEG, GIF or WebP.")
+	case errors.Is(err, media.ErrBadDimensions):
+		apiErr = E(http.StatusBadRequest, "bad_dimensions", "The image dimensions are out of range.")
 	default:
 		slog.Error("internal error", "err", err)
 		apiErr = E(http.StatusInternalServerError, "internal", "Something went wrong on the server.")
