@@ -22,15 +22,17 @@ type Broadcaster interface {
 	EmitUsers(userIDs []ids.ID, event string, data any)
 	EmitChannel(channelID ids.ID, event string, data any)
 	KeysMaybeNeeded(convID ids.ID)
+	Typing(ctx context.Context, uid, channelID ids.ID)
 }
 
 // NoopBroadcaster drops everything (tests, or before the gateway is wired).
 type NoopBroadcaster struct{}
 
-func (NoopBroadcaster) UserUpdated(*store.User)         {}
-func (NoopBroadcaster) EmitUsers([]ids.ID, string, any) {}
-func (NoopBroadcaster) EmitChannel(ids.ID, string, any) {}
-func (NoopBroadcaster) KeysMaybeNeeded(ids.ID)          {}
+func (NoopBroadcaster) UserUpdated(*store.User)                {}
+func (NoopBroadcaster) EmitUsers([]ids.ID, string, any)        {}
+func (NoopBroadcaster) EmitChannel(ids.ID, string, any)        {}
+func (NoopBroadcaster) KeysMaybeNeeded(ids.ID)                 {}
+func (NoopBroadcaster) Typing(context.Context, ids.ID, ids.ID) {}
 
 // Server holds the dependencies of every handler.
 type Server struct {
@@ -51,6 +53,17 @@ type Server struct {
 	limAuthIP  *ratelimit.Limiter
 	limAuthUsr *ratelimit.Limiter
 	limReg     *ratelimit.Limiter
+	limMsg     *ratelimit.Limiter
+	limUpload  *ratelimit.Limiter
+
+	// ChannelAccess decides server-channel access (Phase 2). DM access is built in.
+	ChannelAccess func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error)
+	// ConvForChannel maps a server channel to the conversation that holds its keys (Phase 2).
+	ConvForChannel func(ctx context.Context, ch *store.Channel) (ids.ID, error)
+	// ServerChannelPatch handles PATCH for server channels (Phase 2).
+	ServerChannelPatch func(w http.ResponseWriter, r *http.Request, ch *store.Channel, me *store.User)
+	// CanRotate restricts who may create key epochs for a conversation (Phase 2).
+	CanRotate func(ctx context.Context, u *store.User, conv ids.ID) (bool, error)
 }
 
 // NewServer builds a Server with rate limiters and the authenticator.
@@ -70,6 +83,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limAuthIP:  ratelimit.New(ratelimit.Every(20, time.Minute), 20, 10*time.Minute),
 		limAuthUsr: ratelimit.New(ratelimit.Every(5, time.Minute), 5, 10*time.Minute),
 		limReg:     ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
+		limMsg:     ratelimit.New(ratelimit.Every(5, 5*time.Second), 5, 5*time.Minute),
+		limUpload:  ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
 	}
 }
 

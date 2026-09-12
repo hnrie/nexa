@@ -9,13 +9,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"golang.org/x/time/rate"
 
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
+	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/store"
@@ -51,6 +54,11 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	srv.limReg = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limAuthIP = ratelimit.New(rate.Inf, 1000, time.Hour)
 	srv.limGeneric = ratelimit.New(rate.Inf, 1000, time.Hour)
+	srv.limMsg = ratelimit.New(rate.Inf, 1000, time.Hour)
+	srv.limUpload = ratelimit.New(rate.Inf, 1000, time.Hour)
+	hub := gateway.New(st, srv.Auth, srv.Log, cfg.PublicURL)
+	srv.Bcast = hub
+	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { ts.Close(); d.Close() })
 	return srv, ts
@@ -99,4 +107,62 @@ func errCode(m map[string]any) string {
 		return c
 	}
 	return ""
+}
+
+// gw is a minimal gateway client for asserting events in handler tests.
+type gw struct {
+	frames chan map[string]any
+	done   chan struct{}
+}
+
+func connectGW(t *testing.T, ts *httptest.Server, token string) *gw {
+	t.Helper()
+	ws, _, err := websocket.Dial(context.Background(), "ws"+strings.TrimPrefix(ts.URL, "http")+"/gateway", &websocket.DialOptions{HTTPHeader: map[string][]string{"Origin": {"http://localhost"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := &gw{frames: make(chan map[string]any, 256), done: make(chan struct{})}
+	go func() {
+		defer close(g.done)
+		for {
+			_, raw, err := ws.Read(context.Background())
+			if err != nil {
+				return
+			}
+			var f map[string]any
+			if json.Unmarshal(raw, &f) == nil {
+				g.frames <- f
+			}
+		}
+	}()
+	t.Cleanup(func() { ws.Close(websocket.StatusNormalClosure, "") })
+	b, _ := json.Marshal(map[string]any{"op": "identify", "d": map[string]string{"token": token}})
+	if err := ws.Write(context.Background(), websocket.MessageText, b); err != nil {
+		t.Fatal(err)
+	}
+	if g.next("ready", 3*time.Second) == nil {
+		t.Fatal("gateway ready not received")
+	}
+	return g
+}
+
+// next returns the data of the next frame with type t (discarding others).
+func (g *gw) next(t string, timeout time.Duration) map[string]any {
+	deadline := time.After(timeout)
+	for {
+		select {
+		case f := <-g.frames:
+			if f["t"] == t {
+				d, _ := f["d"].(map[string]any)
+				if d == nil {
+					d = map[string]any{"_": true}
+				}
+				return d
+			}
+		case <-deadline:
+			return nil
+		case <-g.done:
+			return nil
+		}
+	}
 }
