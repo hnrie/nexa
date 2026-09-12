@@ -1,0 +1,13 @@
+.overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg-overlay); animation: fadeIn 120ms ease-out; padding: 16px; }
+.card { max-width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; background: var(--bg-surface); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: pop 160ms ease-out; outline: none; overflow: hidden; }
+.bare { background: transparent; box-shadow: none; }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 0; }
+.title { margin: 0; font-size: 20px; font-weight: 600; color: var(--text-strong); }
+.close { color: var(--text-muted); display: inline-flex; padding: 4px; border-radius: var(--radius-xs); }
+.close:hover { color: var(--text); background: var(--bg-hover); }
+.body { padding: 16px; overflow: auto; }
+.bareBody { overflow: auto; }
+.footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px; background: var(--bg-raised); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (max-width: 767px) { .overlay { padding: 0; align-items: flex-end; } .card { width: 100% !important; max-height: 92vh; border-radius: var(--radius-md) var(--radius-md) 0 0; } }

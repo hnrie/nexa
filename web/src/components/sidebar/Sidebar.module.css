@@ -1,0 +1,24 @@
+.sidebar { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-base); }
+.search { flex: none; height: var(--header-h); display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--border-subtle); }
+.searchBtn { width: 100%; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); font-size: 14px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.searchBtn:hover { color: var(--text); }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 8px 0; }
+.nav { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 16px; font-weight: 500; width: 100%; }
+.nav:hover { background: var(--bg-hover); color: var(--text); }
+.nav[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
+.navIcon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+.header { display: flex; align-items: center; justify-content: space-between; height: 40px; padding: 18px 8px 4px; color: var(--text-channel); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; }
+.header:hover { color: var(--text); }
+.headerBtn { display: flex; padding: 2px; color: inherit; border-radius: var(--radius-xs); }
+.headerBtn:hover { color: var(--text-strong); }
+.item { position: relative; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 8px; margin-bottom: 2px; border-radius: var(--radius-xs); color: var(--text-channel); width: 100%; text-align: left; }
+.item:hover { background: var(--bg-hover); color: var(--text); }
+.item[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
+.item[data-unread="true"] { color: var(--text-strong); }
+.item[data-unread="true"]::before { content: ""; position: absolute; left: -8px; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-radius: 0 4px 4px 0; background: var(--text-strong); }
+.text { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; line-height: 1.25; }
+.name { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mention { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; flex: none; }
+.empty { padding: 16px 8px; color: var(--text-muted); font-size: 14px; text-align: center; }
+.groupIcon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--brand); color: #fff; flex: none; }

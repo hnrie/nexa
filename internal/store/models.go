@@ -126,6 +126,14 @@ type Relationship struct {
 	CreatedAt int64  `json:"created_at"`
 }
 
+// RelationshipView is a relationship as clients see it: the other user inline.
+type RelationshipView struct {
+	User      PublicUser `json:"user"`
+	Type      string     `json:"type"`
+	Nickname  string     `json:"nickname"`
+	CreatedAt int64      `json:"created_at"`
+}
+
 // Channel is any conversation container: DM, group DM, or server channel.
 type Channel struct {
 	ID              ids.ID   `json:"id"`

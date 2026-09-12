@@ -21,12 +21,7 @@ func (s *Server) relationshipRoutes(mux *http.ServeMux) {
 	}
 }
 
-type relationshipView struct {
-	User      store.PublicUser `json:"user"`
-	Type      string           `json:"type"`
-	Nickname  string           `json:"nickname"`
-	CreatedAt int64            `json:"created_at"`
-}
+type relationshipView = store.RelationshipView
 
 func (s *Server) handleRelationships(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())

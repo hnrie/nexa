@@ -278,7 +278,8 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 	if p.Channels, err = h.st.DMChannelsForUser(ctx, u.ID); err != nil {
 		return nil, err
 	}
-	if p.Relationships, err = h.st.Relationships(ctx, u.ID); err != nil {
+	rels, err := h.st.Relationships(ctx, u.ID)
+	if err != nil {
 		return nil, err
 	}
 	chanIDs := make([]ids.ID, 0, len(p.Channels))
@@ -289,7 +290,7 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 			userSet[r] = true
 		}
 	}
-	for _, r := range p.Relationships {
+	for _, r := range rels {
 		userSet[r.TargetID] = true
 	}
 	if h.ExtraChannels != nil {
@@ -323,6 +324,12 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 			if h.Online(id) {
 				p.Presences = append(p.Presences, h.PresenceOf(ctx, usr))
 			}
+		}
+	}
+	p.Relationships = make([]store.RelationshipView, 0, len(rels))
+	for _, r := range rels {
+		if usr := users[r.TargetID]; usr != nil {
+			p.Relationships = append(p.Relationships, store.RelationshipView{User: usr.Public(), Type: r.Type, Nickname: r.Nickname, CreatedAt: r.CreatedAt})
 		}
 	}
 	p.Presences = append(p.Presences, h.selfPresence(ctx, u))

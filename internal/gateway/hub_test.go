@@ -182,6 +182,10 @@ func TestReadyTypingPresence(t *testing.T) {
 	if len(d["channels"].([]any)) != 1 || len(d["relationships"].([]any)) != 1 || len(d["users"].([]any)) != 1 || d["user"].(map[string]any)["username"] != "b" {
 		t.Errorf("ready payload: %v", d)
 	}
+	rel := d["relationships"].([]any)[0].(map[string]any)
+	if rel["type"] != "friend" || rel["user"].(map[string]any)["username"] != "a" {
+		t.Errorf("relationships must carry the other user inline: %v", rel)
+	}
 	if len(d["presences"].([]any)) != 1 { // only self, a is offline
 		t.Errorf("presences: %v", d["presences"])
 	}

@@ -1,0 +1,2 @@
+.burger { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--icon); border-radius: var(--radius-xs); flex: none; }
+.burger:hover { color: var(--text); background: var(--bg-hover); }

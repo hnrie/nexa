@@ -1,0 +1,14 @@
+.rail { width: var(--rail-w); height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; background: var(--bg-base); }
+.rail::-webkit-scrollbar { display: none; }
+.item { position: relative; width: 100%; display: flex; justify-content: center; }
+.pill { position: absolute; left: 0; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-radius: 0 4px 4px 0; background: var(--text-strong); opacity: 0; transition: height var(--transition), opacity var(--transition), margin-top var(--transition); }
+.item[data-unread="true"] .pill { opacity: 1; }
+.item:hover .pill { opacity: 1; height: 20px; margin-top: -10px; }
+.item[data-selected="true"] .pill { opacity: 1; height: 40px; margin-top: -20px; }
+.btn { width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-surface); color: var(--text-subtle); transition: border-radius 200ms ease, background-color 200ms ease, color 200ms ease; overflow: hidden; }
+.btn img { width: 100%; height: 100%; object-fit: cover; }
+.item:hover .btn, .item[data-selected="true"] .btn { border-radius: 16px; background: var(--brand); color: #fff; }
+.add:hover .btn { background: var(--positive) !important; color: #fff; }
+.add .btn { color: var(--positive); }
+.sep { width: 32px; height: 2px; border-radius: 1px; background: var(--border); margin: 2px 0; }
+.badge { position: absolute; right: 8px; bottom: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; border: 3px solid var(--bg-base); box-sizing: content-box; }

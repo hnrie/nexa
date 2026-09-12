@@ -1,0 +1,5 @@
+.form { display: flex; flex-direction: column; gap: 16px; }
+.row { display: flex; gap: 8px; }
+.emoji { width: 88px; flex: none; }
+.textField { flex: 1; }
+.select { height: 40px; padding: 0 10px; background: var(--bg-input); color: var(--text); border: 1px solid transparent; border-radius: var(--radius-xs); font-size: 16px; }

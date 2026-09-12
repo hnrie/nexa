@@ -1,0 +1,15 @@
+# Tools
+
+Visual checks and end-to-end runs use Playwright from a Python venv:
+
+```
+python3 -m venv tools/.venv
+tools/.venv/bin/pip install -r tools/requirements.txt
+PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=mac14 tools/.venv/bin/python -m playwright install chromium
+```
+
+(`PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=mac14` is needed on macOS 13, where Playwright
+would otherwise refuse to download its Chromium.)
+
+- `tools/screenshot.py <base-url> <out-dir> --paths /login --viewports 1366x768 390x844`
+- `tools/e2e.py` — starts a throwaway server and drives two browsers through register → friend → DM → attachments.

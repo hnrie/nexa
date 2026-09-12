@@ -90,18 +90,18 @@ type Presence struct {
 
 // ReadyPayload is sent once after a successful identify.
 type ReadyPayload struct {
-	SessionID     ids.ID                `json:"session_id"`
-	User          any                   `json:"user"`
-	Users         []store.PublicUser    `json:"users"`
-	Channels      []*store.Channel      `json:"channels"`
-	Relationships []*store.Relationship `json:"relationships"`
-	ReadStates    []*store.ReadState    `json:"read_states"`
-	Presences     []Presence            `json:"presences"`
-	KeyGrants     []*store.KeyGrant     `json:"key_grants"`
-	Settings      *store.Settings       `json:"settings"`
-	Servers       []any                 `json:"servers"`
-	VoiceStates   []any                 `json:"voice_states"`
-	Extra         map[string]any        `json:"-"`
+	SessionID     ids.ID                   `json:"session_id"`
+	User          any                      `json:"user"`
+	Users         []store.PublicUser       `json:"users"`
+	Channels      []*store.Channel         `json:"channels"`
+	Relationships []store.RelationshipView `json:"relationships"`
+	ReadStates    []*store.ReadState       `json:"read_states"`
+	Presences     []Presence               `json:"presences"`
+	KeyGrants     []*store.KeyGrant        `json:"key_grants"`
+	Settings      *store.Settings          `json:"settings"`
+	Servers       []any                    `json:"servers"`
+	VoiceStates   []any                    `json:"voice_states"`
+	Extra         map[string]any           `json:"-"`
 }
 
 // identifyData is the payload of the identify op.

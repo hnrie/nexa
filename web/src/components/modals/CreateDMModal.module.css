@@ -1,0 +1,10 @@
+.hint { margin: 0 0 12px; font-size: 12px; color: var(--text-muted); }
+.name { margin-top: 8px; }
+.list { margin-top: 12px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radius-xs); cursor: pointer; }
+.row:hover { background: var(--bg-hover); }
+.row input { width: 20px; height: 20px; accent-color: var(--brand); margin-left: auto; }
+.text { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.rowName { font-size: 16px; font-weight: 500; color: var(--text); }
+.rowUser { font-size: 13px; color: var(--text-muted); }
+.empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
