@@ -1,4 +1,4 @@
-import { Expand, Headphones, HeadphoneOff, Maximize2, Mic, MicOff, Minimize2, MonitorUp, MonitorX, PhoneOff, PictureInPicture2, Video, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { Expand, Headphones, HeadphoneOff, Maximize2, Mic, MicOff, Minimize2, MonitorUp, MonitorX, PhoneOff, PictureInPicture2, SwitchCamera, Video, VideoOff, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -10,7 +10,8 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { flipCamera, joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
 /** A video element bound to a MediaStream. */
@@ -40,6 +41,10 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   const remote = useVoice((v) => v.remote);
   const localVideo = useVoice((v) => v.localVideo);
   const localScreen = useVoice((v) => v.localScreen);
+  const [canFlip, setCanFlip] = useState(false);
+  useEffect(() => {
+    void hasSeveralCameras().then(setCanFlip);
+  }, []);
   const speaking = useVoice((v) => v.speaking);
   const peers = useVoice((v) => v.peers);
   const focused = useVoice((v) => v.focused);
@@ -239,6 +244,11 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
             <Tooltip text={localVideo ? "Turn off camera" : "Turn on camera"} side="top">
               <button className={s.ctl} data-on={!!localVideo} aria-label="Camera" onClick={() => void toggleCamera()}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</button>
             </Tooltip>
+            {localVideo && canFlip ? (
+              <Tooltip text="Switch camera" side="top">
+                <button className={s.ctl} aria-label="Switch camera" data-testid="flip-camera" onClick={() => void flipCamera()}><SwitchCamera size={22} /></button>
+              </Tooltip>
+            ) : null}
             <Tooltip text={localScreen ? "Stop sharing" : "Share your screen"} side="top">
               <button className={s.ctl} data-on={!!localScreen} aria-label={localScreen ? "Stop sharing your screen" : "Share your screen"} data-testid="screen-share" onClick={() => void toggleScreen()}>{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</button>
             </Tooltip>

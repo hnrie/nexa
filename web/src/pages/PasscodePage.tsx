@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
-import { MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
+import { hasLock, MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
@@ -15,6 +15,8 @@ export default function PasscodePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [left, setLeft] = useState(() => (me ? triesLeft(me.id) : MAX_FAILURES));
+  // A device that has never been given the passcode is being set up, not unlocked.
+  const [adopting] = useState(() => !!me && !hasLock(me.id));
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => input.current?.focus(), []);
@@ -42,8 +44,12 @@ export default function PasscodePage() {
 
   return (
     <AuthLayout
-      title="Locked"
-      subtitle={`Enter your passcode to unlock, ${me?.display_name ?? me?.username ?? "you"}.`}
+      title={adopting ? "This account has a passcode" : "Locked"}
+      subtitle={
+        adopting
+          ? "Enter it to finish setting this device up. Your keys are then kept wrapped by it here too."
+          : `Enter your passcode to unlock, ${me?.display_name ?? me?.username ?? "you"}.`
+      }
       width={420}
     >
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
@@ -61,7 +67,7 @@ export default function PasscodePage() {
           />
         </Field>
         {left <= 3 ? <div className={s.warn}>{left} {left === 1 ? "try" : "tries"} left before this device forgets your keys. You would then sign in with your password.</div> : null}
-        <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">Unlock</Button>
+        <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">{adopting ? "Set up this device" : "Unlock"}</Button>
         <Button type="button" variant="link" onClick={() => void logout()}>Log out instead</Button>
       </form>
     </AuthLayout>

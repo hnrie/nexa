@@ -13,7 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { LevelMeter, audioContext, getCamera, getMic, getScreen, screenBitrate, sensitivityToThreshold } from "./media";
+import { LevelMeter, audioContext, getCamera, getMic, getScreen, screenBitrate, sensitivityToThreshold, type CameraFacing } from "./media";
 import { MeshTransport, type SignalPayload } from "./mesh";
 
 interface Session {
@@ -220,6 +220,37 @@ export async function refreshMic(): Promise<void> {
   }
 }
 
+/** Which way the camera points; a phone can turn it round mid-call. */
+let cameraFacing: CameraFacing = "user";
+
+export function currentCameraFacing(): CameraFacing {
+  return cameraFacing;
+}
+
+/**
+ * Turns the camera round. The new stream replaces the old one in place, so
+ * the other side sees the picture change without renegotiating.
+ */
+export async function flipCamera(): Promise<void> {
+  const s = session;
+  if (!s?.camera) return;
+  const next: CameraFacing = cameraFacing === "user" ? "environment" : "user";
+  let stream: MediaStream;
+  try {
+    stream = await getCamera(next);
+  } catch {
+    useUI.getState().toast("This device has no other camera.", "error");
+    return;
+  }
+  s.camera.getTracks().forEach((t) => t.stop());
+  cameraFacing = next;
+  s.camera = stream;
+  const track = stream.getVideoTracks()[0] ?? null;
+  if (track) track.onended = () => void toggleCamera();
+  s.transport.setLocalVideo(track);
+  useVoice.getState().setLocalVideo(stream);
+}
+
 export async function toggleCamera(): Promise<void> {
   const s = session;
   if (!s) return;
@@ -230,7 +261,7 @@ export async function toggleCamera(): Promise<void> {
     useVoice.getState().setLocalVideo(null);
   } else {
     try {
-      s.camera = await getCamera();
+      s.camera = await getCamera(cameraFacing);
       const track = s.camera.getVideoTracks()[0] ?? null;
       if (track) track.onended = () => void toggleCamera();
       s.transport.setLocalVideo(track);

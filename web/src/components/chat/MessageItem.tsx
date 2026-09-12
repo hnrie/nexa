@@ -1,5 +1,5 @@
 import { Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -66,9 +66,6 @@ function ToolButton({ label, danger, onClick, children }: { label: string; dange
   );
 }
 
-/** How far the hover toolbar reaches above its row, in pixels. */
-const TOOLBAR_OVERHANG = 18;
-
 export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
   const author = useUsers((u) => u.byId[msg.author_id]);
@@ -86,18 +83,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const friendNickname = useRelationships((r) => r.byUser[msg.author_id]?.nickname);
-  const row = useRef<HTMLDivElement>(null);
-  const [tuck, setTuck] = useState(false);
-  // The toolbar normally hangs above the row, into the gap between messages.
-  // On the row sitting at the very top of the list there is no gap to hang
-  // into and it would be clipped, so it tucks inside instead.
-  const checkRoom = useCallback(() => {
-    const el = row.current;
-    if (!el) return;
-    const scroller = el.closest("[data-scroller]");
-    const top = scroller ? scroller.getBoundingClientRect().top : 0;
-    setTuck(el.getBoundingClientRect().top - top < TOOLBAR_OVERHANG);
-  }, []);
   const shift = useShiftHeld();
 
   const mentioned = !!me && (msg.mention_everyone || msg.mentions.includes(me.id)) && msg.author_id !== me.id;
@@ -135,11 +120,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 
   return (
     <div
-      ref={row}
       className={s.msg}
       data-id={msg.id}
-      data-tuck={tuck}
-      onMouseEnter={checkRoom}
       data-group-start={showHeader}
       data-mentioned={mentioned}
       data-highlight={highlight}
@@ -197,23 +179,23 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {!pending && !editing ? (
         <div className={s.toolbar} role="toolbar" data-shift={shift}>
-          <ToolButton label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={20} /></ToolButton>
+          <ToolButton label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
           {canEdit(msg) ? (
-            <ToolButton label="Edit Message" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={20} /></ToolButton>
+            <ToolButton label="Edit Message" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
           ) : null}
-          <ToolButton label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={20} /></ToolButton>
+          <ToolButton label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
           {shift ? (
             <>
-              <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={20} /> : <Pin size={20} />}</ToolButton>
-              <ToolButton label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={20} /></ToolButton>
-              <ToolButton label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={20} /></ToolButton>
-              {dev ? <ToolButton label="Copy Message ID" onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={20} /></ToolButton> : null}
+              <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton>
+              <ToolButton label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
+              <ToolButton label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
+              {dev ? <ToolButton label="Copy Message ID" onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
               {canDelete(msg) ? (
-                <ToolButton label="Delete Message (Shift skips the prompt)" danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={20} /></ToolButton>
+                <ToolButton label="Delete Message (Shift skips the prompt)" danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
               ) : null}
             </>
           ) : null}
-          <ToolButton label={shift ? "Everything else" : "More (hold Shift for all actions)"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={20} /></ToolButton>
+          <ToolButton label={shift ? "Everything else" : "More (hold Shift for all actions)"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
         </div>
       ) : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}

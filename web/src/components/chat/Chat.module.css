@@ -63,15 +63,18 @@
 .replyName { font-weight: 500; color: var(--text); }
 .replyText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .replyLine:hover .replyText { color: var(--text); }
-.toolbar { position: absolute; right: 16px; top: -16px; display: none; align-items: center; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-xs); box-shadow: var(--shadow-low); z-index: 2; }
-/* a row with nothing above it has no gap to overhang into, so the toolbar
-   tucks inside rather than being clipped by the top of the list */
-.msg[data-first="true"] .toolbar, .msg[data-tuck="true"] .toolbar { top: 2px; }
+/* The toolbar stays inside the row it belongs to. Hanging it into the gap
+   above put it over the message before, which is worse than covering the
+   empty right-hand end of this one. */
+.toolbar { position: absolute; right: 16px; top: 0; display: none; align-items: center; height: 26px; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-xs); box-shadow: var(--shadow-low); z-index: 3; }
+/* a row with a name and avatar has more height, so the toolbar can sit lower
+   and line up with the text rather than the header */
+.msg[data-group-start="true"] .toolbar { top: 4px; }
 .toolbar[data-shift="true"] { border-color: var(--brand); }
 .tDanger { color: var(--danger); }
 .tDanger:hover { color: #fff; background: var(--danger); }
 .msg:hover .toolbar, .msg[data-menu="true"] .toolbar { display: flex; }
-.tBtn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--icon); }
+.tBtn { width: 26px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--icon); }
 .tBtn:hover { color: var(--text); background: var(--bg-hover); }
 .reactions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; position: relative; }
 .pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 6px; border-radius: 8px; background: var(--bg-surface); border: 1px solid transparent; font-size: 14px; color: var(--text-subtle); }

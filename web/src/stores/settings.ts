@@ -21,6 +21,22 @@ export interface VoiceSettings {
   streamQuality: "720p30" | "1080p30" | "1080p60" | "source";
 }
 
+/**
+ * The passcode policy, kept with the account so every device asks for it.
+ * The wrapped key itself never leaves the device that made it; the verifier
+ * is only enough to check a passcode, not to derive anything from it.
+ */
+export interface AppLockPolicy {
+  /** base64 argon2 salt. */
+  salt: string;
+  params: { m: number; t: number; p: number; v: 1 };
+  /** base64 of a value derived from the passcode key, for checking it. */
+  verifier: string;
+  autoLockMs: number;
+  lockOnBlur: boolean;
+  blurDelayMs: number;
+}
+
 export interface Settings {
   theme: Theme;
   accent: string | null;
@@ -42,6 +58,7 @@ export interface Settings {
   serverPositions: string[];
   collapsedCategories: string[];
   userNotes: Record<string, string>;
+  appLock: AppLockPolicy | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -78,6 +95,7 @@ export const DEFAULT_SETTINGS: Settings = {
   serverPositions: [],
   collapsedCategories: [],
   userNotes: {},
+  appLock: null,
 };
 
 function mergeSettings(base: Settings, incoming: unknown): Settings {

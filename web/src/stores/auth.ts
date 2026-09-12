@@ -7,7 +7,8 @@ import { b64, randomBytes } from "@/crypto/bytes";
 import { DEFAULT_KDF, deriveAuthKey, deriveEncKey, deriveMaster, deriveSettingsKey, newRecoveryKey, recoveryKeyToBytes, recoveryToKeys, type KdfParams } from "@/crypto/kdf";
 import { generateIdentity, unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
-import { clearLock, enableLock, hasLock, loadLock, unlockIdentity, type LockConfig } from "@/lib/appLock";
+import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, unlockIdentity, type LockConfig } from "@/lib/appLock";
+import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { storage } from "@/lib/storage";
 
 export type AuthStatus = "idle" | "loading" | "anonymous" | "locked" | "pinlocked" | "ready";
@@ -17,6 +18,12 @@ export type LoginOutcome = { mfa: false } | { mfa: true; backupCodesLeft: number
 
 /** Kept out of the store so a half-finished sign-in never lands in a snapshot. */
 let pendingMfa: { username: string; encKey: Uint8Array; ticket: string } | null = null;
+/**
+ * The account's passcode policy, held from the moment we decide to ask for it.
+ * Showing the lock screen tears the session down, which clears the settings it
+ * came from, so it has to be kept here rather than read back later.
+ */
+let pendingPolicy: AppLockPolicy | null = null;
 
 const TOKEN_KEY = "ec.token";
 
@@ -38,6 +45,8 @@ interface AuthState {
   unlockWithPasscode: (passcode: string) => Promise<void>;
   /** Forgets the keys held in memory and shows the passcode screen. */
   lockApp: () => void;
+  /** Asks for the account passcode on a device that has not stored it yet. */
+  requirePasscode: () => void;
   /** Wraps the identity with a passcode and drops the plaintext copy. */
   setPasscode: (passcode: string, opts?: Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" | "blurDelayMs">>) => Promise<void>;
   /** Removes the passcode and goes back to keeping the keys on this device. */
@@ -47,6 +56,13 @@ interface AuthState {
   newRecoveryKey: (password: string) => Promise<string>;
   logout: () => Promise<void>;
   setMe: (me: MeUser) => void;
+}
+
+/** Pushes settings to the server now rather than on the usual debounce. */
+async function saveSettingsNow(): Promise<void> {
+  await useSettings.getState().flush();
+  await new Promise((r) => setTimeout(r, 50));
+  await useSettings.getState().flush();
 }
 
 async function deriveAll(password: string, salt: Uint8Array, params: KdfParams) {
@@ -168,10 +184,31 @@ export const useAuth = create<AuthState>()((set, get) => ({
   },
 
   unlockWithPasscode: async (passcode) => {
-    const { me, token } = get();
+    const { me, token, identity: current } = get();
     if (!me || !token) throw new Error("not logged in");
+    if (!hasLock(me.id)) {
+      // This device has not seen the account's passcode yet: check it against
+      // the policy, then wrap this device's copy of the key with it.
+      const policy = pendingPolicy ?? useSettings.getState().settings.appLock;
+      if (!policy || !current) throw new Error("This device has no passcode.");
+      await adoptPolicy(me.id, current, passcode, policy);
+      pendingPolicy = null;
+      await keystore.forgetIdentity(me.id);
+      set({ status: "ready", error: null });
+      return;
+    }
     const identity = await unlockIdentity(me.id, passcode);
     set({ status: "ready", me, identity, settingsKey: deriveSettingsKey(identity.privateKey), error: null });
+  },
+
+  /** Asks for the account passcode on a device that has not stored it yet. */
+  requirePasscode: () => {
+    const { me, status } = get();
+    if (!me || status !== "ready" || hasLock(me.id)) return;
+    const policy = useSettings.getState().settings.appLock;
+    if (!policy) return;
+    pendingPolicy = policy;
+    set({ status: "pinlocked" });
   },
 
   lockApp: () => {
@@ -183,9 +220,14 @@ export const useAuth = create<AuthState>()((set, get) => ({
   setPasscode: async (passcode, opts) => {
     const { me, identity } = get();
     if (!me || !identity) throw new Error("Unlock your keys first.");
-    await enableLock(me.id, identity, passcode, opts);
+    const cfg = await enableLock(me.id, identity, passcode, opts);
     // The wrapped copy is now the only one on this device; drop the readable one.
     await keystore.forgetIdentity(me.id);
+    // The policy travels with the account, so every other device asks too. It
+    // is saved right away: a reload before the debounce would come back to
+    // settings that say there is no passcode, and drop the one just made.
+    useSettings.getState().patch({ appLock: await policyFor(cfg, passcode) });
+    await saveSettingsNow();
   },
 
   removePasscode: async () => {
@@ -193,6 +235,8 @@ export const useAuth = create<AuthState>()((set, get) => ({
     if (!me) return;
     clearLock(me.id);
     if (identity) await keystore.saveIdentity(me.id, identity);
+    useSettings.getState().patch({ appLock: null });
+    await saveSettingsNow();
   },
 
   recover: async (username, recoveryKey, newPassword) => {
@@ -260,6 +304,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     storage.remove(TOKEN_KEY);
     api.setToken(null);
     pendingMfa = null;
+    pendingPolicy = null;
     if (me) {
       clearLock(me.id);
       await keystore.clear(me.id);

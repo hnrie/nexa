@@ -9,8 +9,11 @@
  * fetch the key back from the server.
  */
 
-import { b64, randomBytes } from "@/crypto/bytes";
+import { hkdf } from "@noble/hashes/hkdf";
+import { sha256 } from "@noble/hashes/sha256";
+import { b64, randomBytes, utf8 } from "@/crypto/bytes";
 import { deriveEncKey, deriveMaster, type KdfParams } from "@/crypto/kdf";
+import type { AppLockPolicy } from "@/stores/settings";
 import { unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
 import { storage } from "./storage";
 
@@ -118,6 +121,16 @@ async function passcodeKey(passcode: string, salt: Uint8Array, params: KdfParams
   return deriveEncKey(await deriveMaster(passcode, salt, params));
 }
 
+const INFO_VERIFY = utf8.enc("evilion-chat/app-lock-verify/v1");
+
+/**
+ * A value another device can compare a passcode against. It is derived one way
+ * from the passcode key, so holding it proves nothing and unlocks nothing.
+ */
+function verifierOf(key: Uint8Array): string {
+  return b64.enc(hkdf(sha256, key, new Uint8Array(0), INFO_VERIFY, 32));
+}
+
 /** Returns why a passcode is unacceptable, or null when it is fine. */
 export function passcodeProblem(passcode: string): string | null {
   if (passcode.length < MIN_PASSCODE) return `Use at least ${MIN_PASSCODE} characters.`;
@@ -152,6 +165,47 @@ export async function enableLock(userId: string, identity: Identity, passcode: s
   };
   saveLock(userId, cfg);
   return cfg;
+}
+
+/** The account-wide policy for a lock that was just set up on this device. */
+export async function policyFor(cfg: LockConfig, passcode: string): Promise<AppLockPolicy> {
+  const key = await passcodeKey(passcode, b64.dec(cfg.salt), cfg.params);
+  return {
+    salt: cfg.salt,
+    params: cfg.params,
+    verifier: verifierOf(key),
+    autoLockMs: cfg.autoLockMs,
+    lockOnBlur: cfg.lockOnBlur,
+    blurDelayMs: cfg.blurDelayMs,
+  };
+}
+
+/**
+ * Takes on the account's passcode on a device that has not seen it before:
+ * checks the passcode against the policy, then wraps this device's copy of the
+ * identity with it. Throws WrongPasscode if it does not match.
+ */
+export async function adoptPolicy(userId: string, identity: Identity, passcode: string, policy: AppLockPolicy): Promise<LockConfig> {
+  const key = await passcodeKey(passcode, b64.dec(policy.salt), policy.params);
+  if (verifierOf(key) !== policy.verifier) {
+    const cfg = loadLock(userId);
+    const failures = (cfg?.failures ?? 0) + 1;
+    throw new WrongPasscode(Math.max(0, MAX_FAILURES - failures));
+  }
+  const wrapped = await wrapPrivateKey(identity.privateKey, key);
+  const next: LockConfig = {
+    v: 1,
+    salt: policy.salt,
+    params: policy.params,
+    wrapped: b64.enc(wrapped),
+    pub: b64.enc(identity.publicKey),
+    autoLockMs: policy.autoLockMs,
+    lockOnBlur: policy.lockOnBlur,
+    blurDelayMs: policy.blurDelayMs,
+    failures: 0,
+  };
+  saveLock(userId, next);
+  return next;
 }
 
 /**

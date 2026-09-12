@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode, type TouchEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
@@ -50,29 +50,81 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [leftOpen, mobile]);
 
-  const onTouchStart = (e: TouchEvent) => {
-    const t = e.touches[0];
-    if (!t) return;
-    touch.current = { x: t.clientX, y: t.clientY, edge: t.clientX < 28 };
-  };
-  const onTouchEnd = (e: TouchEvent) => {
-    const start = touch.current;
-    const t = e.changedTouches[0];
-    touch.current = null;
-    if (!start || !t || !mobile) return;
-    const dx = t.clientX - start.x;
-    const dy = Math.abs(t.clientY - start.y);
-    if (dy > 60) return;
-    if (start.edge && dx > 60) setLeftOpen(true);
-    else if (leftOpen && dx < -60) setLeftOpen(false);
+  // --- swiping the drawers -------------------------------------------------
+  // The drawer follows the finger and snaps when it is let go, so it feels
+  // like a drawer rather than a shortcut that either fires or does not.
+  const drag = useRef<{ x: number; y: number; t: number; axis: "" | "x" | "y"; from: boolean } | null>(null);
+  const [dragX, setDragX] = useState<number | null>(null);
+
+  const drawerWidth = () => Math.min(420, Math.max(240, window.innerWidth - 56));
+
+  /** A swipe inside something that scrolls sideways belongs to that thing. */
+  const scrollsSideways = (target: EventTarget | null): boolean => {
+    let el = target instanceof Element ? target : null;
+    while (el && el !== document.body) {
+      if (el.hasAttribute("data-no-swipe")) return true;
+      if (el.scrollWidth > el.clientWidth + 4) {
+        const overflow = getComputedStyle(el).overflowX;
+        if (overflow === "auto" || overflow === "scroll") return true;
+      }
+      el = el.parentElement;
+    }
+    return false;
   };
 
+  const onTouchStart = (e: TouchEvent) => {
+    const t = e.touches[0];
+    if (!mobile || !t) return;
+    if (document.querySelector("[data-modal-layer]")) return;
+    if (scrollsSideways(e.target)) return;
+    drag.current = { x: t.clientX, y: t.clientY, t: Date.now(), axis: "", from: leftOpen };
+  };
+
+  const onTouchMove = (e: TouchEvent) => {
+    const d = drag.current;
+    const t = e.touches[0];
+    if (!d || !t) return;
+    const dx = t.clientX - d.x;
+    const dy = t.clientY - d.y;
+    if (d.axis === "") {
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
+      d.axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? "x" : "y";
+      if (d.axis === "y") drag.current = null;
+      return;
+    }
+    const w = drawerWidth();
+    const at = d.from ? w + dx : dx;
+    setDragX(Math.max(0, Math.min(w, at)));
+  };
+
+  const onTouchEnd = (e: TouchEvent) => {
+    const d = drag.current;
+    const t = e.changedTouches[0];
+    drag.current = null;
+    if (!d || !t || d.axis !== "x") {
+      setDragX(null);
+      return;
+    }
+    const dx = t.clientX - d.x;
+    const w = drawerWidth();
+    const speed = dx / Math.max(1, Date.now() - d.t);
+    const open = Math.abs(speed) > 0.4 ? dx > 0 : (d.from ? w + dx : dx) > w * 0.4;
+    setDragX(null);
+    if (open) setLeftOpen(true);
+    else if (d.from) setLeftOpen(false);
+    else if (dx < -60) setRightOpen(true); // a left swipe with nothing open looks right
+  };
+
+  const dragging = dragX !== null;
+  const drawerStyle = dragging ? { transform: `translateX(${dragX - drawerWidth()}px)`, transition: "none" } : undefined;
+  const backdropStyle = dragging ? { opacity: dragX / drawerWidth(), pointerEvents: "none" as const, transition: "none" } : undefined;
+
   return (
-    <div className={s.app} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div className={s.app} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
       {mobile ? (
         <>
-          <div className={s.backdrop} data-open={leftOpen} onClick={() => setLeftOpen(false)} />
-          <div className={s.drawer} data-open={leftOpen}>
+          <div className={s.backdrop} data-open={leftOpen || dragging} style={backdropStyle} onClick={() => setLeftOpen(false)} />
+          <div className={s.drawer} data-open={leftOpen} style={drawerStyle}>
             <div className={s.rail}><Rail /></div>
             <div className={s.sidebar}>{sidebar}</div>
           </div>

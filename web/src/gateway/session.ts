@@ -4,6 +4,8 @@ import { useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { clearLock, hasLock } from "@/lib/appLock";
+import { keystore } from "@/crypto/keystore";
 
 let client: GatewayClient | null = null;
 let queue: Promise<void> = Promise.resolve();
@@ -41,4 +43,27 @@ export function stopSession(): void {
 
 export function gateway(): GatewayClient | null {
   return client;
+}
+
+/**
+ * Keeps this device in step with the account's passcode: asks for it when the
+ * account has one and this device does not, and forgets it when it is removed
+ * somewhere else.
+ */
+export function applyLockPolicy(): void {
+  const { me, identity } = useAuth.getState();
+  const { settings, loaded } = useSettings.getState();
+  // Before the account's settings arrive they are all defaults, and acting on
+  // those would read "no passcode" and throw this device's copy away.
+  if (!me || !loaded) return;
+  const policy = settings.appLock;
+  const local = hasLock(me.id);
+  if (policy && !local) {
+    useAuth.getState().requirePasscode();
+    return;
+  }
+  if (!policy && local && identity) {
+    clearLock(me.id);
+    void keystore.saveIdentity(me.id, identity);
+  }
 }

@@ -24,22 +24,29 @@ interface Props {
 
 export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  // Held in a ref so a caller passing a fresh function on every render does
+  // not re-run the effect below: that put the caret back on the dialog after
+  // every keystroke, so a field could only ever take one character.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isTopLayer(ref.current)) {
         e.stopPropagation();
-        onClose();
+        closeRef.current();
       }
     };
     document.addEventListener("keydown", onKey);
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    // start in the first field, so a dialog that asks for something is ready
+    const first = ref.current?.querySelector<HTMLElement>("input:not([type=hidden]):not([disabled]), textarea:not([disabled])");
+    (first ?? ref.current)?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       prev?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return createPortal(
     <div className={s.overlay} onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>

@@ -14,6 +14,7 @@ import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
 import { users as usersApi } from "@/api/users";
 import { AUTO_LOCK_CHOICES, BLUR_DELAY_CHOICES, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
+import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
@@ -47,6 +48,8 @@ export default function SecurityPage() {
   const [pin, setPin] = useState("");
   const [pin2, setPin2] = useState("");
   const [lock, setLock] = useState<LockConfig | null>(() => (me ? loadLock(me.id) : null));
+  // The account's own policy: it may have been set on another device.
+  const policy = useSettings((st) => st.settings.appLock);
 
   useEffect(() => {
     authApi.mfaStatus().then(setStatus).catch(() => setStatus(null));
@@ -140,6 +143,8 @@ export default function SecurityPage() {
   const patch = (p: Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" | "blurDelayMs">>) => {
     const next = patchLock(me.id, p);
     if (next) setLock(next);
+    // keep the account's copy in step, so another device locks the same way
+    if (policy) useSettings.getState().patch({ appLock: { ...policy, ...p } });
   };
 
   const copyCodes = async () => {
@@ -199,12 +204,12 @@ export default function SecurityPage() {
       </p>
       <div className={s.device} data-testid="lock-row">
         <div>
-          <div className={s.deviceName}>{lock ? "Passcode is on for this device" : "No passcode on this device"}</div>
-          <div className={s.deviceSub}>{lock ? "Asked for on every reload and whenever the app locks." : "The app opens straight into your messages."}</div>
+          <div className={s.deviceName}>{policy ? "Passcode is on for this account" : "No passcode set"}</div>
+          <div className={s.deviceSub}>{policy ? "Every device you sign in on asks for it, on each reload and whenever the app locks." : "The app opens straight into your messages."}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {lock ? <Button size="sm" variant="secondary" onClick={() => setDialog("passcode")}>Change</Button> : null}
-          {lock ? (
+          {policy ? <Button size="sm" variant="secondary" onClick={() => setDialog("passcode")}>Change</Button> : null}
+          {policy ? (
             <Button size="sm" variant="danger" onClick={() => setDialog("removePasscode")} data-testid="lock-remove">Remove</Button>
           ) : (
             <Button size="sm" onClick={() => setDialog("passcode")} data-testid="lock-set">Set a passcode</Button>

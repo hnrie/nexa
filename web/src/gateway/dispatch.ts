@@ -12,6 +12,7 @@ import { handleVoiceEvent, onReadyVoice } from "@/voice/session";
 import { useSettings } from "@/stores/settings";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
+import { applyLockPolicy } from "./session";
 import { useUsers } from "@/stores/users";
 import { decryptForStore } from "@/lib/decrypt";
 import { users as usersApi } from "@/api/users";
@@ -93,6 +94,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       onReadyVoice(d.voice_states ?? []);
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
+      // The account's passcode policy only arrives with the settings, so this
+      // is the first moment a fresh device can know it needs to ask for one.
+      applyLockPolicy();
       await useKeys.getState().ingestGrants(d.key_grants);
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();

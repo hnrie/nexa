@@ -46,8 +46,21 @@ export async function getMic(v: VoiceSettings): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({ audio, video: false });
 }
 
-export async function getCamera(): Promise<MediaStream> {
-  return navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: false });
+export type CameraFacing = "user" | "environment";
+
+export async function getCamera(facing: CameraFacing = "user"): Promise<MediaStream> {
+  const video: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: { ideal: facing } };
+  return navigator.mediaDevices.getUserMedia({ video, audio: false });
+}
+
+/** Whether this device has more than one camera to switch between. */
+export async function hasSeveralCameras(): Promise<boolean> {
+  try {
+    const list = await navigator.mediaDevices.enumerateDevices();
+    return list.filter((d) => d.kind === "videoinput").length > 1;
+  } catch {
+    return false;
+  }
 }
 
 export async function getScreen(q: StreamQuality): Promise<MediaStream> {

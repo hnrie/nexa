@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"mime"
 	"net/http"
 	"os"
@@ -51,6 +52,13 @@ func (s *Server) staticHandler() http.Handler {
 				}
 			}
 		}
+		// An invite link gets its own page head, so pasting it anywhere else
+		// shows what it leads to rather than a bare address.
+		if code, ok := strings.CutPrefix(p, "/invite/"); ok && code != "" && !strings.Contains(code, "/") {
+			if s.serveInvitePage(w, r, dist, code) {
+				return
+			}
+		}
 		index := filepath.Join(dist, "index.html")
 		f, err := os.Open(index)
 		if err != nil {
@@ -99,4 +107,66 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string,
 		h.Set("Service-Worker-Allowed", "/")
 	}
 	http.ServeContent(w, r, filepath.Base(fp), mod, f)
+}
+
+// escapeAttr keeps text safe inside a double-quoted HTML attribute.
+var escapeAttr = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace
+
+// serveInvitePage renders index.html with the invite's own preview tags in the
+// head. It reports whether it answered the request.
+func (s *Server) serveInvitePage(w http.ResponseWriter, r *http.Request, dist, code string) bool {
+	res := s.inviteUnfurl(r, s.Cfg.PublicURL+"/invite/"+code)
+	if res == nil {
+		return false
+	}
+	raw, err := os.ReadFile(filepath.Join(dist, "index.html"))
+	if err != nil {
+		return false
+	}
+	title := res.Title
+	if title == "" {
+		title = "An invitation"
+	}
+	desc := res.Description
+	if res.MemberCount > 0 {
+		desc = fmt.Sprintf("%s · %d member%s", desc, res.MemberCount, plural(res.MemberCount))
+	}
+	var tags strings.Builder
+	tags.WriteString("\n<title>" + escapeAttr("Join "+title) + "</title>")
+	meta := func(prop, content string) {
+		if content == "" {
+			return
+		}
+		tags.WriteString("\n<meta property=\"" + prop + "\" content=\"" + escapeAttr(content) + "\">")
+	}
+	meta("og:type", "website")
+	meta("og:site_name", res.SiteName)
+	meta("og:title", "Join "+title)
+	meta("og:description", desc)
+	meta("og:url", res.URL)
+	meta("og:image", res.Image)
+	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
+	tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
+
+	body := string(raw)
+	if i := strings.Index(body, "</head>"); i >= 0 {
+		body = body[:i] + tags.String() + "\n" + body[i:]
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Content-Security-Policy", CSP)
+	if r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return true
+	}
+	_, _ = w.Write([]byte(body))
+	return true
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }
