@@ -148,3 +148,46 @@ describe("GatewayClient", () => {
     expect(statuses).toEqual(["closed"]);
   });
 });
+
+
+describe("platform timers", () => {
+  // A browser refuses `const f = setTimeout; f(...)`: the DOM checks the
+  // receiver and throws "Illegal invocation". Stand that check in here so the
+  // suite notices if the client ever hands the natives out bare again.
+  function brandChecked() {
+    const set = function (this: unknown, fn: () => void): number {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      void fn;
+      return 1;
+    };
+    const clear = function (this: unknown): void {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+    };
+    return { set, clear };
+  }
+
+  beforeEach(() => {
+    const { set, clear } = brandChecked();
+    vi.stubGlobal("setTimeout", set);
+    vi.stubGlobal("clearTimeout", clear);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("closes without tripping the receiver check", () => {
+    const { client } = make();
+    client.connect();
+    FakeWS.instances[0]!.open();
+    expect(() => client.close()).not.toThrow();
+    expect(client.status).toBe("closed");
+  });
+
+  it("schedules a reconnect without tripping the receiver check", () => {
+    const { client } = make();
+    client.connect();
+    FakeWS.instances[0]!.open();
+    expect(() => FakeWS.instances[0]!.serverClose(1006, "dropped")).not.toThrow();
+    expect(client.status).toBe("closed");
+  });
+});

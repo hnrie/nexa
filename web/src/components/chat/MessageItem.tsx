@@ -1,5 +1,5 @@
-import { Link2, Lock, MailOpen, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -21,7 +21,10 @@ import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
 import { Reactions } from "./Reactions";
 import { SystemMessage } from "./SystemMessage";
-import { buildMessageMenu, canDelete, canEdit, copyMessageLink, deleteMessageNow, markUnread } from "./messageMenu";
+import { Tooltip } from "@/components/common/Tooltip";
+import { MSG_FLAG_PINNED } from "@/api/types";
+import { discardPending, retryPending } from "@/components/composer/send";
+import { buildMessageMenu, canDelete, canEdit, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
 import s from "./Chat.module.css";
 
 interface Props {
@@ -51,6 +54,20 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   );
 }
 
+/** A hover-toolbar button that always says what it does. */
+function ToolButton({ label, danger, onClick, children }: { label: string; danger?: boolean; onClick: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode }) {
+  return (
+    <Tooltip text={label} side="top">
+      <button className={[s.tBtn, danger ? s.tDanger : ""].join(" ")} aria-label={label} onClick={onClick}>
+        {children}
+      </button>
+    </Tooltip>
+  );
+}
+
+/** How far the hover toolbar reaches above its row, in pixels. */
+const TOOLBAR_OVERHANG = 18;
+
 export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
   const author = useUsers((u) => u.byId[msg.author_id]);
@@ -67,6 +84,18 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const color = serverState ? memberColor(serverState, msg.author_id) : undefined;
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const row = useRef<HTMLDivElement>(null);
+  const [tuck, setTuck] = useState(false);
+  // The toolbar normally hangs above the row, into the gap between messages.
+  // On the row sitting at the very top of the list there is no gap to hang
+  // into and it would be clipped, so it tucks inside instead.
+  const checkRoom = useCallback(() => {
+    const el = row.current;
+    if (!el) return;
+    const scroller = el.closest("[data-scroller]");
+    const top = scroller ? scroller.getBoundingClientRect().top : 0;
+    setTuck(el.getBoundingClientRect().top - top < TOOLBAR_OVERHANG);
+  }, []);
   const shift = useShiftHeld();
 
   const mentioned = !!me && (msg.mention_everyone || msg.mentions.includes(me.id)) && msg.author_id !== me.id;
@@ -96,12 +125,17 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : "Unknown User");
   const name = member?.nickname || baseName;
   const isReply = !!msg.reply_to_id;
+  const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
+
   const showHeader = groupStart || isReply;
 
   return (
     <div
+      ref={row}
       className={s.msg}
       data-id={msg.id}
+      data-tuck={tuck}
+      onMouseEnter={checkRoom}
       data-group-start={showHeader}
       data-mentioned={mentioned}
       data-highlight={highlight}
@@ -147,30 +181,35 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
           {msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
           {msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? <Embeds list={msg.payload.embeds as UnfurlResult[]} /> : null}
-          {pending === "failed" ? <div className={s.edited} style={{ color: "var(--danger)" }}>Failed to send.</div> : null}
+          {pending === "failed" ? (
+            <div className={s.failedRow}>
+              <span>Message failed to send.</span>
+              <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> Retry</button>
+              <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>Delete</button>
+            </div>
+          ) : null}
         </div>
       )}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {!pending && !editing ? (
         <div className={s.toolbar} role="toolbar" data-shift={shift}>
+          <ToolButton label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={20} /></ToolButton>
+          {canEdit(msg) ? (
+            <ToolButton label="Edit Message" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={20} /></ToolButton>
+          ) : null}
+          <ToolButton label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={20} /></ToolButton>
           {shift ? (
             <>
-              <button className={s.tBtn} title="Mark Unread" aria-label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={20} /></button>
-              <button className={s.tBtn} title="Copy Message Link" aria-label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={20} /></button>
+              <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={20} /> : <Pin size={20} />}</ToolButton>
+              <ToolButton label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={20} /></ToolButton>
+              <ToolButton label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={20} /></ToolButton>
+              {dev ? <ToolButton label="Copy Message ID" onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={20} /></ToolButton> : null}
               {canDelete(msg) ? (
-                <button className={[s.tBtn, s.tDanger].join(" ")} title="Delete (no confirmation while Shift is held)" aria-label="Delete Message" onClick={() => void deleteMessageNow(msg)}><Trash2 size={20} /></button>
+                <ToolButton label="Delete Message (Shift skips the prompt)" danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={20} /></ToolButton>
               ) : null}
             </>
-          ) : (
-            <>
-              <button className={s.tBtn} title="Add Reaction" aria-label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={20} /></button>
-              {canEdit(msg) ? (
-                <button className={s.tBtn} title="Edit" aria-label="Edit" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={20} /></button>
-              ) : null}
-              <button className={s.tBtn} title="Reply" aria-label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={20} /></button>
-            </>
-          )}
-          <button className={s.tBtn} title="More" aria-label="More" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={20} /></button>
+          ) : null}
+          <ToolButton label={shift ? "Everything else" : "More (hold Shift for all actions)"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={20} /></ToolButton>
         </div>
       ) : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}

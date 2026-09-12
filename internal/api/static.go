@@ -85,7 +85,9 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string,
 	if ct := mime.TypeByExtension(filepath.Ext(fp)); ct != "" {
 		h.Set("Content-Type", ct)
 	}
-	if strings.HasPrefix(urlPath, "/assets/") {
+	// Hashed bundles and the emoji artwork are named after their content, so
+	// they never change under the same URL.
+	if strings.HasPrefix(urlPath, "/assets/") || strings.HasPrefix(urlPath, "/twemoji/") {
 		h.Set("Cache-Control", "public, max-age=31536000, immutable")
 	} else {
 		h.Set("Cache-Control", "no-cache")

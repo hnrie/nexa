@@ -39,14 +39,23 @@ func validKDF(raw json.RawMessage) bool {
 // MeUser is the authenticated user's own view.
 type MeUser struct {
 	store.PublicUser
-	Flags        int64  `json:"flags"`
-	PresencePref string `json:"presence_pref"`
-	DMPrivacy    string `json:"dm_privacy"`
-	HasRecovery  bool   `json:"has_recovery"`
+	Flags           int64  `json:"flags"`
+	PresencePref    string `json:"presence_pref"`
+	DMPrivacy       string `json:"dm_privacy"`
+	HasRecovery     bool   `json:"has_recovery"`
+	MFAEnabled      bool   `json:"mfa_enabled"`
+	BackupCodesLeft int    `json:"backup_codes_left"`
 }
 
-func meView(u *store.User) MeUser {
-	return MeUser{PublicUser: u.Public(), Flags: u.Flags, PresencePref: u.PresencePref, DMPrivacy: u.DMPrivacy, HasRecovery: u.RecoveryAuthHash != ""}
+func (s *Server) meView(ctx context.Context, u *store.User) MeUser {
+	v := MeUser{PublicUser: u.Public(), Flags: u.Flags, PresencePref: u.PresencePref, DMPrivacy: u.DMPrivacy, HasRecovery: u.RecoveryAuthHash != ""}
+	if m, err := s.Store.MFAFor(ctx, u.ID); err == nil && m != nil && m.Enabled {
+		v.MFAEnabled = true
+		if n, err := s.Store.BackupCodesLeft(ctx, u.ID); err == nil {
+			v.BackupCodesLeft = n
+		}
+	}
+	return v
 }
 
 func (s *Server) authRoutes(mux *http.ServeMux) {
@@ -161,7 +170,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusCreated, map[string]any{"user": meView(u), "token": token})
+	WriteJSON(w, http.StatusCreated, map[string]any{"user": s.meView(ctx, u), "token": token})
 }
 
 func (s *Server) fakeSalt(username string) []byte {
@@ -220,6 +229,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		fail()
 		return
 	}
+	needsMFA, err := s.Store.MFAEnabled(r.Context(), u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if needsMFA {
+		// The password was right, so stop punishing it; the code has its own limiter.
+		s.limAuthUsr.Reset("login:" + req.Username)
+		s.mfaChallenge(w, u, start)
+		return
+	}
 	token, err := s.newSession(r, u.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -230,7 +250,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(minLoginTime - d)
 	}
 	resp := keyBundle(u)
-	resp["user"] = meView(u)
+	resp["user"] = s.meView(r.Context(), u)
 	resp["token"] = token
 	WriteJSON(w, http.StatusOK, resp)
 }
@@ -348,6 +368,10 @@ func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Store.DeleteUserSessions(r.Context(), u.ID, 0)
+	// The recovery key is the way back in after losing a phone, so it clears the
+	// second factor too. It already unwraps the identity, so it grants nothing
+	// new; leaving the authenticator on would only lock the owner out for good.
+	_ = s.Store.DisableMFA(r.Context(), u.ID)
 	token, err := s.newSession(r, u.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -355,7 +379,7 @@ func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	u, _ = s.Store.UserByID(r.Context(), u.ID)
 	resp := keyBundle(u)
-	resp["user"] = meView(u)
+	resp["user"] = s.meView(r.Context(), u)
 	resp["token"] = token
 	WriteJSON(w, http.StatusOK, resp)
 }

@@ -52,3 +52,4 @@
 .gifStar { position: absolute; top: 4px; right: 4px; display: flex; padding: 3px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; opacity: 0; }
 .gifCell:hover .gifStar { opacity: 1; }
 .gifStar[data-on="true"] { opacity: 1; color: var(--warning); }
+.inspector .big img { width: 28px; height: 28px; object-fit: contain; display: block; }

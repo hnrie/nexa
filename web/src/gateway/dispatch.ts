@@ -15,6 +15,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { decryptForStore } from "@/lib/decrypt";
 import { users as usersApi } from "@/api/users";
+import { channels as channelsApi } from "@/api/channels";
 import { ring } from "@/lib/keyring";
 import type { Message, ServerView } from "@/api/types";
 
@@ -25,8 +26,8 @@ export const dispatchHooks: {
   onReady: (() => void)[];
 } = { onMessage: [], onUnhandled: [], onReady: [] };
 
-function resetAll(): void {
-  useMessages.getState().clearAll();
+function resetAll(keepMessagesIn?: string): void {
+  useMessages.getState().clearAll(keepMessagesIn);
   useChannels.getState().clear();
   useUsers.getState().clear();
   usePresence.getState().clear();
@@ -40,6 +41,21 @@ function resetAll(): void {
 function ingestServerView(view: ServerView): void {
   useChannels.getState().upsert(view.channels);
   useServers.getState().setFromView(view);
+}
+
+const channelFetches = new Set<string>();
+
+/** A message can arrive for a conversation this client closed or never saw. */
+async function ensureChannel(id: string): Promise<void> {
+  if (useChannels.getState().byId[id] || channelFetches.has(id)) return;
+  channelFetches.add(id);
+  try {
+    useChannels.getState().upsert(await channelsApi.get(id));
+  } catch {
+    /* no access: the message will simply not show a conversation */
+  } finally {
+    channelFetches.delete(id);
+  }
 }
 
 async function ensureUser(id: string): Promise<void> {
@@ -60,7 +76,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
   switch (e.t) {
     case "ready": {
       const d = e.d;
-      resetAll();
+      // A reconnect re-sends ready. Everything else is rebuilt from the
+      // payload, but the open conversation keeps its messages so the reader
+      // stays where they were instead of being thrown to the newest message.
+      const active = useUI.getState().activeChannelId;
+      resetAll(active ?? undefined);
       useAuth.getState().setMe(d.user);
       useUsers.getState().upsert([...d.users, d.user]);
       useChannels.getState().upsert(d.channels);
@@ -76,11 +96,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       await useKeys.getState().ingestGrants(d.key_grants);
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();
-      const active = useUI.getState().activeChannelId;
-      if (active) {
-        useMessages.getState().clearChannel(active);
-        void useMessages.getState().loadInitial(active);
-      }
+      if (active) void useMessages.getState().syncGap(active);
       return;
     }
     case "message_create": {
@@ -93,6 +109,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useTyping.getState().remove(m.channel_id, m.author_id);
       if (decrypted.decryptError === "no_key" && m.key_conv_id) useKeys.getState().markWaiting(m.key_conv_id);
       void ensureUser(m.author_id);
+      void ensureChannel(m.channel_id);
       const mine = meId === m.author_id;
       const ui = useUI.getState();
       const visible = ui.activeChannelId === m.channel_id && ui.focused && typeof document !== "undefined" && document.visibilityState === "visible";

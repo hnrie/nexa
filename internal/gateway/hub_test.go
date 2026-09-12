@@ -169,7 +169,7 @@ func TestReadyTypingPresence(t *testing.T) {
 	ctx := context.Background()
 	a, tokA := e.user(t, "a")
 	b, tokB := e.user(t, "b")
-	_, tokC := e.user(t, "c")
+	cUser, tokC := e.user(t, "c")
 	dm, _, _ := e.st.CreateDM(ctx, a.ID, b.ID)
 	_ = e.st.SetRelationshipPair(ctx, a.ID, b.ID, "friend", "friend")
 
@@ -214,11 +214,28 @@ func TestReadyTypingPresence(t *testing.T) {
 	if got := cc.next("typing", 500*time.Millisecond); got != nil {
 		t.Error("c must not receive typing for a dm it is not in")
 	}
-	// typing for a channel a is not in is dropped
-	other, _, _ := e.st.CreateDM(ctx, b.ID, ids.ID(0)+b.ID) // self-dm placeholder not visible to a
+	// a stop clears the indicator at once instead of waiting for it to expire
+	ca.send("typing", map[string]any{"channel_id": dm.ID.String(), "stop": true})
+	stop := cb.next("typing", 3*time.Second)
+	if stop == nil || stop["d"].(map[string]any)["stop"] != true {
+		t.Errorf("typing stop not delivered: %v", stop)
+	}
+	// a second stop with nothing running says nothing
+	ca.send("typing", map[string]any{"channel_id": dm.ID.String(), "stop": true})
+	if got := cb.next("typing", 500*time.Millisecond); got != nil {
+		t.Error("a redundant stop must not be broadcast")
+	}
+	// typing in a conversation a is not part of is dropped
+	other, _, err := e.st.CreateDM(ctx, b.ID, cUser.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.ID == dm.ID {
+		t.Fatal("expected a separate conversation between b and c")
+	}
 	ca.send("typing", map[string]string{"channel_id": other.ID.String()})
 	if got := cb.next("typing", 500*time.Millisecond); got != nil {
-		t.Error("typing in a channel the sender cannot access must be dropped")
+		t.Errorf("typing in a channel the sender cannot access must be dropped: %v", got)
 	}
 
 	// presence op: a goes dnd with a custom status; b sees it

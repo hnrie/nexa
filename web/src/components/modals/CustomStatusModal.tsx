@@ -1,7 +1,10 @@
+import { SmilePlus, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
+import { Twemoji } from "@/components/common/Twemoji";
+import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { gateway } from "@/gateway/session";
 import { useAuth } from "@/stores/auth";
 import { usePresence } from "@/stores/presence";
@@ -22,6 +25,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
   const [text, setText] = useState(presence?.status_text ?? "");
   const [emoji, setEmoji] = useState(presence?.status_emoji ?? "");
   const [clear, setClear] = useState(0);
+  const [picker, setPicker] = useState<DOMRect | null>(null);
 
   const save = () => {
     if (!me) return;
@@ -44,12 +48,36 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
       <div className={s.form}>
         <div className={s.row}>
           <Field label="Emoji" className={s.emoji}>
-            <TextInput value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="😀" maxLength={16} />
+            <div className={s.emojiPick}>
+              <button
+                type="button"
+                className={s.emojiBtn}
+                aria-label={emoji ? "Change the emoji" : "Pick an emoji"}
+                onClick={(e) => setPicker(picker ? null : e.currentTarget.getBoundingClientRect())}
+                data-testid="status-emoji"
+              >
+                {emoji ? <Twemoji text={emoji} className={s.emojiImg} title="" /> : <SmilePlus size={20} />}
+              </button>
+              {emoji ? (
+                <button type="button" className={s.emojiClear} aria-label="Remove the emoji" onClick={() => setEmoji("")}><X size={12} /></button>
+              ) : null}
+            </div>
           </Field>
           <Field label={`What's cookin', ${me?.display_name ?? ""}?`} className={s.textField}>
             <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder="Support has arrived!" maxLength={128} autoFocus />
           </Field>
         </div>
+        {picker ? (
+          <ExpressionPicker
+            anchor={picker}
+            onClose={() => setPicker(null)}
+            onEmoji={(e) => {
+              // a custom emoji is a server picture; a status can only carry text
+              if (!e.custom) setEmoji(e.unicode);
+              setPicker(null);
+            }}
+          />
+        ) : null}
         <Field label="Clear after">
           <select className={s.select} value={clear} onChange={(e) => setClear(Number(e.target.value))}>
             {CLEAR.map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}

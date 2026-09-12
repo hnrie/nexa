@@ -1,5 +1,11 @@
 .form { display: flex; flex-direction: column; gap: 16px; }
 .row { display: flex; gap: 8px; }
-.emoji { width: 88px; flex: none; }
+.emoji { width: 72px; flex: none; }
 .textField { flex: 1; }
 .select { height: 40px; padding: 0 10px; background: var(--bg-input); color: var(--text); border: 1px solid transparent; border-radius: var(--radius-xs); font-size: 16px; }
+.emojiPick { position: relative; display: flex; }
+.emojiBtn { display: flex; align-items: center; justify-content: center; width: 56px; height: 40px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); }
+.emojiBtn:hover { background: var(--bg-active); color: var(--text); }
+.emojiImg { width: 24px; height: 24px; object-fit: contain; display: block; }
+.emojiClear { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-raised); color: var(--text-muted); box-shadow: var(--shadow-low); }
+.emojiClear:hover { background: var(--danger); color: #fff; }

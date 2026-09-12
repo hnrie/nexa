@@ -1,10 +1,13 @@
-import { Download, FileIcon } from "lucide-react";
+import { Download, FileIcon, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
 import { attachmentObjectURL, cachedURL } from "@/lib/mediaCache";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
+import { Spinner } from "@/components/common/Spinner";
+import { AudioPlayer } from "./AudioPlayer";
+import { VideoPlayer } from "./VideoPlayer";
 import s from "./Chat.module.css";
 
 const MAX_W = 550;
@@ -89,23 +92,46 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
 
 function VideoAttachment({ att }: { att: AttachmentMeta }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { url, error, load } = useDecrypted(att, false);
-  const [revealed, setRevealed] = useState(!att.spoiler);
-  useInView(ref, load);
+  // the whole file has to come down and be decrypted before it can play at all
+  const { url, error, load } = useDecrypted(att, att.size <= 25 * 1024 * 1024);
+  const [asked, setAsked] = useState(false);
+  useInView(ref, () => att.size <= 25 * 1024 * 1024 && load());
   const dims = fit(att.w ?? 640, att.h ?? 360);
+  if (url) return <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} />;
   return (
-    <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={dims} onClick={() => !revealed && setRevealed(true)}>
-      {url ? <video src={url} controls={revealed} preload="metadata" /> : <div className={s.imgPlaceholder}>{error ? "Could not decrypt" : "Decrypting…"}</div>}
-      {!revealed ? <div className={s.spoilerTag}><span>SPOILER</span></div> : null}
+    <div ref={ref} className={s.videoPending} style={dims}>
+      {error ? (
+        <span>This video could not be decrypted.</span>
+      ) : asked || att.size <= 25 * 1024 * 1024 ? (
+        <span className={s.videoLoading}><Spinner size={20} /> Decrypting {att.name} ({formatBytes(att.size)})…</span>
+      ) : (
+        <button
+          className={s.videoLoad}
+          onClick={() => {
+            setAsked(true);
+            load();
+          }}
+        >
+          <Play size={20} /> Load video ({formatBytes(att.size)})
+        </button>
+      )}
     </div>
   );
 }
 
 function AudioAttachment({ att }: { att: AttachmentMeta }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { url, load } = useDecrypted(att, true);
+  const { url, error, load } = useDecrypted(att, true);
   useInView(ref, load);
-  return <div ref={ref} className={s.audio}>{url ? <audio src={url} controls preload="metadata" style={{ width: "100%" }} /> : <span className={s.fileSize}>Decrypting audio…</span>}</div>;
+  return (
+    <div ref={ref} className={s.audio}>
+      {url ? (
+        <AudioPlayer src={url} name={att.name} size={att.size} duration={att.duration} />
+      ) : (
+        <span className={s.fileSize}>{error ? "This audio could not be decrypted." : `Decrypting ${att.name}…`}</span>
+      )}
+    </div>
+  );
 }
 
 function FileAttachment({ att }: { att: AttachmentMeta }) {

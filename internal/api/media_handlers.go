@@ -84,7 +84,7 @@ func (s *Server) handleAvatarPut(kind string) http.HandlerFunc {
 			return
 		}
 		s.Bcast.UserUpdated(updated)
-		WriteJSON(w, http.StatusOK, map[string]any{kind + "_id": b.ID, "user": meView(updated)})
+		WriteJSON(w, http.StatusOK, map[string]any{kind + "_id": b.ID, "user": s.meView(r.Context(), updated)})
 	}
 }
 

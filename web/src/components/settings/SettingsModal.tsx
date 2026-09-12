@@ -8,6 +8,7 @@ import s from "./Settings.module.css";
 const AccountPage = lazy(() => import("./AccountPage"));
 const ProfilePage = lazy(() => import("./ProfilePage"));
 const PrivacyPage = lazy(() => import("./PrivacyPage"));
+const SecurityPage = lazy(() => import("./SecurityPage"));
 const DevicesPage = lazy(() => import("./DevicesPage"));
 const AppearancePage = lazy(() => import("./AppearancePage"));
 const NotificationsPage = lazy(() => import("./NotificationsPage"));
@@ -16,7 +17,7 @@ const VoicePage = lazy(() => import("./VoicePage"));
 const AdminPage = lazy(() => import("./AdminPage"));
 
 const NAV: { head: string; items: { id: string; label: string }[] }[] = [
-  { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "devices", label: "Devices" }] },
+  { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "security", label: "Security" }, { id: "devices", label: "Devices" }] },
   { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "voice", label: "Voice & Video" }, { id: "notifications", label: "Notifications" }, { id: "stickers", label: "Expression Packs" }] },
 ];
 
@@ -37,7 +38,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const body =
-    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "admin" && isAdmin ? <AdminPage /> : <AccountPage onClose={onClose} />;
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "admin" && isAdmin ? <AdminPage /> : <AccountPage onClose={onClose} />;
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings" data-modal-layer="">
       <div className={s.navWrap}>

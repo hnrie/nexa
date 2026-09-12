@@ -71,8 +71,10 @@ interface MessagesState {
   failPending: (channelId: string, tmpId: string) => void;
   resolvePendingByNonce: (channelId: string, nonce: string) => void;
   clearChannel: (channelId: string) => void;
-  clearAll: () => void;
+  clearAll: (keep?: string) => void;
   loadInitial: (channelId: string) => Promise<void>;
+  /** Fills in whatever arrived while the socket was down, keeping what is on screen. */
+  syncGap: (channelId: string) => Promise<void>;
   loadOlder: (channelId: string) => Promise<void>;
   loadAround: (channelId: string, messageId: string) => Promise<void>;
   redecrypt: (predicate: (m: DecryptedMessage) => boolean) => Promise<void>;
@@ -144,9 +146,12 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         if (!m) return c;
         const reactions: ReactionSummary[] = m.reactions.map((r) => ({ ...r }));
         const idx = reactions.findIndex((r) => r.emoji === emoji);
+        // your own add arrives twice: once optimistically, once as the echo,
+        // so the "me" flag decides whether it has already been counted
         if (add) {
           if (idx >= 0) {
             const r = reactions[idx]!;
+            if (isMe && r.me) return c;
             r.count += 1;
             if (isMe) r.me = true;
           } else {
@@ -154,6 +159,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
           }
         } else if (idx >= 0) {
           const r = reactions[idx]!;
+          if (isMe && !r.me) return c;
           r.count -= 1;
           if (isMe) r.me = false;
           if (r.count <= 0) reactions.splice(idx, 1);
@@ -204,7 +210,13 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       delete channels[channelId];
       return { channels };
     }),
-  clearAll: () => set({ channels: {} }),
+  clearAll: (keep) =>
+    set((s) => {
+      // One channel can be spared: the one being read, so a reconnect does not
+      // throw away the reader's place in it.
+      const kept = keep ? s.channels[keep] : undefined;
+      return { channels: kept ? { [keep as string]: kept } : {} };
+    }),
   loadInitial: async (channelId) => {
     const cur = get().channels[channelId];
     if (cur?.loaded || cur?.loading) return;
@@ -217,6 +229,27 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     } finally {
       get().setLoading(channelId, false);
     }
+  },
+  syncGap: async (channelId) => {
+    const cur = get().channels[channelId];
+    const newest = cur?.ids[cur.ids.length - 1];
+    if (!cur?.loaded || !newest) {
+      await get().loadInitial(channelId);
+      return;
+    }
+    let after = newest;
+    // Five pages is more than any short disconnect produces; past that it is
+    // cheaper to start again from the newest page than to walk the gap.
+    for (let i = 0; i < 5; i++) {
+      const page = await messagesApi.list(channelId, { after, limit: PAGE });
+      if (page.length === 0) return;
+      const decrypted = await Promise.all(page.map(decryptForStore));
+      get().insert(channelId, decrypted);
+      if (page.length < PAGE) return;
+      after = page[page.length - 1]!.id;
+    }
+    get().clearChannel(channelId);
+    await get().loadInitial(channelId);
   },
   loadOlder: async (channelId) => {
     const cur = get().channels[channelId];

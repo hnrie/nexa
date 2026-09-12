@@ -277,7 +277,7 @@ func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
 		}
-		for _, q := range []string{`DELETE FROM sessions WHERE user_id = ?`, `DELETE FROM relationships WHERE user_id = ? OR target_id = ?`, `DELETE FROM user_settings WHERE user_id = ?`, `DELETE FROM key_grants WHERE user_id = ?`} {
+		for _, q := range []string{`DELETE FROM sessions WHERE user_id = ?`, `DELETE FROM relationships WHERE user_id = ? OR target_id = ?`, `DELETE FROM user_settings WHERE user_id = ?`, `DELETE FROM key_grants WHERE user_id = ?`, `DELETE FROM user_mfa WHERE user_id = ?`, `DELETE FROM mfa_backup_codes WHERE user_id = ?`} {
 			args := []any{int64(id)}
 			if strings.Count(q, "?") == 2 {
 				args = append(args, int64(id))

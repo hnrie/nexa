@@ -43,10 +43,18 @@ export class GatewayClient {
     this.opts.onStatus?.(s, { ...info, attempt: this.attempt });
   }
 
+  // The browser's timers are methods of the global object and refuse a
+  // detached receiver with "Illegal invocation", so they are called through a
+  // wrapper rather than handed out bare.
   private timers() {
+    const { setTimeoutImpl, clearTimeoutImpl } = this.opts;
     return {
-      set: this.opts.setTimeoutImpl ?? setTimeout,
-      clear: this.opts.clearTimeoutImpl ?? clearTimeout,
+      set: (fn: () => void, ms: number): ReturnType<typeof setTimeout> =>
+        setTimeoutImpl ? setTimeoutImpl(fn, ms) : globalThis.setTimeout(fn, ms),
+      clear: (handle: ReturnType<typeof setTimeout>): void => {
+        if (clearTimeoutImpl) clearTimeoutImpl(handle);
+        else globalThis.clearTimeout(handle);
+      },
     };
   }
 

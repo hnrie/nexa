@@ -119,11 +119,21 @@ describe("emoji", () => {
     expect(img.className).toContain("md-emoji-jumbo");
   });
 
-  it("renders unicode emoji in a span", () => {
+  it("draws a unicode emoji with the bundled twemoji artwork", () => {
     const { container } = render(<Markdown source={"\u{1F600}"} ctx={makeCtx()} jumbo />);
+    const img = container.querySelector("img.md-emoji") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("/twemoji/1f600.svg");
+    expect(img.getAttribute("alt")).toBe("\u{1F600}");
+    expect(img.className).toContain("md-emoji-jumbo");
+  });
+
+  it("falls back to the platform glyph when there is no artwork", () => {
+    // A private-use character is not an emoji anyone ships a picture for.
+    const { container } = render(<Markdown source={"\u{1F600}"} ctx={makeCtx()} />);
+    const img = container.querySelector("img.md-emoji") as HTMLImageElement;
+    fireEvent.error(img);
     const span = container.querySelector(".md-emoji-unicode") as HTMLElement;
     expect(span.textContent).toBe("\u{1F600}");
-    expect(span.className).toContain("md-emoji-jumbo");
   });
 });
 

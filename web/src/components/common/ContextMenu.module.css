@@ -1,4 +1,4 @@
-.menu { position: fixed; z-index: 90; min-width: 188px; max-width: 320px; padding: 6px 8px; background: var(--bg-floating); border-radius: var(--radius-xs); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); }
+.menu { position: fixed; z-index: 300; min-width: 188px; max-width: 320px; padding: 6px 8px; background: var(--bg-floating); border-radius: var(--radius-xs); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); }
 .item { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 32px; padding: 6px 8px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; color: var(--text-subtle); text-align: left; }
 .item:hover:not(:disabled) { background: var(--brand); color: #fff; }
 .item:disabled { opacity: 0.5; cursor: not-allowed; }

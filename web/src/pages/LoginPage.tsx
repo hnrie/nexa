@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/common/Button";
@@ -11,36 +11,121 @@ export default function LoginPage() {
   const nav = useNavigate();
   const loc = useLocation();
   const login = useAuth((a) => a.login);
+  const completeMfa = useAuth((a) => a.completeMfa);
+  const cancelMfa = useAuth((a) => a.cancelMfa);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<"password" | "code">("password");
+  const [useBackup, setUseBackup] = useState(false);
+  const [code, setCode] = useState("");
+  const [codesLeft, setCodesLeft] = useState(0);
+  const codeInput = useRef<HTMLInputElement>(null);
   const next = new URLSearchParams(loc.search).get("next") || "/channels/@me";
+  const go = () => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true });
 
-  const onSubmit = async (e: FormEvent) => {
+  useEffect(() => {
+    if (step === "code") codeInput.current?.focus();
+  }, [step, useBackup]);
+
+  const describe = (err: unknown, fallback: string) => {
+    if (err instanceof ApiError) {
+      if (err.code === "invalid_credentials") return "Username or password is wrong.";
+      if (err.code === "rate_limited") return "Too many attempts. Wait a minute and try again.";
+      return err.message;
+    }
+    return fallback;
+  };
+
+  const onPassword = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      await login(username.trim().toLowerCase(), password);
-      nav(next.startsWith("/") ? next : "/channels/@me", { replace: true });
+      const out = await login(username.trim().toLowerCase(), password);
+      if (out.mfa) {
+        setCodesLeft(out.backupCodesLeft);
+        setStep("code");
+        return;
+      }
+      go();
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === "invalid_credentials") setError("Username or password is wrong.");
-        else if (err.code === "rate_limited") setError("Too many attempts. Wait a minute and try again.");
-        else setError(err.message);
+      setError(describe(err, "Could not decrypt your keys with that password."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onCode = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await completeMfa(useBackup ? { backupCode: code.trim() } : { code });
+      go();
+    } catch (err) {
+      setCode("");
+      if (err instanceof ApiError && (err.code === "mfa_expired" || err.code === "mfa_disabled")) {
+        cancelMfa();
+        setStep("password");
+        setPassword("");
+        setError(err.message);
       } else {
-        setError("Could not decrypt your keys with that password.");
+        setError(describe(err, "That code did not work."));
       }
     } finally {
       setBusy(false);
     }
   };
 
+  const backToPassword = () => {
+    cancelMfa();
+    setStep("password");
+    setCode("");
+    setPassword("");
+    setError(null);
+    setUseBackup(false);
+  };
+
+  if (step === "code") {
+    return (
+      <AuthLayout
+        title="One more step"
+        subtitle={useBackup ? "Enter one of the backup codes you saved." : "Enter the six-digit code from your authenticator app."}
+        width={420}
+      >
+        <form className={s.form} onSubmit={(e) => void onCode(e)}>
+          {error ? <div className={s.error} role="alert">{error}</div> : null}
+          <Field label={useBackup ? "Backup code" : "Authentication code"} required>
+            <TextInput
+              ref={codeInput}
+              value={code}
+              onChange={(e) => setCode(useBackup ? e.target.value.toUpperCase().slice(0, 20) : e.target.value.replace(/[^\d\s]/g, "").slice(0, 7))}
+              inputMode={useBackup ? "text" : "numeric"}
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder={useBackup ? "XXXX-XXXX-XXXX" : "123456"}
+              data-testid="mfa-code"
+              required
+            />
+          </Field>
+          <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">Sign in</Button>
+          <Button type="button" variant="link" onClick={() => { setUseBackup((v) => !v); setCode(""); setError(null); }}>
+            {useBackup ? "Use your authenticator instead" : `Use a backup code${codesLeft ? ` (${codesLeft} left)` : ""}`}
+          </Button>
+          <Button type="button" variant="link" onClick={backToPassword}>Back</Button>
+        </form>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout title="Welcome back!" subtitle="We're so excited to see you again!">
-      <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
+      <form className={s.form} onSubmit={(e) => void onPassword(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label="Username" required>
           <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus required />

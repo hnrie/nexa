@@ -1,0 +1,11 @@
+.wrap { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg-base); }
+.card { width: 100%; max-width: 520px; padding: 28px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); }
+.title { margin: 0 0 8px; font-size: 22px; font-weight: 600; color: var(--text-strong); }
+.body { margin: 0 0 16px; font-size: 15px; color: var(--text); line-height: 1.45; }
+.detail { margin: 0 0 16px; padding: 12px; max-height: 180px; overflow: auto; border-radius: var(--radius-xs); background: var(--code-bg); border: 1px solid var(--code-border); color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.primary { height: 38px; padding: 0 18px; border-radius: var(--radius-xs); background: var(--brand); color: #fff; font-size: 14px; font-weight: 600; }
+.primary:hover { background: var(--brand-hover); }
+.secondary { height: 38px; padding: 0 18px; border-radius: var(--radius-xs); background: var(--bg-surface); color: var(--text); font-size: 14px; font-weight: 600; }
+.secondary:hover { background: var(--bg-hover); }
+.note { margin: 16px 0 0; font-size: 13px; color: var(--text-muted); }

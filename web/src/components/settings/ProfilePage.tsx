@@ -14,6 +14,11 @@ import s from "./Settings.module.css";
 
 const PRESETS = ["#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#9b59b6", "#607d8b"];
 
+/** A colour column may be missing entirely on an older server, so treat anything but a number as unset. */
+function hexOf(v: number | null | undefined): string | null {
+  return typeof v === "number" ? `#${v.toString(16).padStart(6, "0")}` : null;
+}
+
 export default function ProfilePage() {
   const me = useAuth((a) => a.me);
   const setMe = useAuth((a) => a.setMe);
@@ -22,8 +27,8 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState(me?.display_name ?? "");
   const [pronouns, setPronouns] = useState(me?.pronouns ?? "");
   const [about, setAbout] = useState(me?.about_me ?? "");
-  const [accent, setAccent] = useState<string | null>(me?.accent_color !== null && me?.accent_color !== undefined ? `#${me.accent_color.toString(16).padStart(6, "0")}` : null);
-  const [accent2, setAccent2] = useState<string | null>(me?.accent_color_2 !== null && me?.accent_color_2 !== undefined ? `#${me.accent_color_2.toString(16).padStart(6, "0")}` : null);
+  const [accent, setAccent] = useState<string | null>(hexOf(me?.accent_color));
+  const [accent2, setAccent2] = useState<string | null>(hexOf(me?.accent_color_2));
   const [crop, setCrop] = useState<{ file: File; kind: "avatar" | "banner" } | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
@@ -35,13 +40,13 @@ export default function ProfilePage() {
     setDisplayName(me.display_name);
     setPronouns(me.pronouns);
     setAbout(me.about_me);
-    setAccent(me.accent_color !== null ? `#${me.accent_color.toString(16).padStart(6, "0")}` : null);
-    setAccent2(me.accent_color_2 !== null ? `#${me.accent_color_2.toString(16).padStart(6, "0")}` : null);
+    setAccent(hexOf(me.accent_color));
+    setAccent2(hexOf(me.accent_color_2));
   }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!me) return null;
-  const currentAccent = me.accent_color !== null ? `#${me.accent_color.toString(16).padStart(6, "0")}` : null;
-  const currentAccent2 = me.accent_color_2 !== null ? `#${me.accent_color_2.toString(16).padStart(6, "0")}` : null;
+  const currentAccent = hexOf(me.accent_color);
+  const currentAccent2 = hexOf(me.accent_color_2);
   const dirty = displayName !== me.display_name || pronouns !== me.pronouns || about !== me.about_me || accent !== currentAccent || accent2 !== currentAccent2;
   const hex = (v: string | null) => (v ? parseInt(v.slice(1), 16) : null);
   const themeCss = profileTheme(hex(accent), hex(accent2), me.id);

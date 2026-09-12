@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { Twemoji } from "@/components/common/Twemoji";
 import type { Node, RenderCtx } from "./ast";
 import { parse } from "./parse";
 
@@ -147,7 +148,11 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
       );
     case "unicodeEmoji":
       return (
-        <span className={jumbo ? "md-emoji-unicode md-emoji-jumbo" : "md-emoji-unicode"}>{node.text}</span>
+        <Twemoji
+          text={node.text}
+          className={jumbo ? "md-emoji md-emoji-jumbo" : "md-emoji"}
+          fallbackClassName={jumbo ? "md-emoji-unicode md-emoji-jumbo" : "md-emoji-unicode"}
+        />
       );
     case "timestamp":
       return <Timestamp unix={node.unix} style={node.style} />;

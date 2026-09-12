@@ -64,8 +64,9 @@
 .replyText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .replyLine:hover .replyText { color: var(--text); }
 .toolbar { position: absolute; right: 16px; top: -16px; display: none; align-items: center; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-xs); box-shadow: var(--shadow-low); z-index: 2; }
-/* the top rows have nothing to overhang into, so the toolbar tucks inside instead of being clipped */
-.msg[data-first="true"] .toolbar { top: 2px; }
+/* a row with nothing above it has no gap to overhang into, so the toolbar
+   tucks inside rather than being clipped by the top of the list */
+.msg[data-first="true"] .toolbar, .msg[data-tuck="true"] .toolbar { top: 2px; }
 .toolbar[data-shift="true"] { border-color: var(--brand); }
 .tDanger { color: var(--danger); }
 .tDanger:hover { color: #fff; background: var(--danger); }
@@ -149,3 +150,12 @@
   .members[data-open="true"] { transform: none; }
 }
 .sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; }
+.videoPending { display: flex; align-items: center; justify-content: center; margin-top: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); font-size: 14px; text-align: center; padding: 12px; }
+.videoLoading { display: inline-flex; align-items: center; gap: 8px; }
+.videoLoad { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 14px; font-weight: 600; }
+.videoLoad:hover { background: var(--brand); color: #fff; }
+.failedRow { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 13px; color: var(--danger); }
+.retry { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 12px; font-weight: 600; }
+.retry:hover { background: var(--brand); color: #fff; }
+.retry[data-danger="true"]:hover { background: var(--danger); color: #fff; }
+.pillImg { width: 16px; height: 16px; object-fit: contain; display: block; }

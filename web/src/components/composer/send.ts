@@ -113,3 +113,29 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   const decrypted = await decryptForStore(updated);
   useMessages.getState().update(channelId, decrypted);
 }
+
+/** Sends a failed message again from the copy still sitting in the list. */
+export async function retryPending(channelId: string, tmpId: string): Promise<void> {
+  const store = useMessages.getState();
+  const p = store.channels[channelId]?.pending.find((x) => x.tmpId === tmpId);
+  if (!p) return;
+  store.removePending(channelId, tmpId);
+  const opts: SendOptions = {};
+  if (p.replyToId) opts.replyTo = p.replyToId;
+  if (p.payload.embeds?.length) opts.embeds = p.payload.embeds;
+  if (p.payload.sticker) opts.sticker = p.payload.sticker;
+  if (p.payload.att?.length) {
+    // the files were already uploaded; reuse the blobs rather than asking again
+    opts.attachments = p.payload.att.map((meta) => ({ meta, blob_id: meta.blob_id, size: meta.size }));
+  }
+  try {
+    await sendMessage(channelId, p.payload.t ?? "", opts);
+  } catch {
+    /* sendMessage already reported it and left a fresh failed copy */
+  }
+}
+
+/** Throws away a message that could not be sent. */
+export function discardPending(channelId: string, tmpId: string): void {
+  useMessages.getState().removePending(channelId, tmpId);
+}

@@ -1,5 +1,6 @@
 import { Crown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { Twemoji } from "@/components/common/Twemoji";
 import { servers as serversApi } from "@/api/servers";
 import type { Member, PublicUser, Role } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -155,7 +156,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
               </span>
               {p?.status_text ? (
                 <span className={s.sub}>
-                  {p.status_emoji} {p.status_text}
+                  {p.status_emoji ? <Twemoji text={p.status_emoji} className={s.statusEmoji} /> : null} {p.status_text}
                 </span>
               ) : null}
             </span>

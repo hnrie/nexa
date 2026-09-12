@@ -6,6 +6,7 @@ import { initials } from "@/lib/avatarColor";
 import { emojiToken, packEmoji, packImageUrl, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
+import { Twemoji } from "@/components/common/Twemoji";
 import { GROUPS, TONES, allEmoji, emojiLoaded, loadEmoji, searchEmoji, withTone, type EmojiEntry } from "./emojiIndex";
 import s from "./Picker.module.css";
 
@@ -91,7 +92,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
 
   const cell = (e: EmojiEntry) => (
     <button key={e.hexcode} className={s.cell} data-emoji={withTone(e, tone)} data-label={e.label} title={`:${e.shortcodes[0] ?? e.label}:`} onMouseEnter={() => setHover({ kind: "unicode", e })} onFocus={() => setHover({ kind: "unicode", e })} onClick={() => pick(e)}>
-      {withTone(e, tone)}
+      <Twemoji text={withTone(e, tone)} title="" />
     </button>
   );
   const customCell = (e: Emoji) => (
@@ -181,7 +182,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
           </>
         ) : hover ? (
           <>
-            <span className={s.big}>{withTone(hover.e, tone)}</span>
+            <span className={s.big}><Twemoji text={withTone(hover.e, tone)} title="" /></span>
             <span className={s.name}>:{hover.e.shortcodes[0] ?? hover.e.label}:</span>
           </>
         ) : (

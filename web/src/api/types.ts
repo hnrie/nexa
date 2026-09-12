@@ -37,6 +37,9 @@ export interface MeUser extends PublicUser {
   presence_pref: "online" | "idle" | "dnd" | "invisible";
   dm_privacy: "everyone" | "friends" | "nobody";
   has_recovery: boolean;
+  /** An authenticator app is required to sign in. */
+  mfa_enabled?: boolean;
+  backup_codes_left?: number;
 }
 
 export type User = PublicUser;
@@ -466,6 +469,33 @@ export interface LoginResponse extends AuthResponse {
   public_key: string;
   kdf_salt: string;
   kdf_params: KdfParamsJson;
+}
+
+/** The password was right, but the account also wants a code. */
+export interface MfaChallenge {
+  mfa_required: true;
+  ticket: string;
+  backup_codes_left: number;
+}
+
+export type LoginResult = LoginResponse | MfaChallenge;
+
+/** True when the server asked for a second factor instead of signing us in. */
+export function isMfaChallenge(r: LoginResult): r is MfaChallenge {
+  return (r as MfaChallenge).mfa_required === true;
+}
+
+export interface MfaStatus {
+  enabled: boolean;
+  backup_codes_left: number;
+  enabled_at?: number;
+}
+
+export interface TotpSetup {
+  secret: string;
+  formatted: string;
+  uri: string;
+  ticket: string;
 }
 
 export interface SendMessageRequest {

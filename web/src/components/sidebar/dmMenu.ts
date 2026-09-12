@@ -108,7 +108,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
           title: group ? `Delete '${name}'` : `Delete your conversation with ${name}`,
           body: group
             ? "The group and every message in it are removed for everyone. This cannot be undone."
-            : "Every message is removed for both of you, not just from your side. This cannot be undone.",
+            : "Every message is removed for both of you, not just hidden from your side. This cannot be undone. To tidy your own list without deleting anything, use Close DM instead.",
           confirmLabel: group ? "Delete Group" : "Delete For Everyone",
           danger: true,
           onConfirm: () => purgeDM(channelId, ctx.nav),

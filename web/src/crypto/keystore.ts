@@ -130,6 +130,14 @@ export const keystore = {
     return out;
   },
 
+  /** Removes only the identity, leaving cached conversation keys in place. */
+  async forgetIdentity(userId: string): Promise<void> {
+    const db = await openDb();
+    const tx = db.transaction(STORE_IDENTITY, "readwrite");
+    tx.objectStore(STORE_IDENTITY).delete(userId);
+    await committed(tx);
+  },
+
   async clear(userId: string): Promise<void> {
     const db = await openDb();
     const tx = db.transaction([STORE_IDENTITY, STORE_ROOTS], "readwrite");

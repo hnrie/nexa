@@ -2,6 +2,7 @@ import { SmilePlus } from "lucide-react";
 import { useState } from "react";
 import { messages as messagesApi } from "@/api/messages";
 import { emojiUrl } from "@/api/users";
+import { Twemoji } from "@/components/common/Twemoji";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { useAuth } from "@/stores/auth";
 import { emojiReactionKey } from "@/stores/expressions";
@@ -60,7 +61,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
         const custom = isCustom(r.emoji);
         return (
           <button key={r.emoji} className={s.pill} data-me={r.me} title={who[r.emoji] ? `${who[r.emoji]} reacted with ${r.emoji}` : `React with ${r.emoji}`} onMouseEnter={() => void hover(r.emoji)} onClick={() => void toggleReaction(msg, r.emoji)}>
-            {custom ? <img src={emojiUrl(custom.id, custom.animated)} alt={r.emoji} /> : <span className={s.pillEmoji}>{r.emoji}</span>}
+            {custom ? <img src={emojiUrl(custom.id, custom.animated)} alt={r.emoji} /> : <Twemoji text={r.emoji} className={s.pillImg} fallbackClassName={s.pillEmoji} title="" />}
             <span>{r.count}</span>
           </button>
         );

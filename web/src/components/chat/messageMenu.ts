@@ -113,3 +113,14 @@ export async function deleteMessageNow(msg: DecryptedMessage): Promise<void> {
     useUI.getState().toast(err instanceof Error ? err.message : "Could not delete the message.", "error");
   }
 }
+
+/** Pins or unpins, whichever the message is not. */
+export async function togglePin(msg: DecryptedMessage): Promise<void> {
+  const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
+  try {
+    if (pinned) await channelsApi.unpin(msg.channel_id, msg.id);
+    else await channelsApi.pin(msg.channel_id, msg.id);
+  } catch (err) {
+    useUI.getState().toast(err instanceof Error ? err.message : "Could not update the pin.", "error");
+  }
+}

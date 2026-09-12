@@ -225,7 +225,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   return (
     <div className={[s.listWrap, compact ? s.compact : ""].join(" ")}>
       {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>New messages</span><span>Jump to present</span></div> : null}
-      <div className={s.scroll} ref={scrollRef} onScroll={onScroll}>
+      <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="">
         <div className={s.inner}>
           {!hasOlder ? intro : loading || !loaded ? <div className={s.loader}><Spinner size={24} /></div> : <div style={{ height: 24 }} />}
           {rows.map((row, i) => {

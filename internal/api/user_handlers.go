@@ -31,7 +31,7 @@ func (s *Server) userRoutes(mux *http.ServeMux) {
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
-	WriteJSON(w, http.StatusOK, meView(auth.UserFrom(r.Context())))
+	WriteJSON(w, http.StatusOK, s.meView(r.Context(), auth.UserFrom(r.Context())))
 }
 
 // parseUserID resolves "@me" or a snowflake from the path.
@@ -193,7 +193,7 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Bcast.UserUpdated(updated)
-	WriteJSON(w, http.StatusOK, meView(updated))
+	WriteJSON(w, http.StatusOK, s.meView(r.Context(), updated))
 }
 
 func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {

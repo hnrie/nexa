@@ -17,6 +17,8 @@ interface SWScope {
 
 const sw = self as unknown as SWScope;
 const CACHE = `ec-${__BUILD_ID__}`;
+/** Emoji artwork is the same in every build, so it outlives one. */
+const EMOJI_CACHE = "ec-twemoji-v1";
 const NEVER = ["/api/", "/gateway", "/media/attachments/"];
 
 sw.addEventListener("install", (e) => {
@@ -32,7 +34,7 @@ sw.addEventListener("activate", (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== EMOJI_CACHE).map((k) => caches.delete(k))))
       .then(() => sw.clients.claim()),
   );
 });
@@ -43,6 +45,18 @@ sw.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== sw.location.origin) return;
   if (NEVER.some((p) => url.pathname.startsWith(p))) return;
+  if (url.pathname.startsWith("/twemoji/")) {
+    e.respondWith(
+      caches.open(EMOJI_CACHE).then(async (c) => {
+        const hit = await c.match(req);
+        if (hit) return hit;
+        const res = await fetch(req);
+        if (res.ok) void c.put(req, res.clone());
+        return res;
+      }),
+    );
+    return;
+  }
   if (url.pathname.startsWith("/assets/")) {
     e.respondWith(
       caches.open(CACHE).then(async (c) => {

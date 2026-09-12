@@ -310,10 +310,31 @@ func (s *Store) HideDM(ctx context.Context, chID, uid ids.ID, hidden bool) error
 	return nil
 }
 
-// UnhideDM reopens a conversation for everyone in it (a new message arrived).
-func (s *Store) UnhideDM(ctx context.Context, chID ids.ID) error {
-	_, err := s.db.W.ExecContext(ctx, `UPDATE dm_participants SET hidden = 0 WHERE channel_id = ? AND hidden = 1`, int64(chID))
-	return err
+// UnhideDM reopens a conversation for everyone who had closed it, returning
+// those users so the caller can put it back in their sidebar.
+func (s *Store) UnhideDM(ctx context.Context, chID ids.ID) ([]ids.ID, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM dm_participants WHERE channel_id = ? AND hidden = 1`, int64(chID))
+	if err != nil {
+		return nil, err
+	}
+	out := []ids.ID{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out = append(out, ids.ID(id))
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return out, nil
+	}
+	_, err = s.db.W.ExecContext(ctx, `UPDATE dm_participants SET hidden = 0 WHERE channel_id = ? AND hidden = 1`, int64(chID))
+	return out, err
 }
 
 // DeleteChannel removes a channel and everything hanging off it.

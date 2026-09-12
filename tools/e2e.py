@@ -106,6 +106,19 @@ class Session:
         p.click("button[type=submit]")
         p.wait_for_url("**/channels/@me", timeout=60000)
 
+    def logout(self):
+        p = self.page
+        p.click("button[aria-label='User Settings']")
+        p.click("nav button:has-text('Log Out')")
+        p.wait_for_url("**/login**", timeout=30000)
+
+    def open_settings(self, nav):
+        p = self.page
+        if p.locator("[role=dialog][aria-label='User Settings']").count() == 0:
+            p.click("button[aria-label='User Settings']")
+        p.click(f"[data-nav={nav}]")
+        p.wait_for_timeout(300)
+
     def add_friend(self, username):
         p = self.page
         p.goto(self.base + "/channels/@me", wait_until="networkidle")
@@ -134,10 +147,12 @@ class Session:
         row.click()
         p.wait_for_url("**/channels/@me/*", timeout=15000)
 
-    def open_dm_from_sidebar(self, display):
+    def open_dm_from_sidebar(self, *names):
+        """Opens a DM by any of the names it may show under (a nickname wins)."""
         p = self.page
         p.goto(self.base + "/channels/@me", wait_until="networkidle")
-        p.click(f"button:has(span:text-is('{display}'))")
+        sel = ", ".join(f"button:has(span:text-is('{n}'))" for n in names)
+        p.locator(sel).first.click()
         p.wait_for_url("**/channels/@me/*", timeout=15000)
 
     def composer(self):
@@ -357,7 +372,7 @@ def voice_flow(srv, alice, bob, server_id):
     b.click("[data-testid=voice-status-leave]")
     a.wait_for_function("() => !document.querySelector('[data-testid=voice-status]')", timeout=20000)
     # DM call: alice rings bob, bob accepts, both connect
-    alice.open_dm_from_sidebar("Bob")
+    alice.open_dm_from_sidebar("Bobby", "Bob")
     a.click("[data-testid=start-call]")
     a.wait_for_selector("[data-testid=voice-status]", timeout=20000)
     b.wait_for_selector("[data-testid=incoming-call]", timeout=20000)
@@ -418,7 +433,7 @@ def polish_flow(srv, alice, bob, server_id):
     print("  export zip:", size, "bytes")
     a.keyboard.press("Escape")
     # friend nickname + note on bob's profile
-    alice.open_dm_from_sidebar("Bob")
+    alice.open_dm_from_sidebar("Bobby", "Bob")
     a.locator("[data-author]:text-is('Bob')").first.click()
     a.wait_for_selector("text=add nickname", timeout=15000)
     a.click("text=add nickname")
@@ -429,6 +444,189 @@ def polish_flow(srv, alice, bob, server_id):
     time.sleep(0.6)
     alice.shot("profile-note")
     a.keyboard.press("Escape")
+
+
+def groups_flow(srv, alice, bob, phone):
+    a, b, c = alice.page, bob.page, phone.page
+    # alice starts a group with bob, then invites carol with a link
+    a.goto(srv.base + "/channels/@me", wait_until="networkidle")
+    a.click("button[aria-label='Create DM']")
+    a.locator("label:has-text('Bob') input").check()
+    a.click("button:has-text('Create DM'), button:has-text('Create Group DM')")
+    a.wait_for_url("**/channels/@me/*", timeout=20000)
+    a.wait_for_selector("textarea", timeout=15000)
+    group_url = a.url
+    alice.send("group chat works")
+    a.wait_for_selector("[data-id]:has-text('group chat works')", timeout=20000)
+    # a group of two is still a dm here, so add carol to force a group, then invite by link
+    a.click("button[aria-label='Add friends']")
+    modal = a.locator("[role=dialog]")
+    if modal.locator("[data-testid=group-invite-link]").count() == 0:
+        # it was a 1:1 dm: add carol to promote it to a group
+        a.locator("label:has-text('Carol') input").check()
+        a.click("button:has-text('Add to Group'), button:has-text('Create Group DM')")
+        a.wait_for_timeout(1500)
+        a.click("button[aria-label='Add friends']")
+    link_box = a.locator("[data-testid=group-invite-link]")
+    link_box.wait_for(timeout=20000)
+    for _ in range(50):
+        link = link_box.input_value()
+        if "/invite/" in link:
+            break
+        time.sleep(0.1)
+    assert "/invite/" in link, link
+    a.keyboard.press("Escape")
+    alice.shot("group-invite")
+    # bob closes the DM with alice; it disappears from his sidebar
+    b.goto(srv.base + "/channels/@me", wait_until="networkidle")
+    before = b.locator("[data-channel]").count()
+    b.locator("[data-channel]:has(span:text-is('Alice'))").first.click(button="right")
+    b.wait_for_selector("text=Close DM", timeout=10000)
+    b.click("text=Close DM")
+    b.wait_for_function(f"() => document.querySelectorAll('[data-channel]').length === {before - 1}", timeout=15000)
+    bob.shot("dm-closed")
+    # alice messaging him brings it back
+    a.goto(group_url, wait_until="networkidle")
+    alice.open_dm_from_sidebar("Bobby", "Bob")
+    alice.send("knock knock")
+    b.wait_for_function(f"() => document.querySelectorAll('[data-channel]').length === {before}", timeout=20000)
+    # an emoji pack in user settings, usable straight away
+    a.click("button[aria-label='User Settings']")
+    a.click("[data-nav=stickers]")
+    a.click("[data-nav=packs-emoji]")
+    a.once("dialog", lambda d: d.accept("My emoji"))
+    a.click("[data-testid=create-pack]")
+    a.wait_for_selector("[data-testid=pack-name]", timeout=15000)
+    a.set_input_files("[data-testid=sticker-file]", {"name": "blobby.png", "mimeType": "image/png", "buffer": png_bytes(64, 64, (120, 90, 240))})
+    a.wait_for_selector("[data-testid=sticker-name]", timeout=10000)
+    a.fill("[data-testid=sticker-name]", "blobby")
+    a.click("[data-testid=upload-stickers]")
+    a.wait_for_selector("text=Emoji added.", timeout=20000)
+    alice.shot("emoji-pack")
+    a.keyboard.press("Escape")
+    # it shows up in the picker and sends
+    a.click("button[aria-label='Select emoji']")
+    a.fill("input[aria-label='Search emoji']", "blobby")
+    a.locator("[role=dialog][aria-label='Expression picker'] button[data-pack-emoji]").first.click()
+    a.keyboard.press("Escape")
+    alice.composer().press("End")
+    alice.composer().press("Enter")
+    try:
+        a.wait_for_selector("[data-id] img.md-emoji[alt=':blobby:']", timeout=20000)
+    except Exception:
+        alice.shot("pack-emoji-failed")
+        print("composer:", a.locator("textarea[aria-label^='Message']").input_value())
+        print("last message:", a.locator("[data-id]").last.inner_text()[:120])
+        raise
+    alice.shot("pack-emoji-sent")
+
+
+def totp_code(secret, offset=0, when=None):
+    """The six digits an authenticator would be showing, RFC 6238."""
+    import base64, hashlib, hmac, struct
+    raw = secret.replace(" ", "").replace("-", "").upper()
+    key = base64.b32decode(raw + "=" * (-len(raw) % 8))
+    counter = int((when or time.time()) // 30) + offset
+    mac = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    o = mac[-1] & 0x0F
+    return "%06d" % ((struct.unpack(">I", mac[o:o + 4])[0] & 0x7FFFFFFF) % 1000000)
+
+
+def security_flow(srv, out, browser):
+    """Authenticator sign-in and the device passcode, end to end."""
+    dave = Session(browser, srv.base, "dave", out)
+    dave.register("Dave")
+    p = dave.page
+
+    # --- turn on an authenticator -------------------------------------------
+    dave.open_settings("security")
+    p.click("[data-testid=mfa-enable]")
+    p.fill("[role=dialog] input[type=password]", PASSWORD)
+    p.click("[role=dialog] button:has-text('Continue')")
+    p.wait_for_selector("svg[aria-label='Authenticator setup code']", timeout=30000)
+    p.click("text=Can't scan it?")
+    secret = p.locator("[data-testid=totp-secret]").inner_text()
+    dave.shot("security-totp-setup")
+    p.fill("[data-testid=totp-code]", totp_code(secret))
+    p.click("[data-testid=totp-confirm]")
+    p.wait_for_selector("[data-testid=backup-codes]", timeout=30000)
+    codes = [c.strip() for c in p.locator("[data-testid=backup-codes]").inner_text().splitlines() if c.strip()]
+    assert len(codes) == 10, codes
+    dave.shot("security-backup-codes")
+    p.click("[role=dialog] button:has-text('Done')")
+    p.wait_for_selector("[data-testid=mfa-row]:has-text('Authenticator app is on')", timeout=15000)
+    p.keyboard.press("Escape")
+
+    # --- the password alone no longer gets in -------------------------------
+    dave.logout()
+    p.fill("input[autocomplete=username]", "dave")
+    p.fill("input[type=password]", PASSWORD)
+    p.click("button[type=submit]")
+    p.wait_for_selector("[data-testid=mfa-code]", timeout=45000)
+    dave.shot("security-login-code")
+    # setting it up spent the current step, so an app would be showing the next one
+    p.fill("[data-testid=mfa-code]", totp_code(secret, offset=1))
+    p.click("[data-testid=mfa-submit]")
+    try:
+        p.wait_for_url("**/channels/@me", timeout=20000)
+    except Exception:
+        # a step boundary went past mid-test; whatever is on screen now is current
+        p.fill("[data-testid=mfa-code]", totp_code(secret))
+        p.click("[data-testid=mfa-submit]")
+        p.wait_for_url("**/channels/@me", timeout=30000)
+
+    # --- a backup code works once -------------------------------------------
+    dave.logout()
+    p.fill("input[autocomplete=username]", "dave")
+    p.fill("input[type=password]", PASSWORD)
+    p.click("button[type=submit]")
+    p.wait_for_selector("[data-testid=mfa-code]", timeout=45000)
+    p.click("button:has-text('Use a backup code')")
+    p.fill("[data-testid=mfa-code]", codes[0])
+    p.click("[data-testid=mfa-submit]")
+    p.wait_for_url("**/channels/@me", timeout=45000)
+    dave.open_settings("security")
+    p.wait_for_selector("[data-testid=mfa-row]:has-text('9 backup codes left')", timeout=15000)
+
+    # --- a device passcode ---------------------------------------------------
+    p.click("[data-testid=lock-set]")
+    p.fill("[data-testid=passcode-new]", "1379")
+    p.fill("[data-testid=passcode-confirm]", "1379")
+    p.click("[data-testid=passcode-save]")
+    p.wait_for_selector("[data-testid=lock-row]:has-text('Passcode is on')", timeout=30000)
+    dave.shot("security-app-lock")
+    p.keyboard.press("Escape")
+
+    # a reload now stops at the passcode, and a wrong one is refused
+    p.reload(wait_until="domcontentloaded")
+    p.wait_for_selector("[data-testid=passcode-input]", timeout=45000)
+    dave.shot("security-locked")
+    p.fill("[data-testid=passcode-input]", "9999")
+    p.click("[data-testid=passcode-submit]")
+    p.wait_for_selector("text=/Wrong passcode/", timeout=45000)
+    p.fill("[data-testid=passcode-input]", "1379")
+    p.click("[data-testid=passcode-submit]")
+    p.wait_for_url("**/channels/@me", timeout=45000)
+    p.wait_for_selector("text=Friends", timeout=20000)
+
+    # locking by hand comes straight back to the passcode screen
+    dave.open_settings("security")
+    p.click("[data-testid=lock-now]")
+    p.wait_for_selector("[data-testid=passcode-input]", timeout=20000)
+    p.fill("[data-testid=passcode-input]", "1379")
+    p.click("[data-testid=passcode-submit]")
+    p.wait_for_selector("text=Friends", timeout=45000)
+
+    # and it can be turned off again
+    dave.open_settings("security")
+    p.click("[data-testid=lock-remove]")
+    p.click("[role=dialog] button:has-text('Remove it')")
+    p.wait_for_selector("[data-testid=lock-row]:has-text('No passcode')", timeout=20000)
+    p.keyboard.press("Escape")
+    p.reload(wait_until="domcontentloaded")
+    p.wait_for_selector("text=Friends", timeout=45000)
+    assert p.locator("[data-testid=passcode-input]").count() == 0, "removing the passcode should stop the lock screen"
+    return dave
 
 
 def main():
@@ -516,7 +714,11 @@ def main():
             voice_flow(srv, alice, bob, server_id)
             print("polish")
             polish_flow(srv, alice, bob, server_id)
-            errors = alice.errors + bob.errors + phone.errors
+            print("groups + packs")
+            groups_flow(srv, alice, bob, phone)
+            print("security: authenticator + app lock")
+            dave = security_flow(srv, out, browser)
+            errors = alice.errors + bob.errors + phone.errors + dave.errors
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))
             ok = not errors
