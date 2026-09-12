@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { createReadStream, existsSync } from "node:fs";
-import { cp, mkdir } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { fileURLToPath, URL } from "node:url";
 
 const API = process.env["VITE_API_TARGET"] ?? "http://127.0.0.1:8090";
@@ -33,8 +33,31 @@ function twemoji(): Plugin {
   };
 }
 
+/** How long a replaced build's files stay reachable. */
+const KEEP_ASSETS_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Deletes hashed files from builds older than a week. Names carry their own
+ * content hash, so nothing here is ever overwritten, only added to.
+ */
+function pruneOldAssets(): Plugin {
+  return {
+    name: "prune-old-assets",
+    async closeBundle() {
+      const dir = fileURLToPath(new URL("./dist/assets", import.meta.url));
+      if (!existsSync(dir)) return;
+      const cutoff = Date.now() - KEEP_ASSETS_MS;
+      for (const name of await readdir(dir)) {
+        const file = `${dir}/${name}`;
+        const info = await stat(file);
+        if (info.isFile() && info.mtimeMs < cutoff) await rm(file, { force: true });
+      }
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), twemoji()],
+  plugins: [react(), twemoji(), pruneOldAssets()],
   define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
@@ -50,6 +73,10 @@ export default defineConfig({
   build: {
     target: "es2022",
     sourcemap: false,
+    // A page that is already open still asks for the files its own build was
+    // compiled with. Wiping them on every deploy is what makes an open tab
+    // break; they are kept for a week instead and pruned below.
+    emptyOutDir: false,
     rollupOptions: {
       input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), sw: fileURLToPath(new URL("./src/sw.ts", import.meta.url)) },
       output: {

@@ -1,20 +1,21 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { lazyPage } from "@/lib/lazyChunk";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
 import { SettingsLayer, type NavGroup } from "./SettingsLayer";
 
-const OverviewPage = lazy(() => import("./pages/ServerOverviewPage"));
-const RolesPage = lazy(() => import("./pages/RolesPage"));
-const MembersPage = lazy(() => import("./pages/MembersPage"));
-const BansPage = lazy(() => import("./pages/BansPage"));
-const InvitesPage = lazy(() => import("./pages/InvitesPage"));
-const AuditLogPage = lazy(() => import("./pages/AuditLogPage"));
-const EncryptionPage = lazy(() => import("./pages/EncryptionPage"));
-const EmojiPage = lazy(() => import("./pages/EmojiPage"));
-const ServerStickersPage = lazy(() => import("./pages/ServerStickersPage"));
-const DeleteServerPage = lazy(() => import("./pages/DeleteServerPage"));
+const OverviewPage = lazyPage(() => import("./pages/ServerOverviewPage"));
+const RolesPage = lazyPage(() => import("./pages/RolesPage"));
+const MembersPage = lazyPage(() => import("./pages/MembersPage"));
+const BansPage = lazyPage(() => import("./pages/BansPage"));
+const InvitesPage = lazyPage(() => import("./pages/InvitesPage"));
+const AuditLogPage = lazyPage(() => import("./pages/AuditLogPage"));
+const EncryptionPage = lazyPage(() => import("./pages/EncryptionPage"));
+const EmojiPage = lazyPage(() => import("./pages/EmojiPage"));
+const ServerStickersPage = lazyPage(() => import("./pages/ServerStickersPage"));
+const DeleteServerPage = lazyPage(() => import("./pages/DeleteServerPage"));
 
 export default function ServerSettingsModal({ onClose, serverId, page: initial }: { onClose: () => void; serverId: string; page?: string | undefined }) {
   const st = useServers((x) => x.byId[serverId]);

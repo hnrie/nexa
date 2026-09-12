@@ -1,17 +1,18 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { lazyPage } from "@/lib/lazyChunk";
 import { FullScreenSpinner } from "@/components/common/Spinner";
 import { AppShell } from "@/components/shell/AppShell";
 import { RedirectIfAuthed, RequireAuth } from "@/components/shell/RequireAuth";
 
-const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
-const RecoverPage = lazy(() => import("@/pages/RecoverPage"));
-const FriendsPage = lazy(() => import("@/pages/FriendsPage"));
-const DMPage = lazy(() => import("@/pages/DMPage"));
-const ServerPage = lazy(() => import("@/pages/ServerPage"));
-const InvitePage = lazy(() => import("@/pages/InvitePage"));
-const StickerPackPage = lazy(() => import("@/pages/StickerPackPage"));
+const LoginPage = lazyPage(() => import("@/pages/LoginPage"));
+const RegisterPage = lazyPage(() => import("@/pages/RegisterPage"));
+const RecoverPage = lazyPage(() => import("@/pages/RecoverPage"));
+const FriendsPage = lazyPage(() => import("@/pages/FriendsPage"));
+const DMPage = lazyPage(() => import("@/pages/DMPage"));
+const ServerPage = lazyPage(() => import("@/pages/ServerPage"));
+const InvitePage = lazyPage(() => import("@/pages/InvitePage"));
+const StickerPackPage = lazyPage(() => import("@/pages/StickerPackPage"));
 
 export function AppRoutes() {
   return (

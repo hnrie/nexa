@@ -1,7 +1,4 @@
 .wrap { position: relative; display: inline-flex; }
-.tip { position: absolute; z-index: 60; padding: 8px 12px; background: var(--bg-floating); color: var(--text); font-size: 14px; font-weight: 600; line-height: 1.25; border-radius: var(--radius-xs); box-shadow: var(--shadow-high); white-space: nowrap; pointer-events: none; animation: fade 120ms ease-out; }
-.top { bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
-.bottom { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
-.right { left: calc(100% + 12px); top: 50%; transform: translateY(-50%); }
-.left { right: calc(100% + 12px); top: 50%; transform: translateY(-50%); }
+/* drawn on the page itself, so nothing it labels can clip or cover it */
+.tip { position: fixed; z-index: 400; padding: 6px 10px; background: var(--bg-floating); color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.25; border-radius: var(--radius-xs); box-shadow: var(--shadow-high); white-space: nowrap; pointer-events: none; animation: fade 120ms ease-out; }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

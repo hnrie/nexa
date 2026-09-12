@@ -1,20 +1,21 @@
 import { X } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { lazyPage } from "@/lib/lazyChunk";
 import { isTopLayer } from "@/components/common/Modal";
 import { useAuth } from "@/stores/auth";
 import s from "./Settings.module.css";
 
-const AccountPage = lazy(() => import("./AccountPage"));
-const ProfilePage = lazy(() => import("./ProfilePage"));
-const PrivacyPage = lazy(() => import("./PrivacyPage"));
-const SecurityPage = lazy(() => import("./SecurityPage"));
-const DevicesPage = lazy(() => import("./DevicesPage"));
-const AppearancePage = lazy(() => import("./AppearancePage"));
-const NotificationsPage = lazy(() => import("./NotificationsPage"));
-const StickersPage = lazy(() => import("./StickersPage"));
-const VoicePage = lazy(() => import("./VoicePage"));
-const AdminPage = lazy(() => import("./AdminPage"));
+const AccountPage = lazyPage(() => import("./AccountPage"));
+const ProfilePage = lazyPage(() => import("./ProfilePage"));
+const PrivacyPage = lazyPage(() => import("./PrivacyPage"));
+const SecurityPage = lazyPage(() => import("./SecurityPage"));
+const DevicesPage = lazyPage(() => import("./DevicesPage"));
+const AppearancePage = lazyPage(() => import("./AppearancePage"));
+const NotificationsPage = lazyPage(() => import("./NotificationsPage"));
+const StickersPage = lazyPage(() => import("./StickersPage"));
+const VoicePage = lazyPage(() => import("./VoicePage"));
+const AdminPage = lazyPage(() => import("./AdminPage"));
 
 const NAV: { head: string; items: { id: string; label: string }[] }[] = [
   { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "security", label: "Security" }, { id: "devices", label: "Devices" }] },

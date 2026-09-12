@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback } from "react";
+import { Suspense, useCallback } from "react";
+import { lazyPage } from "@/lib/lazyChunk";
 import { useUI, type ModalState } from "@/stores/ui";
 import { ConfirmModal } from "./ConfirmModal";
 import { CreateDMModal } from "./CreateDMModal";
@@ -15,11 +16,11 @@ import { ServerProfileModal } from "./ServerProfileModal";
 import { ChannelTopicModal } from "./ChannelTopicModal";
 import { IncomingCallHost } from "@/components/voice/IncomingCall";
 
-const SettingsModal = lazy(() => import("@/components/settings/SettingsModal"));
-const ProfileModal = lazy(() => import("@/components/profile/ProfileModal"));
-const ServerSettingsModal = lazy(() => import("@/components/server/ServerSettingsModal"));
-const ChannelSettingsModal = lazy(() => import("@/components/server/ChannelSettingsModal"));
-const MemberActionModal = lazy(() => import("@/components/server/MemberActionModal"));
+const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
+const ProfileModal = lazyPage(() => import("@/components/profile/ProfileModal"));
+const ServerSettingsModal = lazyPage(() => import("@/components/server/ServerSettingsModal"));
+const ChannelSettingsModal = lazyPage(() => import("@/components/server/ChannelSettingsModal"));
+const MemberActionModal = lazyPage(() => import("@/components/server/MemberActionModal"));
 
 /** Renders every modal on the ui store's stack; later ones overlay earlier ones. */
 export function ModalHost() {

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import s from "./Tooltip.module.css";
+
+type Side = "top" | "right" | "bottom" | "left";
 
 interface Props {
   text: string;
-  side?: "top" | "right" | "bottom" | "left";
+  side?: Side;
   children: ReactNode;
   className?: string;
   delay?: number;
@@ -14,15 +17,54 @@ function coarsePointer(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
 }
 
-/** A hover/focus tooltip; the child gets an aria-label when it is a plain icon. */
+const GAP = 8;
+
+/** Places the bubble beside the trigger, nudged back on screen if it would not fit. */
+function place(anchor: DOMRect, box: DOMRect, side: Side): { left: number; top: number } {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let left = anchor.left + anchor.width / 2 - box.width / 2;
+  let top = anchor.top - box.height - GAP;
+  if (side === "bottom") top = anchor.bottom + GAP;
+  if (side === "left" || side === "right") {
+    top = anchor.top + anchor.height / 2 - box.height / 2;
+    left = side === "left" ? anchor.left - box.width - GAP : anchor.right + GAP;
+  }
+  // a bubble above the very top of the window flips below, and the reverse
+  if (side === "top" && top < 4) top = anchor.bottom + GAP;
+  if (side === "bottom" && top + box.height > vh - 4) top = anchor.top - box.height - GAP;
+  return {
+    left: Math.max(4, Math.min(left, vw - box.width - 4)),
+    top: Math.max(4, Math.min(top, vh - box.height - 4)),
+  };
+}
+
+/**
+ * A hover tooltip drawn straight onto the page rather than inside whatever it
+ * labels. A message row clips what paints outside it, so a bubble rendered in
+ * place there is simply never seen.
+ */
 export function Tooltip({ text, side = "top", children, className, delay = 250 }: Props) {
-  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const bubble = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clear = () => {
+  const [open, setOpen] = useState(false);
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+
+  const clear = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
-  };
-  useEffect(() => clear, []);
+  }, []);
+  useEffect(() => clear, [clear]);
+
+  // measured after it is in the DOM, so the bubble's own size is known
+  useEffect(() => {
+    if (!open) return;
+    const anchor = wrap.current?.getBoundingClientRect();
+    const box = bubble.current?.getBoundingClientRect();
+    if (anchor && box) setAt(place(anchor, box, side));
+  }, [open, side, text]);
+
   const show = () => {
     if (coarsePointer()) return;
     clear();
@@ -31,9 +73,12 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
   const hide = () => {
     clear();
     setOpen(false);
+    setAt(null);
   };
+
   return (
     <span
+      ref={wrap}
       className={[s.wrap, className ?? ""].join(" ")}
       onMouseEnter={show}
       onMouseLeave={hide}
@@ -43,11 +88,19 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
       onClick={hide}
     >
       {children}
-      {open ? (
-        <span className={[s.tip, s[side]].join(" ")} role="tooltip">
-          {text}
-        </span>
-      ) : null}
+      {open
+        ? createPortal(
+            <span
+              ref={bubble}
+              className={s.tip}
+              role="tooltip"
+              style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}
+            >
+              {text}
+            </span>,
+            document.body,
+          )
+        : null}
     </span>
   );
 }
