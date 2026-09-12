@@ -19,7 +19,10 @@ import { MeshTransport, type SignalPayload } from "./mesh";
 interface Session {
   channelId: string;
   transport: MeshTransport;
+  /** The raw capture; what peers get is the gain-staged copy. */
   mic: MediaStream | null;
+  micRaw: MediaStream | null;
+  inputGain: GainNode | null;
   meter: LevelMeter | null;
   meterTimer: ReturnType<typeof setInterval> | null;
   camera: MediaStream | null;
@@ -76,6 +79,13 @@ function applyTransmit(): void {
   for (const t of session.mic.getAudioTracks()) t.enabled = on;
 }
 
+/** Scales the microphone before it reaches the peers, for the input slider. */
+function applyInputGain(): void {
+  const s = session;
+  if (!s?.inputGain) return;
+  s.inputGain.gain.value = useSettings.getState().settings.voice.inputVolume / 100;
+}
+
 /** Join a voice channel (or DM call). Leaves the current one first. */
 export async function joinVoice(channelId: string): Promise<void> {
   const myId = me();
@@ -93,10 +103,11 @@ export async function joinVoice(channelId: string): Promise<void> {
     onRemoteStream: (uid, kind, stream) => useVoice.getState().setRemote(uid, kind, stream),
     onSpeaking: (uid, on) => useVoice.getState().setSpeaking(uid, on),
   });
-  const s: Session = { channelId, transport, mic: null, meter: null, meterTimer: null, camera: null, screen: null, noiseFloor: 0.01, pttHeld: false };
+  const s: Session = { channelId, transport, mic: null, micRaw: null, inputGain: null, meter: null, meterTimer: null, camera: null, screen: null, noiseFloor: 0.01, pttHeld: false };
   session = s;
   try {
-    s.mic = await getMic(useSettings.getState().settings.voice);
+    s.micRaw = await getMic(useSettings.getState().settings.voice);
+    s.mic = withInputGain(s, s.micRaw);
   } catch {
     useUI.getState().toast("Microphone access was denied. You can listen, but nobody can hear you.", "error");
   }
@@ -109,6 +120,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   for (const uid of Object.keys(useVoice.getState().localMutes)) transport.setLocalMute(uid, true);
   for (const [uid, pct] of Object.entries(useVoice.getState().volumes)) transport.setVolume(uid, pct);
   transport.setOutputMuted(useVoiceLocal.getState().deafened);
+  transport.setMasterVolume(useSettings.getState().settings.voice.outputVolume);
   const out = useSettings.getState().settings.voice.outputDeviceId;
   if (out) void transport.setOutputDevice(out);
   applyTransmit();
@@ -124,12 +136,30 @@ export async function leaveVoice(notify = true): Promise<void> {
     stopMeter(s);
     s.transport.close();
     s.mic?.getTracks().forEach((t) => t.stop());
+    s.micRaw?.getTracks().forEach((t) => t.stop());
     s.camera?.getTracks().forEach((t) => t.stop());
     s.screen?.getTracks().forEach((t) => t.stop());
     if (notify) sendState(null);
     playSound("leave");
   }
   useVoice.getState().resetSession();
+}
+
+/** Routes the capture through a gain node so the input slider does something. */
+function withInputGain(s: Session, raw: MediaStream): MediaStream {
+  try {
+    const ctx = audioContext();
+    const src = ctx.createMediaStreamSource(raw);
+    const gain = ctx.createGain();
+    gain.gain.value = useSettings.getState().settings.voice.inputVolume / 100;
+    const dest = ctx.createMediaStreamDestination();
+    src.connect(gain).connect(dest);
+    s.inputGain = gain;
+    return dest.stream;
+  } catch {
+    s.inputGain = null;
+    return raw;
+  }
 }
 
 function startMeter(s: Session): void {
@@ -171,8 +201,10 @@ export async function refreshMic(): Promise<void> {
     }
     stopMeter(s);
     s.mic?.getTracks().forEach((t) => t.stop());
-    s.mic = next;
-    s.transport.setLocalAudio(next.getAudioTracks()[0] ?? null);
+    s.micRaw?.getTracks().forEach((t) => t.stop());
+    s.micRaw = next;
+    s.mic = withInputGain(s, next);
+    s.transport.setLocalAudio(s.mic.getAudioTracks()[0] ?? null);
     startMeter(s);
     applyTransmit();
   } catch {
@@ -370,6 +402,8 @@ export function installVoice(): void {
     if (!session) return;
     if (a.inputDeviceId !== b.inputDeviceId || a.noiseSuppression !== b.noiseSuppression || a.echoCancellation !== b.echoCancellation || a.autoGain !== b.autoGain) void refreshMic();
     if (a.outputDeviceId !== b.outputDeviceId) void session.transport.setOutputDevice(a.outputDeviceId);
+    if (a.outputVolume !== b.outputVolume) session.transport.setMasterVolume(a.outputVolume);
+    if (a.inputVolume !== b.inputVolume) applyInputGain();
     if (a.mode !== b.mode) applyTransmit();
   });
   const isPtt = (e: KeyboardEvent) => {

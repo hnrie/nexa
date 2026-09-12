@@ -1,4 +1,4 @@
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { UserPanel } from "@/components/shell/UserPanel";
@@ -13,6 +13,7 @@ import { useUsers } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
 import { useMemo } from "react";
 import { iconUrl } from "@/api/users";
+import { closeDM, dmMenuItems } from "./dmMenu";
 import s from "./Sidebar.module.css";
 
 export function DMSidebar() {
@@ -24,6 +25,7 @@ export function DMSidebar() {
   const presence = usePresence((p) => p.byUser);
   const reads = useReadStates((r) => r.byChannel);
   const openModal = useUI((u) => u.openModal);
+  const openContextMenu = useUI((u) => u.openContextMenu);
   const setQuickSwitcher = useUI((u) => u.setQuickSwitcher);
   const rels = useRelationships((r) => r.byUser);
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
@@ -66,13 +68,37 @@ export function DMSidebar() {
             avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} /> : <span className={s.groupIcon}><Users size={18} /></span>;
           }
           return (
-            <button key={ch.id} className={s.item} data-selected={active === ch.id} data-unread={unread && active !== ch.id} onClick={() => nav(`/channels/@me/${ch.id}`)}>
+            <button
+              key={ch.id}
+              className={s.item}
+              data-selected={active === ch.id}
+              data-unread={unread && active !== ch.id}
+              data-channel={ch.id}
+              onClick={() => nav(`/channels/@me/${ch.id}`)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+              }}
+            >
               {avatar}
               <span className={s.text}>
                 <span className={s.name}>{name}</span>
                 {sub ? <span className={s.sub}>{sub}</span> : null}
               </span>
               {mentions > 0 ? <span className={s.mention}>{mentions > 99 ? "99+" : mentions}</span> : null}
+              <span
+                className={s.close}
+                role="button"
+                aria-label="Close DM"
+                title={ch.type === "group_dm" ? "Leave group" : "Close DM"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (ch.type === "group_dm") openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+                  else void closeDM(ch.id, active === ch.id ? nav : undefined);
+                }}
+              >
+                <X size={16} />
+              </span>
             </button>
           );
         })}

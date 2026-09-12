@@ -11,6 +11,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { useRenderCtx } from "@/lib/markdownCtx";
+import { profileTheme } from "@/lib/avatarColor";
 import { Markdown } from "@/markdown";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -19,6 +20,10 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import s from "./Profile.module.css";
+
+function themeOf(u: PublicUser | undefined): string {
+  return profileTheme(u?.accent_color, u?.accent_color_2, u?.id);
+}
 
 function accentColor(u: PublicUser | undefined): string {
   if (u?.accent_color !== null && u?.accent_color !== undefined) return `#${u.accent_color.toString(16).padStart(6, "0")}`;
@@ -122,7 +127,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   return (
     <Modal open onClose={onClose} width={600} bare>
       <div className={s.card}>
-        <div className={s.banner} style={banner ? { backgroundImage: `url(${banner})` } : { background: accentColor(user) }} />
+        <div className={s.banner} style={banner ? { backgroundImage: `url(${banner})` } : { background: themeOf(user) }} />
         <div className={s.head}>
           <div className={s.avatar}><Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={80} status={st} /></div>
           <div className={s.actions}>

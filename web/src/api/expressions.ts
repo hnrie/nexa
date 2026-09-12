@@ -31,7 +31,7 @@ export const expressions = {
   pack(id: Snowflake): Promise<StickerPack> {
     return api.request<StickerPack>("GET", `/stickers/packs/${id}`);
   },
-  createPack(body: { name: string; description?: string; server_id?: Snowflake }): Promise<StickerPack> {
+  createPack(body: { name: string; description?: string; server_id?: Snowflake; kind?: "sticker" | "emoji" }): Promise<StickerPack> {
     return api.request<StickerPack>("POST", "/stickers/packs", body);
   },
   patchPack(id: Snowflake, body: { name?: string; description?: string; public?: boolean; cover_sticker_id?: Snowflake | null }): Promise<StickerPack> {

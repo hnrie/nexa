@@ -21,6 +21,8 @@ export interface PublicUser {
   about_me: string;
   pronouns: string;
   accent_color: number | null;
+  /** Second colour: when set, the profile banner is a gradient between the two. */
+  accent_color_2: number | null;
   status_text: string;
   status_emoji: string;
   status_expires_at: number | null;
@@ -130,7 +132,8 @@ export interface ServerView extends Server {
 
 export interface Invite {
   code: string;
-  server_id: Snowflake;
+  /** Null for a group DM invite, where channel_id carries the group. */
+  server_id: Snowflake | null;
   channel_id: Snowflake | null;
   inviter_id: Snowflake;
   max_uses: number;
@@ -141,7 +144,10 @@ export interface Invite {
 
 export interface InvitePreview {
   code: string;
-  server: { id: Snowflake; name: string; icon_id: Snowflake | null; banner_id: Snowflake | null; description: string; member_count: number; online_count: number };
+  /** Present for a server invite. */
+  server?: { id: Snowflake; name: string; icon_id: Snowflake | null; banner_id: Snowflake | null; description: string; member_count: number; online_count: number };
+  /** Present for a group DM invite. */
+  group?: { id: Snowflake; name: string; icon_id: Snowflake | null; member_count: number };
   channel?: { id: Snowflake; name: string; type: Channel["type"] };
   inviter?: PublicUser;
   expires_at: number | null;
@@ -194,6 +200,8 @@ export interface Sticker {
 
 export interface StickerPack {
   id: Snowflake;
+  /** "sticker" for the big ones you post, "emoji" for the small ones you type. */
+  kind: "sticker" | "emoji";
   owner_user_id: Snowflake | null;
   server_id: Snowflake | null;
   name: string;

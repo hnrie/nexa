@@ -1,5 +1,5 @@
 import { api, errorFromResponse } from "./client";
-import type { Channel, Message, Snowflake } from "./types";
+import type { Channel, Invite, Message, Snowflake } from "./types";
 
 type Progress = (loaded: number, total: number) => void;
 
@@ -38,6 +38,24 @@ export const channels = {
   },
   removeRecipient(id: Snowflake, uid: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${id}/recipients/${uid}`);
+  },
+  /** Closes a DM for you; a new message brings it back. */
+  close(id: Snowflake): Promise<void> {
+    return api.request<void>("DELETE", `/channels/${id}`);
+  },
+  /** Deletes the conversation for everyone, or deletes a group you own. */
+  purge(id: Snowflake): Promise<void> {
+    return api.request<void>("DELETE", `/channels/${id}`, undefined, { query: { purge: "true" } });
+  },
+  /** Leaves a group DM. */
+  leave(id: Snowflake): Promise<void> {
+    return api.request<void>("DELETE", `/channels/${id}`);
+  },
+  groupInvites(id: Snowflake): Promise<Invite[]> {
+    return api.request<Invite[]>("GET", `/channels/${id}/invites`);
+  },
+  createGroupInvite(id: Snowflake, body: { max_age?: number; max_uses?: number } = {}): Promise<Invite> {
+    return api.request<Invite>("POST", `/channels/${id}/invites`, body);
   },
   typing(id: Snowflake): Promise<void> {
     return api.request<void>("POST", `/channels/${id}/typing`);

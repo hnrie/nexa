@@ -16,7 +16,7 @@ import { P } from "@/lib/perms";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { GifPicker } from "@/components/pickers/GifPicker";
 import { StickerPicker } from "@/components/pickers/StickerPicker";
-import { emojiToken, searchCustomEmoji, useExpressions } from "@/stores/expressions";
+import { emojiToken, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
 import { unfurl as unfurlApi } from "@/api/unfurl";
 import type { UnfurlResult } from "@/api/types";
 import { extractUrls } from "@/markdown";
@@ -166,8 +166,14 @@ export function Composer({ channel }: { channel: Channel }) {
       if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: "Notify everyone online in this channel" });
     } else if (tok.kind === "emoji") {
       if (!emojiLoaded()) void loadEmoji().then(() => refreshAc(value, caret));
-      const custom = searchCustomEmoji(useExpressions.getState().emojis, tok.query, 4).map((e) => ({ kind: "customEmoji" as const, emoji: e }));
-      items = [...custom, ...searchEmoji(tok.query, 8 - custom.length).map((e) => ({ kind: "emoji" as const, entry: e }))];
+      const ex = useExpressions.getState();
+      const custom = searchCustomEmoji(ex.emojis, tok.query, 4).map((e) => ({ kind: "customEmoji" as const, emoji: e }));
+      const fromPacks = searchPackEmoji(ex.packs, tok.query, 4 - Math.min(custom.length, 4)).map((r) => ({
+        kind: "customEmoji" as const,
+        emoji: { id: r.sticker.id, server_id: "", name: r.sticker.name, blob_id: r.sticker.blob_id, animated: r.sticker.animated, creator_id: r.sticker.creator_id, created_at: r.sticker.created_at },
+      }));
+      const all = [...custom, ...fromPacks];
+      items = [...all, ...searchEmoji(tok.query, Math.max(2, 8 - all.length)).map((e) => ({ kind: "emoji" as const, entry: e }))];
     } else {
       items = COMMANDS.filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
     }

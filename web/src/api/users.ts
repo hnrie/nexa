@@ -7,6 +7,7 @@ export type MePatch = Partial<{
   about_me: string | null;
   pronouns: string | null;
   accent_color: number | null;
+  accent_color_2: number | null;
   status_text: string | null;
   status_emoji: string | null;
   status_expires_at: number | null;

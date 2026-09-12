@@ -151,6 +151,7 @@ export const servers = {
   invitePreview(code: string): Promise<InvitePreview> {
     return api.request<InvitePreview>("GET", `/invites/${encodeURIComponent(code)}`);
   },
+  /** Accepts a server or group invite; the payload says which came back. */
   join(code: string): Promise<{ server: ServerView; users: PublicUser[] }> {
     return api.request("POST", `/invites/${encodeURIComponent(code)}`);
   },

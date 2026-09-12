@@ -22,3 +22,6 @@
 .mention { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; flex: none; }
 .empty { padding: 16px 8px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .groupIcon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--brand); color: #fff; flex: none; }
+.close { display: none; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: var(--radius-xs); color: var(--text-muted); flex: none; cursor: pointer; }
+.item:hover .close { display: flex; }
+.close:hover { color: var(--text-strong); background: var(--bg-active); }

@@ -3,6 +3,7 @@ import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
+import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { Select } from "@/components/common/Select";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { initials } from "@/lib/avatarColor";
@@ -24,6 +25,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
   const [system, setSystem] = useState(server?.system_channel_id ?? "");
   const [notif, setNotif] = useState(server?.default_notifications ?? 0);
   const [busy, setBusy] = useState(false);
+  const [crop, setCrop] = useState<File | null>(null);
   if (!server) return null;
   const texts = selectServerChannels(channels, serverId).filter((c) => c.type === "text");
   const dirty = name !== server.name || description !== server.description || (system || "") !== (server.system_channel_id ?? "") || notif !== server.default_notifications;
@@ -81,7 +83,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
               <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>Upload Image</Button>
               {server.icon_id ? <Button variant="ghost" size="sm" onClick={() => void removeIcon()} disabled={busy}>Remove</Button> : null}
             </div>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop(f); e.target.value = ""; }} />
           </div>
         </div>
         <Field label="Server name" required>
@@ -103,6 +105,19 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
           </div>
         </Field>
       </div>
+      {crop ? (
+        <ImageCropModal
+          file={crop}
+          aspect={1}
+          round
+          title="Crop the server icon"
+          onClose={() => setCrop(null)}
+          onDone={({ blob }) => {
+            setCrop(null);
+            void upload(new File([blob], "icon.png", { type: blob.type }));
+          }}
+        />
+      ) : null}
       <SaveBar dirty={dirty} busy={busy} onReset={reset} onSave={() => void save()} />
     </>
   );

@@ -7,6 +7,7 @@ import { QuickSwitcher } from "./QuickSwitcher";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { CreateServerModal } from "./CreateServerModal";
 import { InviteModal } from "./InviteModal";
+import { GroupInviteModal } from "./GroupInviteModal";
 import { CreateChannelModal } from "./CreateChannelModal";
 import { CreateCategoryModal } from "./CreateCategoryModal";
 import { ServerNotificationsModal } from "./ServerNotificationsModal";
@@ -54,6 +55,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "shortcuts" ? <ShortcutsHelp onClose={close} /> : null}
       {modal?.kind === "createServer" ? <CreateServerModal onClose={close} /> : null}
       {modal?.kind === "invite" ? <InviteModal onClose={close} serverId={String(modal.props?.["serverId"])} channelId={modal.props?.["channelId"] as string | undefined} /> : null}
+      {modal?.kind === "groupInvite" ? <GroupInviteModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "createChannel" ? <CreateChannelModal onClose={close} serverId={String(modal.props?.["serverId"])} parentId={modal.props?.["parentId"] as string | undefined} /> : null}
       {modal?.kind === "createCategory" ? <CreateCategoryModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}
       {modal?.kind === "serverNotifications" ? <ServerNotificationsModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}

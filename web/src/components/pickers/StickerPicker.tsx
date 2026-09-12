@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { Sticker, StickerPack } from "@/api/types";
-import { stickerUrl } from "@/api/users";
+import { packImageUrl } from "@/stores/expressions";
 import { useAuth } from "@/stores/auth";
 import { groupPacks, searchStickers, useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
@@ -25,7 +25,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
 
   const cell = (sticker: Sticker, pack: StickerPack) => (
     <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} onClick={() => onPick({ sticker, pack })}>
-      <img src={stickerUrl(sticker.blob_id)} alt={sticker.name} loading="lazy" draggable={false} />
+      <img src={packImageUrl(pack, sticker)} alt={sticker.name} loading="lazy" draggable={false} />
     </button>
   );
 
@@ -40,7 +40,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
             const cover = p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
             return (
               <button key={p.id} className={s.cat} title={p.name} onClick={() => jump(p.id)}>
-                {cover ? <img className={s.catImg} src={stickerUrl(cover.blob_id)} alt="" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
+                {cover ? <img className={s.catImg} src={packImageUrl(p, cover)} alt="" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
               </button>
             );
           })}

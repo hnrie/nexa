@@ -19,14 +19,19 @@ import { useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import s from "./InvitePage.module.css";
 
-/** The public invite landing page: preview, then accept (logging in first if needed). */
+/** The public invite landing page for a server or a group chat. */
 export default function InvitePage() {
   const { code = "" } = useParams();
   const loc = useLocation();
   const nav = useNavigate();
   const status = useAuth((a) => a.status);
   const bootstrap = useAuth((a) => a.bootstrap);
-  const meId = useAuth((a) => a.me?.id);
+  const [preview, setPreview] = useState<InvitePreview | null>(null);
+  const alreadyIn = useServers((st) => (preview?.server ? !!st.byId[preview.server.id] : false));
+  const inGroup = useChannels((c) => (preview?.group ? !!c.byId[preview.group.id] : false));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
   // the page lives outside the authed shell, so it restores the session itself
   useEffect(() => {
     if (status === "idle") void bootstrap();
@@ -34,10 +39,6 @@ export default function InvitePage() {
   useEffect(() => {
     if (status === "ready") void startSession();
   }, [status]);
-  const [preview, setPreview] = useState<InvitePreview | null>(null);
-  const member = useServers((st) => (preview ? st.byId[preview.server.id] : undefined));
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -51,9 +52,16 @@ export default function InvitePage() {
   }, [code]);
 
   const accept = async () => {
-    if (busy) return;
+    if (busy || !preview) return;
     setBusy(true);
     try {
+      if (preview.group) {
+        const res = (await serversApi.join(code)) as unknown as { channel: { id: string; recipient_ids: string[] }; users?: { id: string }[] };
+        if (res.users) useUsers.getState().upsert(res.users as never);
+        useChannels.getState().upsert(res.channel as never);
+        nav(`/channels/@me/${res.channel.id}`, { replace: true });
+        return;
+      }
       const res = await serversApi.join(code);
       useUsers.getState().upsert(res.users);
       useChannels.getState().upsert(res.server.channels);
@@ -69,7 +77,7 @@ export default function InvitePage() {
       const first = res.server.channels.find((c) => c.type === "text");
       nav(first ? `/channels/${res.server.id}/${first.id}` : `/channels/${res.server.id}`, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not join the server.");
+      setError(err instanceof ApiError ? err.message : "Could not accept the invite.");
     } finally {
       setBusy(false);
     }
@@ -77,7 +85,10 @@ export default function InvitePage() {
 
   if (status === "locked") return <LockPage />;
   const next = encodeURIComponent(loc.pathname + loc.hash);
-  const icon = preview ? iconUrl(preview.server.icon_id) : null;
+  const target = preview?.server ?? preview?.group;
+  const icon = target ? iconUrl(target.icon_id) : null;
+  const isGroup = !!preview?.group;
+  const member = isGroup ? inGroup : alreadyIn;
   return (
     <div className={s.page}>
       <div className={s.card}>
@@ -90,21 +101,21 @@ export default function InvitePage() {
             <Link to="/channels/@me" className={s.link}>Continue to the app</Link>
           </>
         ) : null}
-        {preview ? (
+        {preview && target ? (
           <>
             <p className={s.kicker}>{preview.inviter ? `${preview.inviter.display_name || preview.inviter.username} invited you to join` : "You've been invited to join"}</p>
-            <div className={s.iconBox}>{icon ? <img src={icon} alt="" /> : initials(preview.server.name)}</div>
-            <h1 className={s.title}>{preview.server.name}</h1>
-            {preview.server.description ? <p className={s.sub}>{preview.server.description}</p> : null}
+            <div className={s.iconBox}>{icon ? <img src={icon} alt="" /> : initials(target.name)}</div>
+            <h1 className={s.title}>{target.name}</h1>
+            {preview.server?.description ? <p className={s.sub}>{preview.server.description}</p> : null}
             <div className={s.counts}>
-              <span><i className={s.online} /> {preview.server.online_count} Online</span>
-              <span><i className={s.offline} /> {preview.server.member_count} Members</span>
+              {preview.server ? <span><i className={s.online} /> {preview.server.online_count} Online</span> : null}
+              <span><i className={s.offline} /> {target.member_count} {isGroup ? "in this group" : "Members"}</span>
             </div>
             {status === "ready" ? (
-              member && meId ? (
-                <Button block onClick={() => nav(`/channels/${preview.server.id}`)}>You're already a member — Open</Button>
+              member ? (
+                <Button block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>You're already in — Open</Button>
               ) : (
-                <Button block loading={busy} onClick={() => void accept()}>Accept Invite</Button>
+                <Button block loading={busy} onClick={() => void accept()}>{isGroup ? "Join Group" : "Accept Invite"}</Button>
               )
             ) : status === "anonymous" ? (
               <div className={s.authRow}>
@@ -114,7 +125,8 @@ export default function InvitePage() {
             ) : (
               <Spinner />
             )}
-            {loc.hash.includes("k=") ? <p className={s.note}>This link carries the server's encryption key, so you can read its history as soon as you join.</p> : null}
+            {loc.hash.includes("k=") ? <p className={s.note}>This link carries the encryption key, so you can read the history as soon as you join.</p> : null}
+            {isGroup ? <p className={s.note}>Group chats are end-to-end encrypted. Someone already inside has to be online to hand you the key.</p> : null}
           </>
         ) : null}
       </div>

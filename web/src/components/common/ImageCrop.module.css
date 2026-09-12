@@ -1,0 +1,14 @@
+.wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.frame { position: relative; overflow: hidden; border-radius: var(--radius-sm); background: var(--bg-input); cursor: grab; touch-action: none; max-width: 100%; }
+.frame:active { cursor: grabbing; }
+.frame[data-round="true"] { border-radius: 50%; }
+.img { position: absolute; left: 50%; top: 50%; max-width: none; user-select: none; pointer-events: none; }
+.mask { position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--brand); border-radius: var(--radius-sm); pointer-events: none; }
+.mask[data-round="true"] { border-radius: 50%; }
+.controls { display: flex; align-items: center; gap: 10px; width: 100%; color: var(--text-muted); }
+.range { flex: 1; accent-color: var(--brand); }
+.reset { display: flex; padding: 4px; border-radius: var(--radius-xs); color: var(--text-muted); }
+.reset:hover { color: var(--text); background: var(--bg-hover); }
+.keep { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; color: var(--text); cursor: pointer; }
+.keep input { accent-color: var(--brand); width: 16px; height: 16px; margin-top: 1px; }
+.hint { margin: 0; font-size: 12px; color: var(--text-muted); text-align: center; }

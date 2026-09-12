@@ -32,12 +32,17 @@ export function ChatView({ channel }: { channel: Channel }) {
   const users = useUsers((u) => u.byId);
   const presence = usePresence((p) => p.byUser);
   const openModal = useUI((u) => u.openModal);
-  const membersOpen = useUI((u) => u.membersOpen);
-  const toggleMembers = useUI((u) => u.toggleMembers);
+  const membersOpenDesktop = useUI((u) => u.membersOpen);
+  const toggleMembersDesktop = useUI((u) => u.toggleMembers);
+  // phones open the member list as a drawer that starts closed on every channel
+  const rightOpen = useUI((u) => u.rightOpen);
+  const setRightOpen = useUI((u) => u.setRightOpen);
   const [pins, setPins] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const mobile = useIsMobile();
+  const membersOpen = mobile ? rightOpen : membersOpenDesktop;
+  const toggleMembers = () => (mobile ? setRightOpen(!rightOpen) : toggleMembersDesktop());
   const serverId = channel.server_id;
   const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
   const rels = useRelationships((r) => r.byUser);
@@ -104,8 +109,8 @@ export function ChatView({ channel }: { channel: Channel }) {
             <button className={s.hBtn} aria-label="Invite People" onClick={() => openModal("invite", { serverId, channelId: channel.id })}><UserPlus size={22} /></button>
           </Tooltip>
         ) : (
-          <Tooltip text={channel.type === "dm" ? "Add Friends to DM" : "Add Friends to Group"} side="bottom">
-            <button className={s.hBtn} aria-label="Add friends" onClick={() => openModal("createDM", channel.type === "dm" ? { initial: other ? [other] : [] } : { groupId: channel.id })}><UserPlus size={22} /></button>
+          <Tooltip text={channel.type === "dm" ? "Add Friends to DM" : "Invite to Group"} side="bottom">
+            <button className={s.hBtn} aria-label="Add friends" onClick={() => openModal(channel.type === "group_dm" ? "groupInvite" : "createDM", channel.type === "dm" ? { initial: other ? [other] : [] } : { channelId: channel.id })}><UserPlus size={22} /></button>
           </Tooltip>
         )}
         {channel.type === "group_dm" || isServer ? (

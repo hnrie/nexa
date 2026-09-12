@@ -24,6 +24,7 @@ type User struct {
 	AboutMe         string  `json:"about_me"`
 	Pronouns        string  `json:"pronouns"`
 	AccentColor     *int    `json:"accent_color"`
+	AccentColor2    *int    `json:"accent_color_2"`
 	StatusText      string  `json:"status_text"`
 	StatusEmoji     string  `json:"status_emoji"`
 	StatusExpiresAt *int64  `json:"status_expires_at"`
@@ -52,6 +53,7 @@ type PublicUser struct {
 	AboutMe         string  `json:"about_me"`
 	Pronouns        string  `json:"pronouns"`
 	AccentColor     *int    `json:"accent_color"`
+	AccentColor2    *int    `json:"accent_color_2"`
 	StatusText      string  `json:"status_text"`
 	StatusEmoji     string  `json:"status_emoji"`
 	StatusExpiresAt *int64  `json:"status_expires_at"`
@@ -63,7 +65,7 @@ type PublicUser struct {
 // Public returns the shareable view of u.
 func (u *User) Public() PublicUser {
 	return PublicUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, BannerID: u.BannerID,
-		AboutMe: u.AboutMe, Pronouns: u.Pronouns, AccentColor: u.AccentColor, StatusText: u.StatusText, StatusEmoji: u.StatusEmoji,
+		AboutMe: u.AboutMe, Pronouns: u.Pronouns, AccentColor: u.AccentColor, AccentColor2: u.AccentColor2, StatusText: u.StatusText, StatusEmoji: u.StatusEmoji,
 		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & FlagAdmin, CreatedAt: u.CreatedAt}
 }
 
@@ -75,6 +77,7 @@ type ProfilePatch struct {
 	AboutMe         *string
 	Pronouns        *string
 	AccentColor     **int
+	AccentColor2    **int
 	AvatarID        **ids.ID
 	BannerID        **ids.ID
 	StatusText      *string

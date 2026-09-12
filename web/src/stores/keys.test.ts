@@ -26,7 +26,7 @@ function user(id: string, pub: Uint8Array) {
     banner_id: null,
     about_me: "",
     pronouns: "",
-    accent_color: null,
+    accent_color: null, accent_color_2: null,
     status_text: "",
     status_emoji: "",
     status_expires_at: null,

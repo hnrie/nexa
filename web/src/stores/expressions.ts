@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Emoji, Sticker, StickerPack } from "@/api/types";
+import { emojiUrl, stickerUrl } from "@/api/users";
 
 interface ExpressionsState {
   /** Custom emoji per server. */
@@ -54,6 +55,14 @@ export const useExpressions = create<ExpressionsState>()((set) => ({
   clear: () => set({ emojis: {}, packs: {}, gifEnabled: null }),
 }));
 
+/** Emoji that come from installed or owned emoji packs, as picker entries. */
+export function packEmoji(packs: Record<string, StickerPack>): { pack: StickerPack; items: Sticker[] }[] {
+  return Object.values(packs)
+    .filter((p) => p.kind === "emoji" && p.stickers.length > 0)
+    .sort((a, b) => b.updated_at - a.updated_at)
+    .map((pack) => ({ pack, items: pack.stickers }));
+}
+
 /** Every custom emoji the user can use, with its server id. */
 export function allCustomEmoji(emojis: Record<string, Emoji[]>): Emoji[] {
   return Object.values(emojis).flat();
@@ -95,7 +104,7 @@ export interface PackGroup {
 
 /** Packs grouped for the picker: this server's, mine, then installed. */
 export function groupPacks(packs: Record<string, StickerPack>, serverId: string | null | undefined, meId: string | undefined): PackGroup[] {
-  const list = Object.values(packs).sort((a, b) => b.updated_at - a.updated_at);
+  const list = Object.values(packs).filter((p) => p.kind !== "emoji").sort((a, b) => b.updated_at - a.updated_at);
   const groups: PackGroup[] = [];
   const server = list.filter((p) => serverId && p.server_id === serverId);
   const mine = list.filter((p) => p.owner_user_id && p.owner_user_id === meId);
@@ -106,6 +115,24 @@ export function groupPacks(packs: Record<string, StickerPack>, serverId: string 
   if (installed.length) groups.push({ label: "Installed", packs: installed });
   if (otherServers.length) groups.push({ label: "Other servers", packs: otherServers });
   return groups;
+}
+
+/** Pack emoji whose name matches, for the picker search and the composer. */
+export function searchPackEmoji(packs: Record<string, StickerPack>, q: string, limit = 20): { sticker: Sticker; pack: StickerPack }[] {
+  const query = q.trim().toLowerCase().replace(/^:|:$/g, "");
+  if (!query) return [];
+  const out: { sticker: Sticker; pack: StickerPack; s: number }[] = [];
+  for (const pack of Object.values(packs)) {
+    if (pack.kind !== "emoji") continue;
+    for (const sticker of pack.stickers) {
+      const n = sticker.name.toLowerCase();
+      if (n === query) out.push({ sticker, pack, s: 100 });
+      else if (n.startsWith(query)) out.push({ sticker, pack, s: 80 });
+      else if (n.includes(query)) out.push({ sticker, pack, s: 40 });
+    }
+  }
+  out.sort((a, b) => b.s - a.s);
+  return out.slice(0, limit).map(({ sticker, pack }) => ({ sticker, pack }));
 }
 
 /** Stickers matching a query by name or tag, across the given packs. */
@@ -128,4 +155,9 @@ export function searchStickers(packs: StickerPack[], q: string, limit = 60): { s
   }
   out.sort((a, b) => b.s - a.s);
   return out.slice(0, limit).map(({ sticker, pack }) => ({ sticker, pack }));
+}
+
+/** Where a pack's image lives: emoji packs store emoji-kind blobs. */
+export function packImageUrl(pack: StickerPack, sticker: Sticker): string {
+  return pack.kind === "emoji" ? emojiUrl(sticker.blob_id, sticker.animated) : stickerUrl(sticker.blob_id);
 }

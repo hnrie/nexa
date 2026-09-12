@@ -53,6 +53,8 @@ export class MeshTransport {
   private videoStream = new MediaStream();
   private screenStream = new MediaStream();
   private outputMuted = false;
+  /** Master output level, 0–200 %, from settings. */
+  private masterVolume = 100;
   private volumes = new Map<string, number>();
   private localMutes = new Set<string>();
   private screenBitrate = 5_000_000;
@@ -332,7 +334,7 @@ export class MeshTransport {
 
   private effectiveGain(userId: string): number {
     if (this.outputMuted || this.localMutes.has(userId)) return 0;
-    return (this.volumes.get(userId) ?? 100) / 100;
+    return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 
   private applyGains(): void {
@@ -354,6 +356,12 @@ export class MeshTransport {
 
   setOutputMuted(on: boolean): void {
     this.outputMuted = on;
+    this.applyGains();
+  }
+
+  /** Master output level for every peer, 0–200 %. */
+  setMasterVolume(pct: number): void {
+    this.masterVolume = Math.max(0, Math.min(200, pct));
     this.applyGains();
   }
 

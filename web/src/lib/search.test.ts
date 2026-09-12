@@ -3,7 +3,7 @@ import type { PublicUser } from "@/api/types";
 import type { DecryptedMessage } from "@/lib/decrypt";
 import { highlight, isEmptyQuery, matches, parseQuery, search } from "./search";
 
-const user = (id: string, username: string, display: string): PublicUser => ({ id, username, display_name: display, avatar_id: null, banner_id: null, about_me: "", pronouns: "", accent_color: null, status_text: "", status_emoji: "", status_expires_at: null, public_key: "", flags: 0, created_at: 0 });
+const user = (id: string, username: string, display: string): PublicUser => ({ id, username, display_name: display, avatar_id: null, banner_id: null, about_me: "", pronouns: "", accent_color: null, accent_color_2: null, status_text: "", status_emoji: "", status_expires_at: null, public_key: "", flags: 0, created_at: 0 });
 const users = { "1": user("1", "alice", "Alice"), "2": user("2", "bob", "Bob") };
 const ctx = { users, channelNames: { c1: "general", c2: "random" } };
 

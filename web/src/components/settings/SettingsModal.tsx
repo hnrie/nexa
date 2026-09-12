@@ -17,7 +17,7 @@ const AdminPage = lazy(() => import("./AdminPage"));
 
 const NAV: { head: string; items: { id: string; label: string }[] }[] = [
   { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "devices", label: "Devices" }] },
-  { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "voice", label: "Voice & Video" }, { id: "notifications", label: "Notifications" }, { id: "stickers", label: "Sticker Packs" }] },
+  { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "voice", label: "Voice & Video" }, { id: "notifications", label: "Notifications" }, { id: "stickers", label: "Expression Packs" }] },
 ];
 
 export default function SettingsModal({ onClose, page: initial, packId }: { onClose: () => void; page: string; packId?: string | undefined }) {

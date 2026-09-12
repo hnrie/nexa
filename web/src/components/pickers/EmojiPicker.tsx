@@ -1,9 +1,9 @@
 import { Activity, Cat, Clock, Flag, Leaf, Lightbulb, Pizza, Plane, Smile, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Emoji } from "@/api/types";
+import type { Emoji, Sticker } from "@/api/types";
 import { emojiUrl, iconUrl } from "@/api/users";
 import { initials } from "@/lib/avatarColor";
-import { emojiToken, searchCustomEmoji, useExpressions } from "@/stores/expressions";
+import { emojiToken, packEmoji, packImageUrl, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { GROUPS, TONES, allEmoji, emojiLoaded, loadEmoji, searchEmoji, withTone, type EmojiEntry } from "./emojiIndex";
@@ -43,6 +43,16 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
     return ids.map((id) => ({ id, name: servers[id]?.server.name ?? "Server", icon: servers[id]?.server.icon_id ?? null, items: customByServer[id]! }));
   }, [customByServer, servers, serverId]);
   const customResults = useMemo(() => (q.trim() ? searchCustomEmoji(customByServer, q, 40) : []), [customByServer, q]);
+  const packs = useExpressions((x) => x.packs);
+  const emojiPacks = useMemo(() => packEmoji(packs), [packs]);
+  const packResults = useMemo(() => (q.trim() ? searchPackEmoji(packs, q, 40) : []), [packs, q]);
+  const pickPack = (st: { id: string; name: string; blob_id: string; animated: boolean }) =>
+    onPick({ unicode: emojiToken({ name: st.name, blob_id: st.blob_id, animated: st.animated }), name: st.name });
+  const packCell = (st: Sticker) => (
+    <button key={st.id} className={s.cell} data-emoji={`:${st.name}:`} data-label={st.name} data-pack-emoji={st.id} title={`:${st.name}:`} onClick={() => pickPack(st)}>
+      <img className={s.cellImg} src={emojiUrl(st.blob_id, st.animated)} alt={`:${st.name}:`} loading="lazy" draggable={false} />
+    </button>
+  );
   const [toneOpen, setToneOpen] = useState(false);
   const tone = useSettings((st) => st.settings.skinTone);
   const recent = useSettings((st) => st.settings.recentEmoji);
@@ -111,6 +121,11 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
       <div className={s.body}>
         <div className={s.cats}>
           {recentEntries.length > 0 ? <button className={s.cat} title="Frequently used" onClick={() => jump(-1)}>{ICONS[-1]}</button> : null}
+          {emojiPacks.map(({ pack, items }) => (
+            <button key={pack.id} className={s.cat} title={pack.name} onClick={() => jumpCustom(pack.id)}>
+              {items[0] ? <img className={s.catImg} src={packImageUrl(pack, items[0])} alt="" /> : <span className={s.catInitial}>{initials(pack.name)}</span>}
+            </button>
+          ))}
           {customGroups.map((g) => (
             <button key={g.id} className={s.cat} title={g.name} onClick={() => jumpCustom(g.id)}>
               {iconUrl(g.icon) ? <img className={s.catImg} src={iconUrl(g.icon) ?? ""} alt="" /> : <span className={s.catInitial}>{initials(g.name)}</span>}
@@ -123,7 +138,11 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
         <div className={s.grid} ref={gridRef}>
           {!ready ? <div className={s.empty}>Loading emoji…</div> : null}
           {results ? (
-            results.length === 0 && customResults.length === 0 ? <div className={s.empty}>No emoji match.</div> : <div className={s.rows}>{[...customResults.map(customCell), ...results.map(cell)]}</div>
+            results.length === 0 && customResults.length === 0 && packResults.length === 0 ? (
+              <div className={s.empty}>No emoji match.</div>
+            ) : (
+              <div className={s.rows}>{[...customResults.map(customCell), ...packResults.map((r) => packCell(r.sticker)), ...results.map(cell)]}</div>
+            )
           ) : (
             <>
               {recentEntries.length > 0 ? (
@@ -136,6 +155,12 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
                 <div key={g.id} data-custom-group={g.id}>
                   <div className={s.section}>{g.name}</div>
                   <div className={s.rows}>{g.items.map(customCell)}</div>
+                </div>
+              ))}
+              {emojiPacks.map(({ pack, items }) => (
+                <div key={pack.id} data-custom-group={pack.id}>
+                  <div className={s.section}>{pack.name}</div>
+                  <div className={s.rows}>{items.map(packCell)}</div>
                 </div>
               ))}
               {groups.map((g) => (

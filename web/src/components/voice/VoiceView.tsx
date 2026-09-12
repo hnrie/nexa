@@ -1,4 +1,4 @@
-import { Headphones, HeadphoneOff, Maximize2, Mic, MicOff, Minimize2, MonitorUp, MonitorX, PhoneOff, PictureInPicture2, Video, VideoOff, Volume2, VolumeX } from "lucide-react";
+import { Expand, Headphones, HeadphoneOff, Maximize2, Mic, MicOff, Minimize2, MonitorUp, MonitorX, PhoneOff, PictureInPicture2, Video, VideoOff, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -55,7 +55,9 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   const openModal = useUI((u) => u.openModal);
   const [quality, setQuality] = useState<{ rtt: number; loss: number } | null>(null);
   const [full, setFull] = useState(false);
+  const [volumeFor, setVolumeFor] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const tileRefs = useRef(new Map<string, HTMLDivElement>());
   const connected = mine?.channel_id === channel.id;
   const participants = useMemo(() => participantsOf(byChannel, channel.id), [byChannel, channel.id]);
 
@@ -92,8 +94,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
         { id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: t.userId }) },
         { id: "focus", label: focused === t.key ? "Unfocus" : "Focus", onSelect: () => setFocused(focused === t.key ? null : t.key), separatorAfter: true },
         { id: "mute", label: localMutes[t.userId] ? "Unmute for me" : "Mute for me", onSelect: () => setUserLocalMute(t.userId, !localMutes[t.userId]) },
-        { id: "vol-", label: `Volume ${vol}% → lower`, onSelect: () => setUserVolume(t.userId, Math.max(0, vol - 25)) },
-        { id: "vol+", label: `Volume ${vol}% → higher (up to 200%)`, onSelect: () => setUserVolume(t.userId, Math.min(200, vol + 25)) },
+        { id: "vol", label: `Volume — ${vol}%`, onSelect: () => setVolumeFor(t.userId) },
         { id: "vol=", label: "Reset volume", onSelect: () => setUserVolume(t.userId, 100) },
       ],
     });
@@ -111,11 +112,16 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     }
   };
 
-  const toggleFull = () => {
-    const el = rootRef.current;
-    if (!el) return;
+  const toggleFull = (el?: HTMLElement | null) => {
+    const target = el ?? rootRef.current;
+    if (!target) return;
     if (document.fullscreenElement) void document.exitFullscreen();
-    else void el.requestFullscreen?.();
+    else void target.requestFullscreen?.();
+  };
+  /** Full-screens one stream, focusing it first so it fills the frame. */
+  const fullscreenTile = (key: string) => {
+    setFocused(key);
+    requestAnimationFrame(() => toggleFull(tileRefs.current.get(key) ?? rootRef.current));
   };
   useEffect(() => {
     const on = () => setFull(!!document.fullscreenElement);
@@ -129,7 +135,21 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     const color = serverState ? memberColor(serverState, t.userId) : undefined;
     const peerState = t.me ? "connected" : (peers[t.userId] ?? "new");
     return (
-      <div key={t.key} className={s.tile} data-kind={t.kind} data-speaking={isSpeaking} data-big={big} data-peer-state={peerState} data-user={t.userId} onContextMenu={(e) => tileMenu(e, t)} onClick={() => !big && t.kind !== "avatar" && setFocused(t.key)}>
+      <div
+        key={t.key}
+        ref={(el) => {
+          if (el) tileRefs.current.set(t.key, el);
+          else tileRefs.current.delete(t.key);
+        }}
+        className={s.tile}
+        data-kind={t.kind}
+        data-speaking={isSpeaking}
+        data-big={big}
+        data-peer-state={peerState}
+        data-user={t.userId}
+        onContextMenu={(e) => tileMenu(e, t)}
+        onClick={() => !big && t.kind !== "avatar" && setFocused(t.key)}
+      >
         {t.stream && t.kind !== "avatar" ? (
           <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video"} className={s.video} onDoubleClick={() => setFocused(focused === t.key ? null : t.key)} />
         ) : (
@@ -144,10 +164,36 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
           {localMutes[t.userId] ? <VolumeX size={14} className={s.tileIcon} /> : null}
           {!t.me && peerState !== "connected" && t.kind !== "screen" ? <span className={s.tileState}>{peerState === "failed" ? "reconnecting…" : "connecting…"}</span> : null}
         </div>
-        {t.kind === "screen" && t.stream ? (
+        {t.kind !== "avatar" && t.stream ? (
           <span className={s.tileBtns}>
+            <button className={s.tileBtn} aria-label="Full screen" title="Full screen" data-testid="tile-fullscreen" onClick={(e) => { e.stopPropagation(); fullscreenTile(t.key); }}><Expand size={16} /></button>
             <button className={s.tileBtn} aria-label="Picture in picture" title="Picture in picture" onClick={(e) => { e.stopPropagation(); void pip(t.stream!); }}><PictureInPicture2 size={16} /></button>
           </span>
+        ) : null}
+        {volumeFor === t.userId && !t.me ? (
+          <div className={s.volumePop} onClick={(e) => e.stopPropagation()}>
+            <Volume2 size={14} />
+            <input
+              className={s.volumeRange}
+              type="range"
+              min={0}
+              max={200}
+              step={1}
+              value={volumes[t.userId] ?? 100}
+              aria-label={`Volume for ${nameOf(t.userId)}`}
+              onChange={(e) => setUserVolume(t.userId, Number(e.target.value))}
+            />
+            <input
+              className={s.volumeNum}
+              type="number"
+              min={0}
+              max={200}
+              value={volumes[t.userId] ?? 100}
+              aria-label="Volume percent"
+              onChange={(e) => setUserVolume(t.userId, Math.max(0, Math.min(200, Number(e.target.value) || 0)))}
+            />
+            <button className={s.tileBtn} aria-label="Close volume" onClick={() => setVolumeFor(null)}>✕</button>
+          </div>
         ) : null}
       </div>
     );
@@ -197,7 +243,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
               <button className={s.ctl} data-on={!!localScreen} aria-label="Share screen" onClick={() => void toggleScreen()}>{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</button>
             </Tooltip>
             <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
-              <button className={s.ctl} aria-label="Full screen" onClick={toggleFull}>{full ? <Minimize2 size={22} /> : <Maximize2 size={22} />}</button>
+              <button className={s.ctl} aria-label="Full screen" onClick={() => toggleFull()}>{full ? <Minimize2 size={22} /> : <Maximize2 size={22} />}</button>
             </Tooltip>
             <Tooltip text="Disconnect" side="top">
               <button className={[s.ctl, s.leave].join(" ")} aria-label="Disconnect" onClick={() => void leaveVoice()} data-testid="voice-leave"><PhoneOff size={22} /></button>

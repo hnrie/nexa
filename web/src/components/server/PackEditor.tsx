@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type DragEvent } from "react";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { Sticker, StickerPack } from "@/api/types";
-import { stickerUrl } from "@/api/users";
+import { packImageUrl } from "@/stores/expressions";
 import { Button } from "@/components/common/Button";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
@@ -45,7 +45,7 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, onCreate, c
           const cover = packCover(p);
           return (
             <button key={p.id} className={s.packRow} data-selected={selected?.id === p.id} onClick={() => onSelect(p.id)} data-pack={p.id}>
-              <span className={s.cover}>{cover ? <img src={stickerUrl(cover.blob_id)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
+              <span className={s.cover}>{cover ? <img src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
               <span className={s.packText}>
                 <span className={s.packName}>{p.name}</span>
                 <span className={s.packSub}>{p.stickers.length} sticker{p.stickers.length === 1 ? "" : "s"}{p.public ? " · public" : ""}</span>
@@ -75,6 +75,9 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => pending.forEach((p) => URL.revokeObjectURL(p.preview)), [pending]);
   const dirty = name !== pack.name || description !== pack.description;
+  const isEmoji = (pack.kind ?? "sticker") === "emoji";
+  const noun = isEmoji ? "emoji" : "sticker";
+  const maxBytes = isEmoji ? 2 * 1024 * 1024 : MAX_STICKER;
 
   const save = async () => {
     setBusy(true);
@@ -98,14 +101,16 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     const list: typeof pending = [];
     for (const f of Array.from(files)) {
       if (!ACCEPT.split(",").includes(f.type)) {
-        toast(`${f.name}: stickers must be PNG, APNG, GIF or WebP.`, "error");
+        toast(`${f.name}: images must be PNG, APNG, GIF or WebP.`, "error");
         continue;
       }
-      if (f.size > MAX_STICKER) {
-        toast(`${f.name} is larger than 5 MB.`, "error");
+      if (f.size > maxBytes) {
+        toast(`${f.name} is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`, "error");
         continue;
       }
-      list.push({ file: f, name: f.name.replace(/\.[a-z0-9]+$/i, "").slice(0, 30) || "sticker", tags: "", preview: URL.createObjectURL(f) });
+      const base = f.name.replace(/\.[a-z0-9]+$/i, "");
+      const clean = isEmoji ? base.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) : base.slice(0, 30);
+      list.push({ file: f, name: clean || noun, tags: "", preview: URL.createObjectURL(f) });
     }
     setPending((cur) => [...cur, ...list]);
   };
@@ -117,7 +122,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       }
       upsertPack(await expressionsApi.pack(pack.id));
       setPending([]);
-      toast(pending.length === 1 ? "Sticker added." : `${pending.length} stickers added.`, "success");
+      toast(pending.length === 1 ? `${isEmoji ? "Emoji" : "Sticker"} added.` : `${pending.length} ${noun} added.`, "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Upload failed.", "error");
       upsertPack(await expressionsApi.pack(pack.id).catch(() => pack));
@@ -198,7 +203,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       <div className={s.head}>
         <div className={s.headText}>
           <h3 className={s.title}>{pack.name}</h3>
-          <span className={s.sub}>{pack.stickers.length} sticker{pack.stickers.length === 1 ? "" : "s"} · {pack.public ? "Public: anyone with the link can install it" : "Private: only you can see it"}{pack.server_id ? " · Server pack" : ""}</span>
+          <span className={s.sub}>{pack.stickers.length} {isEmoji ? "emoji" : `sticker${pack.stickers.length === 1 ? "" : "s"}`} · {pack.public ? "Public: anyone with the link can install it" : "Private: only you can see it"}{pack.server_id ? " · Server pack" : ""}</span>
         </div>
         <div className={s.actions}>
           {!manage ? <Button size="sm" variant={pack.installed ? "secondary" : "primary"} loading={busy} onClick={() => void toggleInstall()}>{pack.installed ? "Remove" : "Install"}</Button> : null}
@@ -234,18 +239,18 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDragLeave={() => setOver(false)}
             onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) stage(e.dataTransfer.files); }}
           >
-            <Upload size={20} /> Drop PNG, APNG, GIF or WebP files here or click to choose (5 MB each, no limit on how many).
+            <Upload size={20} /> Drop PNG, APNG, GIF or WebP files here or click to choose ({Math.round(maxBytes / (1024 * 1024))} MB each, no limit on how many).{isEmoji ? " Emoji names are letters, numbers and underscores." : ""}
             <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
           </div>
           {pending.map((p, i) => (
             <div key={p.preview} className={s.pending}>
               <img src={p.preview} alt="" />
               <TextInput value={p.name} maxLength={30} placeholder="Name" onChange={(e) => setPending((cur) => cur.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} data-testid="sticker-name" />
-              <TextInput value={p.tags} maxLength={200} placeholder="Tags (space separated)" onChange={(e) => setPending((cur) => cur.map((x, j) => (j === i ? { ...x, tags: e.target.value } : x)))} />
+              {isEmoji ? null : <TextInput value={p.tags} maxLength={200} placeholder="Tags (space separated)" onChange={(e) => setPending((cur) => cur.map((x, j) => (j === i ? { ...x, tags: e.target.value } : x)))} />}
               <Button size="sm" variant="ghost" onClick={() => setPending((cur) => cur.filter((_, j) => j !== i))}>Remove</Button>
             </div>
           ))}
-          {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">Upload {pending.length} sticker{pending.length === 1 ? "" : "s"}</Button></div> : null}
+          {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">Upload {pending.length} {isEmoji ? "emoji" : `sticker${pending.length === 1 ? "" : "s"}`}</Button></div> : null}
         </>
       ) : pack.description ? <p className={s.sub}>{pack.description}</p> : null}
       <div className={s.grid}>
@@ -263,7 +268,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDragEnd={() => { setDrag(null); setDrop(null); }}
           >
             {pack.cover_sticker_id === st.id ? <span className={s.coverBadge}>Cover</span> : null}
-            <img className={s.cellImg} src={stickerUrl(st.blob_id)} alt={st.name} loading="lazy" draggable={false} />
+            <img className={s.cellImg} src={packImageUrl(pack, st)} alt={st.name} loading="lazy" draggable={false} />
             <span className={s.cellName} title={st.name}>{st.name}</span>
             <span className={s.cellTags} title={st.tags}>{st.tags}</span>
             {manage ? (
@@ -276,7 +281,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
           </div>
         ))}
       </div>
-      {pack.stickers.length === 0 ? <div className={s.empty}>{manage ? "Add your first sticker above." : "This pack is empty."}</div> : null}
+      {pack.stickers.length === 0 ? <div className={s.empty}>{manage ? `Add your first ${noun} above.` : "This pack is empty."}</div> : null}
       {manage ? <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(pack.name); setDescription(pack.description); }} onSave={() => void save()} /> : null}
     </div>
   );

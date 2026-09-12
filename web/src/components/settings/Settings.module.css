@@ -36,6 +36,7 @@
 .preview { align-self: start; position: sticky; top: 60px; }
 .uploadRow { display: flex; align-items: center; gap: 12px; }
 .bannerPick { height: 100px; border-radius: var(--radius-sm); background: var(--brand); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 8px; }
+.themePreview { height: 56px; border-radius: var(--radius-sm); margin-top: 12px; }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .swatch { width: 40px; height: 40px; border-radius: var(--radius-xs); border: 2px solid transparent; position: relative; }
 .swatch[data-on="true"] { border-color: var(--text-strong); }

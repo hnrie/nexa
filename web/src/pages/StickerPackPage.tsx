@@ -3,12 +3,12 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { StickerPack } from "@/api/types";
-import { stickerUrl } from "@/api/users";
+
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { packCover } from "@/components/server/PackEditor";
 import { useAuth } from "@/stores/auth";
-import { useExpressions } from "@/stores/expressions";
+import { useExpressions, packImageUrl } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
 import s from "./InvitePage.module.css";
 import p from "@/components/server/PackEditor.module.css";
@@ -73,14 +73,14 @@ export default function StickerPackPage() {
         {pack ? (
           <>
             <p className={s.kicker}>Sticker pack</p>
-            <div className={s.iconBox}>{cover ? <img src={stickerUrl(cover.blob_id)} alt="" style={{ objectFit: "contain" }} /> : pack.name.slice(0, 1).toUpperCase()}</div>
+            <div className={s.iconBox}>{cover ? <img src={packImageUrl(pack, cover)} alt="" style={{ objectFit: "contain" }} /> : pack.name.slice(0, 1).toUpperCase()}</div>
             <h1 className={s.title}>{pack.name}</h1>
             {pack.description ? <p className={s.sub}>{pack.description}</p> : null}
             <p className={s.sub}>{pack.stickers.length} sticker{pack.stickers.length === 1 ? "" : "s"}{pack.public ? "" : " · private"}</p>
             <div className={p.grid} style={{ width: "100%" }}>
               {pack.stickers.map((st) => (
                 <div key={st.id} className={p.cell} style={{ cursor: "default" }}>
-                  <img className={p.cellImg} src={stickerUrl(st.blob_id)} alt={st.name} loading="lazy" />
+                  <img className={p.cellImg} src={packImageUrl(pack, st)} alt={st.name} loading="lazy" />
                   <span className={p.cellName}>{st.name}</span>
                 </div>
               ))}

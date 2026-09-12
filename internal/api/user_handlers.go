@@ -155,6 +155,20 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 			p.AccentColor = &np
 		}
 	}
+	if v, ok := raw["accent_color_2"]; ok {
+		if string(v) == "null" {
+			var nilP *int
+			p.AccentColor2 = &nilP
+		} else {
+			var n int
+			if err := json.Unmarshal(v, &n); err != nil || n < 0 || n > 0xFFFFFF {
+				bad("invalid_color", "accent_color_2 must be 0–16777215 or null.")
+				return
+			}
+			np := &n
+			p.AccentColor2 = &np
+		}
+	}
 	if v, present, null := getString("presence_pref"); present {
 		if null || !OneOf(v, "online", "idle", "dnd", "invisible") {
 			bad("invalid_presence", "presence_pref must be online, idle, dnd or invisible.")
