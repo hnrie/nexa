@@ -125,6 +125,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const placeholder = channel.type === "dm" ? `Message @${name}` : isServer ? `Message #${name}` : `Message ${name}`;
 
   useEffect(() => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = null;
     setText(useSettings.getState().settings.drafts[channel.id] ?? "");
     setFiles([]);
     setAc(null);
@@ -246,6 +248,8 @@ export function Composer({ channel }: { channel: Channel }) {
         opts.attachments = uploaded;
       }
       setText("");
+      if (draftTimer.current) clearTimeout(draftTimer.current); // a pending save must not resurrect the sent text
+      draftTimer.current = null;
       setDraft(channel.id, "");
       setReplyTo(null);
       for (const f of files) if (f.preview) URL.revokeObjectURL(f.preview);

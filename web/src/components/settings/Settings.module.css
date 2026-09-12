@@ -64,14 +64,16 @@
 .dangerBox { padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(218, 62, 68, 0.5); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 @media (max-width: 767px) {
   .layer { flex-direction: column; }
-  .navWrap { flex: none; overflow-x: auto; justify-content: flex-start; }
-  .nav { flex-direction: row; width: max-content; padding: 12px 8px; gap: 4px; }
+  .navWrap { flex: none; overflow-x: auto; justify-content: flex-start; background: var(--bg-base); border-bottom: 1px solid var(--border-subtle); padding-right: 48px; }
+  .nav { flex-direction: row; width: max-content; padding: 10px 8px; gap: 4px; }
   .nav > div { display: contents; }
   .navHead, .navSep { display: none; }
   .navItem { height: 36px; white-space: nowrap; }
   .contentWrap { flex: 1; }
   .content { padding: 16px 16px 80px; }
-  .closeCol { position: fixed; top: 8px; right: 8px; padding: 0; z-index: 2; }
+  .closeCol { position: fixed; top: 8px; right: 8px; padding: 0; z-index: 3; }
+  .closeCol .close { width: 32px; height: 32px; background: var(--bg-surface); }
+  .esc { display: none; }
   .twoCol { grid-template-columns: 1fr; }
   .preview { position: static; }
 }

@@ -19,7 +19,7 @@ import s from "./Search.module.css";
  * encrypted, so the server cannot do this for us; "Load older" pulls more
  * history into the index.
  */
-export function SearchPanel({ channel, query, onClose }: { channel: Channel; query: string; onClose: () => void }) {
+export function SearchPanel({ channel, query, onClose, onQuery }: { channel: Channel; query: string; onClose: () => void; onQuery?: ((v: string) => void) | undefined }) {
   const nav = useNavigate();
   const users = useUsers((u) => u.byId);
   const channels = useChannels((c) => c.byId);
@@ -83,6 +83,12 @@ export function SearchPanel({ channel, query, onClose }: { channel: Channel; que
         <span className={s.headText}><Search size={16} /> {isEmptyQuery(q) ? "Search" : `${results.length} result${results.length === 1 ? "" : "s"}`}</span>
         <button className={s.close} aria-label="Close search" onClick={onClose}><X size={18} /></button>
       </div>
+      {onQuery ? (
+        <div className={s.inlineSearch}>
+          <Search size={16} />
+          <input value={query} placeholder="Search" aria-label="Search messages" autoFocus data-testid="search-input-mobile" onChange={(e) => onQuery(e.target.value)} />
+        </div>
+      ) : null}
       {isEmptyQuery(q) ? (
         <div className={s.help}>
           <p>Search the messages this device has decrypted{channel.server_id ? " in this server" : " in this conversation"}. Nothing leaves your device: the server only holds ciphertext.</p>

@@ -436,6 +436,7 @@ def main():
     ap.add_argument("--out", default=str(ROOT / "tools/out"))
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--headed", action="store_true")
+    ap.add_argument("--serve", action="store_true", help="keep the server running afterwards and print its URL")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -527,6 +528,14 @@ def main():
             pass
         raise
     finally:
+        if args.serve and ok:
+            print("SERVING", srv.base, "data:", srv.dir)
+            print("(ctrl-c to stop)")
+            try:
+                while True:
+                    time.sleep(3600)
+            except KeyboardInterrupt:
+                pass
         srv.stop()
     if args.keep:
         print("kept data dir:", srv.dir)

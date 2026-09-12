@@ -3,6 +3,8 @@
 .headText { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .close { display: flex; padding: 4px; border-radius: var(--radius-xs); color: var(--text-muted); }
 .close:hover { color: var(--text); background: var(--bg-hover); }
+.inlineSearch { display: flex; align-items: center; gap: 6px; margin: 8px 12px; padding: 0 8px; height: 32px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); }
+.inlineSearch input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
 .help { padding: 16px; font-size: 14px; color: var(--text-muted); line-height: 1.4; }
 .help p { margin: 0 0 12px; }
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }

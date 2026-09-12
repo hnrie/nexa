@@ -11,6 +11,7 @@ import { customStatus, statusOf, usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useMemo } from "react";
 import { useServers } from "@/stores/servers";
 import { isPrivateChannel } from "@/lib/perms";
@@ -36,6 +37,7 @@ export function ChatView({ channel }: { channel: Channel }) {
   const [pins, setPins] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const mobile = useIsMobile();
   const serverId = channel.server_id;
   const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
   const rels = useRelationships((r) => r.byUser);
@@ -76,18 +78,24 @@ export function ChatView({ channel }: { channel: Channel }) {
             </Tooltip>
           </>
         ) : null}
-        <label className={sc.searchBox} title="Search this device's decrypted messages">
-          <Search size={16} />
-          <input
-            value={searchQuery}
-            placeholder="Search"
-            aria-label="Search messages"
-            data-testid="search-input"
-            onFocus={() => setSearchOpen(true)}
-            onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-            onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); e.currentTarget.blur(); } }}
-          />
-        </label>
+        {mobile ? (
+          <Tooltip text="Search" side="bottom">
+            <button className={s.hBtn} data-on={searchOpen} aria-label="Search messages" onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
+          </Tooltip>
+        ) : (
+          <label className={sc.searchBox} title="Search this device's decrypted messages">
+            <Search size={16} />
+            <input
+              value={searchQuery}
+              placeholder="Search"
+              aria-label="Search messages"
+              data-testid="search-input"
+              onFocus={() => setSearchOpen(true)}
+              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+              onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); e.currentTarget.blur(); } }}
+            />
+          </label>
+        )}
         <Tooltip text="Pinned Messages" side="bottom">
           <button className={s.hBtn} data-on={pins} aria-label="Pinned Messages" onClick={() => setPins((v) => !v)}><Pin size={22} /></button>
         </Tooltip>
@@ -111,7 +119,7 @@ export function ChatView({ channel }: { channel: Channel }) {
       <div className={s.body}>
         <MessageList channel={channel} />
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
-        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && membersOpen && serverId ? <MemberList serverId={serverId} channelId={channel.id} /> : null}
         {channel.type === "group_dm" && membersOpen ? (
           <aside className={s.members}>
