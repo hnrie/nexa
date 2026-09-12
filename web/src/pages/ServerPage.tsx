@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { servers as serversApi } from "@/api/servers";
 import { ChatView } from "@/components/chat/ChatView";
-import { Button } from "@/components/common/Button";
+import { VoiceView } from "@/components/voice/VoiceView";
 import { FullScreenSpinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { channelTree, useChannels } from "@/stores/channels";
@@ -89,7 +89,7 @@ export default function ServerPage() {
     if (!channelId) return <NoChannels />;
   }
   if (!channel || channel.server_id !== serverId) return <NoChannels />;
-  if (channel.type === "voice") return <VoiceLobby name={channel.name} />;
+  if (channel.type === "voice") return <VoiceRoom channel={channel} />;
   if (channel.type === "category") return <Navigate to={`/channels/${serverId}`} replace />;
   return <ChatView channel={channel} />;
 }
@@ -106,17 +106,11 @@ function NoChannels() {
   );
 }
 
-function VoiceLobby({ name }: { name: string }) {
-  const toast = useUI((u) => u.toast);
+function VoiceRoom({ channel }: { channel: import("@/api/types").Channel }) {
   return (
     <div className={s.empty}>
-      <header className={s.header}><PageHeaderButtons /><Volume2 size={22} className={s.hIcon} /><span className={s.hName}>{name}</span></header>
-      <div className={s.emptyBody}>
-        <Volume2 size={48} />
-        <h2>{name}</h2>
-        <p>No one is currently in voice.</p>
-        <Button onClick={() => toast("Voice channels arrive in the next update.", "info")}>Join Voice</Button>
-      </div>
+      <header className={s.header}><PageHeaderButtons /><Volume2 size={22} className={s.hIcon} /><span className={s.hName}>{channel.name}</span></header>
+      <VoiceView channel={channel} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { AtSign, Hash, Lock, Pin, UserPlus, Users } from "lucide-react";
+import { AtSign, Hash, Lock, Phone, Pin, UserPlus, Users, Video } from "lucide-react";
 import { useState } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
@@ -13,6 +13,10 @@ import { useUsers, displayName } from "@/stores/users";
 import { useServers } from "@/stores/servers";
 import { isPrivateChannel } from "@/lib/perms";
 import { MemberList } from "./MemberList";
+import { CallBanner } from "@/components/voice/CallBanner";
+import { VoiceView } from "@/components/voice/VoiceView";
+import { useVoice } from "@/stores/voice";
+import { joinVoice, toggleCamera } from "@/voice/session";
 import { MessageList } from "./MessageList";
 import { PinsPanel } from "./PinsPanel";
 import { TypingBar } from "./TypingBar";
@@ -30,6 +34,11 @@ export function ChatView({ channel }: { channel: Channel }) {
   const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
   const name = channelDisplayName(channel, users, me?.id);
   const isServer = !!serverId && !!serverState;
+  const inThisCall = useVoice((v) => v.mine?.channel_id === channel.id);
+  const startCall = async (video: boolean) => {
+    await joinVoice(channel.id);
+    if (video) await toggleCamera();
+  };
   const priv = isServer && isPrivateChannel(serverId, channel.overwrites);
   const other = channel.type === "dm" ? channel.recipient_ids.find((id) => id !== me?.id) : undefined;
   const otherStatus = other ? statusOf(presence[other]) : "offline";
@@ -49,6 +58,16 @@ export function ChatView({ channel }: { channel: Channel }) {
           <span className={s.hSub}>{channel.recipient_ids.length} members</span>
         )}
         <span className={s.hSpacer} />
+        {!isServer ? (
+          <>
+            <Tooltip text="Start Voice Call" side="bottom">
+              <button className={s.hBtn} aria-label="Start Voice Call" onClick={() => void startCall(false)} data-testid="start-call"><Phone size={22} /></button>
+            </Tooltip>
+            <Tooltip text="Start Video Call" side="bottom">
+              <button className={s.hBtn} aria-label="Start Video Call" onClick={() => void startCall(true)}><Video size={22} /></button>
+            </Tooltip>
+          </>
+        ) : null}
         <Tooltip text="Pinned Messages" side="bottom">
           <button className={s.hBtn} data-on={pins} aria-label="Pinned Messages" onClick={() => setPins((v) => !v)}><Pin size={22} /></button>
         </Tooltip>
@@ -67,6 +86,8 @@ export function ChatView({ channel }: { channel: Channel }) {
           </Tooltip>
         ) : null}
       </header>
+      {!isServer ? <CallBanner channelId={channel.id} /> : null}
+      {!isServer && inThisCall ? <VoiceView channel={channel} embedded /> : null}
       <div className={s.body}>
         <MessageList channel={channel} />
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}

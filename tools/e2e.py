@@ -69,7 +69,7 @@ class Session:
     def __init__(self, browser, base, name, out, viewport=(1366, 768)):
         self.base, self.name, self.out = base, name, out
         w, h = viewport
-        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768)
+        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"])
         self.page = self.ctx.new_page()
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(f"{name}: {e}"))
@@ -330,6 +330,48 @@ def expressions_flow(srv, alice, bob, server_id, link):
     a.keyboard.press("Escape")
 
 
+def voice_flow(srv, alice, bob, server_id):
+    a, b = alice.page, bob.page
+    alice_id = a.evaluate("() => JSON.parse(localStorage.getItem('ec:me') || 'null')")  # may be null; not needed
+    _ = alice_id
+    # both join the server's voice channel from the sidebar
+    for sess in (alice, bob):
+        sess.page.goto(srv.base + "/channels/" + server_id, wait_until="networkidle")
+        sess.page.locator("[data-channel]:has(span:text-is('General')) button").first.click()
+        sess.page.wait_for_selector("[data-testid=voice-status]", timeout=20000)
+    a.wait_for_selector("[data-testid=voice-participants] [data-user]", timeout=20000)
+    for sess in (alice, bob):
+        sess.page.wait_for_function("() => document.querySelectorAll('[data-testid=voice-participants] [data-user]').length === 2", timeout=20000)
+    # peers connect directly (fake devices, loopback ICE)
+    for sess in (alice, bob):
+        sess.page.wait_for_selector("[data-peer-state=connected][data-user]", timeout=40000)
+    assert a.locator("[data-peer-state=connected]").count() == 2, "both tiles connected on alice's side"
+    alice.shot("voice-room")
+    # mute shows up on the other side
+    a.click("[data-testid=voice-mute]")
+    b.wait_for_selector("[data-testid=voice-participants] [data-user] svg.lucide-mic-off", timeout=15000)
+    a.click("[data-testid=voice-mute]")
+    # alice leaves: bob's list shrinks to one
+    a.click("[data-testid=voice-leave]")
+    b.wait_for_function("() => document.querySelectorAll('[data-testid=voice-participants] [data-user]').length === 1", timeout=20000)
+    b.click("[data-testid=voice-status-leave]")
+    a.wait_for_function("() => !document.querySelector('[data-testid=voice-status]')", timeout=20000)
+    # DM call: alice rings bob, bob accepts, both connect
+    alice.open_dm_from_sidebar("Bob")
+    a.click("[data-testid=start-call]")
+    a.wait_for_selector("[data-testid=voice-status]", timeout=20000)
+    b.wait_for_selector("[data-testid=incoming-call]", timeout=20000)
+    bob.shot("incoming-call")
+    b.click("[data-testid=accept-call]")
+    b.wait_for_selector("[data-testid=voice-status]", timeout=20000)
+    for sess in (alice, bob):
+        sess.page.wait_for_selector("[data-peer-state=connected][data-user]", timeout=40000)
+    alice.shot("dm-call")
+    b.click("[data-testid=voice-status-leave]")
+    a.click("[data-testid=voice-status-leave]")
+    a.wait_for_function("() => !document.querySelector('[data-testid=voice-status]')", timeout=20000)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "tools/out"))
@@ -342,7 +384,7 @@ def main():
     ok = False
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=not args.headed)
+            browser = p.chromium.launch(headless=not args.headed, args=["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"])
             alice = Session(browser, srv.base, "alice", out)
             bob = Session(browser, srv.base, "bob", out)
             phone = Session(browser, srv.base, "carol", out, viewport=(390, 844))
@@ -410,6 +452,8 @@ def main():
             server_id, link = server_flow(srv, alice, bob, phone)
             print("expressions")
             expressions_flow(srv, alice, bob, server_id, link)
+            print("voice")
+            voice_flow(srv, alice, bob, server_id)
             errors = alice.errors + bob.errors + phone.errors
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))

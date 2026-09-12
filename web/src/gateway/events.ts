@@ -16,6 +16,7 @@ import type {
   ServerView,
   Snowflake,
   StickerPack,
+  VoiceState,
 } from "@/api/types";
 
 export type GatewayEvent =
@@ -42,7 +43,11 @@ export type GatewayEvent =
   | { t: "relationship_add"; d: Relationship }
   | { t: "relationship_remove"; d: { user_id: Snowflake } }
   | { t: "read_state"; d: ReadState }
-  | { t: "voice_state" | "voice_signal" | "call_ring" | "call_end"; d: unknown }
+  | { t: "voice_state"; d: VoiceState }
+  | { t: "voice_signal"; d: { from: Snowflake; channel_id: Snowflake; payload: unknown } }
+  | { t: "voice_error"; d: { code: string; message: string } }
+  | { t: "call_ring"; d: { channel_id: Snowflake; from: Snowflake } }
+  | { t: "call_end"; d: { channel_id: Snowflake; user_id?: Snowflake; reason: "declined" | "ended" } }
   | { t: "key_grant"; d: KeyGrant }
   | { t: "keys_needed"; d: KeyNeed }
   | { t: "key_rotation_needed"; d: { conv_id: Snowflake } }

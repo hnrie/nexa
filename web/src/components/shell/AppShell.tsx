@@ -7,6 +7,7 @@ import { ModalHost } from "@/components/modals/ModalHost";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useUI } from "@/stores/ui";
+import { installVoice } from "@/voice/session";
 import s from "./AppShell.module.css";
 
 /** Three-pane desktop layout; on phones the rail+sidebar live in a left drawer. */
@@ -31,6 +32,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       setParams(params, { replace: true });
     }
   }, [params, setParams, openModal]);
+
+  useEffect(() => {
+    installVoice();
+  }, []);
 
   useEffect(() => {
     setLeftOpen(false);

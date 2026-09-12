@@ -13,4 +13,5 @@ export type { GrantUpload } from "./keys";
 export { unfurl } from "./unfurl";
 export { servers } from "./servers";
 export { expressions } from "./expressions";
+export { voice } from "./voice";
 export type { ServerPatch, ChannelPatch, ChannelPositionPatch, RoleBody, MemberPatch } from "./servers";

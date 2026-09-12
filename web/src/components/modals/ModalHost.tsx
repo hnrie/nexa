@@ -12,6 +12,7 @@ import { CreateCategoryModal } from "./CreateCategoryModal";
 import { ServerNotificationsModal } from "./ServerNotificationsModal";
 import { ServerProfileModal } from "./ServerProfileModal";
 import { ChannelTopicModal } from "./ChannelTopicModal";
+import { IncomingCallHost } from "@/components/voice/IncomingCall";
 
 const SettingsModal = lazy(() => import("@/components/settings/SettingsModal"));
 const ProfileModal = lazy(() => import("@/components/profile/ProfileModal"));
@@ -25,6 +26,7 @@ export function ModalHost() {
   return (
     <>
       <QuickSwitcher />
+      <IncomingCallHost />
       {modals.map((m) => (
         <ModalEntry key={m.id} modal={m} />
       ))}

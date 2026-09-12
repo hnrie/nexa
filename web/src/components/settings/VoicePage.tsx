@@ -1,0 +1,163 @@
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/common/Button";
+import { Select } from "@/components/common/Select";
+import { Field } from "@/components/common/TextInput";
+import { Toggle } from "@/components/common/Toggle";
+import { useSettings, type VoiceSettings } from "@/stores/settings";
+import { useVoice } from "@/stores/voice";
+import { LevelMeter, audioContext, getMic, listDevices, sensitivityToThreshold, type Devices } from "@/voice/media";
+import { inVoice } from "@/voice/session";
+import st from "./Settings.module.css";
+import v from "@/components/voice/Voice.module.css";
+
+const QUALITIES: { v: VoiceSettings["streamQuality"]; label: string }[] = [
+  { v: "720p30", label: "720p · 30 fps (light)" },
+  { v: "1080p30", label: "1080p · 30 fps" },
+  { v: "1080p60", label: "1080p · 60 fps" },
+  { v: "source", label: "Source resolution · 60 fps" },
+];
+
+/** User settings → Voice & Video. */
+export default function VoicePage() {
+  const settings = useSettings((s) => s.settings.voice);
+  const patch = useSettings((s) => s.patch);
+  const liveLevel = useVoice((x) => x.level);
+  const [devices, setDevices] = useState<Devices | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testLevel, setTestLevel] = useState(0);
+  const [capturing, setCapturing] = useState(false);
+  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval> } | null>(null);
+  const set = (partial: Partial<VoiceSettings>) => patch({ voice: { ...settings, ...partial } });
+
+  useEffect(() => {
+    listDevices().then(setDevices).catch(() => setDevices({ inputs: [], outputs: [], cameras: [] }));
+    const on = () => listDevices().then(setDevices).catch(() => {});
+    navigator.mediaDevices?.addEventListener?.("devicechange", on);
+    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", on);
+  }, []);
+
+  const stopTest = () => {
+    const t = testRef.current;
+    if (!t) return;
+    clearInterval(t.timer);
+    t.meter.close();
+    t.stream.getTracks().forEach((x) => x.stop());
+    testRef.current = null;
+    setTesting(false);
+    setTestLevel(0);
+  };
+  useEffect(() => stopTest, []);
+  const startTest = async () => {
+    try {
+      const stream = await getMic(settings);
+      const meter = new LevelMeter(audioContext(), stream);
+      const timer = setInterval(() => setTestLevel(meter.level()), 60);
+      testRef.current = { stream, meter, timer };
+      setTesting(true);
+      // permission granted: device labels are now readable
+      listDevices().then(setDevices).catch(() => {});
+    } catch {
+      /* denied */
+    }
+  };
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setCapturing(false);
+        return;
+      }
+      set({ pttKey: e.key.length === 1 ? e.key : e.code });
+      setCapturing(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturing]);
+
+  const level = testing ? testLevel : inVoice() ? liveLevel : 0;
+  const threshold = settings.autoSensitivity ? null : sensitivityToThreshold(settings.sensitivity);
+  const label = (d: MediaDeviceInfo, i: number, kind: string) => d.label || `${kind} ${i + 1}`;
+  return (
+    <>
+      <h2 className={st.title}>Voice & Video</h2>
+      <div className={st.form}>
+        <div className={st.twoCol} style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <Field label="Input device">
+            <Select value={settings.inputDeviceId ?? ""} onChange={(e) => set({ inputDeviceId: e.target.value || null })}>
+              <option value="">Default</option>
+              {devices?.inputs.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Microphone")}</option>)}
+            </Select>
+          </Field>
+          <Field label="Output device">
+            <Select value={settings.outputDeviceId ?? ""} onChange={(e) => set({ outputDeviceId: e.target.value || null })}>
+              <option value="">Default</option>
+              {devices?.outputs.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Speaker")}</option>)}
+            </Select>
+          </Field>
+        </div>
+        <div className={st.twoCol} style={{ gridTemplateColumns: "1fr 1fr" }}>
+          <Field label={`Input volume — ${settings.inputVolume}%`}>
+            <input type="range" className={st.slider} min={0} max={200} value={settings.inputVolume} onChange={(e) => set({ inputVolume: Number(e.target.value) })} />
+          </Field>
+          <Field label={`Output volume — ${settings.outputVolume}%`}>
+            <input type="range" className={st.slider} min={0} max={200} value={settings.outputVolume} onChange={(e) => set({ outputVolume: Number(e.target.value) })} />
+          </Field>
+        </div>
+        <Field label="Mic test" hint="Speak and watch the meter. The yellow mark is your voice-activity threshold.">
+          <div>
+            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())}>{testing ? "Stop test" : "Let's check"}</Button>
+            <div className={v.meter} aria-label="Input level">
+              <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
+              {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}
+            </div>
+          </div>
+        </Field>
+        <h5 className={st.h5}>Input mode</h5>
+        <label className={st.radio} data-on={settings.mode === "vad"}>
+          <input type="radio" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
+          <span className={st.radioText}><span className={st.radioLabel}>Voice Activity</span><span className={st.radioDesc}>Transmit whenever you talk.</span></span>
+        </label>
+        <label className={st.radio} data-on={settings.mode === "ptt"}>
+          <input type="radio" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
+          <span className={st.radioText}><span className={st.radioLabel}>Push to Talk</span><span className={st.radioDesc}>Transmit only while you hold a key.</span></span>
+        </label>
+        {settings.mode === "ptt" ? (
+          <Field label="Push-to-talk key" hint="Click the box, then press the key you want. Works while this tab is focused.">
+            <button type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing(true)}>
+              <span>{capturing ? "Press a key…" : settings.pttKey}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? "Esc to cancel" : "Change"}</span>
+            </button>
+          </Field>
+        ) : (
+          <>
+            <Toggle checked={settings.autoSensitivity} onChange={(on) => set({ autoSensitivity: on })} label="Automatically determine input sensitivity" description="Learns your background noise and only counts speech above it." />
+            {!settings.autoSensitivity ? (
+              <Field label={`Input sensitivity — ${settings.sensitivity} dB`}>
+                <input type="range" className={st.slider} min={-100} max={0} value={settings.sensitivity} onChange={(e) => set({ sensitivity: Number(e.target.value) })} />
+              </Field>
+            ) : null}
+          </>
+        )}
+        <h5 className={st.h5}>Voice processing</h5>
+        <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label="Noise suppression" description="Filters keyboard clatter and fans with the browser's built-in suppressor." />
+        <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label="Echo cancellation" />
+        <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label="Automatic gain control" />
+        <h5 className={st.h5}>Screen share</h5>
+        <Field label="Stream quality" hint="Everyone gets the same options here: 1080p at 60 fps and source resolution are free.">
+          <Select value={settings.streamQuality} onChange={(e) => set({ streamQuality: e.target.value as VoiceSettings["streamQuality"] })}>
+            {QUALITIES.map((q) => <option key={q.v} value={q.v}>{q.label}</option>)}
+          </Select>
+        </Field>
+        <Field label="Camera">
+          <Select value="" onChange={() => {}} disabled>
+            <option value="">{devices?.cameras.length ? `${devices.cameras.length} camera${devices.cameras.length === 1 ? "" : "s"} available (the browser picks the default)` : "No camera found"}</option>
+          </Select>
+        </Field>
+      </div>
+    </>
+  );
+}

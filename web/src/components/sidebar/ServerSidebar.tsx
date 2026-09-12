@@ -5,6 +5,10 @@ import type { Channel } from "@/api/types";
 import { ApiError } from "@/api/client";
 import { servers as serversApi, type ChannelPositionPatch } from "@/api/servers";
 import { UserPanel } from "@/components/shell/UserPanel";
+import { VoiceParticipants } from "@/components/voice/VoiceParticipants";
+import { VoiceStatus } from "@/components/voice/VoiceStatus";
+import { joinVoice } from "@/voice/session";
+import { useVoice } from "@/stores/voice";
 import { Tooltip } from "@/components/common/Tooltip";
 import { P, isPrivateChannel } from "@/lib/perms";
 import { isMuted } from "@/lib/unread";
@@ -35,6 +39,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [drop, setDrop] = useState<Drop | null>(null);
+  const voiceByChannel = useVoice((v) => v.byChannel);
   const headRef = useRef<HTMLButtonElement>(null);
   const active = loc.pathname.match(/^\/channels\/\d+\/(\d+)/)?.[1];
   const tree = useMemo(() => channelTree(channels, serverId), [channels, serverId]);
@@ -152,8 +157,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     const priv = isPrivateChannel(serverId, ch.overwrites);
     const muted = settings.notifications.muted.includes(ch.id);
     return (
+      <div key={ch.id}>
       <div
-        key={ch.id}
         className={s.row}
         data-selected={selected}
         data-unread={unread && !selected}
@@ -168,9 +173,17 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         onDragEnd={endDrag}
         onContextMenu={(e) => onChannelContext(e, ch.id)}
       >
-        <button className={s.channel} onClick={() => nav(`/channels/${serverId}/${ch.id}`)} aria-current={selected ? "page" : undefined}>
+        <button
+          className={s.channel}
+          onClick={() => {
+            nav(`/channels/${serverId}/${ch.id}`);
+            if (ch.type === "voice") void joinVoice(ch.id);
+          }}
+          aria-current={selected ? "page" : undefined}
+        >
           <span className={s.icon}>{ch.type === "voice" ? <Volume2 size={20} /> : priv ? <span className={s.lockHash}><Hash size={20} /><Lock size={10} className={s.lock} /></span> : <Hash size={20} />}</span>
           <span className={s.name}>{ch.name}</span>
+          {ch.type === "voice" && ch.user_limit > 0 ? <span className={s.limit}>{Object.keys(voiceByChannel[ch.id] ?? {}).length}/{ch.user_limit}</span> : null}
         </button>
         <span className={s.actions}>
           {canI(st, P.CREATE_INSTANT_INVITE, ch.id) ? (
@@ -185,6 +198,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           ) : null}
         </span>
         {mentions > 0 ? <span className={s.mention}>{mentions > 99 ? "99+" : mentions}</span> : null}
+      </div>
+      {ch.type === "voice" ? <VoiceParticipants channelId={ch.id} serverId={serverId} /> : null}
       </div>
     );
   };
@@ -228,6 +243,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         })}
         {tree.loose.length === 0 && tree.categories.length === 0 ? <div className={s.empty}>No channels you can see yet.</div> : null}
       </div>
+      <VoiceStatus />
       <UserPanel />
     </div>
   );

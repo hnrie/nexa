@@ -2,6 +2,7 @@ import { Plus, Users } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { UserPanel } from "@/components/shell/UserPanel";
+import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { channelDisplayName } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, useChannels } from "@/stores/channels";
@@ -72,6 +73,7 @@ export function DMSidebar() {
           );
         })}
       </div>
+      <VoiceStatus />
       <UserPanel />
     </div>
   );

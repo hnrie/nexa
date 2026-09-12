@@ -220,6 +220,27 @@ export interface GifPage {
   next: string;
 }
 
+export interface VoiceState {
+  user_id: Snowflake;
+  /** Null when the user left; old_channel_id then says where from. */
+  channel_id: Snowflake | null;
+  old_channel_id?: Snowflake;
+  session_id: Snowflake;
+  self_mute: boolean;
+  self_deaf: boolean;
+  video: boolean;
+  streaming: boolean;
+  server_mute: boolean;
+  server_deaf: boolean;
+  joined_at: number;
+}
+
+export interface IceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
 export interface ServerKeyInfo {
   conv_id: Snowflake;
   name: string;
@@ -345,7 +366,7 @@ export interface ReadyPayload {
   servers: ServerView[];
   emojis: Emoji[];
   sticker_packs: StickerPack[];
-  voice_states: unknown[];
+  voice_states: VoiceState[];
 }
 
 export interface UnfurlResult {

@@ -1,4 +1,4 @@
-import { ArrowRightToLine, ArrowLeftFromLine, Pin } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, Phone, Pin } from "lucide-react";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
@@ -33,6 +33,10 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
       break;
     case "system_join":
       body = <>{A} joined.</>;
+      break;
+    case "system_call":
+      icon = <Phone size={18} />;
+      body = <>{A} started a call.</>;
       break;
     default:
       body = <>{A} did something.</>;

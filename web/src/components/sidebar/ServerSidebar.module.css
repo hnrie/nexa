@@ -36,3 +36,4 @@
 .mention { min-width: 16px; height: 16px; padding: 0 4px; margin-left: 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; flex: none; }
 .row:hover .mention { display: none; }
 .empty { padding: 24px 8px; color: var(--text-muted); font-size: 14px; text-align: center; }
+.limit { margin-left: auto; font-size: 12px; color: var(--text-muted); }
