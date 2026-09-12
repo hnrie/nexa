@@ -1,0 +1,213 @@
+package store
+
+import (
+	"context"
+
+	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/perms"
+)
+
+func toPermRoles(roles []*Role) []perms.Role {
+	out := make([]perms.Role, len(roles))
+	for i, r := range roles {
+		out[i] = perms.Role{ID: r.ID, Position: r.Position, Permissions: r.Permissions}
+	}
+	return out
+}
+
+func toPermOverwrites(list []Overwrite) []perms.Overwrite {
+	out := make([]perms.Overwrite, len(list))
+	for i, ow := range list {
+		out[i] = perms.Overwrite{TargetID: ow.TargetID, Kind: ow.TargetType, Allow: ow.Allow, Deny: ow.Deny}
+	}
+	return out
+}
+
+func toPermMember(m *Member, now int64) perms.Member {
+	return perms.Member{UserID: m.UserID, RoleIDs: m.RoleIDs, TimedOut: m.TimeoutUntil != nil && *m.TimeoutUntil > now}
+}
+
+// ServerPerms resolves a user's server-level permissions (0 for non-members).
+func (s *Store) ServerPerms(ctx context.Context, serverID, uid ids.ID) (perms.Perm, error) {
+	srv, err := s.ServerByID(ctx, serverID)
+	if err != nil {
+		return 0, err
+	}
+	m, err := s.Member(ctx, serverID, uid)
+	if err != nil {
+		if err == ErrNotFound {
+			return 0, nil
+		}
+		return 0, err
+	}
+	roles, err := s.Roles(ctx, serverID)
+	if err != nil {
+		return 0, err
+	}
+	return perms.Base(serverID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid), nil
+}
+
+// ChannelPerms resolves a user's permissions in a channel. DM participants get
+// every text permission; non-participants and non-members get 0.
+func (s *Store) ChannelPerms(ctx context.Context, channelID, uid ids.ID) (perms.Perm, *Channel, error) {
+	ch, err := s.ChannelByID(ctx, channelID)
+	if err != nil {
+		return 0, nil, err
+	}
+	if ch.ServerID == nil {
+		for _, id := range ch.Recipients {
+			if id == uid {
+				return perms.All, ch, nil
+			}
+		}
+		return 0, ch, nil
+	}
+	srv, err := s.ServerByID(ctx, *ch.ServerID)
+	if err != nil {
+		return 0, ch, err
+	}
+	m, err := s.Member(ctx, *ch.ServerID, uid)
+	if err != nil {
+		if err == ErrNotFound {
+			return 0, ch, nil
+		}
+		return 0, ch, err
+	}
+	roles, err := s.Roles(ctx, *ch.ServerID)
+	if err != nil {
+		return 0, ch, err
+	}
+	ows, err := s.Overwrites(ctx, channelID)
+	if err != nil {
+		return 0, ch, err
+	}
+	return perms.Compute(*ch.ServerID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid, toPermOverwrites(ows)), ch, nil
+}
+
+// ChannelViewers lists the members who can view a server channel.
+func (s *Store) ChannelViewers(ctx context.Context, channelID ids.ID) ([]ids.ID, error) {
+	ch, err := s.ChannelByID(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+	if ch.ServerID == nil {
+		return ch.Recipients, nil
+	}
+	return s.channelViewers(ctx, *ch.ServerID, channelID)
+}
+
+func (s *Store) channelViewers(ctx context.Context, serverID, channelID ids.ID) ([]ids.ID, error) {
+	srv, err := s.ServerByID(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := s.Roles(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	ows, err := s.Overwrites(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+	members, err := s.allMembers(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	pr, po := toPermRoles(roles), toPermOverwrites(ows)
+	now := nowMs()
+	out := []ids.ID{}
+	for _, m := range members {
+		if perms.Compute(serverID, pr, toPermMember(m, now), srv.OwnerID == m.UserID, po).Has(perms.ViewChannel) {
+			out = append(out, m.UserID)
+		}
+	}
+	return out, nil
+}
+
+// allMembers loads every membership with roles (pages of 1000).
+func (s *Store) allMembers(ctx context.Context, serverID ids.ID) ([]*Member, error) {
+	var out []*Member
+	var after ids.ID
+	for {
+		page, err := s.Members(ctx, serverID, after, 1000, "")
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, page...)
+		if len(page) < 1000 {
+			return out, nil
+		}
+		after = page[len(page)-1].UserID
+	}
+}
+
+// ChannelsForUser lists every server channel the user can view.
+func (s *Store) ChannelsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
+	servers, err := s.ServersForUser(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	out := []ids.ID{}
+	now := nowMs()
+	for _, srv := range servers {
+		m, err := s.Member(ctx, srv.ID, uid)
+		if err != nil {
+			continue
+		}
+		roles, err := s.Roles(ctx, srv.ID)
+		if err != nil {
+			return nil, err
+		}
+		chans, err := s.ServerChannels(ctx, srv.ID)
+		if err != nil {
+			return nil, err
+		}
+		ows, err := s.OverwritesForServer(ctx, srv.ID)
+		if err != nil {
+			return nil, err
+		}
+		pr, pm := toPermRoles(roles), toPermMember(m, now)
+		for _, ch := range chans {
+			if ch.Type == "category" {
+				continue
+			}
+			if perms.Compute(srv.ID, pr, pm, srv.OwnerID == uid, toPermOverwrites(ows[ch.ID])).Has(perms.ViewChannel) {
+				out = append(out, ch.ID)
+			}
+		}
+	}
+	return out, nil
+}
+
+// ViewableServerChannels is ChannelsForUser restricted to one server.
+func (s *Store) ViewableServerChannels(ctx context.Context, serverID, uid ids.ID) (map[ids.ID]perms.Perm, error) {
+	srv, err := s.ServerByID(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	m, err := s.Member(ctx, serverID, uid)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := s.Roles(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	chans, err := s.ServerChannels(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	ows, err := s.OverwritesForServer(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	pr, pm := toPermRoles(roles), toPermMember(m, nowMs())
+	out := map[ids.ID]perms.Perm{}
+	for _, ch := range chans {
+		p := perms.Compute(serverID, pr, pm, srv.OwnerID == uid, toPermOverwrites(ows[ch.ID]))
+		if p.Has(perms.ViewChannel) {
+			out[ch.ID] = p
+		}
+	}
+	return out, nil
+}

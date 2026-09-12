@@ -107,6 +107,20 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 		if c.Recipients, err = s.Participants(ctx, c.ID); err != nil {
 			return nil, err
 		}
+		c.KeyConvID = c.ID
+		return c, nil
+	}
+	c.Recipients = []ids.ID{}
+	if c.ServerID != nil {
+		c.KeyConvID = *c.ServerID
+		if _, own, err := s.LatestEpoch(ctx, c.ID); err != nil {
+			return nil, err
+		} else if own {
+			c.KeyConvID = c.ID
+		}
+		if c.Overwrites, err = s.Overwrites(ctx, c.ID); err != nil {
+			return nil, err
+		}
 	}
 	return c, nil
 }
@@ -253,12 +267,18 @@ func (s *Store) UpdateChannel(ctx context.Context, id ids.ID, p ChannelPatch) er
 	return nil
 }
 
-// DeleteChannel removes a channel and everything in it.
+// DeleteChannel removes a channel and everything in it. Deleting a category
+// leaves its children in place without a parent.
 func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 	return s.Tx(ctx, func(tx *sql.Tx) error {
 		// release attachment blobs
 		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id = ?)`, int64(id)); err != nil {
 			return err
+		}
+		for _, q := range []string{`DELETE FROM key_grants WHERE conv_id = ?`, `DELETE FROM key_epochs WHERE conv_id = ?`, `DELETE FROM key_flags WHERE conv_id = ?`, `UPDATE channels SET parent_id = NULL WHERE parent_id = ?`} {
+			if _, err := tx.ExecContext(ctx, q, int64(id)); err != nil {
+				return err
+			}
 		}
 		res, err := tx.ExecContext(ctx, `DELETE FROM channels WHERE id = ?`, int64(id))
 		if err != nil {

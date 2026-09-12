@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/perms"
 )
 
 // User flag bits.
@@ -151,6 +152,130 @@ type Channel struct {
 	LastMessageID   *ids.ID  `json:"last_message_id"`
 	CreatedAt       int64    `json:"created_at"`
 	Recipients      []ids.ID `json:"recipient_ids"`
+	// KeyConvID is the conversation whose keys encrypt this channel: itself
+	// for DMs and private channels, the server otherwise.
+	KeyConvID ids.ID `json:"key_conv_id"`
+	// Overwrites is filled for server channels.
+	Overwrites []Overwrite `json:"overwrites,omitempty"`
+}
+
+// Server is a community with channels, roles and members.
+type Server struct {
+	ID                   ids.ID  `json:"id"`
+	Name                 string  `json:"name"`
+	IconID               *ids.ID `json:"icon_id"`
+	BannerID             *ids.ID `json:"banner_id"`
+	OwnerID              ids.ID  `json:"owner_id"`
+	Description          string  `json:"description"`
+	SystemChannelID      *ids.ID `json:"system_channel_id"`
+	DefaultNotifications int     `json:"default_notifications"`
+	Flags                int64   `json:"flags"`
+	CreatedAt            int64   `json:"created_at"`
+}
+
+// ServerPatch is an optional set of server changes.
+type ServerPatch struct {
+	Name                 *string
+	Description          *string
+	IconID               **ids.ID
+	BannerID             **ids.ID
+	SystemChannelID      **ids.ID
+	DefaultNotifications *int
+	OwnerID              *ids.ID
+}
+
+// Member is a user's membership in a server.
+type Member struct {
+	ServerID     ids.ID   `json:"server_id"`
+	UserID       ids.ID   `json:"user_id"`
+	Nickname     string   `json:"nickname"`
+	AvatarID     *ids.ID  `json:"avatar_id"`
+	JoinedAt     int64    `json:"joined_at"`
+	TimeoutUntil *int64   `json:"timeout_until"`
+	Flags        int64    `json:"flags"`
+	RoleIDs      []ids.ID `json:"role_ids"`
+}
+
+// MemberPatch is an optional set of membership changes.
+type MemberPatch struct {
+	Nickname     *string
+	AvatarID     **ids.ID
+	TimeoutUntil **int64
+}
+
+// Role is a server role.
+type Role struct {
+	ID          ids.ID     `json:"id"`
+	ServerID    ids.ID     `json:"server_id"`
+	Name        string     `json:"name"`
+	Color       int        `json:"color"`
+	Hoist       bool       `json:"hoist"`
+	Mentionable bool       `json:"mentionable"`
+	Position    int        `json:"position"`
+	Permissions perms.Perm `json:"permissions"`
+	IconID      *ids.ID    `json:"icon_id"`
+	CreatedAt   int64      `json:"created_at"`
+}
+
+// RolePatch is an optional set of role changes.
+type RolePatch struct {
+	Name        *string
+	Color       *int
+	Hoist       *bool
+	Mentionable *bool
+	Permissions *perms.Perm
+	IconID      **ids.ID
+}
+
+// Overwrite is a channel permission overwrite.
+type Overwrite struct {
+	ChannelID  ids.ID     `json:"channel_id"`
+	TargetID   ids.ID     `json:"target_id"`
+	TargetType string     `json:"target_type"` // role | member
+	Allow      perms.Perm `json:"allow"`
+	Deny       perms.Perm `json:"deny"`
+}
+
+// ChannelPosition is one entry of a bulk reorder.
+type ChannelPosition struct {
+	ID        ids.ID  `json:"id"`
+	Position  int     `json:"position"`
+	ParentID  *ids.ID `json:"parent_id"`
+	ParentSet bool    `json:"-"`
+}
+
+// Invite is a server invite link.
+type Invite struct {
+	Code      string  `json:"code"`
+	ServerID  ids.ID  `json:"server_id"`
+	ChannelID *ids.ID `json:"channel_id"`
+	InviterID ids.ID  `json:"inviter_id"`
+	MaxUses   int     `json:"max_uses"`
+	Uses      int     `json:"uses"`
+	ExpiresAt *int64  `json:"expires_at"`
+	CreatedAt int64   `json:"created_at"`
+}
+
+// Ban is a server ban.
+type Ban struct {
+	ServerID  ids.ID `json:"server_id"`
+	UserID    ids.ID `json:"user_id"`
+	Reason    string `json:"reason"`
+	BannedBy  ids.ID `json:"banned_by"`
+	CreatedAt int64  `json:"created_at"`
+}
+
+// AuditEntry records a moderation or configuration action.
+type AuditEntry struct {
+	ID         ids.ID          `json:"id"`
+	ServerID   ids.ID          `json:"server_id"`
+	ActorID    ids.ID          `json:"actor_id"`
+	Action     string          `json:"action"`
+	TargetType string          `json:"target_type"`
+	TargetID   *ids.ID         `json:"target_id"`
+	Changes    json.RawMessage `json:"changes"`
+	Reason     string          `json:"reason"`
+	CreatedAt  int64           `json:"created_at"`
 }
 
 // ChannelPatch is an optional set of channel changes.

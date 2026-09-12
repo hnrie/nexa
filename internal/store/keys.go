@@ -176,13 +176,16 @@ func (s *Store) UsersLackingGrant(ctx context.Context, conv ids.ID, epoch int, e
 	return out, nil
 }
 
-// Entitled lists the users who should hold a conversation's keys. DM and
-// group conversations are their participants; server conversations are
-// resolved by the server layer (Phase 2) and return ErrNotFound until then.
+// Entitled lists the users who should hold a conversation's keys: DM and
+// group participants, a server's members, or a server channel's viewers.
 func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 	var typ string
-	err := s.db.R.QueryRowContext(ctx, `SELECT type FROM channels WHERE id = ?`, int64(conv)).Scan(&typ)
+	var serverID sql.NullInt64
+	err := s.db.R.QueryRowContext(ctx, `SELECT type, server_id FROM channels WHERE id = ?`, int64(conv)).Scan(&typ, &serverID)
 	if errors.Is(err, sql.ErrNoRows) {
+		if _, err := s.ServerByID(ctx, conv); err == nil {
+			return s.MemberIDs(ctx, conv)
+		}
 		if s.EntitledHook != nil {
 			return s.EntitledHook(ctx, conv)
 		}
@@ -193,6 +196,9 @@ func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 	}
 	if typ == "dm" || typ == "group_dm" {
 		return s.Participants(ctx, conv)
+	}
+	if serverID.Valid {
+		return s.channelViewers(ctx, ids.ID(serverID.Int64), conv)
 	}
 	if s.EntitledHook != nil {
 		return s.EntitledHook(ctx, conv)

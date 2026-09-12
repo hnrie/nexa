@@ -58,6 +58,7 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	srv.limUpload = ratelimit.New(rate.Inf, 1000, time.Hour)
 	hub := gateway.New(st, srv.Auth, srv.Log, cfg.PublicURL)
 	srv.Bcast = hub
+	srv.WireServers(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { ts.Close(); d.Close() })

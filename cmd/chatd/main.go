@@ -83,6 +83,7 @@ func main() {
 	srv.Unfurl = unfurl.NewService()
 	hub := gateway.New(st, srv.Auth, log, cfg.PublicURL)
 	srv.Bcast = hub
+	srv.WireServers(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 
 	ctx, cancel := context.WithCancel(context.Background())

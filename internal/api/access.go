@@ -39,6 +39,13 @@ func (s *Server) channel(w http.ResponseWriter, r *http.Request, need string) (*
 		return nil, nil
 	}
 	if !ok {
+		if need != NeedView {
+			// a channel the caller can see but lacks a specific permission in is a 403
+			if canView, _ := s.canAccess(r, u, ch, NeedView); canView {
+				WriteError(w, E(http.StatusForbidden, "missing_permission", "You do not have permission to do that here."))
+				return nil, nil
+			}
+		}
 		WriteError(w, ErrNotFound) // hide existence
 		return nil, nil
 	}

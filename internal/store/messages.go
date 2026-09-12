@@ -432,3 +432,33 @@ func (s *Store) AttachmentByBlob(ctx context.Context, blobID ids.ID) (*Attachmen
 	}
 	return &a, nil
 }
+
+// DeleteMessagesByUserSince removes a user's recent messages in a server
+// (ban with message purge). Returns the deleted ids per channel.
+func (s *Store) DeleteMessagesByUserSince(ctx context.Context, serverID, uid ids.ID, since int64) (map[ids.ID][]ids.ID, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT m.id, m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ? AND m.author_id = ? AND m.created_at >= ?`, int64(serverID), int64(uid), since)
+	if err != nil {
+		return nil, err
+	}
+	out := map[ids.ID][]ids.ID{}
+	for rows.Next() {
+		var id, ch int64
+		if err := rows.Scan(&id, &ch); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		out[ids.ID(ch)] = append(out[ids.ID(ch)], ids.ID(id))
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, list := range out {
+		for _, id := range list {
+			if err := s.DeleteMessage(ctx, id); err != nil && err != ErrNotFound {
+				return nil, err
+			}
+		}
+	}
+	return out, nil
+}

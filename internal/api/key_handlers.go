@@ -78,6 +78,15 @@ func (s *Server) handleKeyGrantsPut(w http.ResponseWriter, r *http.Request) {
 		}
 		key := [2]int64{int64(g.ConvID), int64(g.Epoch)}
 		holds, seen := holdCache[key]
+		if g.UserID == me.ID {
+			// a self-grant only affects the caller (e.g. a key received through an invite link)
+			if _, err := s.Store.Epoch(ctx, g.ConvID, g.Epoch); err != nil {
+				WriteError(w, ErrNotFound)
+				return
+			}
+			holds, seen = true, true
+			holdCache[key] = true
+		}
 		if !seen {
 			// A holder is someone with a grant, or the epoch's creator bootstrapping the first grants.
 			if _, err := s.Store.Grant(ctx, g.ConvID, g.Epoch, me.ID); err == nil {
