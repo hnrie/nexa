@@ -20,4 +20,7 @@ export const relationships = {
   unblock(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/users/@me/blocks/${id}`);
   },
+  setNickname(userId: Snowflake, nickname: string): Promise<Relationship> {
+    return api.request<Relationship>("PATCH", `/users/@me/relationships/${userId}`, { nickname });
+  },
 };

@@ -1,19 +1,23 @@
-import { AtSign, Hash, Lock, Phone, Pin, UserPlus, Users, Video } from "lucide-react";
+import { AtSign, Hash, Lock, Phone, Pin, Search, UserPlus, Users, Video } from "lucide-react";
 import { useState } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
 import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
-import { channelDisplayName } from "@/lib/names";
+import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { customStatus, statusOf, usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
+import { useRelationships } from "@/stores/relationships";
+import { useMemo } from "react";
 import { useServers } from "@/stores/servers";
 import { isPrivateChannel } from "@/lib/perms";
 import { MemberList } from "./MemberList";
 import { CallBanner } from "@/components/voice/CallBanner";
+import { SearchPanel } from "@/components/search/SearchPanel";
+import sc from "@/components/search/Search.module.css";
 import { VoiceView } from "@/components/voice/VoiceView";
 import { useVoice } from "@/stores/voice";
 import { joinVoice, toggleCamera } from "@/voice/session";
@@ -30,9 +34,13 @@ export function ChatView({ channel }: { channel: Channel }) {
   const membersOpen = useUI((u) => u.membersOpen);
   const toggleMembers = useUI((u) => u.toggleMembers);
   const [pins, setPins] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const serverId = channel.server_id;
   const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
-  const name = channelDisplayName(channel, users, me?.id);
+  const rels = useRelationships((r) => r.byUser);
+  const nicknames = useMemo(() => friendNicknames(rels), [rels]);
+  const name = channelDisplayName(channel, users, me?.id, nicknames);
   const isServer = !!serverId && !!serverState;
   const inThisCall = useVoice((v) => v.mine?.channel_id === channel.id);
   const startCall = async (video: boolean) => {
@@ -68,6 +76,18 @@ export function ChatView({ channel }: { channel: Channel }) {
             </Tooltip>
           </>
         ) : null}
+        <label className={sc.searchBox} title="Search this device's decrypted messages">
+          <Search size={16} />
+          <input
+            value={searchQuery}
+            placeholder="Search"
+            aria-label="Search messages"
+            data-testid="search-input"
+            onFocus={() => setSearchOpen(true)}
+            onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+            onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); e.currentTarget.blur(); } }}
+          />
+        </label>
         <Tooltip text="Pinned Messages" side="bottom">
           <button className={s.hBtn} data-on={pins} aria-label="Pinned Messages" onClick={() => setPins((v) => !v)}><Pin size={22} /></button>
         </Tooltip>
@@ -91,6 +111,7 @@ export function ChatView({ channel }: { channel: Channel }) {
       <div className={s.body}>
         <MessageList channel={channel} />
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && membersOpen && serverId ? <MemberList serverId={serverId} channelId={channel.id} /> : null}
         {channel.type === "group_dm" && membersOpen ? (
           <aside className={s.members}>

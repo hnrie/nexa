@@ -241,6 +241,50 @@ export interface IceServer {
   credential?: string;
 }
 
+export interface AdminUser {
+  id: Snowflake;
+  username: string;
+  display_name: string;
+  flags: number;
+  created_at: number;
+  admin: boolean;
+  disabled: boolean;
+}
+
+export interface AdminStats {
+  users: number;
+  servers: number;
+  messages: number;
+  blobs: number;
+  blob_bytes: number;
+  online: number;
+  version: string;
+}
+
+export interface AdminSettings {
+  registration: "open" | "invite" | "closed";
+  registration_key_set: boolean;
+  config_registration: string;
+  overrides: Record<string, string>;
+  max_upload_bytes: number;
+  max_emoji_bytes: number;
+  max_sticker_bytes: number;
+  max_avatar_bytes: number;
+  tenor: boolean;
+  turn: boolean;
+}
+
+export interface InstanceInfo {
+  name: string;
+  version: string;
+  registration: "open" | "invite" | "closed";
+  needs_key: boolean;
+  max_upload_bytes: number;
+  gif_search: boolean;
+  public_url: string;
+  turn_configured: boolean;
+}
+
 export interface ServerKeyInfo {
   conv_id: Snowflake;
   name: string;

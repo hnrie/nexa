@@ -15,3 +15,8 @@
 .mutual { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
 .badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--bg-active); color: var(--text-subtle); text-transform: uppercase; }
 .small { font-size: 13px; color: var(--text-muted); }
+.nickBtn { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--text-brand); }
+.nickBtn:hover { text-decoration: underline; }
+.nickInput { margin-left: 8px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid var(--brand); color: var(--text); font-size: 14px; }
+.note { width: 100%; min-height: 56px; padding: 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid transparent; color: var(--text); font-size: 14px; resize: vertical; }
+.note:focus { border-color: var(--brand); outline: none; }

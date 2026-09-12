@@ -111,7 +111,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             <Avatar id={msg.author_id} avatarId={author?.avatar_id ?? null} name={name} size={40} />
           </div>
           <div className={s.headerRow}>
-            <span className={s.author} style={color ? { color } : undefined} onClick={() => openModal("profile", { userId: msg.author_id })}>{name}</span>
+            <span className={s.author} data-author={msg.author_id} style={color ? { color } : undefined} onClick={() => openModal("profile", { userId: msg.author_id })}>{name}</span>
             <time className={s.time} title={formatFull(msg.created_at)} dateTime={new Date(msg.created_at).toISOString()}>{formatTimestamp(msg.created_at)}</time>
           </div>
         </>

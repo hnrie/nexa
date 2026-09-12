@@ -13,6 +13,7 @@ const AppearancePage = lazy(() => import("./AppearancePage"));
 const NotificationsPage = lazy(() => import("./NotificationsPage"));
 const StickersPage = lazy(() => import("./StickersPage"));
 const VoicePage = lazy(() => import("./VoicePage"));
+const AdminPage = lazy(() => import("./AdminPage"));
 
 const NAV: { head: string; items: { id: string; label: string }[] }[] = [
   { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "devices", label: "Devices" }] },
@@ -22,6 +23,8 @@ const NAV: { head: string; items: { id: string; label: string }[] }[] = [
 export default function SettingsModal({ onClose, page: initial, packId }: { onClose: () => void; page: string; packId?: string | undefined }) {
   const [page, setPage] = useState(initial);
   const logout = useAuth((a) => a.logout);
+  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
+  const nav = isAdmin ? [...NAV, { head: "Instance", items: [{ id: "admin", label: "Instance Admin" }] }] : NAV;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -34,16 +37,16 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const body =
-    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : <AccountPage onClose={onClose} />;
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "admin" && isAdmin ? <AdminPage /> : <AccountPage onClose={onClose} />;
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings" data-modal-layer="">
       <div className={s.navWrap}>
         <nav className={s.nav}>
-          {NAV.map((g) => (
+          {nav.map((g) => (
             <div key={g.head}>
               <div className={s.navHead}>{g.head}</div>
               {g.items.map((it) => (
-                <button key={it.id} className={s.navItem} data-selected={page === it.id} onClick={() => setPage(it.id)}>{it.label}</button>
+                <button key={it.id} className={s.navItem} data-selected={page === it.id} data-nav={it.id} onClick={() => setPage(it.id)}>{it.label}</button>
               ))}
             </div>
           ))}

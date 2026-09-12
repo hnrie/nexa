@@ -2,17 +2,25 @@ import type { Channel, PublicUser } from "@/api/types";
 import { displayName } from "@/stores/users";
 
 /** The name shown for a DM or group DM. */
-export function channelDisplayName(ch: Channel, users: Record<string, PublicUser>, meId: string | undefined): string {
+export function channelDisplayName(ch: Channel, users: Record<string, PublicUser>, meId: string | undefined, nicknames?: Record<string, string>): string {
+  const name = (id: string | undefined) => (id && nicknames?.[id]) || displayName(id ? users[id] : undefined);
   if (ch.type === "dm") {
     const other = ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0];
-    return displayName(other ? users[other] : undefined);
+    return name(other);
   }
   if (ch.type === "group_dm") {
     if (ch.name) return ch.name;
-    const names = ch.recipient_ids.filter((id) => id !== meId).map((id) => displayName(users[id]));
+    const names = ch.recipient_ids.filter((id) => id !== meId).map(name);
     return names.length ? names.join(", ") : "Unnamed group";
   }
   return ch.name;
+}
+
+/** Friend nicknames by user id, for channelDisplayName. */
+export function friendNicknames(rels: Record<string, { nickname: string }>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [id, r] of Object.entries(rels)) if (r.nickname) out[id] = r.nickname;
+  return out;
 }
 
 /** A member's name in a server: nickname, else display name, else username. */

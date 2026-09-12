@@ -372,6 +372,65 @@ def voice_flow(srv, alice, bob, server_id):
     a.wait_for_function("() => !document.querySelector('[data-testid=voice-status]')", timeout=20000)
 
 
+def polish_flow(srv, alice, bob, server_id):
+    a = alice.page
+    # search the decrypted history of the server
+    a.goto(srv.base + "/channels/" + server_id, wait_until="networkidle")
+    a.locator("[data-channel]:has(span:text-is('general')) button").first.click()
+    a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
+    a.fill("[data-testid=search-input]", "first message")
+    a.wait_for_selector("[data-testid=search-panel] [data-result]", timeout=15000)
+    assert a.locator("[data-testid=search-panel] mark").count() >= 1, "search highlights the match"
+    alice.shot("search")
+    a.fill("[data-testid=search-input]", "from:bob hi")
+    a.wait_for_selector("[data-testid=search-panel] [data-result]", timeout=15000)
+    a.fill("[data-testid=search-input]", "zzzz-nothing-matches")
+    a.wait_for_selector("text=No results in the", timeout=15000)
+    a.click("[data-testid=search-panel] button[aria-label='Close search']")
+    # the first account is the instance admin
+    a.click("button[aria-label='User Settings']")
+    a.click("[data-nav=admin]")
+    a.wait_for_selector("text=Instance Admin", timeout=15000)
+    a.wait_for_selector("text=Registration", timeout=15000)
+    alice.shot("admin")
+    # flip registration to closed and back
+    a.locator("label:has-text('Closed') input").check()
+    time.sleep(0.5)
+    a.locator("label:has-text('Open') input").check()
+    time.sleep(0.5)
+    # bob is not an admin
+    b = bob.page
+    b.goto(srv.base + "/channels/@me", wait_until="networkidle")
+    b.click("button[aria-label='User Settings']")
+    assert b.locator("[data-nav=admin]").count() == 0, "non-admins have no admin page"
+    b.keyboard.press("Escape")
+    # data export downloads a zip
+    a.click("[data-nav=privacy], button:has-text('Privacy & Safety')")
+    a.wait_for_selector("[data-testid=export-data]", timeout=15000)
+    with a.expect_download(timeout=60000) as dl:
+        a.click("[data-testid=export-data]")
+    path = dl.value.path()
+    size = os.path.getsize(path)
+    assert size > 200, f"export zip is tiny: {size}"
+    with open(path, "rb") as f:
+        head = f.read(4)
+    assert head == b"PK\x03\x04", head
+    print("  export zip:", size, "bytes")
+    a.keyboard.press("Escape")
+    # friend nickname + note on bob's profile
+    alice.open_dm_from_sidebar("Bob")
+    a.locator("[data-author]:text-is('Bob')").first.click()
+    a.wait_for_selector("text=add nickname", timeout=15000)
+    a.click("text=add nickname")
+    a.fill("input[aria-label='Friend nickname']", "Bobby")
+    a.keyboard.press("Enter")
+    a.wait_for_selector("text=Bobby", timeout=15000)
+    a.fill("textarea[aria-label=Note]", "met at the thing")
+    time.sleep(0.6)
+    alice.shot("profile-note")
+    a.keyboard.press("Escape")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "tools/out"))
@@ -454,6 +513,8 @@ def main():
             expressions_flow(srv, alice, bob, server_id, link)
             print("voice")
             voice_flow(srv, alice, bob, server_id)
+            print("polish")
+            polish_flow(srv, alice, bob, server_id)
             errors = alice.errors + bob.errors + phone.errors
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))

@@ -1,5 +1,6 @@
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useSettings } from "@/stores/settings";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
@@ -39,6 +40,20 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   const openContextMenu = useUI((u) => u.openContextMenu);
   const ctx = useRenderCtx();
   const [mutual, setMutual] = useState<string[]>([]);
+  const note = useSettings((st) => st.settings.userNotes[userId] ?? "");
+  const patchSettings = useSettings((st) => st.patch);
+  const allNotes = useSettings((st) => st.settings.userNotes);
+  const [nickEditing, setNickEditing] = useState(false);
+  const [nickDraft, setNickDraft] = useState("");
+  const saveNickname = async () => {
+    setNickEditing(false);
+    if (!rel || rel.type !== "friend" || nickDraft.trim() === rel.nickname) return;
+    try {
+      setRel(await relApi.setNickname(userId, nickDraft.trim()));
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not save the nickname.", "error");
+    }
+  };
   const users = useUsers((u) => u.byId);
   const isMe = me?.id === userId;
   const user: PublicUser | undefined = isMe && me ? me : stored;
@@ -122,8 +137,28 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
             )}
           </div>
           <div className={s.names}>
-            <div className={s.display}>{user.display_name}{user.flags & 1 ? <span className={s.badge}>Admin</span> : null}</div>
-            <div className={s.user}>{user.username}{user.pronouns ? <span className={s.pronouns}> • {user.pronouns}</span> : null}</div>
+            <div className={s.display}>
+              {rel?.type === "friend" && rel.nickname ? rel.nickname : user.display_name}
+              {user.flags & 1 ? <span className={s.badge}>Admin</span> : null}
+              {rel?.type === "friend" && !isMe ? (
+                nickEditing ? (
+                  <input
+                    className={s.nickInput}
+                    value={nickDraft}
+                    maxLength={32}
+                    autoFocus
+                    placeholder={user.display_name}
+                    aria-label="Friend nickname"
+                    onChange={(e) => setNickDraft(e.target.value)}
+                    onBlur={() => void saveNickname()}
+                    onKeyDown={(e) => { if (e.key === "Enter") void saveNickname(); if (e.key === "Escape") setNickEditing(false); }}
+                  />
+                ) : (
+                  <button className={s.nickBtn} onClick={() => { setNickDraft(rel.nickname); setNickEditing(true); }} title="Set a nickname only you see">{rel.nickname ? "edit nickname" : "add nickname"}</button>
+                )
+              ) : null}
+            </div>
+            <div className={s.user}>{rel?.type === "friend" && rel.nickname ? `${user.display_name} · ${user.username}` : user.username}{user.pronouns ? <span className={s.pronouns}> • {user.pronouns}</span> : null}</div>
             {cs ? <div className={s.status}>{cs.emoji ? cs.emoji + " " : ""}{cs.text}</div> : null}
           </div>
         </div>
@@ -132,6 +167,24 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
             <div className={s.section}>
               <h4>About Me</h4>
               <div className={s.about}><Markdown source={user.about_me} ctx={ctx} /></div>
+            </div>
+          ) : null}
+          {!isMe ? (
+            <div className={s.section}>
+              <h4>Note</h4>
+              <textarea
+                className={s.note}
+                value={note}
+                maxLength={256}
+                placeholder="Click to add a note (only you can see it; it is stored encrypted with your settings)"
+                aria-label="Note"
+                onChange={(e) => {
+                  const userNotes = { ...allNotes };
+                  if (e.target.value) userNotes[userId] = e.target.value;
+                  else delete userNotes[userId];
+                  patchSettings({ userNotes });
+                }}
+              />
             </div>
           ) : null}
           <div className={s.section}>

@@ -3,13 +3,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { UserPanel } from "@/components/shell/UserPanel";
 import { VoiceStatus } from "@/components/voice/VoiceStatus";
-import { channelDisplayName } from "@/lib/names";
+import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, useChannels } from "@/stores/channels";
 import { customStatus, statusOf, usePresence } from "@/stores/presence";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { useRelationships } from "@/stores/relationships";
+import { useMemo } from "react";
 import { iconUrl } from "@/api/users";
 import s from "./Sidebar.module.css";
 
@@ -23,6 +25,8 @@ export function DMSidebar() {
   const reads = useReadStates((r) => r.byChannel);
   const openModal = useUI((u) => u.openModal);
   const setQuickSwitcher = useUI((u) => u.setQuickSwitcher);
+  const rels = useRelationships((r) => r.byUser);
+  const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const dms = selectDMs(channels);
   const active = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
 
@@ -44,7 +48,7 @@ export function DMSidebar() {
         </div>
         {dms.length === 0 ? <div className={s.empty}>No conversations yet. Add a friend to start one.</div> : null}
         {dms.map((ch) => {
-          const name = channelDisplayName(ch, users, meId);
+          const name = channelDisplayName(ch, users, meId, nicknames);
           const rs = reads[ch.id];
           const unread = isUnread(rs, ch.last_message_id);
           const mentions = rs?.mentions ?? 0;

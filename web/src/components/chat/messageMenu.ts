@@ -68,7 +68,9 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks): Conte
     const suppressed = (msg.flags & 4) !== 0;
     items.push({ id: "embeds", label: suppressed ? "Show Embeds" : "Remove Embeds", onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast("Could not update embeds.", "error")) });
   }
-  items.push({ id: "link", label: "Copy Message Link", onSelect: () => void navigator.clipboard?.writeText(`${location.origin}/channels/@me/${msg.channel_id}/${msg.id}`), separatorAfter: dev || canDelete(msg) });
+  const chan = useChannels.getState().byId[msg.channel_id];
+  const linkBase = chan?.server_id ? `/channels/${chan.server_id}` : "/channels/@me";
+  items.push({ id: "link", label: "Copy Message Link", onSelect: () => void navigator.clipboard?.writeText(`${location.origin}${linkBase}/${msg.channel_id}/${msg.id}`), separatorAfter: dev || canDelete(msg) });
   if (dev) items.push({ id: "id", label: "Copy Message ID", onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
   if (canDelete(msg)) {
     items.push({
