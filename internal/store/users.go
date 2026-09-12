@@ -1,0 +1,260 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+
+	"evilion.xyz/chat/internal/ids"
+)
+
+const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at`
+
+type rowScanner interface{ Scan(dest ...any) error }
+
+func scanUser(r rowScanner) (*User, error) {
+	var u User
+	var recoveryHash sql.NullString
+	var avatar, banner, accent, statusExp sql.NullInt64
+	err := r.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AuthHash, &u.KDFSalt, &u.KDFParams, &u.PublicKey, &u.EncPrivateKey, &u.EncPrivateKeyRecovery, &recoveryHash,
+		&avatar, &banner, &u.AboutMe, &u.Pronouns, &accent, &u.StatusText, &u.StatusEmoji, &statusExp, &u.PresencePref, &u.DMPrivacy, &u.Flags, &u.CreatedAt, &u.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	u.RecoveryAuthHash = recoveryHash.String
+	u.AvatarID, u.BannerID = idPtr(avatar), idPtr(banner)
+	u.AccentColor = intPtr(accent)
+	u.StatusExpiresAt = int64Ptr(statusExp)
+	return &u, nil
+}
+
+// CreateUser inserts u (ID and CreatedAt are filled in when zero).
+func (s *Store) CreateUser(ctx context.Context, u *User) error {
+	if u.ID.IsZero() {
+		u.ID = ids.New()
+	}
+	if u.CreatedAt == 0 {
+		u.CreatedAt = nowMs()
+	}
+	u.UpdatedAt = u.CreatedAt
+	if u.PresencePref == "" {
+		u.PresencePref = "online"
+	}
+	if u.DMPrivacy == "" {
+		u.DMPrivacy = "everyone"
+	}
+	var recovery any
+	if u.RecoveryAuthHash != "" {
+		recovery = u.RecoveryAuthHash
+	}
+	res, err := s.db.W.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
+		int64(u.ID), u.Username, u.DisplayName, u.AuthHash, u.KDFSalt, u.KDFParams, u.PublicKey, u.EncPrivateKey, u.EncPrivateKeyRecovery, recovery,
+		nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrUsernameTaken
+	}
+	return nil
+}
+
+// UserByID loads one user.
+func (s *Store) UserByID(ctx context.Context, id ids.ID) (*User, error) {
+	return scanUser(s.db.R.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE id = ?`, int64(id)))
+}
+
+// UserByUsername loads one user by exact (lowercase) username.
+func (s *Store) UserByUsername(ctx context.Context, username string) (*User, error) {
+	return scanUser(s.db.R.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE username = ?`, username))
+}
+
+// UsersByIDs loads many users at once.
+func (s *Store) UsersByIDs(ctx context.Context, list []ids.ID) (map[ids.ID]*User, error) {
+	out := map[ids.ID]*User{}
+	for start := 0; start < len(list); start += 500 {
+		end := start + 500
+		if end > len(list) {
+			end = len(list)
+		}
+		chunk := list[start:end]
+		rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE id IN (`+placeholders(len(chunk))+`)`, idArgs(chunk)...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			u, err := scanUser(rows)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[u.ID] = u
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// SearchUsers finds users whose username or display name starts with q.
+func (s *Store) SearchUsers(ctx context.Context, q string, limit int) ([]*User, error) {
+	q = strings.ToLower(strings.TrimSpace(q))
+	if q == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+	like := escapeLike(q) + "%"
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR lower(display_name) LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*User
+	for rows.Next() {
+		u, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+func escapeLike(s string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return r.Replace(s)
+}
+
+// CountUsers returns the number of accounts.
+func (s *Store) CountUsers(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users`).Scan(&n)
+	return n, err
+}
+
+// UpdateProfile applies p to the user.
+func (s *Store) UpdateProfile(ctx context.Context, id ids.ID, p ProfilePatch) error {
+	var sets []string
+	var args []any
+	set := func(col string, v any) { sets = append(sets, col+" = ?"); args = append(args, v) }
+	if p.Username != nil {
+		set("username", *p.Username)
+	}
+	if p.DisplayName != nil {
+		set("display_name", *p.DisplayName)
+	}
+	if p.AboutMe != nil {
+		set("about_me", *p.AboutMe)
+	}
+	if p.Pronouns != nil {
+		set("pronouns", *p.Pronouns)
+	}
+	if p.AccentColor != nil {
+		set("accent_color", nullInt(*p.AccentColor))
+	}
+	if p.AvatarID != nil {
+		set("avatar_id", nullID(*p.AvatarID))
+	}
+	if p.BannerID != nil {
+		set("banner_id", nullID(*p.BannerID))
+	}
+	if p.StatusText != nil {
+		set("status_text", *p.StatusText)
+	}
+	if p.StatusEmoji != nil {
+		set("status_emoji", *p.StatusEmoji)
+	}
+	if p.StatusExpiresAt != nil {
+		set("status_expires_at", nullInt64(*p.StatusExpiresAt))
+	}
+	if p.PresencePref != nil {
+		set("presence_pref", *p.PresencePref)
+	}
+	if p.DMPrivacy != nil {
+		set("dm_privacy", *p.DMPrivacy)
+	}
+	if len(sets) == 0 {
+		return nil
+	}
+	set("updated_at", nowMs())
+	args = append(args, int64(id))
+	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+	if err != nil {
+		if p.Username != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: users.username") {
+			return ErrUsernameTaken
+		}
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateAuth replaces the password-derived credentials. Recovery fields are
+// replaced only when recoveryHash is non-empty.
+func (s *Store) UpdateAuth(ctx context.Context, id ids.ID, authHash string, encPriv []byte, encPrivRecovery []byte, recoveryHash string) error {
+	var res sql.Result
+	var err error
+	if recoveryHash != "" {
+		res, err = s.db.W.ExecContext(ctx, `UPDATE users SET auth_hash = ?, enc_private_key = ?, enc_private_key_recovery = ?, recovery_auth_hash = ?, updated_at = ? WHERE id = ?`, authHash, encPriv, encPrivRecovery, recoveryHash, nowMs(), int64(id))
+	} else {
+		res, err = s.db.W.ExecContext(ctx, `UPDATE users SET auth_hash = ?, enc_private_key = ?, updated_at = ? WHERE id = ?`, authHash, encPriv, nowMs(), int64(id))
+	}
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// SetUserFlags overwrites the flags bitfield.
+func (s *Store) SetUserFlags(ctx context.Context, id ids.ID, flags int64) error {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET flags = ?, updated_at = ? WHERE id = ?`, flags, nowMs(), int64(id))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeleteAccount anonymises the account (messages are kept) and drops sessions.
+func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
+	return s.Tx(ctx, func(tx *sql.Tx) error {
+		anon := fmt.Sprintf("deleted-%d", int64(id))
+		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = x'', enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', flags = flags | ?, updated_at = ? WHERE id = ?`, anon, FlagDeleted, nowMs(), int64(id))
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		for _, q := range []string{`DELETE FROM sessions WHERE user_id = ?`, `DELETE FROM relationships WHERE user_id = ? OR target_id = ?`, `DELETE FROM user_settings WHERE user_id = ?`, `DELETE FROM key_grants WHERE user_id = ?`} {
+			args := []any{int64(id)}
+			if strings.Count(q, "?") == 2 {
+				args = append(args, int64(id))
+			}
+			if _, err := tx.ExecContext(ctx, q, args...); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}

@@ -1,0 +1,113 @@
+// Package store contains every SQL query chatd runs, grouped by domain. Handlers
+// never touch database/sql directly.
+package store
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"strings"
+	"time"
+
+	"evilion.xyz/chat/internal/db"
+	"evilion.xyz/chat/internal/ids"
+)
+
+var (
+	ErrNotFound      = errors.New("not found")
+	ErrUsernameTaken = errors.New("username taken")
+	ErrConflict      = errors.New("conflict")
+	ErrAlreadyExists = errors.New("already exists")
+)
+
+// Store wraps the database pools.
+type Store struct {
+	db *db.DB
+}
+
+// New returns a Store over d.
+func New(d *db.DB) *Store { return &Store{db: d} }
+
+// DB exposes the underlying pools for callers that need transactions spanning domains.
+func (s *Store) DB() *db.DB { return s.db }
+
+// Tx runs fn inside a write transaction.
+func (s *Store) Tx(ctx context.Context, fn func(tx *sql.Tx) error) error { return s.db.Tx(ctx, fn) }
+
+func nowMs() int64 { return time.Now().UnixMilli() }
+
+// nullID converts an optional id into a driver value.
+func nullID(id *ids.ID) any {
+	if id == nil {
+		return nil
+	}
+	return int64(*id)
+}
+
+func idPtr(n sql.NullInt64) *ids.ID {
+	if !n.Valid {
+		return nil
+	}
+	v := ids.ID(n.Int64)
+	return &v
+}
+
+func int64Ptr(n sql.NullInt64) *int64 {
+	if !n.Valid {
+		return nil
+	}
+	v := n.Int64
+	return &v
+}
+
+func intPtr(n sql.NullInt64) *int {
+	if !n.Valid {
+		return nil
+	}
+	v := int(n.Int64)
+	return &v
+}
+
+func nullInt64(p *int64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+func nullInt(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return int64(*p)
+}
+
+func boolInt(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// placeholders returns "?,?,?" for n values.
+func placeholders(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	return strings.Repeat("?,", n-1) + "?"
+}
+
+func idArgs(list []ids.ID) []any {
+	out := make([]any, len(list))
+	for i, id := range list {
+		out[i] = int64(id)
+	}
+	return out
+}
+
+// querier is satisfied by *sql.DB and *sql.Tx.
+type querier interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}

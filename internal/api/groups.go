@@ -1,0 +1,9 @@
+package api
+
+import "net/http"
+
+// routeGroups lists every registration function. Handler files append to it
+// through init-free explicit listing so the order (and the routes) stay visible.
+func (s *Server) routeGroups() []func(mux *http.ServeMux) {
+	return []func(mux *http.ServeMux){}
+}

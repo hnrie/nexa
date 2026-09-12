@@ -1,0 +1,32 @@
+package api
+
+import (
+	"net/http"
+	"testing"
+)
+
+func TestHealthAnd404(t *testing.T) {
+	_, ts := newTestServer(t)
+	res, body := do(t, ts, "GET", "/api/health", "", nil)
+	if res.StatusCode != 200 || body["ok"] != true {
+		t.Errorf("health: %d %v", res.StatusCode, body)
+	}
+	if res.Header.Get("X-Content-Type-Options") != "nosniff" || res.Header.Get("X-Request-Id") == "" {
+		t.Error("security headers / request id missing")
+	}
+	res, body = do(t, ts, "GET", "/api/v1/nope", "", nil)
+	if res.StatusCode != 404 || errCode(body) != "not_found" {
+		t.Errorf("404: %d %v", res.StatusCode, body)
+	}
+	res, _ = do(t, ts, "GET", "/api/v1/users/@me", "", nil)
+	if res.StatusCode != 404 {
+		t.Errorf("unregistered authed route should 404 for now, got %d", res.StatusCode)
+	}
+}
+
+func TestReadJSON(t *testing.T) {
+	_, ts := newTestServer(t)
+	_ = ts
+	req, _ := http.NewRequest("POST", "/x", nil)
+	_ = req
+}
