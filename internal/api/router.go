@@ -15,6 +15,7 @@ import (
 	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/unfurl"
+	"evilion.xyz/chat/internal/voice"
 )
 
 // Broadcaster is how handlers push realtime events; the gateway implements it.
@@ -60,6 +61,8 @@ type Server struct {
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
+	// Voice tracks who is in which voice channel (set by WireVoice).
+	Voice *voice.Registry
 
 	// ChannelAccess decides server-channel access (Phase 2). DM access is built in.
 	ChannelAccess func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error)

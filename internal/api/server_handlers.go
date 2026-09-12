@@ -709,6 +709,7 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	viewers, _ := s.Store.ChannelViewers(r.Context(), ch.ID)
+	s.voiceChannelDeleted(r.Context(), ch)
 	if err := s.Store.DeleteChannel(r.Context(), ch.ID); err != nil {
 		WriteError(w, err)
 		return

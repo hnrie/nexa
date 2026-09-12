@@ -46,6 +46,8 @@ type Hub struct {
 	VoiceOp func(ctx context.Context, c *Conn, op string, data []byte)
 	// OnDisconnect runs when a user's last connection closes (voice cleanup).
 	OnDisconnect func(ctx context.Context, uid ids.ID)
+	// OnConnClose runs when any connection closes; voice states belong to one session.
+	OnConnClose func(ctx context.Context, uid, sessionID ids.ID)
 }
 
 // New creates a hub.

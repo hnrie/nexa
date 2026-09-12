@@ -59,6 +59,7 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	hub := gateway.New(st, srv.Auth, srv.Log, cfg.PublicURL)
 	srv.Bcast = hub
 	srv.WireServers(hub)
+	srv.WireVoice(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { ts.Close(); d.Close() })
@@ -114,15 +115,35 @@ func errCode(m map[string]any) string {
 type gw struct {
 	frames chan map[string]any
 	done   chan struct{}
+	ws     *websocket.Conn
+	// ready is the ready payload (only kept by connectGWReady).
+	ready map[string]any
+}
+
+// close ends the connection (the server treats it as a disconnect).
+func (g *gw) close() {
+	_ = g.ws.Close(websocket.StatusNormalClosure, "")
+	<-g.done
+}
+
+// connectGWReady connects and keeps the ready payload for inspection.
+func connectGWReady(t *testing.T, ts *httptest.Server, token string) *gw {
+	t.Helper()
+	return connectGWOpts(t, ts, token, true)
 }
 
 func connectGW(t *testing.T, ts *httptest.Server, token string) *gw {
+	t.Helper()
+	return connectGWOpts(t, ts, token, false)
+}
+
+func connectGWOpts(t *testing.T, ts *httptest.Server, token string, keepReady bool) *gw {
 	t.Helper()
 	ws, _, err := websocket.Dial(context.Background(), "ws"+strings.TrimPrefix(ts.URL, "http")+"/gateway", &websocket.DialOptions{HTTPHeader: map[string][]string{"Origin": {"http://localhost"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	g := &gw{frames: make(chan map[string]any, 256), done: make(chan struct{})}
+	g := &gw{frames: make(chan map[string]any, 256), done: make(chan struct{}), ws: ws}
 	go func() {
 		defer close(g.done)
 		for {
@@ -141,8 +162,12 @@ func connectGW(t *testing.T, ts *httptest.Server, token string) *gw {
 	if err := ws.Write(context.Background(), websocket.MessageText, b); err != nil {
 		t.Fatal(err)
 	}
-	if g.next("ready", 3*time.Second) == nil {
+	ready := g.next("ready", 3*time.Second)
+	if ready == nil {
 		t.Fatal("gateway ready not received")
+	}
+	if keepReady {
+		g.ready = ready
 	}
 	return g
 }

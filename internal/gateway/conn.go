@@ -123,6 +123,9 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	last := h.unregister(c)
 	c.close(websocket.StatusNormalClosure, "bye")
+	if h.OnConnClose != nil {
+		h.OnConnClose(context.Background(), user.ID, session.ID)
+	}
 	if last {
 		bg := context.Background()
 		if u, err := h.st.UserByID(bg, user.ID); err == nil {
