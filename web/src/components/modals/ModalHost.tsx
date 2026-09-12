@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { useUI } from "@/stores/ui";
+import { lazy, Suspense, useCallback } from "react";
+import { useUI, type ModalState } from "@/stores/ui";
 import { ConfirmModal } from "./ConfirmModal";
 import { CreateDMModal } from "./CreateDMModal";
 import { CustomStatusModal } from "./CustomStatusModal";
@@ -19,13 +19,24 @@ const ServerSettingsModal = lazy(() => import("@/components/server/ServerSetting
 const ChannelSettingsModal = lazy(() => import("@/components/server/ChannelSettingsModal"));
 const MemberActionModal = lazy(() => import("@/components/server/MemberActionModal"));
 
-/** Renders whichever modal the ui store asks for. */
+/** Renders every modal on the ui store's stack; later ones overlay earlier ones. */
 export function ModalHost() {
-  const modal = useUI((u) => u.modal);
-  const close = useUI((u) => u.closeModal);
+  const modals = useUI((u) => u.modals);
   return (
     <>
       <QuickSwitcher />
+      {modals.map((m) => (
+        <ModalEntry key={m.id} modal={m} />
+      ))}
+    </>
+  );
+}
+
+function ModalEntry({ modal }: { modal: ModalState }) {
+  const closeModal = useUI((u) => u.closeModal);
+  const close = useCallback(() => closeModal(modal.id), [closeModal, modal.id]);
+  return (
+    <>
       {modal?.kind === "createDM" ? <CreateDMModal onClose={close} initial={(modal.props?.["initial"] as string[] | undefined) ?? []} groupId={modal.props?.["groupId"] as string | undefined} /> : null}
       {modal?.kind === "confirm" ? (
         <ConfirmModal

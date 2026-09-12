@@ -1,5 +1,5 @@
 import { Volume2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { servers as serversApi } from "@/api/servers";
 import { ChatView } from "@/components/chat/ChatView";
@@ -24,11 +24,21 @@ export default function ServerPage() {
   const setActiveChannel = useUI((u) => u.setActiveChannel);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const [missing, setMissing] = useState(false);
+  const seen = useRef(false);
   const channel = channelId ? channels[channelId] : undefined;
 
-  // an unknown server (deep link before ready, or one we were just added to) is fetched once
+  // an unknown server (deep link before ready, or one we were just added to) is fetched once;
+  // one that vanishes after being seen was left, deleted or kicked from: go home without asking
   useEffect(() => {
-    if (st || !serverId) return;
+    if (st) {
+      seen.current = true;
+      return;
+    }
+    if (!serverId) return;
+    if (seen.current) {
+      setMissing(true);
+      return;
+    }
     let alive = true;
     serversApi
       .get(serverId)

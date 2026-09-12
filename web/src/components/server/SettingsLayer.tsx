@@ -1,7 +1,8 @@
 import { X } from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/common/Button";
+import { isTopLayer } from "@/components/common/Modal";
 import s from "@/components/settings/Settings.module.css";
 
 export interface NavGroup {
@@ -11,9 +12,10 @@ export interface NavGroup {
 
 /** The full-screen settings frame (nav on the left, content on the right) used by user, server and channel settings. */
 export function SettingsLayer({ label, groups, page, setPage, onClose, children, footer }: { label: string; groups: NavGroup[]; page: string; setPage: (id: string) => void; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && isTopLayer(ref.current)) {
         e.stopPropagation();
         onClose();
       }
@@ -22,7 +24,7 @@ export function SettingsLayer({ label, groups, page, setPage, onClose, children,
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   return createPortal(
-    <div className={s.layer} role="dialog" aria-modal="true" aria-label={label}>
+    <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label={label} data-modal-layer="">
       <div className={s.navWrap}>
         <nav className={s.nav}>
           {groups.map((g, i) => (

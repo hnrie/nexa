@@ -3,6 +3,13 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import s from "./Modal.module.css";
 
+/** Only the most recently opened dialog reacts to Escape; portals mount in order, so the last in the DOM is on top. */
+export function isTopLayer(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  const layers = document.querySelectorAll("[data-modal-layer]");
+  return layers[layers.length - 1] === el;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -20,7 +27,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && isTopLayer(ref.current)) {
         e.stopPropagation();
         onClose();
       }
@@ -36,7 +43,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
   if (!open) return null;
   return createPortal(
     <div className={s.overlay} onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
-      <div ref={ref} className={[s.card, bare ? s.bare : "", className ?? ""].join(" ")} style={{ width }} role="dialog" aria-modal="true" tabIndex={-1}>
+      <div ref={ref} className={[s.card, bare ? s.bare : "", className ?? ""].join(" ")} style={{ width }} role="dialog" aria-modal="true" tabIndex={-1} data-modal-layer="">
         {!bare && title !== undefined ? (
           <div className={s.header}>
             <h2 className={s.title}>{title}</h2>

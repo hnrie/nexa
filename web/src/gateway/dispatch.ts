@@ -59,7 +59,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const d = e.d;
       resetAll();
       useAuth.getState().setMe(d.user);
-      useUsers.getState().upsert(d.users);
+      useUsers.getState().upsert([...d.users, d.user]);
       useChannels.getState().upsert(d.channels);
       useRelationships.getState().setMany(d.relationships);
       useReadStates.getState().setMany(d.read_states);

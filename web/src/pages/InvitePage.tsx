@@ -6,6 +6,8 @@ import type { InvitePreview } from "@/api/types";
 import { iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
+import { startSession } from "@/gateway/session";
+import LockPage from "@/pages/LockPage";
 import { initials } from "@/lib/avatarColor";
 import { parseInviteFragment } from "@/lib/inviteLink";
 import { keystore } from "@/crypto/keystore";
@@ -23,7 +25,15 @@ export default function InvitePage() {
   const loc = useLocation();
   const nav = useNavigate();
   const status = useAuth((a) => a.status);
+  const bootstrap = useAuth((a) => a.bootstrap);
   const meId = useAuth((a) => a.me?.id);
+  // the page lives outside the authed shell, so it restores the session itself
+  useEffect(() => {
+    if (status === "idle") void bootstrap();
+  }, [status, bootstrap]);
+  useEffect(() => {
+    if (status === "ready") void startSession();
+  }, [status]);
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const member = useServers((st) => (preview ? st.byId[preview.server.id] : undefined));
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +75,7 @@ export default function InvitePage() {
     }
   };
 
+  if (status === "locked") return <LockPage />;
   const next = encodeURIComponent(loc.pathname + loc.hash);
   const icon = preview ? iconUrl(preview.server.icon_id) : null;
   return (
@@ -89,7 +100,7 @@ export default function InvitePage() {
               <span><i className={s.online} /> {preview.server.online_count} Online</span>
               <span><i className={s.offline} /> {preview.server.member_count} Members</span>
             </div>
-            {status === "ready" || status === "locked" ? (
+            {status === "ready" ? (
               member && meId ? (
                 <Button block onClick={() => nav(`/channels/${preview.server.id}`)}>You're already a member — Open</Button>
               ) : (

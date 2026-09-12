@@ -155,6 +155,115 @@ class Session:
         return self.page.locator(f"[data-id]:has-text('{text}')").last
 
 
+def server_flow(srv, alice, bob, phone):
+    a, b = alice.page, bob.page
+    # alice creates a server
+    a.goto(srv.base + "/channels/@me", wait_until="networkidle")
+    a.click("button[aria-label='Add a Server']")
+    a.fill("[data-testid=server-name]", "Test Server")
+    a.click("button:has-text('Create')")
+    a.wait_for_url("**/channels/*/*", timeout=20000)
+    a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
+    alice.send("first message in general")
+    a.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
+    server_id = a.url.split("/channels/")[1].split("/")[0]
+    # invite link carries the key fragment
+    a.click("button[aria-label='Invite People']")
+    link_box = a.locator("[data-testid=invite-link]")
+    link_box.wait_for(timeout=15000)
+    for _ in range(50):
+        link = link_box.input_value()
+        if "#k=" in link:
+            break
+        time.sleep(0.1)
+    assert "#k=" in link, link
+    a.keyboard.press("Escape")
+    # bob joins through the link and can read the history immediately
+    b.goto(link, wait_until="networkidle")
+    b.wait_for_selector("text=Test Server", timeout=15000)
+    bob.shot("invite")
+    b.click("button:has-text('Accept Invite')")
+    b.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
+    b.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
+    a.wait_for_selector("[data-testid=member-list] [data-user]", timeout=15000)
+    assert a.locator("[data-testid=member-list] [data-user]").count() == 2, "alice sees both members"
+    bob.send("bob says hi in general")
+    a.wait_for_selector("[data-id]:has-text('bob says hi in general')", timeout=20000)
+    alice.shot("server")
+    bob.shot("server")
+    # a private channel: bob must not see it, and it encrypts under its own key
+    a.click("button[aria-label='Create Channel']")
+    a.fill("[data-testid=channel-name]", "staff")
+    a.locator("input[role=switch]").check()
+    a.click("button:has-text('Create Channel')")
+    a.wait_for_selector("textarea[aria-label='Message #staff']", timeout=20000)
+    alice.send("secret staff message")
+    a.wait_for_selector("[data-id]:has-text('secret staff message')", timeout=20000)
+    time.sleep(0.5)
+    assert b.locator("[data-channel] >> text=staff").count() == 0, "bob must not see the private channel"
+    # a role that cannot send messages, assigned to bob
+    a.click("button:has-text('Test Server')")
+    a.click("text=Server Settings")
+    a.click("[data-nav=roles]")
+    a.click("[data-testid=create-role]")
+    a.fill("[data-testid=role-name]", "Muted")
+    a.click("[data-testid=save]")
+    a.wait_for_selector("text=Role saved.", timeout=15000)
+    a.click("[data-nav=members]")
+    b_row = a.locator(f"[data-member]:has-text('Bob')")
+    b_row.locator("button[aria-label='Edit roles']").click()
+    a.locator("label:has-text('Muted') input").check()
+    time.sleep(0.5)
+    a.keyboard.press("Escape")
+    a.keyboard.press("Escape")
+    # deny Send Messages for @everyone in general (the role and everyone are both muted for bob)
+    general = a.locator("[data-channel] >> text=general").first
+    general.hover()
+    a.locator("[data-channel]:has-text('general') button[aria-label='Edit Channel']").first.click()
+    a.click("[data-nav=permissions]")
+    a.locator("[data-perm=SEND_MESSAGES] button[aria-label=Deny]").click()
+    a.click("[data-testid=save]")
+    a.wait_for_selector("text=Permissions saved.", timeout=15000)
+    a.keyboard.press("Escape")
+    b.wait_for_selector("[data-testid=composer-locked]", timeout=20000)
+    bob.shot("server-locked")
+    # alice (owner) can still send in #general
+    a.locator("[data-channel]:has-text('general') button").first.click()
+    a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
+    # drag reorder: move #staff above #general inside Text Channels
+    staff_row = a.locator("[data-channel]:has-text('staff')").first
+    general_row = a.locator("[data-channel]:has-text('general')").first
+    staff_row.drag_to(general_row, target_position={"x": 40, "y": 4})
+    time.sleep(1.0)
+    names = [t.strip() for t in a.locator("[data-channel] span:nth-child(2)").all_inner_texts()]
+    assert names.index("staff") < names.index("general"), names
+    a.reload(wait_until="networkidle")
+    a.wait_for_selector("[data-channel]", timeout=15000)
+    names = [t.strip() for t in a.locator("[data-channel] span:nth-child(2)").all_inner_texts()]
+    assert names.index("staff") < names.index("general"), "order persists after reload: " + str(names)
+    alice.shot("server-reordered")
+    # kick bob: he loses the server and the key rotates
+    a.click("button:has-text('Test Server')")
+    a.click("text=Server Settings")
+    a.click("[data-nav=members]")
+    a.locator("[data-member]:has-text('Bob') button[aria-label=Kick]").click()
+    a.click("button:has-text('Kick'):not(:has-text('Members'))")
+    b.wait_for_url("**/channels/@me**", timeout=20000)
+    a.click("[data-nav=encryption]")
+    a.wait_for_selector("text=/Key epoch [1-9]/", timeout=20000)
+    alice.shot("server-encryption")
+    a.keyboard.press("Escape")
+    # carol on the phone opens the server through the drawer
+    phone.page.goto(link, wait_until="networkidle")
+    phone.page.click("button:has-text('Accept Invite')")
+    phone.page.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
+    phone.page.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
+    phone.shot("server")
+    phone.page.click("button[aria-label='Open navigation']")
+    time.sleep(0.4)
+    phone.shot("server-drawer")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "tools/out"))
@@ -231,6 +340,8 @@ def main():
             phone.page.click("button[aria-label='Open navigation']")
             time.sleep(0.4)
             phone.shot("drawer")
+            print("servers")
+            server_flow(srv, alice, bob, phone)
             errors = alice.errors + bob.errors + phone.errors
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))

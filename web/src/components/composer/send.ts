@@ -26,7 +26,7 @@ export interface SendOptions {
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
 export function convForChannel(channelId: string): string {
   const ch = useChannels.getState().byId[channelId];
-  if (ch?.key_conv_id) return ch.key_conv_id;
+  if (ch?.key_conv_id && ch.key_conv_id !== "0") return ch.key_conv_id;
   if (ch?.server_id && ch.type !== "dm" && ch.type !== "group_dm") return ch.server_id;
   return channelId;
 }

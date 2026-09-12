@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { isTopLayer } from "@/components/common/Modal";
 import { useAuth } from "@/stores/auth";
 import s from "./Settings.module.css";
 
@@ -19,9 +20,10 @@ const NAV: { head: string; items: { id: string; label: string }[] }[] = [
 export default function SettingsModal({ onClose, page: initial }: { onClose: () => void; page: string }) {
   const [page, setPage] = useState(initial);
   const logout = useAuth((a) => a.logout);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && isTopLayer(ref.current)) {
         e.stopPropagation();
         onClose();
       }
@@ -32,7 +34,7 @@ export default function SettingsModal({ onClose, page: initial }: { onClose: () 
   const body =
     page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : <AccountPage onClose={onClose} />;
   return createPortal(
-    <div className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings">
+    <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings" data-modal-layer="">
       <div className={s.navWrap}>
         <nav className={s.nav}>
           {NAV.map((g) => (

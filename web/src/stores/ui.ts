@@ -2,6 +2,8 @@ import { create } from "zustand";
 import type { GatewayStatus } from "@/gateway/client";
 
 export interface ModalState {
+  /** Stack entry id; closeModal(id) removes exactly this modal. */
+  id?: number;
   kind: string;
   props?: Record<string, unknown>;
 }
@@ -33,7 +35,10 @@ interface UIState {
   leftOpen: boolean;
   rightOpen: boolean;
   membersOpen: boolean;
+  /** The topmost open modal (kept for readers that only care whether one is open). */
   modal: ModalState | null;
+  /** Every open modal, bottom to top; a modal opened from inside another stacks above it. */
+  modals: ModalState[];
   contextMenu: ContextMenuState | null;
   quickSwitcher: boolean;
   activeChannelId: string | null;
@@ -47,7 +52,9 @@ interface UIState {
   setRightOpen: (v: boolean) => void;
   toggleMembers: () => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
-  closeModal: () => void;
+  /** Closes the modal with that id, or the topmost one. */
+  closeModal: (id?: number) => void;
+  closeAllModals: () => void;
   openContextMenu: (m: ContextMenuState) => void;
   closeContextMenu: () => void;
   setQuickSwitcher: (v: boolean) => void;
@@ -61,6 +68,7 @@ interface UIState {
 }
 
 let toastSeq = 0;
+let modalSeq = 0;
 
 export const useUI = create<UIState>()((set) => ({
   connection: "idle",
@@ -68,6 +76,7 @@ export const useUI = create<UIState>()((set) => ({
   rightOpen: false,
   membersOpen: true,
   modal: null,
+  modals: [],
   contextMenu: null,
   quickSwitcher: false,
   activeChannelId: null,
@@ -80,8 +89,20 @@ export const useUI = create<UIState>()((set) => ({
   setLeftOpen: (leftOpen) => set(leftOpen ? { leftOpen: true, rightOpen: false } : { leftOpen: false }),
   setRightOpen: (rightOpen) => set(rightOpen ? { rightOpen: true, leftOpen: false } : { rightOpen: false }),
   toggleMembers: () => set((s) => ({ membersOpen: !s.membersOpen })),
-  openModal: (kind, props) => set({ modal: props ? { kind, props } : { kind } }),
-  closeModal: () => set({ modal: null }),
+  openModal: (kind, props) =>
+    set((s) => {
+      modalSeq += 1;
+      const entry: ModalState = props ? { id: modalSeq, kind, props } : { id: modalSeq, kind };
+      const modals = [...s.modals, entry];
+      return { modals, modal: entry };
+    }),
+  closeModal: (id) =>
+    set((s) => {
+      if (s.modals.length === 0) return s;
+      const modals = id === undefined ? s.modals.slice(0, -1) : s.modals.filter((m) => m.id !== id);
+      return { modals, modal: modals[modals.length - 1] ?? null };
+    }),
+  closeAllModals: () => set({ modals: [], modal: null }),
   openContextMenu: (contextMenu) => set({ contextMenu }),
   closeContextMenu: () => set({ contextMenu: null }),
   setQuickSwitcher: (quickSwitcher) => set({ quickSwitcher }),

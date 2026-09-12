@@ -24,6 +24,12 @@ func scanChannel(r rowScanner) (*Channel, error) {
 	}
 	c.ServerID, c.ParentID, c.OwnerID, c.IconID, c.LastMessageID = idPtr(server), idPtr(parent), idPtr(owner), idPtr(icon), idPtr(last)
 	c.NSFW = nsfw == 1
+	// the default key conversation; callers that know about private-channel epochs refine it
+	if c.ServerID != nil {
+		c.KeyConvID = *c.ServerID
+	} else {
+		c.KeyConvID = c.ID
+	}
 	return &c, nil
 }
 

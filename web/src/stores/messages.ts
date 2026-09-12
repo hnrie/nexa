@@ -1,9 +1,32 @@
 import { create } from "zustand";
+import { users as usersApi } from "@/api/users";
+import { useUsers } from "./users";
 import { messages as messagesApi } from "@/api/messages";
 import type { Message, ReactionSummary } from "@/api/types";
 import type { MessagePayload } from "@/crypto/message";
 import { decryptForStore, type DecryptedMessage, type DecryptError } from "@/lib/decrypt";
 import { compareIds } from "@/lib/ids";
+
+const authorFetches = new Set<string>();
+
+/** Authors of loaded history may no longer be members or friends; fetch the ones the users store lacks. */
+function resolveAuthors(msgs: { author_id: string; mentions?: string[] }[]): void {
+  const known = useUsers.getState().byId;
+  const want = new Set<string>();
+  for (const m of msgs) {
+    if (!known[m.author_id]) want.add(m.author_id);
+    for (const id of m.mentions ?? []) if (!known[id]) want.add(id);
+  }
+  for (const id of want) {
+    if (authorFetches.has(id)) continue;
+    authorFetches.add(id);
+    usersApi
+      .get(id)
+      .then((u) => useUsers.getState().upsert(u))
+      .catch(() => {})
+      .finally(() => authorFetches.delete(id));
+  }
+}
 
 export type { DecryptedMessage };
 
@@ -83,6 +106,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   ensure: (channelId) => get().channels[channelId] ?? emptyChannel(),
   insert: (channelId, msgs) => {
     if (msgs.length === 0) return;
+    resolveAuthors(msgs);
     set((s) =>
       withChannel(s, channelId, (c) => {
         const byId = { ...c.byId };

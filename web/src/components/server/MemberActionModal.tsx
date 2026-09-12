@@ -36,6 +36,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
   const [days, setDays] = useState(0);
   const [duration, setDuration] = useState(600);
   const [busy, setBusy] = useState(false);
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   const member = st?.members[userId];
   const name = memberName(member?.nickname, user);
   const timedOut = !!member?.timeout_until && member.timeout_until > Date.now();
@@ -66,10 +67,20 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
   if (action === "roles") {
     const mine = meId ? memberHighest(st, meId) : { highest: 0, isOwner: false };
     const roles = rolesByPosition(st).filter((ro) => ro.id !== serverId);
-    const toggle = (roleId: string, on: boolean) =>
-      void run(async () => {
+    const toggle = async (roleId: string, on: boolean) => {
+      setOptimistic((o) => ({ ...o, [roleId]: on }));
+      try {
         upsertMember(on ? await serversApi.addRole(serverId, userId, roleId) : await serversApi.removeRole(serverId, userId, roleId));
-      }).then(() => setBusy(false));
+      } catch (err) {
+        toast(err instanceof ApiError ? err.message : "Could not change roles.", "error");
+      } finally {
+        setOptimistic((o) => {
+          const next = { ...o };
+          delete next[roleId];
+          return next;
+        });
+      }
+    };
     return (
       <Modal open onClose={onClose} title="Edit Roles" width={440} footer={<Button onClick={onClose}>Done</Button>}>
         <div className={s.form}>
@@ -77,11 +88,11 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
           {roles.length === 0 ? <p className={s.hint}>This server has no roles yet. Create some in Server Settings.</p> : null}
           <div className={r.list}>
             {roles.map((ro) => {
-              const on = member?.role_ids.includes(ro.id) ?? false;
+              const on = optimistic[ro.id] ?? member?.role_ids.includes(ro.id) ?? false;
               const allowed = canManageRole(mine.highest, mine.isOwner, ro.position);
               return (
                 <label key={ro.id} className={r.row} data-disabled={!allowed}>
-                  <input type="checkbox" checked={on} disabled={!allowed || busy} onChange={(e) => toggle(ro.id, e.target.checked)} />
+                  <input type="checkbox" checked={on} disabled={!allowed} onChange={(e) => void toggle(ro.id, e.target.checked)} />
                   <span className={r.dot} style={{ background: ro.color ? `#${ro.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
                   <span className={r.name}>{ro.name}</span>
                 </label>
