@@ -16,6 +16,8 @@ export interface ContextMenuItem {
   icon?: string;
   onSelect?: () => void;
   separatorAfter?: boolean;
+  /** Makes the item a slider that takes effect as it moves, and leaves the menu open. */
+  slider?: { value: number; min: number; max: number; step?: number; unit?: string; onChange: (value: number) => void };
 }
 
 export interface ContextMenuState {

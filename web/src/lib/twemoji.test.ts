@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { twemojiCode, twemojiUrl } from "./twemoji";
 
 describe("twemojiCode", () => {
@@ -36,5 +36,37 @@ describe("twemojiCode", () => {
     const url = twemojiUrl("😀");
     expect(url).toBe("/twemoji/1f600.svg");
     expect(url).not.toMatch(/^https?:/);
+  });
+});
+
+describe("the list of pictures", () => {
+  it("asks for nothing until it knows what exists, then only for what does", async () => {
+    vi.resetModules();
+    let answer: (names: string[]) => void = () => undefined;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => (answer = (names) => resolve(new Response(JSON.stringify(names))))));
+    vi.stubGlobal("fetch", fetchMock);
+    const tw = await import("./twemoji");
+    expect(tw.twemojiIndexSettled()).toBe(false);
+    tw.ensureTwemojiIndex();
+    const ready = new Promise<void>((r) => tw.onTwemojiIndexReady(r));
+    answer(["1f600"]);
+    await ready;
+    expect(tw.twemojiIndexSettled()).toBe(true);
+    expect(tw.twemojiCandidates("😀")).toHaveLength(1);
+    expect(tw.twemojiCandidates("🫩")).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("tries the pictures anyway if the list cannot be had", async () => {
+    vi.resetModules();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    const tw = await import("./twemoji");
+    const settled = new Promise<void>((r) => tw.onTwemojiIndexReady(r));
+    tw.ensureTwemojiIndex();
+    await settled;
+    expect(tw.twemojiIndexReady()).toBe(false);
+    expect(tw.twemojiIndexSettled()).toBe(true);
+    expect(tw.twemojiCandidates("🫩")).toHaveLength(1);
+    vi.unstubAllGlobals();
   });
 });

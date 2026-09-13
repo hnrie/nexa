@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ensureTwemojiIndex, onTwemojiIndexReady, twemojiCandidates, twemojiIndexReady } from "@/lib/twemoji";
+import { ensureTwemojiIndex, onTwemojiIndexReady, twemojiCandidates, twemojiIndexSettled } from "@/lib/twemoji";
 
 interface Props {
   /** The emoji itself, as text. */
@@ -20,11 +20,12 @@ const missing = new Set<string>();
 export function Twemoji({ text, className, title, fallbackClassName }: Props) {
   const [, bump] = useState(0);
   useEffect(() => {
-    if (twemojiIndexReady()) return;
+    if (twemojiIndexSettled()) return;
     ensureTwemojiIndex();
     return onTwemojiIndexReady(() => bump((n) => n + 1));
   }, []);
-  const candidates = twemojiCandidates(text).filter((u) => !missing.has(u));
+  // the glyph stands in for the moment until the list says which pictures exist
+  const candidates = twemojiIndexSettled() ? twemojiCandidates(text).filter((u) => !missing.has(u)) : [];
   const [attempt, setAttempt] = useState(0);
   useEffect(() => setAttempt(0), [text]);
   const src = candidates[attempt];

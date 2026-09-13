@@ -189,7 +189,12 @@ export function ChatView({ channel }: { channel: Channel }) {
       {!isServer ? <CallBanner channelId={convo.id} /> : null}
       {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
       <div className={s.body}>
-        <MessageList channel={channel} />
+        {/* the composer belongs to the conversation's column, so the member list and search run the full height beside it */}
+        <div className={s.main}>
+          <MessageList channel={channel} />
+          <TypingBar channelId={channel.id} />
+          <Composer channel={channel} />
+        </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (mobile || membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={mobile} open={membersOpen} /> : null}
@@ -210,8 +215,6 @@ export function ChatView({ channel }: { channel: Channel }) {
           </aside>
         ) : null}
       </div>
-      <TypingBar channelId={channel.id} />
-      <Composer channel={channel} />
     </div>
   );
 }

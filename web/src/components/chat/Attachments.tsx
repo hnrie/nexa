@@ -1,4 +1,4 @@
-import { Download, FileIcon, Play } from "lucide-react";
+import { Download, FileIcon, Play, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
@@ -75,6 +75,7 @@ export function Lightbox({ src, name, onClose }: { src: string; name: string; on
   }, [onClose]);
   return createPortal(
     <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name}>
+      <button className={s.lbClose} aria-label="Close" onClick={onClose}><X size={22} /></button>
       <img src={src} alt={name} onClick={(e) => e.stopPropagation()} />
       <div className={s.lbBar} onClick={(e) => e.stopPropagation()}>
         <a href={src} target="_blank" rel="noopener noreferrer">Open original</a>

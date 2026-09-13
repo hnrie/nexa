@@ -34,6 +34,11 @@ interface VoiceStore {
   ringing: Record<string, { from: string; at: number }>;
   /** A tile pinned to the focused layout: "user:video" or "user:screen". */
   focused: string | null;
+  /**
+   * Whose screen shares I have chosen to watch. A share is offered, not
+   * forced: it only plays once someone asks for it, and they can stop.
+   */
+  watching: Record<string, boolean>;
   error: string | null;
   applyState: (vs: VoiceState) => void;
   setAll: (list: VoiceState[]) => void;
@@ -50,6 +55,8 @@ interface VoiceStore {
   setLocalMute: (userId: string, on: boolean) => void;
   setRinging: (channelId: string, from: string | null) => void;
   setFocused: (key: string | null) => void;
+  /** Starts or stops watching someone's screen share; watching one brings it to the front. */
+  setWatching: (userId: string, on: boolean) => void;
   setError: (e: string | null) => void;
   resetSession: () => void;
   clear: () => void;
@@ -78,6 +85,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   localMutes: {},
   ringing: {},
   focused: null,
+  watching: {},
   error: null,
   applyState: (vs) =>
     set((s) => {
@@ -109,10 +117,19 @@ export const useVoice = create<VoiceStore>()((set) => ({
       delete remote[userId];
       const speaking = { ...s.speaking };
       delete speaking[userId];
-      return { peers, remote, speaking, focused: s.focused?.startsWith(userId + ":") ? null : s.focused };
+      const watching = { ...s.watching };
+      delete watching[userId];
+      return { peers, remote, speaking, watching, focused: s.focused?.startsWith(userId + ":") ? null : s.focused };
     }),
   setRemote: (userId, kind, stream) =>
-    set((s) => ({ remote: { ...s.remote, [userId]: { ...(s.remote[userId] ?? EMPTY_MEDIA), [kind]: stream } } })),
+    set((s) => {
+      const remote = { ...s.remote, [userId]: { ...(s.remote[userId] ?? EMPTY_MEDIA), [kind]: stream } };
+      if (kind !== "screen" || stream) return { remote };
+      // the share ended: nothing is left to watch
+      const watching = { ...s.watching };
+      delete watching[userId];
+      return { remote, watching, focused: s.focused === `${userId}:screen` ? null : s.focused };
+    }),
   setLocalVideo: (localVideo) => set({ localVideo }),
   setLocalScreen: (localScreen) => set({ localScreen }),
   setSpeaking: (userId, on) =>
@@ -136,9 +153,20 @@ export const useVoice = create<VoiceStore>()((set) => ({
       return { ringing };
     }),
   setFocused: (focused) => set({ focused }),
+  setWatching: (userId, on) =>
+    set((s) => {
+      const watching = { ...s.watching };
+      const key = `${userId}:screen`;
+      if (on) {
+        watching[userId] = true;
+        return { watching, focused: key };
+      }
+      delete watching[userId];
+      return { watching, focused: s.focused === key ? null : s.focused };
+    }),
   setError: (error) => set({ error }),
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, focused: null }),
-  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, ringing: {}, focused: null, error: null }),
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, focused: null, watching: {} }),
+  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, ringing: {}, focused: null, watching: {}, error: null }),
 }));
 
 /** A channel's participants in join order. */

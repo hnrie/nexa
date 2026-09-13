@@ -1,4 +1,4 @@
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSettings } from "@/stores/settings";
 import { useNavigate } from "react-router-dom";
@@ -127,6 +127,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   return (
     <Modal open onClose={onClose} width={600} bare>
       <div className={s.card}>
+        <button className={s.close} aria-label="Close profile" onClick={onClose}><X size={20} /></button>
         <div className={s.banner} style={banner ? { backgroundImage: `url(${banner})` } : { background: themeOf(user) }} />
         <div className={s.head}>
           <div className={s.avatar}><Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={80} status={st} /></div>

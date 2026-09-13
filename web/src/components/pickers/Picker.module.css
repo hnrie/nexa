@@ -4,6 +4,8 @@
 .tab { padding: 4px 8px; border-radius: var(--radius-xs); font-size: 16px; font-weight: 500; color: var(--text-muted); }
 .tab[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
 .tab:hover { color: var(--text); }
+.close { margin-left: auto; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-xs); color: var(--icon); }
+.close:hover { background: var(--bg-hover); color: var(--text); }
 .tab:disabled { opacity: 0.4; cursor: not-allowed; }
 .searchRow { display: flex; align-items: center; gap: 8px; padding: 12px 16px 8px; }
 .search { flex: 1; height: 32px; padding: 0 10px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); border: 0; outline: none; font-size: 14px; }

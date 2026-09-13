@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { EmojiPicker, type EmojiPick } from "./EmojiPicker";
@@ -59,6 +60,7 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
         <button className={s.tab} data-selected={active === "gif"} disabled={!gifs} onClick={() => setActive("gif")}>GIFs</button>
         <button className={s.tab} data-selected={active === "sticker"} disabled={!stickers} onClick={() => setActive("sticker")}>Stickers</button>
         <button className={s.tab} data-selected={active === "emoji"} onClick={() => setActive("emoji")}>Emoji</button>
+        <button className={s.close} aria-label="Close picker" onClick={onClose}><X size={18} /></button>
       </div>
       {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} /> : active === "gif" ? gifs : stickers}
     </div>

@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { channels as channelsApi } from "@/api/channels";
 import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
@@ -34,7 +35,10 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
   }, [channelId, onClose]);
   return (
     <div className={s.pinsPop} ref={ref}>
-      <div className={s.pinsHead}>Pinned Messages</div>
+      <div className={s.pinsHead}>
+        <span>Pinned Messages</span>
+        <button className={s.popClose} aria-label="Close pinned messages" onClick={onClose}><X size={18} /></button>
+      </div>
       <div className={s.pinsList}>
         {pins === null ? <div className={s.pinEmpty}>Loading…</div> : pins.length === 0 ? <div className={s.pinEmpty}>This channel doesn't have any pinned messages… yet.</div> : null}
         {pins?.map((m) => (

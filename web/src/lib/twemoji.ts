@@ -36,6 +36,8 @@ export function twemojiUrl(text: string): string | null {
 /** The names the set actually holds, once the list has been fetched. */
 let available: Set<string> | null = null;
 let loading: Promise<void> | null = null;
+/** The list could not be had, so pictures are tried blind rather than never shown. */
+let unlisted = false;
 const waiting = new Set<() => void>();
 
 /**
@@ -54,11 +56,22 @@ export function ensureTwemojiIndex(): void {
     .catch(() => {
       // no list: fall back to trying, which still works
       loading = null;
+      unlisted = true;
+      for (const fn of waiting) fn();
     });
 }
 
 export function twemojiIndexReady(): boolean {
   return available !== null;
+}
+
+/**
+ * Whether it is known which pictures to ask for: the list has arrived, or it
+ * could not be had. Until then nothing is asked for, or every emoji the set
+ * lacks would be a request that can only fail.
+ */
+export function twemojiIndexSettled(): boolean {
+  return available !== null || unlisted;
 }
 
 export function onTwemojiIndexReady(fn: () => void): () => void {

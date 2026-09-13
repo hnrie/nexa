@@ -6,6 +6,7 @@ import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
+import { setUserLocalMute, setUserVolume } from "@/voice/session";
 import s from "./Voice.module.css";
 
 /** Who is in a voice channel, listed under it in the sidebar. */
@@ -16,6 +17,9 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
   const server = useServers((st) => (serverId ? st.byId[serverId] : undefined));
   const meId = useAuth((a) => a.me?.id);
   const openModal = useUI((u) => u.openModal);
+  const openContextMenu = useUI((u) => u.openContextMenu);
+  const volumes = useVoice((v) => v.volumes);
+  const localMutes = useVoice((v) => v.localMutes);
   const list = participantsOf(byChannel, channelId);
   if (list.length === 0) return null;
   return (
@@ -23,7 +27,30 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
       {list.map((p) => {
         const name = memberName(server?.members[p.user_id]?.nickname, users[p.user_id], p.user_id === meId ? "You" : "Unknown User");
         return (
-          <button key={p.user_id} className={s.participant} data-speaking={!!speaking[p.user_id]} data-user={p.user_id} onClick={() => openModal("profile", { userId: p.user_id })}>
+          <button
+            key={p.user_id}
+            className={s.participant}
+            data-speaking={!!speaking[p.user_id]}
+            data-user={p.user_id}
+            onClick={() => openModal("profile", { userId: p.user_id })}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const vol = volumes[p.user_id] ?? 100;
+              openContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                items:
+                  p.user_id === meId
+                    ? [{ id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: p.user_id }) }]
+                    : [
+                        { id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: p.user_id }), separatorAfter: true },
+                        { id: "volume", label: "User Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setUserVolume(p.user_id, v) } },
+                        { id: "mute", label: localMutes[p.user_id] ? "Unmute" : "Mute", onSelect: () => setUserLocalMute(p.user_id, !localMutes[p.user_id]) },
+                        { id: "reset", label: "Reset Volume", disabled: vol === 100, onSelect: () => setUserVolume(p.user_id, 100) },
+                      ],
+              });
+            }}
+          >
             <Avatar id={p.user_id} avatarId={users[p.user_id]?.avatar_id ?? null} name={name} size={24} className={s.pAvatar} />
             <span className={s.pName}>{name}</span>
             <span className={s.pIcons}>

@@ -4,6 +4,8 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { installCrashReporting } from "./lib/crashReport";
 import { downloadsSettled } from "./lib/download";
+import { installLongPress } from "./lib/longPress";
+import { ensureTwemojiIndex } from "./lib/twemoji";
 import "./styles/base.css";
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
@@ -33,6 +35,9 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 }
 
 installCrashReporting();
+installLongPress();
+// the first emoji on screen should not have to wait for the list of pictures
+ensureTwemojiIndex();
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("missing #root");

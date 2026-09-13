@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { ensureTwemojiIndex, onTwemojiIndexReady, twemojiIndexSettled } from "@/lib/twemoji";
 import type { RenderCtx } from "./ast";
 import { Markdown, parseHighlightHtml, RenderNodes } from "./render";
 import { parse } from "./parse";
@@ -103,6 +104,14 @@ describe("mentions", () => {
 });
 
 describe("emoji", () => {
+  // pictures are only asked for once the list of what the set holds has arrived
+  beforeAll(async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(["1f600"]))));
+    ensureTwemojiIndex();
+    await new Promise<void>((resolve) => (twemojiIndexSettled() ? resolve() : onTwemojiIndexReady(resolve)));
+    vi.unstubAllGlobals();
+  });
+
   it("renders a custom emoji image", () => {
     const { container } = render(<Markdown source="<:smile:123>" ctx={makeCtx()} />);
     const img = container.querySelector("img.md-emoji") as HTMLImageElement;
