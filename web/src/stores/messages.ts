@@ -39,6 +39,9 @@ export interface PendingMessage {
   createdAt: number;
   status: "sending" | "failed";
   replyToId?: string;
+  /** The reply's ping choice and the message flags, so a retry sends what was chosen. */
+  ping?: boolean;
+  flags?: number;
 }
 
 export interface ChannelMessages {

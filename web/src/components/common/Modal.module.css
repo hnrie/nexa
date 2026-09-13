@@ -11,3 +11,4 @@
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes pop { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @media (max-width: 767px) { .overlay { padding: 0; align-items: flex-end; } .card { width: 100% !important; max-height: 92vh; border-radius: var(--radius-md) var(--radius-md) 0 0; } }
+@media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }

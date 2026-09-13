@@ -1,12 +1,12 @@
 import type { PublicUser } from "@/api/types";
 
-/** Turns `@username` tokens into `<@id>` and collects the mentioned ids. Code spans are left alone. */
+/** Turns `@username` tokens into `<@id>` and collects the mentioned ids. Code spans and links (youtube.com/@name) are left alone. */
 export function extractMentions(text: string, users: Record<string, PublicUser>): { text: string; mentions: string[]; everyone: boolean } {
   const byName = new Map<string, string>();
   for (const u of Object.values(users)) byName.set(u.username, u.id);
   const mentions = new Set<string>();
   let everyone = false;
-  const segments = text.split(/(```[\s\S]*?```|`[^`\n]*`)/);
+  const segments = text.split(/(```[\s\S]*?```|`[^`\n]*`|https?:\/\/[^\s<]+)/i);
   const out = segments
     .map((seg, i) => {
       if (i % 2 === 1) return seg;

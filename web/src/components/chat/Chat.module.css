@@ -194,3 +194,4 @@
 @media (max-width: 767px) {
   .subPanel { right: 8px; left: 8px; width: auto; }
 }
+@media (pointer: coarse) { .subClose { padding: 10px; margin-top: -10px; margin-bottom: -10px; margin-right: -10px; } }

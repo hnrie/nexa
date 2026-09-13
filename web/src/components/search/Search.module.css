@@ -26,3 +26,4 @@
 .searchBox input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
 .searchBox input::placeholder { color: var(--text-placeholder); }
 @media (max-width: 767px) { .panel { position: absolute; inset: 0; width: 100%; max-width: none; z-index: 5; } .searchBox { width: 120px; } .searchBox:focus-within { width: 180px; } }
+@media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }

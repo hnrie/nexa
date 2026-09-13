@@ -12,6 +12,7 @@ import { useMessages } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useSlowmode } from "@/stores/slowmode";
+import { extractUrls } from "@/markdown";
 import { extractMentions } from "./mentions";
 
 export interface SendOptions {
@@ -45,7 +46,7 @@ export async function sendMessage(channelId: string, rawText: string, opts: Send
   const nonce = newNonce();
   const tmp = tmpId();
   const messages = useMessages.getState();
-  messages.addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload, createdAt: Date.now(), status: "sending", ...(opts.replyTo ? { replyToId: opts.replyTo } : {}) });
+  messages.addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload, createdAt: Date.now(), status: "sending", ...(opts.replyTo ? { replyToId: opts.replyTo } : {}), ...(opts.ping !== undefined ? { ping: opts.ping } : {}), ...(opts.flags ? { flags: opts.flags } : {}) });
   try {
     const conv = convForChannel(channelId);
     const key = await useKeys.getState().ensureConvKey(conv);
@@ -96,6 +97,16 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   const payload: MessagePayload = { ...(existing.payload ?? {}) };
   if (text) payload.t = text;
   else delete payload.t;
+  // A preview belongs to a link in the text. Previews of redirected links carry
+  // the final address, so they are only dropped when the links themselves change.
+  const before = extractUrls(existing.payload?.t ?? "");
+  const after = extractUrls(rawText);
+  if (payload.embeds?.length && (before.length !== after.length || before.some((u, i) => u !== after[i]))) {
+    const keep = new Set(after);
+    const kept = payload.embeds.filter((e) => !!e && typeof e === "object" && keep.has((e as { url?: unknown }).url as string));
+    if (kept.length) payload.embeds = kept;
+    else delete payload.embeds;
+  }
   if (!payload.t && !payload.att?.length && !payload.sticker) return;
   const conv = existing.key_conv_id ?? convForChannel(channelId);
   const epoch = existing.key_epoch ?? 0;
@@ -122,6 +133,8 @@ export async function retryPending(channelId: string, tmpId: string): Promise<vo
   store.removePending(channelId, tmpId);
   const opts: SendOptions = {};
   if (p.replyToId) opts.replyTo = p.replyToId;
+  if (p.ping !== undefined) opts.ping = p.ping;
+  if (p.flags) opts.flags = p.flags;
   if (p.payload.embeds?.length) opts.embeds = p.payload.embeds;
   if (p.payload.sticker) opts.sticker = p.payload.sticker;
   if (p.payload.att?.length) {

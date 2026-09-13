@@ -1,5 +1,6 @@
 const KAOMOJI: Record<string, string> = {
-  shrug: "¯\\_(ツ)_/¯",
+  // markdown eats one backslash as an escape and would read the arm's _ as emphasis, so both are escaped
+  shrug: "¯\\\\\\_(ツ)_/¯",
   tableflip: "(╯°□°)╯︵ ┻━┻",
   unflip: "┬─┬ ノ( ゜-゜ノ)",
   lenny: "( ͡° ͜ʖ ͡°)",
