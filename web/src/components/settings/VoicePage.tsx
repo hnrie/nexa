@@ -5,7 +5,7 @@ import { Field } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
-import { LevelMeter, audioContext, getMic, listDevices, sensitivityToThreshold, type Devices } from "@/voice/media";
+import { LevelMeter, audioContext, describeInput, getMic, listDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
 import { inVoice } from "@/voice/session";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
@@ -25,8 +25,10 @@ export default function VoicePage() {
   const [devices, setDevices] = useState<Devices | null>(null);
   const [testing, setTesting] = useState(false);
   const [testLevel, setTestLevel] = useState(0);
+  const [sentLevel, setSentLevel] = useState(0);
+  const [diag, setDiag] = useState("");
   const [capturing, setCapturing] = useState(false);
-  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval> } | null>(null);
+  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null } | null>(null);
   const set = (partial: Partial<VoiceSettings>) => patch({ voice: { ...settings, ...partial } });
 
   useEffect(() => {
@@ -41,23 +43,37 @@ export default function VoicePage() {
     if (!t) return;
     clearInterval(t.timer);
     t.meter.close();
+    t.sentMeter?.close();
+    t.sent?.getTracks().forEach((x) => x.stop());
     t.stream.getTracks().forEach((x) => x.stop());
     testRef.current = null;
     setTesting(false);
     setTestLevel(0);
+    setSentLevel(0);
   };
   useEffect(() => stopTest, []);
   const startTest = async () => {
     try {
       const stream = await getMic(settings);
-      const meter = new LevelMeter(audioContext(), stream);
-      const timer = setInterval(() => setTestLevel(meter.level()), 60);
-      testRef.current = { stream, meter, timer };
+      const ctx = audioContext();
+      if (ctx.state === "suspended") await ctx.resume();
+      const meter = new LevelMeter(ctx, stream);
+      // The second meter listens to exactly what a call would send: the same
+      // stream after the input slider. If this one stays flat while the first
+      // moves, the trouble is here rather than with the microphone.
+      const sent = sentStream(ctx, stream, settings.inputVolume);
+      const sentMeter = new LevelMeter(ctx, sent.stream);
+      const timer = setInterval(() => {
+        setTestLevel(meter.level());
+        setSentLevel(sentMeter.level());
+      }, 60);
+      testRef.current = { stream, meter, timer, sent: sent.stream, sentMeter, gain: sent.gain };
       setTesting(true);
+      setDiag(describeInput(ctx, stream, sent.stream, settings.inputVolume));
       // permission granted: device labels are now readable
       listDevices().then(setDevices).catch(() => {});
-    } catch {
-      /* denied */
+    } catch (err) {
+      setDiag(`The microphone could not be opened: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
     }
   };
 
@@ -107,13 +123,22 @@ export default function VoicePage() {
             <input type="range" className={st.slider} min={0} max={200} value={settings.outputVolume} onChange={(e) => set({ outputVolume: Number(e.target.value) })} />
           </Field>
         </div>
-        <Field label="Mic test" hint="Speak and watch the meter. The yellow mark is your voice-activity threshold.">
+        <Field label="Mic test" hint="Speak and watch both meters. The top one is your microphone; the bottom one is what a call would actually send. The yellow mark is your voice-activity threshold.">
           <div>
-            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())}>{testing ? "Stop test" : "Let's check"}</Button>
-            <div className={v.meter} aria-label="Input level">
+            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} data-testid="mic-test">{testing ? "Stop test" : "Let's check"}</Button>
+            <div className={v.meter} aria-label="Input level" data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
               {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}
             </div>
+            {testing ? (
+              <>
+                <div className={v.meter} aria-label="Level others would hear" data-testid="sent-level" style={{ marginTop: 6 }}>
+                  <div className={v.meterFill} data-sent="true" style={{ width: `${Math.round(sentLevel * 100)}%` }} />
+                </div>
+                <p className={st.hint} style={{ marginTop: 6 }}>Top: your microphone. Bottom: what the call sends.</p>
+              </>
+            ) : null}
+            {diag ? <pre className={v.diag} data-testid="mic-diagnostics">{diag}</pre> : null}
           </div>
         </Field>
         <h5 className={st.h5}>Input mode</h5>

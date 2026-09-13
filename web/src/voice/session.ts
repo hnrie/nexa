@@ -13,7 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { LevelMeter, audioContext, getCamera, getMic, getScreen, screenBitrate, sensitivityToThreshold, type CameraFacing } from "./media";
+import { LevelMeter, audioContext, getCamera, getMic, getScreen, screenBitrate, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { MeshTransport, type SignalPayload } from "./mesh";
 
 interface Session {
@@ -82,8 +82,25 @@ function applyTransmit(): void {
 /** Scales the microphone before it reaches the peers, for the input slider. */
 function applyInputGain(): void {
   const s = session;
-  if (!s?.inputGain) return;
-  s.inputGain.gain.value = useSettings.getState().settings.voice.inputVolume / 100;
+  if (!s?.micRaw) return;
+  const volume = useSettings.getState().settings.voice.inputVolume;
+  if (s.inputGain) {
+    // moving back to 100% takes the extra stage out of the way again
+    if (volume === 100) rebuildInput(s);
+    else s.inputGain.gain.value = volume / 100;
+    return;
+  }
+  if (volume !== 100) rebuildInput(s);
+}
+
+/** Rebuilds the path from the microphone to the peers after a volume change. */
+function rebuildInput(s: Session): void {
+  if (!s.micRaw) return;
+  if (s.mic && s.mic !== s.micRaw) s.mic.getTracks().forEach((t) => t.stop());
+  s.mic = withInputGain(s, s.micRaw);
+  const track = s.mic.getAudioTracks()[0] ?? null;
+  s.transport.setLocalAudio(track);
+  applyTransmit();
 }
 
 /** Join a voice channel (or DM call). Leaves the current one first. */
@@ -153,21 +170,15 @@ export async function leaveVoice(notify = true): Promise<void> {
   useVoice.getState().resetSession();
 }
 
-/** Routes the capture through a gain node so the input slider does something. */
+/**
+ * Routes the capture through a gain node so the input slider does something.
+ * At 100% the microphone's own track is sent instead: a graph that produces
+ * silence on some devices is not worth inserting for no change in level.
+ */
 function withInputGain(s: Session, raw: MediaStream): MediaStream {
-  try {
-    const ctx = audioContext();
-    const src = ctx.createMediaStreamSource(raw);
-    const gain = ctx.createGain();
-    gain.gain.value = useSettings.getState().settings.voice.inputVolume / 100;
-    const dest = ctx.createMediaStreamDestination();
-    src.connect(gain).connect(dest);
-    s.inputGain = gain;
-    return dest.stream;
-  } catch {
-    s.inputGain = null;
-    return raw;
-  }
+  const { stream, gain } = sentStream(audioContext(), raw, useSettings.getState().settings.voice.inputVolume);
+  s.inputGain = gain;
+  return stream;
 }
 
 function startMeter(s: Session): void {

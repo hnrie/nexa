@@ -127,9 +127,50 @@ export function sensitivityToThreshold(db: number): number {
 
 let sharedCtx: AudioContext | null = null;
 
-/** One AudioContext for meters and playback; resumed on first use. */
+/**
+ * One AudioContext for meters and playback. The rate is left to the device:
+ * asking for 48 kHz makes Chrome resample some USB microphones, and a few of
+ * them come out silent when it does.
+ */
 export function audioContext(): AudioContext {
-  if (!sharedCtx) sharedCtx = new AudioContext({ sampleRate: 48000 });
+  if (!sharedCtx) sharedCtx = new AudioContext();
   if (sharedCtx.state === "suspended") void sharedCtx.resume();
   return sharedCtx;
+}
+
+/**
+ * The stream a call would send: the microphone through the input slider. At
+ * 100% there is nothing to apply, so the microphone's own track goes out
+ * untouched rather than through a graph that could go wrong.
+ */
+export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: number): { stream: MediaStream; gain: GainNode | null } {
+  if (inputVolume === 100) return { stream: mic, gain: null };
+  try {
+    const src = ctx.createMediaStreamSource(mic);
+    const gain = ctx.createGain();
+    gain.gain.value = Math.max(0, inputVolume) / 100;
+    const dest = ctx.createMediaStreamDestination();
+    src.connect(gain).connect(dest);
+    if (dest.stream.getAudioTracks().length === 0) return { stream: mic, gain: null };
+    return { stream: dest.stream, gain };
+  } catch {
+    return { stream: mic, gain: null };
+  }
+}
+
+/** What the microphone and the call are actually doing, in words. */
+export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaStream, inputVolume: number): string {
+  const track = mic.getAudioTracks()[0];
+  const st = track?.getSettings() ?? {};
+  const out = sent.getAudioTracks()[0];
+  const lines = [
+    `device: ${track?.label || "unnamed"}`,
+    `track: ${track?.readyState ?? "none"}, muted=${String(track?.muted ?? "?")}, enabled=${String(track?.enabled ?? "?")}`,
+    `format: ${st.sampleRate ?? "?"} Hz, ${st.channelCount ?? "?"} channel(s)`,
+    `processing: echo=${String(st.echoCancellation ?? "?")} noise=${String(st.noiseSuppression ?? "?")} gain=${String(st.autoGainControl ?? "?")}`,
+    `audio engine: ${ctx.state}, ${Math.round(ctx.sampleRate)} Hz`,
+    `input volume: ${inputVolume}% (${sent === mic ? "sent straight through" : "through the slider"})`,
+    `sent track: ${out?.readyState ?? "none"}`,
+  ];
+  return lines.join("\n");
 }
