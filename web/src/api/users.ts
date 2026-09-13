@@ -72,22 +72,40 @@ export const users = {
   },
 };
 
-function mediaUrl(kind: string, id: Snowflake | null): string | null {
-  return id ? `${api.baseUrl}/media/${kind}/${id}` : null;
+/**
+ * The size to ask the server for so a picture drawn `css` pixels across stays
+ * sharp on this screen: doubled or tripled for dense screens, then rounded up
+ * to a power of two, which is what the server keeps copies at. Without it a
+ * 32-pixel avatar would come as uploaded, and a 4096-pixel one costs the
+ * browser 64 MB to show.
+ */
+export function mediaSize(css: number): number {
+  const density = typeof window !== "undefined" ? Math.min(3, Math.max(1, window.devicePixelRatio || 1)) : 1;
+  const want = Math.ceil(css * density);
+  let size = 16;
+  while (size < want && size < 1024) size *= 2;
+  return size;
 }
 
-export function avatarUrl(id: Snowflake | null, _fallbackSeed?: string): string | null {
-  return mediaUrl("avatar", id);
+function mediaUrl(kind: string, id: Snowflake | null, css?: number): string | null {
+  if (!id) return null;
+  const url = `${api.baseUrl}/media/${kind}/${id}`;
+  return css ? `${url}?size=${mediaSize(css)}` : url;
 }
-export function bannerUrl(id: Snowflake | null): string | null {
-  return mediaUrl("banner", id);
+
+/** `css` is how many pixels across it is drawn; leave it out for the original. */
+export function avatarUrl(id: Snowflake | null, css?: number): string | null {
+  return mediaUrl("avatar", id, css);
 }
-export function iconUrl(id: Snowflake | null): string | null {
-  return mediaUrl("icon", id);
+export function bannerUrl(id: Snowflake | null, css?: number): string | null {
+  return mediaUrl("banner", id, css);
 }
-export function emojiUrl(id: Snowflake, _animated: boolean): string {
-  return `${api.baseUrl}/media/emoji/${id}`;
+export function iconUrl(id: Snowflake | null, css?: number): string | null {
+  return mediaUrl("icon", id, css);
 }
-export function stickerUrl(id: Snowflake): string {
-  return `${api.baseUrl}/media/sticker/${id}`;
+export function emojiUrl(id: Snowflake, _animated: boolean, css?: number): string {
+  return mediaUrl("emoji", id, css) ?? "";
+}
+export function stickerUrl(id: Snowflake, css?: number): string {
+  return mediaUrl("sticker", id, css) ?? "";
 }

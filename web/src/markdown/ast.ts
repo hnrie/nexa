@@ -25,7 +25,8 @@ export interface RenderCtx {
   users: Record<string, { display_name: string; username: string }>;
   channels: Record<string, { name: string }>;
   roles?: Record<string, { name: string; color: number }>;
-  emojiUrl: (id: string, animated: boolean) => string;
+  /** `css`, when given, is how many pixels across the emoji is drawn. */
+  emojiUrl: (id: string, animated: boolean, css?: number) => string;
   onUserClick?: (id: string, el: HTMLElement) => void;
   onChannelClick?: (id: string) => void;
   revealSpoilers?: boolean; // when true spoilers render revealed

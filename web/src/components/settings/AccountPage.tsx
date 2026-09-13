@@ -60,7 +60,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       toast("Saved.", "success");
       close();
     });
-  const banner = bannerUrl(me.banner_id);
+  const banner = bannerUrl(me.banner_id, 600);
 
   return (
     <>

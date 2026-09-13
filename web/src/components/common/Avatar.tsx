@@ -17,7 +17,7 @@ interface Props {
 
 /** A user or group avatar with an optional presence dot. Animated avatars play as-is. */
 export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style }: Props) {
-  const url = avatarUrl(avatarId);
+  const url = avatarUrl(avatarId, size);
   const dot = Math.max(8, Math.round(size * 0.3125));
   return (
     <span className={[s.wrap, className ?? ""].join(" ")} style={{ width: size, height: size, ...style }}>

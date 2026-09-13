@@ -102,7 +102,7 @@ export function Rail() {
       {ids.map((id) => {
         const st = servers[id];
         if (!st) return null;
-        const url = iconUrl(st.server.icon_id);
+        const url = iconUrl(st.server.icon_id, 48);
         const u = serverUnread(id, channels, reads, settings);
         const selected = activeServer === id;
         const muted = settings.notifications.muted.includes(id);

@@ -267,6 +267,7 @@ func (m *Store) Remove(ctx context.Context, b *store.Blob) error {
 	}
 	if n == 0 {
 		_ = os.Remove(m.Path(shaOf(b)))
+		m.removeVariants(shaOf(b))
 	}
 	return nil
 }

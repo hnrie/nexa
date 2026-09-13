@@ -159,5 +159,5 @@ export function searchStickers(packs: StickerPack[], q: string, limit = 60): { s
 
 /** Where a pack's image lives: emoji packs store emoji-kind blobs. */
 export function packImageUrl(pack: StickerPack, sticker: Sticker): string {
-  return pack.kind === "emoji" ? emojiUrl(sticker.blob_id, sticker.animated) : stickerUrl(sticker.blob_id);
+  return pack.kind === "emoji" ? emojiUrl(sticker.blob_id, sticker.animated, 48) : stickerUrl(sticker.blob_id, 160);
 }

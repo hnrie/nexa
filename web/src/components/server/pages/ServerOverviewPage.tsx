@@ -70,7 +70,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       setBusy(false);
     }
   };
-  const icon = iconUrl(server.icon_id);
+  const icon = iconUrl(server.icon_id, 128);
   return (
     <>
       <h2 className={st.title}>Server Overview</h2>

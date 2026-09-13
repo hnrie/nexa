@@ -81,7 +81,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   if (!user) return <Modal open onClose={onClose} title="Profile"><p className={s.small}>Loading…</p></Modal>;
   const st = statusOf(presence);
   const cs = customStatus(presence);
-  const banner = bannerUrl(user.banner_id);
+  const banner = bannerUrl(user.banner_id, 600);
 
   const message = async () => {
     try {

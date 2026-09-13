@@ -86,7 +86,7 @@ export default function InvitePage() {
   if (status === "locked") return <LockPage />;
   const next = encodeURIComponent(loc.pathname + loc.hash);
   const target = preview?.server ?? preview?.group;
-  const icon = target ? iconUrl(target.icon_id) : null;
+  const icon = target ? iconUrl(target.icon_id, 96) : null;
   const isGroup = !!preview?.group;
   const member = isGroup ? inGroup : alreadyIn;
   return (

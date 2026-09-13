@@ -69,7 +69,7 @@ export function DMSidebar() {
             avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
           } else {
             sub = `${ch.recipient_ids.length} Members`;
-            const url = iconUrl(ch.icon_id);
+            const url = iconUrl(ch.icon_id, 32);
             avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} /> : <span className={s.groupIcon}><Users size={18} /></span>;
           }
           const subs = activeConvo === ch.id ? selectSubchats(channels, ch.id) : [];

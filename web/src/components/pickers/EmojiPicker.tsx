@@ -51,7 +51,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
     onPick({ unicode: emojiToken({ name: st.name, blob_id: st.blob_id, animated: st.animated }), name: st.name });
   const packCell = (st: Sticker) => (
     <button key={st.id} className={s.cell} data-emoji={`:${st.name}:`} data-label={st.name} data-pack-emoji={st.id} title={`:${st.name}:`} onClick={() => pickPack(st)}>
-      <img className={s.cellImg} src={emojiUrl(st.blob_id, st.animated)} alt={`:${st.name}:`} loading="lazy" draggable={false} />
+      <img className={s.cellImg} src={emojiUrl(st.blob_id, st.animated, 48)} alt={`:${st.name}:`} loading="lazy" draggable={false} />
     </button>
   );
   const [toneOpen, setToneOpen] = useState(false);
@@ -97,7 +97,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
   );
   const customCell = (e: Emoji) => (
     <button key={e.id} className={s.cell} data-emoji={emojiToken(e)} data-label={e.name} data-custom={e.id} title={`:${e.name}:`} onMouseEnter={() => setHover({ kind: "custom", e })} onFocus={() => setHover({ kind: "custom", e })} onClick={() => onPick({ unicode: emojiToken(e), name: e.name, custom: e })}>
-      <img className={s.cellImg} src={emojiUrl(e.blob_id, e.animated)} alt={`:${e.name}:`} loading="lazy" draggable={false} />
+      <img className={s.cellImg} src={emojiUrl(e.blob_id, e.animated, 48)} alt={`:${e.name}:`} loading="lazy" draggable={false} />
     </button>
   );
   const jumpCustom = (id: string) => gridRef.current?.querySelector<HTMLElement>(`[data-custom-group="${id}"]`)?.scrollIntoView({ block: "start" });
@@ -129,7 +129,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
           ))}
           {customGroups.map((g) => (
             <button key={g.id} className={s.cat} title={g.name} onClick={() => jumpCustom(g.id)}>
-              {iconUrl(g.icon) ? <img className={s.catImg} src={iconUrl(g.icon) ?? ""} alt="" /> : <span className={s.catInitial}>{initials(g.name)}</span>}
+              {iconUrl(g.icon, 24) ? <img className={s.catImg} src={iconUrl(g.icon, 24) ?? ""} alt="" /> : <span className={s.catInitial}>{initials(g.name)}</span>}
             </button>
           ))}
           {groups.map((g) => (
@@ -177,7 +177,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
       <div className={s.inspector}>
         {hover?.kind === "custom" ? (
           <>
-            <img className={s.cellImg} src={emojiUrl(hover.e.blob_id, hover.e.animated)} alt="" />
+            <img className={s.cellImg} src={emojiUrl(hover.e.blob_id, hover.e.animated, 48)} alt="" />
             <span className={s.name}>:{hover.e.name}:</span>
           </>
         ) : hover ? (

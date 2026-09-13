@@ -91,7 +91,7 @@ export default function ProfilePage() {
       toast(err instanceof ApiError ? err.message : "Could not remove.", "error");
     }
   };
-  const banner = bannerUrl(me.banner_id);
+  const banner = bannerUrl(me.banner_id, 600);
 
   return (
     <>

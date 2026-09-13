@@ -211,7 +211,12 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
       {!revealed ? (
         <div className={s.spoiler} onClick={() => setRevealed(true)}><span>SPOILER</span></div>
       ) : null}
-      {failed ? <div className={s.failed}>This video cannot be played here. Download it to watch.</div> : null}
+      {failed ? (
+        <div className={s.failed}>
+          <span>This browser cannot play this video.</span>
+          <a className={s.failedDownload} href={src} download={name}>Download it</a>
+        </div>
+      ) : null}
       {!playing && revealed && !failed ? (
         <button className={s.bigPlay} aria-label="Play" onClick={toggle}><Play size={28} fill="currentColor" /></button>
       ) : null}

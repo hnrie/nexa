@@ -213,5 +213,5 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
   if (!sticker.blob) return <span className={s.edited}>[sticker]</span>;
   const w = sticker.w && sticker.h ? Math.round((160 * sticker.w) / sticker.h) : 160;
-  return <img className={s.sticker} src={stickerUrl(sticker.blob)} alt={sticker.name ?? "sticker"} title={sticker.name} width={Math.min(160, w)} height={160} loading="lazy" draggable={false} />;
+  return <img className={s.sticker} src={stickerUrl(sticker.blob, 160)} alt={sticker.name ?? "sticker"} title={sticker.name} width={Math.min(160, w)} height={160} loading="lazy" draggable={false} />;
 }

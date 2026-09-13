@@ -43,7 +43,8 @@ func (s *Server) handleMediaPublic(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if !s.Media.ServePublic(w, r, kind, id) {
+	// ?size= asks for a copy no larger than that, so a 32-pixel avatar is not a 4096-pixel one
+	if !s.Media.ServePublicSized(w, r, kind, id, media.VariantSize(r.URL.Query().Get("size"))) {
 		http.NotFound(w, r)
 	}
 }

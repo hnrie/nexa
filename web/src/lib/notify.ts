@@ -55,7 +55,7 @@ function onMessage(m: Message, mine: boolean): void {
   const author = displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (#${ch.name})` : author;
   try {
-    const n = new Notification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null) ?? "/icons/icon-192.png", silent: true });
+    const n = new Notification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true });
     n.onclick = () => {
       window.focus();
       navigateTo?.(ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`);

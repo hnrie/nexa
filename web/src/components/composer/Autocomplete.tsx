@@ -28,7 +28,7 @@ export function Autocomplete({ items, index, onHover, onPick, tone }: { items: A
             </>
           ) : it.kind === "customEmoji" ? (
             <>
-              <img className={s.acEmoji} src={emojiUrl(it.emoji.blob_id, it.emoji.animated)} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />
+              <img className={s.acEmoji} src={emojiUrl(it.emoji.blob_id, it.emoji.animated, 24)} alt="" style={{ width: 24, height: 24, objectFit: "contain" }} />
               <span>:{it.emoji.name}:</span>
             </>
           ) : (

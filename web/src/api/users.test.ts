@@ -1,6 +1,6 @@
 import { api } from "./client";
 import { one, recordRequests, recordUploads } from "./testing";
-import { avatarUrl, bannerUrl, emojiUrl, iconUrl, stickerUrl, users } from "./users";
+import { avatarUrl, mediaSize, bannerUrl, emojiUrl, iconUrl, stickerUrl, users } from "./users";
 
 beforeEach(() => {
   api.baseUrl = "";
@@ -137,9 +137,27 @@ describe("media urls", () => {
 
   it("returns null when there is no id", () => {
     expect(avatarUrl(null)).toBeNull();
-    expect(avatarUrl(null, "mara")).toBeNull();
+    expect(avatarUrl(null, 32)).toBeNull();
     expect(bannerUrl(null)).toBeNull();
     expect(iconUrl(null)).toBeNull();
+  });
+
+  it("asks for a copy the size a picture is drawn, sharp on dense screens", () => {
+    const dpr = Object.getOwnPropertyDescriptor(globalThis, "window");
+    Object.defineProperty(globalThis, "window", { value: { devicePixelRatio: 2 }, configurable: true });
+    try {
+      expect(avatarUrl("7", 32)).toBe("/media/avatar/7?size=64");
+      // rounded up to the powers of two the server keeps
+      expect(iconUrl("7", 48)).toBe("/media/icon/7?size=128");
+      expect(emojiUrl("7", true, 24)).toBe("/media/emoji/7?size=64");
+      expect(stickerUrl("7", 160)).toBe("/media/sticker/7?size=512");
+      // never past the largest copy
+      expect(bannerUrl("7", 600)).toBe("/media/banner/7?size=1024");
+    } finally {
+      if (dpr) Object.defineProperty(globalThis, "window", dpr);
+      else delete (globalThis as { window?: unknown }).window;
+    }
+    expect(mediaSize(10)).toBe(16);
   });
 
   it("honours a cross-origin baseUrl", () => {

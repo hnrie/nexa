@@ -35,6 +35,21 @@ function evict(keep: string): void {
   }
 }
 
+/**
+ * QuickTime and M4V files are MP4 underneath, and every browser that plays
+ * one plays the other, but some turn a file away by its QuickTime label alone.
+ */
+const PLAYABLE_AS: Record<string, string> = {
+  "video/quicktime": "video/mp4",
+  "video/x-m4v": "video/mp4",
+  "audio/x-m4a": "audio/mp4",
+  "audio/m4a": "audio/mp4",
+};
+
+export function playableType(type: string | undefined): string {
+  return (type && PLAYABLE_AS[type.toLowerCase()]) || type || "application/octet-stream";
+}
+
 /** Downloads, decrypts and caches an attachment as an object URL. */
 export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): Promise<string> {
   const hit = cache.get(att.blob_id);
@@ -49,7 +64,7 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
     try {
       const cipher = await channelsApi.downloadAttachment(att.blob_id, signal, encryptedSize(att.size));
       const plain = await decryptFile(cipher, b64.dec(att.key));
-      const typed = new Blob([plain], { type: att.type || "application/octet-stream" });
+      const typed = new Blob([plain], { type: playableType(att.type) });
       const url = URL.createObjectURL(typed);
       cache.set(att.blob_id, { url, size: typed.size, last: Date.now() });
       total += typed.size;

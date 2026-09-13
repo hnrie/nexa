@@ -156,7 +156,7 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
       return (
         <img
           className={jumbo ? "md-emoji md-emoji-jumbo" : "md-emoji"}
-          src={ctx.emojiUrl(node.id, node.animated)}
+          src={ctx.emojiUrl(node.id, node.animated, 48)}
           alt={":" + node.name + ":"}
           title={":" + node.name + ":"}
           draggable={false}

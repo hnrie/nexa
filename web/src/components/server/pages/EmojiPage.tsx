@@ -98,7 +98,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
             <tbody>
               {list.map((e) => (
                 <tr key={e.id} data-emoji-id={e.id}>
-                  <td><img src={emojiUrl(e.blob_id, e.animated)} alt={`:${e.name}:`} width={32} height={32} style={{ objectFit: "contain" }} /></td>
+                  <td><img src={emojiUrl(e.blob_id, e.animated, 32)} alt={`:${e.name}:`} width={32} height={32} style={{ objectFit: "contain" }} /></td>
                   <td className={s.code}>:{e.name}:</td>
                   <td>{displayName(users[e.creator_id])}</td>
                   {manage ? (
