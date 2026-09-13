@@ -35,15 +35,16 @@ func (s *Server) admin(h http.HandlerFunc) http.Handler {
 func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 	mode, key := s.registrationPolicy(r.Context())
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"name":              "Evilion Chat",
-		"version":           s.Version,
-		"registration":      mode,
-		"needs_key":         mode == "invite" && key != "",
-		"max_upload_bytes":  s.Cfg.MaxUploadBytes,
-		"gif_search":        s.gifEnabled(),
-		"public_url":        s.Cfg.PublicURL,
-		"turn_configured":   len(s.Cfg.TurnURLs) > 0,
-		"max_sticker_bytes": s.Cfg.MaxStickerBytes,
+		"name":               "Evilion Chat",
+		"version":            s.Version,
+		"registration":       mode,
+		"needs_key":          mode == "invite" && key != "",
+		"max_upload_bytes":   s.Cfg.MaxUploadBytes,
+		"gif_search":         s.gifEnabled(),
+		"public_url":         s.Cfg.PublicURL,
+		"turn_configured":    len(s.Cfg.TurnURLs) > 0 || s.Cfg.TurnKeyID != "",
+		"max_sticker_bytes":  s.Cfg.MaxStickerBytes,
+		"upload_chunk_bytes": MaxChunkBytes,
 	})
 }
 

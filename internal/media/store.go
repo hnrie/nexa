@@ -138,6 +138,76 @@ func (m *Store) PutEncrypted(ctx context.Context, r io.Reader, max int64, owner 
 	return b, nil
 }
 
+// SpoolPath is where a resumable upload's bytes accumulate.
+func (m *Store) SpoolPath(id ids.ID) string {
+	return filepath.Join(m.Dir, "tmp", "resume-"+id.String())
+}
+
+// AppendSpool writes the next piece of a resumable upload at exactly `at`,
+// refusing anything that would leave a hole or overwrite what is already
+// there. It returns the new length.
+func (m *Store) AppendSpool(id ids.ID, at int64, r io.Reader, limit int64) (int64, error) {
+	path := m.SpoolPath(id)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o640)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return 0, err
+	}
+	if info.Size() != at {
+		return info.Size(), ErrBadOffset
+	}
+	if _, err := f.Seek(at, io.SeekStart); err != nil {
+		return info.Size(), err
+	}
+	n, err := io.Copy(f, io.LimitReader(r, limit+1))
+	if err != nil {
+		return at + n, err
+	}
+	if n > limit {
+		// too much arrived; put the file back how it was
+		_ = f.Truncate(at)
+		return at, ErrTooLarge
+	}
+	if err := f.Sync(); err != nil {
+		return at + n, err
+	}
+	return at + n, nil
+}
+
+// DiscardSpool removes a half-finished upload.
+func (m *Store) DiscardSpool(id ids.ID) {
+	_ = os.Remove(m.SpoolPath(id))
+}
+
+// FinishSpool turns a completed upload into a blob. The bytes are already
+// encrypted by the sender, so they are stored under a name of their own
+// rather than hashed for sharing: the same file uploaded twice is two blobs.
+func (m *Store) FinishSpool(ctx context.Context, id ids.ID, owner ids.ID) (*store.Blob, error) {
+	path := m.SpoolPath(id)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	if info.Size() == 0 {
+		m.DiscardSpool(id)
+		return nil, ErrUnsupported
+	}
+	name := hex.EncodeToString([]byte(id.String())) + ids.New().String()
+	if err := m.commit(path, name); err != nil {
+		return nil, err
+	}
+	ow := owner
+	b := &store.Blob{SHA256: name, Size: info.Size(), Mime: "application/octet-stream", Kind: "attachment", Encrypted: true, RefCount: 0, OwnerID: &ow}
+	if err := m.st.InsertBlob(ctx, b); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
 // commit moves a spooled file into its content-addressed place.
 func (m *Store) commit(tmp, sha string) error {
 	dst := m.Path(sha)

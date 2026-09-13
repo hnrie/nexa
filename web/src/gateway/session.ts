@@ -4,6 +4,8 @@ import { useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { admin as adminApi } from "@/api/admin";
+import { setUploadLimits } from "@/lib/attachments";
 import { clearLock, hasLock } from "@/lib/appLock";
 import { keystore } from "@/crypto/keystore";
 
@@ -20,6 +22,7 @@ export async function startSession(): Promise<void> {
   const { me, identity, settingsKey } = useAuth.getState();
   if (!me || !identity) return;
   useSettings.getState().setKey(settingsKey);
+  void loadUploadLimits();
   await useKeys.getState().init(me.id, identity);
   if (client) return;
   client = new GatewayClient({
@@ -65,5 +68,15 @@ export function applyLockPolicy(): void {
   if (!policy && local && identity) {
     clearLock(me.id);
     void keystore.saveIdentity(me.id, identity);
+  }
+}
+
+/** Asks the server what it accepts, so the composer can refuse early. */
+async function loadUploadLimits(): Promise<void> {
+  try {
+    const info = await adminApi.instance();
+    setUploadLimits(info.max_upload_bytes, info.upload_chunk_bytes ?? 0);
+  } catch {
+    /* the built-in defaults stand */
   }
 }

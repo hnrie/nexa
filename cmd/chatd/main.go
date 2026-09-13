@@ -136,6 +136,14 @@ func maintenance(ctx context.Context, log *slog.Logger, st *store.Store, m *medi
 		} else if n > 0 {
 			log.Info("session sweep", "removed", n)
 		}
+		// transfers nobody came back to finish, and the bytes they left behind
+		if stale, err := st.StaleUploads(ctx, time.Now().Add(-24*time.Hour).UnixMilli()); err == nil && len(stale) > 0 {
+			for _, id := range stale {
+				m.DiscardSpool(id)
+				_ = st.DeleteUpload(ctx, id)
+			}
+			log.Info("upload sweep", "removed", len(stale))
+		}
 	}
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()

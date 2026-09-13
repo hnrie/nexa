@@ -53,3 +53,5 @@
 .gifCell:hover .gifStar { opacity: 1; }
 .gifStar[data-on="true"] { opacity: 1; color: var(--warning); }
 .inspector .big img { width: 28px; height: 28px; object-fit: contain; display: block; }
+.gifCell[data-dead="true"] { display: flex; align-items: center; justify-content: center; min-height: 72px; background: var(--bg-input); border-radius: var(--radius-xs); }
+.gifDead { font-size: 12px; color: var(--text-muted); text-align: center; padding: 8px; }

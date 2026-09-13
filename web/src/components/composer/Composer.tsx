@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
-import { MAX_UPLOAD, stage, uploadStaged, type Staged } from "@/lib/attachments";
+import { stage, uploadLimit, uploadStaged, type Staged } from "@/lib/attachments";
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
@@ -227,8 +227,10 @@ export function Composer({ channel }: { channel: Channel }) {
   const addFiles = (list: FileList | File[]) => {
     const staged: Staged[] = [];
     for (const f of Array.from(list)) {
-      if (f.size > MAX_UPLOAD) {
-        toast(`${f.name} is over the 100 MB limit.`, "error");
+      const max = uploadLimit();
+      if (f.size > max) {
+        const gb = max / (1024 * 1024 * 1024);
+        toast(`${f.name} is over this server's ${gb >= 1 ? `${Math.round(gb * 10) / 10} GB` : `${Math.round(max / (1024 * 1024))} MB`} limit.`, "error");
         continue;
       }
       staged.push(stage(f));

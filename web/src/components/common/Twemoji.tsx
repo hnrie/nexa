@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { twemojiCandidates } from "@/lib/twemoji";
+import { ensureTwemojiIndex, onTwemojiIndexReady, twemojiCandidates, twemojiIndexReady } from "@/lib/twemoji";
 
 interface Props {
   /** The emoji itself, as text. */
@@ -18,6 +18,12 @@ const missing = new Set<string>();
  * set has no picture for it, the platform's own glyph is shown instead.
  */
 export function Twemoji({ text, className, title, fallbackClassName }: Props) {
+  const [, bump] = useState(0);
+  useEffect(() => {
+    if (twemojiIndexReady()) return;
+    ensureTwemojiIndex();
+    return onTwemojiIndexReady(() => bump((n) => n + 1));
+  }, []);
   const candidates = twemojiCandidates(text).filter((u) => !missing.has(u));
   const [attempt, setAttempt] = useState(0);
   useEffect(() => setAttempt(0), [text]);

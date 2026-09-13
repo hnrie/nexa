@@ -33,19 +33,54 @@ export function twemojiUrl(text: string): string | null {
   return code ? `${TWEMOJI_BASE}/${code}.svg` : null;
 }
 
+/** The names the set actually holds, once the list has been fetched. */
+let available: Set<string> | null = null;
+let loading: Promise<void> | null = null;
+const waiting = new Set<() => void>();
+
+/**
+ * Fetches the list of artwork this build ships. Twemoji trails Unicode, so
+ * without it the app asks for pictures that were never drawn.
+ */
+export function ensureTwemojiIndex(): void {
+  if (available || loading) return;
+  loading = fetch(`${TWEMOJI_BASE}/available.json`)
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error("no index"))))
+    .then((names: unknown) => {
+      if (!Array.isArray(names)) return;
+      available = new Set(names.filter((n): n is string => typeof n === "string"));
+      for (const fn of waiting) fn();
+    })
+    .catch(() => {
+      // no list: fall back to trying, which still works
+      loading = null;
+    });
+}
+
+export function twemojiIndexReady(): boolean {
+  return available !== null;
+}
+
+export function onTwemojiIndexReady(fn: () => void): () => void {
+  waiting.add(fn);
+  return () => waiting.delete(fn);
+}
+
 /**
  * Twemoji is not quite consistent about the variation selector inside joined
  * sequences: the rainbow flag keeps it, the eye in a speech bubble does not.
- * Rather than encode the exceptions, offer both spellings and let the first
- * one that loads win.
+ * Rather than encode the exceptions, offer both spellings; once the list of
+ * artwork is known, only the spellings that exist are offered at all.
  */
 export function twemojiCandidates(text: string): string[] {
-  const out: string[] = [];
-  const first = twemojiUrl(text);
-  if (first) out.push(first);
+  const codes: string[] = [];
+  const first = twemojiCode(text);
+  if (first) codes.push(first);
   if (text.includes(ZWJ)) {
-    const stripped = twemojiUrl(text.replace(VARIATION, ""));
-    if (stripped && stripped !== first) out.push(stripped);
+    const stripped = twemojiCode(text.replace(VARIATION, ""));
+    if (stripped && stripped !== first) codes.push(stripped);
   }
-  return out;
+  const known = available;
+  const usable = known ? codes.filter((c) => known.has(c)) : codes;
+  return usable.map((c) => `${TWEMOJI_BASE}/${c}.svg`);
 }

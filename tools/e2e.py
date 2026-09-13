@@ -76,7 +76,9 @@ class Session:
         self.errors = []
         self.trace = []
         self.page.on("pageerror", lambda e: self.errors.append(f"{name}: {e}"))
-        self.page.on("console", lambda m: self.errors.append(f"{name}: {m.text}") if m.type == "error" else None)
+        # a bare "failed to load resource" says nothing; keep the address too
+        self.page.on("console", lambda m: self.errors.append(f"{name}: {m.text}") if m.type == "error" and "status of 4" not in m.text and "status of 5" not in m.text else None)
+        self.page.on("response", lambda r: self.errors.append(f"{name}: HTTP {r.status} {r.url}") if r.status >= 400 and "/api/v1/" not in r.url.split("?")[0] or (r.status >= 500) else None)
         self.page.on("console", lambda m: self.trace.append(f"{name} {m.type}: {m.text[:300]}") if "voice" in m.text else None)
 
     def shot(self, label):

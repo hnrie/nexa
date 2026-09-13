@@ -17,6 +17,9 @@ export function GifPicker({ onPick }: { onPick: (gif: { url: string; w?: number;
   const [results, setResults] = useState<GifResult[]>([]);
   const [next, setNext] = useState("");
   const [loading, setLoading] = useState(false);
+  // Favourites saved from a provider that is no longer used stop loading;
+  // rather than a row of broken boxes, say so and offer the cross.
+  const [dead, setDead] = useState<Set<string>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seq = useRef(0);
   const favSet = useMemo(() => new Set(favs.map((f) => f.url)), [favs]);
@@ -74,14 +77,24 @@ export function GifPicker({ onPick }: { onPick: (gif: { url: string; w?: number;
           {enabled ? <button className={s.gifTab} data-on={tab === "search"} onClick={() => setTab("search")}>{q.trim() ? "Results" : "Trending"}</button> : null}
         </div>
       </div>
+      {tab === "favorites" && dead.size > 0 ? (
+        <div className={s.gifNote}>
+          {dead.size} favourite{dead.size === 1 ? "" : "s"} no longer load.{" "}
+          <button className={s.gifTab} onClick={() => patch({ favoriteGifs: favs.filter((f) => !dead.has(f.url)) })}>Remove them</button>
+        </div>
+      ) : null}
       {tab === "favorites" ? (
         favs.length === 0 ? (
           <div className={s.empty}>No favorite GIFs yet. {enabled ? "Star a GIF in search to keep it here." : "Hover any GIF in chat and press the star to save it here."}</div>
         ) : (
           <div className={s.gifGrid}>
             {favs.map((f) => (
-              <div key={f.url} className={s.gifCell}>
-                <img src={f.url} alt="" loading="lazy" referrerPolicy="no-referrer" onClick={() => onPick(f)} />
+              <div key={f.url} className={s.gifCell} data-dead={dead.has(f.url)}>
+                {dead.has(f.url) ? (
+                  <span className={s.gifDead}>This one is gone</span>
+                ) : (
+                  <img src={f.url} alt="" loading="lazy" referrerPolicy="no-referrer" onClick={() => onPick(f)} onError={() => setDead((d) => new Set(d).add(f.url))} />
+                )}
                 <button className={s.gifRemove} aria-label="Remove favorite" onClick={() => patch({ favoriteGifs: favs.filter((x) => x.url !== f.url) })}><X size={14} /></button>
               </div>
             ))}

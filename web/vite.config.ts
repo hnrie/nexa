@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { createReadStream, existsSync } from "node:fs";
-import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { fileURLToPath, URL } from "node:url";
 
 const API = process.env["VITE_API_TARGET"] ?? "http://127.0.0.1:8090";
@@ -29,6 +29,11 @@ function twemoji(): Plugin {
       const out = fileURLToPath(new URL("./dist/twemoji", import.meta.url));
       await mkdir(out, { recursive: true });
       await cp(TWEMOJI_DIR, out, { recursive: true, filter: (src) => !src.endsWith(".json") && !src.endsWith(".md") && !src.endsWith("license") });
+      // A list of what the set actually holds. Twemoji is behind Unicode, so
+      // without this the app asks for pictures that were never drawn and the
+      // reader gets a broken box before the glyph takes over.
+      const names = (await readdir(out)).filter((n) => n.endsWith(".svg")).map((n) => n.slice(0, -4));
+      await writeFile(`${out}/available.json`, JSON.stringify(names));
     },
   };
 }

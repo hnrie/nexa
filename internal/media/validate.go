@@ -16,8 +16,12 @@ import (
 )
 
 var (
-	ErrTooLarge      = errors.New("file too large")
-	ErrUnsupported   = errors.New("unsupported file type")
+	ErrTooLarge    = errors.New("file too large")
+	ErrUnsupported = errors.New("unsupported file type")
+	// ErrBadOffset means a piece of a resumable upload arrived out of order.
+	ErrBadOffset = errors.New("unexpected upload offset")
+	// ErrNotFound means the upload being finished has no bytes on disk.
+	ErrNotFound      = errors.New("upload not found")
 	ErrBadDimensions = errors.New("image dimensions out of range")
 )
 
