@@ -63,6 +63,10 @@ const ICE_CACHE_MS = 30 * 60 * 1000;
 const VAD_HOLD_MS = 400;
 /** Refusals of a voice_signal: they race people leaving and reconnects, and say nothing about our own place in the call. */
 const SIGNAL_ERRORS = new Set(["not_in_voice", "peer_gone", "too_large"]);
+/** The server connects calls the other way than this page thought (turned on or off since it asked). */
+const MODE_ERRORS = new Set(["sfu_required", "sfu_off"]);
+/** When this page last joined again after such a refusal; a second one soon after is shown instead. */
+let modeRetryAt = 0;
 
 function me(): string | undefined {
   return useAuth.getState().me?.id;
@@ -78,6 +82,8 @@ function sendState(channelId: string | null, resume = false): void {
     self_deaf: local.deafened,
     video: !!st.localVideo,
     streaming: !!st.localScreen,
+    // how this device connects, so the server can turn away a page set up for the other kind
+    ...(channelId ? { sfu: session?.transport instanceof SfuTransport } : {}),
     ...(resume ? { resume: true } : {}),
   });
 }
@@ -599,6 +605,14 @@ export function handleVoiceEvent(e: GatewayEvent): void {
         console.warn("voice: signal refused:", e.d.code);
         return;
       }
+      if (MODE_ERRORS.has(e.d.code) && session && Date.now() - modeRetryAt > 30_000) {
+        // ask the server again how calls connect, and join that way
+        modeRetryAt = Date.now();
+        iceCache = null;
+        const channelId = session.channelId;
+        void leaveVoice(false).then(() => joinVoice(channelId));
+        return;
+      }
       store.setJoining(null);
       store.setError(e.d.message);
       useUI.getState().toast(e.d.message, "error");
@@ -628,6 +642,8 @@ function channelOfUser(userId: string): string | null {
 
 export function onReadyVoice(list: VoiceState[], sessionId?: string): void {
   mySessionId = sessionId ?? null;
+  // a reconnect may follow a restart that changed how calls connect
+  iceCache = null;
   useVoice.getState().setAll(list);
   // after a reconnect the server has forgotten us: rejoin the room we were in
   // (a join still asking for the mic announces itself when it gets there)

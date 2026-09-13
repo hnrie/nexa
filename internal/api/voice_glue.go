@@ -145,6 +145,8 @@ type voiceStateReq struct {
 	// Resume is set when a client rejoins the call it was in after a
 	// reconnect; that is not a new call and deserves no new call message.
 	Resume bool `json:"resume"`
+	// SFU says the device connects through the SFU rather than peer to peer.
+	SFU bool `json:"sfu"`
 }
 
 type voiceSignalReq struct {
@@ -188,6 +190,17 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		resumed := req.Resume || s.Voice.RecentlyActive(ch.ID)
 		cur, had := s.Voice.Get(me.ID)
 		inSame := had && cur.ChannelID == ch.ID
+		// Everyone in a call has to connect the same way. A page set up for
+		// the other kind (opened before calls changed, or an older version of
+		// the app) is turned away rather than let into a call it cannot hear.
+		if (!inSame || cur.ConnID != c.ID()) && req.SFU != (s.Realtime != nil) {
+			if s.Realtime != nil {
+				voiceErr(c, "sfu_required", "Calls here have changed. Reload the page to join.")
+			} else {
+				voiceErr(c, "sfu_off", "Calls here have changed. Join again.")
+			}
+			return
+		}
 		// server mutes belong to one server: they follow a move inside it,
 		// but nobody could lift them in a DM call or in another server
 		keep := inSame

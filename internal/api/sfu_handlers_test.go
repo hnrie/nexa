@@ -137,9 +137,14 @@ func TestCallsThroughTheSFU(t *testing.T) {
 	if res, body := do(t, ts, "POST", "/api/v1/voice/sfu/session", tokC, nil); res.StatusCode != 409 || errCode(body) != "not_in_voice" {
 		t.Errorf("a session needs a call: %d %v", res.StatusCode, body)
 	}
+	// a page still set up for peer-to-peer calls is turned away
 	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := ga.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "sfu_required" {
+		t.Errorf("a join without the SFU: %v", ev)
+	}
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
 	ga.next("voice_state", 3*time.Second)
-	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
 	gb.next("voice_state", 3*time.Second)
 	ga.next("voice_state", 3*time.Second)
 
@@ -211,7 +216,7 @@ func TestCallsThroughTheSFU(t *testing.T) {
 	}
 
 	// a mute toggle keeps alice's session and what she publishes
-	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "self_mute": true})
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "self_mute": true, "sfu": true})
 	if ev := nextVoiceState(gb, func(e map[string]any) bool { return e["user_id"] == idA && e["self_mute"] == true }); ev == nil || mediaCount(ev) != 2 {
 		t.Errorf("a toggle keeps the published tracks: %v", ev)
 	}
@@ -234,7 +239,7 @@ func TestCallsThroughTheSFU(t *testing.T) {
 	if res, body := do(t, ts, "POST", "/api/v1/voice/sfu/publish", tokB, map[string]any{"session_id": sessB2, "offer": offerSDP, "tracks": []map[string]any{{"mid": "1", "kind": "video"}}}); res.StatusCode != 403 || errCode(body) != "video_paused" {
 		t.Errorf("video paused: %d %v", res.StatusCode, body)
 	}
-	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
 	if ev := ga.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "calls_paused" {
 		t.Errorf("a new call is refused at the limit: %v", ev)
 	}
@@ -243,6 +248,18 @@ func TestCallsThroughTheSFU(t *testing.T) {
 func TestSFUOffWithoutKeys(t *testing.T) {
 	_, ts := newTestServer(t)
 	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Calls")
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	g := connectGW(t, ts, tok)
+	// a page that still thinks calls go through the SFU is sent to join again
+	g.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
+	if ev := g.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "sfu_off" {
+		t.Errorf("an SFU join without keys: %v", ev)
+	}
+	g.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := g.next("voice_state", 3*time.Second); ev == nil {
+		t.Error("a peer-to-peer join goes ahead")
+	}
 	if res, body := do(t, ts, "POST", "/api/v1/voice/sfu/session", tok, nil); res.StatusCode != 404 || errCode(body) != "sfu_off" {
 		t.Errorf("sfu off: %d %v", res.StatusCode, body)
 	}
