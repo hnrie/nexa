@@ -442,6 +442,10 @@ func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.
 		if ok, err := h.st.IsParticipant(ctx, channelID, uid); err != nil || !ok {
 			return nil, false
 		}
+		// a block closes a 1:1 conversation both ways, typing included
+		if blocked, err := h.st.DMBlocked(ctx, ch, uid); err != nil || blocked {
+			return nil, false
+		}
 		viewers = ch.Recipients
 	} else {
 		if h.SendAccess == nil || h.ViewerResolver == nil {

@@ -31,6 +31,7 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	INSERT INTO messages(id,channel_id,author_id,created_at) VALUES (20,12,1,0);
 	INSERT INTO attachments(id,message_id,channel_id,uploader_id,blob_id,size,created_at) VALUES (30,20,12,1,5,1,0);
 	INSERT INTO key_epochs(conv_id,epoch,created_by,created_at) VALUES (12,0,1,0);
+	ALTER TABLE uploads DROP COLUMN blob_id;
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)
