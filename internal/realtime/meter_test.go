@@ -37,8 +37,8 @@ func TestMeterChargesPulledTracks(t *testing.T) {
 	ctx := context.Background()
 	m, st, now := newTestMeter(1000, time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC))
 
-	m.Start("s1", "0", AudioBps)
-	m.Start("s1", "1", CameraBps)
+	m.Start("s1", "0", Source("p1", KindAudio), AudioBps)
+	m.Start("s1", "1", Source("p1", KindVideo), CameraBps)
 	*now = now.Add(10 * time.Second)
 	// 10 s of audio (80 KB) and camera (1.875 MB)
 	if got, want := m.Used(ctx), int64(80_000+1_875_000); got != want {
@@ -73,7 +73,7 @@ func TestMeterMonthsAndThresholds(t *testing.T) {
 	if !m.VideoAllowed(ctx) || !m.CallsAllowed(ctx) {
 		t.Fatal("under 90 %: everything allowed")
 	}
-	m.Start("s", "0", 8_000_000) // 1 MB a second
+	m.Start("s", "0", Source("p", KindScreen), 8_000_000) // 1 MB a second
 	*now = now.Add(2 * time.Second)
 	if m.VideoAllowed(ctx) {
 		t.Error("at 90 % video pauses")
@@ -106,5 +106,31 @@ func TestRates(t *testing.T) {
 	}
 	if !ValidKind("screen_audio") || ValidKind("data") || !IsVideo(KindScreen) || IsVideo(KindScreenAudio) {
 		t.Error("kinds")
+	}
+}
+
+func TestMeterSkipsTracksThatSendNothing(t *testing.T) {
+	ctx := context.Background()
+	m, _, now := newTestMeter(1000, time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC))
+	camera := Source("pub", KindVideo)
+	m.SetSourceLive(camera, false)
+	m.Start("sub", "3", camera, CameraBps)
+	*now = now.Add(time.Minute)
+	if got := m.Used(ctx); got != 0 {
+		t.Fatalf("a camera that is off costs nothing: %d", got)
+	}
+	m.SetSourceLive(camera, true)
+	*now = now.Add(8 * time.Second)
+	if got, want := m.Used(ctx), int64(1_500_000); got != want {
+		t.Fatalf("on again, it is charged: %d, want %d", got, want)
+	}
+	m.SetSourceLive(camera, false)
+	*now = now.Add(time.Hour)
+	if got, want := m.Used(ctx), int64(1_500_000); got != want {
+		t.Fatalf("off again, the charge stops: %d, want %d", got, want)
+	}
+	m.StopSession("pub")
+	if len(m.off) != 0 {
+		t.Errorf("the publisher leaving forgets its tracks: %v", m.off)
 	}
 }

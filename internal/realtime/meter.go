@@ -60,9 +60,14 @@ type UsageStore interface {
 }
 
 type pull struct {
-	bps   int64
-	since time.Time
+	// source is the published track pulled: its SFU session and kind
+	source string
+	bps    int64
+	since  time.Time
 }
+
+// Source names a published track for the meter.
+func Source(session, kind string) string { return session + ":" + kind }
 
 // Meter estimates the month's SFU egress from the tracks devices pull. Video
 // pauses at 90 % of the allowance and new calls stop at 99 %.
@@ -72,6 +77,9 @@ type Meter struct {
 	now   func() time.Time
 	limit int64
 	pulls map[string]map[string]pull
+	// off holds the sources sending nothing just now (a camera turned off, a
+	// share ended); pulls of them are not charged meanwhile
+	off map[string]bool
 	// month and used are the stored total the counts below add to
 	month     string
 	used      int64
@@ -81,7 +89,7 @@ type Meter struct {
 
 // NewMeter meters against a monthly allowance in gigabytes.
 func NewMeter(st UsageStore, monthlyGB int64) *Meter {
-	return &Meter{st: st, now: time.Now, limit: monthlyGB * 1_000_000_000, pulls: map[string]map[string]pull{}}
+	return &Meter{st: st, now: time.Now, limit: monthlyGB * 1_000_000_000, pulls: map[string]map[string]pull{}, off: map[string]bool{}}
 }
 
 func monthOf(t time.Time) string { return t.UTC().Format("2006-01") }
@@ -93,8 +101,16 @@ func bytesFor(bps int64, d time.Duration) int64 {
 	return bps * d.Milliseconds() / 8000
 }
 
-// Start begins charging a pulled track.
-func (m *Meter) Start(session, mid string, bps int64) {
+// charge is what a pull has used since it was last counted.
+func (m *Meter) charge(p pull, now time.Time) int64 {
+	if m.off[p.source] {
+		return 0
+	}
+	return bytesFor(p.bps, now.Sub(p.since))
+}
+
+// Start begins charging a pulled track of source.
+func (m *Meter) Start(session, mid, source string, bps int64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := m.now()
@@ -104,9 +120,9 @@ func (m *Meter) Start(session, mid string, bps int64) {
 		m.pulls[session] = byMid
 	}
 	if old, ok := byMid[mid]; ok {
-		m.unflushed += bytesFor(old.bps, now.Sub(old.since))
+		m.unflushed += m.charge(old, now)
 	}
-	byMid[mid] = pull{bps: bps, since: now}
+	byMid[mid] = pull{source: source, bps: bps, since: now}
 }
 
 // Stop ends charging one pulled track.
@@ -114,7 +130,7 @@ func (m *Meter) Stop(session, mid string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if p, ok := m.pulls[session][mid]; ok {
-		m.unflushed += bytesFor(p.bps, m.now().Sub(p.since))
+		m.unflushed += m.charge(p, m.now())
 		delete(m.pulls[session], mid)
 		if len(m.pulls[session]) == 0 {
 			delete(m.pulls, session)
@@ -122,15 +138,46 @@ func (m *Meter) Stop(session, mid string) {
 	}
 }
 
-// StopSession ends charging everything a session pulls.
+// StopSession ends charging everything a session pulls, and forgets what it published.
 func (m *Meter) StopSession(session string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := m.now()
 	for _, p := range m.pulls[session] {
-		m.unflushed += bytesFor(p.bps, now.Sub(p.since))
+		m.unflushed += m.charge(p, now)
 	}
 	delete(m.pulls, session)
+	for source := range m.off {
+		if len(source) > len(session) && source[:len(session)+1] == session+":" {
+			delete(m.off, source)
+		}
+	}
+}
+
+// SetSourceLive says whether a published track is sending. Pulls of a track
+// that is off (a camera turned off) cost nothing until it is on again.
+func (m *Meter) SetSourceLive(source string, live bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.off[source] == live {
+		return
+	}
+	now := m.now()
+	for _, byMid := range m.pulls {
+		for mid, p := range byMid {
+			if p.source != source {
+				continue
+			}
+			m.unflushed += m.charge(p, now)
+			p.since = now
+			byMid[mid] = p
+		}
+	}
+	if live {
+		delete(m.off, source)
+	} else {
+		m.off[source] = true
+	}
 }
 
 // ensureMonth loads the stored total when the month is new to the meter.
@@ -152,8 +199,9 @@ func (m *Meter) Flush(ctx context.Context) error {
 	now := m.now()
 	for _, byMid := range m.pulls {
 		for mid, p := range byMid {
-			m.unflushed += bytesFor(p.bps, now.Sub(p.since))
-			byMid[mid] = pull{bps: p.bps, since: now}
+			m.unflushed += m.charge(p, now)
+			p.since = now
+			byMid[mid] = p
 		}
 	}
 	add := m.unflushed
@@ -186,7 +234,7 @@ func (m *Meter) Used(ctx context.Context) int64 {
 	total := m.used + m.unflushed
 	for _, byMid := range m.pulls {
 		for _, p := range byMid {
-			total += bytesFor(p.bps, now.Sub(p.since))
+			total += m.charge(p, now)
 		}
 	}
 	return total

@@ -14,6 +14,7 @@ import (
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
+	"evilion.xyz/chat/internal/realtime"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/voice"
 )
@@ -33,11 +34,13 @@ type voiceStatePayload struct {
 	ServerMute   bool    `json:"server_mute"`
 	ServerDeaf   bool    `json:"server_deaf"`
 	JoinedAt     int64   `json:"joined_at"`
+	// Media lists the kinds this participant publishes through the SFU.
+	Media []string `json:"media,omitempty"`
 }
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt}
+	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Kinds()}
 }
 
 func leavePayload(st voice.State) voiceStatePayload {
@@ -50,6 +53,7 @@ func (s *Server) voiceRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/channels/{id}/voice", s.authed(s.handleVoiceParticipants))
 	mux.Handle("POST /api/v1/channels/{id}/call/decline", s.authed(s.handleCallDecline))
 	mux.Handle("PATCH /api/v1/servers/{id}/members/{uid}/voice", s.authed(s.handleVoiceModerate))
+	s.sfuRoutes(mux)
 }
 
 // WireVoice installs the voice registry, the gateway voice ops and cleanup hooks.
@@ -57,6 +61,12 @@ func (s *Server) voiceRoutes(mux *http.ServeMux) {
 func (s *Server) WireVoice(hub *gateway.Hub) {
 	if s.Voice == nil {
 		s.Voice = voice.New()
+	}
+	if s.Realtime == nil {
+		s.Realtime = realtime.New(s.Cfg.RealtimeAppID, s.Cfg.RealtimeAppSecret)
+	}
+	if s.Realtime != nil && s.Meter == nil {
+		s.Meter = realtime.NewMeter(s.Store, s.Cfg.RealtimeMonthlyGB)
 	}
 	if hub == nil {
 		return
@@ -101,6 +111,7 @@ func (s *Server) voiceAudience(ctx context.Context, ch *store.Channel) []ids.ID 
 }
 
 func (s *Server) broadcastVoiceLeave(ctx context.Context, st voice.State) {
+	s.closeSFUSession(st.SFUSession)
 	ch, err := s.Store.ChannelByID(ctx, st.ChannelID)
 	if err != nil {
 		return
@@ -190,9 +201,11 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		} else if old != nil && old.ConnID != c.ID() {
 			// the call moved to this connection (another device or tab picked
 			// it up): the one that held it hears that it is no longer in it
+			s.closeSFUSession(old.SFUSession)
 			s.emitConn(me.ID, old.ConnID, "voice_state", leavePayload(*old))
 		}
 		st, _ := s.Voice.Get(me.ID)
+		s.sfuSyncLive(st)
 		audience := s.voiceAudience(ctx, ch)
 		s.Bcast.EmitUsers(audience, "voice_state", statePayload(st))
 		if s.isDM(ch) && !inSame && !wasEmpty {
@@ -258,6 +271,10 @@ func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Cha
 	if ch.Type == "subchat" {
 		return 0, false, "no_call", "A subchat has no call of its own. Use the conversation it belongs to."
 	}
+	if cur, ok := s.Voice.Get(me.ID); s.Meter != nil && !(ok && cur.ChannelID == ch.ID) && !s.Meter.CallsAllowed(ctx) {
+		// toggles inside a running call still pass; new calls wait for next month
+		return 0, false, "calls_paused", "Calls are paused until next month to keep them free."
+	}
 	if s.isDM(ch) {
 		member := false
 		for _, id := range ch.Recipients {
@@ -318,7 +335,7 @@ func (s *Server) handleVoiceICE(w http.ResponseWriter, r *http.Request) {
 	if relay := s.cloudflareTURN(r); relay != nil {
 		servers = append(servers, relay...)
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"ice_servers": servers})
+	WriteJSON(w, http.StatusOK, map[string]any{"ice_servers": servers, "sfu": s.Realtime != nil})
 }
 
 // turnTTL is how long a minted relay credential lasts, and turnReuse how long
@@ -538,6 +555,8 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {
 			old := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak)}, true)
 			if old != nil {
+				// what they pulled in the old channel stops; their client makes a new session
+				s.closeSFUSession(old.SFUSession)
 				// The moved member must not hear this leave: their client takes
 				// a leave of its own channel as a disconnect and drops the call.
 				// The join below moves them instead.
@@ -576,6 +595,7 @@ func (s *Server) voiceChannelDeleted(ctx context.Context, ch *store.Channel) {
 	audience := s.voiceAudience(ctx, ch)
 	cleared := s.Voice.ClearChannel(ch.ID)
 	for _, st := range cleared {
+		s.closeSFUSession(st.SFUSession)
 		s.Bcast.EmitUsers(audience, "voice_state", leavePayload(st))
 	}
 	if len(cleared) > 0 && s.isDM(ch) {
@@ -594,6 +614,7 @@ func (s *Server) voiceServerDeleted(chans []*store.Channel, members []ids.ID) {
 			continue
 		}
 		for _, st := range s.Voice.ClearChannel(ch.ID) {
+			s.closeSFUSession(st.SFUSession)
 			s.Bcast.EmitUsers(members, "voice_state", leavePayload(st))
 		}
 	}

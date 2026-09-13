@@ -99,3 +99,48 @@ func TestRecentlyActive(t *testing.T) {
 		t.Error("a channel empty for longer than the window is not recent")
 	}
 }
+
+func TestSFUSessionFollowsTheCall(t *testing.T) {
+	r := New()
+	u, ch, other := ids.ID(1), ids.ID(10), ids.ID(20)
+	r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 1000}, false)
+	if _, ok := r.SetSFU(u, other, 1000, "s1"); ok {
+		t.Fatal("a session is only given to the call as it is")
+	}
+	if old, ok := r.SetSFU(u, ch, 1000, "s1"); !ok || old != "" {
+		t.Fatalf("set session: %q %v", old, ok)
+	}
+	if _, ok := r.SetTrack(u, "stale", "audio", "a1", 0); ok {
+		t.Error("a track from another session is ignored")
+	}
+	st, ok := r.SetTrack(u, "s1", "screen", "sc1", 8_000_000)
+	if !ok || st.Tracks.Screen != "sc1" || st.ScreenBps != 8_000_000 {
+		t.Fatalf("track: %+v", st)
+	}
+	r.SetTrack(u, "s1", "audio", "a1", 0)
+	if got, _ := r.Get(u); len(got.Tracks.Kinds()) != 2 || got.Tracks.Kinds()[0] != "audio" || got.Tracks.Kinds()[1] != "screen" {
+		t.Errorf("kinds: %v", got.Tracks.Kinds())
+	}
+	// a mute toggle rejoins the same channel on the same connection: the session stays
+	r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 1000, SelfMute: true}, false)
+	if got, _ := r.Get(u); got.SFUSession != "s1" || got.Tracks.Audio != "a1" || !got.SelfMute {
+		t.Errorf("a toggle keeps the session: %+v", got)
+	}
+	// another device picking up the call starts without it
+	old := r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 2000}, false)
+	if got, _ := r.Get(u); got.SFUSession != "" || old == nil || old.SFUSession != "s1" {
+		t.Errorf("another device: %+v, old %+v", got, old)
+	}
+	// and so does a move
+	r.SetSFU(u, ch, 2000, "s2")
+	old = r.Join(State{UserID: u, ChannelID: other, SessionID: 100, ConnID: 2000}, true)
+	if got, _ := r.Get(u); got.SFUSession != "" || old.SFUSession != "s2" {
+		t.Errorf("a move: %+v, old %+v", got, old)
+	}
+	if old, ok := r.SetSFU(u, other, 2000, "s3"); !ok || old != "" {
+		t.Errorf("replacing: %q %v", old, ok)
+	}
+	if old, ok := r.SetSFU(u, other, 2000, "s4"); !ok || old != "s3" {
+		t.Errorf("a new session hands back the one it replaces: %q %v", old, ok)
+	}
+}

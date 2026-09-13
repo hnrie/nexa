@@ -94,12 +94,15 @@ func main() {
 	defer cancel()
 	go hub.Run(ctx)
 	srv.StartLimiters(ctx)
+	if srv.Meter != nil {
+		go srv.Meter.Run(ctx, time.Minute, func(err error) { log.Warn("realtime usage", "err", err) })
+	}
 	go maintenance(ctx, log, st, mediaStore, cfg.SessionTTL)
 
 	httpSrv := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", cfg.Listen, "public_url", cfg.PublicURL, "version", version, "web_dist", cfg.WebDist, "captcha", cfg.TurnstileSecretKey != "")
+		log.Info("listening", "addr", cfg.Listen, "public_url", cfg.PublicURL, "version", version, "web_dist", cfg.WebDist, "captcha", cfg.TurnstileSecretKey != "", "sfu", srv.Realtime != nil)
 		errc <- httpSrv.ListenAndServe()
 	}()
 

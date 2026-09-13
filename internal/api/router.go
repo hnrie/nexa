@@ -13,6 +13,7 @@ import (
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/ratelimit"
+	"evilion.xyz/chat/internal/realtime"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/unfurl"
 	"evilion.xyz/chat/internal/voice"
@@ -64,11 +65,16 @@ type Server struct {
 	limMsg     *ratelimit.Limiter
 	limUpload  *ratelimit.Limiter
 	limUnfurl  *ratelimit.Limiter
+	limVoice   *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
 	// Voice tracks who is in which voice channel (set by WireVoice).
 	Voice *voice.Registry
+	// Realtime sends calls through Cloudflare Realtime SFU when configured, and
+	// Meter keeps them inside its free allowance (both nil otherwise).
+	Realtime *realtime.Client
+	Meter    *realtime.Meter
 
 	// ChannelAccess decides server-channel access (Phase 2). DM access is built in.
 	ChannelAccess func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error)
@@ -100,6 +106,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limMsg:     ratelimit.New(ratelimit.Every(5, 5*time.Second), 5, 5*time.Minute),
 		limUpload:  ratelimit.New(ratelimit.Every(60, time.Minute), 60, time.Hour),
 		limUnfurl:  ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
+		// a call renegotiates for every camera, share and person joining
+		limVoice: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
 	}
 }
 
@@ -107,7 +115,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 // Without them every IP and every username ever tried stays in memory for the
 // life of the process.
 func (s *Server) StartLimiters(ctx context.Context) {
-	for _, l := range []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl} {
+	for _, l := range []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limVoice} {
 		l.Start(ctx)
 	}
 }

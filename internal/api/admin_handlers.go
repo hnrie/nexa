@@ -71,7 +71,12 @@ func (s *Server) handleAdminStats(w http.ResponseWriter, r *http.Request) {
 	if h, ok := s.Bcast.(interface{ OnlineUsers() []ids.ID }); ok {
 		online = len(h.OnlineUsers())
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"users": st.Users, "servers": st.Servers, "messages": st.Messages, "blobs": st.Blobs, "blob_bytes": st.BlobBytes, "online": online, "version": s.Version})
+	var calls any
+	if s.Meter != nil {
+		ctx := r.Context()
+		calls = map[string]any{"month": s.Meter.Month(), "used_bytes": s.Meter.Used(ctx), "limit_bytes": s.Meter.Limit(), "video_paused": !s.Meter.VideoAllowed(ctx), "calls_paused": !s.Meter.CallsAllowed(ctx)}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"users": st.Users, "servers": st.Servers, "messages": st.Messages, "blobs": st.Blobs, "blob_bytes": st.BlobBytes, "online": online, "version": s.Version, "realtime": calls})
 }
 
 func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {

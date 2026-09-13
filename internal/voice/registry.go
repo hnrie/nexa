@@ -30,6 +30,59 @@ type State struct {
 	// Suppress is set when the channel denies Speak; it silences the user
 	// like a server mute but belongs to the channel, not to a moderator.
 	Suppress bool `json:"-"`
+	// SFUSession is this device's Cloudflare Realtime session when calls go
+	// through the SFU, Tracks what it publishes there, and ScreenBps the
+	// bitrate its screen share declared.
+	SFUSession string `json:"-"`
+	Tracks     Tracks `json:"-"`
+	ScreenBps  int64  `json:"-"`
+}
+
+// Tracks names what a call device publishes through the SFU, by kind. Only
+// the server knows the names; everyone else learns which kinds exist.
+type Tracks struct {
+	Audio, Video, Screen, ScreenAudio string
+}
+
+// Get returns the name published for a kind, or "".
+func (t Tracks) Get(kind string) string {
+	switch kind {
+	case "audio":
+		return t.Audio
+	case "video":
+		return t.Video
+	case "screen":
+		return t.Screen
+	case "screen_audio":
+		return t.ScreenAudio
+	}
+	return ""
+}
+
+// With returns the tracks with a kind named.
+func (t Tracks) With(kind, name string) Tracks {
+	switch kind {
+	case "audio":
+		t.Audio = name
+	case "video":
+		t.Video = name
+	case "screen":
+		t.Screen = name
+	case "screen_audio":
+		t.ScreenAudio = name
+	}
+	return t
+}
+
+// Kinds lists the published kinds in a fixed order, or nil.
+func (t Tracks) Kinds() []string {
+	var out []string
+	for _, k := range []string{"audio", "video", "screen", "screen_audio"} {
+		if t.Get(k) != "" {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 // RecentWindow is how long a channel counts as still active after its last
@@ -112,6 +165,12 @@ func (r *Registry) Join(st State, keepModeration bool) *State {
 		if keepModeration {
 			st.ServerMute, st.ServerDeaf = prev.ServerMute, prev.ServerDeaf
 		}
+		// The same device staying in the same call keeps its SFU session (a
+		// mute or camera toggle comes through here too). A move or another
+		// device starts afresh, and the caller closes the old session.
+		if prev.ChannelID == st.ChannelID && prev.ConnID == st.ConnID {
+			st.SFUSession, st.Tracks, st.ScreenBps = prev.SFUSession, prev.Tracks, prev.ScreenBps
+		}
 	}
 	if st.JoinedAt == 0 {
 		st.JoinedAt = time.Now().UnixMilli()
@@ -123,6 +182,37 @@ func (r *Registry) Join(st State, keepModeration bool) *State {
 	}
 	r.byChannel[st.ChannelID][st.UserID] = &cp
 	return old
+}
+
+// SetSFU gives a user's call its SFU session, as long as the call is still in
+// channelID on connID, and returns the session it replaces. What the old
+// session published is forgotten.
+func (r *Registry) SetSFU(uid, channelID, connID ids.ID, session string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.byUser[uid]
+	if !ok || st.ChannelID != channelID || st.ConnID != connID {
+		return "", false
+	}
+	old := st.SFUSession
+	st.SFUSession, st.Tracks, st.ScreenBps = session, Tracks{}, 0
+	return old, true
+}
+
+// SetTrack records a track published by the call's SFU session. It does
+// nothing once the session was replaced or the user left.
+func (r *Registry) SetTrack(uid ids.ID, session, kind, name string, screenBps int64) (State, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.byUser[uid]
+	if !ok || session == "" || st.SFUSession != session {
+		return State{}, false
+	}
+	st.Tracks = st.Tracks.With(kind, name)
+	if kind == "screen" {
+		st.ScreenBps = screenBps
+	}
+	return *st, true
 }
 
 // Update mutates a user's state in place and returns the result.
