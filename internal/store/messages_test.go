@@ -266,7 +266,7 @@ func TestMentionsBeforeJoiningDoNotCount(t *testing.T) {
 	if _, err := s.AddMember(ctx, srv.ID, newbie.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.AddParticipant(ctx, group.ID, newbie.ID, owner.ID); err != nil {
+	if _, err := s.AddParticipant(ctx, group.ID, newbie.ID, owner.ID); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(5 * time.Millisecond)
