@@ -214,11 +214,15 @@ func TestReadStatesAndMentions(t *testing.T) {
 	if err != nil || len(states) != 2 || states[0].MentionCount != 2 || states[0].LastReadMessageID != nil || states[1].MentionCount != 0 {
 		t.Fatalf("states: %v %+v", err, states)
 	}
+	// a conversation counts every unread message from the others, mention or not
+	if states[0].UnreadCount != 3 || states[1].UnreadCount != 0 {
+		t.Errorf("unread counts: %+v", states)
+	}
 	if err := s.Ack(ctx, b.ID, dm.ID, m2.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	states, _ = s.ReadStatesFor(ctx, b.ID, []ids.ID{dm.ID})
-	if *states[0].LastReadMessageID != m2.ID || states[0].MentionCount != 1 {
+	if *states[0].LastReadMessageID != m2.ID || states[0].MentionCount != 1 || states[0].UnreadCount != 1 {
 		t.Errorf("after ack m2: %+v", states[0])
 	}
 	_ = s.Ack(ctx, b.ID, dm.ID, m1.ID, false) // never moves backwards
@@ -284,5 +288,26 @@ func TestMentionsBeforeJoiningDoNotCount(t *testing.T) {
 		if states[0].MentionCount != tc.general || states[1].MentionCount != tc.grp {
 			t.Errorf("%s: general %d group %d, want %d %d", tc.user.Username, states[0].MentionCount, states[1].MentionCount, tc.general, tc.grp)
 		}
+		// messages from before joining a group are not unread either, and server channels count none
+		if states[0].UnreadCount != 0 || states[1].UnreadCount != tc.grp {
+			t.Errorf("%s: unread general %d group %d, want 0 %d", tc.user.Username, states[0].UnreadCount, states[1].UnreadCount, tc.grp)
+		}
+	}
+}
+
+func TestUnreadCountStopsAtTheMost(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b := mkUser(t, s, "a"), mkUser(t, s, "b")
+	dm, _, _ := s.CreateDM(ctx, a.ID, b.ID)
+	for i := 0; i < MaxUnreadCount+5; i++ {
+		mkMsg(t, s, dm.ID, a.ID, "x")
+	}
+	states, err := s.ReadStatesFor(ctx, b.ID, []ids.ID{dm.ID})
+	if err != nil || states[0].UnreadCount != MaxUnreadCount {
+		t.Fatalf("unread: %v %+v", err, states)
+	}
+	if states, _ := s.ReadStatesFor(ctx, a.ID, []ids.ID{dm.ID}); states[0].UnreadCount != 0 {
+		t.Errorf("your own messages are never unread: %+v", states[0])
 	}
 }

@@ -39,23 +39,23 @@ beforeEach(() => {
 });
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
-const ready = (lastRead: string) => useReadStates.getState().setMany([{ channel_id: "7", last_read_message_id: lastRead, last_ack_at: 0, mention_count: 2 }]);
+const ready = (lastRead: string) => useReadStates.getState().setMany([{ channel_id: "7", last_read_message_id: lastRead, last_ack_at: 0, mention_count: 2, unread_count: 3 }]);
 
 describe("read states", () => {
   it("sends a failed ack again on the next ready and keeps the channel read", async () => {
     fail = new TypeError("Failed to fetch");
     await useReadStates.getState().ack("7", "50");
-    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "50", mentions: 0 });
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "50", mentions: 0, unread: 0 });
 
     fail = null;
     ready("10");
-    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "50", mentions: 0 });
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "50", mentions: 0, unread: 0 });
     await flush();
     expect(acks).toEqual(["POST /channels/7/messages/50/ack", "POST /channels/7/messages/50/ack"]);
 
     // once it went through, a later ready is taken as it is
     ready("10");
-    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "10", mentions: 2 });
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "10", mentions: 2, unread: 3 });
     expect(acks).toHaveLength(2);
   });
 
@@ -64,7 +64,7 @@ describe("read states", () => {
     await useReadStates.getState().ack("7", "50");
     fail = null;
     ready("10");
-    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "10", mentions: 2 });
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "10", mentions: 2, unread: 3 });
     expect(acks).toHaveLength(1);
   });
 
@@ -76,5 +76,21 @@ describe("read states", () => {
     ready("20");
     expect(useReadStates.getState().byChannel["7"]!.lastReadId).toBe("20");
     expect(acks).toHaveLength(1);
+  });
+
+  it("counts a conversation's unread messages until it is read, and takes back deleted ones", async () => {
+    ready("10");
+    const rs = useReadStates.getState();
+    rs.bumpUnread("7");
+    rs.bumpUnread("7");
+    expect(useReadStates.getState().byChannel["7"]!.unread).toBe(5);
+    // a deleted message after the marker was one of them; one before it was not
+    useReadStates.getState().dropUnread("7", "60");
+    useReadStates.getState().dropUnread("7", "5");
+    expect(useReadStates.getState().byChannel["7"]!.unread).toBe(4);
+    await useReadStates.getState().ack("7", "70");
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "70", mentions: 0, unread: 0 });
+    for (let i = 0; i < 150; i++) useReadStates.getState().bumpUnread("7");
+    expect(useReadStates.getState().byChannel["7"]!.unread).toBe(100);
   });
 });

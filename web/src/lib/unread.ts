@@ -1,4 +1,5 @@
 import type { Channel } from "@/api/types";
+import { compareIds } from "@/lib/ids";
 import type { ChannelRead } from "@/stores/readStates";
 import { isUnread } from "@/stores/readStates";
 import type { Settings } from "@/stores/settings";
@@ -15,6 +16,32 @@ export function isMuted(settings: Settings, channelId: string, serverId: string 
   if (serverId && muted.includes(serverId)) return true;
   const level = perChannel[channelId] ?? (serverId ? perChannel[serverId] : undefined);
   return level === "none";
+}
+
+/**
+ * The number a conversation's badge shows: every unread message from the
+ * others, or only the mentions once it is muted.
+ */
+export function conversationCount(ch: Channel, rs: ChannelRead | undefined, settings: Settings): number {
+  if (!rs || !isUnread(rs, ch.last_message_id)) return 0;
+  if (isMuted(settings, ch.id, null)) return rs.mentions;
+  return Math.max(rs.unread, rs.mentions);
+}
+
+/** DMs and groups with messages waiting, newest first, leaving out the one open. */
+export function unreadConversations(channels: Record<string, Channel>, reads: Record<string, ChannelRead>, settings: Settings, openId?: string): { channel: Channel; count: number }[] {
+  const out: { channel: Channel; count: number }[] = [];
+  for (const ch of Object.values(channels)) {
+    if ((ch.type !== "dm" && ch.type !== "group_dm") || ch.id === openId) continue;
+    const count = conversationCount(ch, reads[ch.id], settings);
+    if (count > 0) out.push({ channel: ch, count });
+  }
+  return out.sort((a, b) => compareIds(b.channel.last_message_id ?? b.channel.id, a.channel.last_message_id ?? a.channel.id));
+}
+
+/** A badge's text: the count, or 99+. */
+export function badgeText(n: number): string {
+  return n > 99 ? "99+" : String(n);
 }
 
 /** Aggregates unread state over a server's text channels, honouring mutes. */

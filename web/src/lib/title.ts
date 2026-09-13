@@ -1,19 +1,20 @@
+import { conversationCount } from "@/lib/unread";
 import { useChannels } from "@/stores/channels";
-import { isUnread, useReadStates } from "@/stores/readStates";
+import { useReadStates } from "@/stores/readStates";
+import { useSettings } from "@/stores/settings";
 
 const BASE = "Evilion Chat";
 
 function compute(): string {
   const channels = useChannels.getState().byId;
   const reads = useReadStates.getState().byChannel;
-  let mentions = 0;
-  let unread = 0;
+  const settings = useSettings.getState().settings;
+  let n = 0;
   for (const ch of Object.values(channels)) {
     const rs = reads[ch.id];
-    mentions += rs?.mentions ?? 0;
-    if ((ch.type === "dm" || ch.type === "group_dm") && isUnread(rs, ch.last_message_id)) unread += 1;
+    // a conversation counts its waiting messages; elsewhere only mentions do
+    n += ch.type === "dm" || ch.type === "group_dm" ? conversationCount(ch, rs, settings) : (rs?.mentions ?? 0);
   }
-  const n = mentions + unread;
   return n > 0 ? `(${n > 99 ? "99+" : n}) ${BASE}` : BASE;
 }
 
@@ -25,9 +26,11 @@ export function installTitleBadge(): () => void {
   apply();
   const a = useChannels.subscribe(apply);
   const b = useReadStates.subscribe(apply);
+  const c = useSettings.subscribe(apply);
   return () => {
     a();
     b();
+    c();
     document.title = BASE;
   };
 }

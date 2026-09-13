@@ -14,6 +14,8 @@ import { useRelationships } from "@/stores/relationships";
 import { useMemo } from "react";
 import { iconUrl } from "@/api/users";
 import { subchatMenuItems } from "@/components/chat/SubchatPanel";
+import { badgeText, conversationCount } from "@/lib/unread";
+import { useSettings } from "@/stores/settings";
 import { closeDM, dmMenuItems } from "./dmMenu";
 import s from "./Sidebar.module.css";
 
@@ -25,6 +27,7 @@ export function DMSidebar() {
   const users = useUsers((u) => u.byId);
   const presence = usePresence((p) => p.byUser);
   const reads = useReadStates((r) => r.byChannel);
+  const settings = useSettings((st) => st.settings);
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const setQuickSwitcher = useUI((u) => u.setQuickSwitcher);
@@ -64,7 +67,8 @@ export function DMSidebar() {
           const name = channelDisplayName(ch, users, meId, nicknames);
           const rs = reads[ch.id];
           const unread = isUnread(rs, ch.last_message_id);
-          const mentions = rs?.mentions ?? 0;
+          // how many messages wait here; the open conversation is being read
+          const count = active === ch.id ? 0 : conversationCount(ch, rs, settings);
           let sub = "";
           let avatar: React.ReactNode;
           if (ch.type === "dm") {
@@ -98,7 +102,7 @@ export function DMSidebar() {
                 <span className={s.name}>{name}</span>
                 {sub ? <span className={s.sub}>{sub}</span> : null}
               </span>
-              {mentions > 0 ? <span className={s.mention}>{mentions > 99 ? "99+" : mentions}</span> : null}
+              {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-label={`${count > 99 ? "more than 99" : count} unread`}>{badgeText(count)}</span> : null}
               <span
                 className={s.close}
                 role="button"

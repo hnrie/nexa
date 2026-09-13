@@ -8,6 +8,8 @@ import { useChannels } from "./channels";
 export interface ChannelRead {
   lastReadId: string | null;
   mentions: number;
+  /** Unread messages from others; kept for DMs and group DMs only. */
+  unread: number;
 }
 
 interface ReadStatesState {
@@ -15,6 +17,10 @@ interface ReadStatesState {
   set: (rs: ReadState) => void;
   setMany: (list: ReadState[]) => void;
   bumpMentions: (channelId: string) => void;
+  /** Counts a message someone else sent to a conversation that is not being read. */
+  bumpUnread: (channelId: string) => void;
+  /** Takes back the count of an unread message that was deleted. */
+  dropUnread: (channelId: string, messageId: string) => void;
   markRead: (channelId: string, messageId: string) => void;
   ack: (channelId: string, messageId: string) => Promise<void>;
   clear: () => void;
@@ -42,18 +48,27 @@ function send(channelId: string, messageId: string): Promise<void> {
   );
 }
 
+/** The server stops counting a conversation's unread messages here. */
+export const MAX_UNREAD = 100;
+
+const EMPTY: ChannelRead = { lastReadId: null, mentions: 0, unread: 0 };
+
+function fromServer(rs: ReadState): ChannelRead {
+  return { lastReadId: rs.last_read_message_id, mentions: rs.mention_count, unread: rs.unread_count ?? 0 };
+}
+
 export const useReadStates = create<ReadStatesState>()((set, get) => ({
   byChannel: {},
   set: (rs) => {
     // a state set on purpose (marked unread, or read on another device) replaces any ack still waiting
     unsent.delete(rs.channel_id);
-    set((s) => ({ byChannel: { ...s.byChannel, [rs.channel_id]: { lastReadId: rs.last_read_message_id, mentions: rs.mention_count } } }));
+    set((s) => ({ byChannel: { ...s.byChannel, [rs.channel_id]: fromServer(rs) } }));
   },
   setMany: (list) => {
     const retry: [string, string][] = [];
     set((s) => {
       const byChannel = { ...s.byChannel };
-      for (const rs of list) byChannel[rs.channel_id] = { lastReadId: rs.last_read_message_id, mentions: rs.mention_count };
+      for (const rs of list) byChannel[rs.channel_id] = fromServer(rs);
       for (const [channelId, messageId] of unsent) {
         const cur = byChannel[channelId];
         // only channels this account can still see; one the server already has read past needs nothing
@@ -61,7 +76,7 @@ export const useReadStates = create<ReadStatesState>()((set, get) => ({
           unsent.delete(channelId);
           continue;
         }
-        byChannel[channelId] = { lastReadId: messageId, mentions: 0 };
+        byChannel[channelId] = { lastReadId: messageId, mentions: 0, unread: 0 };
         retry.push([channelId, messageId]);
       }
       return { byChannel };
@@ -70,18 +85,30 @@ export const useReadStates = create<ReadStatesState>()((set, get) => ({
   },
   bumpMentions: (channelId) =>
     set((s) => {
-      const cur = s.byChannel[channelId] ?? { lastReadId: null, mentions: 0 };
+      const cur = s.byChannel[channelId] ?? EMPTY;
       return { byChannel: { ...s.byChannel, [channelId]: { ...cur, mentions: cur.mentions + 1 } } };
+    }),
+  bumpUnread: (channelId) =>
+    set((s) => {
+      const cur = s.byChannel[channelId] ?? EMPTY;
+      return { byChannel: { ...s.byChannel, [channelId]: { ...cur, unread: Math.min(MAX_UNREAD, cur.unread + 1) } } };
+    }),
+  dropUnread: (channelId, messageId) =>
+    set((s) => {
+      const cur = s.byChannel[channelId];
+      // only a message after the read marker was counted; anything this account sent it had read
+      if (!cur || cur.unread === 0 || (cur.lastReadId && compareIds(messageId, cur.lastReadId) <= 0)) return s;
+      return { byChannel: { ...s.byChannel, [channelId]: { ...cur, unread: cur.unread - 1 } } };
     }),
   markRead: (channelId, messageId) =>
     set((s) => {
       const cur = s.byChannel[channelId];
-      if (cur?.lastReadId && compareIds(cur.lastReadId, messageId) >= 0 && cur.mentions === 0) return s;
-      return { byChannel: { ...s.byChannel, [channelId]: { lastReadId: messageId, mentions: 0 } } };
+      if (cur?.lastReadId && compareIds(cur.lastReadId, messageId) >= 0 && cur.mentions === 0 && cur.unread === 0) return s;
+      return { byChannel: { ...s.byChannel, [channelId]: { lastReadId: messageId, mentions: 0, unread: 0 } } };
     }),
   ack: async (channelId, messageId) => {
     const cur = get().byChannel[channelId];
-    if (cur?.lastReadId && compareIds(cur.lastReadId, messageId) >= 0 && cur.mentions === 0) return;
+    if (cur?.lastReadId && compareIds(cur.lastReadId, messageId) >= 0 && cur.mentions === 0 && cur.unread === 0) return;
     get().markRead(channelId, messageId);
     await send(channelId, messageId);
   },

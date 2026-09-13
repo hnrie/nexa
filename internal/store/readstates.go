@@ -19,8 +19,9 @@ func (s *Store) Ack(ctx context.Context, uid, chID, msgID ids.ID, force bool) er
 	return err
 }
 
-// ReadStatesFor returns the user's read position and unread mention count for
-// each of the given channels (channels without a row get a zero state).
+// ReadStatesFor returns the user's read position, unread mention count and,
+// for conversations, unread message count in each of the given channels
+// (channels without a row get a zero state).
 func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID) ([]*ReadState, error) {
 	out := make([]*ReadState, 0, len(channels))
 	if len(channels) == 0 {
@@ -61,30 +62,35 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	// @everyone. The join time becomes the lowest snowflake of that millisecond
 	// (ids keep the millisecond above 22 bits). Counting per channel lets each
 	// count walk the messages_channel index from the floor instead of scanning
-	// the whole channel.
-	args := []any{int64(uid), ids.Epoch, uid.String(), int64(uid), int64(uid), int64(uid)}
+	// the whole channel. Conversations also count their unread messages, which
+	// stop at MaxUnreadCount so a long-ignored one costs no more than a short one.
+	args := []any{int64(uid), uid.String(), int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
 	args = append(args, idArgs(channels)...)
-	mrows, err := s.db.R.QueryContext(ctx, `SELECT c.id, (SELECT count(*) FROM messages m
-			WHERE m.channel_id = c.id AND m.author_id != ?
-			AND m.id > max(coalesce(r.last_read_message_id, 0), coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0))
-			AND (m.mention_everyone = 1 OR EXISTS (SELECT 1 FROM json_each(m.mentions) WHERE value = ?)))
-		FROM channels c
-		LEFT JOIN read_states r ON r.channel_id = c.id AND r.user_id = ?
-		LEFT JOIN server_members sm ON sm.server_id = c.server_id AND sm.user_id = ?
-		LEFT JOIN dm_participants p ON p.channel_id = c.id AND p.user_id = ?
-		WHERE c.id IN (`+ph+`)`, args...)
+	mrows, err := s.db.R.QueryContext(ctx, `SELECT f.id,
+			(SELECT count(*) FROM messages m
+				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor
+				AND (m.mention_everyone = 1 OR EXISTS (SELECT 1 FROM json_each(m.mentions) WHERE value = ?))),
+			CASE WHEN f.type IN ('dm', 'group_dm') THEN (SELECT count(*) FROM (SELECT 1 FROM messages m
+				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor LIMIT ?)) ELSE 0 END
+		FROM (SELECT c.id, c.type, max(coalesce(r.last_read_message_id, 0), coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0)) AS floor
+			FROM channels c
+			LEFT JOIN read_states r ON r.channel_id = c.id AND r.user_id = ?
+			LEFT JOIN server_members sm ON sm.server_id = c.server_id AND sm.user_id = ?
+			LEFT JOIN dm_participants p ON p.channel_id = c.id AND p.user_id = ?
+			WHERE c.id IN (`+ph+`)) f`, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer mrows.Close()
 	for mrows.Next() {
 		var ch int64
-		var n int
-		if err := mrows.Scan(&ch, &n); err != nil {
+		var mentions, unread int
+		if err := mrows.Scan(&ch, &mentions, &unread); err != nil {
 			return nil, err
 		}
 		if rs := byCh[ids.ID(ch)]; rs != nil {
-			rs.MentionCount = n
+			rs.MentionCount = mentions
+			rs.UnreadCount = unread
 		}
 	}
 	return out, mrows.Err()

@@ -142,8 +142,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const visible = ui.activeChannelId === m.channel_id && ui.focused && typeof document !== "undefined" && document.visibilityState === "visible";
       if (mine || visible) {
         void useReadStates.getState().ack(m.channel_id, m.id);
-      } else if (meId && mentionsMe(m, meId)) {
-        useReadStates.getState().bumpMentions(m.channel_id);
+      } else {
+        if (meId && mentionsMe(m, meId)) useReadStates.getState().bumpMentions(m.channel_id);
+        // conversations count every message, so their badges say how many are waiting
+        const type = useChannels.getState().byId[m.channel_id]?.type;
+        if (!type || type === "dm" || type === "group_dm") useReadStates.getState().bumpUnread(m.channel_id);
       }
       for (const h of dispatchHooks.onMessage) h(m, mine);
       return;
@@ -155,6 +158,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     }
     case "message_delete":
       useMessages.getState().remove(e.d.channel_id, e.d.id);
+      useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
       return;
     case "message_delete_bulk":
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);

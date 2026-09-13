@@ -346,7 +346,13 @@ type ReadState struct {
 	LastReadMessageID *ids.ID `json:"last_read_message_id"`
 	LastAckAt         int64   `json:"last_ack_at"`
 	MentionCount      int     `json:"mention_count"`
+	// UnreadCount counts other people's unread messages in a DM or group DM,
+	// up to MaxUnreadCount; it is zero for server channels.
+	UnreadCount int `json:"unread_count"`
 }
+
+// MaxUnreadCount is where a conversation's unread count stops counting.
+const MaxUnreadCount = 100
 
 // KeyEpoch is one generation of a conversation's root key.
 type KeyEpoch struct {

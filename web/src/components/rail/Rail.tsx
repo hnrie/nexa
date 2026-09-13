@@ -1,15 +1,21 @@
-import { MessageCircle, Plus } from "lucide-react";
+import { MessageCircle, Plus, Users } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { iconUrl } from "@/api/users";
+import { Avatar } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
 import { initials } from "@/lib/avatarColor";
-import { serverUnread } from "@/lib/unread";
+import { channelDisplayName, friendNicknames } from "@/lib/names";
+import { badgeText, serverUnread, unreadConversations } from "@/lib/unread";
+import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useReadStates, isUnread } from "@/stores/readStates";
+import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { useUsers } from "@/stores/users";
+import { dmMenuItems } from "@/components/sidebar/dmMenu";
 import { serverMenuItems } from "@/components/sidebar/serverMenu";
 import { lastChannelOf } from "@/stores/serverNav";
 import s from "./Rail.module.css";
@@ -22,7 +28,10 @@ export function orderedServerIds(order: string[], positions: string[]): string[]
   return out;
 }
 
-/** The 72 px server rail: home (DMs), separator, servers, add. */
+/** How many waiting conversations the rail shows under home; the DM list has the rest. */
+const MAX_WAITING = 10;
+
+/** The 72 px server rail: home (DMs), the conversations with messages waiting, separator, servers, add. */
 export function Rail() {
   const nav = useNavigate();
   const loc = useLocation();
@@ -34,20 +43,24 @@ export function Rail() {
   const patch = useSettings((st) => st.patch);
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
+  const meId = useAuth((a) => a.me?.id);
+  const users = useUsers((u) => u.byId);
+  const rels = useRelationships((r) => r.byUser);
+  const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const home = loc.pathname.startsWith("/channels/@me");
   const activeServer = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
+  const openConvo = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<{ id: string; after: boolean } | null>(null);
   const railRef = useRef<HTMLElement>(null);
 
-  let mentions = 0;
   let unread = false;
   for (const ch of Object.values(channels)) {
     if (ch.type !== "dm" && ch.type !== "group_dm") continue;
-    const rs = reads[ch.id];
-    mentions += rs?.mentions ?? 0;
-    if (isUnread(rs, ch.last_message_id)) unread = true;
+    if (isUnread(reads[ch.id], ch.last_message_id)) unread = true;
   }
+  // like the people themselves waiting at the door: who sent something, and how much
+  const waiting = unreadConversations(channels, reads, settings, openConvo).slice(0, MAX_WAITING);
 
   const ids = useMemo(() => orderedServerIds(order, settings.serverPositions), [order, settings.serverPositions]);
 
@@ -97,8 +110,40 @@ export function Rail() {
             <MessageCircle size={28} strokeWidth={2.2} />
           </button>
         </Tooltip>
-        {mentions > 0 ? <span className={s.badge}>{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
+      {waiting.map(({ channel: ch, count }) => {
+        const name = channelDisplayName(ch, users, meId, nicknames);
+        const other = ch.type === "dm" ? (ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0] ?? "") : "";
+        const label = `${name}, ${count > 99 ? "more than 99" : count} unread ${count === 1 ? "message" : "messages"}`;
+        return (
+          <div key={ch.id} className={[s.item, s.waiting].join(" ")} data-unread="true" data-waiting={ch.id}>
+            <span className={s.pill} />
+            <Tooltip text={name} side="right">
+              <button
+                className={[s.btn, s.hasIcon].join(" ")}
+                aria-label={label}
+                onClick={() => {
+                  nav(`/channels/@me/${ch.id}`);
+                  useUI.getState().setLeftOpen(false);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+                }}
+              >
+                {ch.type === "dm" ? (
+                  <Avatar id={other} avatarId={users[other]?.avatar_id ?? null} name={name} size={48} />
+                ) : ch.icon_id ? (
+                  <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={48} />
+                ) : (
+                  <span className={s.groupIcon}><Users size={24} /></span>
+                )}
+              </button>
+            </Tooltip>
+            <span className={s.badge} aria-hidden="true" data-testid="waiting-count">{badgeText(count)}</span>
+          </div>
+        );
+      })}
       <div className={s.sep} />
       {ids.map((id) => {
         const st = servers[id];

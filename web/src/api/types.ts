@@ -373,6 +373,8 @@ export interface ReadState {
   last_read_message_id: Snowflake | null;
   last_ack_at: number;
   mention_count: number;
+  /** Other people's unread messages in a DM or group DM, up to 100; absent or 0 elsewhere. */
+  unread_count?: number;
 }
 
 export interface KeyGrant {
