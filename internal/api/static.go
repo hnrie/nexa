@@ -54,14 +54,6 @@ func (s *Server) staticHandler() http.Handler {
 		}
 		// A build's own files either exist or they do not. Answering with the
 		// app's HTML instead turns a missing script into a page the browser
-		// refuses to run, and the service worker then keeps that HTML under
-		// the script's address for good.
-		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" {
-			WriteError(w, ErrNotFound)
-			return
-		}
-		// A build's own files either exist or they do not. Answering with the
-		// app's HTML instead turns a missing script into a page the browser
 		// refuses to run, and any cache in front of this, the browser's own or
 		// a CDN's, then keeps that HTML under the script's address.
 		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" {

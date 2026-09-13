@@ -29,7 +29,7 @@ func TestStaticServing(t *testing.T) {
 		return res, string(b)
 	}
 	res, body := get("/")
-	if res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") || res.Header.Get("Cache-Control") != "no-cache" || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+	if res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") || res.Header.Get("Cache-Control") != "no-cache, must-revalidate" || res.Header.Get("CDN-Cache-Control") != "no-store" || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
 		t.Errorf("index: %d %q %v", res.StatusCode, body, res.Header)
 	}
 	if res, body = get("/channels/@me/123"); res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") {
@@ -38,6 +38,14 @@ func TestStaticServing(t *testing.T) {
 	res, body = get("/assets/app-abc123.js")
 	if res.StatusCode != 200 || body != "console.log(1)" || res.Header.Get("Cache-Control") != "public, max-age=31536000, immutable" || !strings.HasPrefix(res.Header.Get("Content-Type"), "text/javascript") {
 		t.Errorf("asset: %d %q %v", res.StatusCode, body, res.Header)
+	}
+	// a file from a build that has been replaced must 404, never fall back to
+	// the page: a cache would then keep that page at the script's address
+	for _, missing := range []string{"/assets/gone-deadbeef.js", "/twemoji/9999.svg"} {
+		res, body = get(missing)
+		if res.StatusCode != 404 || strings.Contains(body, "Evilion Chat") || res.Header.Get("Cache-Control") != "no-store" {
+			t.Errorf("missing %s: %d %q %v", missing, res.StatusCode, body, res.Header.Get("Cache-Control"))
+		}
 	}
 	if res, _ = get("/manifest.webmanifest"); res.Header.Get("Content-Type") != "application/manifest+json" {
 		t.Errorf("manifest type: %s", res.Header.Get("Content-Type"))
