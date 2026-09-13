@@ -251,13 +251,9 @@ func (s *Server) handleChannelIcon(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	bid := b.ID
-	ptr := &bid
-	if err := s.Store.UpdateChannel(r.Context(), ch.ID, store.ChannelPatch{IconID: &ptr}); err != nil {
+	if err := s.Store.SwapImage(r.Context(), "channels", "icon_id", ch.ID, &bid); err != nil {
 		WriteError(w, err)
 		return
-	}
-	if ch.IconID != nil && *ch.IconID != b.ID {
-		_ = s.Store.AddBlobRef(r.Context(), *ch.IconID, -1)
 	}
 	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
 	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
@@ -273,13 +269,9 @@ func (s *Server) handleChannelIconDelete(w http.ResponseWriter, r *http.Request)
 		WriteError(w, E(http.StatusBadRequest, "not_group", "Only group DMs have icons."))
 		return
 	}
-	var nilID *ids.ID
-	if err := s.Store.UpdateChannel(r.Context(), ch.ID, store.ChannelPatch{IconID: &nilID}); err != nil {
+	if err := s.Store.SwapImage(r.Context(), "channels", "icon_id", ch.ID, nil); err != nil {
 		WriteError(w, err)
 		return
-	}
-	if ch.IconID != nil {
-		_ = s.Store.AddBlobRef(r.Context(), *ch.IconID, -1)
 	}
 	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
 	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
@@ -376,7 +368,7 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTyping(w http.ResponseWriter, r *http.Request) {
 	ch, me := s.channel(w, r, NeedSend)
-	if ch == nil {
+	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
 	}
 	s.Bcast.Typing(r.Context(), me.ID, ch.ID)

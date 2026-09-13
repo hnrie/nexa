@@ -174,6 +174,20 @@ describe("uploadStaged", () => {
       expect(await same(server.stored(), meta.key, data)).toBe(true);
     });
 
+    it("asks to finish again when the reply to finishing was lost", async () => {
+      const { server, send } = fakeServer();
+      let n = 0;
+      vi.spyOn(uploads, "finish").mockImplementation(async () => {
+        n += 1;
+        if (n === 1) throw new TypeError("Failed to fetch");
+        return { blob_id: "b1", size: server.stored().length };
+      });
+      const { blob_id } = await uploadStaged("c1", staged(data), () => undefined, send);
+      expect(blob_id).toBe("b1");
+      expect(n).toBe(2);
+      expect(server.cancelled).toBe(0);
+    });
+
     it("gives up after a few failures and throws the upload away", async () => {
       const { server, send } = fakeServer();
       server.onPiece = async () => {

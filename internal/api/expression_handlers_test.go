@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -316,5 +317,40 @@ func TestGifSearchOffWithoutAKey(t *testing.T) {
 	res, body = do(t, ts, "GET", "/api/v1/gif/status", token, nil)
 	if res.StatusCode == 200 && body["enabled"] != false {
 		t.Errorf("status should say it is off: %v", body)
+	}
+}
+
+// Deleting a pack tells whoever installed it, and lets go of every sticker's
+// picture, even one added twice.
+func TestPackDeleteReachesInstallers(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, _ := register(t, ts, "bob")
+	_, body := do(t, ts, "POST", "/api/v1/stickers/packs", tokA, map[string]any{"name": "Dogs"})
+	pack := body["id"].(string)
+	img := pngBytes(32, 32)
+	for _, name := range []string{"One", "Two"} {
+		if res, raw := rawPost(t, ts.URL+"/api/v1/stickers/packs/"+pack+"/stickers?name="+name, tokA, "image/png", img); res.StatusCode != 201 {
+			t.Fatalf("add sticker: %d %s", res.StatusCode, raw)
+		}
+	}
+	_, body = do(t, ts, "GET", "/api/v1/stickers/packs/"+pack, tokA, nil)
+	blob, _ := parseID(body["stickers"].([]any)[0].(map[string]any)["blob_id"].(string))
+	if b, _ := srv.Store.BlobByID(context.Background(), blob); b == nil || b.RefCount != 2 {
+		t.Fatalf("the same picture twice holds two references: %+v", b)
+	}
+	do(t, ts, "PATCH", "/api/v1/stickers/packs/"+pack, tokA, map[string]any{"public": true})
+	if res, _ := do(t, ts, "PUT", "/api/v1/stickers/packs/"+pack+"/install", tokB, nil); res.StatusCode != 200 {
+		t.Fatalf("install: %d", res.StatusCode)
+	}
+	gb := connectGW(t, ts, tokB)
+	if res, _ := do(t, ts, "DELETE", "/api/v1/stickers/packs/"+pack, tokA, nil); res.StatusCode != 204 {
+		t.Fatalf("delete: %d", res.StatusCode)
+	}
+	if ev := gb.next("sticker_update", 3*time.Second); ev == nil || ev["pack_id"] != pack || ev["deleted"] != true {
+		t.Errorf("installer hears of the delete: %v", ev)
+	}
+	if b, _ := srv.Store.BlobByID(context.Background(), blob); b == nil || b.RefCount != 0 {
+		t.Errorf("references after delete: %+v", b)
 	}
 }

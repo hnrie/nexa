@@ -141,7 +141,8 @@ func (s *Store) UpdateServer(ctx context.Context, id ids.ID, p ServerPatch) erro
 // DeleteServer removes a server and its key material.
 func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 	return s.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id)); err != nil {
+		// one reference per attachment row, however many rows share a blob
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.blob_id = blobs.id AND a.channel_id IN (SELECT id FROM channels WHERE server_id = ?))) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id), int64(id)); err != nil {
 			return err
 		}
 		// the icon, banner, emoji and server sticker packs go with the server
@@ -333,7 +334,7 @@ func (s *Store) Members(ctx context.Context, serverID ids.ID, after ids.ID, limi
 	args := []any{int64(serverID), int64(after)}
 	if q = strings.ToLower(strings.TrimSpace(q)); q != "" {
 		like := escapeLike(q) + "%"
-		query += ` AND (u.username LIKE ? ESCAPE '\' OR lower(u.display_name) LIKE ? ESCAPE '\' OR lower(m.nickname) LIKE ? ESCAPE '\')`
+		query += ` AND (u.username LIKE ? ESCAPE '\' OR ulower(u.display_name) LIKE ? ESCAPE '\' OR ulower(m.nickname) LIKE ? ESCAPE '\')`
 		args = append(args, like, like, like)
 	}
 	query += ` ORDER BY m.user_id LIMIT ?`

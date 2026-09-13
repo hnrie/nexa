@@ -7,7 +7,6 @@ import (
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
-	"evilion.xyz/chat/internal/store"
 )
 
 func (s *Server) mediaRoutes(mux *http.ServeMux) {
@@ -60,24 +59,10 @@ func (s *Server) handleAvatarPut(kind string) http.HandlerFunc {
 			WriteError(w, err)
 			return
 		}
-		var old *ids.ID
 		bid := b.ID
-		p := store.ProfilePatch{}
-		if kind == "banner" {
-			old = u.BannerID
-			ptr := &bid
-			p.BannerID = &ptr
-		} else {
-			old = u.AvatarID
-			ptr := &bid
-			p.AvatarID = &ptr
-		}
-		if err := s.Store.UpdateProfile(r.Context(), u.ID, p); err != nil {
+		if err := s.Store.SwapImage(r.Context(), "users", kind+"_id", u.ID, &bid); err != nil {
 			WriteError(w, err)
 			return
-		}
-		if old != nil && *old != b.ID {
-			_ = s.Store.AddBlobRef(r.Context(), *old, -1)
 		}
 		updated, err := s.Store.UserByID(r.Context(), u.ID)
 		if err != nil {
@@ -92,22 +77,10 @@ func (s *Server) handleAvatarPut(kind string) http.HandlerFunc {
 func (s *Server) handleAvatarDelete(kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		u := auth.UserFrom(r.Context())
-		var old *ids.ID
-		var nilID *ids.ID
-		p := store.ProfilePatch{}
-		if kind == "banner" {
-			old = u.BannerID
-			p.BannerID = &nilID
-		} else {
-			old = u.AvatarID
-			p.AvatarID = &nilID
-		}
-		if err := s.Store.UpdateProfile(r.Context(), u.ID, p); err != nil {
+		// the old image is read and released in one write, so a double tap releases it once
+		if err := s.Store.SwapImage(r.Context(), "users", kind+"_id", u.ID, nil); err != nil {
 			WriteError(w, err)
 			return
-		}
-		if old != nil {
-			_ = s.Store.AddBlobRef(r.Context(), *old, -1)
 		}
 		if updated, err := s.Store.UserByID(r.Context(), u.ID); err == nil {
 			s.Bcast.UserUpdated(updated)

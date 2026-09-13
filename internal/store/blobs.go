@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"evilion.xyz/chat/internal/ids"
 )
@@ -72,10 +73,52 @@ func (s *Store) UnreferencedBlobs(ctx context.Context, olderThan int64) ([]*Blob
 	return out, rows.Err()
 }
 
-// DeleteBlob removes blob metadata.
-func (s *Store) DeleteBlob(ctx context.Context, id ids.ID) error {
-	_, err := s.db.W.ExecContext(ctx, `DELETE FROM blobs WHERE id = ?`, int64(id))
-	return err
+// DeleteBlob removes blob metadata, but only while nothing references it: a
+// blob listed as unreferenced can be picked up again (public images are shared
+// by content) before the sweep gets to it. It reports whether a row went.
+func (s *Store) DeleteBlob(ctx context.Context, id ids.ID) (bool, error) {
+	res, err := s.db.W.ExecContext(ctx, `DELETE FROM blobs WHERE id = ? AND ref_count <= 0`, int64(id))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// imageColumns are the only places SwapImage writes, so its SQL is never
+// built from anything else.
+var imageColumns = map[string]bool{
+	"users.avatar_id": true, "users.banner_id": true,
+	"servers.icon_id": true, "servers.banner_id": true,
+	"channels.icon_id": true,
+}
+
+// SwapImage points an image column of one row at newID (nil clears it) and
+// releases the blob it pointed at before. The caller already holds a reference
+// on newID. The old value is read in the same write, so two overlapping
+// requests (a double tap on Remove) cannot both release it.
+func (s *Store) SwapImage(ctx context.Context, table, col string, rowID ids.ID, newID *ids.ID) error {
+	if !imageColumns[table+"."+col] {
+		return fmt.Errorf("swap image: %s.%s is not an image column", table, col)
+	}
+	return s.Tx(ctx, func(tx *sql.Tx) error {
+		var old sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT `+col+` FROM `+table+` WHERE id = ?`, int64(rowID)).Scan(&old); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE `+table+` SET `+col+` = ?, updated_at = ? WHERE id = ?`, nullID(newID), nowMs(), int64(rowID)); err != nil {
+			return err
+		}
+		if !old.Valid {
+			return nil
+		}
+		// even when old is newID: the new reference was taken for this row, which already had one
+		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id = ?`, old.Int64)
+		return err
+	})
 }
 
 // CountBlobsByContent counts rows that share the same bytes: exact sha matches

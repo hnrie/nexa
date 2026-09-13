@@ -443,8 +443,8 @@ func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 }
 
 func deleteChannelTx(ctx context.Context, tx *sql.Tx, id ids.ID) error {
-	// release attachment blobs, and a group's icon
-	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id = ?)`, int64(id)); err != nil {
+	// release attachment blobs, one reference per attachment row, and a group's icon
+	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.channel_id = ? AND a.blob_id = blobs.id)) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id = ?)`, int64(id), int64(id)); err != nil {
 		return err
 	}
 	if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM channels WHERE id = ?`, int64(id)); err != nil {

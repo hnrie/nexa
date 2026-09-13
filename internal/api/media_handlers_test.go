@@ -84,3 +84,51 @@ func TestAvatarUploadServeDelete(t *testing.T) {
 		t.Errorf("too large: %d %s", res.StatusCode, body)
 	}
 }
+
+// A double tap on Remove releases a shared picture once, and setting the same
+// picture again does not leave an extra reference behind.
+func TestImageRemovalReleasesOnce(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, _ := register(t, ts, "bob")
+	pic := pngBytes(24, 24)
+	for _, tok := range []string{tokA, tokB, tokA} {
+		if res, body := rawPut(t, ts.URL+"/api/v1/users/@me/avatar", tok, "image/png", pic); res.StatusCode != 200 {
+			t.Fatalf("avatar: %d %s", res.StatusCode, body)
+		}
+	}
+	_, me := do(t, ts, "GET", "/api/v1/users/@me", tokA, nil)
+	avatar, _ := ids.Parse(me["avatar_id"].(string))
+	refs := func(id ids.ID) int {
+		b, err := srv.Store.BlobByID(t.Context(), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return b.RefCount
+	}
+	if n := refs(avatar); n != 2 {
+		t.Fatalf("alice and bob share the picture: %d references", n)
+	}
+	do(t, ts, "DELETE", "/api/v1/users/@me/avatar", tokA, nil)
+	do(t, ts, "DELETE", "/api/v1/users/@me/avatar", tokA, nil)
+	if n := refs(avatar); n != 1 {
+		t.Errorf("bob's reference must survive alice removing hers twice: %d", n)
+	}
+
+	sid := createServer(t, ts, tokA, "Icons")["id"].(string)
+	for i := 0; i < 2; i++ {
+		if res, body := rawPut(t, ts.URL+"/api/v1/servers/"+sid+"/icon", tokA, "image/png", pic); res.StatusCode != 200 {
+			t.Fatalf("icon: %d %s", res.StatusCode, body)
+		}
+	}
+	_, view := do(t, ts, "GET", "/api/v1/servers/"+sid, tokA, nil)
+	icon, _ := ids.Parse(view["server"].(map[string]any)["icon_id"].(string))
+	if n := refs(icon); n != 1 {
+		t.Errorf("icon set twice: %d references", n)
+	}
+	do(t, ts, "DELETE", "/api/v1/servers/"+sid+"/icon", tokA, nil)
+	do(t, ts, "DELETE", "/api/v1/servers/"+sid+"/icon", tokA, nil)
+	if n := refs(icon); n != 0 {
+		t.Errorf("icon removed: %d references", n)
+	}
+}

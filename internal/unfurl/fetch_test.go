@@ -9,6 +9,7 @@ import (
 	"image/color"
 	"image/gif"
 	"image/png"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -383,6 +384,65 @@ func TestFetchUnsupportedContentType(t *testing.T) {
 		if !errors.Is(err, ErrUnsupported) {
 			t.Errorf("content-type %q: err = %v, want ErrUnsupported", ct, err)
 		}
+	}
+}
+
+// An image the media proxy will not pass on would only be a broken picture.
+func TestFetchImageTheProxyRefuses(t *testing.T) {
+	for _, ct := range []string{"image/svg+xml", "image/heic", "image/tiff"} {
+		f, _ := fetcherFor(t, body(ct, "<svg/>"))
+		if _, err := f.Fetch(context.Background(), "http://example.test/logo"); !errors.Is(err, ErrUnsupported) {
+			t.Errorf("%s: err = %v, want ErrUnsupported", ct, err)
+		}
+	}
+	f, _ := fetcherFor(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Content-Length", strconv.Itoa(MaxMediaBytes+1))
+		w.Write(pngOf(t, 3, 5))
+	}))
+	if _, err := f.Fetch(context.Background(), "http://example.test/huge.png"); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("oversized: err = %v, want ErrUnsupported", err)
+	}
+}
+
+// The proxy's client has no deadline on the whole transfer: a slow body that
+// keeps moving arrives whole, and one that stops is cut off.
+func TestStreamClientWatchesForProgress(t *testing.T) {
+	f, _ := fetcherFor(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/gif")
+		for i := 0; i < 8; i++ {
+			w.Write([]byte("GIF89a.."))
+			w.(http.Flusher).Flush()
+			if r.URL.Path == "/stalls" && i == 1 {
+				<-r.Context().Done()
+				return
+			}
+			time.Sleep(60 * time.Millisecond)
+		}
+	}))
+	f.Timeout = 200 * time.Millisecond
+	get := func(path string) ([]byte, error) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		watch := f.Watch(cancel)
+		defer watch.Stop()
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.test"+path, nil)
+		res, err := f.StreamClient().Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer res.Body.Close()
+		return io.ReadAll(watch.Body(res.Body))
+	}
+	if b, err := get("/slow"); err != nil || len(b) != 64 {
+		t.Errorf("slow but steady: %d bytes, %v", len(b), err)
+	}
+	start := time.Now()
+	if _, err := get("/stalls"); err == nil {
+		t.Error("a stalled body should fail")
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Errorf("stall noticed after %v", time.Since(start))
 	}
 }
 

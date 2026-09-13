@@ -3,12 +3,29 @@ package store
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"strings"
 
+	"modernc.org/sqlite"
+
 	"evilion.xyz/chat/internal/ids"
 )
+
+// SQLite's lower() and LIKE only fold ASCII, so a search for "łukasz" would
+// never find "Łukasz". ulower folds a column the same way Go folds the query.
+func init() {
+	sqlite.MustRegisterDeterministicScalarFunction("ulower", 1, func(_ *sqlite.FunctionContext, args []driver.Value) (driver.Value, error) {
+		switch v := args[0].(type) {
+		case string:
+			return strings.ToLower(v), nil
+		case []byte:
+			return strings.ToLower(string(v)), nil
+		}
+		return args[0], nil
+	})
+}
 
 const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at`
 
@@ -117,7 +134,7 @@ func (s *Store) SearchUsers(ctx context.Context, q string, limit int) ([]*User, 
 		limit = 10
 	}
 	like := escapeLike(q) + "%"
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR lower(display_name) LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted, limit)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR ulower(display_name) LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted, limit)
 	if err != nil {
 		return nil, err
 	}

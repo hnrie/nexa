@@ -69,11 +69,11 @@ func TestMessagesPaginationAndCRUD(t *testing.T) {
 		t.Error("same nonce by another author is fine:", err)
 	}
 	// edit
-	if err := s.UpdateMessage(ctx, all[0].ID, json.RawMessage(`{"v":1,"ct":"edited"}`), []ids.ID{b.ID}, nil, false, 12345); err != nil {
+	if err := s.UpdateMessage(ctx, all[0].ID, json.RawMessage(`{"v":1,"ct":"edited"}`), dm.ID, 3, []ids.ID{b.ID}, nil, false, 12345); err != nil {
 		t.Fatal(err)
 	}
 	m, _ := s.MessageByID(ctx, all[0].ID, b.ID)
-	if string(m.Ciphertext) != `{"v":1,"ct":"edited"}` || m.EditedAt == nil || *m.EditedAt != 12345 || len(m.Mentions) != 1 || m.Mentions[0] != b.ID {
+	if string(m.Ciphertext) != `{"v":1,"ct":"edited"}` || m.EditedAt == nil || *m.EditedAt != 12345 || len(m.Mentions) != 1 || m.Mentions[0] != b.ID || m.KeyConvID == nil || *m.KeyConvID != dm.ID || m.KeyEpoch == nil || *m.KeyEpoch != 3 {
 		t.Errorf("edit: %+v", m)
 	}
 	// attachments + delete releases blob

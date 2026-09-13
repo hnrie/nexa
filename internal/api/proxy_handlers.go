@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -9,6 +10,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"evilion.xyz/chat/internal/unfurl"
 )
 
 // The media proxy fetches remote images on the user's behalf so that opening a
@@ -17,16 +20,15 @@ import (
 // never learns the key and cannot mint links of its own.
 
 const (
-	maxProxyBytes  = 25 << 20
+	maxProxyBytes  = unfurl.MaxMediaBytes
 	proxyCacheCtl  = "public, max-age=604800, immutable"
 	proxySigLength = 16 // bytes of HMAC kept, base64url encoded
 )
 
+// proxyTypes are the video and audio types passed through; images are
+// unfurl.ProxyImageTypes, which leaves out SVG because it can script.
 var proxyTypes = map[string]bool{
-	"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true,
-	"image/avif": true, "image/bmp": true, "image/x-icon": true, "image/vnd.microsoft.icon": true,
-	"image/svg+xml": false, // SVG can script; never pass it through
-	"video/mp4":     true, "video/webm": true, "video/quicktime": true,
+	"video/mp4": true, "video/webm": true, "video/quicktime": true,
 	"audio/mpeg": true, "audio/mp4": true, "audio/ogg": true,
 }
 
@@ -82,7 +84,13 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "blocked", http.StatusForbidden)
 		return
 	}
-	req, err := http.NewRequestWithContext(r.Context(), r.Method, target.String(), nil)
+	// No deadline on the whole transfer, which a slow phone can stretch past any
+	// sensible one; the request is dropped only once it stops making progress.
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	watch := f.Watch(cancel)
+	defer watch.Stop()
+	req, err := http.NewRequestWithContext(ctx, r.Method, target.String(), nil)
 	if err != nil {
 		http.Error(w, "bad url", http.StatusBadRequest)
 		return
@@ -93,7 +101,7 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	if rng := r.Header.Get("Range"); rng != "" {
 		req.Header.Set("Range", rng)
 	}
-	res, err := f.Client().Do(req)
+	res, err := f.StreamClient().Do(req)
 	if err != nil {
 		http.Error(w, "upstream failed", http.StatusBadGateway)
 		return
@@ -104,7 +112,7 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ct := strings.ToLower(strings.TrimSpace(strings.Split(res.Header.Get("Content-Type"), ";")[0]))
-	if !proxyTypes[ct] {
+	if !proxyTypes[ct] && !unfurl.ProxyImageTypes[ct] {
 		http.Error(w, "unsupported media type", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -131,5 +139,5 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodHead {
 		return
 	}
-	_, _ = io.Copy(w, io.LimitReader(res.Body, maxProxyBytes))
+	_, _ = io.Copy(w, watch.Body(io.LimitReader(res.Body, maxProxyBytes)))
 }

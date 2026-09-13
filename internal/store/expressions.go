@@ -242,7 +242,8 @@ func (s *Store) UpdatePack(ctx context.Context, id ids.ID, patch StickerPackPatc
 // DeletePack removes a pack, its stickers and their blob references.
 func (s *Store) DeletePack(ctx context.Context, id ids.ID) error {
 	return s.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(ref_count - 1, 0) WHERE id IN (SELECT blob_id FROM stickers WHERE pack_id = ?)`, int64(id)); err != nil {
+		// one reference per sticker: the same picture added twice holds two
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(ref_count - (SELECT count(*) FROM stickers st WHERE st.pack_id = ? AND st.blob_id = blobs.id), 0) WHERE id IN (SELECT blob_id FROM stickers WHERE pack_id = ?)`, int64(id), int64(id)); err != nil {
 			return err
 		}
 		res, err := tx.ExecContext(ctx, `DELETE FROM sticker_packs WHERE id = ?`, int64(id))

@@ -16,6 +16,8 @@ type Upload struct {
 	Received  int64  `json:"received"`
 	CreatedAt int64  `json:"created_at"`
 	UpdatedAt int64  `json:"updated_at"`
+	// BlobID is what the transfer became once it was finished.
+	BlobID *ids.ID `json:"-"`
 }
 
 // CreateUpload opens a transfer.
@@ -32,11 +34,13 @@ func (s *Store) CreateUpload(ctx context.Context, userID ids.ID, size int64) (*U
 // UploadByID loads one transfer.
 func (s *Store) UploadByID(ctx context.Context, id ids.ID) (*Upload, error) {
 	var u Upload
-	err := s.db.R.QueryRowContext(ctx, `SELECT id, user_id, size, received, created_at, updated_at FROM uploads WHERE id = ?`, int64(id)).
-		Scan(&u.ID, &u.UserID, &u.Size, &u.Received, &u.CreatedAt, &u.UpdatedAt)
+	var blob sql.NullInt64
+	err := s.db.R.QueryRowContext(ctx, `SELECT id, user_id, size, received, created_at, updated_at, blob_id FROM uploads WHERE id = ?`, int64(id)).
+		Scan(&u.ID, &u.UserID, &u.Size, &u.Received, &u.CreatedAt, &u.UpdatedAt, &blob)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
+	u.BlobID = idPtr(blob)
 	return &u, err
 }
 
@@ -49,6 +53,13 @@ func (s *Store) AdvanceUpload(ctx context.Context, id ids.ID, from, to int64) (b
 	}
 	n, err := res.RowsAffected()
 	return n > 0, err
+}
+
+// FinishUpload records the blob a transfer became. The row stays until the
+// stale sweep, so a repeated finish can answer with the same blob.
+func (s *Store) FinishUpload(ctx context.Context, id, blobID ids.ID) error {
+	_, err := s.db.W.ExecContext(ctx, `UPDATE uploads SET blob_id = ?, updated_at = ? WHERE id = ?`, int64(blobID), nowMs(), int64(id))
+	return err
 }
 
 // DeleteUpload forgets a transfer.

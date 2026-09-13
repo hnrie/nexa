@@ -52,6 +52,16 @@ describe("messages store", () => {
     expect(useMessages.getState().channels["c1"]?.ids).toEqual(["1", "3"]);
   });
 
+  it("keeps this viewer's reactions when a message is edited", () => {
+    const s = useMessages.getState();
+    s.insert("c1", [msg("1")]);
+    s.setReaction("c1", "1", "👍", "me", true, true);
+    s.update("c1", { ...msg("1"), edited_at: 5, reactions: [{ emoji: "👍", count: 1, me: false }] });
+    const m = useMessages.getState().channels["c1"]?.byId["1"];
+    expect(m?.edited_at).toBe(5);
+    expect(m?.reactions).toEqual([{ emoji: "👍", count: 1, me: true }]);
+  });
+
   it("toggles reaction summaries", () => {
     const s = useMessages.getState();
     s.insert("c1", [msg("1")]);

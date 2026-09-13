@@ -110,8 +110,19 @@ func TestBlobs(t *testing.T) {
 	if len(un) != 0 {
 		t.Error("olderThan filter")
 	}
-	if err := s.DeleteBlob(ctx, b.ID); err != nil {
+	// a blob picked up again after it was listed is kept
+	if err := s.AddBlobRef(ctx, b.ID, 1); err != nil {
 		t.Fatal(err)
+	}
+	if deleted, err := s.DeleteBlob(ctx, b.ID); err != nil || deleted {
+		t.Fatalf("delete of a referenced blob: %v %v", deleted, err)
+	}
+	if _, err := s.BlobByID(ctx, b.ID); err != nil {
+		t.Error("a referenced blob must survive:", err)
+	}
+	_ = s.AddBlobRef(ctx, b.ID, -1)
+	if deleted, err := s.DeleteBlob(ctx, b.ID); err != nil || !deleted {
+		t.Fatalf("delete: %v %v", deleted, err)
 	}
 	if _, err := s.BlobByID(ctx, b.ID); !errors.Is(err, ErrNotFound) {
 		t.Error("deleted")

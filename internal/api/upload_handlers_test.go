@@ -9,9 +9,110 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"evilion.xyz/chat/internal/ids"
 )
+
+// downloadAttachment fetches a blob's bytes as token.
+func downloadAttachment(t *testing.T, ts *httptest.Server, token, blobID string) []byte {
+	t.Helper()
+	req, _ := http.NewRequest("GET", ts.URL+"/media/attachments/"+blobID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return b
+}
+
+// A lost reply to finish must not cost the upload: finishing again gives the same file.
+func TestFinishingTwiceGivesTheSameFile(t *testing.T) {
+	_, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	body := bytes.Repeat([]byte("abc"), 400)
+	_, created := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": len(body)})
+	id := created["id"].(string)
+	if r, out := sendChunk(t, ts, token, id, 0, body); r.StatusCode != 200 {
+		t.Fatalf("piece: %d %v", r.StatusCode, out)
+	}
+	res, first := do(t, ts, "POST", "/api/v1/uploads/"+id+"/finish", token, nil)
+	if res.StatusCode != 201 {
+		t.Fatalf("finish: %d %v", res.StatusCode, first)
+	}
+	res, again := do(t, ts, "POST", "/api/v1/uploads/"+id+"/finish", token, nil)
+	if res.StatusCode != 201 || again["blob_id"] != first["blob_id"] || again["size"] != first["size"] {
+		t.Fatalf("finish again: %d %v, first %v", res.StatusCode, again, first)
+	}
+	if r, _ := sendChunk(t, ts, token, id, int64(len(body)), []byte("x")); r.StatusCode < 400 {
+		t.Errorf("a finished upload takes no more pieces: %d", r.StatusCode)
+	}
+	if got := downloadAttachment(t, ts, token, first["blob_id"].(string)); !bytes.Equal(got, body) {
+		t.Errorf("stored bytes differ: %d of %d", len(got), len(body))
+	}
+}
+
+// A request still stuck on its body when the retry of its piece lands must
+// not be able to wipe what the retry wrote once it finally fails.
+func TestStalePieceCannotSpoilItsRetry(t *testing.T) {
+	_, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	body := bytes.Repeat([]byte("0123456789abcdef"), 256)
+	_, created := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": len(body)})
+	id := created["id"].(string)
+
+	pr, pw := io.Pipe()
+	stale := make(chan struct{})
+	go func() {
+		defer close(stale)
+		req, _ := http.NewRequest("PATCH", ts.URL+"/api/v1/uploads/"+id, pr)
+		req.Header.Set("Authorization", "Bearer "+token)
+		req.Header.Set("Upload-Offset", "0")
+		if res, err := http.DefaultClient.Do(req); err == nil {
+			res.Body.Close()
+		}
+	}()
+	if _, err := pw.Write(body[:1000]); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond) // let the server start reading it
+
+	if r, out := sendChunk(t, ts, token, id, 0, body); r.StatusCode != 200 {
+		t.Fatalf("retry: %d %v", r.StatusCode, out)
+	}
+	pw.CloseWithError(io.ErrUnexpectedEOF)
+	<-stale
+	time.Sleep(100 * time.Millisecond) // and let its handler give up
+
+	res, fin := do(t, ts, "POST", "/api/v1/uploads/"+id+"/finish", token, nil)
+	if res.StatusCode != 201 {
+		t.Fatalf("finish: %d %v", res.StatusCode, fin)
+	}
+	if got := downloadAttachment(t, ts, token, fin["blob_id"].(string)); !bytes.Equal(got, body) {
+		t.Errorf("stored bytes differ: %d of %d", len(got), len(body))
+	}
+}
+
+// Bytes on disk that do not match what the database counted are never sent
+// on as a file that fails to decrypt.
+func TestFinishRefusesADamagedSpool(t *testing.T) {
+	srv, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	body := bytes.Repeat([]byte("z"), 500)
+	_, created := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": len(body)})
+	id := created["id"].(string)
+	sendChunk(t, ts, token, id, 0, body)
+	parsed, _ := parseID(id)
+	if err := os.Truncate(srv.Media.SpoolPath(parsed), 200); err != nil {
+		t.Fatal(err)
+	}
+	res, out := do(t, ts, "POST", "/api/v1/uploads/"+id+"/finish", token, nil)
+	if res.StatusCode != 409 || errCode(out) != "upload_damaged" {
+		t.Errorf("finish of a damaged upload: %d %v", res.StatusCode, out)
+	}
+}
 
 func jsonUnmarshal(b []byte, v any) error  { return json.Unmarshal(b, v) }
 func parseID(s string) (ids.ID, error)     { return ids.Parse(s) }

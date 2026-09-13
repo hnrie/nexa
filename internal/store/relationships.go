@@ -103,6 +103,32 @@ func (s *Store) Blocked(ctx context.Context, a, b ids.ID) (aBlockedB, bBlockedA 
 	return aBlockedB, bBlockedA, rows.Err()
 }
 
+// DMBlocked reports whether uid and the other person in a 1:1 DM (or a subchat
+// of one) have blocked each other either way. Group conversations are never
+// blocked as a whole.
+func (s *Store) DMBlocked(ctx context.Context, ch *Channel, uid ids.ID) (bool, error) {
+	if ch.Type == "subchat" && ch.ParentID != nil {
+		parent, err := s.ChannelByID(ctx, *ch.ParentID)
+		if err != nil {
+			return false, err
+		}
+		ch = parent
+	}
+	if ch.Type != "dm" {
+		return false, nil
+	}
+	for _, other := range ch.Recipients {
+		if other == uid {
+			continue
+		}
+		ab, ba, err := s.Blocked(ctx, uid, other)
+		if err != nil || ab || ba {
+			return ab || ba, err
+		}
+	}
+	return false, nil
+}
+
 // Friends lists uid's friends.
 func (s *Store) Friends(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT target_id FROM relationships WHERE user_id = ? AND type = 'friend'`, int64(uid))

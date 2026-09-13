@@ -352,22 +352,10 @@ func (s *Server) handleServerImage(kind string) http.HandlerFunc {
 			return
 		}
 		bid := b.ID
-		ptr := &bid
-		var old *ids.ID
-		p := store.ServerPatch{}
-		if kind == "banner" {
-			old = srv.BannerID
-			p.BannerID = &ptr
-		} else {
-			old = srv.IconID
-			p.IconID = &ptr
-		}
-		if err := s.Store.UpdateServer(r.Context(), srv.ID, p); err != nil {
+		col := map[bool]string{true: "banner_id", false: "icon_id"}[kind == "banner"]
+		if err := s.Store.SwapImage(r.Context(), "servers", col, srv.ID, &bid); err != nil {
 			WriteError(w, err)
 			return
-		}
-		if old != nil && *old != b.ID {
-			_ = s.Store.AddBlobRef(r.Context(), *old, -1)
 		}
 		updated, _ := s.Store.ServerByID(r.Context(), srv.ID)
 		s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, map[string]any{kind: b.ID}, "")
@@ -382,20 +370,10 @@ func (s *Server) handleServerImageDelete(kind string) http.HandlerFunc {
 		if srv == nil {
 			return
 		}
-		var nilID *ids.ID
-		var old *ids.ID
-		p := store.ServerPatch{}
-		if kind == "banner" {
-			old, p.BannerID = srv.BannerID, &nilID
-		} else {
-			old, p.IconID = srv.IconID, &nilID
-		}
-		if err := s.Store.UpdateServer(r.Context(), srv.ID, p); err != nil {
+		col := map[bool]string{true: "banner_id", false: "icon_id"}[kind == "banner"]
+		if err := s.Store.SwapImage(r.Context(), "servers", col, srv.ID, nil); err != nil {
 			WriteError(w, err)
 			return
-		}
-		if old != nil {
-			_ = s.Store.AddBlobRef(r.Context(), *old, -1)
 		}
 		updated, _ := s.Store.ServerByID(r.Context(), srv.ID)
 		s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, map[string]any{kind: nil}, "")

@@ -83,6 +83,15 @@ func TestUsersCRUD(t *testing.T) {
 	if len(res) != 0 {
 		t.Error("LIKE wildcard must be escaped")
 	}
+	// capitals outside ASCII fold too
+	if err := s.UpdateProfile(ctx, u.ID, ProfilePatch{DisplayName: ptr("Łukasz Émile")}); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{"Łukasz", "łuk", "ŁUKASZ"} {
+		if res, err := s.SearchUsers(ctx, q, 10); err != nil || len(res) != 1 || res[0].ID != u.ID {
+			t.Errorf("search %q: %v %v", q, res, err)
+		}
+	}
 }
 
 func TestUpdateAuthAndFlagsAndDelete(t *testing.T) {
@@ -130,5 +139,47 @@ func TestUpdateAuthAndFlagsAndDelete(t *testing.T) {
 	}
 	if _, err := s.SessionByTokenHash(ctx, "t"); !errors.Is(err, ErrNotFound) {
 		t.Error("sessions should be gone")
+	}
+}
+
+// Two overlapping removals of the same avatar release its picture once.
+func TestSwapImageReleasesTheOldPictureOnce(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	u := mkUser(t, s, "dana")
+	// one reference is dana's, the other belongs to someone with the same picture
+	pic := &Blob{SHA256: "pic", Size: 10, Mime: "image/png", Kind: "avatar", RefCount: 2}
+	if err := s.InsertBlob(ctx, pic); err != nil {
+		t.Fatal(err)
+	}
+	picID := &pic.ID
+	if err := s.UpdateProfile(ctx, u.ID, ProfilePatch{AvatarID: &picID}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := s.SwapImage(ctx, "users", "avatar_id", u.ID, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, _ := s.BlobByID(ctx, pic.ID); got.RefCount != 1 {
+		t.Errorf("ref count = %d, want 1: the other reference must survive", got.RefCount)
+	}
+	if me, _ := s.UserByID(ctx, u.ID); me.AvatarID != nil {
+		t.Errorf("avatar should be cleared: %v", *me.AvatarID)
+	}
+	// setting the picture it already has keeps one reference for it
+	_ = s.AddBlobRef(ctx, pic.ID, 1) // what an upload of the same picture takes
+	if err := s.SwapImage(ctx, "users", "avatar_id", u.ID, &pic.ID); err != nil {
+		t.Fatal(err)
+	}
+	_ = s.AddBlobRef(ctx, pic.ID, 1)
+	if err := s.SwapImage(ctx, "users", "avatar_id", u.ID, &pic.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.BlobByID(ctx, pic.ID); got.RefCount != 2 {
+		t.Errorf("ref count after setting the same picture twice = %d, want 2", got.RefCount)
+	}
+	if err := s.SwapImage(ctx, "users", "flags", u.ID, nil); err == nil {
+		t.Error("only image columns can be swapped")
 	}
 }

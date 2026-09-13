@@ -105,8 +105,26 @@ func dedupeIDs(list []ids.ID, max int) []ids.ID {
 	return out
 }
 
+// dmBlocked answers 403 when the caller and the other person in a 1:1 DM have
+// blocked each other, so a block also closes a conversation that already exists.
+func (s *Server) dmBlocked(w http.ResponseWriter, r *http.Request, ch *store.Channel, me *store.User) bool {
+	blocked, err := s.Store.DMBlocked(r.Context(), ch, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return true
+	}
+	if blocked {
+		WriteError(w, E(http.StatusForbidden, "blocked", "You cannot message this user."))
+		return true
+	}
+	return false
+}
+
 // checkEnvelope validates the ciphertext against the channel's conversation.
-func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store.Channel, body *messageBody) (*envelope, bool) {
+// An edit may instead keep the conversation its message was first sealed for,
+// passed as alt: a channel that later got its own key still has older
+// messages under the server's.
+func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store.Channel, body *messageBody, alt *ids.ID) (*envelope, bool) {
 	env, ok := validEnvelope(body.Ciphertext)
 	if !ok {
 		WriteError(w, E(http.StatusBadRequest, "bad_envelope", "The encrypted message envelope is malformed."))
@@ -116,6 +134,9 @@ func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store
 	if err != nil {
 		WriteError(w, err)
 		return nil, false
+	}
+	if alt != nil && !alt.IsZero() && env.Conv == *alt {
+		conv = *alt
 	}
 	if env.Conv != conv || body.KeyConvID != conv || env.Epoch != body.KeyEpoch {
 		WriteError(w, E(http.StatusBadRequest, "wrong_conversation", "The message is encrypted for a different conversation."))
@@ -215,7 +236,10 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	env, ok := s.checkEnvelope(w, r, ch, &body)
+	if s.dmBlocked(w, r, ch, me) {
+		return
+	}
+	env, ok := s.checkEnvelope(w, r, ch, &body, nil)
 	if !ok {
 		return
 	}
@@ -251,7 +275,12 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		m.ReplyToID = body.ReplyToID
 		m.Type = "reply"
 	}
+	seenBlobs := map[ids.ID]bool{}
 	for _, a := range body.Attachments {
+		if seenBlobs[a.BlobID] {
+			continue // the same file listed twice is attached once
+		}
+		seenBlobs[a.BlobID] = true
 		b, err := s.Store.BlobByID(ctx, a.BlobID)
 		if err != nil || b.Kind != "attachment" || b.OwnerID == nil || *b.OwnerID != me.ID {
 			WriteError(w, E(http.StatusBadRequest, "bad_attachment", "One of the attachments is not yours or does not exist."))
@@ -319,10 +348,15 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, ErrForbidden)
 			return
 		}
-		if _, ok := s.checkEnvelope(w, r, ch, &body); !ok {
+		if s.dmBlocked(w, r, ch, me) {
 			return
 		}
-		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, dedupeIDs(body.Mentions, maxMentions), dedupeIDs(body.MentionRoles, maxMentions), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
+		env, ok := s.checkEnvelope(w, r, ch, &body, m.KeyConvID)
+		if !ok {
+			return
+		}
+		// readers open a message with the key its row names, so the row follows the new envelope
+		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), dedupeIDs(body.MentionRoles, maxMentions), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
 			WriteError(w, err)
 			return
 		}
@@ -332,7 +366,11 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.Bcast.EmitChannel(ch.ID, "message_update", updated)
+	// Reactions carry a "me" flag for whoever loaded them, so everyone gets a
+	// copy loaded for no one rather than the editor's.
+	if shared, err := s.Store.MessageByID(r.Context(), mid, 0); err == nil {
+		s.Bcast.EmitChannel(ch.ID, "message_update", shared)
+	}
 	WriteJSON(w, http.StatusOK, updated)
 }
 
@@ -415,8 +453,11 @@ func parseEmoji(raw string) (string, bool) {
 	return e, true
 }
 
-func (s *Server) reactionTarget(w http.ResponseWriter, r *http.Request) (*store.Channel, *store.User, *store.Message, string) {
-	ch, me := s.channel(w, r, NeedReact)
+// reactionTarget loads the channel, message and emoji of a reaction route.
+// Only adding a reaction needs Add Reactions: taking your own back needs to see
+// the channel, and listing who reacted needs its history.
+func (s *Server) reactionTarget(w http.ResponseWriter, r *http.Request, need string) (*store.Channel, *store.User, *store.Message, string) {
+	ch, me := s.channel(w, r, need)
 	if ch == nil {
 		return nil, nil, nil, ""
 	}
@@ -439,8 +480,8 @@ func (s *Server) reactionTarget(w http.ResponseWriter, r *http.Request) (*store.
 }
 
 func (s *Server) handleReactionAdd(w http.ResponseWriter, r *http.Request) {
-	ch, me, m, emoji := s.reactionTarget(w, r)
-	if ch == nil {
+	ch, me, m, emoji := s.reactionTarget(w, r, NeedReact)
+	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
 	}
 	added, err := s.Store.AddReaction(r.Context(), m.ID, me.ID, emoji)
@@ -459,7 +500,7 @@ func (s *Server) handleReactionAdd(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReactionRemove(w http.ResponseWriter, r *http.Request) {
-	ch, me, m, emoji := s.reactionTarget(w, r)
+	ch, me, m, emoji := s.reactionTarget(w, r, NeedView)
 	if ch == nil {
 		return
 	}
@@ -475,7 +516,7 @@ func (s *Server) handleReactionRemove(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReactors(w http.ResponseWriter, r *http.Request) {
-	ch, _, m, emoji := s.reactionTarget(w, r)
+	ch, _, m, emoji := s.reactionTarget(w, r, NeedHistory)
 	if ch == nil {
 		return
 	}

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
@@ -20,6 +21,40 @@ const sniffBytes = 1 << 20
 type Store struct {
 	Dir string
 	st  *store.Store
+
+	locksMu sync.Mutex
+	locks   map[ids.ID]*uploadLock
+}
+
+type uploadLock struct {
+	mu    sync.Mutex
+	users int
+}
+
+// LockUpload serialises the requests that change one resumable upload: a
+// retried piece can arrive while the request it replaced is still stuck on its
+// body. It returns the unlock function.
+func (m *Store) LockUpload(id ids.ID) func() {
+	m.locksMu.Lock()
+	if m.locks == nil {
+		m.locks = map[ids.ID]*uploadLock{}
+	}
+	l := m.locks[id]
+	if l == nil {
+		l = &uploadLock{}
+		m.locks[id] = l
+	}
+	l.users++
+	m.locksMu.Unlock()
+	l.mu.Lock()
+	return func() {
+		l.mu.Unlock()
+		m.locksMu.Lock()
+		if l.users--; l.users == 0 {
+			delete(m.locks, id)
+		}
+		m.locksMu.Unlock()
+	}
 }
 
 // New creates the directory layout under dir.
@@ -143,12 +178,39 @@ func (m *Store) SpoolPath(id ids.ID) string {
 	return filepath.Join(m.Dir, "tmp", "resume-"+id.String())
 }
 
-// AppendSpool writes the next piece of a resumable upload at exactly `at`,
-// refusing anything that would leave a hole or overwrite what is already
-// there. It returns the new length.
-func (m *Store) AppendSpool(id ids.ID, at int64, r io.Reader, limit int64) (int64, error) {
-	path := m.SpoolPath(id)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0o640)
+// StagePiece reads one piece of a resumable upload into a file of its own, so
+// a body that never finishes arriving leaves the spool untouched. The caller
+// removes the returned file.
+func (m *Store) StagePiece(r io.Reader, limit int64) (string, int64, error) {
+	f, err := os.CreateTemp(filepath.Join(m.Dir, "tmp"), "piece-*")
+	if err != nil {
+		return "", 0, err
+	}
+	path := f.Name()
+	n, err := io.Copy(f, io.LimitReader(r, limit+1))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil && n > limit {
+		err = ErrTooLarge
+	}
+	if err != nil {
+		os.Remove(path)
+		return "", 0, err
+	}
+	return path, n, nil
+}
+
+// AppendSpool adds a staged piece to a resumable upload at exactly `at`,
+// refusing anything that would leave a hole. It returns the new length. The
+// caller holds LockUpload and has checked `at` against the database.
+func (m *Store) AppendSpool(id ids.ID, at int64, piece string) (int64, error) {
+	src, err := os.Open(piece)
+	if err != nil {
+		return at, err
+	}
+	defer src.Close()
+	f, err := os.OpenFile(m.SpoolPath(id), os.O_CREATE|os.O_WRONLY, 0o640)
 	if err != nil {
 		return 0, err
 	}
@@ -162,10 +224,8 @@ func (m *Store) AppendSpool(id ids.ID, at int64, r io.Reader, limit int64) (int6
 		return info.Size(), ErrBadOffset
 	}
 	if info.Size() > at {
-		// The caller has already checked `at` against the database, which only
-		// advances once a piece is written and synced. Anything past it is what
-		// a request left behind when its connection dropped mid-body, and keeping
-		// it would refuse every retry for good.
+		// The database only advances once a piece is written and synced, so
+		// anything past it was written by a request that never got to record it.
 		if err := f.Truncate(at); err != nil {
 			return info.Size(), err
 		}
@@ -173,15 +233,10 @@ func (m *Store) AppendSpool(id ids.ID, at int64, r io.Reader, limit int64) (int6
 	if _, err := f.Seek(at, io.SeekStart); err != nil {
 		return at, err
 	}
-	n, err := io.Copy(f, io.LimitReader(r, limit+1))
+	n, err := io.Copy(f, src)
 	if err != nil {
 		_ = f.Truncate(at)
 		return at, err
-	}
-	if n > limit {
-		// too much arrived; put the file back how it was
-		_ = f.Truncate(at)
-		return at, ErrTooLarge
 	}
 	if err := f.Sync(); err != nil {
 		return at + n, err
@@ -194,10 +249,10 @@ func (m *Store) DiscardSpool(id ids.ID) {
 	_ = os.Remove(m.SpoolPath(id))
 }
 
-// FinishSpool turns a completed upload into a blob. The bytes are already
-// encrypted by the sender, so they are stored under a name of their own
-// rather than hashed for sharing: the same file uploaded twice is two blobs.
-func (m *Store) FinishSpool(ctx context.Context, id ids.ID, owner ids.ID) (*store.Blob, error) {
+// FinishSpool turns a completed upload of `size` bytes into a blob. The bytes
+// are already encrypted by the sender, so they are stored under a name of their
+// own rather than hashed for sharing: the same file uploaded twice is two blobs.
+func (m *Store) FinishSpool(ctx context.Context, id ids.ID, owner ids.ID, size int64) (*store.Blob, error) {
 	path := m.SpoolPath(id)
 	info, err := os.Stat(path)
 	if err != nil {
@@ -206,6 +261,11 @@ func (m *Store) FinishSpool(ctx context.Context, id ids.ID, owner ids.ID) (*stor
 	if info.Size() == 0 {
 		m.DiscardSpool(id)
 		return nil, ErrUnsupported
+	}
+	if info.Size() != size {
+		// the file on disk is not what the database counted; it would not decrypt
+		m.DiscardSpool(id)
+		return nil, ErrBadOffset
 	}
 	name := hex.EncodeToString([]byte(id.String())) + ids.New().String()
 	if err := m.commit(path, name); err != nil {
@@ -258,8 +318,12 @@ func shaOf(b *store.Blob) string {
 // Remove deletes a blob's metadata and, when no other row shares the same
 // bytes, the file.
 func (m *Store) Remove(ctx context.Context, b *store.Blob) error {
-	if err := m.st.DeleteBlob(ctx, b.ID); err != nil {
+	deleted, err := m.st.DeleteBlob(ctx, b.ID)
+	if err != nil {
 		return err
+	}
+	if !deleted {
+		return errReferenced // picked up again since it was listed
 	}
 	n, err := m.st.CountBlobsByContent(ctx, shaOf(b))
 	if err != nil {
@@ -271,6 +335,9 @@ func (m *Store) Remove(ctx context.Context, b *store.Blob) error {
 	}
 	return nil
 }
+
+// errReferenced tells GC a blob it listed is in use again and was kept.
+var errReferenced = errors.New("blob is referenced again")
 
 // GC removes unreferenced blobs older than olderThan (unix ms). Returns the count.
 func (m *Store) GC(ctx context.Context, olderThan int64) (int, error) {

@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -93,6 +94,10 @@ func (s *Server) handleUploadStatus(w http.ResponseWriter, r *http.Request) {
 	if up == nil {
 		return
 	}
+	if up.BlobID != nil {
+		WriteError(w, ErrNotFound) // finished: nothing left to resume
+		return
+	}
 	WriteJSON(w, http.StatusOK, uploadView(up))
 }
 
@@ -122,15 +127,36 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 		limit = room
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
-	end, err := s.Media.AppendSpool(up.ID, offset, r.Body, limit)
+	// The body lands in a file of its own first: a request stuck on its body
+	// must not be able to touch the spool once a retry has taken over.
+	piece, _, err := s.Media.StagePiece(r.Body, limit)
+	if err != nil {
+		if errors.Is(err, media.ErrTooLarge) {
+			WriteError(w, E(http.StatusRequestEntityTooLarge, "chunk_too_large", "That piece is larger than this server takes at once."))
+			return
+		}
+		WriteError(w, err)
+		return
+	}
+	defer os.Remove(piece)
+	unlock := s.Media.LockUpload(up.ID)
+	defer unlock()
+	// another request may have landed this piece while the body was arriving
+	fresh, err := s.Store.UploadByID(r.Context(), up.ID)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if fresh.Received != offset || fresh.BlobID != nil {
+		w.Header().Set("Upload-Offset", strconv.FormatInt(fresh.Received, 10))
+		WriteError(w, E(http.StatusConflict, "offset_mismatch", "That piece does not follow on from what has arrived."))
+		return
+	}
+	end, err := s.Media.AppendSpool(up.ID, offset, piece)
 	if err != nil {
 		if errors.Is(err, media.ErrBadOffset) {
 			w.Header().Set("Upload-Offset", strconv.FormatInt(end, 10))
 			WriteError(w, E(http.StatusConflict, "offset_mismatch", "That piece does not follow on from what has arrived."))
-			return
-		}
-		if errors.Is(err, media.ErrTooLarge) {
-			WriteError(w, E(http.StatusRequestEntityTooLarge, "chunk_too_large", "That piece is larger than this server takes at once."))
 			return
 		}
 		WriteError(w, err)
@@ -158,16 +184,41 @@ func (s *Server) handleUploadFinish(w http.ResponseWriter, r *http.Request) {
 	if up == nil {
 		return
 	}
+	unlock := s.Media.LockUpload(up.ID)
+	defer unlock()
+	up, err := s.Store.UploadByID(r.Context(), up.ID)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if up.BlobID != nil {
+		// finished already and the reply went missing: give the same answer again
+		b, err := s.Store.BlobByID(r.Context(), *up.BlobID)
+		if err != nil {
+			WriteError(w, ErrNotFound)
+			return
+		}
+		WriteJSON(w, http.StatusCreated, map[string]any{"blob_id": b.ID, "size": b.Size})
+		return
+	}
 	if up.Received != up.Size {
 		WriteError(w, E(http.StatusBadRequest, "incomplete", "Some of the file has not arrived yet."))
 		return
 	}
-	b, err := s.Media.FinishSpool(r.Context(), up.ID, me.ID)
+	b, err := s.Media.FinishSpool(r.Context(), up.ID, me.ID, up.Size)
 	if err != nil {
+		if errors.Is(err, media.ErrBadOffset) {
+			_ = s.Store.DeleteUpload(r.Context(), up.ID)
+			WriteError(w, E(http.StatusConflict, "upload_damaged", "The file did not arrive intact. Send it again."))
+			return
+		}
 		WriteError(w, err)
 		return
 	}
-	_ = s.Store.DeleteUpload(r.Context(), up.ID)
+	if err := s.Store.FinishUpload(r.Context(), up.ID, b.ID); err != nil {
+		WriteError(w, err)
+		return
+	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"blob_id": b.ID, "size": b.Size})
 }
 
@@ -176,6 +227,8 @@ func (s *Server) handleUploadCancel(w http.ResponseWriter, r *http.Request) {
 	if up == nil {
 		return
 	}
+	unlock := s.Media.LockUpload(up.ID)
+	defer unlock()
 	s.Media.DiscardSpool(up.ID)
 	_ = s.Store.DeleteUpload(r.Context(), up.ID)
 	w.WriteHeader(http.StatusNoContent)

@@ -271,8 +271,8 @@ func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) er
 }
 
 // UpdateMessage replaces the ciphertext and mention metadata.
-func (s *Store) UpdateMessage(ctx context.Context, id ids.ID, ciphertext json.RawMessage, mentions, roles []ids.ID, everyone bool, editedAt int64) error {
-	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET ciphertext = ?, mentions = ?, mention_roles = ?, mention_everyone = ?, edited_at = ? WHERE id = ?`, string(ciphertext), idsJSON(mentions), idsJSON(roles), boolInt(everyone), editedAt, int64(id))
+func (s *Store) UpdateMessage(ctx context.Context, id ids.ID, ciphertext json.RawMessage, keyConv ids.ID, keyEpoch int, mentions, roles []ids.ID, everyone bool, editedAt int64) error {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET ciphertext = ?, key_conv_id = ?, key_epoch = ?, mentions = ?, mention_roles = ?, mention_everyone = ?, edited_at = ? WHERE id = ?`, string(ciphertext), int64(keyConv), keyEpoch, idsJSON(mentions), idsJSON(roles), boolInt(everyone), editedAt, int64(id))
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,8 @@ func (s *Store) DeleteMessage(ctx context.Context, id ids.ID) error {
 			}
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id IN (SELECT blob_id FROM attachments WHERE message_id = ?)`, int64(id)); err != nil {
+		// one reference per attachment row, however many rows share a blob
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.message_id = ? AND a.blob_id = blobs.id)) WHERE id IN (SELECT blob_id FROM attachments WHERE message_id = ?)`, int64(id), int64(id)); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE id = ?`, int64(id)); err != nil {

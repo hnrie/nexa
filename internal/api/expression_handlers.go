@@ -194,6 +194,12 @@ func (s *Server) packRights(ctx context.Context, p *store.StickerPack, me ids.ID
 
 // notifyPack tells everyone who can see a pack that it changed.
 func (s *Server) notifyPack(ctx context.Context, p *store.StickerPack, deleted bool) {
+	s.emitPack(s.packTargets(ctx, p), p, deleted)
+}
+
+// packTargets lists everyone who can see a pack: its owner, the members of
+// its server and whoever installed it.
+func (s *Server) packTargets(ctx context.Context, p *store.StickerPack) []ids.ID {
 	targets := map[ids.ID]bool{}
 	if p.OwnerUserID != nil {
 		targets[*p.OwnerUserID] = true
@@ -214,11 +220,15 @@ func (s *Server) notifyPack(ctx context.Context, p *store.StickerPack, deleted b
 	for id := range targets {
 		list = append(list, id)
 	}
+	return list
+}
+
+func (s *Server) emitPack(targets []ids.ID, p *store.StickerPack, deleted bool) {
 	payload := map[string]any{"pack_id": p.ID, "deleted": deleted}
 	if !deleted {
 		payload["pack"] = p
 	}
-	s.Bcast.EmitUsers(list, "sticker_update", payload)
+	s.Bcast.EmitUsers(targets, "sticker_update", payload)
 }
 
 func (s *Server) handlePacks(w http.ResponseWriter, r *http.Request) {
@@ -429,6 +439,8 @@ func (s *Server) handlePackDelete(w http.ResponseWriter, r *http.Request) {
 	if p == nil {
 		return
 	}
+	// installs go with the pack, so whoever had it installed is found first
+	targets := s.packTargets(r.Context(), p)
 	if err := s.Store.DeletePack(r.Context(), p.ID); err != nil {
 		WriteError(w, err)
 		return
@@ -436,7 +448,7 @@ func (s *Server) handlePackDelete(w http.ResponseWriter, r *http.Request) {
 	if p.ServerID != nil {
 		s.audit(r, *p.ServerID, me.ID, "sticker_pack_delete", "sticker_pack", &p.ID, map[string]any{"name": p.Name}, "")
 	}
-	s.notifyPack(r.Context(), p, true)
+	s.emitPack(targets, p, true)
 	w.WriteHeader(http.StatusNoContent)
 }
 

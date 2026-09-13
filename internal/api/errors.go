@@ -37,7 +37,7 @@ func WriteError(w http.ResponseWriter, err error) {
 	var apiErr *Error
 	switch {
 	case errors.As(err, &apiErr):
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound), errors.Is(err, media.ErrNotFound):
 		apiErr = ErrNotFound
 	case errors.Is(err, store.ErrUsernameTaken):
 		apiErr = E(http.StatusConflict, "username_taken", "That username is already taken.")

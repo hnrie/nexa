@@ -191,6 +191,23 @@ function formatSize(bytes: number): string {
 const CHUNK_TRIES = 4;
 
 /**
+ * Turns the landed pieces into a file. Finishing twice gives back the same
+ * file, so a reply lost to a dropped connection or a server hiccup is asked for
+ * again rather than costing the whole upload; a refusal is final.
+ */
+async function finishUpload(id: string): Promise<{ blob_id: string; size: number }> {
+  for (let tries = 1; ; tries++) {
+    try {
+      return await uploadsApi.finish(id);
+    } catch (err) {
+      const refused = err instanceof ApiError && err.status > 0 && err.status < 500;
+      if (refused || tries >= CHUNK_TRIES) throw err;
+      await new Promise((r) => setTimeout(r, 400 * tries));
+    }
+  }
+}
+
+/**
  * Sends a file too big for one request, a piece at a time. Each piece is a
  * whole number of chunks, so it can be encrypted on its own when its turn
  * comes, and again identically if it has to be sent twice.
@@ -234,7 +251,7 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
       }
     }
     if (sent !== total) throw new Error("The upload came out a different size than expected.");
-    return await uploadsApi.finish(session.id);
+    return await finishUpload(session.id);
   } catch (err) {
     await uploadsApi.cancel(session.id).catch(() => undefined);
     throw err;

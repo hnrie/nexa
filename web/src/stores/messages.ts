@@ -124,8 +124,11 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   update: (channelId, msg) =>
     set((s) =>
       withChannel(s, channelId, (c) => {
-        if (!(msg.id in c.byId)) return c;
-        return { ...c, byId: { ...c.byId, [msg.id]: msg } };
+        const prev = c.byId[msg.id];
+        if (!prev) return c;
+        // An update's reactions say "me" for whoever loaded it, not for this
+        // viewer; reaction events keep the stored ones right instead.
+        return { ...c, byId: { ...c.byId, [msg.id]: { ...msg, reactions: prev.reactions } } };
       }),
     ),
   remove: (channelId, id) => get().removeMany(channelId, [id]),

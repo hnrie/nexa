@@ -188,3 +188,32 @@ func TestPutEncrypted(t *testing.T) {
 		f.Close()
 	}
 }
+
+// A blob listed as unreferenced but picked up again before the sweep reaches
+// it keeps its row and its file.
+func TestRemoveKeepsABlobReferencedAgain(t *testing.T) {
+	m, st := newMedia(t)
+	ctx := context.Background()
+	lim := Limits{MaxBytes: 10 << 20, MaxW: 64, MaxH: 64}
+	b, err := m.PutPublic(ctx, "avatar", bytes.NewReader(pngBytes(8, 8)), lim, ids.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = st.AddBlobRef(ctx, b.ID, -1)
+	listed, _ := st.UnreferencedBlobs(ctx, ids.New().Time().UnixMilli()+1)
+	if len(listed) != 1 {
+		t.Fatalf("listed: %d", len(listed))
+	}
+	// the same picture is uploaded again in between
+	if again, err := m.PutPublic(ctx, "avatar", bytes.NewReader(pngBytes(8, 8)), lim, ids.New()); err != nil || again.ID != b.ID {
+		t.Fatalf("reupload: %v", err)
+	}
+	if err := m.Remove(ctx, listed[0]); err == nil {
+		t.Error("remove should refuse a blob in use")
+	}
+	if f, _, err := m.Open(ctx, b.ID); err != nil {
+		t.Error("the picture must survive:", err)
+	} else {
+		f.Close()
+	}
+}

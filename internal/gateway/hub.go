@@ -315,7 +315,13 @@ func (h *Hub) CanAccess(ctx context.Context, uid, channelID ids.ID) (bool, error
 		return false, err
 	}
 	if ch.Type == "dm" || ch.Type == "group_dm" {
-		return h.st.IsParticipant(ctx, channelID, uid)
+		ok, err := h.st.IsParticipant(ctx, channelID, uid)
+		if err != nil || !ok {
+			return false, err
+		}
+		// a block closes a 1:1 conversation both ways, typing included
+		blocked, err := h.st.DMBlocked(ctx, ch, uid)
+		return !blocked, err
 	}
 	if h.Access != nil {
 		return h.Access(ctx, uid, channelID)

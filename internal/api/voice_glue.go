@@ -213,6 +213,9 @@ func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Cha
 	if s.isDM(ch) {
 		for _, id := range ch.Recipients {
 			if id == me.ID {
+				if blocked, err := s.Store.DMBlocked(ctx, ch, me.ID); err != nil || blocked {
+					return false, "blocked", "You cannot call this user."
+				}
 				return true, "", ""
 			}
 		}

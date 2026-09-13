@@ -33,6 +33,17 @@ const (
 	maxDescRunes     = 2048
 )
 
+// MaxMediaBytes is the largest body the media proxy passes through.
+const MaxMediaBytes = 25 << 20
+
+// ProxyImageTypes are the image types the media proxy passes through. An image
+// link of any other type (SVG, HEIC, TIFF) would only show as a broken picture,
+// so it gets no image preview.
+var ProxyImageTypes = map[string]bool{
+	"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true,
+	"image/avif": true, "image/bmp": true, "image/x-icon": true, "image/vnd.microsoft.icon": true,
+}
+
 // Result is a link preview.
 type Result struct {
 	URL         string `json:"url"`
@@ -121,6 +132,47 @@ func (f *Fetcher) Client() *http.Client {
 	}
 }
 
+// StreamClient is Client without a deadline on the whole exchange, for the
+// media proxy: a big GIF on a weak connection can take minutes to pass through,
+// which is fine while it keeps moving. Bound its requests with Watch.
+func (f *Fetcher) StreamClient() *http.Client {
+	c := f.Client()
+	c.Timeout = 0
+	return c
+}
+
+// Watchdog cancels a request that goes the fetcher's timeout without progress:
+// no response yet, or no bytes read from its body.
+type Watchdog struct {
+	timer *time.Timer
+	idle  time.Duration
+}
+
+// Watch starts a Watchdog that calls cancel once the request stalls.
+func (f *Fetcher) Watch(cancel context.CancelFunc) *Watchdog {
+	d := f.timeout()
+	return &Watchdog{timer: time.AfterFunc(d, cancel), idle: d}
+}
+
+// Body wraps a response body so that every read bringing bytes resets the clock.
+func (w *Watchdog) Body(r io.Reader) io.Reader { return watchedReader{r: r, w: w} }
+
+// Stop ends the watch.
+func (w *Watchdog) Stop() { w.timer.Stop() }
+
+type watchedReader struct {
+	r io.Reader
+	w *Watchdog
+}
+
+func (r watchedReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	if n > 0 {
+		r.w.timer.Reset(r.w.idle)
+	}
+	return n, err
+}
+
 // Validate reports whether a URL is safe to fetch (public host, http(s) only).
 func (f *Fetcher) Validate(ctx context.Context, u *url.URL) error { return f.validate(ctx, u) }
 
@@ -177,6 +229,10 @@ func (f *Fetcher) Fetch(ctx context.Context, rawURL string) (*Result, error) {
 	ct = strings.ToLower(ct)
 	switch {
 	case strings.HasPrefix(ct, "image/"):
+		// the preview is shown through the media proxy, so only what it passes on
+		if !ProxyImageTypes[ct] || res.ContentLength > MaxMediaBytes {
+			return nil, ErrUnsupported
+		}
 		return f.mediaResult(res.Body, final, ct, "image")
 	case ct == "video/mp4" || ct == "video/webm":
 		return &Result{URL: final.String(), Type: "video", Mime: ct}, nil
