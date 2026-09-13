@@ -76,7 +76,14 @@ function OverviewPage({ channel }: { channel: Channel }) {
       if (slow !== channel.slowmode_seconds) body.slowmode_seconds = slow;
       if (nsfw !== channel.nsfw) body.nsfw = nsfw;
       if (limit !== channel.user_limit) body.user_limit = limit;
-      upsert(await serversApi.patchChannel(channel.id, body));
+      const ch = await serversApi.patchChannel(channel.id, body);
+      upsert(ch);
+      // the server tidies names and topics (text channel names become lowercase-with-dashes), so show what it kept
+      setName(ch.name);
+      setTopic(ch.topic);
+      setSlow(ch.slowmode_seconds);
+      setNsfw(ch.nsfw);
+      setLimit(ch.user_limit);
       toast("Channel saved.", "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not save the channel.", "error");
@@ -92,7 +99,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
         <Field label={channel.type === "category" ? "Category name" : "Channel name"} required>
           <div className={s.iconInput}>
             {channel.type === "text" ? <Hash size={16} /> : channel.type === "voice" ? <Volume2 size={16} /> : null}
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="channel-settings-name" />
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="channel-settings-name" {...(isText ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
           </div>
         </Field>
         {isText ? (
@@ -132,14 +139,16 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const editable = canI(server, P.MANAGE_ROLES, channel.id) || canI(server, P.MANAGE_CHANNELS, channel.id);
-  const current: Overwrite | undefined = overwrites.find((o) => o.target_id === selected);
+  // a selection whose overwrite is gone (removed elsewhere, or never added) falls back to @everyone, like the list does
+  const current: Overwrite | undefined = overwrites.find((o) => o.target_id === selected) ?? overwrites.find((o) => o.target_id === serverId);
   const [allow, setAllow] = useState<bigint>(current ? parsePerm(current.allow) : 0n);
   const [deny, setDeny] = useState<bigint>(current ? parsePerm(current.deny) : 0n);
   useEffect(() => {
-    const cur = (channel.overwrites ?? []).find((o) => o.target_id === selected);
+    const list = channel.overwrites ?? [];
+    const cur = list.find((o) => o.target_id === selected) ?? list.find((o) => o.target_id === serverId);
     setAllow(cur ? parsePerm(cur.allow) : 0n);
     setDeny(cur ? parsePerm(cur.deny) : 0n);
-  }, [selected, channel.overwrites]);
+  }, [selected, serverId, channel.overwrites]);
 
   if (!server) return null;
   const targets: Target[] = [];
@@ -158,11 +167,11 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
   const selectedTarget = targets.find((t) => t.id === selected) ?? targets[0]!;
   const dirty = allow !== (current ? parsePerm(current.allow) : 0n) || deny !== (current ? parsePerm(current.deny) : 0n);
   const isPrivate = isPrivateChannel(serverId, overwrites);
-  const wantPrivate = selected === serverId ? has(deny, P.VIEW_CHANNEL) : isPrivate;
+  const wantPrivate = selectedTarget.id === serverId ? has(deny, P.VIEW_CHANNEL) : isPrivate;
 
   const refresh = async () => upsert(await serversApi.channels(serverId));
 
-  const save = async (a = allow, d = deny, targetId = selected, type = selectedTarget.type) => {
+  const save = async (a = allow, d = deny, targetId = selectedTarget.id, type = selectedTarget.type): Promise<boolean> => {
     setBusy(true);
     try {
       const res = await serversApi.putOverwrite(channel.id, targetId, { type, allow: permString(a & ~d), deny: permString(d) });
@@ -173,8 +182,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
         await refresh();
       }
       toast("Permissions saved.", "success");
+      return true;
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not save permissions.", "error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -196,8 +207,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
     setQuery("");
     // a private channel's new target starts with View Channel allowed, so adding someone actually lets them in
     const a = isPrivate ? P.VIEW_CHANNEL : 0n;
-    await save(a, 0n, targetId, type);
-    setSelected(targetId);
+    if (await save(a, 0n, targetId, type)) setSelected(targetId);
   };
 
   const candidateRoles = rolesByPosition(server).filter((r) => r.id !== serverId && !overwrites.some((o) => o.target_id === r.id));

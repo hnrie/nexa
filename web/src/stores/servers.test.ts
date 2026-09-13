@@ -81,14 +81,35 @@ describe("servers store", () => {
     expect(st.me.role_ids).toEqual([]);
   });
   it("tracks members", () => {
-    useServers.getState().upsertMember(member("4"));
+    useServers.getState().upsertMember(member("4"), true);
     expect(useServers.getState().byId[S]!.memberCount).toBe(4);
     useServers.getState().upsertMember(member("4", []));
     expect(useServers.getState().byId[S]!.memberCount).toBe(4);
-    useServers.getState().removeMember(S, "4");
+    useServers.getState().removeMember(S, "4", true);
     expect(useServers.getState().byId[S]!.memberCount).toBe(3);
     useServers.getState().remove(S);
     expect(useServers.getState().byId[S]).toBeUndefined();
     expect(useServers.getState().order).toEqual([]);
+  });
+  it("counts joins and leaves, not updates to members that aren't loaded", () => {
+    // a large server: most members are not loaded, so an update is often about someone unknown
+    useServers.getState().upsertMember(member("9", ["300"]));
+    expect(useServers.getState().byId[S]!.memberCount).toBe(3);
+    // kicked here: the member goes at once and member_remove counts them out, whichever comes first
+    useServers.getState().removeMember(S, "3");
+    expect(useServers.getState().byId[S]!.memberCount).toBe(3);
+    useServers.getState().removeMember(S, "3", true);
+    expect(useServers.getState().byId[S]!.memberCount).toBe(2);
+    // someone never loaded leaves
+    useServers.getState().removeMember(S, "77", true);
+    expect(useServers.getState().byId[S]!.memberCount).toBe(1);
+  });
+  it("recomputes my permissions when ownership moves", () => {
+    const st = useServers.getState().byId[S]!;
+    expect(canI(st, P.KICK_MEMBERS)).toBe(false);
+    useServers.getState().updateServer({ ...st.server, owner_id: "2" });
+    expect(canI(useServers.getState().byId[S], P.KICK_MEMBERS)).toBe(true);
+    useServers.getState().updateServer({ ...st.server, owner_id: "1" });
+    expect(canI(useServers.getState().byId[S], P.KICK_MEMBERS)).toBe(false);
   });
 });

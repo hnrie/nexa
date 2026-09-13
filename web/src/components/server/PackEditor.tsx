@@ -92,7 +92,10 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   const [over, setOver] = useState(false);
   const [pending, setPending] = useState<{ file: File; name: string; tags: string; preview: string }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
-  useEffect(() => () => pending.forEach((p) => URL.revokeObjectURL(p.preview)), [pending]);
+  // previews stay alive while they are staged: each is revoked when it is removed or uploaded, and the rest on unmount
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+  useEffect(() => () => pendingRef.current.forEach((p) => URL.revokeObjectURL(p.preview)), []);
   const dirty = name !== pack.name || description !== pack.description;
   const isEmoji = (pack.kind ?? "sticker") === "emoji";
   const noun = isEmoji ? "emoji" : "sticker";
@@ -101,7 +104,11 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   const save = async () => {
     setBusy(true);
     try {
-      upsertPack(await expressionsApi.patchPack(pack.id, { ...(name !== pack.name ? { name } : {}), ...(description !== pack.description ? { description } : {}) }));
+      const saved = await expressionsApi.patchPack(pack.id, { ...(name !== pack.name ? { name } : {}), ...(description !== pack.description ? { description } : {}) });
+      upsertPack(saved);
+      // the server tidies whitespace, so show what it kept or the save bar never goes away
+      setName(saved.name);
+      setDescription(saved.description);
       toast("Pack saved.", "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not save the pack.", "error");
@@ -133,15 +140,24 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     }
     setPending((cur) => [...cur, ...list]);
   };
+  const unstage = (preview: string) => {
+    URL.revokeObjectURL(preview);
+    setPending((cur) => cur.filter((x) => x.preview !== preview));
+  };
   const uploadAll = async () => {
     setBusy(true);
+    // each upload leaves the list as soon as it is in, so a retry after a failure only sends what is left,
+    // and files staged while this runs stay staged
+    const batch = pending;
+    let done = 0;
     try {
-      for (const p of pending) {
+      for (const p of batch) {
         await expressionsApi.uploadSticker(pack.id, p.name.trim() || "sticker", p.tags.trim(), p.file);
+        unstage(p.preview);
+        done++;
       }
       upsertPack(await expressionsApi.pack(pack.id));
-      setPending([]);
-      toast(pending.length === 1 ? `${isEmoji ? "Emoji" : "Sticker"} added.` : `${pending.length} ${noun} added.`, "success");
+      toast(done === 1 ? `${isEmoji ? "Emoji" : "Sticker"} added.` : `${done} ${noun} added.`, "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Upload failed.", "error");
       upsertPack(await expressionsApi.pack(pack.id).catch(() => pack));
@@ -265,12 +281,12 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             <Upload size={20} /> Drop PNG, APNG, GIF or WebP files here or click to choose ({Math.round(maxBytes / (1024 * 1024))} MB each, no limit on how many).{isEmoji ? " Emoji names are letters, numbers and underscores." : ""}
             <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
           </div>
-          {pending.map((p, i) => (
+          {pending.map((p) => (
             <div key={p.preview} className={s.pending}>
               <img src={p.preview} alt="" />
-              <TextInput value={p.name} maxLength={30} placeholder="Name" onChange={(e) => setPending((cur) => cur.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} data-testid="sticker-name" />
-              {isEmoji ? null : <TextInput value={p.tags} maxLength={200} placeholder="Tags (space separated)" onChange={(e) => setPending((cur) => cur.map((x, j) => (j === i ? { ...x, tags: e.target.value } : x)))} />}
-              <Button size="sm" variant="ghost" onClick={() => setPending((cur) => cur.filter((_, j) => j !== i))}>Remove</Button>
+              <TextInput value={p.name} maxLength={30} placeholder="Name" onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, name: e.target.value } : x)))} data-testid="sticker-name" />
+              {isEmoji ? null : <TextInput value={p.tags} maxLength={200} placeholder="Tags (space separated)" onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, tags: e.target.value } : x)))} />}
+              <Button size="sm" variant="ghost" onClick={() => unstage(p.preview)}>Remove</Button>
             </div>
           ))}
           {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">Upload {pending.length} {isEmoji ? "emoji" : `sticker${pending.length === 1 ? "" : "s"}`}</Button></div> : null}

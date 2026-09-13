@@ -8,11 +8,14 @@ interface FieldProps {
   required?: boolean;
   children: ReactNode;
   className?: string;
+  /** "div" for a field wrapping a group of radios: a label would pass a stray tap on its caption or gaps to the first radio. */
+  as?: "label" | "div";
 }
 
-export function Field({ label, error, hint, required, children, className }: FieldProps) {
+export function Field({ label, error, hint, required, children, className, as }: FieldProps) {
+  const Tag = as ?? "label";
   return (
-    <label className={[s.field, error ? s.hasError : "", className ?? ""].join(" ")}>
+    <Tag className={[s.field, error ? s.hasError : "", className ?? ""].join(" ")}>
       {label ? (
         <span className={s.label}>
           {label}
@@ -22,7 +25,7 @@ export function Field({ label, error, hint, required, children, className }: Fie
       ) : null}
       {children}
       {hint && !error ? <span className={s.hint}>{hint}</span> : null}
-    </label>
+    </Tag>
   );
 }
 

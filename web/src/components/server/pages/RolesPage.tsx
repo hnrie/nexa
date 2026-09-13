@@ -16,6 +16,7 @@ import { useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import { RoleGrid } from "../PermissionGrid";
 import { SaveBar } from "../SettingsLayer";
+import { rolePositionsAfterDrop } from "./rolePositions";
 import s from "../ServerSettings.module.css";
 
 const SWATCHES = [0x1abc9c, 0x2ecc71, 0x3498db, 0x9b59b6, 0xe91e63, 0xf1c40f, 0xe67e22, 0xe74c3c, 0x95a5a6, 0x607d8b, 0x11806a, 0x1f8b4c, 0x206694, 0x71368a, 0xad1457, 0xc27c0e, 0xa84300, 0x992d22, 0x979c9f, 0x546e7a];
@@ -46,6 +47,8 @@ export default function RolesPage({ serverId }: { serverId: string }) {
   }, [server, selected, serverId]);
 
   if (!server || !role) return null;
+  // @everyone has no member list to manage, however it got selected
+  const view = tab === "members" && role.id === serverId ? "display" : tab;
   const memberCount = (id: string) => (id === serverId ? server.memberCount : Object.values(server.members).filter((m) => m.role_ids.includes(id)).length);
 
   const create = async () => {
@@ -68,14 +71,9 @@ export default function RolesPage({ serverId }: { serverId: string }) {
     const at = drop;
     setDrag(null);
     setDrop(null);
-    if (!d || !at || d === at.id) return;
-    const list = roles.filter((r) => r.id !== serverId && r.id !== d);
-    const moving = server.roles[d];
-    if (!moving) return;
-    const idx = list.findIndex((r) => r.id === at.id) + (at.after ? 1 : 0);
-    list.splice(idx, 0, moving);
-    // top of the list = highest position
-    const positions = list.map((r, i) => ({ id: r.id, position: list.length - i }));
+    if (!d || !at) return;
+    const positions = rolePositionsAfterDrop(roles.filter((r) => r.id !== serverId), d, at.id, at.after, mine.highest, mine.isOwner);
+    if (!positions) return;
     try {
       upsertRoles(serverId, await serversApi.setRolePositions(serverId, positions));
     } catch (err) {
@@ -102,10 +100,10 @@ export default function RolesPage({ serverId }: { serverId: string }) {
                 data-drop={drop?.id === r.id ? (drop.after ? "after" : "before") : undefined}
                 draggable={canDrag}
                 onDragStart={(e) => { if (!canDrag) return e.preventDefault(); setDrag(r.id); e.dataTransfer.effectAllowed = "move"; }}
-                onDragOver={(e) => { if (!drag || drag === r.id || r.id === serverId) return; e.preventDefault(); const b = e.currentTarget.getBoundingClientRect(); setDrop({ id: r.id, after: e.clientY > b.top + b.height / 2 }); }}
+                onDragOver={(e) => { if (!drag || drag === r.id || !canDrag) return; e.preventDefault(); const b = e.currentTarget.getBoundingClientRect(); setDrop({ id: r.id, after: e.clientY > b.top + b.height / 2 }); }}
                 onDrop={(e) => void onDrop(e)}
                 onDragEnd={() => { setDrag(null); setDrop(null); }}
-                onClick={() => setSelected(r.id)}
+                onClick={() => { setSelected(r.id); if (r.id === serverId && tab === "members") setTab("display"); }}
               >
                 <span className={s.dot} style={{ background: r.color ? hex(r.color) : "var(--text-muted)" }} />
                 <span className={s.roleName}>{r.name}</span>
@@ -116,13 +114,13 @@ export default function RolesPage({ serverId }: { serverId: string }) {
         </div>
         <div>
           <div className={s.tabs}>
-            <button className={s.tab} data-on={tab === "display"} onClick={() => setTab("display")}>Display</button>
-            <button className={s.tab} data-on={tab === "permissions"} onClick={() => setTab("permissions")}>Permissions</button>
+            <button className={s.tab} data-on={view === "display"} onClick={() => setTab("display")}>Display</button>
+            <button className={s.tab} data-on={view === "permissions"} onClick={() => setTab("permissions")}>Permissions</button>
             {role.id !== serverId ? <button className={s.tab} data-on={tab === "members"} onClick={() => setTab("members")}>Manage Members</button> : null}
           </div>
-          {tab === "display" ? <DisplayTab key={role.id} role={role} editable={editable} everyone={role.id === serverId} onSaved={upsertRole} onDeleted={() => { removeRole(serverId, role.id); setSelected(serverId); }} /> : null}
-          {tab === "permissions" ? <PermissionsTab key={role.id} role={role} editable={editable} actorPerms={server.myPermissions} onSaved={upsertRole} /> : null}
-          {tab === "members" ? <MembersTab key={role.id} role={role} serverId={serverId} editable={editable} /> : null}
+          {view === "display" ? <DisplayTab key={role.id} role={role} editable={editable} everyone={role.id === serverId} onSaved={upsertRole} onDeleted={() => { removeRole(serverId, role.id); setSelected(serverId); }} /> : null}
+          {view === "permissions" ? <PermissionsTab key={role.id} role={role} editable={editable} actorPerms={server.myPermissions} onSaved={upsertRole} /> : null}
+          {view === "members" ? <MembersTab key={role.id} role={role} serverId={serverId} editable={editable} /> : null}
         </div>
       </div>
     </>
@@ -146,7 +144,13 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       if (color !== role.color) body.color = color;
       if (hoist !== role.hoist) body.hoist = hoist;
       if (mentionable !== role.mentionable) body.mentionable = mentionable;
-      onSaved(await serversApi.patchRole(role.server_id, role.id, body));
+      const saved = await serversApi.patchRole(role.server_id, role.id, body);
+      onSaved(saved);
+      // the server tidies whitespace in names, so show what it kept or the save bar never goes away
+      setName(saved.name);
+      setColor(saved.color);
+      setHoist(saved.hoist);
+      setMentionable(saved.mentionable);
       toast("Role saved.", "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not save the role.", "error");
@@ -163,8 +167,8 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       ) : (
         <p className={st.hint}>@everyone is the base role every member has. You can change its colour and permissions but not its name.</p>
       )}
-      <Field label="Role colour" hint="Members use the colour of their highest role that has one.">
-        <div className={s.swatches}>
+      <Field as="div" label="Role colour" hint="Members use the colour of their highest role that has one.">
+        <div className={s.swatches} role="radiogroup" aria-label="Role colour">
           <span className={s.preview}><span className={s.dot} style={{ background: color ? hex(color) : "var(--text-muted)" }} />{name || "@everyone"}</span>
           <label className={s.swatch} data-on={color === 0} style={{ background: "var(--bg-active)" }} title="Default"><input type="radio" checked={color === 0} disabled={!editable} onChange={() => setColor(0)} /></label>
           {SWATCHES.map((c) => (

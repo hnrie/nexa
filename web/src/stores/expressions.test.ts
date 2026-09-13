@@ -1,5 +1,5 @@
 import type { StickerPack } from "@/api/types";
-import { groupPacks } from "./expressions";
+import { groupPacks, useExpressions } from "./expressions";
 
 const pack = (id: string, over: Partial<StickerPack>): StickerPack => ({
   id,
@@ -46,5 +46,14 @@ describe("groupPacks", () => {
   it("leaves out groups with nothing in them", () => {
     expect(groupPacks({}, "s1", "me")).toEqual([]);
     expect(groupPacks({ p2: pack("p2", { owner_user_id: "me" }) }, null, "me").map((g) => g.label)).toEqual(["My packs"]);
+  });
+});
+
+describe("removeServer", () => {
+  it("drops the server's packs even when it has no custom emoji", () => {
+    useExpressions.getState().clear();
+    useExpressions.getState().setPacks([pack("p1", { server_id: "s1" }), pack("p2", { owner_user_id: "me" })]);
+    useExpressions.getState().removeServer("s1");
+    expect(Object.keys(useExpressions.getState().packs)).toEqual(["p2"]);
   });
 });

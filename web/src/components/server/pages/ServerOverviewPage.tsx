@@ -43,7 +43,13 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       if (description !== server.description) body.description = description;
       if ((system || "") !== (server.system_channel_id ?? "")) body.system_channel_id = system || null;
       if (notif !== server.default_notifications) body.default_notifications = notif;
-      updateServer(await serversApi.patch(serverId, body));
+      const srv = await serversApi.patch(serverId, body);
+      updateServer(srv);
+      // the server tidies whitespace, so show what it kept or the save bar never goes away
+      setName(srv.name);
+      setDescription(srv.description);
+      setSystem(srv.system_channel_id ?? "");
+      setNotif(srv.default_notifications);
       toast("Server saved.", "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not save the server.", "error");
@@ -98,8 +104,8 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
             {texts.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
           </Select>
         </Field>
-        <Field label="Default notification settings" hint="What new members get until they change it themselves.">
-          <div className={st.form} style={{ gap: 8 }}>
+        <Field as="div" label="Default notification settings" hint="What new members get until they change it themselves.">
+          <div className={st.form} style={{ gap: 8 }} role="radiogroup" aria-label="Default notification settings">
             <label className={st.radio} data-on={notif === 0}><input type="radio" checked={notif === 0} onChange={() => setNotif(0)} /><span className={st.radioText}><span className={st.radioLabel}>All Messages</span></span></label>
             <label className={st.radio} data-on={notif === 1}><input type="radio" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>Only @mentions</span></span></label>
           </div>

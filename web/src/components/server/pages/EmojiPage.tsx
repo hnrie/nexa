@@ -37,6 +37,8 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
   const upload = async (files: FileList | File[]) => {
     setBusy(true);
     let added = 0;
+    // names given earlier in this batch count as taken too, so party.gif and party.png don't collide
+    const used = new Set(emojis.map((e) => e.name));
     try {
       for (const f of Array.from(files)) {
         if (!ACCEPT.split(",").includes(f.type)) {
@@ -48,7 +50,8 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
           continue;
         }
         let name = slug(f.name);
-        for (let i = 2; emojis.some((e) => e.name === name); i++) name = `${slug(f.name).slice(0, 29)}_${i}`;
+        for (let i = 2; used.has(name); i++) name = `${slug(f.name).slice(0, 29)}_${i}`;
+        used.add(name);
         try {
           await expressionsApi.uploadEmoji(serverId, name, f);
           added++;

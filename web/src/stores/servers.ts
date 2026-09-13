@@ -30,9 +30,15 @@ interface ServersState {
   upsertRole: (role: Role) => void;
   upsertRoles: (serverId: string, roles: Role[]) => void;
   removeRole: (serverId: string, roleId: string) => void;
-  upsertMember: (member: Member) => void;
+  /** `joined` is true only for member_add: an update about a member not loaded here is not a join. */
+  upsertMember: (member: Member, joined?: boolean) => void;
   upsertMembers: (serverId: string, members: Member[], complete?: boolean) => void;
-  removeMember: (serverId: string, userId: string) => void;
+  /**
+   * `left` is true for member_remove, which counts the member out even when it
+   * was never loaded (large servers load members lazily). A local removal leaves
+   * the count to that event, so the two together count the member out once.
+   */
+  removeMember: (serverId: string, userId: string, left?: boolean) => void;
   setMemberCount: (serverId: string, count: number) => void;
   clear: () => void;
 }
@@ -74,7 +80,9 @@ export const useServers = create<ServersState>()((set) => ({
     set((s) => {
       const cur = s.byId[server.id];
       if (!cur) return s;
-      return { byId: { ...s.byId, [server.id]: { ...cur, server } } };
+      // a new owner_id changes who holds every permission
+      const next = { ...cur, server };
+      return { byId: { ...s.byId, [server.id]: { ...next, myPermissions: recomputeMine(next) } } };
     }),
   remove: (id) =>
     set((s) => {
@@ -110,14 +118,14 @@ export const useServers = create<ServersState>()((set) => ({
       const next = { ...cur, roles, members, me };
       return { byId: { ...s.byId, [serverId]: { ...next, myPermissions: recomputeMine(next) } } };
     }),
-  upsertMember: (member) =>
+  upsertMember: (member, joined = false) =>
     set((s) => {
       const cur = s.byId[member.server_id];
       if (!cur) return s;
       const known = member.user_id in cur.members;
       const members = { ...cur.members, [member.user_id]: member };
       const me = member.user_id === cur.me.user_id ? member : cur.me;
-      const next = { ...cur, members, me, memberCount: known ? cur.memberCount : cur.memberCount + 1 };
+      const next = { ...cur, members, me, memberCount: joined && !known ? cur.memberCount + 1 : cur.memberCount };
       return { byId: { ...s.byId, [member.server_id]: { ...next, myPermissions: recomputeMine(next) } } };
     }),
   upsertMembers: (serverId, list, complete) =>
@@ -128,14 +136,13 @@ export const useServers = create<ServersState>()((set) => ({
       for (const m of list) members[m.user_id] = m;
       return { byId: { ...s.byId, [serverId]: { ...cur, members, membersComplete: complete ?? cur.membersComplete } } };
     }),
-  removeMember: (serverId, userId) =>
+  removeMember: (serverId, userId, left = false) =>
     set((s) => {
       const cur = s.byId[serverId];
       if (!cur) return s;
       const members = { ...cur.members };
-      const known = userId in members;
       delete members[userId];
-      return { byId: { ...s.byId, [serverId]: { ...cur, members, memberCount: Math.max(0, cur.memberCount - (known ? 1 : 0)) } } };
+      return { byId: { ...s.byId, [serverId]: { ...cur, members, memberCount: Math.max(0, cur.memberCount - (left ? 1 : 0)) } } };
     }),
   setMemberCount: (serverId, count) =>
     set((s) => {

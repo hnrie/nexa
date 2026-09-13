@@ -31,11 +31,13 @@ export const useExpressions = create<ExpressionsState>()((set) => ({
   },
   removeServer: (serverId) =>
     set((s) => {
-      if (!(serverId in s.emojis)) return s;
+      // a server with sticker packs but no custom emoji has no emoji entry, so check both
+      const gone = Object.values(s.packs).filter((p) => p.server_id === serverId);
+      if (!(serverId in s.emojis) && gone.length === 0) return s;
       const emojis = { ...s.emojis };
       delete emojis[serverId];
       const packs = { ...s.packs };
-      for (const [id, p] of Object.entries(packs)) if (p.server_id === serverId) delete packs[id];
+      for (const p of gone) delete packs[p.id];
       return { emojis, packs };
     }),
   setPacks: (list) => {

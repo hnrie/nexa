@@ -6,6 +6,7 @@ import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { formatFull } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
+import { useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
@@ -30,6 +31,13 @@ const VERBS: Record<string, string> = {
   member_kick: "kicked",
   member_ban: "banned",
   member_unban: "unbanned",
+  member_voice: "changed the voice state of",
+  emoji_create: "added the emoji",
+  emoji_update: "updated the emoji",
+  emoji_delete: "deleted the emoji",
+  sticker_pack_create: "created the sticker pack",
+  sticker_pack_update: "updated the sticker pack",
+  sticker_pack_delete: "deleted the sticker pack",
   invite_create: "created an invite",
   invite_delete: "revoked an invite",
 };
@@ -39,6 +47,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
   const upsertUsers = useUsers((u) => u.upsert);
   const channels = useChannels((c) => c.byId);
   const server = useServers((x) => x.byId[serverId]);
+  const packs = useExpressions((x) => x.packs);
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -74,6 +83,15 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     if (e.target_type === "role") {
       const changes = e.changes as { name?: string } | null;
       return server?.roles[e.target_id]?.name ?? changes?.name ?? "a deleted role";
+    }
+    if (e.target_type === "emoji") {
+      const changes = e.changes as { name?: string } | null;
+      return changes?.name ? `:${changes.name}:` : "";
+    }
+    if (e.target_type === "sticker_pack") {
+      // pack updates record no changes, so the pack's current name is the only one there is
+      const changes = e.changes as { name?: string } | null;
+      return changes?.name ?? packs[e.target_id]?.name ?? "";
     }
     return "";
   };

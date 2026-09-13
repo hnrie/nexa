@@ -210,13 +210,13 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "member_add":
       useUsers.getState().upsert(e.d.user);
-      useServers.getState().upsertMember(e.d.member);
+      useServers.getState().upsertMember(e.d.member, true);
       return;
     case "member_update":
       useServers.getState().upsertMember(e.d);
       return;
     case "member_remove":
-      useServers.getState().removeMember(e.d.server_id, e.d.user_id);
+      useServers.getState().removeMember(e.d.server_id, e.d.user_id, true);
       return;
     case "role_create":
     case "role_update":
