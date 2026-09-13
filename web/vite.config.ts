@@ -33,6 +33,23 @@ function twemoji(): Plugin {
   };
 }
 
+/**
+ * Marks the app's own tags so a CDN leaves them alone. Cloudflare's Rocket
+ * Loader rewrites `type="module"` into a private type and loads the script
+ * itself later, which breaks the module graph and makes a dynamic import fail
+ * at random. `data-cfasync="false"` is the documented way to opt a tag out.
+ */
+function keepScriptsIntact(): Plugin {
+  return {
+    name: "keep-scripts-intact",
+    transformIndexHtml(html) {
+      return html
+        .replace(/<script (?![^>]*data-cfasync)/g, '<script data-cfasync="false" ')
+        .replace(/<link (?![^>]*data-cfasync)/g, '<link data-cfasync="false" ');
+    },
+  };
+}
+
 /** How long a replaced build's files stay reachable. */
 const KEEP_ASSETS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -57,7 +74,7 @@ function pruneOldAssets(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), twemoji(), pruneOldAssets()],
+  plugins: [react(), twemoji(), keepScriptsIntact(), pruneOldAssets()],
   define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {

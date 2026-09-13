@@ -45,28 +45,23 @@ sw.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== sw.location.origin) return;
   if (NEVER.some((p) => url.pathname.startsWith(p))) return;
+  // An error page served in place of a script or a picture must never be
+  // kept: it would sit at that address until the cache is thrown away.
+  const isAsset = (r: Response): boolean => r.ok && !(r.headers.get("content-type") ?? "").includes("text/html");
+  const cacheFirst = (cacheName: string) =>
+    caches.open(cacheName).then(async (c) => {
+      const hit = await c.match(req);
+      if (hit) return hit;
+      const res = await fetch(req);
+      if (isAsset(res)) void c.put(req, res.clone());
+      return res;
+    });
   if (url.pathname.startsWith("/twemoji/")) {
-    e.respondWith(
-      caches.open(EMOJI_CACHE).then(async (c) => {
-        const hit = await c.match(req);
-        if (hit) return hit;
-        const res = await fetch(req);
-        if (res.ok) void c.put(req, res.clone());
-        return res;
-      }),
-    );
+    e.respondWith(cacheFirst(EMOJI_CACHE));
     return;
   }
   if (url.pathname.startsWith("/assets/")) {
-    e.respondWith(
-      caches.open(CACHE).then(async (c) => {
-        const hit = await c.match(req);
-        if (hit) return hit;
-        const res = await fetch(req);
-        if (res.ok) void c.put(req, res.clone());
-        return res;
-      }),
-    );
+    e.respondWith(cacheFirst(CACHE));
     return;
   }
   if (req.mode === "navigate" || url.pathname === "/") {
@@ -85,7 +80,7 @@ sw.addEventListener("fetch", (e) => {
       (hit) =>
         hit ??
         fetch(req).then((res) => {
-          if (res.ok && (url.pathname.startsWith("/icons/") || url.pathname.endsWith(".webmanifest"))) void caches.open(CACHE).then((c) => c.put(req, res.clone()));
+          if (isAsset(res) && (url.pathname.startsWith("/icons/") || url.pathname.endsWith(".webmanifest"))) void caches.open(CACHE).then((c) => c.put(req, res.clone()));
           return res;
         }),
     ),

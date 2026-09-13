@@ -52,6 +52,23 @@ func (s *Server) staticHandler() http.Handler {
 				}
 			}
 		}
+		// A build's own files either exist or they do not. Answering with the
+		// app's HTML instead turns a missing script into a page the browser
+		// refuses to run, and the service worker then keeps that HTML under
+		// the script's address for good.
+		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" {
+			WriteError(w, ErrNotFound)
+			return
+		}
+		// A build's own files either exist or they do not. Answering with the
+		// app's HTML instead turns a missing script into a page the browser
+		// refuses to run, and any cache in front of this, the browser's own or
+		// a CDN's, then keeps that HTML under the script's address.
+		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" {
+			w.Header().Set("Cache-Control", "no-store")
+			WriteError(w, ErrNotFound)
+			return
+		}
 		// An invite link gets its own page head, so pasting it anywhere else
 		// shows what it leads to rather than a bare address.
 		if code, ok := strings.CutPrefix(p, "/invite/"); ok && code != "" && !strings.Contains(code, "/") {
@@ -72,7 +89,10 @@ func (s *Server) staticHandler() http.Handler {
 		st, _ := f.Stat()
 		h := w.Header()
 		h.Set("Content-Type", "text/html; charset=utf-8")
-		h.Set("Cache-Control", "no-cache")
+		// This page names the files of one particular build. A cache that
+		// holds on to it hands out a build whose files have moved on.
+		h.Set("Cache-Control", "no-cache, must-revalidate")
+		h.Set("CDN-Cache-Control", "no-store")
 		h.Set("Content-Security-Policy", CSP)
 		var mod time.Time
 		if st != nil {
@@ -154,7 +174,8 @@ func (s *Server) serveInvitePage(w http.ResponseWriter, r *http.Request, dist, c
 	}
 	h := w.Header()
 	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Set("Cache-Control", "no-cache")
+	h.Set("Cache-Control", "no-cache, must-revalidate")
+	h.Set("CDN-Cache-Control", "no-store")
 	h.Set("Content-Security-Policy", CSP)
 	if r.Method == http.MethodHead {
 		w.WriteHeader(http.StatusOK)
