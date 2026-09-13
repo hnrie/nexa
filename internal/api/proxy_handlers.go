@@ -97,9 +97,10 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("User-Agent", f.UA())
 	req.Header.Set("Accept", "image/*,video/*,audio/*;q=0.8,*/*;q=0.1")
-	// a Range request lets the browser seek inside proxied video
+	// a Range request lets the browser seek inside proxied video, and a long
+	// one comes through a piece at a time instead of being refused
 	if rng := r.Header.Get("Range"); rng != "" {
-		req.Header.Set("Range", rng)
+		req.Header.Set("Range", narrowRange(rng, maxProxyBytes))
 	}
 	res, err := f.StreamClient().Do(req)
 	if err != nil {
@@ -140,4 +141,30 @@ func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_, _ = io.Copy(w, watch.Body(io.LimitReader(res.Body, maxProxyBytes)))
+}
+
+// narrowRange limits a single "bytes=start-[end]" range to at most max bytes.
+// A video player opens with "bytes=0-", the whole file; answered with the first
+// part, it asks for the rest as it plays, so a video over max still plays
+// while no one response is larger than max. Suffix and multi-part ranges pass
+// unchanged.
+func narrowRange(h string, max int64) string {
+	spec, ok := strings.CutPrefix(strings.TrimSpace(h), "bytes=")
+	if !ok || strings.Contains(spec, ",") {
+		return h
+	}
+	startS, endS, ok := strings.Cut(spec, "-")
+	start, err := strconv.ParseInt(strings.TrimSpace(startS), 10, 64)
+	if !ok || err != nil || start < 0 {
+		return h
+	}
+	last := start + max - 1
+	if endS = strings.TrimSpace(endS); endS != "" {
+		end, err := strconv.ParseInt(endS, 10, 64)
+		if err != nil || end < start {
+			return h
+		}
+		last = min(last, end)
+	}
+	return "bytes=" + strconv.FormatInt(start, 10) + "-" + strconv.FormatInt(last, 10)
 }
