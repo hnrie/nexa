@@ -109,6 +109,11 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 			WriteJSON(w, http.StatusCreated, ch)
 			return
 		}
+		// opening a DM the caller had closed puts it back for good, not just
+		// until the next reconnect rebuilds the sidebar without it
+		if reopened, err := s.Store.ReopenDM(ctx, ch.ID, me.ID); err == nil && reopened {
+			s.Bcast.EmitUsers([]ids.ID{me.ID}, "channel_create", ch)
+		}
 		WriteJSON(w, http.StatusOK, ch)
 	default:
 		if len(recipients) > maxGroupCreate {
@@ -159,7 +164,10 @@ func (s *Server) handleChannelGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
-	ch, me := s.channel(w, r, NeedManage)
+	// Each kind checks its own right below: Manage Channels for a server
+	// channel (asking for Manage Messages here too locked out channel managers),
+	// who may manage a subchat, and ownership for handing a group on.
+	ch, me := s.channel(w, r, NeedView)
 	if ch == nil {
 		return
 	}
@@ -301,7 +309,8 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "not_friends", "You can only add your friends."))
 		return
 	}
-	if err := s.Store.AddParticipant(r.Context(), ch.ID, uid, me.ID); err != nil {
+	subs, err := s.Store.AddParticipant(r.Context(), ch.ID, uid, me.ID)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -310,6 +319,7 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 	s.Bcast.EmitUsers(ch.Recipients, "channel_update", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_add", []ids.ID{uid}, nil)
 	s.Bcast.KeysMaybeNeeded(ch.ID)
+	s.subchatsJoined(r.Context(), subs, uid)
 	WriteJSON(w, http.StatusOK, updated)
 }
 
@@ -332,16 +342,23 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "not_owner", "Only the group owner can remove others."))
 		return
 	}
-	if err := s.Store.RemoveParticipant(r.Context(), ch.ID, uid); err != nil {
+	subs, err := s.Store.RemoveParticipant(r.Context(), ch.ID, uid)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
+	s.subchatsLeft(r.Context(), ch.ID, subs, uid)
 	remaining, _ := s.Store.Participants(r.Context(), ch.ID)
 	if len(remaining) == 0 {
-		_ = s.Store.DeleteChannel(r.Context(), ch.ID)
+		_ = s.deleteConversation(r.Context(), ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 		w.WriteHeader(http.StatusNoContent)
 		return
+	}
+	if uid != me.ID {
+		// every member can list the group's links, so whoever was just removed
+		// has seen them; they stop working rather than letting them back in
+		_ = s.Store.RevokeChannelInvites(r.Context(), ch.ID)
 	}
 	if ch.OwnerID != nil && *ch.OwnerID == uid {
 		newOwner := remaining[0]

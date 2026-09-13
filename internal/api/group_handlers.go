@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"evilion.xyz/chat/internal/auth"
@@ -74,7 +75,7 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		recipients := ch.Recipients
-		if err := s.Store.DeleteChannel(r.Context(), ch.ID); err != nil {
+		if err := s.deleteConversation(r.Context(), ch); err != nil {
 			WriteError(w, err)
 			return
 		}
@@ -93,12 +94,66 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	// deleting a one-to-one conversation takes it away from both sides
 	recipients := ch.Recipients
-	if err := s.Store.DeleteChannel(r.Context(), ch.ID); err != nil {
+	if err := s.deleteConversation(r.Context(), ch); err != nil {
 		WriteError(w, err)
 		return
 	}
 	s.Bcast.EmitUsers(recipients, "channel_delete", map[string]any{"id": ch.ID})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteConversation deletes a DM or group together with its subchats, and
+// tells whoever is in each subchat that it is gone. The caller tells the
+// conversation's own members about the conversation.
+func (s *Server) deleteConversation(ctx context.Context, ch *store.Channel) error {
+	subs, err := s.Store.SubchatsFor(ctx, ch.ID)
+	if err != nil {
+		return err
+	}
+	if err := s.Store.DeleteChannel(ctx, ch.ID); err != nil {
+		return err
+	}
+	for _, sub := range subs {
+		s.Bcast.EmitUsers(sub.Recipients, "channel_delete", map[string]any{"id": sub.ID, "parent_id": ch.ID})
+	}
+	return nil
+}
+
+// subchatsJoined brings a new group member into the group's subchats, which
+// hold the same people as the group: each appears for them, and a holder of
+// its key is asked to share it.
+func (s *Server) subchatsJoined(ctx context.Context, subs []ids.ID, uid ids.ID) {
+	for _, id := range subs {
+		sub, err := s.Store.ChannelByID(ctx, id)
+		if err != nil {
+			continue
+		}
+		others := make([]ids.ID, 0, len(sub.Recipients))
+		for _, r := range sub.Recipients {
+			if r != uid {
+				others = append(others, r)
+			}
+		}
+		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_create", sub)
+		s.Bcast.EmitUsers(others, "channel_update", sub)
+		s.Bcast.KeysMaybeNeeded(id)
+	}
+}
+
+// subchatsLeft follows someone out of a group's subchats: each disappears for
+// them, and whoever is left moves to a fresh key they do not hold.
+func (s *Server) subchatsLeft(ctx context.Context, parentID ids.ID, subs []ids.ID, uid ids.ID) {
+	tr := true
+	for _, id := range subs {
+		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": id, "parent_id": parentID})
+		sub, err := s.Store.ChannelByID(ctx, id)
+		if err != nil || len(sub.Recipients) == 0 {
+			continue
+		}
+		s.Bcast.EmitUsers(sub.Recipients, "channel_update", sub)
+		_ = s.Store.SetKeyFlags(ctx, id, &tr, nil)
+		s.Bcast.EmitUsers(sub.Recipients, "key_rotation_needed", map[string]any{"conv_id": id})
+	}
 }
 
 // leaveGroup removes the caller from a group DM.
@@ -114,9 +169,11 @@ func (s *Server) leaveGroup(w http.ResponseWriter, r *http.Request, ch *store.Ch
 // needed, deleting the group if nobody is left, and telling everyone.
 func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID) error {
 	ctx := r.Context()
-	if err := s.Store.RemoveParticipant(ctx, ch.ID, uid); err != nil {
+	subs, err := s.Store.RemoveParticipant(ctx, ch.ID, uid)
+	if err != nil {
 		return err
 	}
+	s.subchatsLeft(ctx, ch.ID, subs, uid)
 	remaining := make([]ids.ID, 0, len(ch.Recipients))
 	for _, id := range ch.Recipients {
 		if id != uid {
@@ -124,7 +181,7 @@ func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID)
 		}
 	}
 	if len(remaining) == 0 {
-		_ = s.Store.DeleteChannel(ctx, ch.ID)
+		_ = s.deleteConversation(ctx, ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 		return nil
 	}
@@ -186,7 +243,8 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 		WriteJSON(w, http.StatusOK, map[string]any{"channel": ch})
 		return
 	}
-	if err := s.Store.AddParticipant(ctx, ch.ID, me.ID, me.ID); err != nil {
+	subs, err := s.Store.AddParticipant(ctx, ch.ID, me.ID, me.ID)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -199,6 +257,7 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 	s.Bcast.EmitUsers(updated.Recipients, "channel_create", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_add", []ids.ID{me.ID}, nil)
 	s.Bcast.KeysMaybeNeeded(updated.ID)
+	s.subchatsJoined(ctx, subs, me.ID)
 	users := []store.PublicUser{}
 	if byID, err := s.Store.UsersByIDs(ctx, updated.Recipients); err == nil {
 		for _, id := range updated.Recipients {

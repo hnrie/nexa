@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"evilion.xyz/chat/internal/ids"
@@ -32,17 +33,17 @@ func TestDMAndGroupDM(t *testing.T) {
 	if !ok {
 		t.Error("c should be a participant")
 	}
-	if err := s.AddParticipant(ctx, g.ID, c.ID, a.ID); !errors.Is(err, ErrAlreadyExists) {
+	if _, err := s.AddParticipant(ctx, g.ID, c.ID, a.ID); !errors.Is(err, ErrAlreadyExists) {
 		t.Error("re-adding should be ErrAlreadyExists")
 	}
-	if err := s.RemoveParticipant(ctx, g.ID, c.ID); err != nil {
+	if _, err := s.RemoveParticipant(ctx, g.ID, c.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RemoveParticipant(ctx, g.ID, c.ID); !errors.Is(err, ErrNotFound) {
+	if _, err := s.RemoveParticipant(ctx, g.ID, c.ID); !errors.Is(err, ErrNotFound) {
 		t.Error("removing twice")
 	}
 	d := mkUser(t, s, "d")
-	if err := s.AddParticipant(ctx, g.ID, d.ID, a.ID); err != nil {
+	if _, err := s.AddParticipant(ctx, g.ID, d.ID, a.ID); err != nil {
 		t.Fatal(err)
 	}
 	parts, _ := s.Participants(ctx, g.ID)
@@ -80,5 +81,64 @@ func TestDMAndGroupDM(t *testing.T) {
 	}
 	if n, _ := s.Participants(ctx, g.ID); len(n) != 0 {
 		t.Error("participants should cascade")
+	}
+}
+
+func TestConcurrentCreateDMMakesOneConversation(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b := mkUser(t, s, "a"), mkUser(t, s, "b")
+	const n = 8
+	got := make([]ids.ID, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			x, y := a.ID, b.ID
+			if i%2 == 1 {
+				x, y = y, x
+			}
+			if ch, _, err := s.CreateDM(ctx, x, y); err == nil {
+				got[i] = ch.ID
+			}
+		}()
+	}
+	wg.Wait()
+	for i := range got {
+		if got[i].IsZero() || got[i] != got[0] {
+			t.Fatalf("two taps opened different DMs: %v", got)
+		}
+	}
+}
+
+func TestSubchatMembersFollowTheGroup(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b, c := mkUser(t, s, "a"), mkUser(t, s, "b"), mkUser(t, s, "c")
+	g, _ := s.CreateGroupDM(ctx, a.ID, []ids.ID{b.ID}, "g")
+	sub, err := s.CreateSubchat(ctx, g, a.ID, "plans")
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined, err := s.AddParticipant(ctx, g.ID, c.ID, a.ID)
+	if err != nil || len(joined) != 1 || joined[0] != sub.ID {
+		t.Fatalf("join: %v %v", joined, err)
+	}
+	if ok, _ := s.IsParticipant(ctx, sub.ID, c.ID); !ok {
+		t.Error("a new group member should be in its subchats")
+	}
+	left, err := s.RemoveParticipant(ctx, g.ID, b.ID)
+	if err != nil || len(left) != 1 || left[0] != sub.ID {
+		t.Fatalf("leave: %v %v", left, err)
+	}
+	if ok, _ := s.IsParticipant(ctx, sub.ID, b.ID); ok {
+		t.Error("someone who left the group should leave its subchats")
+	}
+	if err := s.DeleteChannel(ctx, g.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ChannelByID(ctx, sub.ID); !errors.Is(err, ErrNotFound) {
+		t.Error("deleting a group should delete its subchats")
 	}
 }

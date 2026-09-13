@@ -121,7 +121,11 @@ export const useKeys = create<KeysState>()((set, get) => ({
   reconcile: async () => {
     const needs = await keysApi.needs();
     for (const n of needs) {
-      if (ring.get(n.conv_id, n.epoch)) await get().grantTo(n.conv_id, n.epoch, n.user_ids);
+      if (!ring.get(n.conv_id, n.epoch)) continue;
+      await get().grantTo(n.conv_id, n.epoch, n.user_ids);
+      // someone lost access while no holder was online; the server lets only
+      // the first device that asks create the new key
+      if (n.rotate) await get().rotate(n.conv_id, "membership change");
     }
   },
   rotate: async (conv, reason) => {

@@ -67,7 +67,7 @@ func (s *Server) dmForSubchats(w http.ResponseWriter, r *http.Request) (*store.C
 }
 
 func (s *Server) handleSubchatList(w http.ResponseWriter, r *http.Request) {
-	ch, _ := s.dmForSubchats(w, r)
+	ch, me := s.dmForSubchats(w, r)
 	if ch == nil {
 		return
 	}
@@ -76,7 +76,15 @@ func (s *Server) handleSubchatList(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, list)
+	// only the subchats the caller is in: one they cannot open would still
+	// give away its name and who is in it
+	mine := make([]*store.Channel, 0, len(list))
+	for _, sub := range list {
+		if hasID(sub.Recipients, me.ID) {
+			mine = append(mine, sub)
+		}
+	}
+	WriteJSON(w, http.StatusOK, mine)
 }
 
 func (s *Server) handleSubchatCreate(w http.ResponseWriter, r *http.Request) {

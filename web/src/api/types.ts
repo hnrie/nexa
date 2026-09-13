@@ -384,6 +384,8 @@ export interface KeyNeed {
   conv_id: Snowflake;
   epoch: number;
   user_ids: Snowflake[];
+  /** the key is waiting to be rotated after someone lost access */
+  rotate?: boolean;
 }
 
 export interface KeyEpoch {

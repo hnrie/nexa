@@ -11,6 +11,8 @@ import (
 const (
 	maxGrantBytes  = 512
 	maxGrantsBatch = 200
+	// rotationReason is what clients send when answering key_rotation_needed.
+	rotationReason = "membership change"
 )
 
 func (s *Server) keyRoutes(mux *http.ServeMux) {
@@ -76,30 +78,6 @@ func (s *Server) handleKeyGrantsPut(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, E(http.StatusBadRequest, "bad_grant", "A grant is malformed."))
 			return
 		}
-		key := [2]int64{int64(g.ConvID), int64(g.Epoch)}
-		holds, seen := holdCache[key]
-		if g.UserID == me.ID {
-			// a self-grant only affects the caller (e.g. a key received through an invite link)
-			if _, err := s.Store.Epoch(ctx, g.ConvID, g.Epoch); err != nil {
-				WriteError(w, ErrNotFound)
-				return
-			}
-			holds, seen = true, true
-			holdCache[key] = true
-		}
-		if !seen {
-			// A holder is someone with a grant, or the epoch's creator bootstrapping the first grants.
-			if _, err := s.Store.Grant(ctx, g.ConvID, g.Epoch, me.ID); err == nil {
-				holds = true
-			} else if e, err := s.Store.Epoch(ctx, g.ConvID, g.Epoch); err == nil && e.CreatedBy == me.ID {
-				holds = true
-			}
-			holdCache[key] = holds
-		}
-		if !holds {
-			WriteError(w, E(http.StatusForbidden, "not_holder", "You do not hold that key, so you cannot share it."))
-			return
-		}
 		set, ok := entitledCache[g.ConvID]
 		if !ok {
 			var err error
@@ -108,6 +86,43 @@ func (s *Server) handleKeyGrantsPut(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			entitledCache[g.ConvID] = set
+		}
+		// someone who left or was removed keeps their old grants but has no
+		// business handing keys to the people still in the conversation
+		if !set[me.ID] {
+			WriteError(w, E(http.StatusForbidden, "not_entitled", "You are not part of that conversation."))
+			return
+		}
+		key := [2]int64{int64(g.ConvID), int64(g.Epoch)}
+		var holds bool
+		if g.UserID == me.ID {
+			// A self-grant only affects the caller (e.g. a key received through
+			// an invite link). It says nothing about whether the caller really
+			// holds the key, so it does not make them a holder for the rest of
+			// the batch.
+			if _, err := s.Store.Epoch(ctx, g.ConvID, g.Epoch); err != nil {
+				WriteError(w, ErrNotFound)
+				return
+			}
+			holds = true
+		} else if cached, seen := holdCache[key]; seen {
+			holds = cached
+		} else {
+			// A holder is someone another member granted the key to, or the
+			// epoch's creator bootstrapping the first grants. A grant the caller
+			// wrapped for themselves does not count: anyone can plant one, and
+			// junk shared from it would block the real key, since the first
+			// grant stored wins.
+			if e, err := s.Store.Epoch(ctx, g.ConvID, g.Epoch); err == nil && e.CreatedBy == me.ID {
+				holds = true
+			} else if own, err := s.Store.Grant(ctx, g.ConvID, g.Epoch, me.ID); err == nil && own.WrappedBy != me.ID {
+				holds = true
+			}
+			holdCache[key] = holds
+		}
+		if !holds {
+			WriteError(w, E(http.StatusForbidden, "not_holder", "You do not hold that key, so you cannot share it."))
+			return
 		}
 		if !set[g.UserID] {
 			WriteError(w, E(http.StatusForbidden, "not_entitled", "That user is not part of the conversation."))
@@ -162,7 +177,14 @@ func (s *Server) handleKeyEpochCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	reason, _ := CleanText(req.Reason, 64)
 	var epoch *store.KeyEpoch
-	for attempt := 0; attempt < 3; attempt++ {
+	create, attempts := s.Store.CreateEpoch, 3
+	if reason == rotationReason {
+		// Every online device that holds the key answers key_rotation_needed.
+		// One new epoch is enough, so this only goes through while the
+		// rotation is still pending, and a lost race is not retried.
+		create, attempts = s.Store.CreatePendingEpoch, 1
+	}
+	for attempt := 0; attempt < attempts; attempt++ {
 		latest, exists, err := s.Store.LatestEpoch(ctx, req.ConvID)
 		if err != nil {
 			WriteError(w, err)
@@ -173,7 +195,7 @@ func (s *Server) handleKeyEpochCreate(w http.ResponseWriter, r *http.Request) {
 			next = latest + 1
 		}
 		e := &store.KeyEpoch{ConvID: req.ConvID, Epoch: next, CreatedBy: me.ID, Reason: reason}
-		if err := s.Store.CreateEpoch(ctx, e); err == nil {
+		if err := create(ctx, e); err == nil {
 			epoch = e
 			break
 		} else if err != store.ErrConflict {

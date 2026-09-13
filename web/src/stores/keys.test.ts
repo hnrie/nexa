@@ -74,6 +74,26 @@ describe("key manager", () => {
     expect(b64.enc(channelKey(ring.get("conv1", 0)!, "chan9"))).toBe(b64.enc(channelKey(rootA, "chan9")));
   });
 
+  it("carries out a rotation that was left pending while nobody was online", async () => {
+    await useKeys.getState().init("A", alice);
+    await useKeys.getState().ensureConvKey("conv1");
+    const base = api.request;
+    const reasons: string[] = [];
+    api.request = <T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> => {
+      if (method === "GET" && path === "/keys/needs") return Promise.resolve([{ conv_id: "conv1", epoch: 0, user_ids: [], rotate: true }] as T);
+      if (method === "POST" && path === "/keys/epochs") {
+        reasons.push((body as { reason: string }).reason);
+        return Promise.resolve({ conv_id: "conv1", epoch: 1, user_ids: ["A", "B"] } as T);
+      }
+      return base<T>(method, path, body, opts);
+    };
+    putGrants.length = 0;
+    await useKeys.getState().reconcile();
+    expect(reasons).toEqual(["membership change"]);
+    expect(ring.latest("conv1")?.epoch).toBe(1);
+    expect(putGrants.filter((g) => g.epoch === 1).map((g) => g.user_id).sort()).toEqual(["A", "B"]);
+  });
+
   it("re-decrypts waiting messages when a grant arrives", async () => {
     // Alice encrypts a message with a root Bob does not have yet.
     await useKeys.getState().init("A", alice);

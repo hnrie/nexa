@@ -12,10 +12,31 @@ import (
 // epoch it expects to create; anything but latest+1 (or 0 for a new
 // conversation) returns ErrConflict.
 func (s *Store) CreateEpoch(ctx context.Context, e *KeyEpoch) error {
+	return s.createEpoch(ctx, e, false)
+}
+
+// CreatePendingEpoch is CreateEpoch for a rotation someone losing access asked
+// for: it only succeeds while that rotation is still pending, so when every
+// online device answers the same request only the first creates an epoch and
+// the rest get ErrConflict.
+func (s *Store) CreatePendingEpoch(ctx context.Context, e *KeyEpoch) error {
+	return s.createEpoch(ctx, e, true)
+}
+
+func (s *Store) createEpoch(ctx context.Context, e *KeyEpoch, pending bool) error {
 	if e.CreatedAt == 0 {
 		e.CreatedAt = nowMs()
 	}
 	return s.Tx(ctx, func(tx *sql.Tx) error {
+		if pending {
+			var n int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM key_flags WHERE conv_id = ? AND needs_rotation = 1`, int64(e.ConvID)).Scan(&n); err != nil {
+				return err
+			}
+			if n == 0 {
+				return ErrConflict
+			}
+		}
 		var max sql.NullInt64
 		if err := tx.QueryRowContext(ctx, `SELECT max(epoch) FROM key_epochs WHERE conv_id = ?`, int64(e.ConvID)).Scan(&max); err != nil {
 			return err
@@ -211,31 +232,50 @@ type KeyNeed struct {
 	ConvID  ids.ID   `json:"conv_id"`
 	Epoch   int      `json:"epoch"`
 	UserIDs []ids.ID `json:"user_ids"`
+	// Rotate asks the holder to replace the key: someone lost access while
+	// nobody holding it was online to do so.
+	Rotate bool `json:"rotate,omitempty"`
 }
 
-// HeldLatest lists the conversations (and their latest epoch) that uid holds
-// a grant for at that latest epoch.
-func (s *Store) HeldLatest(ctx context.Context, uid ids.ID) ([]KeyEpoch, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT g.conv_id, g.epoch FROM key_grants g WHERE g.user_id = ? AND g.epoch = (SELECT max(e.epoch) FROM key_epochs e WHERE e.conv_id = g.conv_id)`, int64(uid))
+// heldKey is a conversation whose latest key a user holds.
+type heldKey struct {
+	KeyEpoch
+	rotate bool
+}
+
+// heldLatest lists the conversations (and their latest epoch) that uid holds
+// a grant for at that latest epoch, and whether each still needs rotating. A
+// grant the user wrapped for themselves only counts on an epoch they created:
+// the server cannot tell a key from an invite link from junk, so such a
+// holder is not asked to share it.
+func (s *Store) heldLatest(ctx context.Context, uid ids.ID) ([]heldKey, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT g.conv_id, g.epoch, coalesce(f.needs_rotation, 0) FROM key_grants g
+		JOIN key_epochs e ON e.conv_id = g.conv_id AND e.epoch = g.epoch
+		LEFT JOIN key_flags f ON f.conv_id = g.conv_id
+		WHERE g.user_id = ? AND g.epoch = (SELECT max(m.epoch) FROM key_epochs m WHERE m.conv_id = g.conv_id)
+		AND (g.wrapped_by != g.user_id OR e.created_by = g.user_id)`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []KeyEpoch{}
+	out := []heldKey{}
 	for rows.Next() {
-		var e KeyEpoch
-		if err := rows.Scan(&e.ConvID, &e.Epoch); err != nil {
+		var h heldKey
+		var rot int64
+		if err := rows.Scan(&h.ConvID, &h.Epoch, &rot); err != nil {
 			return nil, err
 		}
-		out = append(out, e)
+		h.rotate = rot == 1
+		out = append(out, h)
 	}
 	return out, rows.Err()
 }
 
-// Needs computes, for every conversation uid holds the latest key of, which
-// entitled users still lack a grant.
+// Needs computes, for every conversation uid holds the latest key of and is
+// still part of, which entitled users lack a grant and whether the key is
+// waiting to be rotated.
 func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
-	held, err := s.HeldLatest(ctx, uid)
+	held, err := s.heldLatest(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -248,12 +288,23 @@ func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
 			}
 			return nil, err
 		}
+		member := false
+		for _, id := range entitled {
+			if id == uid {
+				member = true
+				break
+			}
+		}
+		if !member {
+			// a key kept from a conversation the user has left is not theirs to share
+			continue
+		}
 		lacking, err := s.UsersLackingGrant(ctx, e.ConvID, e.Epoch, entitled)
 		if err != nil {
 			return nil, err
 		}
-		if len(lacking) > 0 {
-			out = append(out, KeyNeed{ConvID: e.ConvID, Epoch: e.Epoch, UserIDs: lacking})
+		if len(lacking) > 0 || e.rotate {
+			out = append(out, KeyNeed{ConvID: e.ConvID, Epoch: e.Epoch, UserIDs: lacking, Rotate: e.rotate})
 		}
 	}
 	return out, nil

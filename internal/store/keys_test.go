@@ -54,7 +54,7 @@ func TestKeyEpochsGrantsNeeds(t *testing.T) {
 	if len(needs) != 0 {
 		t.Errorf("all granted: %+v", needs)
 	}
-	_ = s.AddParticipant(ctx, g.ID, c.ID, a.ID)
+	_, _ = s.AddParticipant(ctx, g.ID, c.ID, a.ID)
 	needs, _ = s.Needs(ctx, b.ID)
 	if len(needs) != 1 || needs[0].UserIDs[0] != c.ID {
 		t.Errorf("new participant needs key from any holder: %+v", needs)
