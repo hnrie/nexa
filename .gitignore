@@ -3,6 +3,7 @@
 /logs/
 /bin/
 /chatd.env
+/backup/
 # web
 /web/node_modules/
 /web/dist/
