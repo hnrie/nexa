@@ -62,7 +62,9 @@ export function MessageList({ channel }: { channel: Channel }) {
   const byIdChannels = useChannels((c) => c.byId);
   const state = useMessages((m) => m.channels[channel.id]);
   const loadOlder = useMessages((m) => m.loadOlder);
+  const loadNewer = useMessages((m) => m.loadNewer);
   const loadInitial = useMessages((m) => m.loadInitial);
+  const returnToPresent = useMessages((m) => m.returnToPresent);
   const readState = useReadStates((r) => r.byChannel[channel.id]);
   const ack = useReadStates((r) => r.ack);
   const focused = useUI((u) => u.focused);
@@ -71,25 +73,26 @@ export function MessageList({ channel }: { channel: Channel }) {
   const compact = useSettings((st) => st.settings.messageDisplay === "compact");
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
-  const prepend = useRef<{ height: number; top: number } | null>(null);
+  const prepend = useRef<{ height: number } | null>(null);
   const [newBelow, setNewBelow] = useState(false);
+  // Scrolling only moves refs, so whether the jump button shows has to be state of its own.
+  const [showJump, setShowJump] = useState(false);
+  // Newer pages load below the reader; the loader at the top is for older ones.
+  const [newerBusy, setNewerBusy] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
+  // ChatView mounts a fresh list for each channel, so these start over per channel.
   const unreadFrom = useRef<string | null | undefined>(undefined);
   const lastAcked = useRef<string | null>(null);
+  const triedAround = useRef<string | null>(null);
 
   const ids = state?.ids ?? [];
   const byId = state?.byId ?? {};
   const pending = state?.pending ?? [];
   const hasOlder = state?.hasOlder ?? true;
+  const hasNewer = state?.hasNewer ?? false;
   const loading = state?.loading ?? false;
   const loaded = state?.loaded ?? false;
-
-  useEffect(() => {
-    unreadFrom.current = undefined;
-    lastAcked.current = null;
-    atBottom.current = true;
-    setNewBelow(false);
-  }, [channel.id]);
+  const failed = state?.failed ?? 0;
 
   if (unreadFrom.current === undefined && loaded) unreadFrom.current = readState?.lastReadId ?? null;
 
@@ -111,11 +114,13 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     for (const p of pending) out.push({ kind: "pending", key: p.tmpId, p });
     return out;
-  }, [ids, byId, pending, me?.id]);
+    // loaded is listed so the rows are built again once the unread point is captured
+  }, [ids, byId, pending, me?.id, loaded]);
 
   const newest = ids[ids.length - 1];
   const prevNewest = useRef<string | undefined>(undefined);
   const prevPending = useRef(0);
+  const prevHasNewer = useRef(false);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
@@ -127,22 +132,33 @@ export function MessageList({ channel }: { channel: Channel }) {
       // Only hold the reading position when older messages really did arrive.
       // The list can change height for other reasons, and treating that as a
       // prepend would throw the reader back up to where the page begins.
+      // The shift is added to where the reader is now, not where they were
+      // when the page was asked for: a fling keeps scrolling while it loads.
       if (grew > 0) {
-        el.scrollTop = pre.top + grew;
+        el.scrollTop += grew;
         return;
       }
     }
-    // Your own message always gets shown, wherever you were reading.
-    if (pending.length > prevPending.current) atBottom.current = true;
+    // Your own message always gets shown, wherever you were reading. When the
+    // list stops short of the present it would land after old history, so the
+    // newest page is loaded again first.
+    if (pending.length > prevPending.current) {
+      atBottom.current = true;
+      setShowJump(false);
+      if (hasNewer) returnToPresent(channel.id);
+    }
     prevPending.current = pending.length;
     if (atBottom.current) {
       el.scrollTop = el.scrollHeight;
       setNewBelow(false);
-    } else if (newest && prevNewest.current && newest !== prevNewest.current && byId[newest]?.author_id !== me?.id) {
+    } else if (newest && prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current && byId[newest]?.author_id !== me?.id) {
+      // A list that stopped short of the present only grows downwards by
+      // loading pages the reader scrolled to, which are not news.
       setNewBelow(true);
     }
     prevNewest.current = newest;
-  }, [rows, newest, byId, me?.id, pending.length]);
+    prevHasNewer.current = hasNewer;
+  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -162,35 +178,60 @@ export function MessageList({ channel }: { channel: Channel }) {
     const el = scrollRef.current;
     if (!el) return;
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
-    atBottom.current = dist < 80;
+    // The end of a list that stops short of the present is not the bottom:
+    // nothing should stick to it or be marked read from it.
+    atBottom.current = dist < 80 && !hasNewer;
+    setShowJump(!atBottom.current);
     if (atBottom.current) setNewBelow(false);
     if (el.scrollTop < 400 && hasOlder && !loading && loaded && ids.length > 0) {
-      prepend.current = { height: el.scrollHeight, top: el.scrollTop };
-      void loadOlder(channel.id).finally(() => {
-        if (prepend.current && scrollRef.current && scrollRef.current.scrollHeight === prepend.current.height) prepend.current = null;
-      });
+      prepend.current = { height: el.scrollHeight };
+      void loadOlder(channel.id)
+        .catch(() => {})
+        .finally(() => {
+          if (prepend.current && scrollRef.current && scrollRef.current.scrollHeight === prepend.current.height) prepend.current = null;
+        });
+    } else if (dist < 400 && hasNewer && !loading && loaded) {
+      // Pages added below the reader leave the scroll position where it is.
+      setNewerBusy(true);
+      void loadNewer(channel.id)
+        .catch(() => {})
+        .finally(() => setNewerBusy(false));
     }
-  }, [channel.id, hasOlder, loading, loaded, ids.length, loadOlder]);
+  }, [channel.id, hasOlder, hasNewer, loading, loaded, ids.length, loadOlder, loadNewer]);
 
   useEffect(() => {
-    if (!newest || !focused || !atBottom.current || typeof document === "undefined" || document.visibilityState !== "visible") return;
+    // Wait for the first page: the unread point is taken from the read state
+    // on that render, and acking earlier would move it to the newest message.
+    // A list that stops short of the present has not shown the newest message.
+    if (!loaded || hasNewer || !newest || !focused || !atBottom.current || typeof document === "undefined" || document.visibilityState !== "visible") return;
     if (lastAcked.current === newest) return;
     if (readState?.lastReadId && compareIds(readState.lastReadId, newest) >= 0 && readState.mentions === 0) return;
     lastAcked.current = newest;
     void ack(channel.id, newest);
-  }, [newest, focused, readState, ack, channel.id]);
+  }, [loaded, hasNewer, newest, focused, readState, ack, channel.id]);
 
   useEffect(() => {
     if (!jumpTo || jumpTo.channelId !== channel.id) return;
     const el = scrollRef.current?.querySelector<HTMLElement>(`[data-id="${jumpTo.messageId}"]`);
     if (el) {
+      triedAround.current = null;
       atBottom.current = false;
+      setShowJump(true);
       el.scrollIntoView({ block: "center" });
       setHighlight(jumpTo.messageId);
       setTimeout(() => setHighlight(null), 2000);
       setJumpTo(null);
     } else if (!loading) {
-      void useMessages.getState().loadAround(channel.id, jumpTo.messageId);
+      // The page around a deleted message holds its neighbours but never the
+      // message itself, so after one try the jump is given up.
+      if (triedAround.current === jumpTo.messageId) {
+        triedAround.current = null;
+        setJumpTo(null);
+        useUI.getState().toast("That message could not be found.", "error");
+        return;
+      }
+      triedAround.current = jumpTo.messageId;
+      void useMessages.getState().loadAround(channel.id, jumpTo.messageId).catch(() => {});
     }
   }, [jumpTo, channel.id, rows, loading, setJumpTo]);
 
@@ -198,8 +239,11 @@ export function MessageList({ channel }: { channel: Channel }) {
     const el = scrollRef.current;
     if (!el) return;
     atBottom.current = true;
-    el.scrollTop = el.scrollHeight;
+    setShowJump(false);
     setNewBelow(false);
+    // The newest messages are not loaded after a jump far back, so they are fetched again.
+    if (hasNewer) returnToPresent(channel.id);
+    else el.scrollTop = el.scrollHeight;
   };
 
   const intro = useMemo(() => {
@@ -235,8 +279,21 @@ export function MessageList({ channel }: { channel: Channel }) {
   }, [channel, users, me?.id, byIdChannels]);
 
   useEffect(() => {
-    if (!loaded && !loading) void loadInitial(channel.id);
-  }, [channel.id, loaded, loading, loadInitial]);
+    if (loaded || loading) return;
+    if (failed === 0) {
+      void loadInitial(channel.id);
+      return;
+    }
+    // After a failure, try again once the connection is back or after a pause
+    // that doubles each time, up to half a minute.
+    const retry = () => void loadInitial(channel.id);
+    const timer = setTimeout(retry, Math.min(30_000, 1000 * 2 ** (failed - 1)));
+    window.addEventListener("online", retry);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("online", retry);
+    };
+  }, [channel.id, loaded, loading, failed, loadInitial]);
 
   useEffect(() => {
     const onScrollKey = (e: Event) => {
@@ -254,16 +311,28 @@ export function MessageList({ channel }: { channel: Channel }) {
       {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>New messages</span><span>Jump to present</span></div> : null}
       <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="">
         <div className={s.inner}>
-          {!hasOlder ? intro : loading || !loaded ? <div className={s.loader}><Spinner size={24} /></div> : <div style={{ height: 24 }} />}
+          {!hasOlder ? (
+            intro
+          ) : !loaded && !loading && failed > 0 ? (
+            <div className={s.loadError}>
+              <span>Messages could not be loaded.</span>
+              <button className={s.loadRetry} onClick={() => void loadInitial(channel.id)}>Try again</button>
+            </div>
+          ) : (loading && !newerBusy) || !loaded ? (
+            <div className={s.loader}><Spinner size={24} /></div>
+          ) : (
+            <div style={{ height: 24 }} />
+          )}
           {rows.map((row, i) => {
             if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
             if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>New</span></div>;
             if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={true} pending={row.p.status} />;
             return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
           })}
+          {hasNewer && loaded ? <div className={s.loader}><Spinner size={24} /></div> : null}
         </div>
       </div>
-      {!atBottom.current && ids.length > 0 && !newBelow ? (
+      {showJump && ids.length > 0 && !newBelow ? (
         <button className={s.jumpBtn} aria-label="Jump to present" onClick={jumpToPresent}><ArrowDown size={18} /></button>
       ) : null}
     </div>

@@ -48,14 +48,30 @@ export interface ChannelMessages {
   ids: string[];
   byId: Record<string, DecryptedMessage>;
   hasOlder: boolean;
+  /** The list stops short of the newest message, after a jump far back into history. */
+  hasNewer: boolean;
   loading: boolean;
   loaded: boolean;
+  /** First-page loads that failed in a row, so the list can back off instead of asking again at once. */
+  failed: number;
   pending: PendingMessage[];
 }
 
 const PAGE = 50;
+// Pages of already-loaded history read again after a reconnect. Past this the
+// older end of a very long reading session is left as it was.
+const REFRESH_PAGES = 10;
 
-const emptyChannel = (): ChannelMessages => ({ ids: [], byId: {}, hasOlder: true, loading: false, loaded: false, pending: [] });
+const emptyChannel = (): ChannelMessages => ({ ids: [], byId: {}, hasOlder: true, hasNewer: false, loading: false, loaded: false, failed: 0, pending: [] });
+
+// A load started before its channel was cleared or sent back to the present
+// must not write its page into the fresh list, or the list would show two
+// unrelated stretches of history as if they were one.
+const generations = new Map<string, number>();
+const generation = (channelId: string): number => generations.get(channelId) ?? 0;
+const nextGeneration = (channelId: string): void => {
+  generations.set(channelId, generation(channelId) + 1);
+};
 
 interface MessagesState {
   channels: Record<string, ChannelMessages>;
@@ -80,12 +96,37 @@ interface MessagesState {
   syncGap: (channelId: string) => Promise<void>;
   loadOlder: (channelId: string) => Promise<void>;
   loadAround: (channelId: string, messageId: string) => Promise<void>;
+  loadNewer: (channelId: string) => Promise<void>;
+  /** Drops a list that stops short of the newest message so the newest page loads again. Unsent messages stay. */
+  returnToPresent: (channelId: string) => void;
   redecrypt: (predicate: (m: DecryptedMessage) => boolean) => Promise<void>;
 }
 
 function withChannel(s: MessagesState, channelId: string, fn: (c: ChannelMessages) => ChannelMessages): Partial<MessagesState> {
   const cur = s.channels[channelId] ?? emptyChannel();
   return { channels: { ...s.channels, [channelId]: fn(cur) } };
+}
+
+/** Adds messages to a list, keeping ids ascending and unique. */
+function put(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages {
+  if (msgs.length === 0) return c;
+  const byId = { ...c.byId };
+  const fresh: string[] = [];
+  for (const m of msgs) {
+    if (!(m.id in byId)) fresh.push(m.id);
+    byId[m.id] = m;
+  }
+  return { ...c, byId, ids: mergeIds(c.ids, fresh) };
+}
+
+/** The server's copy of a loaded message, reusing the decryption, and the object itself when nothing changed. */
+async function refreshed(prev: DecryptedMessage, m: Message): Promise<DecryptedMessage> {
+  if (prev.edited_at !== m.edited_at || JSON.stringify(prev.ciphertext) !== JSON.stringify(m.ciphertext)) return decryptForStore(m);
+  if (prev.flags === m.flags && JSON.stringify(prev.reactions) === JSON.stringify(m.reactions) && JSON.stringify(prev.attachments) === JSON.stringify(m.attachments)) return prev;
+  const next: DecryptedMessage = { ...m };
+  if (prev.payload !== undefined) next.payload = prev.payload;
+  if (prev.decryptError !== undefined) next.decryptError = prev.decryptError;
+  return next;
 }
 
 function mergeIds(existing: string[], added: string[]): string[] {
@@ -114,13 +155,12 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     resolveAuthors(msgs);
     set((s) =>
       withChannel(s, channelId, (c) => {
-        const byId = { ...c.byId };
-        const fresh: string[] = [];
-        for (const m of msgs) {
-          if (!(m.id in byId)) fresh.push(m.id);
-          byId[m.id] = m;
-        }
-        return { ...c, byId, ids: mergeIds(c.ids, fresh) };
+        // A list that stops short of the present cannot take messages past its
+        // end, because the ones in between are missing. They come with the
+        // newer pages instead.
+        const newest = c.ids[c.ids.length - 1];
+        if (!c.hasNewer || !newest) return put(c, msgs);
+        return put(c, msgs.filter((m) => compareIds(m.id, newest) <= 0));
       }),
     );
   },
@@ -129,8 +169,8 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       withChannel(s, channelId, (c) => {
         const prev = c.byId[msg.id];
         if (!prev) return c;
-        // An update's reactions say "me" for whoever loaded it, not for this
-        // viewer; reaction events keep the stored ones right instead.
+        // The edited copy carries the editor's own "me" flags on its reactions,
+        // so the reactions already here stay; their own events keep them current.
         return { ...c, byId: { ...c.byId, [msg.id]: { ...msg, reactions: prev.reactions } } };
       }),
     ),
@@ -210,77 +250,174 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         return { ...c, pending: c.pending.filter((p) => p.nonce !== nonce) };
       }),
     ),
-  clearChannel: (channelId) =>
+  clearChannel: (channelId) => {
+    nextGeneration(channelId);
     set((s) => {
       const channels = { ...s.channels };
       delete channels[channelId];
       return { channels };
-    }),
+    });
+  },
   clearAll: (keep) =>
     set((s) => {
+      for (const id of Object.keys(s.channels)) if (id !== keep) nextGeneration(id);
       // One channel can be spared: the one being read, so a reconnect does not
       // throw away the reader's place in it.
       const kept = keep ? s.channels[keep] : undefined;
       return { channels: kept ? { [keep as string]: kept } : {} };
     }),
+  returnToPresent: (channelId) => {
+    nextGeneration(channelId);
+    set((s) => withChannel(s, channelId, (c) => ({ ...emptyChannel(), pending: c.pending })));
+  },
   loadInitial: async (channelId) => {
     const cur = get().channels[channelId];
     if (cur?.loaded || cur?.loading) return;
+    const gen = generation(channelId);
     get().setLoading(channelId, true);
     try {
       const page = await messagesApi.list(channelId, { limit: PAGE });
       const decrypted = await Promise.all(page.map(decryptForStore));
-      set((s) => withChannel(s, channelId, (c) => ({ ...c, loaded: true, hasOlder: page.length >= PAGE })));
-      get().insert(channelId, decrypted);
-    } finally {
-      get().setLoading(channelId, false);
+      if (generation(channelId) !== gen) return;
+      resolveAuthors(decrypted);
+      set((s) => withChannel(s, channelId, (c) => ({ ...put(c, decrypted), loaded: true, loading: false, failed: 0, hasOlder: page.length >= PAGE, hasNewer: false })));
+    } catch {
+      // Counted rather than thrown: the list shows the failure and tries again
+      // after a growing pause, instead of asking again the moment loading ends.
+      if (generation(channelId) === gen) set((s) => withChannel(s, channelId, (c) => ({ ...c, loading: false, failed: c.failed + 1 })));
     }
   },
   syncGap: async (channelId) => {
     const cur = get().channels[channelId];
     const newest = cur?.ids[cur.ids.length - 1];
-    if (!cur?.loaded || !newest) {
+    const oldest = cur?.ids[0];
+    if (!cur?.loaded || !newest || !oldest) {
       await get().loadInitial(channelId);
       return;
     }
-    let after = newest;
-    // Five pages is more than any short disconnect produces; past that it is
-    // cheaper to start again from the newest page than to walk the gap.
-    for (let i = 0; i < 5; i++) {
-      const page = await messagesApi.list(channelId, { after, limit: PAGE });
-      if (page.length === 0) return;
-      const decrypted = await Promise.all(page.map(decryptForStore));
-      get().insert(channelId, decrypted);
-      if (page.length < PAGE) return;
-      after = page[page.length - 1]!.id;
+    const gen = generation(channelId);
+    // A list that stops short of the present has no gap at its end to fill;
+    // scrolling down brings the newer pages.
+    if (!cur.hasNewer) {
+      let after = newest;
+      let filled = false;
+      // Five pages is more than any short disconnect produces; past that it is
+      // cheaper to start again from the newest page than to walk the gap.
+      for (let i = 0; i < 5 && !filled; i++) {
+        const page = await messagesApi.list(channelId, { after, limit: PAGE });
+        const decrypted = await Promise.all(page.map(decryptForStore));
+        if (generation(channelId) !== gen) return;
+        get().insert(channelId, decrypted);
+        filled = page.length < PAGE;
+        if (!filled) after = page[page.length - 1]!.id;
+      }
+      if (!filled) {
+        get().clearChannel(channelId);
+        await get().loadInitial(channelId);
+        return;
+      }
     }
-    get().clearChannel(channelId);
-    await get().loadInitial(channelId);
+    // Messages already on screen may have been edited, deleted or reacted to
+    // while the socket was down, and those events are lost. Read the kept
+    // stretch again, newest first, and bring it in line with the server.
+    let before = (BigInt(newest) + 1n).toString();
+    for (let i = 0; i < REFRESH_PAGES; i++) {
+      const page = await messagesApi.list(channelId, { before, limit: PAGE });
+      if (generation(channelId) !== gen) return;
+      const known = get().channels[channelId]?.byId ?? {};
+      const fresh = await Promise.all(page.filter((m) => known[m.id]).map((m) => refreshed(known[m.id]!, m)));
+      if (generation(channelId) !== gen) return;
+      const upto = before;
+      // A short page reaches the start of the channel, so everything below it is covered too.
+      const floor = page.length >= PAGE ? page[0]!.id : null;
+      const returned = new Set(page.map((m) => m.id));
+      set((s) =>
+        withChannel(s, channelId, (c) => {
+          const gone = c.ids.filter((id) => compareIds(id, upto) < 0 && (floor === null || compareIds(id, floor) >= 0) && !returned.has(id));
+          // A copy changed by a live event since the page was read is newer than the page.
+          const changed = fresh.filter((m) => m !== known[m.id] && c.byId[m.id] === known[m.id]);
+          if (gone.length === 0 && changed.length === 0) return c;
+          const byId = { ...c.byId };
+          for (const m of changed) byId[m.id] = m;
+          for (const id of gone) delete byId[id];
+          const drop = new Set(gone);
+          return { ...c, byId, ids: gone.length > 0 ? c.ids.filter((id) => !drop.has(id)) : c.ids };
+        }),
+      );
+      if (floor === null || compareIds(floor, oldest) <= 0) return;
+      before = floor;
+    }
   },
   loadOlder: async (channelId) => {
     const cur = get().channels[channelId];
     if (!cur || cur.loading || !cur.hasOlder) return;
     const oldest = cur.ids[0];
     if (!oldest) return get().loadInitial(channelId);
+    const gen = generation(channelId);
     get().setLoading(channelId, true);
     try {
       const page = await messagesApi.list(channelId, { before: oldest, limit: PAGE });
       const decrypted = await Promise.all(page.map(decryptForStore));
+      if (generation(channelId) !== gen) return;
       get().setHasOlder(channelId, page.length >= PAGE);
       get().insert(channelId, decrypted);
     } finally {
-      get().setLoading(channelId, false);
+      if (generation(channelId) === gen) get().setLoading(channelId, false);
+    }
+  },
+  loadNewer: async (channelId) => {
+    const cur = get().channels[channelId];
+    const newest = cur?.ids[cur.ids.length - 1];
+    if (!cur || cur.loading || !cur.hasNewer || !newest) return;
+    const gen = generation(channelId);
+    get().setLoading(channelId, true);
+    try {
+      const page = await messagesApi.list(channelId, { after: newest, limit: PAGE });
+      const decrypted = await Promise.all(page.map(decryptForStore));
+      if (generation(channelId) !== gen) return;
+      resolveAuthors(decrypted);
+      set((s) => withChannel(s, channelId, (c) => ({ ...put(c, decrypted), hasNewer: page.length >= PAGE })));
+    } finally {
+      if (generation(channelId) === gen) get().setLoading(channelId, false);
     }
   },
   loadAround: async (channelId, messageId) => {
+    const gen = generation(channelId);
     get().setLoading(channelId, true);
     try {
       const page = await messagesApi.list(channelId, { around: messageId, limit: PAGE });
       const decrypted = await Promise.all(page.map(decryptForStore));
-      set((s) => withChannel(s, channelId, (c) => ({ ...c, loaded: true })));
-      get().insert(channelId, decrypted);
+      if (generation(channelId) !== gen) return;
+      resolveAuthors(decrypted);
+      // The server sends up to half a page from before the target and the rest
+      // from the target on; a short side means that end of the channel is in the page.
+      const from = page.filter((m) => compareIds(m.id, messageId) >= 0).length;
+      const reachesPresent = from < PAGE - PAGE / 2;
+      const reachesStart = page.length - from < PAGE / 2;
+      set((s) =>
+        withChannel(s, channelId, (c) => {
+          const first = decrypted[0];
+          const last = decrypted[decrypted.length - 1];
+          const oldest = c.ids[0];
+          const newest = c.ids[c.ids.length - 1];
+          if (!first || !last) return { ...c, loaded: true };
+          const overlaps = !!oldest && !!newest && compareIds(first.id, newest) <= 0 && compareIds(last.id, oldest) >= 0;
+          if (overlaps || (reachesPresent && !c.hasNewer)) {
+            return {
+              ...put(c, decrypted),
+              loaded: true,
+              hasOlder: !oldest || compareIds(first.id, oldest) <= 0 ? !reachesStart : c.hasOlder,
+              hasNewer: c.hasNewer && !reachesPresent,
+            };
+          }
+          // The page is not next to what is loaded. Joining the two would hide
+          // everything in between, so the page replaces the list and the rest
+          // loads as the reader scrolls either way.
+          return { ...put({ ...c, ids: [], byId: {} }, decrypted), loaded: true, hasOlder: !reachesStart, hasNewer: !reachesPresent };
+        }),
+      );
     } finally {
-      get().setLoading(channelId, false);
+      if (generation(channelId) === gen) get().setLoading(channelId, false);
     }
   },
   redecrypt: async (predicate) => {

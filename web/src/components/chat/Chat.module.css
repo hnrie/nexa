@@ -24,6 +24,9 @@
 .mRow[data-offline="true"] { opacity: 0.5; }
 .mName { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loader { display: flex; justify-content: center; padding: 16px; color: var(--text-muted); }
+.loadError { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; padding: 16px; color: var(--text-muted); font-size: 14px; text-align: center; }
+.loadRetry { color: var(--link); font-size: 14px; font-weight: 500; padding: 4px; }
+.loadRetry:hover { text-decoration: underline; }
 .empty { padding: 16px 16px 8px; }
 .emptyAvatar { margin-bottom: 8px; }
 .emptyName { font-size: 32px; font-weight: 700; color: var(--text-strong); margin: 0; line-height: 1.2; }
@@ -34,7 +37,7 @@
 .dateDivider span { padding: 0 8px; }
 .unreadDivider { display: flex; align-items: center; margin: 8px 16px 0 16px; height: 0; border-top: 1px solid var(--danger); position: relative; }
 .unreadDivider span { position: absolute; right: 0; top: -9px; padding: 0 4px; height: 16px; line-height: 16px; font-size: 10px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 0 0 2px 2px; text-transform: uppercase; }
-.msg { position: relative; padding: 2px 48px 2px 72px; margin-top: 0; min-height: 22px; content-visibility: auto; contain-intrinsic-size: auto 48px; }
+.msg { position: relative; padding: 2px 48px 2px 72px; margin-top: 0; min-height: 22px; }
 .msg:hover, .msg[data-menu="true"] { background: var(--bg-message-hover); }
 .msg[data-group-start="true"] { margin-top: 17px; padding-top: 2px; }
 .msg[data-mentioned="true"] { background: var(--mention-bg); }

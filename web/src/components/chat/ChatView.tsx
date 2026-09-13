@@ -191,7 +191,7 @@ export function ChatView({ channel }: { channel: Channel }) {
       <div className={s.body}>
         {/* the composer belongs to the conversation's column, so the member list and search run the full height beside it */}
         <div className={s.main}>
-          <MessageList channel={channel} />
+          <MessageList key={channel.id} channel={channel} />
           <TypingBar channelId={channel.id} />
           <Composer channel={channel} />
         </div>
