@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { StickerPack } from "@/api/types";
 
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { packCover } from "@/components/server/PackEditor";
+import { ConfirmModal } from "@/components/modals/ConfirmModal";
+import { packCount, packCover } from "@/components/server/PackEditor";
+import { canRemovePack, removePack as removeInstalledPack, removePackQuestion } from "@/lib/packRemoval";
 import { useAuth } from "@/stores/auth";
 import { useExpressions, packImageUrl } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
@@ -24,6 +26,9 @@ export default function StickerPackPage() {
   const [pack, setPack] = useState<StickerPack | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // this page is outside the app, where its dialogs live, so it shows its own
+  const [confirming, setConfirming] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let alive = true;
@@ -38,6 +43,10 @@ export default function StickerPackPage() {
 
   const toggle = async () => {
     if (!pack) return;
+    if (pack.installed && canRemovePack(pack, meId)) {
+      setConfirming(true);
+      return;
+    }
     setBusy(true);
     try {
       if (pack.installed) {
@@ -72,11 +81,11 @@ export default function StickerPackPage() {
         ) : null}
         {pack ? (
           <>
-            <p className={s.kicker}>Sticker pack</p>
+            <p className={s.kicker}>{pack.kind === "emoji" ? "Emoji pack" : "Sticker pack"}</p>
             <div className={s.iconBox}>{cover ? <img src={packImageUrl(pack, cover)} alt="" style={{ objectFit: "contain" }} /> : pack.name.slice(0, 1).toUpperCase()}</div>
             <h1 className={s.title}>{pack.name}</h1>
             {pack.description ? <p className={s.sub}>{pack.description}</p> : null}
-            <p className={s.sub}>{pack.stickers.length} sticker{pack.stickers.length === 1 ? "" : "s"}{pack.public ? "" : " · private"}</p>
+            <p className={s.sub}>{packCount(pack)}{pack.public ? "" : " · private"}</p>
             <div className={p.grid} style={{ width: "100%" }}>
               {pack.stickers.map((st) => (
                 <div key={st.id} className={p.cell} style={{ cursor: "default" }}>
@@ -86,12 +95,22 @@ export default function StickerPackPage() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", justifyContent: "center" }}>
-              {mine ? <Button onClick={() => openModal("settings", { page: "stickers", packId: pack.id })}>Edit pack</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? "Remove from my stickers" : "Install pack"}</Button>}
+              {mine ? <Button onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>Edit pack</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? "Remove from my stickers" : "Install pack"}</Button>}
               <Link to="/channels/@me" className={s.link} style={{ alignSelf: "center" }}>Back to the app</Link>
             </div>
           </>
         ) : null}
       </div>
+      {confirming && pack ? (
+        <ConfirmModal
+          {...removePackQuestion(pack)}
+          danger
+          onClose={() => setConfirming(false)}
+          onConfirm={async () => {
+            if (await removeInstalledPack(pack)) setPack({ ...pack, installed: false });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

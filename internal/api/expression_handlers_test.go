@@ -202,6 +202,21 @@ func TestStickerPacks(t *testing.T) {
 	if !found {
 		t.Errorf("member sees server pack: %v", body)
 	}
+	// a member who installs their own server's pack and removes it again still has it
+	if res, _ = do(t, ts, "PATCH", "/api/v1/stickers/packs/"+spack, tokA, map[string]any{"public": true}); res.StatusCode != 200 {
+		t.Fatalf("publish server pack: %d", res.StatusCode)
+	}
+	if res, _ = do(t, ts, "PUT", "/api/v1/stickers/packs/"+spack+"/install", tokB, nil); res.StatusCode != 200 {
+		t.Fatalf("install server pack: %d", res.StatusCode)
+	}
+	for ev := gb.next("sticker_update", 3*time.Second); ev != nil && ev["pack"] != nil && ev["pack"].(map[string]any)["installed"] != true; ev = gb.next("sticker_update", 3*time.Second) {
+	}
+	if res, _ = do(t, ts, "DELETE", "/api/v1/stickers/packs/"+spack+"/install", tokB, nil); res.StatusCode != 204 {
+		t.Fatalf("uninstall server pack: %d", res.StatusCode)
+	}
+	if ev := gb.next("sticker_update", 3*time.Second); ev == nil || ev["deleted"] != false || ev["pack"].(map[string]any)["installed"] != false {
+		t.Errorf("uninstalling a pack of your own server keeps it listed: %v", ev)
+	}
 	// delete drops blob references
 	if res, _ = do(t, ts, "DELETE", "/api/v1/stickers/packs/"+pack, tokB, nil); res.StatusCode != 403 && res.StatusCode != 404 {
 		t.Errorf("outsider delete: %d", res.StatusCode)

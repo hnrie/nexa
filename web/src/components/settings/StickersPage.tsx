@@ -6,9 +6,11 @@ import type { StickerPack } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { TextInput } from "@/components/common/TextInput";
-import { PackEditor, packCover } from "@/components/server/PackEditor";
+import { PackEditor, packCount, packCover } from "@/components/server/PackEditor";
+import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
 import { useAuth } from "@/stores/auth";
 import { useExpressions, packImageUrl } from "@/stores/expressions";
+import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import st from "./Settings.module.css";
 import s from "@/components/server/PackEditor.module.css";
@@ -17,6 +19,7 @@ import s from "@/components/server/PackEditor.module.css";
 export default function StickersPage({ initialPackId }: { initialPackId?: string | undefined }) {
   const meId = useAuth((a) => a.me?.id);
   const packs = useExpressions((x) => x.packs);
+  const servers = useServers((x) => x.byId);
   const upsertPack = useExpressions((x) => x.upsertPack);
   const toast = useUI((u) => u.toast);
   const [tab, setTab] = useState<"stickers" | "emoji" | "discover">("stickers");
@@ -28,9 +31,10 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
   const mine = useMemo(
     () =>
       Object.values(packs)
-        .filter((p) => !p.server_id && (p.owner_user_id === meId || p.installed) && (p.kind ?? "sticker") === kind)
+        // a server's packs live in its settings, unless one was installed from a server you are not in
+        .filter((p) => ((!p.server_id && (p.owner_user_id === meId || p.installed)) || canRemovePack(p, meId)) && (p.kind ?? "sticker") === kind)
         .sort((a, b) => Number(b.owner_user_id === meId) - Number(a.owner_user_id === meId) || b.updated_at - a.updated_at),
-    [packs, meId, kind],
+    [packs, meId, kind, servers],
   );
 
   useEffect(() => {
@@ -86,6 +90,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
           selectedId={selected}
           onSelect={setSelected}
           canManage={(p) => p.owner_user_id === meId}
+          canRemove={(p) => canRemovePack(p, meId)}
           onCreate={() => void create()}
           createLabel={kind === "emoji" ? "Create Emoji Pack" : "Create Sticker Pack"}
           emptyText={kind === "emoji" ? "No emoji packs yet. Create one and drop images in; type them as :name: anywhere." : "You have no sticker packs yet. Create one, or install some from Discover."}
@@ -104,12 +109,14 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
                     <span className={s.cover}>{cover ? <img src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
                     <span className={s.packText}>
                       <span className={s.packName}>{p.name}</span>
-                      <span className={s.packSub}>{p.stickers.length} {(p.kind ?? "sticker") === "emoji" ? "emoji" : `sticker${p.stickers.length === 1 ? "" : "s"}`}</span>
+                      <span className={s.packSub}>{packCount(p)}</span>
                     </span>
                   </div>
                   {p.description ? <span className={s.packSub}>{p.description}</span> : null}
                   <div className={s.browseStickers}>{p.stickers.slice(0, 4).map((x) => <img key={x.id} src={packImageUrl(p, x)} alt={x.name} title={x.name} loading="lazy" />)}</div>
-                  {p.owner_user_id === meId ? <Button size="sm" variant="secondary" onClick={() => { setSelected(p.id); setTab((p.kind ?? "sticker") === "emoji" ? "emoji" : "stickers"); }}>Edit</Button> : p.installed ? <Button size="sm" variant="secondary" disabled>Installed</Button> : <Button size="sm" loading={busy === p.id} onClick={() => void install(p)}>Install</Button>}
+                  {p.owner_user_id === meId ? <Button size="sm" variant="secondary" onClick={() => { setSelected(p.id); setTab((p.kind ?? "sticker") === "emoji" ? "emoji" : "stickers"); }}>Edit</Button> : p.installed ? (
+                    canRemovePack(p, meId) ? <Button size="sm" variant="secondary" onClick={() => confirmRemovePack(p, () => setFound((cur) => cur?.map((x) => (x.id === p.id ? { ...x, installed: false } : x)) ?? null))}>Remove</Button> : <Button size="sm" variant="secondary" disabled>Installed</Button>
+                  ) : <Button size="sm" loading={busy === p.id} onClick={() => void install(p)}>Install</Button>}
                 </div>
               );
             })}

@@ -1,4 +1,4 @@
-import { Check, Copy, Pencil, Star, Trash2, Upload } from "lucide-react";
+import { Check, Copy, Pencil, Star, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
@@ -7,6 +7,8 @@ import { packImageUrl } from "@/stores/expressions";
 import { Button } from "@/components/common/Button";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
+import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
+import { useAuth } from "@/stores/auth";
 import { useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
 import { SaveBar } from "./SettingsLayer";
@@ -19,6 +21,12 @@ export function packCover(p: StickerPack): Sticker | undefined {
   return p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
 }
 
+/** "3 stickers", "1 sticker", "12 emoji". */
+export function packCount(p: StickerPack): string {
+  const n = p.stickers.length;
+  return (p.kind ?? "sticker") === "emoji" ? `${n} emoji` : `${n} sticker${n === 1 ? "" : "s"}`;
+}
+
 export function packUrl(id: string): string {
   return `${window.location.origin}/stickers/pack/${id}`;
 }
@@ -28,13 +36,15 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   canManage: (p: StickerPack) => boolean;
+  /** Packs the user installed and may remove from the list itself. */
+  canRemove?: (p: StickerPack) => boolean;
   onCreate?: (() => void) | undefined;
   createLabel?: string;
   emptyText?: string;
 }
 
 /** Pack list on the left, the selected pack's editor on the right. */
-export function PackEditor({ packs, selectedId, onSelect, canManage, onCreate, createLabel = "Create Pack", emptyText = "No packs yet." }: Props) {
+export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, onCreate, createLabel = "Create Pack", emptyText = "No packs yet." }: Props) {
   const selected = packs.find((p) => p.id === selectedId) ?? packs[0] ?? null;
   return (
     <div className={s.layout}>
@@ -43,14 +53,22 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, onCreate, c
         {packs.length === 0 ? <div className={s.empty}>{emptyText}</div> : null}
         {packs.map((p) => {
           const cover = packCover(p);
+          const removable = canRemove?.(p) ?? false;
           return (
-            <button key={p.id} className={s.packRow} data-selected={selected?.id === p.id} onClick={() => onSelect(p.id)} data-pack={p.id}>
-              <span className={s.cover}>{cover ? <img src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
-              <span className={s.packText}>
-                <span className={s.packName}>{p.name}</span>
-                <span className={s.packSub}>{p.stickers.length} sticker{p.stickers.length === 1 ? "" : "s"}{p.public ? " · public" : ""}</span>
-              </span>
-            </button>
+            <div key={p.id} className={s.packItem}>
+              <button className={s.packRow} data-selected={selected?.id === p.id} data-removable={removable || undefined} onClick={() => onSelect(p.id)} data-pack={p.id}>
+                <span className={s.cover}>{cover ? <img src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
+                <span className={s.packText}>
+                  <span className={s.packName}>{p.name}</span>
+                  <span className={s.packSub}>{packCount(p)}{removable ? " · installed" : p.public ? " · public" : ""}</span>
+                </span>
+              </button>
+              {removable ? (
+                <button className={s.packRemove} aria-label={`Remove ${p.name}`} title="Remove pack" onClick={() => confirmRemovePack(p, () => { if (selected?.id === p.id) onSelect(null); })}>
+                  <X size={16} />
+                </button>
+              ) : null}
+            </div>
           );
         })}
       </div>
@@ -60,6 +78,7 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, onCreate, c
 }
 
 function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: boolean; onDeleted: () => void }) {
+  const meId = useAuth((a) => a.me?.id);
   const upsertPack = useExpressions((x) => x.upsertPack);
   const removePack = useExpressions((x) => x.removePack);
   const toast = useUI((u) => u.toast);
@@ -184,6 +203,10 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     });
   };
   const toggleInstall = async () => {
+    if (pack.installed && canRemovePack(pack, meId)) {
+      confirmRemovePack(pack, onDeleted);
+      return;
+    }
     setBusy(true);
     try {
       if (pack.installed) {

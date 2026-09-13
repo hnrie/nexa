@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { UnfurlResult } from "@/api/types";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/common/Button";
+import { toggleFavoriteGif } from "@/lib/gifFavorites";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { Lightbox, fitMedia } from "./Attachments";
@@ -28,10 +29,8 @@ function fitCard(w: number | undefined, h: number | undefined, maxW = 400, maxH 
 
 /** Saves the proxied URL, so favourites load through this server too. */
 export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: number }) {
-  const favs = useSettings((st) => st.settings.favoriteGifs);
-  const patch = useSettings((st) => st.patch);
+  const on = useSettings((st) => st.settings.favoriteGifs.some((f) => f.url === url));
   const toast = useUI((u) => u.toast);
-  const on = favs.some((f) => f.url === url);
   return (
     <button
       className={s.star}
@@ -40,9 +39,8 @@ export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: num
       aria-label={on ? "Remove from favorites" : "Add to favorites"}
       onClick={(e) => {
         e.stopPropagation();
-        const next = on ? favs.filter((f) => f.url !== url) : [{ url, ...(w ? { w } : {}), ...(h ? { h } : {}) }, ...favs].slice(0, 500);
-        patch({ favoriteGifs: next });
-        toast(on ? "Removed from favorites." : "Added to your GIF favorites.", "success");
+        const now = toggleFavoriteGif({ url, ...(w ? { w } : {}), ...(h ? { h } : {}) });
+        toast(now ? "Added to your GIF favorites." : "Removed from favorites.", "success");
       }}
     >
       <Star size={16} fill={on ? "currentColor" : "none"} />

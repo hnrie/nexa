@@ -32,6 +32,19 @@ function anchoredStyle(a: DOMRect): CSSProperties {
   return { position: "fixed", left, top, width: w, height: h, right: "auto", bottom: "auto" };
 }
 
+/** Context menus and dialogs, which live outside the picker in the page. */
+const OVER = "[data-context-menu], [data-modal-overlay]";
+
+/**
+ * Whether el was opened over the picker, from inside it (a GIF's menu, the
+ * question before removing a pack): it comes later in the page. One the
+ * picker itself was opened from comes earlier, and a click on it still
+ * closes the picker.
+ */
+function openedOver(picker: HTMLElement, el: Element | null): boolean {
+  return !!el && !!(picker.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
 /** Tabbed popover above the composer (or anchored anywhere); closes on outside click or Escape. */
 export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId }: Props) {
   const [active, setActive] = useState<PickerTab>(tab);
@@ -39,10 +52,13 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
   const mobile = typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches;
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (!ref.current || ref.current.contains(e.target as Node)) return;
+      if (e.target instanceof Element && openedOver(ref.current, e.target.closest(OVER))) return;
+      onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // Escape closes whatever is on top first: a menu or a dialog opened from the picker
+      if (e.key === "Escape" && ref.current && !Array.from(document.querySelectorAll(OVER)).some((el) => openedOver(ref.current!, el))) {
         e.stopPropagation();
         onClose();
       }

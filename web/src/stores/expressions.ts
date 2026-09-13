@@ -102,18 +102,20 @@ export interface PackGroup {
   packs: StickerPack[];
 }
 
-/** Packs grouped for the picker: this server's, mine, then installed. */
+/** Packs grouped for the picker: this server's, mine, installed, then other servers'. Each pack shows once. */
 export function groupPacks(packs: Record<string, StickerPack>, serverId: string | null | undefined, meId: string | undefined): PackGroup[] {
-  const list = Object.values(packs).filter((p) => p.kind !== "emoji").sort((a, b) => b.updated_at - a.updated_at);
+  let rest = Object.values(packs).filter((p) => p.kind !== "emoji").sort((a, b) => b.updated_at - a.updated_at);
   const groups: PackGroup[] = [];
-  const server = list.filter((p) => serverId && p.server_id === serverId);
-  const mine = list.filter((p) => p.owner_user_id && p.owner_user_id === meId);
-  const installed = list.filter((p) => p.installed && !(p.owner_user_id && p.owner_user_id === meId));
-  const otherServers = list.filter((p) => p.server_id && p.server_id !== serverId);
-  if (server.length) groups.push({ label: "This server", packs: server });
-  if (mine.length) groups.push({ label: "My packs", packs: mine });
-  if (installed.length) groups.push({ label: "Installed", packs: installed });
-  if (otherServers.length) groups.push({ label: "Other servers", packs: otherServers });
+  const take = (label: string, test: (p: StickerPack) => boolean) => {
+    const packs = rest.filter(test);
+    if (!packs.length) return;
+    rest = rest.filter((p) => !test(p));
+    groups.push({ label, packs });
+  };
+  take("This server", (p) => !!serverId && p.server_id === serverId);
+  take("My packs", (p) => !!p.owner_user_id && p.owner_user_id === meId);
+  take("Installed", (p) => p.installed);
+  take("Other servers", (p) => !!p.server_id);
   return groups;
 }
 

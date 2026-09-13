@@ -49,7 +49,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
   }, [open]);
   if (!open) return null;
   return createPortal(
-    <div className={s.overlay} onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
+    <div className={s.overlay} data-modal-overlay="" onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
       <div ref={ref} className={[s.card, bare ? s.bare : "", className ?? ""].join(" ")} style={{ width }} role="dialog" aria-modal="true" tabIndex={-1} data-modal-layer="">
         {!bare && title !== undefined ? (
           <div className={s.header}>

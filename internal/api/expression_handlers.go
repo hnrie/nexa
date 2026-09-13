@@ -658,9 +658,16 @@ func (s *Server) handlePackInstall(install bool) http.HandlerFunc {
 			WriteError(w, err)
 			return
 		}
-		// a pack you no longer see is gone from your list; one you still own or share stays
-		view, _ := s.packRights(r.Context(), p, me.ID)
-		if !view || p.OwnerUserID == nil || *p.OwnerUserID != me.ID {
+		// The pack leaves your list unless it is still there for another reason:
+		// you made it, or it belongs to a server you are in.
+		stays := p.OwnerUserID != nil && *p.OwnerUserID == me.ID
+		if !stays && p.ServerID != nil {
+			stays, _ = s.Store.IsMember(r.Context(), *p.ServerID, me.ID)
+		}
+		if stays {
+			p.Installed = false
+			s.Bcast.EmitUsers([]ids.ID{me.ID}, "sticker_update", map[string]any{"pack_id": p.ID, "pack": p, "deleted": false})
+		} else {
 			s.Bcast.EmitUsers([]ids.ID{me.ID}, "sticker_update", map[string]any{"pack_id": p.ID, "deleted": true})
 		}
 		w.WriteHeader(http.StatusNoContent)

@@ -90,13 +90,14 @@ export function ContextMenuHost() {
       <div
         ref={backdrop}
         className={s.backdrop}
+        data-context-menu
         onClick={close}
         onContextMenu={(e) => {
           e.preventDefault();
           close();
         }}
       />
-      <div ref={ref} className={s.menu} style={{ left: pos?.x ?? menu.x, top: pos?.y ?? menu.y, visibility: pos ? "visible" : "hidden" }} role="menu">
+      <div ref={ref} className={s.menu} data-context-menu style={{ left: pos?.x ?? menu.x, top: pos?.y ?? menu.y, visibility: pos ? "visible" : "hidden" }} role="menu">
         {menu.items.map((item) => (
           <div key={item.id}>
             {item.slider ? (
