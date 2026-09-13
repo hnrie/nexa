@@ -1,0 +1,230 @@
+package realtime
+
+import (
+	"context"
+	"sync"
+	"time"
+)
+
+// Kinds of track a call device publishes.
+const (
+	KindAudio       = "audio"
+	KindVideo       = "video"
+	KindScreen      = "screen"
+	KindScreenAudio = "screen_audio"
+)
+
+// ValidKind reports whether k is one of the four kinds.
+func ValidKind(k string) bool {
+	return k == KindAudio || k == KindVideo || k == KindScreen || k == KindScreenAudio
+}
+
+// IsVideo reports whether a kind is paused when the allowance runs low.
+func IsVideo(k string) bool { return k == KindVideo || k == KindScreen }
+
+// The rates a pulled track is charged at, in bits per second. They are what
+// each kind can carry at most (the camera sender is capped to match), so the
+// estimate errs high rather than letting a bill through.
+const (
+	AudioBps         = 64_000
+	CameraBps        = 1_500_000
+	DefaultScreenBps = 5_000_000
+	minScreenBps     = 1_000_000
+	maxScreenBps     = 12_000_000
+)
+
+// ClampScreenBps bounds a screen share's declared bitrate.
+func ClampScreenBps(bps int64) int64 {
+	if bps <= 0 {
+		return DefaultScreenBps
+	}
+	return min(maxScreenBps, max(minScreenBps, bps))
+}
+
+// RateFor returns the bits per second a pulled track of kind is charged at.
+func RateFor(kind string, screenBps int64) int64 {
+	switch kind {
+	case KindVideo:
+		return CameraBps
+	case KindScreen:
+		return ClampScreenBps(screenBps)
+	default:
+		return AudioBps
+	}
+}
+
+// UsageStore keeps the monthly totals.
+type UsageStore interface {
+	AddRealtimeUsage(ctx context.Context, month string, bytes int64) (int64, error)
+	RealtimeUsage(ctx context.Context, month string) (int64, error)
+}
+
+type pull struct {
+	bps   int64
+	since time.Time
+}
+
+// Meter estimates the month's SFU egress from the tracks devices pull. Video
+// pauses at 90 % of the allowance and new calls stop at 99 %.
+type Meter struct {
+	mu    sync.Mutex
+	st    UsageStore
+	now   func() time.Time
+	limit int64
+	pulls map[string]map[string]pull
+	// month and used are the stored total the counts below add to
+	month     string
+	used      int64
+	loaded    bool
+	unflushed int64
+}
+
+// NewMeter meters against a monthly allowance in gigabytes.
+func NewMeter(st UsageStore, monthlyGB int64) *Meter {
+	return &Meter{st: st, now: time.Now, limit: monthlyGB * 1_000_000_000, pulls: map[string]map[string]pull{}}
+}
+
+func monthOf(t time.Time) string { return t.UTC().Format("2006-01") }
+
+func bytesFor(bps int64, d time.Duration) int64 {
+	if d <= 0 {
+		return 0
+	}
+	return bps * d.Milliseconds() / 8000
+}
+
+// Start begins charging a pulled track.
+func (m *Meter) Start(session, mid string, bps int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.now()
+	byMid := m.pulls[session]
+	if byMid == nil {
+		byMid = map[string]pull{}
+		m.pulls[session] = byMid
+	}
+	if old, ok := byMid[mid]; ok {
+		m.unflushed += bytesFor(old.bps, now.Sub(old.since))
+	}
+	byMid[mid] = pull{bps: bps, since: now}
+}
+
+// Stop ends charging one pulled track.
+func (m *Meter) Stop(session, mid string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if p, ok := m.pulls[session][mid]; ok {
+		m.unflushed += bytesFor(p.bps, m.now().Sub(p.since))
+		delete(m.pulls[session], mid)
+		if len(m.pulls[session]) == 0 {
+			delete(m.pulls, session)
+		}
+	}
+}
+
+// StopSession ends charging everything a session pulls.
+func (m *Meter) StopSession(session string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.now()
+	for _, p := range m.pulls[session] {
+		m.unflushed += bytesFor(p.bps, now.Sub(p.since))
+	}
+	delete(m.pulls, session)
+}
+
+// ensureMonth loads the stored total when the month is new to the meter.
+func (m *Meter) ensureMonth(ctx context.Context, now time.Time) {
+	month := monthOf(now)
+	if m.loaded && m.month == month {
+		return
+	}
+	used, err := m.st.RealtimeUsage(ctx, month)
+	if err != nil {
+		return
+	}
+	m.month, m.used, m.loaded = month, used, true
+}
+
+// Flush writes what running and finished pulls have used so far.
+func (m *Meter) Flush(ctx context.Context) error {
+	m.mu.Lock()
+	now := m.now()
+	for _, byMid := range m.pulls {
+		for mid, p := range byMid {
+			m.unflushed += bytesFor(p.bps, now.Sub(p.since))
+			byMid[mid] = pull{bps: p.bps, since: now}
+		}
+	}
+	add := m.unflushed
+	m.unflushed = 0
+	month := monthOf(now)
+	m.mu.Unlock()
+	if add == 0 {
+		m.mu.Lock()
+		m.ensureMonth(ctx, now)
+		m.mu.Unlock()
+		return nil
+	}
+	total, err := m.st.AddRealtimeUsage(ctx, month, add)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err != nil {
+		m.unflushed += add
+		return err
+	}
+	m.month, m.used, m.loaded = month, total, true
+	return nil
+}
+
+// Used estimates this month's egress, including what has not been written yet.
+func (m *Meter) Used(ctx context.Context) int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	now := m.now()
+	m.ensureMonth(ctx, now)
+	total := m.used + m.unflushed
+	for _, byMid := range m.pulls {
+		for _, p := range byMid {
+			total += bytesFor(p.bps, now.Sub(p.since))
+		}
+	}
+	return total
+}
+
+// Limit is the monthly allowance in bytes.
+func (m *Meter) Limit() int64 { return m.limit }
+
+// Month is the month the estimate is for, as YYYY-MM.
+func (m *Meter) Month() string { return monthOf(m.now()) }
+
+// VideoAllowed reports whether camera and screen tracks may still be used.
+func (m *Meter) VideoAllowed(ctx context.Context) bool {
+	return m.Used(ctx)*100 < m.limit*90
+}
+
+// CallsAllowed reports whether calls may still start.
+func (m *Meter) CallsAllowed(ctx context.Context) bool {
+	return m.Used(ctx)*100 < m.limit*99
+}
+
+// Run flushes every interval until ctx ends, and once more on the way out.
+func (m *Meter) Run(ctx context.Context, every time.Duration, onErr func(error)) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			if err := m.Flush(flushCtx); err != nil && onErr != nil {
+				onErr(err)
+			}
+			cancel()
+			return
+		case <-t.C:
+			if err := m.Flush(ctx); err != nil && onErr != nil {
+				onErr(err)
+			}
+		}
+	}
+}

@@ -128,3 +128,20 @@ func TestBlobs(t *testing.T) {
 		t.Error("deleted")
 	}
 }
+
+func TestRealtimeUsage(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	if n, err := s.RealtimeUsage(ctx, "2026-09"); err != nil || n != 0 {
+		t.Fatalf("empty month: %d %v", n, err)
+	}
+	if n, err := s.AddRealtimeUsage(ctx, "2026-09", 1500); err != nil || n != 1500 {
+		t.Fatalf("first add: %d %v", n, err)
+	}
+	if n, err := s.AddRealtimeUsage(ctx, "2026-09", 500); err != nil || n != 2000 {
+		t.Fatalf("second add: %d %v", n, err)
+	}
+	if n, _ := s.RealtimeUsage(ctx, "2026-10"); n != 0 {
+		t.Errorf("months are separate: %d", n)
+	}
+}
