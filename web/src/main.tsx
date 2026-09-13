@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { reloadAllowed } from "./lib/busy";
 import { installCrashReporting } from "./lib/crashReport";
 import { downloadsSettled } from "./lib/download";
 import { loadCaptchaConfig } from "./lib/captcha";
@@ -20,8 +21,10 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (!wasControlled || reloading) return;
       reloading = true;
-      // not in the middle of saving a file, though: reloading would cut it off
-      void downloadsSettled().then(() => window.location.reload());
+      // not in the middle of saving a file, sending one or a call, though: reloading would cut it off
+      void reloadAllowed()
+        .then(() => downloadsSettled())
+        .then(() => window.location.reload());
     });
     // the one that streams large downloads covers only its own addresses, so none of the app's requests pass through it
     const workers = [navigator.serviceWorker.register("/sw.js"), navigator.serviceWorker.register("/download-sw.js", { scope: "/__download/" })];

@@ -188,6 +188,45 @@ describe("uploadStaged", () => {
       expect(server.cancelled).toBe(0);
     });
 
+    it("waits out a dropped connection instead of throwing the upload away", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        const { server, send } = fakeServer();
+        const onPiece = server.onPiece;
+        let down = false;
+        let n = 0;
+        server.onPiece = async (job, body) => {
+          n += 1;
+          if (n === 3) down = true;
+          if (down) throw new Error("network");
+          return onPiece(job, body);
+        };
+        const status = uploads.status;
+        let asked = 0;
+        vi.mocked(status).mockImplementation(async () => {
+          asked += 1;
+          // the connection is back after a while
+          if (asked === 6) down = false;
+          if (down) throw new TypeError("Failed to fetch");
+          return { id: "u1", size: 0, received: server.stored().length, chunk_size: 32 * MiB };
+        });
+        let result: { meta: { key: string } } | null = null;
+        let failed: unknown = null;
+        const run = uploadStaged("c1", staged(data), () => undefined, send).then(
+          (r) => (result = r),
+          (e: unknown) => (failed = e),
+        );
+        for (let i = 0; i < 200 && !result && !failed; i++) await vi.advanceTimersByTimeAsync(1000);
+        await run;
+        expect(failed).toBeNull();
+        expect(server.cancelled).toBe(0);
+        expect(asked).toBeGreaterThanOrEqual(6);
+        expect(await same(server.stored(), result!.meta.key, data)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("gives up after a few failures and throws the upload away", async () => {
       const { server, send } = fakeServer();
       server.onPiece = async () => {

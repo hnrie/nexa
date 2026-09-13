@@ -18,6 +18,12 @@ export interface GatewayOptions {
 
 const MAX_QUEUE = 64;
 const MAX_BACKOFF_MS = 30_000;
+/**
+ * How long a heartbeat may go unanswered. A phone that changes network or
+ * wakes from sleep can keep a socket "open" for minutes after its connection
+ * is gone, and nothing but silence ever says so.
+ */
+const ACK_TIMEOUT_MS = 8_000;
 
 export class GatewayClient {
   private readonly opts: GatewayOptions;
@@ -27,6 +33,9 @@ export class GatewayClient {
   private closedByUser = false;
   private heartbeat: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private ackTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the socket last delivered anything at all. */
+  private lastFrameAt = 0;
   private queue: string[] = [];
   private ready = false;
 
@@ -79,6 +88,7 @@ export class GatewayClient {
     this.ws = ws;
     ws.onopen = () => {
       if (this.ws !== ws) return;
+      this.lastFrameAt = Date.now();
       ws.send(JSON.stringify({ op: "identify", d: { token } }));
       this.setStatus("open");
       this.flush();
@@ -86,6 +96,7 @@ export class GatewayClient {
     };
     ws.onmessage = (ev: MessageEvent) => {
       if (this.ws !== ws) return;
+      this.lastFrameAt = Date.now();
       let parsed: unknown;
       try {
         parsed = JSON.parse(typeof ev.data === "string" ? ev.data : "") as unknown;
@@ -125,11 +136,54 @@ export class GatewayClient {
     const rnd = this.opts.random ?? Math.random;
     const delay = Math.min(MAX_BACKOFF_MS, 1000 * Math.pow(1.7, this.attempt)) + rnd() * 500;
     this.attempt += 1;
-    const { set } = this.timers();
+    const { set, clear } = this.timers();
+    if (this.reconnectTimer !== null) clear(this.reconnectTimer);
     this.reconnectTimer = set(() => {
       this.reconnectTimer = null;
       if (!this.closedByUser) this.connect();
     }, delay);
+  }
+
+  /**
+   * For when the device is back: online again, or the app reopened. A socket
+   * waiting out its backoff tries again straight away rather than after up to
+   * half a minute, and an open one is asked to prove it is still alive.
+   */
+  wake(): void {
+    if (this.closedByUser) return;
+    if (this._status === "open") {
+      this.ping();
+      return;
+    }
+    if (this._status !== "closed" || this.reconnectTimer === null) return;
+    this.timers().clear(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.attempt = 0;
+    this.connect();
+  }
+
+  /** Sends a heartbeat and gives up on the socket if nothing comes back in time. */
+  private ping(): void {
+    const ws = this.ws;
+    if (!ws || this._status !== "open") return;
+    ws.send(JSON.stringify({ op: "heartbeat" }));
+    if (this.ackTimer !== null) return;
+    const sentAt = Date.now();
+    this.ackTimer = this.timers().set(() => {
+      this.ackTimer = null;
+      if (this.ws !== ws || this.lastFrameAt > sentAt) return;
+      // The connection is gone without saying so. Stop listening to it; its
+      // close event, if one ever comes, is ignored like any stale socket's.
+      this.ws = null;
+      this.stopHeartbeat();
+      this.ready = false;
+      try {
+        ws.close(4000, "heartbeat timeout");
+      } catch {
+        /* already closing */
+      }
+      this.scheduleReconnect(1006, "heartbeat timeout");
+    }, ACK_TIMEOUT_MS);
   }
 
   close(): void {
@@ -190,8 +244,8 @@ export class GatewayClient {
     const interval = this.opts.heartbeatMs ?? 25_000;
     const tick = (): void => {
       if (this.ws && this._status === "open") {
-        this.ws.send(JSON.stringify({ op: "heartbeat" }));
         this.heartbeat = set(tick, interval);
+        this.ping();
       }
     };
     this.heartbeat = set(tick, interval);
@@ -201,6 +255,10 @@ export class GatewayClient {
     if (this.heartbeat !== null) {
       this.timers().clear(this.heartbeat);
       this.heartbeat = null;
+    }
+    if (this.ackTimer !== null) {
+      this.timers().clear(this.ackTimer);
+      this.ackTimer = null;
     }
   }
 }

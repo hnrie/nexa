@@ -125,89 +125,171 @@ interface SettingsState {
   reload: () => Promise<void>;
   patch: (partial: Partial<Settings>) => void;
   setDraft: (channelId: string, text: string) => void;
-  /** Saves now; resolves false when the settings did not reach the server. */
+  /** Saves now; resolves false when changes made here have not reached the server. */
   flush: () => Promise<boolean>;
   reset: () => void;
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null;
-let inflightSave: Promise<boolean> | null = null;
+/** Two batches of changes as one, the later winning, nested groups merged the way patch merges them. */
+function mergeChanges(a: Partial<Settings> | null, b: Partial<Settings> | null): Partial<Settings> | null {
+  if (!a || !b) return a ?? b;
+  const out: Partial<Settings> = { ...a, ...b };
+  if (a.notifications && b.notifications) out.notifications = { ...a.notifications, ...b.notifications };
+  if (a.voice && b.voice) out.voice = { ...a.voice, ...b.voice };
+  return out;
+}
 
-export const useSettings = create<SettingsState>()((set, get) => ({
-  settings: DEFAULT_SETTINGS,
-  version: 0,
-  loaded: false,
-  key: null,
-  saving: false,
-  setKey: (key) => set({ key }),
-  load: async (blob, version) => {
-    const key = get().key;
-    if (!blob || !key) {
-      set({ settings: DEFAULT_SETTINGS, version, loaded: true });
-      return;
-    }
-    const doc = await decryptSettings(key, blob);
-    set({ settings: mergeSettings(DEFAULT_SETTINGS, doc), version, loaded: true });
-  },
-  reload: async () => {
-    const res = await usersApi.getSettings();
-    await get().load(res?.blob ?? null, res?.version ?? 0);
-  },
-  patch: (partial) => {
-    set((s) => ({ settings: mergeSettings(s.settings, partial) }));
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let failures = 0;
+
+// What this device changed and the server does not have yet: `dirty` waits
+// for the next save, `sending` is in the save under way. Only these are laid
+// over the server's copy when it is loaded, so a save that crosses another
+// device's (or its own echo) keeps both sides instead of one erasing the other.
+let dirty: Partial<Settings> | null = null;
+let sending: Partial<Settings> | null = null;
+let inflight: Promise<boolean> | null = null;
+let again = false;
+/** Bumped on reset, so a save from the account before it cannot land on the next one. */
+let generation = 0;
+
+/** Whether a failed save is worth trying again later: the network or the server, not the request. */
+function retryable(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return true;
+  return err.status === 0 || err.status === 429 || err.status >= 500;
+}
+
+export const useSettings = create<SettingsState>()((set, get) => {
+  const scheduleRetry = (): void => {
+    if (retryTimer) return;
+    const delay = Math.min(60_000, 2000 * 2 ** failures);
+    failures += 1;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
       void get().flush();
-    }, 800);
-  },
-  setDraft: (channelId, text) => {
-    const drafts = { ...get().settings.drafts };
-    if (text) drafts[channelId] = text;
-    else delete drafts[channelId];
-    get().patch({ drafts });
-  },
-  flush: async () => {
-    // A save already under way may carry older settings, so wait for it and
-    // then send what is here now. Callers such as the passcode need to know
-    // their change really reached the server.
-    while (inflightSave) await inflightSave;
-    if (!get().key) return false;
-    const job = (async (): Promise<boolean> => {
+    }, delay);
+  };
+
+  /** One save of everything changed so far; reports whether it should run again straight away. */
+  const saveOnce = async (): Promise<boolean> => {
+    const { key, settings, version, loaded } = get();
+    // Before the account's settings arrive, the local copy is defaults plus
+    // these changes; saving that would overwrite everything. load saves them.
+    if (!key || !loaded || !dirty) return false;
+    const gen = generation;
+    sending = dirty;
+    dirty = null;
+    try {
+      const blob = await encryptSettings(key, settings);
+      const res = await usersApi.putSettings(blob, version);
+      if (gen !== generation) return false;
+      sending = null;
+      failures = 0;
+      set({ version: res.version });
+      return false;
+    } catch (err) {
+      if (gen !== generation) return false;
+      dirty = mergeChanges(sending, dirty);
+      sending = null;
+      if (err instanceof ApiError && err.status === 409 && failures < 3) {
+        // someone else saved first: take theirs, put ours back on top, try again
+        failures += 1;
+        try {
+          await get().reload();
+          return gen === generation;
+        } catch {
+          scheduleRetry();
+          return false;
+        }
+      }
+      if (retryable(err) || (err instanceof ApiError && err.status === 409)) scheduleRetry();
+      return false;
+    }
+  };
+
+  return {
+    settings: DEFAULT_SETTINGS,
+    version: 0,
+    loaded: false,
+    key: null,
+    saving: false,
+    setKey: (key) => set({ key }),
+    load: async (blob, version) => {
+      const key = get().key;
+      const doc = blob && key ? await decryptSettings(key, blob) : null;
+      // a save of ours may have landed while this copy was on its way
+      if (get().loaded && version < get().version) return;
+      const base = doc ? mergeSettings(DEFAULT_SETTINGS, doc) : DEFAULT_SETTINGS;
+      const unsaved = mergeChanges(sending, dirty);
+      set({ settings: unsaved ? mergeSettings(base, unsaved) : base, version, loaded: true });
+      if (dirty) void get().flush();
+    },
+    reload: async () => {
+      const res = await usersApi.getSettings();
+      await get().load(res?.blob ?? null, res?.version ?? 0);
+    },
+    patch: (partial) => {
+      set((s) => ({ settings: mergeSettings(s.settings, partial) }));
+      dirty = mergeChanges(dirty, partial);
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        void get().flush();
+      }, 800);
+    },
+    setDraft: (channelId, text) => {
+      const drafts = { ...get().settings.drafts };
+      if (text) drafts[channelId] = text;
+      else delete drafts[channelId];
+      get().patch({ drafts });
+    },
+    flush: () => {
+      // A save already under way takes these changes along when it finishes,
+      // and whoever waits on this waits for that too.
+      if (inflight) {
+        again = true;
+        return inflight;
+      }
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      const gen = generation;
       set({ saving: true });
-      try {
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const { key, settings, version } = get();
-          if (!key) return false;
-          try {
-            const blob = await encryptSettings(key, settings);
-            const res = await usersApi.putSettings(blob, version);
-            set({ version: res.version });
-            return true;
-          } catch (err) {
-            if (!(err instanceof ApiError && err.status === 409)) return false;
-            const local = get().settings;
-            await get().reload();
-            set((s) => ({ settings: mergeSettings(s.settings, local) }));
+      const run = (async (): Promise<boolean> => {
+        try {
+          do {
+            again = false;
+            if (await saveOnce()) again = true;
+          } while (again && gen === generation);
+          // Callers such as the passcode need to know their change really
+          // reached the server: it did when nothing made here is still waiting.
+          return gen === generation && !dirty && !sending;
+        } catch {
+          return false;
+        } finally {
+          if (gen === generation) {
+            inflight = null;
+            set({ saving: false });
           }
         }
-        return false;
-      } catch {
-        return false;
-      } finally {
-        set({ saving: false });
-      }
-    })();
-    inflightSave = job;
-    try {
-      return await job;
-    } finally {
-      if (inflightSave === job) inflightSave = null;
-    }
-  },
-  reset: () => {
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = null;
-    set({ settings: DEFAULT_SETTINGS, version: 0, loaded: false, key: null, saving: false });
-  },
-}));
+      })();
+      inflight = run;
+      return run;
+    },
+    reset: () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = null;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
+      generation += 1;
+      dirty = null;
+      sending = null;
+      inflight = null;
+      again = false;
+      failures = 0;
+      set({ settings: DEFAULT_SETTINGS, version: 0, loaded: false, key: null, saving: false });
+    },
+  };
+});

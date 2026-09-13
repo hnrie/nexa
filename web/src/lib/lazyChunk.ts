@@ -42,11 +42,37 @@ export function markChunksHealthy(): void {
   }, 20_000);
 }
 
+/** Resolves when the device says it is online, straight away if it already does. */
+function online(): Promise<void> {
+  if (typeof navigator === "undefined" || navigator.onLine !== false) return Promise.resolve();
+  return new Promise((resolve) => window.addEventListener("online", () => resolve(), { once: true }));
+}
+
+/**
+ * Loads a page's file, trying again a few times when the network is what
+ * failed. Reloading without a connection would not bring the app back, only
+ * the browser's offline page, and lose everything on screen.
+ */
+async function loadPatiently<T>(load: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await load();
+    } catch (err) {
+      // Online, a couple of quick retries cover a blip; after that the file is
+      // most likely gone with an old build, and reloading is the way back.
+      // Offline, it keeps waiting for the connection instead.
+      if (attempt >= 2 && navigator.onLine !== false) throw err;
+      await online();
+      await new Promise((r) => setTimeout(r, Math.min(4000, 1000 * 2 ** Math.min(attempt, 2))));
+    }
+  }
+}
+
 /** React.lazy that survives the file it wanted being replaced by a deploy. */
 export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>): LazyExoticComponent<T> {
   return lazy(async () => {
     try {
-      return await load();
+      return await loadPatiently(load);
     } catch (err) {
       if (reloadedAlready()) throw err;
       markReloaded();

@@ -3,6 +3,7 @@ import { uploads as uploadsApi } from "@/api/uploads";
 import { b64 } from "@/crypto/bytes";
 import { FRAME_LEN, HEADER_LEN, chunkCount, encryptChunks, encryptedSize, frameOffset, newBaseIv, newFileKey } from "@/crypto/fileChunks";
 import type { AttachmentMeta } from "@/crypto/message";
+import { holdReload } from "./busy";
 import type { PieceReply, PieceRequest } from "./upload.worker";
 
 /** Fallback until the server says what it accepts. */
@@ -165,11 +166,17 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   const key = newFileKey();
   const baseIv = newBaseIv();
   let res: { blob_id: string; size: number };
-  if (total <= limits.single) {
-    const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
-    res = (await send(job, (loaded) => onProgress(loaded / total))) as { blob_id: string; size: number };
-  } else {
-    res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send);
+  // a new version of the app waits for the upload rather than reloading over it
+  const release = holdReload();
+  try {
+    if (total <= limits.single) {
+      const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
+      res = (await send(job, (loaded) => onProgress(loaded / total))) as { blob_id: string; size: number };
+    } else {
+      res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send);
+    }
+  } finally {
+    release();
   }
   const dims = await imageDims(st.file);
   const meta: AttachmentMeta = { blob_id: res.blob_id, name: st.name || st.file.name, type: st.file.type || "application/octet-stream", size: st.file.size, key: b64.enc(key) };
@@ -187,8 +194,45 @@ function formatSize(bytes: number): string {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
-/** How many times one piece is retried before the upload gives up. */
+/** How many times one piece is retried, while the server can be reached, before the upload gives up. */
 const CHUNK_TRIES = 4;
+
+/** How long an upload waits for a lost connection to come back without getting any further. */
+const STALL_MS = 5 * 60_000;
+
+/** Waits `ms`, or less if the device was offline and comes back online. */
+function connectionBack(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const offline = typeof window !== "undefined" && navigator.onLine === false;
+    const done = (): void => {
+      clearTimeout(timer);
+      if (offline) window.removeEventListener("online", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    if (offline) window.addEventListener("online", done);
+  });
+}
+
+/**
+ * How much of an upload the server holds. When it cannot be asked (the phone
+ * is between networks, the server is restarting) this keeps asking, further
+ * apart each time, until `deadline`; null means it never answered.
+ * `waited` says the connection was down for a while.
+ */
+async function landedSoFar(id: string, deadline: number): Promise<{ received: number; waited: boolean } | null> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const state = await uploadsApi.status(id);
+      return { received: state.received, waited: attempt > 0 };
+    } catch (err) {
+      // gone, or not ours any more: no amount of waiting brings it back
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) return null;
+      if (Date.now() >= deadline) return null;
+      await connectionBack(Math.min(30_000, 1000 * 2 ** attempt, Math.max(0, deadline - Date.now())));
+    }
+  }
+}
 
 /**
  * Turns the landed pieces into a file. Finishing twice gives back the same
@@ -223,6 +267,8 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
   const limit = Math.min(session.chunk_size || limits.chunk, limits.chunk);
   const perPiece = Math.max(1, Math.floor((limit - HEADER_LEN) / FRAME_LEN));
   let sent = 0;
+  /** When the upload last got further; it gives up after STALL_MS without. */
+  let movedAt = Date.now();
   try {
     for (let first = 0; first < chunks; first += perPiece) {
       const count = Math.min(perPiece, chunks - first);
@@ -238,13 +284,20 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
           const received = reply?.received ?? -1;
           if (received <= sent || received > end) throw new Error("The server lost track of this upload.");
           sent = received;
+          movedAt = Date.now();
         } catch (err) {
-          tries += 1;
-          if (tries >= CHUNK_TRIES) throw err;
-          // ask where it got to, then carry on from there
-          const state = await uploadsApi.status(session.id).catch(() => null);
-          if (!state || state.received < start || state.received > end) throw err;
-          sent = state.received;
+          // ask where it got to, waiting for the connection if it dropped, then carry on from there
+          const landed = await landedSoFar(session.id, movedAt + STALL_MS);
+          if (!landed || landed.received < start || landed.received > end) throw err;
+          if (landed.received > sent) {
+            tries = 0;
+            movedAt = Date.now();
+          } else if (!landed.waited) {
+            // the server was there all along and the piece still did not land
+            tries += 1;
+          }
+          if (tries >= CHUNK_TRIES || Date.now() - movedAt > STALL_MS) throw err;
+          sent = landed.received;
           if (sent < end) await new Promise((r) => setTimeout(r, 400 * tries));
         }
         onProgress(sent);

@@ -141,6 +141,63 @@ describe("GatewayClient", () => {
     expect(client.status).toBe("closed");
   });
 
+  it("drops a socket whose heartbeat goes unanswered and reconnects", () => {
+    const { client, statuses } = make();
+    client.connect();
+    const ws1 = FakeWS.instances[0]!;
+    ws1.open();
+    vi.advanceTimersByTime(1010);
+    ws1.message({ t: "heartbeat_ack", d: {} });
+    vi.advanceTimersByTime(8000);
+    expect(client.status).toBe("open");
+    // the network goes away silently: acks stop, no close event
+    vi.advanceTimersByTime(8000);
+    expect(client.status).toBe("closed");
+    expect(statuses.at(-1)).toBe("closed");
+    const beats = ops(ws1).length;
+    vi.advanceTimersByTime(1000);
+    expect(FakeWS.instances).toHaveLength(2);
+    expect(ops(ws1)).toHaveLength(beats);
+    // the old socket's late close is ignored
+    ws1.serverClose(1006);
+    expect(client.status).toBe("connecting");
+  });
+
+  it("wake() retries at once while backing off, and probes an open socket", () => {
+    const { client } = make();
+    client.connect();
+    FakeWS.instances[0]!.serverClose(1006);
+    vi.advanceTimersByTime(1000);
+    FakeWS.instances[1]!.serverClose(1006);
+    vi.advanceTimersByTime(1700);
+    FakeWS.instances[2]!.serverClose(1006);
+    expect(FakeWS.instances).toHaveLength(3);
+    client.wake();
+    expect(FakeWS.instances).toHaveLength(4);
+    const ws = FakeWS.instances[3]!;
+    ws.open();
+    ws.message({ t: "ready", d: {} });
+    client.wake();
+    expect(ops(ws)).toEqual(["identify", "heartbeat"]);
+    vi.advanceTimersByTime(8000);
+    expect(client.status).toBe("closed");
+    // backoff starts over, and the pending retry is not doubled up
+    vi.advanceTimersByTime(1000);
+    expect(FakeWS.instances).toHaveLength(5);
+    vi.advanceTimersByTime(60_000);
+    expect(FakeWS.instances).toHaveLength(5);
+  });
+
+  it("wake() leaves a closed client alone", () => {
+    const { client } = make();
+    client.connect();
+    FakeWS.instances[0]!.open();
+    client.close();
+    client.wake();
+    expect(FakeWS.instances).toHaveLength(1);
+    expect(client.status).toBe("closed");
+  });
+
   it("does not connect without a token", () => {
     const { client, statuses } = make(null);
     client.connect();

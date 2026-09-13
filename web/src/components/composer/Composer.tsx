@@ -4,6 +4,7 @@ import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
 import { fitsUploadLimit, stage, uploadLimit, uploadStaged, type Staged } from "@/lib/attachments";
+import { holdReload } from "@/lib/busy";
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
@@ -247,6 +248,8 @@ export function Composer({ channel }: { channel: Channel }) {
     if (expanded !== null) body = expanded;
     if (!body && files.length === 0) return;
     setSending(true);
+    // a new version of the app waits until the files and the message are through
+    const release = holdReload();
     const opts: SendOptions = {};
     if (replyTo && replyTo.channelId === channel.id) {
       opts.replyTo = replyTo.messageId;
@@ -282,6 +285,7 @@ export function Composer({ channel }: { channel: Channel }) {
       setFiles((cur) => cur.map((x) => ({ ...x, error: x.progress < 1 ? msg : x.error })));
         if (files.length) toast(msg, "error");
     } finally {
+      release();
       setSending(false);
       // the box keeps focus through the round trip; restore it if an upload dialog stole it
       requestAnimationFrame(() => taRef.current?.focus({ preventScroll: true }));

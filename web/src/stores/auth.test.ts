@@ -118,6 +118,8 @@ describe("auth store", () => {
       await keystore.saveRoot("1", "conv-a", 0, randomBytes(32));
       useSettings.getState().reset();
       useSettings.getState().setKey(randomBytes(32));
+      // settings are saved only once the account's own copy has been loaded
+      await useSettings.getState().load(null, 0);
       useAuth.setState({ status: "ready", me: me as never, token: "tok", identity });
     });
 

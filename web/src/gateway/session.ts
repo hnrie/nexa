@@ -47,9 +47,24 @@ export async function startSession(): Promise<void> {
     onStatus: (s) => useUI.getState().setConnection(s),
   });
   client.connect();
+  window.addEventListener("online", wakeGateway);
+  window.addEventListener("pageshow", wakeGateway);
+  document.addEventListener("visibilitychange", wakeGatewayIfShown);
+}
+
+/** Coming back online or to the app is when a connection is most likely to have died. */
+function wakeGateway(): void {
+  client?.wake();
+}
+
+function wakeGatewayIfShown(): void {
+  if (document.visibilityState === "visible") client?.wake();
 }
 
 export function stopSession(): void {
+  window.removeEventListener("online", wakeGateway);
+  window.removeEventListener("pageshow", wakeGateway);
+  document.removeEventListener("visibilitychange", wakeGatewayIfShown);
   client?.close();
   client = null;
   useKeys.getState().reset();

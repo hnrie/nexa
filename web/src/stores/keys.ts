@@ -48,13 +48,18 @@ async function persistRoot(userId: string, conv: string, epoch: number, root: Ui
 /** Wraps a root for each user and uploads the grants; users without a public key are skipped. */
 async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, userIds: string[]): Promise<void> {
   const uploads: { conv_id: string; epoch: number; user_id: string; wrapped_key: string }[] = [];
-  for (const uid of userIds) {
-    try {
-      const pub = await publicKeyOf(uid);
-      uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(pub, root)) });
-    } catch {
-      /* unknown user: skip */
-    }
+  // a few keys looked up at a time: a large server's members are not all known here
+  for (let i = 0; i < userIds.length; i += 16) {
+    await Promise.all(
+      userIds.slice(i, i + 16).map(async (uid) => {
+        try {
+          const pub = await publicKeyOf(uid);
+          uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(pub, root)) });
+        } catch {
+          /* unknown user: skip */
+        }
+      }),
+    );
   }
   for (let i = 0; i < uploads.length; i += 200) {
     await keysApi.putGrants(uploads.slice(i, i + 200));

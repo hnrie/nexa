@@ -28,14 +28,33 @@ interface WorkerScope {
 
 const scope = self as unknown as WorkerScope;
 
+/**
+ * How long a request may go without sending a byte or hearing back. A
+ * connection that dies quietly (a phone changing networks) never errors on
+ * its own, and the upload would sit there instead of picking up again.
+ */
+const STALL_MS = 60_000;
+
 scope.onmessage = (e) => {
   const job = e.data;
   const xhr = new XMLHttpRequest();
+  let stall: ReturnType<typeof setTimeout> | undefined;
+  const watch = (): void => {
+    clearTimeout(stall);
+    stall = setTimeout(() => xhr.abort(), STALL_MS);
+  };
   xhr.open(job.method, job.url);
   for (const [k, v] of Object.entries(job.headers)) xhr.setRequestHeader(k, v);
-  xhr.upload.onprogress = (ev) => scope.postMessage({ type: "progress", loaded: ev.loaded });
+  xhr.upload.onprogress = (ev) => {
+    watch();
+    scope.postMessage({ type: "progress", loaded: ev.loaded });
+  };
+  // all sent: the answer gets the same time to arrive
+  xhr.upload.onload = watch;
   xhr.onload = () => scope.postMessage({ type: "done", status: xhr.status, text: typeof xhr.responseText === "string" ? xhr.responseText : "", retryAfter: xhr.getResponseHeader("Retry-After") });
   xhr.onerror = () => scope.postMessage({ type: "failed" });
   xhr.onabort = () => scope.postMessage({ type: "failed" });
+  xhr.onloadend = () => clearTimeout(stall);
+  watch();
   xhr.send(job.body);
 };

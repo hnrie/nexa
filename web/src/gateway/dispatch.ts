@@ -18,7 +18,7 @@ import { decryptForStore } from "@/lib/decrypt";
 import { users as usersApi } from "@/api/users";
 import { channels as channelsApi } from "@/api/channels";
 import { ring } from "@/lib/keyring";
-import type { Message, ServerView } from "@/api/types";
+import type { Message, PublicUser, ServerView } from "@/api/types";
 
 /** Hooks other layers register: notifications, voice, servers (later phases). */
 export const dispatchHooks: {
@@ -27,10 +27,14 @@ export const dispatchHooks: {
   onReady: (() => void)[];
 } = { onMessage: [], onUnhandled: [], onReady: [] };
 
+// Channels are not cleared here: ready replaces them in one step, because a
+// call whose channel vanished from the store even for a moment is ended.
 export function resetAll(keepMessagesIn?: string): void {
   useMessages.getState().clearAll(keepMessagesIn);
-  useChannels.getState().clear();
-  useUsers.getState().clear();
+  // Ready does not bring back everyone the kept conversation shows (people in
+  // a large server, people who left), and its messages are never looked up
+  // again, so their authors would turn into "Unknown User".
+  useUsers.setState({ byId: usersShownIn(keepMessagesIn) });
   usePresence.getState().clear();
   useReadStates.getState().clear();
   useRelationships.getState().clear();
@@ -39,12 +43,29 @@ export function resetAll(keepMessagesIn?: string): void {
   useExpressions.getState().clear();
 }
 
+function usersShownIn(channelId: string | undefined): Record<string, PublicUser> {
+  const known = useUsers.getState().byId;
+  const kept: Record<string, PublicUser> = {};
+  const keep = (id: string): void => {
+    const u = known[id];
+    if (u) kept[id] = u;
+  };
+  const ch = channelId ? useMessages.getState().channels[channelId] : undefined;
+  for (const m of Object.values(ch?.byId ?? {})) {
+    keep(m.author_id);
+    for (const id of m.mentions) keep(id);
+  }
+  return kept;
+}
+
 function ingestServerView(view: ServerView): void {
   useChannels.getState().upsert(view.channels);
   useServers.getState().setFromView(view);
 }
 
 const channelFetches = new Set<string>();
+/** Key rotations under way, by conversation. */
+const rotations = new Map<string, Promise<void>>();
 
 /** A message can arrive for a conversation this client closed or never saw. */
 async function ensureChannel(id: string): Promise<void> {
@@ -84,11 +105,13 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       resetAll(active ?? undefined);
       useAuth.getState().setMe(d.user);
       useUsers.getState().upsert([...d.users, d.user]);
-      useChannels.getState().upsert(d.channels);
+      const servers = d.servers ?? [];
+      const channels = [...d.channels, ...servers.flatMap((v) => v.channels)];
+      useChannels.setState({ byId: Object.fromEntries(channels.map((c) => [c.id, c])) });
       useRelationships.getState().setMany(d.relationships);
       useReadStates.getState().setMany(d.read_states);
       usePresence.getState().setMany(d.presences);
-      for (const view of d.servers ?? []) ingestServerView(view);
+      for (const view of servers) useServers.getState().setFromView(view);
       useExpressions.getState().setAllEmojis(d.emojis ?? []);
       useExpressions.getState().setPacks(d.sticker_packs ?? []);
       onReadyVoice(d.voice_states ?? []);
@@ -143,7 +166,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "typing":
       if (e.d.user_id === meId) return;
       if (e.d.stop) useTyping.getState().remove(e.d.channel_id, e.d.user_id);
-      else useTyping.getState().add(e.d.channel_id, e.d.user_id, e.d.ts);
+      // timed from when it arrived: the server's clock and this device's rarely agree
+      else useTyping.getState().add(e.d.channel_id, e.d.user_id);
       return;
     case "channel_create":
     case "channel_update":
@@ -224,12 +248,25 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "key_grant":
       await useKeys.getState().ingestGrants([e.d]);
       return;
+    // Key upkeep can mean hundreds of requests. It runs beside the event queue
+    // rather than in it, so messages, typing and calls do not wait behind it.
     case "keys_needed":
-      if (ring.get(e.d.conv_id, e.d.epoch)) await useKeys.getState().grantTo(e.d.conv_id, e.d.epoch, e.d.user_ids);
+      if (ring.get(e.d.conv_id, e.d.epoch)) void useKeys.getState().grantTo(e.d.conv_id, e.d.epoch, e.d.user_ids).catch(() => undefined);
       return;
-    case "key_rotation_needed":
-      if (ring.latest(e.d.conv_id)) await useKeys.getState().rotate(e.d.conv_id, "membership change");
+    case "key_rotation_needed": {
+      const conv = e.d.conv_id;
+      if (!ring.latest(conv)) return;
+      // Each change still gets its own rotation, one after another: a key made
+      // before a second removal may already have gone to the person removed.
+      const job = (rotations.get(conv) ?? Promise.resolve())
+        .then(() => useKeys.getState().rotate(conv, "membership change"))
+        .catch(() => undefined)
+        .finally(() => {
+          if (rotations.get(conv) === job) rotations.delete(conv);
+        });
+      rotations.set(conv, job);
       return;
+    }
     case "pin_update": {
       const ch = useMessages.getState().channels[e.d.channel_id];
       const m = ch?.byId[e.d.message_id];
@@ -237,7 +274,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     }
     case "settings_update":
-      void useSettings.getState().reload();
+      // our own saves come back here too, and there is nothing new to fetch in those
+      if (e.d.version > useSettings.getState().version) void useSettings.getState().reload().catch(() => undefined);
       return;
     case "session_expired":
       void useAuth.getState().logout();

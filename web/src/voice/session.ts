@@ -6,6 +6,7 @@ import { voice as voiceApi } from "@/api/voice";
 import type { VoiceState } from "@/api/types";
 import type { GatewayEvent } from "@/gateway/events";
 import { gateway } from "@/gateway/session";
+import { holdReload } from "@/lib/busy";
 import { playSound } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -32,6 +33,8 @@ interface Session {
 }
 
 let session: Session | null = null;
+/** Keeps a new version of the app from reloading the page while in a call. */
+let releaseCall: (() => void) | null = null;
 let iceCache: RTCIceServer[] | null = null;
 let installed = false;
 let ringTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -132,6 +135,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   });
   const s: Session = { channelId, transport, mic: null, micRaw: null, inputGain: null, meter: null, meterTimer: null, camera: null, screen: null, noiseFloor: 0.01, pttHeld: false };
   session = s;
+  releaseCall ??= holdReload();
   try {
     s.micRaw = await getMic(useSettings.getState().settings.voice);
     s.mic = withInputGain(s, s.micRaw);
@@ -163,6 +167,8 @@ export async function joinVoice(channelId: string): Promise<void> {
 export async function leaveVoice(notify = true): Promise<void> {
   const s = session;
   session = null;
+  releaseCall?.();
+  releaseCall = null;
   if (s) {
     stopMeter(s);
     s.transport.close();
