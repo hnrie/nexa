@@ -325,6 +325,12 @@ describe("plainText", () => {
     expect(plainText(parse("`a*b`"))).toBe("a*b");
     expect(plainText(parse("```js\nx\n```"))).toBe("x");
   });
+  it("writes mentions as names when it is given them", () => {
+    const src = "thanks <@123> in <#456> for <@&789> and <@999>";
+    expect(plainText(parse(src, { inline: true }))).toBe("thanks @123 in #456 for @789 and @999");
+    const names = { users: { "123": { display_name: "Alice", username: "alice" } }, channels: { "456": { name: "general" } }, roles: { "789": { name: "mods", color: 0 } } };
+    expect(plainText(parse(src, { inline: true }), names)).toBe("thanks @Alice in #general for @mods and @unknown-user");
+  });
   it("renders links as their url", () => {
     expect(plainText(parse("[label](https://a.b)"))).toBe("https://a.b");
     expect(plainText(parse("https://a.b"))).toBe("https://a.b");

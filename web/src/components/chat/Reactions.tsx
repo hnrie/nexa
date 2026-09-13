@@ -4,12 +4,23 @@ import { messages as messagesApi } from "@/api/messages";
 import { emojiUrl } from "@/api/users";
 import { Twemoji } from "@/components/common/Twemoji";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
+import type { EmojiPick } from "@/components/pickers/EmojiPicker";
 import { useAuth } from "@/stores/auth";
 import { emojiReactionKey } from "@/stores/expressions";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import s from "./Chat.module.css";
+
+/**
+ * The reaction key for a pick. Pack emoji arrive as a bare <a?:name:id> token
+ * without `custom`, and the key must not keep the angle brackets.
+ */
+export function reactionKeyOf(e: EmojiPick): string {
+  if (e.custom) return emojiReactionKey(e.custom);
+  const m = /^<(a?):(\w+):(\d+)>$/.exec(e.unicode);
+  return m ? `${m[1]}:${m[2]}:${m[3]}` : e.unicode;
+}
 
 function isCustom(emoji: string): { id: string; animated: boolean } | null {
   const m = /^(a?):?([\w]+):(\d+)$/.exec(emoji);
@@ -69,7 +80,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
       {msg.reactions.length > 0 ? (
         <button className={s.addReact} aria-label="Add reaction" onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={16} /></button>
       ) : null}
-      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, e.custom ? emojiReactionKey(e.custom) : e.unicode); }} /> : null}
+      {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, reactionKeyOf(e)); }} /> : null}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/common/Button";
 import { humanizeMentions } from "@/components/composer/mentions";
 import { editMessage } from "@/components/composer/send";
 import { useAutosize } from "@/components/composer/useAutosize";
@@ -14,6 +15,9 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   const [text, setText] = useState(() => humanizeMentions(msg.payload?.t ?? "", users));
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLTextAreaElement>(null);
+  // Phone keyboards have no Shift+Enter, so there return adds a line, as in
+  // the composer, and saving and cancelling get real buttons.
+  const [touch] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches);
   useAutosize(ref, text, 400);
   useEffect(() => {
     const el = ref.current;
@@ -49,15 +53,22 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
           if (e.key === "Escape") {
             e.preventDefault();
             setEditing(null);
-          } else if (e.key === "Enter" && !e.shiftKey) {
+          } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !touch) {
             e.preventDefault();
             void save();
           }
         }}
       />
-      <div className={s.editHint}>
-        escape to <b onClick={() => setEditing(null)}>cancel</b> • enter to <b onClick={() => void save()}>save</b>
-      </div>
+      {touch ? (
+        <div className={s.editActions}>
+          <Button variant="secondary" className={s.editBtn} onClick={() => setEditing(null)}>Cancel</Button>
+          <Button className={s.editBtn} loading={busy} onClick={() => void save()}>Save</Button>
+        </div>
+      ) : (
+        <div className={s.editHint}>
+          escape to <b onClick={() => setEditing(null)}>cancel</b> • enter to <b onClick={() => void save()}>save</b>
+        </div>
+      )}
     </div>
   );
 }

@@ -108,7 +108,14 @@ export const useUI = create<UIState>()((set) => ({
   openContextMenu: (contextMenu) => set({ contextMenu }),
   closeContextMenu: () => set({ contextMenu: null }),
   setQuickSwitcher: (quickSwitcher) => set({ quickSwitcher }),
-  setActiveChannel: (activeChannelId) => set({ activeChannelId, replyTo: null, editing: null }),
+  // Re-activating the open channel keeps a reply or edit in progress; only
+  // one that belongs to another channel is dropped.
+  setActiveChannel: (id) =>
+    set((s) =>
+      s.activeChannelId === id
+        ? s
+        : { activeChannelId: id, replyTo: s.replyTo?.channelId === id ? s.replyTo : null, editing: s.editing?.channelId === id ? s.editing : null },
+    ),
   setReplyTo: (replyTo) => set({ replyTo }),
   setEditing: (editing) => set({ editing }),
   setJumpTo: (jumpTo) => set({ jumpTo }),

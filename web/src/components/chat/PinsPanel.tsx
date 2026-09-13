@@ -15,6 +15,9 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
   const setJumpTo = useUI((u) => u.setJumpTo);
   const ctx = useRenderCtx();
   const ref = useRef<HTMLDivElement>(null);
+  // The parent passes a new onClose on every render; fetching must not follow it.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     let alive = true;
     channelsApi
@@ -24,15 +27,20 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
         if (alive) setPins(dec);
       })
       .catch(() => alive && setPins([]));
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener("mousedown", onDown);
     return () => {
       alive = false;
-      document.removeEventListener("mousedown", onDown);
     };
-  }, [channelId, onClose]);
+  }, [channelId]);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element;
+      // the header's own pin button toggles the popup shut on its click
+      if (target.closest?.('[data-pop-toggle="pins"]')) return;
+      if (ref.current && !ref.current.contains(target)) closeRef.current();
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
   return (
     <div className={s.pinsPop} ref={ref}>
       <div className={s.pinsHead}>

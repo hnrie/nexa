@@ -9,7 +9,7 @@ import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
-import { isInstanceAdmin } from "@/stores/servers";
+import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 
 export interface MenuHooks {
@@ -23,7 +23,17 @@ export function canDelete(msg: DecryptedMessage): boolean {
   // whoever runs the instance can take down any message
   if (isInstanceAdmin(me.id)) return true;
   const ch = useChannels.getState().byId[msg.channel_id];
-  return !!ch && ch.type === "group_dm" && ch.owner_id === me.id;
+  if (!ch) return false;
+  // Manage Messages lets moderators and the server owner remove anyone's message
+  if (ch.server_id) return canI(useServers.getState().byId[ch.server_id], P.MANAGE_MESSAGES, ch.id);
+  return ch.type === "group_dm" && ch.owner_id === me.id;
+}
+
+/** Anyone in a DM may pin; a server channel needs Manage Messages, as the server requires. */
+export function canPin(msg: DecryptedMessage): boolean {
+  const ch = useChannels.getState().byId[msg.channel_id];
+  if (!ch?.server_id) return true;
+  return canI(useServers.getState().byId[ch.server_id], P.MANAGE_MESSAGES, ch.id);
 }
 
 export function canEdit(msg: DecryptedMessage): boolean {
@@ -46,7 +56,7 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks): Conte
     disabled: !msg.payload?.t,
     onSelect: () => void navigator.clipboard?.writeText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId)),
   });
-  items.push({
+  if (canPin(msg)) items.push({
     id: "pin",
     label: pinned ? "Unpin Message" : "Pin Message",
     onSelect: () => {

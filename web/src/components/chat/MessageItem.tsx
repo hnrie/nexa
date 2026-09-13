@@ -26,7 +26,7 @@ import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, canPin, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
 import s from "./Chat.module.css";
 
 interface Props {
@@ -43,11 +43,12 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const target = useMessages((m) => (msg.reply_to_id ? m.channels[msg.channel_id]?.byId[msg.reply_to_id] : undefined));
   const setJumpTo = useUI((u) => u.setJumpTo);
   const openModal = useUI((u) => u.openModal);
+  const ctx = useRenderCtx();
   if (!msg.reply_to_id) return null;
   if (!target) return <div className={s.replyLine}><span className={s.replyText}>Original message was deleted or is not loaded.</span></div>;
   const author = users[target.author_id];
   const mediaOnly = !!target.payload?.t && isOnlyMediaLinks(target.payload.t, (target.payload.embeds ?? []) as UnfurlResult[]);
-  const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true })) : target.payload?.att?.length || mediaOnly ? "Click to see attachment" : target.decryptError ? "Encrypted message" : "";
+  const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true }), ctx) : target.payload?.att?.length || mediaOnly ? "Click to see attachment" : target.decryptError ? "Encrypted message" : "";
   return (
     <div className={s.replyLine} onClick={() => setJumpTo({ channelId: msg.channel_id, messageId: target.id })}>
       <Avatar id={target.author_id} avatarId={author?.avatar_id ?? null} name={displayName(author)} size={16} />
@@ -192,7 +193,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           <ToolButton label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
           {shift ? (
             <>
-              <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton>
+              {canPin(msg) ? <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
               <ToolButton label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
               <ToolButton label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
               {dev ? <ToolButton label="Copy Message ID" onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}

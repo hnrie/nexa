@@ -8,11 +8,15 @@ import { memberName } from "@/lib/names";
 import { memberMenuItems } from "@/components/server/memberMenu";
 import { useAuth } from "@/stores/auth";
 import { statusOf, usePresence } from "@/stores/presence";
-import { channelPerms, memberColor, rolesByPosition, useServers } from "@/stores/servers";
+import { useChannels } from "@/stores/channels";
+import { isInstanceAdmin, memberColor, permRolesOf, rolesByPosition, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
-import { P, has } from "@/lib/perms";
+import { P, compute, has, toPermMember } from "@/lib/perms";
 import s from "./MemberList.module.css";
+
+// one collator for every sort: localeCompare with options builds one per call
+const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
 
 type Row =
   | { kind: "head"; key: string; label: string; count: number }
@@ -66,6 +70,20 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     return () => ro.disconnect();
   }, []);
 
+  // Who can see the channel changes with members, roles and overwrites, not
+  // presence, so it is worked out apart from the presence-driven rows below,
+  // with the server's roles converted once rather than once per member.
+  const overwrites = useChannels((c) => c.byId[channelId]?.overwrites);
+  const visible = useMemo<Member[]>(() => {
+    if (!st) return [];
+    const roles = permRolesOf(st);
+    const now = Date.now();
+    return Object.values(st.members).filter((m) => {
+      const isOwner = st.server.owner_id === m.user_id || isInstanceAdmin(m.user_id);
+      return has(compute(serverId, roles, toPermMember(m, m.user_id, now), isOwner, overwrites), P.VIEW_CHANNEL);
+    });
+  }, [st, serverId, overwrites]);
+
   const rows = useMemo<Row[]>(() => {
     if (!st) return [];
     const roles = rolesByPosition(st);
@@ -74,7 +92,6 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     for (const r of hoisted) groups.set(r.id, { label: r.name, members: [] });
     const online: Member[] = [];
     const offline: Member[] = [];
-    const visible = Object.values(st.members).filter((m) => has(channelPerms(st, channelId, m.user_id), P.VIEW_CHANNEL));
     for (const m of visible) {
       const status = statusOf(presence[m.user_id]);
       if (status === "offline" || status === "invisible") {
@@ -89,8 +106,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
       if (top && groups.has(top.id)) groups.get(top.id)!.members.push(m);
       else online.push(m);
     }
-    const byName = (a: Member, b: Member) =>
-      memberName(a.nickname, users[a.user_id]).localeCompare(memberName(b.nickname, users[b.user_id]), undefined, { sensitivity: "base" });
+    const byName = (a: Member, b: Member) => nameOrder.compare(memberName(a.nickname, users[a.user_id]), memberName(b.nickname, users[b.user_id]));
     const out: Row[] = [];
     const push = (key: string, label: string, list: Member[], off: boolean) => {
       if (list.length === 0) return;
@@ -102,7 +118,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     push("online", "Online", online, false);
     push("offline", "Offline", offline, true);
     return out;
-  }, [st, users, presence, channelId, serverId]);
+  }, [st, visible, users, presence, serverId]);
 
   if (!st) return null;
   const virtual = rows.length > VIRTUAL_FROM;

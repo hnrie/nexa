@@ -1,12 +1,12 @@
 import { Search, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { memberName } from "@/lib/names";
 import { highlight, isEmptyQuery, parseQuery, search } from "@/lib/search";
-import { formatFull } from "@/lib/time";
+import { formatFull, formatTimestamp } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { useServers } from "@/stores/servers";
@@ -19,7 +19,7 @@ import s from "./Search.module.css";
  * encrypted, so the server cannot do this for us; "Load older" pulls more
  * history into the index.
  */
-export function SearchPanel({ channel, query, onClose, onQuery }: { channel: Channel; query: string; onClose: () => void; onQuery?: ((v: string) => void) | undefined }) {
+export function SearchPanel({ channel, query, onClose, onQuery, onJump }: { channel: Channel; query: string; onClose: () => void; onQuery?: ((v: string) => void) | undefined; onJump?: (() => void) | undefined }) {
   const nav = useNavigate();
   const users = useUsers((u) => u.byId);
   const channels = useChannels((c) => c.byId);
@@ -41,6 +41,14 @@ export function SearchPanel({ channel, query, onClose, onQuery }: { channel: Cha
     return search(all, q, { users, channelNames, nicknames });
   }, [q, scope, store, users, channelNames, nicknames]);
 
+  // Channels whose history could not be loaded (one you may view but not read
+  // the history of answers 403). They are skipped so the rest still load.
+  const failed = useRef(new Set<string>());
+  const [, setFailedCount] = useState(0);
+  const markFailed = (id: string) => {
+    failed.current.add(id);
+    setFailedCount(failed.current.size);
+  };
   // pull more history into the index for whichever scoped channels still have older pages
   const loadMore = async () => {
     setLoading(true);
@@ -48,13 +56,18 @@ export function SearchPanel({ channel, query, onClose, onQuery }: { channel: Cha
       for (let round = 0; round < 3; round++) {
         let any = false;
         for (const c of scope) {
+          if (failed.current.has(c.id)) continue;
           const cur = useMessages.getState().channels[c.id];
-          if (!cur?.loaded) {
-            await loadInitial(c.id);
-            any = true;
-          } else if (cur.hasOlder) {
-            await loadOlder(c.id);
-            any = true;
+          try {
+            if (!cur?.loaded) {
+              await loadInitial(c.id);
+              any = true;
+            } else if (cur.hasOlder) {
+              await loadOlder(c.id);
+              any = true;
+            }
+          } catch {
+            markFailed(c.id);
           }
         }
         if (!any) break;
@@ -65,16 +78,17 @@ export function SearchPanel({ channel, query, onClose, onQuery }: { channel: Cha
   };
   useEffect(() => {
     // make sure every scoped channel has at least its first page
-    for (const c of scope) if (!useMessages.getState().channels[c.id]?.loaded) void loadInitial(c.id);
+    for (const c of scope) if (!useMessages.getState().channels[c.id]?.loaded && !failed.current.has(c.id)) loadInitial(c.id).catch(() => markFailed(c.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.length]);
-  const exhausted = scope.every((c) => store[c.id]?.loaded && !store[c.id]?.hasOlder);
+  const exhausted = scope.every((c) => failed.current.has(c.id) || (store[c.id]?.loaded && !store[c.id]?.hasOlder));
 
   const jump = (channelId: string, messageId: string) => {
     const ch = channels[channelId];
     if (!ch) return;
     nav(ch.server_id ? `/channels/${ch.server_id}/${ch.id}/${messageId}` : `/channels/@me/${ch.id}/${messageId}`);
     setJumpTo({ channelId, messageId });
+    onJump?.();
   };
 
   return (
@@ -113,7 +127,7 @@ export function SearchPanel({ channel, query, onClose, onQuery }: { channel: Cha
                 <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={name} size={20} />
                 <span className={s.resultName}>{name}</span>
                 {channel.server_id && ch ? <span className={s.resultChan}>#{ch.name}</span> : null}
-                <span className={s.resultTime}>{formatFull(m.created_at)}</span>
+                <span className={s.resultTime} title={formatFull(m.created_at)}>{formatTimestamp(m.created_at)}</span>
               </div>
               <div className={s.resultText}>
                 {m.payload?.t ? highlight(m.payload.t, q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? "[sticker]" : m.payload?.att?.length ? `[${m.payload.att.length} file${m.payload.att.length === 1 ? "" : "s"}]` : ""}

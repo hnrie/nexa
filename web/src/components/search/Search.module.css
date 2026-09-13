@@ -10,10 +10,12 @@
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
 .help dt { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
 .help dd { margin: 0; }
-.list { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
 .result { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); text-align: left; color: var(--text); width: 100%; }
 .result:hover { background: var(--bg-hover); }
-.resultHead { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+/* long names and channels shorten rather than push the card wider than the panel */
+.resultHead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
+.resultName, .resultChan { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resultName { font-weight: 600; color: var(--text-strong); }
 .resultChan { color: var(--text-muted); }
 .resultTime { margin-left: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
@@ -25,5 +27,8 @@
 .searchBox:focus-within { width: 260px; color: var(--text); }
 .searchBox input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
 .searchBox input::placeholder { color: var(--text-placeholder); }
+/* Tablets and narrow windows have no room for a 420px column beside the chat,
+   which would squeeze the messages and composer to nothing: search opens over it. */
+@media (max-width: 1099px) { .panel { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(420px, 100%); max-width: none; box-shadow: var(--shadow-high); } }
 @media (max-width: 767px) { .panel { position: absolute; inset: 0; width: 100%; max-width: none; z-index: 5; } .searchBox { width: 120px; } .searchBox:focus-within { width: 180px; } }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }

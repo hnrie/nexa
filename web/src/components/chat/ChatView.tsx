@@ -13,7 +13,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { conversationOf, useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
-import { useIsMobile } from "@/hooks/useIsMobile";
+import { useIsMobile, useIsNarrow } from "@/hooks/useIsMobile";
 import { useMemo } from "react";
 import { useServers } from "@/stores/servers";
 import { isPrivateChannel } from "@/lib/perms";
@@ -38,7 +38,8 @@ export function ChatView({ channel }: { channel: Channel }) {
   const openContextMenu = useUI((u) => u.openContextMenu);
   const membersOpenDesktop = useUI((u) => u.membersOpen);
   const toggleMembersDesktop = useUI((u) => u.toggleMembers);
-  // phones open the member list as a drawer that starts closed on every channel
+  // phones, tablets and narrow windows open the member list as a drawer that
+  // starts closed on every channel: beside the chat it would squeeze it to nothing
   const rightOpen = useUI((u) => u.rightOpen);
   const setRightOpen = useUI((u) => u.setRightOpen);
   const [pins, setPins] = useState(false);
@@ -46,8 +47,20 @@ export function ChatView({ channel }: { channel: Channel }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const mobile = useIsMobile();
-  const membersOpen = mobile ? rightOpen : membersOpenDesktop;
-  const toggleMembers = () => (mobile ? setRightOpen(!rightOpen) : toggleMembersDesktop());
+  const drawer = useIsNarrow();
+  const membersOpen = drawer ? rightOpen : membersOpenDesktop;
+  const toggleMembers = () => (drawer ? setRightOpen(!rightOpen) : toggleMembersDesktop());
+  // The drawer's member list is mounted only while open, and for its slide-out
+  // after, so a closed drawer never pages in and sorts every member of a big server.
+  const [membersMounted, setMembersMounted] = useState(membersOpen);
+  useEffect(() => {
+    if (membersOpen) {
+      setMembersMounted(true);
+      return;
+    }
+    const t = setTimeout(() => setMembersMounted(false), 250);
+    return () => clearTimeout(t);
+  }, [membersOpen]);
   const nav = useNavigate();
   const channelsById = useChannels((c) => c.byId);
   // A subchat borrows its conversation for calls, invites and the member
@@ -101,7 +114,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         {isSub ? (
           <button className={s.hParent} onClick={() => nav(`/channels/@me/${convo.id}`)} data-testid="subchat-parent">
             <ChevronLeft size={14} />
-            in {channelDisplayName(convo, users, me?.id, nicknames)}
+            <span className={s.hParentText}>in {channelDisplayName(convo, users, me?.id, nicknames)}</span>
           </button>
         ) : channel.type === "dm" ? (
           <span className={s.hSub}>{cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : statusLabel(otherStatus)}</span>
@@ -113,7 +126,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         <span className={s.hSpacer} />
         {!isServer && !mobile ? (
           <Tooltip text="Subchats" side="bottom">
-            <button className={s.hBtn} data-on={subchats} aria-label="Subchats" onClick={() => setSubchats((v) => !v)} data-testid="subchats-button"><MessageCircle size={22} /></button>
+            <button className={s.hBtn} data-on={subchats} aria-label="Subchats" onClick={() => setSubchats((v) => !v)} data-testid="subchats-button" data-pop-toggle="subchats"><MessageCircle size={22} /></button>
           </Tooltip>
         ) : null}
         {!isServer ? (
@@ -146,7 +159,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         )}
         {!mobile ? (
           <Tooltip text="Pinned Messages" side="bottom">
-            <button className={s.hBtn} data-on={pins} aria-label="Pinned Messages" onClick={() => setPins((v) => !v)}><Pin size={22} /></button>
+            <button className={s.hBtn} data-on={pins} aria-label="Pinned Messages" onClick={() => setPins((v) => !v)} data-pop-toggle="pins"><Pin size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && isServer ? (
@@ -173,7 +186,8 @@ export function ChatView({ channel }: { channel: Channel }) {
               const r = e.currentTarget.getBoundingClientRect();
               const items: ContextMenuItem[] = [
                 { id: "pins", label: "Pinned Messages", onSelect: () => setPins(true) },
-                { id: "subchats", label: "Subchats", onSelect: () => setSubchats(true) },
+                // server channels have no subchats
+                ...(!isServer ? [{ id: "subchats", label: "Subchats", onSelect: () => setSubchats(true) }] : []),
               ];
               if (isServer) items.push({ id: "invite", label: "Invite People", onSelect: () => openModal("invite", { serverId, channelId: channel.id }) });
               else items.push({ id: "add", label: convo.type === "dm" ? "Add Friends to DM" : "Invite to Group", onSelect: () => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id }) });
@@ -188,7 +202,7 @@ export function ChatView({ channel }: { channel: Channel }) {
       {subchats && !isServer ? <SubchatPanel parent={convo} activeId={channel.id} onClose={() => setSubchats(false)} /> : null}
       {!isServer ? <CallBanner channelId={convo.id} /> : null}
       {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
-      <div className={s.body}>
+      <div className={s.body} data-search={searchOpen}>
         {/* the composer belongs to the conversation's column, so the member list and search run the full height beside it */}
         <div className={s.main}>
           <MessageList key={channel.id} channel={channel} />
@@ -196,11 +210,12 @@ export function ChatView({ channel }: { channel: Channel }) {
           <Composer channel={channel} />
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
-        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
-        {isServer && serverId && (mobile || membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={mobile} open={membersOpen} /> : null}
-        {mobile && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
-        {convo.type === "group_dm" && (mobile || membersOpen) ? (
-          <aside className={s.members} data-open={mobile ? membersOpen : undefined}>
+        {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
+        {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
+        {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
+        {convo.type === "group_dm" && (drawer || membersOpen) ? (
+          <aside className={s.members} data-open={drawer ? membersOpen : undefined}>
             <div className={s.mHead}>Members — {convo.recipient_ids.length}</div>
             {convo.recipient_ids.map((id) => {
               const u = users[id];

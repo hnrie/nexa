@@ -65,15 +65,19 @@ export default function ServerPage() {
     return null;
   }, [channels, serverId]);
 
+  // Keyed on the id and type, not the channel object: every new message
+  // replaces that object, and re-running this would cancel a reply or edit.
+  const chId = channel?.id;
+  const chType = channel?.type;
   useEffect(() => {
-    if (!channel || channel.type !== "text") {
+    if (!chId || chType !== "text") {
       setActiveChannel(null);
       return;
     }
-    setActiveChannel(channel.id);
-    rememberChannel(serverId, channel.id);
+    setActiveChannel(chId);
+    rememberChannel(serverId, chId);
     return () => setActiveChannel(null);
-  }, [channel, serverId, setActiveChannel]);
+  }, [chId, chType, serverId, setActiveChannel]);
 
   useEffect(() => {
     if (channelId && messageId) setJumpTo({ channelId, messageId });

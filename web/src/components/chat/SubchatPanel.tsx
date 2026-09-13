@@ -94,6 +94,8 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
 
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
+      // the header's own Subchats button toggles the popup shut on its click
+      if ((e.target as Element).closest?.('[data-pop-toggle="subchats"]')) return;
       if (box.current && !box.current.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {

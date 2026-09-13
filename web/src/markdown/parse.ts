@@ -1,5 +1,5 @@
 import { shortcodeToEmoji } from "@/lib/shortcodes";
-import type { Node } from "./ast";
+import type { Node, RenderCtx } from "./ast";
 
 // ---------------------------------------------------------------------------
 // Discord-flavoured markdown parser.
@@ -643,7 +643,10 @@ export function emojiCount(nodes: Node[]): number {
   return count;
 }
 
-function nodeText(node: Node): string {
+/** Names for mentions; without them a mention flattens to its raw id. */
+export type PlainTextNames = Pick<RenderCtx, "users" | "channels" | "roles">;
+
+function nodeText(node: Node, names?: PlainTextNames): string {
   switch (node.type) {
     case "text":
       return node.text;
@@ -661,10 +664,10 @@ function nodeText(node: Node): string {
     case "quote":
     case "heading":
     case "subtext":
-      return node.children.map(nodeText).join("");
+      return node.children.map((child) => nodeText(child, names)).join("");
     case "list":
       return node.items
-        .map((item) => item.map((child) => (child.type === "list" ? "\n" + nodeText(child) : nodeText(child))).join(""))
+        .map((item) => item.map((child) => (child.type === "list" ? "\n" + nodeText(child, names) : nodeText(child, names))).join(""))
         .join("\n");
     case "link":
       return node.url;
@@ -675,9 +678,14 @@ function nodeText(node: Node): string {
         case "here":
           return "@here";
         case "channel":
-          return "#" + node.id;
+          return "#" + (names ? names.channels[node.id]?.name || "deleted-channel" : node.id);
+        case "user": {
+          if (!names) return "@" + node.id;
+          const user = names.users[node.id];
+          return "@" + (user ? user.display_name || user.username || "unknown-user" : "unknown-user");
+        }
         default:
-          return "@" + node.id;
+          return "@" + (names ? names.roles?.[node.id]?.name || "unknown-role" : node.id);
       }
     case "emoji":
       return ":" + node.name + ":";
@@ -689,11 +697,11 @@ function nodeText(node: Node): string {
 }
 
 /** Human-readable flattening used for notifications, replies and search. */
-export function plainText(nodes: Node[]): string {
+export function plainText(nodes: Node[], names?: PlainTextNames): string {
   let out = "";
   for (const node of nodes) {
     if (BLOCK_TYPES.has(node.type) && out !== "" && !out.endsWith("\n")) out += "\n";
-    out += nodeText(node);
+    out += nodeText(node, names);
   }
   return out;
 }
