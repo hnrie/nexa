@@ -24,6 +24,8 @@ export default function PrivacyPage() {
     try {
       const bytes = await exportMyData(setExportStatus);
       downloadBytes(`evilion-chat-export-${new Date().toISOString().slice(0, 10)}.zip`, bytes);
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not export your data.", "error");
     } finally {
       setExporting(false);
       setExportStatus("");
@@ -59,7 +61,9 @@ export default function PrivacyPage() {
       <Toggle checked={settings.imagePreviews} onChange={(v) => patch({ imagePreviews: v })} label="Show embedded images and GIFs from links" description="Direct image links load straight from their site, which reveals your address to that site, as in any browser." />
       <h3 className={s.h5}>Your data</h3>
       <p className={s.hint} style={{ marginBottom: 8 }}>Download everything: your profile, friends, servers and every message you hold keys for, decrypted on this device into a zip. Nothing is decrypted on the server.</p>
-      <Button size="sm" variant="secondary" loading={exporting} onClick={() => void runExport()} data-testid="export-data">{exporting ? exportStatus : "Export my data"}</Button>
+      <Button size="sm" variant="secondary" loading={exporting} onClick={() => void runExport()} data-testid="export-data">Export my data</Button>
+      {/* the button hides its label while loading, so the progress goes under it */}
+      {exporting && exportStatus ? <p className={s.hint} aria-live="polite">{exportStatus}</p> : null}
       <h3 className={s.h5}>Advanced</h3>
       <Toggle checked={settings.developerMode} onChange={(v) => patch({ developerMode: v })} label="Developer Mode" description="Adds Copy ID options to context menus." />
     </>

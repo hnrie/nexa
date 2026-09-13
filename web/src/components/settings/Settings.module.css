@@ -22,8 +22,11 @@
 .cardAvatar { position: absolute; left: 16px; top: -40px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); }
 .cardName { font-size: 20px; font-weight: 600; color: var(--text-strong); padding-top: 16px; }
 .cardUser { font-size: 14px; color: var(--text-muted); }
+/* a long name wraps inside its column instead of pushing the buttons out of the card */
+.cardText { min-width: 0; overflow-wrap: anywhere; }
 .rows { margin: 0 16px 16px; padding: 16px; background: var(--bg-raised); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 16px; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.row > :first-child { min-width: 0; overflow-wrap: anywhere; }
 .rowLabel { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
 .rowValue { font-size: 16px; color: var(--text); margin-top: 2px; }
 .sep { height: 1px; background: var(--border); margin: 24px 0; }
@@ -32,10 +35,10 @@
 .saveBar { position: sticky; bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 16px; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); margin-top: 24px; font-size: 14px; color: var(--text); animation: slideUp 150ms ease-out; }
 @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .saveBtns { display: flex; gap: 8px; }
-.twoCol { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+.twoCol { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; }
 .twoEqual { grid-template-columns: 1fr 1fr; }
 .preview { align-self: start; position: sticky; top: 60px; }
-.uploadRow { display: flex; align-items: center; gap: 12px; }
+.uploadRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .bannerPick { aspect-ratio: 5 / 2; border-radius: var(--radius-sm); background: var(--brand); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 8px; }
 .themePreview { height: 56px; border-radius: var(--radius-sm); margin-top: 12px; }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -59,11 +62,20 @@
 .previewText { font-size: 1rem; line-height: 1.375; color: var(--text); }
 .previewName { font-weight: 500; color: var(--text-strong); margin-right: 6px; }
 .previewTime { font-size: 0.75rem; color: var(--text-muted); }
-.device { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 8px; }
+.device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 8px; }
 .deviceName { font-size: 16px; font-weight: 500; color: var(--text); }
-.deviceSub { font-size: 13px; color: var(--text-muted); }
+.deviceSub { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
+/* the text takes what is left and the buttons drop below it when a phone is too narrow for both */
+.device > :first-child { flex: 1 1 180px; min-width: 0; }
+.device > :not(:first-child) { margin-left: auto; }
+.adminActions { display: flex; gap: 6px; }
 .recovery { font-family: var(--font-mono); padding: 12px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; word-break: break-all; color: var(--text-strong); }
 .dangerBox { padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(218, 62, 68, 0.5); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+/* beside the nav on a tablet there is no room for the form and a 300px preview */
+@media (max-width: 1023px) {
+  .twoCol { grid-template-columns: minmax(0, 1fr); }
+  .preview { position: static; }
+}
 @media (max-width: 767px) {
   .layer { flex-direction: column; }
   .navWrap { flex: none; overflow-x: auto; justify-content: flex-start; background: var(--bg-base); border-bottom: 1px solid var(--border-subtle); padding-right: 48px; }
@@ -76,9 +88,11 @@
   .closeCol { position: fixed; top: 8px; right: 8px; padding: 0; z-index: 3; }
   .closeCol .close { width: 32px; height: 32px; background: var(--bg-surface); }
   .esc { display: none; }
-  .twoCol { grid-template-columns: 1fr; }
   .twoEqual { grid-template-columns: 1fr; }
-  .preview { position: static; }
+  .cardHead { flex-wrap: wrap; row-gap: 8px; }
+  .cardHead > button { margin-left: auto; }
+  .adminUser { flex-wrap: wrap; }
+  .adminActions { flex-basis: 100%; flex-wrap: wrap; justify-content: flex-end; }
 }
 .hex { width: 88px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); border: 1px solid transparent; font-family: var(--font-mono); font-size: 13px; text-transform: lowercase; }
 .hex:focus { border-color: var(--brand); outline: none; }

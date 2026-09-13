@@ -61,6 +61,14 @@ export default function AdminPage() {
       toast(err instanceof ApiError ? err.message : "Could not save the key.", "error");
     }
   };
+  const clearKey = async () => {
+    try {
+      setSettings(await adminApi.patchSettings({ registration_key: "" }));
+      toast("Registration key cleared.", "success");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not clear the key.", "error");
+    }
+  };
   const deleteUser = async (u: AdminUser) => {
     setBusy(u.id);
     try {
@@ -116,7 +124,7 @@ export default function AdminPage() {
             <div style={{ display: "flex", gap: 8 }}>
               <TextInput value={key} onChange={(e) => setKey(e.target.value)} placeholder="New key" maxLength={128} />
               <Button size="sm" onClick={() => void saveKey()}>Save</Button>
-              {settings.registration_key_set ? <Button size="sm" variant="ghost" onClick={() => void adminApi.patchSettings({ registration_key: "" }).then(setSettings)}>Clear</Button> : null}
+              {settings.registration_key_set ? <Button size="sm" variant="ghost" onClick={() => void clearKey()}>Clear</Button> : null}
             </div>
           </Field>
           <p className={st.hint} style={{ marginTop: 12 }}>Limits from the config: uploads {formatBytes(settings.max_upload_bytes)}, avatars {formatBytes(settings.max_avatar_bytes)}, emoji {formatBytes(settings.max_emoji_bytes)}, stickers {formatBytes(settings.max_sticker_bytes)}. GIF search {settings.gif_search ? "on" : "off"}, TURN {settings.turn ? "configured" : "not configured"}. Change these in chatd.env and restart.</p>
@@ -128,14 +136,14 @@ export default function AdminPage() {
       </div>
       {users === null ? <Spinner /> : null}
       {users?.map((u) => (
-        <div key={u.id} className={s.memberRow}>
+        <div key={u.id} className={`${s.memberRow} ${st.adminUser}`}>
           <Avatar id={u.id} avatarId={null} name={u.display_name} size={36} />
           <div className={s.memberText}>
             <span className={s.memberName}>{u.display_name}{u.admin ? <span style={{ fontSize: 11, color: "var(--text-brand)" }}>ADMIN</span> : null}{u.disabled ? <span style={{ fontSize: 11, color: "var(--danger)" }}>DISABLED</span> : null}</span>
             <span className={s.memberSub}>@{u.username} · joined {formatFull(u.created_at)}</span>
           </div>
           {u.id !== meId ? (
-            <div style={{ display: "flex", gap: 6 }}>
+            <div className={st.adminActions}>
               <Button size="sm" variant="secondary" disabled={busy === u.id} onClick={() => void patchUser(u, { admin: !u.admin })}>{u.admin ? "Remove admin" : "Make admin"}</Button>
               <Button size="sm" variant={u.disabled ? "positive" : "danger"} disabled={busy === u.id} onClick={() => (u.disabled ? void patchUser(u, { disabled: false }) : openModal("confirm", { title: `Disable @${u.username}`, body: "They are logged out everywhere and cannot log in until re-enabled. Their messages stay.", confirmLabel: "Disable", danger: true, onConfirm: () => patchUser(u, { disabled: true }) }))}>{u.disabled ? "Enable" : "Disable"}</Button>
               <Button

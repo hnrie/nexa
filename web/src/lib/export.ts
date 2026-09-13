@@ -117,16 +117,23 @@ function safeName(s: string): string {
   return s.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60) || "channel";
 }
 
-/** Walks a channel's whole history (newest → oldest) and decrypts what we can. */
-async function allMessages(channelId: string, onProgress: (n: number) => void): Promise<unknown[]> {
-  const out: unknown[] = [];
+/**
+ * Walks a channel's whole history (newest → oldest) and decrypts what we can.
+ * Each page comes back oldest first, so the pages are kept apart and only
+ * their order is reversed: reversing the flat list would also turn every
+ * page of 100 around.
+ */
+export async function allMessages(channelId: string, onProgress: (n: number) => void): Promise<unknown[]> {
+  const pages: unknown[][] = [];
+  let count = 0;
   let before: string | undefined;
   for (let page = 0; page < 10000; page++) {
     const batch = await messagesApi.list(channelId, { limit: 100, ...(before ? { before } : {}) });
     if (batch.length === 0) break;
+    const rows: unknown[] = [];
     for (const m of batch) {
       const d = await decryptForStore(m);
-      out.push({
+      rows.push({
         id: m.id,
         author_id: m.author_id,
         type: m.type,
@@ -142,11 +149,13 @@ async function allMessages(channelId: string, onProgress: (n: number) => void): 
         error: d.decryptError ?? null,
       });
     }
-    onProgress(out.length);
+    pages.push(rows);
+    count += rows.length;
+    onProgress(count);
     before = batch[0]!.id;
     if (batch.length < 100) break;
   }
-  return out.reverse();
+  return pages.reverse().flat();
 }
 
 /** Gathers everything and returns the zip bytes. */

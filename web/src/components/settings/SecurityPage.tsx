@@ -254,10 +254,12 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "enable" ? (
-        <Modal title={setup ? "Scan this with your authenticator" : "Set up two-factor authentication"} open onClose={close} width={460}>
+        <Modal title={codes ? "Save your backup codes" : setup ? "Scan this with your authenticator" : "Set up two-factor authentication"} open onClose={close} closeOnOverlay={!codes} width={460}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
-            {!setup ? (
+            {codes ? (
+              <BackupCodes codes={codes} copied={copied} onCopy={() => void copyCodes()} onDownload={downloadCodes} onDone={close} />
+            ) : !setup ? (
               <>
                 <p className={s.hint}>Confirm your password to start.</p>
                 <Field label="Password" required>
@@ -288,13 +290,12 @@ export default function SecurityPage() {
                 <Button block loading={busy} disabled={code.replace(/\s/g, "").length !== 6} onClick={() => void finishSetup()} data-testid="totp-confirm">Turn on</Button>
               </>
             )}
-            {codes ? <BackupCodes codes={codes} copied={copied} onCopy={() => void copyCodes()} onDownload={downloadCodes} onDone={close} /> : null}
           </div>
         </Modal>
       ) : null}
 
       {dialog === "codes" ? (
-        <Modal title="Backup codes" open onClose={close} width={460}>
+        <Modal title="Backup codes" open onClose={close} closeOnOverlay={!codes} width={460}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             {!codes ? (
@@ -331,10 +332,10 @@ export default function SecurityPage() {
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             <p className={s.hint}>Digits or a phrase, at least 4 characters. It never leaves this device, so nobody, including this server, can reset it for you. Forgetting it costs you nothing permanent: sign in again with your password.</p>
             <Field label="Passcode" required>
-              <TextInput type="password" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="new-password" autoFocus data-testid="passcode-new" />
+              <TextInput type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="new-password" autoFocus data-testid="passcode-new" />
             </Field>
             <Field label="Passcode again" required>
-              <TextInput type="password" inputMode="numeric" value={pin2} onChange={(e) => setPin2(e.target.value)} autoComplete="new-password" data-testid="passcode-confirm" />
+              <TextInput type="password" value={pin2} onChange={(e) => setPin2(e.target.value)} autoComplete="new-password" data-testid="passcode-confirm" />
             </Field>
             <Button block loading={busy} disabled={!pin || !pin2} onClick={() => void savePasscode()} data-testid="passcode-save">{lock ? "Change it" : "Turn it on"}</Button>
           </div>

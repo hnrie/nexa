@@ -69,7 +69,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
         <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : me.accent_color !== null ? { background: `#${me.accent_color.toString(16).padStart(6, "0")}` } : undefined} />
         <div className={s.cardHead}>
           <div className={s.cardAvatar}><Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={80} status="online" /></div>
-          <div>
+          <div className={s.cardText}>
             <div className={s.cardName}>{me.display_name}</div>
             <div className={s.cardUser}>{me.username}</div>
           </div>
@@ -123,7 +123,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       ) : null}
 
       {dialog === "recovery" ? (
-        <Modal open onClose={close} title="Recovery key" footer={recovery ? <Button onClick={close}>Done</Button> : <><Button variant="ghost" onClick={close}>Cancel</Button><Button loading={busy} disabled={!value} onClick={() => void run(async () => setRecovery(await newRecoveryKey(value)))}>Generate</Button></>}>
+        <Modal open onClose={close} closeOnOverlay={!recovery} title="Recovery key" footer={recovery ? <Button onClick={close}>Done</Button> : <><Button variant="ghost" onClick={close}>Cancel</Button><Button loading={busy} disabled={!value} onClick={() => void run(async () => setRecovery(await newRecoveryKey(value)))}>Generate</Button></>}>
           {recovery ? (
             <div className={s.form}>
               <p className={s.hint}>Save this key now. It will not be shown again, and it replaces any previous key.</p>

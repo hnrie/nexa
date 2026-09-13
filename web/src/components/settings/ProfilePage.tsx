@@ -54,7 +54,14 @@ export default function ProfilePage() {
   const save = async () => {
     setSaving(true);
     try {
-      setMe(await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: about, accent_color: hex(accent), accent_color_2: hex(accent2) }));
+      const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: about, accent_color: hex(accent), accent_color_2: hex(accent2) });
+      setMe(u);
+      // the server trims and cleans what it stores, so take its copy back or the form stays "unsaved"
+      setDisplayName(u.display_name);
+      setPronouns(u.pronouns);
+      setAbout(u.about_me);
+      setAccent(hexOf(u.accent_color));
+      setAccent2(hexOf(u.accent_color_2));
       toast("Profile saved.", "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not save.", "error");

@@ -1,5 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { buildZip, crc32 } from "./export";
+import { describe, expect, it, vi } from "vitest";
+import { allMessages, buildZip, crc32 } from "./export";
+
+// A channel of 250 messages with ids 1…250, served the way the server does:
+// newest page first, each page sorted oldest first.
+vi.mock("@/api/messages", () => ({
+  messages: {
+    list: async (_channelId: string, q: { limit: number; before?: string }) => {
+      const top = q.before ? Number(q.before) - 1 : 250;
+      const ids: number[] = [];
+      for (let id = Math.max(1, top - q.limit + 1); id <= top; id++) ids.push(id);
+      return ids.map((id) => ({ id: String(id), author_id: "9", type: 0, created_at: id * 1000, edited_at: null, reply_to_id: null, reactions: [] }));
+    },
+  },
+}));
+vi.mock("@/lib/decrypt", () => ({ decryptForStore: async (m: object) => ({ ...m, payload: { t: "hi" } }) }));
 
 const enc = (s: string) => new TextEncoder().encode(s);
 
@@ -34,5 +48,14 @@ describe("zip writer", () => {
     expect(u32(zip, 18)).toBe(5); // compressed size == "hello".length
     expect(u32(zip, 22)).toBe(5); // uncompressed size
     expect(u32(zip, 14)).toBe(crc32(enc("hello")));
+  });
+});
+
+describe("channel history export", () => {
+  it("keeps messages oldest first across pages", async () => {
+    const progress: number[] = [];
+    const rows = (await allMessages("1", (n) => progress.push(n))) as { id: string }[];
+    expect(rows.map((r) => Number(r.id))).toEqual(Array.from({ length: 250 }, (_, i) => i + 1));
+    expect(progress).toEqual([100, 200, 250]);
   });
 });

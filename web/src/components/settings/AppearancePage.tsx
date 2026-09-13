@@ -43,7 +43,7 @@ export default function AppearancePage() {
       <div className={s.swatches}>
         <button className={s.swatch} data-on={st.accent === null} style={{ background: "#5865f2" }} title="Default" onClick={() => patch({ accent: null })} />
         {ACCENTS.map((c) => <button key={c} className={s.swatch} data-on={st.accent === c} style={{ background: c }} title={c} onClick={() => patch({ accent: c })} />)}
-        <label className={s.swatch} title="Custom" style={{ background: st.accent && !ACCENTS.includes(st.accent) ? st.accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
+        <label className={s.swatch} data-on={!!st.accent && !ACCENTS.includes(st.accent)} title="Custom" style={{ background: st.accent && !ACCENTS.includes(st.accent) ? st.accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
           <input type="color" value={st.accent ?? "#5865f2"} onChange={(e) => patch({ accent: e.target.value })} />
         </label>
       </div>
