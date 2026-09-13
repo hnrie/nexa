@@ -30,8 +30,8 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { flipCamera, joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
-import { hasSeveralCameras } from "@/voice/media";
+import { currentCameraFacing, flipCamera, joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
 /** A video element bound to a MediaStream. */
@@ -56,7 +56,6 @@ const GAP = 8;
 
 const canFullscreen = typeof document !== "undefined" && !!document.fullscreenEnabled;
 const canPip = typeof document !== "undefined" && "pictureInPictureEnabled" in document && !!(document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled;
-const canShare = typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
 
 function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): { w: number; h: number } {
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -239,7 +238,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
         onDoubleClick={() => playing && canFullscreen && fullscreenTile(t.key)}
       >
         {playing && t.stream ? (
-          <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video"} className={s.video} />
+          <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video" && currentCameraFacing() === "user"} className={s.video} />
         ) : live ? (
           <div className={s.offer}>
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
@@ -344,7 +343,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
           {localVideo && canFlip ? (
             <ControlButton label="Switch camera" onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>
           ) : null}
-          {canShare ? (
+          {canShareScreen ? (
             <ControlButton label={localScreen ? "Stop sharing" : "Share your screen"} on={!!localScreen} onClick={() => void toggleScreen()} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
           ) : null}
           <ControlButton label="Disconnect" danger onClick={() => void leaveVoice()} testId="voice-leave"><PhoneOff size={22} /></ControlButton>

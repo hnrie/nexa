@@ -29,6 +29,9 @@ export default function VoicePage() {
   const [diag, setDiag] = useState("");
   const [wrongDevice, setWrongDevice] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const aliveRef = useRef(true);
   const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null } | null>(null);
   const set = (partial: Partial<VoiceSettings>) => patch({ voice: { ...settings, ...partial } });
 
@@ -53,12 +56,28 @@ export default function VoicePage() {
     setSentLevel(0);
     setWrongDevice(false);
   };
-  useEffect(() => stopTest, []);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      stopTest();
+    };
+  }, []);
   const startTest = async () => {
+    // one test at a time, even while the permission prompt is still up
+    if (startingRef.current || testRef.current) return;
+    startingRef.current = true;
+    setStarting(true);
+    let stream: MediaStream | null = null;
     try {
-      const stream = await getMic(settings);
+      stream = await getMic(settings);
       const ctx = audioContext();
       if (ctx.state === "suspended") await ctx.resume();
+      // Settings closed while the prompt was up: let the microphone go rather than holding it with nothing to show
+      if (!aliveRef.current) {
+        stream.getTracks().forEach((x) => x.stop());
+        return;
+      }
       const meter = new LevelMeter(ctx, stream);
       // The second meter listens to exactly what a call would send: the same
       // stream after the input slider. If this one stays flat while the first
@@ -76,7 +95,11 @@ export default function VoicePage() {
       // permission granted: device labels are now readable
       listDevices().then(setDevices).catch(() => {});
     } catch (err) {
+      if (stream && testRef.current?.stream !== stream) stream.getTracks().forEach((x) => x.stop());
       setDiag(`The microphone could not be opened: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
+    } finally {
+      startingRef.current = false;
+      setStarting(false);
     }
   };
 
@@ -104,7 +127,7 @@ export default function VoicePage() {
     <>
       <h2 className={st.title}>Voice & Video</h2>
       <div className={st.form}>
-        <div className={st.twoCol} style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <div className={`${st.twoCol} ${st.twoEqual}`}>
           <Field label="Input device">
             <Select
               value={settings.inputDeviceId ?? ""}
@@ -133,7 +156,7 @@ export default function VoicePage() {
             </Select>
           </Field>
         </div>
-        <div className={st.twoCol} style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <div className={`${st.twoCol} ${st.twoEqual}`}>
           <Field label={`Input volume — ${settings.inputVolume}%`}>
             <input type="range" className={st.slider} min={0} max={200} value={settings.inputVolume} onChange={(e) => set({ inputVolume: Number(e.target.value) })} />
           </Field>
@@ -143,7 +166,7 @@ export default function VoicePage() {
         </div>
         <Field label="Mic test" hint="Speak and watch both meters. The top one is your microphone; the bottom one is what a call would actually send. The yellow mark is your voice-activity threshold.">
           <div>
-            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} data-testid="mic-test">{testing ? "Stop test" : "Let's check"}</Button>
+            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? "Stop test" : "Let's check"}</Button>
             <div className={v.meter} aria-label="Input level" data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
               {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}

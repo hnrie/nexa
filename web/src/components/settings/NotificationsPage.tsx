@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Toggle } from "@/components/common/Toggle";
+import { showNotification } from "@/lib/notify";
 import { playSound } from "@/lib/sounds";
 import { useSettings } from "@/stores/settings";
+import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 export default function NotificationsPage() {
   const st = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
+  const toast = useUI((x) => x.toast);
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
   const enable = async (v: boolean) => {
     if (v && typeof Notification !== "undefined" && Notification.permission !== "granted") {
@@ -16,6 +19,13 @@ export default function NotificationsPage() {
       if (p !== "granted") return;
     }
     patch({ notifications: { ...st.notifications, desktop: v } });
+  };
+  const testNotification = async () => {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+      toast("Turn on desktop notifications first.", "error");
+      return;
+    }
+    if (!(await showNotification("Evilion Chat", { body: "Notifications are working." }))) toast("This browser would not show the notification.", "error");
   };
   return (
     <>
@@ -27,7 +37,7 @@ export default function NotificationsPage() {
         <Button size="sm" variant="secondary" onClick={() => playSound("message")}>Message</Button>
         <Button size="sm" variant="secondary" onClick={() => playSound("mention")}>Mention</Button>
         <Button size="sm" variant="secondary" onClick={() => playSound("ring")}>Call</Button>
-        <Button size="sm" variant="secondary" onClick={() => { if (typeof Notification !== "undefined" && Notification.permission === "granted") new Notification("Evilion Chat", { body: "Notifications are working." }); }}>Desktop notification</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testNotification()}>Desktop notification</Button>
       </div>
     </>
   );

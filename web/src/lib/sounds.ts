@@ -7,9 +7,59 @@ function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctor) return null;
-  if (!ctx) ctx = new Ctor();
-  if (ctx.state === "suspended") void ctx.resume();
+  if (!ctx) {
+    const ac = new Ctor();
+    ctx = ac;
+    // iOS suspends the context again after a phone call or Siri, and only a tap can wake it
+    ac.onstatechange = () => (ac.state === "running" ? disarmUnlock() : armUnlock());
+  }
+  if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
   return ctx;
+}
+
+const UNLOCK_EVENTS = ["pointerdown", "touchend", "keydown"] as const;
+let unlockWanted = false;
+let unlockArmed = false;
+
+/**
+ * Starts the context from inside a tap or key press. Sounds mostly play from
+ * gateway events, and iOS Safari keeps Web Audio silent until a gesture has
+ * started it, which resume() outside one cannot do. A one-sample silent
+ * buffer is what makes WebKit count the gesture.
+ */
+function unlock(): void {
+  const ac = audio();
+  if (!ac) {
+    disarmUnlock();
+    return;
+  }
+  try {
+    const src = ac.createBufferSource();
+    src.buffer = ac.createBuffer(1, 1, 22050);
+    src.connect(ac.destination);
+    src.start(0);
+  } catch {
+    /* nothing to unlock with; the next gesture tries again */
+  }
+  if (ac.state === "running") disarmUnlock();
+}
+
+function armUnlock(): void {
+  if (!unlockWanted || unlockArmed || typeof window === "undefined") return;
+  unlockArmed = true;
+  for (const t of UNLOCK_EVENTS) window.addEventListener(t, unlock, { capture: true, passive: true });
+}
+
+function disarmUnlock(): void {
+  if (!unlockArmed) return;
+  unlockArmed = false;
+  for (const t of UNLOCK_EVENTS) window.removeEventListener(t, unlock, { capture: true });
+}
+
+/** Lets the next tap or key press start audio, and again whenever the system suspends it. */
+export function installAudioUnlock(): void {
+  unlockWanted = true;
+  if (ctx?.state !== "running") armUnlock();
 }
 
 function tone(ac: AudioContext, freq: number, start: number, dur: number, type: OscillatorType = "sine", gain = 0.18): void {

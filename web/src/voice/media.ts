@@ -111,6 +111,9 @@ export async function hasSeveralCameras(): Promise<boolean> {
   }
 }
 
+/** Whether this browser can share a screen at all; phone browsers cannot. */
+export const canShareScreen = typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
+
 export async function getScreen(q: StreamQuality): Promise<MediaStream> {
   const c = qualityConstraints(q);
   const video: MediaTrackConstraints = { frameRate: { ideal: c.frameRate, max: c.frameRate } };

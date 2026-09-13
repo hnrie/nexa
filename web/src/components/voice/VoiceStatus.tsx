@@ -8,6 +8,7 @@ import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
+import { canShareScreen } from "@/voice/media";
 import { leaveVoice, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
 import s from "./Voice.module.css";
 
@@ -57,7 +58,8 @@ export function VoiceStatus() {
       </div>
       <div className={s.statusBtns}>
         <button className={s.statusWide} data-on={!!localVideo} onClick={() => void toggleCamera()} disabled={!mine}><Video size={16} /> {localVideo ? "Camera on" : "Camera"}</button>
-        <button className={s.statusWide} data-on={!!localScreen} onClick={() => void toggleScreen()} disabled={!mine}><MonitorUp size={16} /> {localScreen ? "Sharing" : "Share"}</button>
+        {/* phone browsers cannot share a screen, so the camera gets the row */}
+        {canShareScreen ? <button className={s.statusWide} data-on={!!localScreen} onClick={() => void toggleScreen()} disabled={!mine}><MonitorUp size={16} /> {localScreen ? "Sharing" : "Share"}</button> : null}
       </div>
     </div>
   );

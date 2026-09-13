@@ -10,13 +10,42 @@ import { usePresence } from "@/stores/presence";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
-import { playSound } from "./sounds";
+import { installAudioUnlock, playSound } from "./sounds";
 
 let navigateTo: ((path: string) => void) | null = null;
 
 /** The router's navigate function, supplied by the shell. */
 export function setNotificationNavigator(fn: ((path: string) => void) | null): void {
   navigateTo = fn;
+}
+
+/**
+ * Shows a notification the way this browser allows. Chrome on Android and
+ * iOS home-screen apps refuse the Notification constructor and only take one
+ * through the service worker, which then hands the click back (see sw.ts).
+ * Resolves false when neither way works.
+ */
+export async function showNotification(title: string, opts: NotificationOptions, path?: string): Promise<boolean> {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration("/");
+    if (reg?.active) {
+      await reg.showNotification(title, { ...opts, data: { path } });
+      return true;
+    }
+  } catch {
+    /* no usable worker: try the constructor */
+  }
+  try {
+    const n = new Notification(title, opts);
+    n.onclick = () => {
+      window.focus();
+      if (path) navigateTo?.(path);
+      n.close();
+    };
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function previewOf(m: Message): string {
@@ -54,16 +83,8 @@ function onMessage(m: Message, mine: boolean): void {
   const ch = useChannels.getState().byId[m.channel_id];
   const author = displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (#${ch.name})` : author;
-  try {
-    const n = new Notification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true });
-    n.onclick = () => {
-      window.focus();
-      navigateTo?.(ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`);
-      n.close();
-    };
-  } catch {
-    /* some browsers throw for constructor-based notifications; ignore */
-  }
+  const path = ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`;
+  void showNotification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
 }
 
 let installed = false;
@@ -71,4 +92,11 @@ export function installNotifications(): void {
   if (installed) return;
   installed = true;
   dispatchHooks.onMessage.push(onMessage);
+  // a phone can only play sounds once a tap has let the page make noise
+  installAudioUnlock();
+  // a notification shown by the service worker is clicked there, which sends the chat to open back here
+  navigator.serviceWorker?.addEventListener("message", (e: MessageEvent) => {
+    const d = e.data as { type?: unknown; path?: unknown } | null;
+    if (d?.type === "notification-open" && typeof d.path === "string" && d.path.startsWith("/")) navigateTo?.(d.path);
+  });
 }
