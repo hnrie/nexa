@@ -60,14 +60,14 @@ func TestLoadOverridesAndValidation(t *testing.T) {
 
 func TestLoadEnvFile(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "chatd.env")
-	if err := os.WriteFile(p, []byte("# comment\nLISTEN=127.0.0.1:1\n\nPUBLIC_URL = \"http://x\"\nexport TENOR_API_KEY='k'\nnoequals\n"), 0o600); err != nil {
+	if err := os.WriteFile(p, []byte("# comment\nLISTEN=127.0.0.1:1\n\nPUBLIC_URL = \"http://x\"\nexport KLIPY_API_KEY='k'\nnoequals\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	m, err := LoadEnvFile(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m["LISTEN"] != "127.0.0.1:1" || m["PUBLIC_URL"] != "http://x" || m["TENOR_API_KEY"] != "k" {
+	if m["LISTEN"] != "127.0.0.1:1" || m["PUBLIC_URL"] != "http://x" || m["KLIPY_API_KEY"] != "k" {
 		t.Errorf("parsed %v", m)
 	}
 	if _, ok := m["noequals"]; ok {

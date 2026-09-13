@@ -1,10 +1,16 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	urlpkg "net/url"
+	"sync"
+	"time"
 
+	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
@@ -244,7 +250,93 @@ func (s *Server) handleVoiceICE(w http.ResponseWriter, r *http.Request) {
 		}
 		servers = append(servers, entry)
 	}
+	if relay := s.cloudflareTURN(r); relay != nil {
+		servers = append(servers, relay...)
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ice_servers": servers})
+}
+
+// turnTTL is how long a minted relay credential lasts, and turnReuse how long
+// this server hands the same one back before asking for another.
+const (
+	turnTTL   = 4 * time.Hour
+	turnReuse = 3 * time.Hour
+)
+
+var turnCache = struct {
+	sync.Mutex
+	m map[ids.ID]struct {
+		at      time.Time
+		servers []map[string]any
+	}
+}{m: map[ids.ID]struct {
+	at      time.Time
+	servers []map[string]any
+}{}}
+
+var turnClient = &http.Client{Timeout: 6 * time.Second}
+
+// cloudflareTURN mints a short-lived relay credential for this user, for the
+// networks where two people cannot reach each other directly. The long-term
+// key never leaves this server. Returns nil when TURN is not configured or
+// the request fails: a call without a relay is better than no call at all.
+func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
+	if s.Cfg.TurnKeyID == "" || s.Cfg.TurnAPIToken == "" {
+		return nil
+	}
+	me := auth.UserFrom(r.Context())
+	if me == nil {
+		return nil
+	}
+	turnCache.Lock()
+	if hit, ok := turnCache.m[me.ID]; ok && time.Since(hit.at) < turnReuse {
+		servers := hit.servers
+		turnCache.Unlock()
+		return servers
+	}
+	turnCache.Unlock()
+
+	body, _ := json.Marshal(map[string]any{"ttl": int(turnTTL.Seconds()), "customIdentifier": me.ID.String()})
+	url := "https://rtc.live.cloudflare.com/v1/turn/keys/" + urlpkg.PathEscape(s.Cfg.TurnKeyID) + "/credentials/generate-ice-servers"
+	req, err := http.NewRequestWithContext(r.Context(), "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Authorization", "Bearer "+s.Cfg.TurnAPIToken)
+	req.Header.Set("Content-Type", "application/json")
+	res, err := turnClient.Do(req)
+	if err != nil {
+		s.Log.Warn("turn credentials unavailable", "err", err)
+		return nil
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(res.Body, 64<<10))
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusCreated {
+		s.Log.Warn("turn credentials refused", "status", res.StatusCode)
+		return nil
+	}
+	var parsed struct {
+		ICEServers json.RawMessage `json:"iceServers"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil
+	}
+	// the shape is either one entry or a list, depending on the endpoint
+	var list []map[string]any
+	if err := json.Unmarshal(parsed.ICEServers, &list); err != nil {
+		var one map[string]any
+		if json.Unmarshal(parsed.ICEServers, &one) != nil {
+			return nil
+		}
+		list = []map[string]any{one}
+	}
+	turnCache.Lock()
+	turnCache.m[me.ID] = struct {
+		at      time.Time
+		servers []map[string]any
+	}{time.Now(), list}
+	turnCache.Unlock()
+	return list
 }
 
 func (s *Server) handleVoiceParticipants(w http.ResponseWriter, r *http.Request) {

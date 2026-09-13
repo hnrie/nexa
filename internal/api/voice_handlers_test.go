@@ -3,6 +3,10 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,5 +185,78 @@ func TestDMCalls(t *testing.T) {
 	gc.op(t, "voice_state", map[string]any{"channel_id": dm})
 	if ev := gc.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "not_found" {
 		t.Errorf("outsider join: %v", ev)
+	}
+}
+
+// TestCloudflareTURNCredentials checks that a relay credential is minted per
+// person, handed out with the STUN list, and reused rather than re-fetched.
+func TestCloudflareTURNCredentials(t *testing.T) {
+	calls := 0
+	var lastAuth, lastBody string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		lastAuth = r.Header.Get("Authorization")
+		b, _ := io.ReadAll(r.Body)
+		lastBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"iceServers":{"urls":["turn:turn.cloudflare.com:3478?transport=udp"],"username":"u1","credential":"c1"}}`))
+	}))
+	defer upstream.Close()
+	prev := turnClient.Transport
+	turnClient.Transport = &redirectTransport{to: upstream.Listener.Addr().String()}
+	defer func() { turnClient.Transport = prev }()
+
+	srv, ts := newTestServer(t)
+	srv.Cfg.TurnKeyID = "key-123"
+	srv.Cfg.TurnAPIToken = "token-abc"
+	token, id := register(t, ts, "alice")
+
+	res, body := do(t, ts, "GET", "/api/v1/voice/ice", token, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("ice: %d %v", res.StatusCode, body)
+	}
+	servers, _ := body["ice_servers"].([]any)
+	found := false
+	for _, entry := range servers {
+		m, _ := entry.(map[string]any)
+		if m["username"] == "u1" && m["credential"] == "c1" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the relay credential should be handed to the client: %v", body)
+	}
+	if lastAuth != "Bearer token-abc" {
+		t.Errorf("the long-term key goes in the header: %q", lastAuth)
+	}
+	if !strings.Contains(lastBody, id) {
+		t.Errorf("usage should be attributed to the person: %q", lastBody)
+	}
+	if !strings.Contains(lastBody, `"ttl"`) {
+		t.Errorf("the credential should expire: %q", lastBody)
+	}
+
+	// asking again reuses it rather than minting another
+	do(t, ts, "GET", "/api/v1/voice/ice", token, nil)
+	if calls != 1 {
+		t.Errorf("credentials should be reused, minted %d times", calls)
+	}
+}
+
+func TestVoiceICEWithoutTURN(t *testing.T) {
+	srv, ts := newTestServer(t)
+	srv.Cfg.TurnKeyID = ""
+	srv.Cfg.TurnAPIToken = ""
+	token, _ := register(t, ts, "alice")
+	res, body := do(t, ts, "GET", "/api/v1/voice/ice", token, nil)
+	servers, _ := body["ice_servers"].([]any)
+	if res.StatusCode != 200 {
+		t.Fatalf("ice: %d %v", res.StatusCode, body)
+	}
+	for _, entry := range servers {
+		m, _ := entry.(map[string]any)
+		if m["credential"] != nil {
+			t.Errorf("nothing should be minted without a key: %v", body)
+		}
 	}
 }

@@ -6,7 +6,7 @@ import { useExpressions } from "@/stores/expressions";
 import { useSettings } from "@/stores/settings";
 import s from "./Picker.module.css";
 
-/** The GIFs tab: favourites always; Tenor trending and search when the server has a key. */
+/** The GIFs tab: favourites always; trending and search when the server has a key. */
 export function GifPicker({ onPick }: { onPick: (gif: { url: string; w?: number; h?: number }) => void }) {
   const favs = useSettings((st) => st.settings.favoriteGifs);
   const patch = useSettings((st) => st.patch);
@@ -67,7 +67,7 @@ export function GifPicker({ onPick }: { onPick: (gif: { url: string; w?: number;
     <div className={s.body} style={{ flexDirection: "column" }}>
       <div className={s.searchRow} style={{ flexDirection: "column", alignItems: "stretch" }}>
         {enabled ? (
-          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder="Search Tenor" aria-label="Search GIFs" autoFocus />
+          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder="Search GIFs" aria-label="Search GIFs" autoFocus />
         ) : null}
         <div className={s.gifTabs}>
           <button className={s.gifTab} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>Favorites</button>
@@ -100,10 +100,10 @@ export function GifPicker({ onPick }: { onPick: (gif: { url: string; w?: number;
             {next && !loading ? <button className={s.gifTab} style={{ width: "100%", marginTop: 4 }} onClick={() => void load(q, next)}>Load more</button> : null}
             {loading ? <div className={s.gifNote}>Loading…</div> : null}
           </div>
-          <div className={s.gifNote}>Search powered by Tenor. The server proxies requests, so Tenor never sees who you are.</div>
+          <div className={s.gifNote}>Search powered by Klipy. This server fetches every picture for you, so nobody on the other end learns who is looking.</div>
         </>
       )}
-      {!enabled && enabled !== null ? <div className={s.gifNote}>GIF search is off on this server: set TENOR_API_KEY to enable it.</div> : null}
+      {!enabled && enabled !== null ? <div className={s.gifNote}>GIF search is off on this server: set KLIPY_API_KEY to enable it.</div> : null}
     </div>
   );
 }

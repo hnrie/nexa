@@ -40,7 +40,7 @@ func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 		"registration":      mode,
 		"needs_key":         mode == "invite" && key != "",
 		"max_upload_bytes":  s.Cfg.MaxUploadBytes,
-		"gif_search":        s.Cfg.TenorAPIKey != "",
+		"gif_search":        s.gifEnabled(),
 		"public_url":        s.Cfg.PublicURL,
 		"turn_configured":   len(s.Cfg.TurnURLs) > 0,
 		"max_sticker_bytes": s.Cfg.MaxStickerBytes,
@@ -134,7 +134,7 @@ func (s *Server) adminSettingsView(r *http.Request) map[string]any {
 		"max_emoji_bytes":      s.Cfg.MaxEmojiBytes,
 		"max_sticker_bytes":    s.Cfg.MaxStickerBytes,
 		"max_avatar_bytes":     s.Cfg.MaxAvatarBytes,
-		"tenor":                s.Cfg.TenorAPIKey != "",
+		"gif_search":           s.gifEnabled(),
 		"turn":                 len(s.Cfg.TurnURLs) > 0,
 	}
 }

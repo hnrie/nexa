@@ -107,7 +107,7 @@ export default function AdminPage() {
               {settings.registration_key_set ? <Button size="sm" variant="ghost" onClick={() => void adminApi.patchSettings({ registration_key: "" }).then(setSettings)}>Clear</Button> : null}
             </div>
           </Field>
-          <p className={st.hint} style={{ marginTop: 12 }}>Limits from the config: uploads {formatBytes(settings.max_upload_bytes)}, avatars {formatBytes(settings.max_avatar_bytes)}, emoji {formatBytes(settings.max_emoji_bytes)}, stickers {formatBytes(settings.max_sticker_bytes)}. GIF search {settings.tenor ? "on" : "off"}, TURN {settings.turn ? "configured" : "not configured"}. Change these in chatd.env and restart.</p>
+          <p className={st.hint} style={{ marginTop: 12 }}>Limits from the config: uploads {formatBytes(settings.max_upload_bytes)}, avatars {formatBytes(settings.max_avatar_bytes)}, emoji {formatBytes(settings.max_emoji_bytes)}, stickers {formatBytes(settings.max_sticker_bytes)}. GIF search {settings.gif_search ? "on" : "off"}, TURN {settings.turn ? "configured" : "not configured"}. Change these in chatd.env and restart.</p>
         </>
       ) : <Spinner />}
       <h5 className={st.h5}>Users</h5>

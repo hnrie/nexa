@@ -30,9 +30,17 @@ type Config struct {
 	TurnURLs       []string
 	TurnUsername   string
 	TurnCredential string
-	TenorAPIKey    string
-	LogLevel       string
-	SessionTTL     time.Duration
+	// TurnKeyID and TurnAPIToken turn on Cloudflare Realtime TURN, where this
+	// server mints a short-lived credential for each person who joins a call.
+	// The relay is billed by the gigabyte and is only used when two people
+	// cannot reach each other directly.
+	TurnKeyID    string
+	TurnAPIToken string
+	// KlipyAPIKey enables GIF search. Without it the picker still offers
+	// whatever has been favourited.
+	KlipyAPIKey string
+	LogLevel    string
+	SessionTTL  time.Duration
 }
 
 // Load builds a Config from getenv, applying defaults and validating values.
@@ -64,7 +72,9 @@ func Load(getenv func(string) string) (Config, error) {
 	str("ADMIN_USERNAME", &c.AdminUsername)
 	str("TURN_USERNAME", &c.TurnUsername)
 	str("TURN_CREDENTIAL", &c.TurnCredential)
-	str("TENOR_API_KEY", &c.TenorAPIKey)
+	str("TURN_KEY_ID", &c.TurnKeyID)
+	str("TURN_API_TOKEN", &c.TurnAPIToken)
+	str("KLIPY_API_KEY", &c.KlipyAPIKey)
 	str("LOG_LEVEL", &c.LogLevel)
 
 	ints := []struct {

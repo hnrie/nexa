@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -217,4 +219,85 @@ func TestStickerPacks(t *testing.T) {
 		t.Errorf("gif disabled: %d %v", res.StatusCode, body)
 	}
 	_ = srv
+}
+
+// klipyStub stands in for api.klipy.com so the mapping can be checked without
+// a key or a network.
+func klipyStub(t *testing.T, body string) func() {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	prev := gifClient.Transport
+	gifClient.Transport = &redirectTransport{to: srv.Listener.Addr().String()}
+	return func() {
+		gifClient.Transport = prev
+		srv.Close()
+	}
+}
+
+// redirectTransport sends every request to one address, whatever the host says.
+type redirectTransport struct{ to string }
+
+func (t *redirectTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	clone := r.Clone(r.Context())
+	clone.URL.Scheme = "http"
+	clone.URL.Host = t.to
+	return http.DefaultTransport.RoundTrip(clone)
+}
+
+const klipyBody = `{"result":true,"data":{"current_page":1,"per_page":30,"has_next":true,"data":[
+  {"id":7,"slug":"happy-cat","title":"Happy cat","type":"gif","file":{
+    "xs":{"gif":{"url":"https://static.klipy.com/xs.gif","width":80,"height":60,"size":1}},
+    "md":{"gif":{"url":"https://static.klipy.com/md.gif","width":320,"height":240,"size":9}}}},
+  {"id":8,"slug":"no-gif-here","title":"Only webp","type":"gif","file":{
+    "md":{"webp":{"url":"https://static.klipy.com/md.webp","width":320,"height":240,"size":9}}}}
+]}}`
+
+func TestKlipyGifSearch(t *testing.T) {
+	srv, ts := newTestServer(t)
+	srv.Cfg.KlipyAPIKey = "test-key"
+	defer klipyStub(t, klipyBody)()
+	token, _ := register(t, ts, "alice")
+
+	res, body := do(t, ts, "GET", "/api/v1/gif/search?q=cat", token, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("search: %d %v", res.StatusCode, body)
+	}
+	results, _ := body["results"].([]any)
+	if len(results) != 1 {
+		t.Fatalf("a GIF with no gif rendition should be skipped: %v", body)
+	}
+	first, _ := results[0].(map[string]any)
+	if first["id"] != "happy-cat" || first["title"] != "Happy cat" || first["w"].(float64) != 320 || first["h"].(float64) != 240 {
+		t.Errorf("mapped result: %v", first)
+	}
+	// every picture goes through this server, never straight to the source
+	for _, key := range []string{"url", "preview"} {
+		u, _ := first[key].(string)
+		if !strings.HasPrefix(u, "/media/proxy/") {
+			t.Errorf("%s should be proxied, got %q", key, u)
+		}
+	}
+	if first["url"] == first["preview"] {
+		t.Error("the small rendition should be used for the preview")
+	}
+	if body["next"] != "2" {
+		t.Errorf("next page: %v", body["next"])
+	}
+}
+
+func TestGifSearchOffWithoutAKey(t *testing.T) {
+	srv, ts := newTestServer(t)
+	srv.Cfg.KlipyAPIKey = ""
+	token, _ := register(t, ts, "alice")
+	res, body := do(t, ts, "GET", "/api/v1/gif/trending", token, nil)
+	if res.StatusCode != 404 || errCode(body) != "gif_disabled" {
+		t.Fatalf("without a key: %d %v", res.StatusCode, body)
+	}
+	res, body = do(t, ts, "GET", "/api/v1/gif/status", token, nil)
+	if res.StatusCode == 200 && body["enabled"] != false {
+		t.Errorf("status should say it is off: %v", body)
+	}
 }

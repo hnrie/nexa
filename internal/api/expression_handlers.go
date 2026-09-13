@@ -667,7 +667,10 @@ func (s *Server) handlePackInstall(install bool) http.HandlerFunc {
 	}
 }
 
-// --- GIF search (Tenor proxy) --------------------------------------------
+// --- GIF search (Klipy) ----------------------------------------------------
+//
+// The pictures themselves are rewritten through this server's proxy, so
+// opening the picker never hands the reader's address to whoever hosts them.
 
 type gifResult struct {
 	ID      string `json:"id"`
@@ -696,30 +699,29 @@ var gifCache = struct {
 
 var gifClient = &http.Client{Timeout: 8 * time.Second}
 
+func (s *Server) gifEnabled() bool { return s.Cfg.KlipyAPIKey != "" }
+
 func (s *Server) handleGifStatus(w http.ResponseWriter, r *http.Request) {
-	WriteJSON(w, http.StatusOK, map[string]any{"enabled": s.Cfg.TenorAPIKey != ""})
+	WriteJSON(w, http.StatusOK, map[string]any{"enabled": s.gifEnabled()})
 }
 
 func (s *Server) handleGifSearch(w http.ResponseWriter, r *http.Request) {
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	if q == "" {
-		s.handleGifTrending(w, r)
-		return
-	}
-	s.gifProxy(w, r, "search", url.Values{"q": {q}})
+	s.gifProxy(w, r, strings.TrimSpace(r.URL.Query().Get("q")))
 }
 
 func (s *Server) handleGifTrending(w http.ResponseWriter, r *http.Request) {
-	s.gifProxy(w, r, "featured", url.Values{})
+	s.gifProxy(w, r, "")
 }
 
-func (s *Server) gifProxy(w http.ResponseWriter, r *http.Request, endpoint string, params url.Values) {
-	if s.Cfg.TenorAPIKey == "" {
+// gifProxy answers a search, or trending when the query is empty. `pos` is
+// whatever the provider called the next page last time.
+func (s *Server) gifProxy(w http.ResponseWriter, r *http.Request, query string) {
+	if !s.gifEnabled() {
 		WriteError(w, E(http.StatusNotFound, "gif_disabled", "GIF search is not configured on this server."))
 		return
 	}
 	pos := r.URL.Query().Get("pos")
-	cacheKey := endpoint + "|" + params.Encode() + "|" + pos
+	cacheKey := query + "|" + pos
 	gifCache.Lock()
 	if hit, ok := gifCache.m[cacheKey]; ok && time.Since(hit.at) < 2*time.Minute {
 		gifCache.Unlock()
@@ -727,59 +729,11 @@ func (s *Server) gifProxy(w http.ResponseWriter, r *http.Request, endpoint strin
 		return
 	}
 	gifCache.Unlock()
-	params.Set("key", s.Cfg.TenorAPIKey)
-	params.Set("client_key", "evilion-chat")
-	params.Set("limit", "30")
-	params.Set("media_filter", "gif,tinygif")
-	params.Set("contentfilter", "medium")
-	if pos != "" {
-		params.Set("pos", pos)
-	}
-	req, err := http.NewRequestWithContext(r.Context(), "GET", "https://tenor.googleapis.com/v2/"+endpoint+"?"+params.Encode(), nil)
+
+	page, err := s.klipyPage(r, query, pos)
 	if err != nil {
 		WriteError(w, err)
 		return
-	}
-	res, err := gifClient.Do(req)
-	if err != nil {
-		WriteError(w, E(http.StatusBadGateway, "gif_unavailable", "GIF search is unavailable right now."))
-		return
-	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
-	if res.StatusCode != http.StatusOK {
-		WriteError(w, E(http.StatusBadGateway, "gif_unavailable", "GIF search is unavailable right now."))
-		return
-	}
-	var parsed struct {
-		Results []struct {
-			ID                 string `json:"id"`
-			ContentDescription string `json:"content_description"`
-			MediaFormats       map[string]struct {
-				URL  string `json:"url"`
-				Dims []int  `json:"dims"`
-			} `json:"media_formats"`
-		} `json:"results"`
-		Next string `json:"next"`
-	}
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		WriteError(w, E(http.StatusBadGateway, "gif_unavailable", "GIF search returned something unexpected."))
-		return
-	}
-	page := gifPage{Results: []gifResult{}, Next: parsed.Next}
-	for _, item := range parsed.Results {
-		gif, ok := item.MediaFormats["gif"]
-		if !ok || gif.URL == "" {
-			continue
-		}
-		out := gifResult{ID: item.ID, URL: s.ProxyURL(gif.URL), Preview: s.ProxyURL(gif.URL), Title: item.ContentDescription}
-		if len(gif.Dims) == 2 {
-			out.W, out.H = gif.Dims[0], gif.Dims[1]
-		}
-		if tiny, ok := item.MediaFormats["tinygif"]; ok && tiny.URL != "" {
-			out.Preview = s.ProxyURL(tiny.URL)
-		}
-		page.Results = append(page.Results, out)
 	}
 	gifCache.Lock()
 	if len(gifCache.m) > 500 {
@@ -794,4 +748,100 @@ func (s *Server) gifProxy(w http.ResponseWriter, r *http.Request, endpoint strin
 	}{time.Now(), page}
 	gifCache.Unlock()
 	WriteJSON(w, http.StatusOK, page)
+}
+
+var errGifUpstream = E(http.StatusBadGateway, "gif_unavailable", "GIF search is unavailable right now.")
+
+// fetchGif performs the upstream request and returns the body.
+func fetchGif(r *http.Request, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(r.Context(), "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := gifClient.Do(req)
+	if err != nil {
+		return nil, errGifUpstream
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if res.StatusCode != http.StatusOK {
+		return nil, errGifUpstream
+	}
+	return body, nil
+}
+
+// klipyFile is one rendition of one GIF.
+type klipyFile struct {
+	URL    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+// pick returns the first rendition present, in the order asked for.
+func pickKlipy(sizes map[string]map[string]klipyFile, order []string, format string) klipyFile {
+	for _, size := range order {
+		if f, ok := sizes[size][format]; ok && f.URL != "" {
+			return f
+		}
+	}
+	return klipyFile{}
+}
+
+func (s *Server) klipyPage(r *http.Request, query, pos string) (gifPage, error) {
+	page := 1
+	if pos != "" {
+		if n, err := strconv.Atoi(pos); err == nil && n > 1 {
+			page = n
+		}
+	}
+	params := url.Values{}
+	params.Set("per_page", "30")
+	params.Set("page", strconv.Itoa(page))
+	params.Set("content_filter", "medium")
+	endpoint := "trending"
+	if query != "" {
+		endpoint = "search"
+		params.Set("q", query)
+	}
+	body, err := fetchGif(r, "https://api.klipy.com/api/v1/"+url.PathEscape(s.Cfg.KlipyAPIKey)+"/gifs/"+endpoint+"?"+params.Encode())
+	if err != nil {
+		return gifPage{}, err
+	}
+	var parsed struct {
+		Data struct {
+			CurrentPage int  `json:"current_page"`
+			HasNext     bool `json:"has_next"`
+			Data        []struct {
+				Slug  string                          `json:"slug"`
+				Title string                          `json:"title"`
+				File  map[string]map[string]klipyFile `json:"file"`
+			} `json:"data"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return gifPage{}, E(http.StatusBadGateway, "gif_unavailable", "GIF search returned something unexpected.")
+	}
+	out := gifPage{Results: []gifResult{}}
+	if parsed.Data.HasNext {
+		out.Next = strconv.Itoa(parsed.Data.CurrentPage + 1)
+	}
+	for _, item := range parsed.Data.Data {
+		full := pickKlipy(item.File, []string{"md", "hd", "sm", "xs"}, "gif")
+		if full.URL == "" {
+			continue
+		}
+		preview := pickKlipy(item.File, []string{"xs", "sm", "md"}, "gif")
+		if preview.URL == "" {
+			preview = full
+		}
+		out.Results = append(out.Results, gifResult{
+			ID:      item.Slug,
+			URL:     s.ProxyURL(full.URL),
+			Preview: s.ProxyURL(preview.URL),
+			W:       full.Width,
+			H:       full.Height,
+			Title:   item.Title,
+		})
+	}
+	return out, nil
 }

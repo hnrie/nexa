@@ -281,7 +281,7 @@ export interface AdminSettings {
   max_emoji_bytes: number;
   max_sticker_bytes: number;
   max_avatar_bytes: number;
-  tenor: boolean;
+  gif_search: boolean;
   turn: boolean;
 }
 
