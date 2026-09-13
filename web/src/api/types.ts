@@ -244,6 +244,8 @@ export interface VoiceState {
   server_mute: boolean;
   server_deaf: boolean;
   joined_at: number;
+  /** The kinds this participant publishes through the SFU (audio, video, screen, screen_audio). */
+  media?: string[];
 }
 
 export interface IceServer {

@@ -33,6 +33,7 @@ describe("crypto module surface", () => {
       // conv
       "newRootKey",
       "channelKey",
+      "voiceFrameKey",
       "KeyRing",
       // message
       "aadBytes",

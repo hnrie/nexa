@@ -5,23 +5,11 @@
  * never sees it. Playback goes through WebAudio so per-user volume can exceed
  * 100 % and the output device can be chosen.
  */
-import { LevelMeter, audioContext } from "./media";
+import type { VoiceState } from "@/api/types";
+import { Playback } from "./playback";
+import type { MediaKind, SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 
-export type MediaKind = "audio" | "video" | "screen";
-
-export interface SignalPayload {
-  description?: RTCSessionDescriptionInit;
-  candidate?: RTCIceCandidateInit | null;
-  /** Which of my stream ids carries which kind, so the receiver can label tracks. */
-  streams?: Partial<Record<MediaKind, string>>;
-}
-
-export interface TransportEvents {
-  onSignal: (to: string, payload: SignalPayload) => void;
-  onPeerState: (userId: string, state: RTCPeerConnectionState) => void;
-  onRemoteStream: (userId: string, kind: MediaKind, stream: MediaStream | null) => void;
-  onSpeaking: (userId: string, speaking: boolean) => void;
-}
+export type { MediaKind, SignalPayload, TransportEvents } from "./transport";
 
 interface Peer {
   userId: string;
@@ -34,10 +22,6 @@ interface Peer {
   audioSender: RTCRtpSender | null;
   videoSender: RTCRtpSender | null;
   screenSenders: RTCRtpSender[];
-  playback: { source: MediaStreamAudioSourceNode; gain: GainNode; el: HTMLAudioElement; meter: LevelMeter; timer: ReturnType<typeof setInterval> } | null;
-  /** The sound of their screen share, kept so volume, deafen and watching reach it. */
-  screenAudio: { stream: MediaStream; track: MediaStreamTrack | undefined; source: MediaStreamAudioSourceNode; gain: GainNode; el: HTMLAudioElement } | null;
-  speaking: boolean;
   restartTimer: ReturnType<typeof setTimeout> | null;
   /** ICE restarts tried since the connection last worked. */
   restarts: number;
@@ -71,7 +55,7 @@ const MAX_ICE_RESTARTS = 3;
 /** How long a renegotiation offer may go unanswered before it is taken back and sent again. */
 const OFFER_DEADLINE_MS = 10_000;
 
-export class MeshTransport {
+export class MeshTransport implements VoiceTransport {
   private peers = new Map<string, Peer>();
   private audioTrack: MediaStreamTrack | null = null;
   private videoTrack: MediaStreamTrack | null = null;
@@ -79,15 +63,9 @@ export class MeshTransport {
   private audioStream = new MediaStream();
   private videoStream = new MediaStream();
   private screenStream = new MediaStream();
-  private outputMuted = false;
-  /** Master output level, 0–200 %, from settings. */
-  private masterVolume = 100;
-  private volumes = new Map<string, number>();
   /** Signals that beat the roster: an offer can arrive before we know the sender. */
   private early = new Map<string, SignalPayload[]>();
-  private localMutes = new Set<string>();
-  /** Whose screen shares are being watched; the others' share audio stays silent. */
-  private watching = new Set<string>();
+  private playback: Playback;
   private screenBitrate = 5_000_000;
   private audioGateOpen = true;
   private closed = false;
@@ -96,7 +74,9 @@ export class MeshTransport {
     private meId: string,
     private ice: RTCIceServer[],
     private events: TransportEvents,
-  ) {}
+  ) {
+    this.playback = new Playback(events.onSpeaking);
+  }
 
   // --- local media -------------------------------------------------------
 
@@ -143,7 +123,7 @@ export class MeshTransport {
   addPeer(userId: string, attempts = 0): void {
     if (this.closed || this.peers.has(userId) || userId === this.meId) return;
     const pc = new RTCPeerConnection({ iceServers: this.ice, bundlePolicy: "max-bundle" });
-    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], playback: null, screenAudio: null, speaking: false, restartTimer: null, restarts: 0, offerTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
+    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], restartTimer: null, restarts: 0, offerTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
     this.peers.set(userId, peer);
     pc.onicecandidate = (e) => this.events.onSignal(userId, { candidate: e.candidate ? e.candidate.toJSON() : null });
     pc.onnegotiationneeded = () => this.enqueue(peer, () => this.negotiate(peer));
@@ -218,8 +198,7 @@ export class MeshTransport {
     const p = this.peers.get(userId);
     if (!p) return;
     this.peers.delete(userId);
-    this.teardownPlayback(p);
-    this.teardownScreenAudio(p);
+    this.playback.detach(userId);
     if (p.restartTimer) clearTimeout(p.restartTimer);
     if (p.offerTimer) clearTimeout(p.offerTimer);
     p.pc.onicecandidate = null;
@@ -236,10 +215,16 @@ export class MeshTransport {
     return [...this.peers.keys()];
   }
 
+  /** The mesh learns about peers one by one through addPeer. */
+  setRoster(_states: VoiceState[]): void {}
+
+  joined(_state: VoiceState): void {}
+
   close(): void {
     this.closed = true;
     this.early.clear();
     for (const id of [...this.peers.keys()]) this.removePeer(id);
+    this.playback.close();
   }
 
   // --- signalling --------------------------------------------------------
@@ -430,155 +415,45 @@ export class MeshTransport {
     if (kind === "screen") {
       // screen audio and video share one stream; expose it once
       this.events.onRemoteStream(peer.userId, "screen", stream);
-      if (e.track.kind === "audio") this.attachScreenAudio(peer, stream);
+      if (e.track.kind === "audio") this.playback.attachScreenAudio(peer.userId, stream);
     } else if (kind === "audio") {
-      this.setupPlayback(peer, stream);
+      this.playback.attachVoice(peer.userId, stream);
       this.events.onRemoteStream(peer.userId, "audio", stream);
     } else {
       this.events.onRemoteStream(peer.userId, "video", stream);
     }
     e.track.onended = () => this.events.onRemoteStream(peer.userId, kind, null);
     stream.onremovetrack = () => {
-      if (kind === "screen" && peer.screenAudio?.stream === stream && stream.getAudioTracks().length === 0) this.teardownScreenAudio(peer);
+      if (kind === "screen" && this.playback.screenAudioStream(peer.userId) === stream && stream.getAudioTracks().length === 0) this.playback.detachScreenAudio(peer.userId);
       if (stream.getTracks().length === 0) this.events.onRemoteStream(peer.userId, kind, null);
     };
   }
 
-  private setupPlayback(peer: Peer, stream: MediaStream): void {
-    this.teardownPlayback(peer);
-    const ctx = audioContext();
-    // Chrome only delivers remote WebRTC audio into WebAudio when an element also plays it
-    const el = document.createElement("audio");
-    el.srcObject = stream;
-    el.muted = true;
-    el.autoplay = true;
-    el.setAttribute("data-voice-peer", peer.userId);
-    document.body.appendChild(el);
-    void el.play().catch(() => {});
-    const source = ctx.createMediaStreamSource(stream);
-    const gain = ctx.createGain();
-    gain.gain.value = this.effectiveGain(peer.userId);
-    source.connect(gain).connect(ctx.destination);
-    const meter = new LevelMeter(ctx, stream);
-    const timer = setInterval(() => {
-      const on = meter.level() > 0.02 && !this.localMutes.has(peer.userId);
-      if (on !== peer.speaking) {
-        peer.speaking = on;
-        this.events.onSpeaking(peer.userId, on);
-      }
-    }, 100);
-    peer.playback = { source, gain, el, meter, timer };
-  }
-
-  private attachScreenAudio(peer: Peer, stream: MediaStream): void {
-    this.teardownScreenAudio(peer);
-    const ctx = audioContext();
-    const el = document.createElement("audio");
-    el.srcObject = new MediaStream(stream.getAudioTracks());
-    el.muted = true;
-    el.autoplay = true;
-    el.setAttribute("data-voice-screen", peer.userId);
-    document.body.appendChild(el);
-    void el.play().catch(() => {});
-    const source = ctx.createMediaStreamSource(el.srcObject as MediaStream);
-    const gain = ctx.createGain();
-    gain.gain.value = this.screenGain(peer.userId);
-    source.connect(gain).connect(ctx.destination);
-    const track = stream.getAudioTracks()[0];
-    peer.screenAudio = { stream, track, source, gain, el };
-    track?.addEventListener(
-      "ended",
-      () => {
-        if (peer.screenAudio?.track === track) this.teardownScreenAudio(peer);
-      },
-      { once: true },
-    );
-  }
-
-  private teardownScreenAudio(peer: Peer): void {
-    const sa = peer.screenAudio;
-    if (!sa) return;
-    try {
-      sa.source.disconnect();
-      sa.gain.disconnect();
-    } catch {
-      /* already gone */
-    }
-    sa.el.srcObject = null;
-    sa.el.remove();
-    peer.screenAudio = null;
-  }
-
-  private teardownPlayback(peer: Peer): void {
-    const pb = peer.playback;
-    if (!pb) return;
-    clearInterval(pb.timer);
-    pb.meter.close();
-    try {
-      pb.source.disconnect();
-      pb.gain.disconnect();
-    } catch {
-      /* already gone */
-    }
-    pb.el.srcObject = null;
-    pb.el.remove();
-    peer.playback = null;
-    if (peer.speaking) {
-      peer.speaking = false;
-      this.events.onSpeaking(peer.userId, false);
-    }
-  }
-
   // --- output control ----------------------------------------------------
 
-  private effectiveGain(userId: string): number {
-    if (this.outputMuted || this.localMutes.has(userId)) return 0;
-    return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
-  }
-
-  /** A share is offered, not forced: its sound only plays while it is watched. */
-  private screenGain(userId: string): number {
-    return this.watching.has(userId) ? this.effectiveGain(userId) : 0;
-  }
-
-  private applyGains(): void {
-    for (const p of this.peers.values()) {
-      if (p.playback) p.playback.gain.gain.value = this.effectiveGain(p.userId);
-      if (p.screenAudio) p.screenAudio.gain.gain.value = this.screenGain(p.userId);
-    }
-  }
-
   setWatching(userId: string, on: boolean): void {
-    if (on) this.watching.add(userId);
-    else this.watching.delete(userId);
-    this.applyGains();
+    this.playback.setWatching(userId, on);
   }
 
   setVolume(userId: string, pct: number): void {
-    this.volumes.set(userId, pct);
-    this.applyGains();
+    this.playback.setVolume(userId, pct);
   }
 
   setLocalMute(userId: string, on: boolean): void {
-    if (on) this.localMutes.add(userId);
-    else this.localMutes.delete(userId);
-    this.applyGains();
+    this.playback.setLocalMute(userId, on);
   }
 
   setOutputMuted(on: boolean): void {
-    this.outputMuted = on;
-    this.applyGains();
+    this.playback.setOutputMuted(on);
   }
 
   /** Master output level for every peer, 0–200 %. */
   setMasterVolume(pct: number): void {
-    this.masterVolume = Math.max(0, Math.min(200, pct));
-    this.applyGains();
+    this.playback.setMasterVolume(pct);
   }
 
-  async setOutputDevice(deviceId: string | null): Promise<void> {
-    const ctx = audioContext() as AudioContext & { setSinkId?: (id: string | { type: "none" }) => Promise<void> };
-    if (typeof ctx.setSinkId === "function") await ctx.setSinkId(deviceId ?? "").catch(() => {});
+  setOutputDevice(deviceId: string | null): Promise<void> {
+    return this.playback.setOutputDevice(deviceId);
   }
 
   /** Aggregate stats: round-trip time and packet loss over all peers, for a quality indicator. */

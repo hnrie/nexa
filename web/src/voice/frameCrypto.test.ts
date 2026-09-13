@@ -1,0 +1,58 @@
+import { channelKey, voiceFrameKey } from "@/crypto/conv";
+import { clearBytes, frameIv, importFrameKey, openFrame, sealFrame } from "./frameCrypto";
+
+const raw = (n: number) => new Uint8Array(32).fill(n);
+const frame = (len: number) => Uint8Array.from({ length: len }, (_, i) => (i * 37) & 0xff);
+
+describe("frame encryption", () => {
+  it("opens what it seals, for audio and both kinds of video frame", async () => {
+    const key = await importFrameKey(raw(1));
+    const keys = new Map([[7, key]]);
+    const salt = new Uint8Array([9, 8, 7, 6]);
+    for (const [kind, keyFrame] of [["audio", false], ["video", true], ["video", false]] as const) {
+      const clear = clearBytes(kind, keyFrame);
+      const plain = frame(200);
+      const sealed = await sealFrame(key, 7, frameIv(salt, 42n), plain, clear);
+      // the header stays readable for the packetizer and the SFU, the rest does not
+      expect(sealed.subarray(0, clear)).toEqual(plain.subarray(0, clear));
+      expect(sealed.subarray(clear, 200)).not.toEqual(plain.subarray(clear, 200));
+      expect(sealed.length).toBe(200 + 16 + 12 + 1);
+      expect(await openFrame(keys, sealed, clear)).toEqual(plain);
+    }
+  });
+
+  it("refuses a wrong key, an unknown key index and an altered header", async () => {
+    const key = await importFrameKey(raw(1));
+    const other = await importFrameKey(raw(2));
+    const plain = frame(80);
+    const sealed = await sealFrame(key, 3, frameIv(new Uint8Array(4), 1n), plain, 10);
+    expect(await openFrame(new Map([[3, other]]), sealed, 10)).toBeNull();
+    expect(await openFrame(new Map([[4, key]]), sealed, 10)).toBeNull();
+    const altered = sealed.slice();
+    altered[0] = altered[0]! ^ 1;
+    expect(await openFrame(new Map([[3, key]]), altered, 10)).toBeNull();
+    expect(await openFrame(new Map([[3, key]]), sealed.subarray(0, 20), 10)).toBeNull();
+  });
+
+  it("seals frames shorter than their header", async () => {
+    const key = await importFrameKey(raw(5));
+    const tiny = frame(2);
+    const sealed = await sealFrame(key, 0, frameIv(new Uint8Array(4), 5n), tiny, 10);
+    expect(await openFrame(new Map([[0, key]]), sealed, 10)).toEqual(tiny);
+  });
+
+  it("never repeats an IV and keeps the salt", () => {
+    const salt = new Uint8Array([1, 2, 3, 4]);
+    const a = frameIv(salt, 1n);
+    const b = frameIv(salt, 2n);
+    expect(a.subarray(0, 4)).toEqual(salt);
+    expect(a).not.toEqual(b);
+  });
+
+  it("derives the call key apart from the message key", () => {
+    const root = raw(3);
+    expect(voiceFrameKey(root, "10")).not.toEqual(channelKey(root, "10"));
+    expect(voiceFrameKey(root, "10")).not.toEqual(voiceFrameKey(root, "11"));
+    expect(voiceFrameKey(root, "10")).toEqual(voiceFrameKey(raw(3), "10"));
+  });
+});

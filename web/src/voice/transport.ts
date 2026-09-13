@@ -1,0 +1,47 @@
+/**
+ * What the voice session asks of a call transport. There are two: the
+ * peer-to-peer mesh (development and servers without Realtime keys) and
+ * Cloudflare Realtime SFU (every call on a server that has them).
+ */
+import type { VoiceState } from "@/api/types";
+
+export type MediaKind = "audio" | "video" | "screen";
+
+export interface SignalPayload {
+  description?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit | null;
+  /** Which of my stream ids carries which kind, so the receiver can label tracks. */
+  streams?: Partial<Record<MediaKind, string>>;
+}
+
+export interface TransportEvents {
+  onSignal: (to: string, payload: SignalPayload) => void;
+  onPeerState: (userId: string, state: RTCPeerConnectionState) => void;
+  onRemoteStream: (userId: string, kind: MediaKind, stream: MediaStream | null) => void;
+  onSpeaking: (userId: string, speaking: boolean) => void;
+  /** Something the person should hear about, like video pausing near the free allowance. */
+  onError?: (code: string, message: string) => void;
+}
+
+export interface VoiceTransport {
+  setLocalAudio(track: MediaStreamTrack | null): void;
+  setAudioGate(open: boolean): void;
+  setLocalVideo(track: MediaStreamTrack | null): void;
+  setLocalScreen(stream: MediaStream | null, bitrate?: number): void;
+  addPeer(userId: string): void;
+  removePeer(userId: string): void;
+  peerIds(): string[];
+  handleSignal(from: string, payload: SignalPayload): void;
+  /** Everyone in the call as the server last described them, this device included. */
+  setRoster(states: VoiceState[]): void;
+  /** The server acknowledged this device's voice state. */
+  joined(state: VoiceState): void;
+  setWatching(userId: string, on: boolean): void;
+  setVolume(userId: string, pct: number): void;
+  setLocalMute(userId: string, on: boolean): void;
+  setOutputMuted(on: boolean): void;
+  setMasterVolume(pct: number): void;
+  setOutputDevice(deviceId: string | null): Promise<void>;
+  stats(): Promise<{ rtt: number; loss: number }>;
+  close(): void;
+}

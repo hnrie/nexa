@@ -21,6 +21,15 @@ export function channelKey(root: Uint8Array, channelId: string): Uint8Array {
   return hkdf(sha256, root, NO_SALT, utf8.enc(`chan:${channelId}`), KEY_LEN);
 }
 
+/**
+ * The key a call's audio and video frames are sealed with. Everyone who can
+ * read the channel can hear its call; it is derived apart from the message
+ * key so that one never stands in for the other.
+ */
+export function voiceFrameKey(root: Uint8Array, channelId: string): Uint8Array {
+  return hkdf(sha256, root, NO_SALT, utf8.enc(`voice:${channelId}`), KEY_LEN);
+}
+
 /** In-memory cache of conversation root keys, keyed by conversation and epoch. */
 export class KeyRing {
   private readonly rings = new Map<string, Map<number, Uint8Array>>();
