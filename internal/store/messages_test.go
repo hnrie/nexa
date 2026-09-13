@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"evilion.xyz/chat/internal/ids"
 )
@@ -233,5 +234,55 @@ func TestReadStatesAndMentions(t *testing.T) {
 	n, _ := s.CountMentionsAfter(ctx, dm.ID, b.ID, m1.ID)
 	if n != 2 {
 		t.Errorf("count after m1 = %d", n)
+	}
+}
+
+func TestMentionsBeforeJoiningDoNotCount(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	owner, old, newbie := mkUser(t, s, "owner"), mkUser(t, s, "old"), mkUser(t, s, "newbie")
+	srv, err := s.CreateServer(ctx, owner.ID, "S")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddMember(ctx, srv.ID, old.ID); err != nil {
+		t.Fatal(err)
+	}
+	group, err := s.CreateGroupDM(ctx, owner.ID, []ids.ID{old.ID}, "g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ping := func(ch ids.ID) {
+		m := &Message{ChannelID: ch, AuthorID: owner.ID, Ciphertext: json.RawMessage(`{"v":1}`), MentionEveryone: true}
+		if err := s.InsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	general := *srv.SystemChannelID
+	ping(general)
+	ping(general)
+	ping(group.ID)
+	time.Sleep(5 * time.Millisecond) // the joins land in a later millisecond than the old pings
+	if _, err := s.AddMember(ctx, srv.ID, newbie.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddParticipant(ctx, group.ID, newbie.ID, owner.ID); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(5 * time.Millisecond)
+	ping(general)
+	ping(group.ID)
+
+	for _, tc := range []struct {
+		user         *User
+		general, grp int
+	}{{old, 3, 2}, {newbie, 1, 1}} {
+		states, err := s.ReadStatesFor(ctx, tc.user.ID, []ids.ID{general, group.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if states[0].MentionCount != tc.general || states[1].MentionCount != tc.grp {
+			t.Errorf("%s: general %d group %d, want %d %d", tc.user.Username, states[0].MentionCount, states[1].MentionCount, tc.general, tc.grp)
+		}
 	}
 }

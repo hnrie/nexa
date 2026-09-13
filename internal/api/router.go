@@ -99,6 +99,16 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limReg:     ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
 		limMsg:     ratelimit.New(ratelimit.Every(5, 5*time.Second), 5, 5*time.Minute),
 		limUpload:  ratelimit.New(ratelimit.Every(60, time.Minute), 60, time.Hour),
+		limUnfurl:  ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
+	}
+}
+
+// StartLimiters runs the rate limiters' idle-key sweepers until ctx is done.
+// Without them every IP and every username ever tried stays in memory for the
+// life of the process.
+func (s *Server) StartLimiters(ctx context.Context) {
+	for _, l := range []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl} {
+		l.Start(ctx)
 	}
 }
 

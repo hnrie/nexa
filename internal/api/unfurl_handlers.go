@@ -5,18 +5,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
-	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/unfurl"
 )
 
 func (s *Server) unfurlRoutes(mux *http.ServeMux) {
-	if s.limUnfurl == nil {
-		s.limUnfurl = ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute)
-	}
 	mux.Handle("GET /api/v1/unfurl", s.authed(s.handleUnfurl))
 }
 

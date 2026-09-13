@@ -7,11 +7,13 @@ import (
 	"crypto/rand"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/gateway"
+	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/unfurl"
@@ -90,6 +93,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go hub.Run(ctx)
+	srv.StartLimiters(ctx)
 	go maintenance(ctx, log, st, mediaStore, cfg.SessionTTL)
 
 	httpSrv := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
@@ -144,6 +148,9 @@ func maintenance(ctx context.Context, log *slog.Logger, st *store.Store, m *medi
 			}
 			log.Info("upload sweep", "removed", len(stale))
 		}
+		if n := sweepTemp(ctx, st, m.Dir, time.Now()); n > 0 {
+			log.Info("temp sweep", "removed", n)
+		}
 	}
 	t := time.NewTicker(time.Hour)
 	defer t.Stop()
@@ -163,16 +170,87 @@ func maintenance(ctx context.Context, log *slog.Logger, st *store.Store, m *medi
 	}
 }
 
-// loadOrCreateSecret returns a stable random secret persisted at path.
+// sweepTemp removes the temp files that requests cut short by a restart or
+// crash leave in the media directory, since only the request that made them
+// would have deleted them. Files still being written keep a fresh modification
+// time, so only ones idle for an hour go; a resumable spool also needs its
+// upload row to be gone, and gets the day a client has to come back for it.
+func sweepTemp(ctx context.Context, st *store.Store, dir string, now time.Time) int {
+	removed := 0
+	remove := func(path string) {
+		if os.Remove(path) == nil {
+			removed++
+		}
+	}
+	idle := func(path string, d time.Duration) bool {
+		info, err := os.Lstat(path)
+		return err == nil && info.Mode().IsRegular() && info.ModTime().Before(now.Add(-d))
+	}
+	entries, _ := os.ReadDir(filepath.Join(dir, "tmp"))
+	for _, e := range entries {
+		path := filepath.Join(dir, "tmp", e.Name())
+		switch {
+		case strings.HasPrefix(e.Name(), "upload-"):
+			if idle(path, time.Hour) {
+				remove(path)
+			}
+		case strings.HasPrefix(e.Name(), "resume-"):
+			id, err := ids.Parse(strings.TrimPrefix(e.Name(), "resume-"))
+			if err != nil || !idle(path, 24*time.Hour) {
+				continue
+			}
+			if _, err := st.UploadByID(ctx, id); errors.Is(err, store.ErrNotFound) {
+				remove(path)
+			}
+		}
+	}
+	variants, _ := filepath.Glob(filepath.Join(dir, "variants", "*", ".variant-*"))
+	for _, path := range variants {
+		if idle(path, time.Hour) {
+			remove(path)
+		}
+	}
+	return removed
+}
+
+// loadOrCreateSecret returns a stable random secret persisted at path. The
+// secret seals every two-factor seed, so a file that exists but cannot be read
+// or is too short stops startup instead of being replaced: a new secret would
+// lock every 2FA user out and destroy the one that still works.
 func loadOrCreateSecret(path string) ([]byte, error) {
-	if b, err := os.ReadFile(path); err == nil && len(b) >= 32 {
+	b, err := os.ReadFile(path)
+	if err == nil {
+		if len(b) < 32 {
+			return nil, fmt.Errorf("%s is shorter than 32 bytes; refusing to replace it", path)
+		}
 		return b, nil
 	}
-	b := make([]byte, 32)
+	if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	b = make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, b, 0o600); err != nil {
+	// Written beside the real path and renamed into place, so a crash half way
+	// never leaves a truncated secret behind.
+	tmp := path + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return nil, err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(tmp, path); err != nil {
 		return nil, err
 	}
 	return b, nil

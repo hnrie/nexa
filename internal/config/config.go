@@ -83,6 +83,9 @@ func Load(getenv func(string) string) (Config, error) {
 	str("TURNSTILE_SITE_KEY", &c.TurnstileSiteKey)
 	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
 	str("LOG_LEVEL", &c.LogLevel)
+	// Usernames are stored lowercase, so a name written with capitals would
+	// otherwise never match the account it means.
+	c.AdminUsername = strings.ToLower(c.AdminUsername)
 
 	ints := []struct {
 		k   string
@@ -106,8 +109,10 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if v := strings.TrimSpace(getenv("SESSION_TTL_DAYS")); v != "" {
 		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			return c, fmt.Errorf("SESSION_TTL_DAYS: expected a positive integer, got %q", v)
+		// A hundred years is "forever"; much larger overflows the duration and
+		// turns into a TTL that signs everyone out.
+		if err != nil || n <= 0 || n > 36500 {
+			return c, fmt.Errorf("SESSION_TTL_DAYS: expected 1..36500, got %q", v)
 		}
 		c.SessionTTL = time.Duration(n) * 24 * time.Hour
 	}

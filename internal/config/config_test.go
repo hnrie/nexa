@@ -30,7 +30,7 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestLoadOverridesAndValidation(t *testing.T) {
-	env := map[string]string{"LISTEN": "127.0.0.1:9000", "MAX_UPLOAD_BYTES": "10", "REGISTRATION": "invite", "TURN_URLS": "turn:a:3478, turns:b:5349", "PUBLIC_URL": "http://localhost:8090/"}
+	env := map[string]string{"LISTEN": "127.0.0.1:9000", "MAX_UPLOAD_BYTES": "10", "REGISTRATION": "invite", "TURN_URLS": "turn:a:3478, turns:b:5349", "PUBLIC_URL": "http://localhost:8090/", "ADMIN_USERNAME": " Boss ", "SESSION_TTL_DAYS": "36500"}
 	c, err := Load(func(k string) string { return env[k] })
 	if err != nil {
 		t.Fatal(err)
@@ -41,11 +41,17 @@ func TestLoadOverridesAndValidation(t *testing.T) {
 	if len(c.TurnURLs) != 2 || c.TurnURLs[1] != "turns:b:5349" {
 		t.Errorf("TurnURLs = %v", c.TurnURLs)
 	}
+	if c.AdminUsername != "boss" {
+		t.Errorf("AdminUsername not lowercased: %q", c.AdminUsername)
+	}
+	if c.SessionTTL != 36500*24*time.Hour {
+		t.Errorf("SessionTTL = %v", c.SessionTTL)
+	}
 	if c.PublicURL != "http://localhost:8090" {
 		t.Errorf("PublicURL trailing slash kept: %q", c.PublicURL)
 	}
 	// half a captcha setup is refused rather than quietly leaving captchas off
-	bad := map[string]string{"REGISTRATION": "sometimes", "MAX_UPLOAD_BYTES": "abc", "SESSION_TTL_DAYS": "0", "PUBLIC_URL": "chat.example", "LOG_LEVEL": "loud", "TURNSTILE_SITE_KEY": "site", "TURNSTILE_SECRET_KEY": "secret"}
+	bad := map[string]string{"REGISTRATION": "sometimes", "MAX_UPLOAD_BYTES": "abc", "SESSION_TTL_DAYS": "999999", "PUBLIC_URL": "chat.example", "LOG_LEVEL": "loud", "TURNSTILE_SITE_KEY": "site", "TURNSTILE_SECRET_KEY": "secret"}
 	for k, v := range bad {
 		_, err := Load(func(kk string) string {
 			if kk == k {

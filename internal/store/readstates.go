@@ -56,13 +56,23 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	args := []any{int64(uid), int64(uid), uid.String()}
+	// Mentions sent before the user joined the server or was added to the
+	// conversation never count, so a newcomer is not greeted with every old
+	// @everyone. The join time becomes the lowest snowflake of that millisecond
+	// (ids keep the millisecond above 22 bits). Counting per channel lets each
+	// count walk the messages_channel index from the floor instead of scanning
+	// the whole channel.
+	args := []any{int64(uid), ids.Epoch, uid.String(), int64(uid), int64(uid), int64(uid)}
 	args = append(args, idArgs(channels)...)
-	mrows, err := s.db.R.QueryContext(ctx, `SELECT m.channel_id, count(*) FROM messages m
-		LEFT JOIN read_states r ON r.channel_id = m.channel_id AND r.user_id = ?
-		WHERE m.author_id != ? AND m.id > coalesce(r.last_read_message_id, 0)
-		AND (m.mention_everyone = 1 OR EXISTS (SELECT 1 FROM json_each(m.mentions) WHERE value = ?))
-		AND m.channel_id IN (`+ph+`) GROUP BY m.channel_id`, args...)
+	mrows, err := s.db.R.QueryContext(ctx, `SELECT c.id, (SELECT count(*) FROM messages m
+			WHERE m.channel_id = c.id AND m.author_id != ?
+			AND m.id > max(coalesce(r.last_read_message_id, 0), coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0))
+			AND (m.mention_everyone = 1 OR EXISTS (SELECT 1 FROM json_each(m.mentions) WHERE value = ?)))
+		FROM channels c
+		LEFT JOIN read_states r ON r.channel_id = c.id AND r.user_id = ?
+		LEFT JOIN server_members sm ON sm.server_id = c.server_id AND sm.user_id = ?
+		LEFT JOIN dm_participants p ON p.channel_id = c.id AND p.user_id = ?
+		WHERE c.id IN (`+ph+`)`, args...)
 	if err != nil {
 		return nil, err
 	}
