@@ -54,7 +54,8 @@ export function Rail() {
   const openServer = useCallback(
     (id: string) => {
       const last = lastChannelOf(id);
-      nav(last && channels[last]?.server_id === id ? `/channels/${id}/${last}` : `/channels/${id}`);
+      // on phones the drawer stays open, showing this server's channels to pick from
+      nav(last && channels[last]?.server_id === id ? `/channels/${id}/${last}` : `/channels/${id}`, { state: { keepDrawer: true } });
     },
     [nav, channels],
   );
@@ -92,7 +93,7 @@ export function Rail() {
       <div className={s.item} data-selected={home} data-unread={unread && !home}>
         <span className={s.pill} />
         <Tooltip text="Direct Messages" side="right">
-          <button className={s.btn} aria-label="Direct Messages" onClick={() => nav("/channels/@me")}>
+          <button className={s.btn} aria-label="Direct Messages" onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
             <MessageCircle size={28} strokeWidth={2.2} />
           </button>
         </Tooltip>

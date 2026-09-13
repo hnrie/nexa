@@ -10,7 +10,6 @@
 .catToggle { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; height: 100%; padding: 0 0 0 2px; color: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; text-align: left; }
 .catName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .catAdd { display: flex; padding: 2px; color: inherit; border-radius: var(--radius-xs); opacity: 0; }
-.catHead:hover .catAdd { opacity: 1; }
 .catAdd:hover { color: var(--text-strong); }
 .row { position: relative; display: flex; align-items: center; height: 34px; margin: 1px 0; padding-right: 4px; border-radius: var(--radius-xs); color: var(--text-channel); }
 .row:hover { background: var(--bg-hover); color: var(--text); }
@@ -30,10 +29,17 @@
 .row[data-selected="true"] .lock, .row:hover .lock { background: var(--bg-selected); }
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: none; gap: 4px; }
-.row:hover .actions { display: flex; }
 .action { display: flex; padding: 2px; color: var(--text-muted); border-radius: var(--radius-xs); }
 .action:hover { color: var(--text-strong); }
 .mention { min-width: 16px; height: 16px; padding: 0 4px; margin-left: 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; flex: none; }
-.row:hover .mention { display: none; }
 .empty { padding: 24px 8px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .limit { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+/* Buttons that show on hover stay hover-only: on a touch screen iOS treats a
+   tap that reveals them as a hover and drops the click, and an invisible "+" still
+   takes taps. Long-press menus offer the same actions there. */
+@media (hover: hover) {
+  .catHead:hover .catAdd { opacity: 1; }
+  .row:hover .actions { display: flex; }
+  .row:hover .mention { display: none; }
+}
+@media (hover: none) { .catAdd { display: none; } }

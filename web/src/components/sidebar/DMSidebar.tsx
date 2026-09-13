@@ -36,6 +36,12 @@ export function DMSidebar() {
   // underneath, so you can see where you are.
   const activeChannel = active ? channels[active] : undefined;
   const activeConvo = activeChannel?.type === "subchat" ? (activeChannel.parent_id ?? undefined) : active;
+  // Picking something closes the phone drawer, even the page already open,
+  // which navigating to the same address would not.
+  const go = (path: string) => {
+    nav(path);
+    useUI.getState().setLeftOpen(false);
+  };
 
   return (
     <div className={s.sidebar}>
@@ -43,7 +49,7 @@ export function DMSidebar() {
         <button className={s.searchBtn} onClick={() => setQuickSwitcher(true)}>Find or start a conversation</button>
       </div>
       <div className={s.scroll}>
-        <button className={s.nav} data-selected={loc.pathname === "/channels/@me"} onClick={() => nav("/channels/@me")}>
+        <button className={s.nav} data-selected={loc.pathname === "/channels/@me"} onClick={() => go("/channels/@me")}>
           <span className={s.navIcon}><Users size={22} /></span>
           <span>Friends</span>
         </button>
@@ -81,7 +87,7 @@ export function DMSidebar() {
               data-parent-selected={activeConvo === ch.id && active !== ch.id}
               data-unread={unread && active !== ch.id}
               data-channel={ch.id}
-              onClick={() => nav(`/channels/@me/${ch.id}`)}
+              onClick={() => go(`/channels/@me/${ch.id}`)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
@@ -101,7 +107,7 @@ export function DMSidebar() {
                 onClick={(e) => {
                   e.stopPropagation();
                   if (ch.type === "group_dm") openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
-                  else void closeDM(ch.id, active === ch.id ? nav : undefined);
+                  else void closeDM(ch.id, nav);
                 }}
               >
                 <X size={16} />
@@ -116,7 +122,7 @@ export function DMSidebar() {
                   data-selected={active === sub.id}
                   data-unread={isUnread(srs, sub.last_message_id) && active !== sub.id}
                   data-channel={sub.id}
-                  onClick={() => nav(`/channels/@me/${sub.id}`)}
+                  onClick={() => go(`/channels/@me/${sub.id}`)}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     openContextMenu({ x: e.clientX, y: e.clientY, items: subchatMenuItems(sub, { openModal, nav }) });

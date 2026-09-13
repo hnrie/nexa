@@ -10,6 +10,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { joinVoice } from "@/voice/session";
 
 function nameOf(ch: Channel): string {
   return channelDisplayName(ch, useUsers.getState().byId, useAuth.getState().me?.id, friendNicknames(useRelationships.getState().byUser));
@@ -20,12 +21,27 @@ function forget(channelId: string): void {
   useMessages.getState().clearChannel(channelId);
 }
 
+/**
+ * Whether the page at `pathname` shows this conversation or one of its
+ * subchats, so closing the conversation has to take the user somewhere else.
+ */
+export function isViewingDM(pathname: string, channelId: string, byId: Record<string, Channel | undefined>): boolean {
+  const open = pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
+  if (!open) return false;
+  return open === channelId || byId[open]?.parent_id === channelId;
+}
+
+/** Sends the user to Friends only when they are reading the conversation that went away. */
+function leave(channelId: string, nav?: (p: string) => void): void {
+  if (nav && isViewingDM(window.location.pathname, channelId, useChannels.getState().byId)) nav("/channels/@me");
+}
+
 /** Closes a conversation for you; a new message brings it back. */
 export async function closeDM(channelId: string, nav?: (p: string) => void): Promise<void> {
   try {
     await channelsApi.close(channelId);
+    leave(channelId, nav);
     forget(channelId);
-    nav?.("/channels/@me");
   } catch (err) {
     useUI.getState().toast(err instanceof ApiError ? err.message : "Could not close that conversation.", "error");
   }
@@ -35,8 +51,8 @@ export async function closeDM(channelId: string, nav?: (p: string) => void): Pro
 export async function purgeDM(channelId: string, nav?: (p: string) => void): Promise<void> {
   try {
     await channelsApi.purge(channelId);
+    leave(channelId, nav);
     forget(channelId);
-    nav?.("/channels/@me");
   } catch (err) {
     useUI.getState().toast(err instanceof ApiError ? err.message : "Could not delete that conversation.", "error");
   }
@@ -72,7 +88,14 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
     items.push({ id: "add", label: "Add Friends", onSelect: () => ctx.openModal("createDM", { groupId: channelId }) });
   } else {
     items.push({ id: "profile", label: "Profile", onSelect: () => { const other = ch.recipient_ids.find((id) => id !== me?.id); if (other) ctx.openModal("profile", { userId: other }); } });
-    items.push({ id: "call", label: "Start Call", onSelect: () => ctx.nav(`/channels/@me/${channelId}`) });
+    items.push({
+      id: "call",
+      label: "Start Call",
+      onSelect: () => {
+        ctx.nav(`/channels/@me/${channelId}`);
+        void joinVoice(channelId);
+      },
+    });
   }
   items.push({
     id: "mute",

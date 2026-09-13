@@ -10,8 +10,9 @@
 .large { border-radius: var(--radius-xs); max-width: 100%; height: auto; }
 .gifBadge { position: absolute; left: 8px; bottom: 8px; padding: 2px 6px; border-radius: 4px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 700; }
 .star { position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; display: none; align-items: center; justify-content: center; }
-.media:hover .star, .star[data-on="true"] { display: inline-flex; }
-/* a touch screen has no hover, and a tap on the GIF opens it instead */
+.star[data-on="true"] { display: inline-flex; }
+/* a pointer reveals the star on hover; a touch screen, where a tap that reveals it would be taken as a hover, shows it always */
+@media (hover: hover) { .media:hover .star { display: inline-flex; } }
 @media (hover: none) { .star { display: inline-flex; } }
 .star[data-on="true"] { color: var(--warning); }
 .video { position: relative; width: 400px; max-width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-xs); overflow: hidden; background: #000; }

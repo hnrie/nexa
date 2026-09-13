@@ -29,7 +29,7 @@
 .inspector .big { font-size: 26px; line-height: 1; }
 .inspector .name { font-weight: 600; color: var(--text); }
 .pop[data-anchored="true"] { z-index: 120; }
-@media (max-width: 767px) { .pop { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: 100% !important; max-width: none; height: 60vh !important; border-radius: var(--radius-md) var(--radius-md) 0 0; } }
+@media (max-width: 767px) { .pop { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: 100% !important; max-width: none; height: 60vh !important; padding-bottom: env(safe-area-inset-bottom); border-radius: var(--radius-md) var(--radius-md) 0 0; } }
 /* GifGrid: two columns placed by script, scrolling down only */
 .gifScroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .gifGrid { position: relative; margin: 8px; }
@@ -38,7 +38,8 @@
 .gifPick:focus-visible { outline-offset: -2px; }
 .gifPick img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .gifRemove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; display: none; align-items: center; justify-content: center; }
-.gifCell:hover .gifRemove, .gifCell:focus-within .gifRemove, .gifCell[data-dead="true"] .gifRemove { display: inline-flex; }
+.gifCell:focus-within .gifRemove, .gifCell[data-dead="true"] .gifRemove { display: inline-flex; }
+@media (hover: hover) { .gifCell:hover .gifRemove { display: inline-flex; } }
 
 .cellImg { width: 32px; height: 32px; object-fit: contain; }
 .sectionRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -58,7 +59,10 @@
 .gifTab { padding: 4px 10px; border-radius: var(--radius-xs); font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface); }
 .gifTab[data-on="true"] { background: var(--bg-selected); color: var(--text-strong); }
 .gifStar { position: absolute; top: 4px; right: 4px; display: flex; padding: 3px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; opacity: 0; }
-.gifCell:hover .gifStar, .gifCell:focus-within .gifStar { opacity: 1; }
+.gifCell:focus-within .gifStar { opacity: 1; }
+/* hover-only: on touch an invisible star in the corner would take taps meant for the GIF; long-press offers Add to Favorites */
+@media (hover: hover) { .gifCell:hover .gifStar { opacity: 1; } }
+@media (hover: none) { .gifStar:not([data-on="true"]) { display: none; } }
 .gifStar[data-on="true"] { opacity: 1; color: var(--warning); }
 .inspector .big img { width: 28px; height: 28px; object-fit: contain; display: block; }
 .gifCell[data-dead="true"] { display: flex; align-items: center; justify-content: center; }

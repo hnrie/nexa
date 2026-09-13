@@ -177,6 +177,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           className={s.channel}
           onClick={() => {
             nav(`/channels/${serverId}/${ch.id}`);
+            // closes the phone drawer even when this channel was already open
+            useUI.getState().setLeftOpen(false);
             if (ch.type === "voice") void joinVoice(ch.id);
           }}
           aria-current={selected ? "page" : undefined}

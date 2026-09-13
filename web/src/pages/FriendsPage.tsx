@@ -162,7 +162,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={presenceUser.display_name} size={32} status={rel.type === "friend" ? status : null} />
       <div className={s.rowText}>
         <span className={s.rowName}>
-          {presenceUser.display_name}
+          <span className={s.rowDisplay}>{presenceUser.display_name}</span>
           <span className={s.rowUser}>{presenceUser.username}</span>
         </span>
         <span className={s.rowSub}>{sub}</span>

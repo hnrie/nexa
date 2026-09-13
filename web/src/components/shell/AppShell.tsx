@@ -10,10 +10,14 @@ import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import s from "./AppShell.module.css";
 
+/** Controls a horizontal drag already means something to. */
+const NATIVE_DRAG = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [role=slider], [data-native-press]";
+
 /** Three-pane desktop layout; on phones the rail+sidebar live in a left drawer. */
 export function AppShell({ children }: { children: ReactNode }) {
   const mobile = useIsMobile();
   const leftOpen = useUI((u) => u.leftOpen);
+  const rightOpen = useUI((u) => u.rightOpen);
   const setLeftOpen = useUI((u) => u.setLeftOpen);
   const setRightOpen = useUI((u) => u.setRightOpen);
   const connection = useUI((u) => u.connection);
@@ -37,9 +41,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     installVoice();
   }, []);
 
+  // Going somewhere closes the drawers. Picking a server or Direct Messages in
+  // the rail only changes which list the drawer shows, so the drawer stays open
+  // for the user to choose a channel or conversation in it.
+  const keepDrawer = (loc.state as { keepDrawer?: boolean } | null)?.keepDrawer === true;
   useEffect(() => {
-    setLeftOpen(false);
+    if (!keepDrawer) setLeftOpen(false);
     setRightOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loc.pathname, setLeftOpen, setRightOpen]);
 
   useEffect(() => {
@@ -53,7 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   // --- swiping the drawers -------------------------------------------------
   // The drawer follows the finger and snaps when it is let go, so it feels
   // like a drawer rather than a shortcut that either fires or does not.
-  const drag = useRef<{ x: number; y: number; t: number; axis: "" | "x" | "y"; from: boolean } | null>(null);
+  // `right` is a swipe that started with the member list open; it can only push that list away.
+  const drag = useRef<{ x: number; y: number; t: number; axis: "" | "x" | "y"; from: boolean; right: boolean } | null>(null);
   const [dragX, setDragX] = useState<number | null>(null);
 
   const drawerWidth = () => Math.min(420, Math.max(240, window.innerWidth - 56));
@@ -76,8 +86,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     const t = e.touches[0];
     if (!mobile || !t) return;
     if (document.querySelector("[data-modal-layer]")) return;
+    // a drag on a slider or in a text field moves the slider or the caret, not the drawer
+    if (e.target instanceof Element && e.target.closest(NATIVE_DRAG)) return;
     if (scrollsSideways(e.target)) return;
-    drag.current = { x: t.clientX, y: t.clientY, t: Date.now(), axis: "", from: leftOpen };
+    drag.current = { x: t.clientX, y: t.clientY, t: Date.now(), axis: "", from: leftOpen, right: rightOpen && !leftOpen };
   };
 
   const onTouchMove = (e: TouchEvent) => {
@@ -92,6 +104,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       if (d.axis === "y") drag.current = null;
       return;
     }
+    if (d.right) return;
     const w = drawerWidth();
     const at = d.from ? w + dx : dx;
     setDragX(Math.max(0, Math.min(w, at)));
@@ -108,6 +121,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     const dx = t.clientX - d.x;
     const w = drawerWidth();
     const speed = dx / Math.max(1, Date.now() - d.t);
+    if (d.right) {
+      setDragX(null);
+      if (dx > 60 || speed > 0.4) setRightOpen(false);
+      return;
+    }
     const open = Math.abs(speed) > 0.4 ? dx > 0 : (d.from ? w + dx : dx) > w * 0.4;
     setDragX(null);
     if (open) setLeftOpen(true);
