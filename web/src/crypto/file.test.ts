@@ -1,5 +1,5 @@
 import { equal, randomBytes, readU32be, utf8 } from "./bytes";
-import { CHUNK, decryptFile, encryptFile } from "./file";
+import { CHUNK, decryptFile, encryptFile, encryptFrames, encryptedSize, newFileKey } from "./file";
 import { DecryptError } from "./keys";
 
 const HEADER = 4 + 8;
@@ -156,6 +156,26 @@ describe("encryptFile / decryptFile", () => {
       decSeen.push([done, total]);
     });
     expect(decSeen).toEqual([[0, 0]]);
+  });
+});
+
+describe("encryptedSize / encryptFrames", () => {
+  it("knows the ciphertext size before encrypting", async () => {
+    for (const size of [0, 1, CHUNK - 1, CHUNK, CHUNK + 1, 9 * 1024 * 1024]) {
+      const { blob } = await encryptFile(new Blob([pattern(size)]));
+      expect(blob.size).toBe(encryptedSize(size));
+    }
+  });
+
+  it("yields the header, then one frame per chunk, which together decrypt", async () => {
+    const size = 2 * CHUNK + 5;
+    const data = pattern(size);
+    const key = newFileKey();
+    const frames: Uint8Array[] = [];
+    for await (const f of encryptFrames(new Blob([data]), key)) frames.push(f);
+    expect(frames.map((f) => f.length)).toEqual([HEADER, LEN_PREFIX + CHUNK + TAG, LEN_PREFIX + CHUNK + TAG, LEN_PREFIX + 5 + TAG]);
+    const out = await bytesOf(await decryptFile(new Blob(frames as BlobPart[]), key));
+    expect(firstDiff(out, data)).toBe(-1);
   });
 });
 

@@ -42,6 +42,9 @@ describe("crypto module surface", () => {
       // file
       "CHUNK",
       "encryptFile",
+      "encryptFrames",
+      "encryptedSize",
+      "newFileKey",
       "decryptFile",
       // keystore
       "keystore",

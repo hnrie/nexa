@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { createReadStream, existsSync } from "node:fs";
 import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
 const API = process.env["VITE_API_TARGET"] ?? "http://127.0.0.1:8090";
@@ -13,8 +14,12 @@ const TWEMOJI_DIR = fileURLToPath(new URL("./node_modules/@twemoji/svg", import.
  * never tells a third party who is reading what.
  */
 function twemoji(): Plugin {
+  let outDir = fileURLToPath(new URL("./dist", import.meta.url));
   return {
     name: "twemoji-assets",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
     configureServer(server) {
       server.middlewares.use("/twemoji", (req, res, next) => {
         const name = (req.url ?? "").replace(/^\//, "").split("?")[0] ?? "";
@@ -26,7 +31,7 @@ function twemoji(): Plugin {
       });
     },
     async closeBundle() {
-      const out = fileURLToPath(new URL("./dist/twemoji", import.meta.url));
+      const out = `${outDir}/twemoji`;
       await mkdir(out, { recursive: true });
       await cp(TWEMOJI_DIR, out, { recursive: true, filter: (src) => !src.endsWith(".json") && !src.endsWith(".md") && !src.endsWith("license") });
       // A list of what the set actually holds. Twemoji is behind Unicode, so
@@ -63,10 +68,14 @@ const KEEP_ASSETS_MS = 7 * 24 * 60 * 60 * 1000;
  * content hash, so nothing here is ever overwritten, only added to.
  */
 function pruneOldAssets(): Plugin {
+  let outDir = fileURLToPath(new URL("./dist", import.meta.url));
   return {
     name: "prune-old-assets",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
     async closeBundle() {
-      const dir = fileURLToPath(new URL("./dist/assets", import.meta.url));
+      const dir = `${outDir}/assets`;
       if (!existsSync(dir)) return;
       const cutoff = Date.now() - KEEP_ASSETS_MS;
       for (const name of await readdir(dir)) {

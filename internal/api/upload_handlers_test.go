@@ -162,3 +162,76 @@ func TestUploadChunkTooBig(t *testing.T) {
 		t.Errorf("an over-sized piece should be refused: %d %v", res.StatusCode, body)
 	}
 }
+
+// A connection that drops part-way through a piece can leave bytes in the
+// spool that the database never counted. The retry must still go through.
+func TestResumeAfterAPartialPiece(t *testing.T) {
+	srv, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	body := bytes.Repeat([]byte("0123456789"), 500)
+	_, created := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": len(body)})
+	id := created["id"].(string)
+
+	if r, out := sendChunk(t, ts, token, id, 0, body[:2000]); r.StatusCode != 200 {
+		t.Fatalf("first piece: %d %v", r.StatusCode, out)
+	}
+	// what a request cut off mid-body leaves behind
+	parsed, _ := parseID(id)
+	f, err := os.OpenFile(srv.Media.SpoolPath(parsed), os.O_WRONLY|os.O_APPEND, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write([]byte("GARBAGE-FROM-A-DROPPED-REQUEST")); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	// the client asks where it got to and sends from there
+	_, state := do(t, ts, "GET", "/api/v1/uploads/"+id, token, nil)
+	if state["received"].(float64) != 2000 {
+		t.Fatalf("the database is the record of what arrived: %v", state)
+	}
+	if r, out := sendChunk(t, ts, token, id, 2000, body[2000:]); r.StatusCode != 200 {
+		t.Fatalf("retry after a partial piece: %d %v", r.StatusCode, out)
+	}
+	_, fin := do(t, ts, "POST", "/api/v1/uploads/"+id+"/finish", token, nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/media/attachments/"+fin["blob_id"].(string), nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	got, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer got.Body.Close()
+	back, _ := io.ReadAll(got.Body)
+	if !bytes.Equal(back, body) {
+		t.Fatalf("stored bytes differ: got %d bytes, want %d", len(back), len(body))
+	}
+}
+
+// A single request is only for what fits through the proxy; bigger files have
+// to use the resumable path, and the client is told where that line is.
+func TestSingleUploadIsCapped(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	_, idB := register(t, ts, "bob")
+	dm := dmBetween(t, ts, tokA, idB)
+
+	_, info := do(t, ts, "GET", "/api/v1/instance", "", nil)
+	if info["upload_single_bytes"].(float64) != float64(MaxSingleUploadBytes) {
+		t.Errorf("the client needs the single-request ceiling: %v", info)
+	}
+
+	// the smaller of the two limits applies to one request
+	srv.Cfg.MaxUploadBytes = 1000
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/channels/"+dm+"/attachments", bytes.NewReader(bytes.Repeat([]byte("z"), 2000)))
+	req.Header.Set("Authorization", "Bearer "+tokA)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 413 {
+		t.Errorf("an over-limit single upload should be refused: %d", res.StatusCode)
+	}
+}

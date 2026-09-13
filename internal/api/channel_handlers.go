@@ -376,8 +376,14 @@ func (s *Server) handleAttachmentUpload(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, ErrRateLimited)
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, s.Cfg.MaxUploadBytes+1)
-	b, err := s.Media.PutEncrypted(r.Context(), r.Body, s.Cfg.MaxUploadBytes, me.ID)
+	// One request only takes what fits through the proxy in front; anything
+	// larger goes through /uploads in pieces.
+	limit := s.Cfg.MaxUploadBytes
+	if limit > MaxSingleUploadBytes {
+		limit = MaxSingleUploadBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
+	b, err := s.Media.PutEncrypted(r.Context(), r.Body, limit, me.ID)
 	if err != nil {
 		WriteError(w, err)
 		return

@@ -15,7 +15,7 @@ import (
 // 'wasm-unsafe-eval'; inline style attributes (role colours) need
 // 'unsafe-inline' for styles; embeds may load https images/media directly;
 // only the privacy-enhanced YouTube host may be framed.
-const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' wss: https:; frame-src https://www.youtube-nocookie.com; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' wss: https:; frame-src 'self' https://www.youtube-nocookie.com; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 
 func init() {
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
@@ -57,6 +57,14 @@ func (s *Server) staticHandler() http.Handler {
 		// refuses to run, and any cache in front of this, the browser's own or
 		// a CDN's, then keeps that HTML under the script's address.
 		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" {
+			w.Header().Set("Cache-Control", "no-store")
+			WriteError(w, ErrNotFound)
+			return
+		}
+		// Downloads are answered by the service worker. One that reaches here
+		// has no worker behind it, and must not load a second copy of the app
+		// into the hidden frame that asked.
+		if strings.HasPrefix(p, "/__download/") {
 			w.Header().Set("Cache-Control", "no-store")
 			WriteError(w, ErrNotFound)
 			return

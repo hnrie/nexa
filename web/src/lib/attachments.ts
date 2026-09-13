@@ -1,23 +1,34 @@
 import { channels as channelsApi } from "@/api/channels";
 import { uploads as uploadsApi } from "@/api/uploads";
+import { bufferSource } from "@/crypto/aes";
 import { b64 } from "@/crypto/bytes";
-import { encryptFile } from "@/crypto/file";
+import { encryptFile, encryptFrames, encryptedSize, newFileKey } from "@/crypto/file";
 import type { AttachmentMeta } from "@/crypto/message";
 
 /** Fallback until the server says what it accepts. */
 export const MAX_UPLOAD = 100 * 1024 * 1024;
 
-/** What this server takes, and how much fits in one request. */
-let limits = { max: MAX_UPLOAD, chunk: 32 * 1024 * 1024 };
+/**
+ * What this server takes: the largest file, the most one request may carry
+ * (Cloudflare turns away a body over 100 MB), and the size of each piece of
+ * a file too big for that.
+ */
+const limits = { max: MAX_UPLOAD, single: 90 * 1024 * 1024, chunk: 32 * 1024 * 1024 };
 
 /** Remembers the limits the server reported, so the composer can say no early. */
-export function setUploadLimits(max: number, chunk: number): void {
-  if (max > 0) limits.max = max;
-  if (chunk > 0) limits.chunk = chunk;
+export function setUploadLimits(reported: { max?: number | undefined; single?: number | undefined; chunk?: number | undefined }): void {
+  if (reported.max && reported.max > 0) limits.max = reported.max;
+  if (reported.single && reported.single > 0) limits.single = reported.single;
+  if (reported.chunk && reported.chunk > 0) limits.chunk = reported.chunk;
 }
 
 export function uploadLimit(): number {
   return limits.max;
+}
+
+/** Whether a file of `size` bytes is within the limit once encrypted, which is what the server measures. */
+export function fitsUploadLimit(size: number): boolean {
+  return encryptedSize(size) <= limits.max;
 }
 
 export interface Staged {
@@ -49,12 +60,26 @@ async function imageDims(file: File): Promise<{ w: number; h: number } | null> {
   }
 }
 
-/** Encrypts and uploads a staged file, returning the metadata that rides inside the message. */
+/**
+ * Encrypts and uploads a staged file, returning the metadata that rides inside the message.
+ *
+ * A file that fits in one request is encrypted and sent whole. Anything larger
+ * is encrypted a chunk at a time and sent a piece at a time as it goes, so
+ * only one piece is ever held in memory however big the file is.
+ */
 export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
-  if (st.file.size > limits.max) throw new Error(`That file is over this server's ${formatSize(limits.max)} limit.`);
-  const { key, blob } = await encryptFile(st.file, (done, total) => onProgress(total ? (done / total) * 0.4 : 0));
-  const send = (loaded: number, total: number) => onProgress(0.4 + (total ? loaded / total : 0) * 0.6);
-  const res = blob.size > limits.chunk ? await uploadInPieces(blob, send) : await channelsApi.uploadAttachment(channelId, blob, send);
+  if (!fitsUploadLimit(st.file.size)) throw new Error(`That file is over this server's ${formatSize(limits.max)} limit.`);
+  const total = encryptedSize(st.file.size);
+  let key: Uint8Array;
+  let res: { blob_id: string; size: number };
+  if (total <= limits.single) {
+    const enc = await encryptFile(st.file, (done, size) => onProgress(size ? (done / size) * 0.4 : 0));
+    key = enc.key;
+    res = await channelsApi.uploadAttachment(channelId, enc.blob, (loaded, size) => onProgress(0.4 + (size ? loaded / size : 0) * 0.6));
+  } else {
+    key = newFileKey();
+    res = await uploadInPieces(encryptFrames(st.file, key), total, (sent) => onProgress(sent / total));
+  }
   const dims = await imageDims(st.file);
   const meta: AttachmentMeta = { blob_id: res.blob_id, name: st.name || st.file.name, type: st.file.type || "application/octet-stream", size: st.file.size, key: b64.enc(key) };
   if (dims) {
@@ -75,38 +100,58 @@ function formatSize(bytes: number): string {
 const CHUNK_TRIES = 4;
 
 /**
- * Sends a file that is too big for one request, a piece at a time.
+ * Sends a file too big for one request, a piece at a time, straight from the
+ * encryptor: each piece is gathered, sent and let go before the next is made.
  *
- * The server says where it expects the next piece to start, so a dropped
- * connection costs that piece rather than the whole transfer. Anything already
- * spooled is thrown away if the upload is abandoned.
+ * The server says how much has landed, so a dropped connection costs at most
+ * that one piece rather than the whole transfer. Anything already spooled is
+ * thrown away if the upload is abandoned.
  */
-async function uploadInPieces(blob: Blob, onProgress: (loaded: number, total: number) => void): Promise<{ blob_id: string; size: number }> {
-  const session = await uploadsApi.create(blob.size);
-  const chunk = Math.max(1, Math.min(session.chunk_size || limits.chunk, limits.chunk));
-  let sent = session.received;
-  try {
-    while (sent < blob.size) {
-      const end = Math.min(sent + chunk, blob.size);
-      const piece = blob.slice(sent, end);
-      let tries = 0;
-      for (;;) {
-        try {
-          sent = await uploadsApi.chunk(session.id, sent, piece, (loaded) => onProgress(sent + loaded, blob.size));
-          break;
-        } catch (err) {
-          tries += 1;
-          if (tries >= CHUNK_TRIES) throw err;
-          // ask where it got to, then carry on from there
-          const state = await uploadsApi.status(session.id).catch(() => null);
-          if (!state) throw err;
-          sent = state.received;
-          if (sent >= blob.size) break;
-          await new Promise((r) => setTimeout(r, 400 * tries));
-        }
+export async function uploadInPieces(frames: AsyncIterable<Uint8Array>, total: number, onProgress: (sent: number) => void): Promise<{ blob_id: string; size: number }> {
+  const session = await uploadsApi.create(total);
+  const pieceSize = Math.max(1, Math.min(session.chunk_size || limits.chunk, limits.chunk));
+  let sent = 0;
+  let pending: BlobPart[] = [];
+  let pendingLen = 0;
+
+  const flush = async (): Promise<void> => {
+    const piece = new Blob(pending);
+    pending = [];
+    pendingLen = 0;
+    const start = sent;
+    const end = start + piece.size;
+    let tries = 0;
+    while (sent < end) {
+      try {
+        const received = await uploadsApi.chunk(session.id, sent, piece.slice(sent - start), (loaded) => onProgress(sent + loaded));
+        if (received <= sent || received > end) throw new Error("The server lost track of this upload.");
+        sent = received;
+      } catch (err) {
+        tries += 1;
+        if (tries >= CHUNK_TRIES) throw err;
+        // ask where it got to, then carry on from there
+        const state = await uploadsApi.status(session.id).catch(() => null);
+        if (!state || state.received < start || state.received > end) throw err;
+        sent = state.received;
+        if (sent < end) await new Promise((r) => setTimeout(r, 400 * tries));
       }
-      onProgress(sent, blob.size);
+      onProgress(sent);
     }
+  };
+
+  try {
+    for await (const frame of frames) {
+      let rest = frame;
+      while (rest.length > 0) {
+        const part = rest.subarray(0, pieceSize - pendingLen);
+        pending.push(bufferSource(part));
+        pendingLen += part.length;
+        rest = rest.subarray(part.length);
+        if (pendingLen === pieceSize) await flush();
+      }
+    }
+    if (pendingLen > 0) await flush();
+    if (sent !== total) throw new Error("The upload came out a different size than expected.");
     return await uploadsApi.finish(session.id);
   } catch (err) {
     await uploadsApi.cancel(session.id).catch(() => undefined);

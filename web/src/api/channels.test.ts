@@ -123,10 +123,28 @@ describe("attachments", () => {
       return Promise.resolve(new Response(new Uint8Array([7, 8, 9])));
     }) as unknown as typeof fetch;
 
-    const buf = await channels.downloadAttachment("77");
+    const blob = await channels.downloadAttachment("77");
     expect(seenUrl).toBe("/media/attachments/77");
     expect(seenAuth).toBe("Bearer tok");
-    expect(new Uint8Array(buf)).toEqual(new Uint8Array([7, 8, 9]));
+    expect(blob).toBeInstanceOf(Blob);
+    expect(new Uint8Array(await blob.arrayBuffer())).toEqual(new Uint8Array([7, 8, 9]));
+  });
+
+  it("refuses a file whose size is not the one it was sent with", async () => {
+    const serve = (body: Uint8Array<ArrayBuffer>, headers: Record<string, string> = {}) =>
+      (() => Promise.resolve(new Response(body, { headers }))) as unknown as typeof fetch;
+
+    api.fetchImpl = serve(new Uint8Array(10));
+    expect(await (await channels.downloadAttachment("77", undefined, 10)).arrayBuffer()).toEqual(new Uint8Array(10).buffer);
+
+    api.fetchImpl = serve(new Uint8Array(10), { "Content-Length": "10" });
+    expect((await channels.downloadAttachment("77", undefined, 4).catch((e: unknown) => e)) as ApiError).toMatchObject({ code: "size_mismatch" });
+
+    // no length up front: stops once it has read past what was expected
+    api.fetchImpl = serve(new Uint8Array(10));
+    expect((await channels.downloadAttachment("77", undefined, 4).catch((e: unknown) => e)) as ApiError).toMatchObject({ code: "size_mismatch" });
+    api.fetchImpl = serve(new Uint8Array(3));
+    expect((await channels.downloadAttachment("77", undefined, 4).catch((e: unknown) => e)) as ApiError).toMatchObject({ code: "size_mismatch" });
   });
 
   it("throws an ApiError when the download fails", async () => {

@@ -1,7 +1,10 @@
-import { api, errorFromResponse } from "./client";
+import { ApiError, api, errorFromResponse } from "./client";
 import type { Channel, Invite, Message, Snowflake } from "./types";
 
 type Progress = (loaded: number, total: number) => void;
+
+/** How much of a download is gathered before it is handed to the browser's blob store. */
+const FOLD_BYTES = 16 * 1024 * 1024;
 
 export function attachmentUrl(blobId: Snowflake): string {
   return `${api.baseUrl}/media/attachments/${blobId}`;
@@ -76,7 +79,14 @@ export const channels = {
     if (onProgress) opts.onProgress = onProgress;
     return api.upload(`/channels/${channelId}/attachments`, data, opts);
   },
-  async downloadAttachment(blobId: Snowflake, signal?: AbortSignal): Promise<ArrayBuffer> {
+  /**
+   * The ciphertext, as a Blob the browser may keep out of the page's own
+   * memory. With `expected`, a file of any other size is refused as soon as
+   * that shows, rather than after all of it has come down: the size comes from
+   * the message, and a sender could otherwise pass a huge file off as a small
+   * picture that everyone's client loads by itself.
+   */
+  async downloadAttachment(blobId: Snowflake, signal?: AbortSignal, expected?: number): Promise<Blob> {
     const headers: Record<string, string> = {};
     const token = api.getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -84,7 +94,40 @@ export const channels = {
     if (signal) init.signal = signal;
     const res = await api.fetchImpl(attachmentUrl(blobId), init);
     if (!res.ok) throw await errorFromResponse(res);
-    return res.arrayBuffer();
+    if (expected === undefined || !res.body) return res.blob();
+    const wrongSize = (): ApiError => new ApiError(0, "size_mismatch", "That file is not the size its message says.");
+    const declared = res.headers.get("Content-Length");
+    if (declared !== null && !res.headers.has("Content-Encoding")) {
+      if (Number(declared) !== expected) {
+        void res.body.cancel().catch(() => undefined);
+        throw wrongSize();
+      }
+      // the browser holds a response to its stated length, so its own fast read is safe
+      return res.blob();
+    }
+    const reader = res.body.getReader();
+    let whole = new Blob([]);
+    let batch: BlobPart[] = [];
+    let batchLen = 0;
+    let got = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      got += value.length;
+      if (got > expected) {
+        void reader.cancel().catch(() => undefined);
+        throw wrongSize();
+      }
+      batch.push(value as Uint8Array<ArrayBuffer>);
+      batchLen += value.length;
+      if (batchLen >= FOLD_BYTES) {
+        whole = new Blob([whole, ...batch]);
+        batch = [];
+        batchLen = 0;
+      }
+    }
+    if (got !== expected) throw wrongSize();
+    return new Blob([whole, ...batch]);
   },
   pins(id: Snowflake): Promise<Message[]> {
     return api.request<Message[]>("GET", `/channels/${id}/pins`);

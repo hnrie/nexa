@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
-import { stage, uploadLimit, uploadStaged, type Staged } from "@/lib/attachments";
+import { fitsUploadLimit, stage, uploadLimit, uploadStaged, type Staged } from "@/lib/attachments";
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
@@ -228,7 +228,7 @@ export function Composer({ channel }: { channel: Channel }) {
     const staged: Staged[] = [];
     for (const f of Array.from(list)) {
       const max = uploadLimit();
-      if (f.size > max) {
+      if (!fitsUploadLimit(f.size)) {
         const gb = max / (1024 * 1024 * 1024);
         toast(`${f.name} is over this server's ${gb >= 1 ? `${Math.round(gb * 10) / 10} GB` : `${Math.round(max / (1024 * 1024))} MB`} limit.`, "error");
         continue;

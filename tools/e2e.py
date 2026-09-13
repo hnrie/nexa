@@ -8,7 +8,9 @@ import argparse, os, shutil, signal, socket, struct, subprocess, sys, tempfile, 
 from pathlib import Path
 
 VENV = os.environ.get("PLAYWRIGHT_VENV")
-if VENV and not sys.executable.startswith(VENV):
+# compare resolved paths: a relative PLAYWRIGHT_VENV never matches sys.prefix
+# as written, and re-executing on every start would loop forever
+if VENV and os.path.realpath(sys.prefix) != os.path.realpath(VENV):
     os.execv(os.path.join(VENV, "bin", "python"), [os.path.join(VENV, "bin", "python"), *sys.argv])
 
 from playwright.sync_api import sync_playwright, expect  # noqa: E402
@@ -33,9 +35,13 @@ class Server:
         self.keep = keep
         # STUN_URLS=none keeps ICE to host candidates: both browsers are on this
         # machine, and a public STUN server that times out only adds flakiness.
-        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=str(ROOT / "web/dist"), PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS="none")
+        # E2E_WEB_DIST and E2E_CHATD test a build without first putting it
+        # where the instance running for real on this machine serves from.
+        web_dist = os.environ.get("E2E_WEB_DIST") or str(ROOT / "web/dist")
+        chatd = os.environ.get("E2E_CHATD") or str(ROOT / "bin/chatd")
+        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS="none", MAX_UPLOAD_BYTES=str(1 << 30))
         self.log = open(self.dir / "chatd.log", "w")
-        self.proc = subprocess.Popen([str(ROOT / "bin/chatd")], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.dir))
+        self.proc = subprocess.Popen([chatd], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.dir))
         for _ in range(50):
             try:
                 import urllib.request
@@ -68,10 +74,10 @@ def png_bytes(w=64, h=64, rgb=(218, 62, 68)):
 class Session:
     """One user in one browser context."""
 
-    def __init__(self, browser, base, name, out, viewport=(1366, 768)):
+    def __init__(self, browser, base, name, out, viewport=(1366, 768), service_workers="allow"):
         self.base, self.name, self.out = base, name, out
         w, h = viewport
-        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"])
+        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"], service_workers=service_workers)
         self.page = self.ctx.new_page()
         self.errors = []
         self.trace = []
@@ -576,6 +582,102 @@ def groups_flow(srv, alice, bob, phone):
     alice.shot("pack-emoji-sent")
 
 
+def sha256_file(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def random_file(path, size):
+    with open(path, "wb") as f:
+        left = size
+        while left:
+            n = min(left, 1 << 20)
+            f.write(os.urandom(n))
+            left -= n
+    return sha256_file(path)
+
+
+def files_flow(srv, alice, bob, browser, out):
+    """Big files: one request until a file needs more, pieces above that,
+    streamed to disk on the way down, and big media left alone until asked for."""
+    mib = 1024 * 1024
+    small, big, clip = srv.dir / "small.bin", srv.dir / "big.bin", srv.dir / "clip.mp4"
+    small_sum = random_file(small, 5 * mib)
+    big_sum = random_file(big, 100 * mib)
+    random_file(clip, 30 * mib)
+
+    sent = []
+    alice.page.on("request", lambda r: sent.append((r.method, r.url.split("?")[0])) if "/uploads" in r.url or "/attachments" in r.url else None)
+    alice.open_dm_from_sidebar("Bob")
+    for path in (small, big, clip):
+        alice.page.set_input_files("input[type=file]", str(path))
+        # the staged card, not a toast that happens to name the file
+        alice.page.wait_for_selector(f"[title='{path.name}']", timeout=10000)
+        alice.composer().press("Enter")
+        # a big video shows only its load button, which does not name it
+        shown = "[data-id] button:has-text('Load video')" if path == clip else f"[data-id]:has-text('{path.name}')"
+        alice.page.wait_for_selector(shown, timeout=120000)
+    singles = [u for m, u in sent if m == "POST" and u.endswith("/attachments")]
+    pieces = [u for m, u in sent if m == "PATCH"]
+    assert len(singles) == 2, f"5 MB and 30 MB files should each be one request: {sent}"
+    assert len(pieces) == 4, f"100 MB should go up in four 32 MB pieces: {sent}"
+
+    fetched = []
+    bob.page.on("request", lambda r: fetched.append(r.url) if "/media/attachments/" in r.url or "/__download/" in r.url else None)
+    bob.open_dm_from_sidebar("Alice")
+    for path in (small, big):
+        bob.page.wait_for_selector(f"[data-id]:has-text('{path.name}')", timeout=30000)
+    load = bob.page.locator("[data-id] button:has-text('Load video')")
+    load.wait_for(timeout=30000)
+    time.sleep(2)
+    # only pic.png from earlier may have come down by itself
+    assert len({u for u in fetched if "/media/attachments/" in u}) <= 1, f"nothing big should load by itself: {fetched}"
+    bob.shot("files")
+
+    for _ in range(50):
+        if bob.page.evaluate("!!navigator.serviceWorker.controller"):
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("no service worker is controlling the page")
+    started = time.time()
+    with bob.page.expect_download(timeout=120000) as info:
+        bob.page.locator("[data-id]:has-text('big.bin') button[aria-label=Download]").click()
+    dl = info.value
+    assert dl.suggested_filename == "big.bin", dl.suggested_filename
+    assert sha256_file(dl.path()) == big_sum, "streamed download differs from what was sent"
+    assert any("/__download/" in u for u in fetched), f"100 MB should stream through the worker: {fetched}"
+    print(f"  100 MB streamed down and matched in {time.time() - started:.1f}s")
+
+    with bob.page.expect_download(timeout=60000) as info:
+        bob.page.locator("[data-id]:has-text('small.bin') button[aria-label=Download]").click()
+    assert sha256_file(info.value.path()) == small_sum, "small download differs from what was sent"
+
+    before = len(fetched)
+    load.click()
+    for _ in range(50):
+        if len(fetched) > before:
+            break
+        time.sleep(0.2)
+    else:
+        raise AssertionError("the video should load once asked for")
+    bob.page.wait_for_selector("[data-id] video", timeout=60000)
+
+    # without a service worker the page saves it itself
+    plain = Session(browser, srv.base, "bob", out, service_workers="block")
+    plain.login()
+    plain.open_dm_from_sidebar("Alice")
+    with plain.page.expect_download(timeout=120000) as info:
+        plain.page.locator("[data-id]:has-text('big.bin') button[aria-label=Download]").click()
+    assert sha256_file(info.value.path()) == big_sum, "in-page download differs from what was sent"
+    print("  100 MB saved in-page without a worker and matched")
+    return plain
+
+
 def totp_code(secret, offset=0, when=None):
     """The six digits an authenticator would be showing, RFC 6238."""
     import base64, hashlib, hmac, struct
@@ -690,7 +792,7 @@ def main():
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--serve", action="store_true", help="keep the server running afterwards and print its URL")
-    ap.add_argument("--flows", default="all", help="comma-separated subset: server,expressions,voice,polish,groups,security (register/friends/dm always run)")
+    ap.add_argument("--flows", default="all", help="comma-separated subset: server,expressions,voice,polish,groups,security,files (register/friends/dm always run)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -763,8 +865,10 @@ def main():
             phone.page.click("button[aria-label='Open navigation']")
             time.sleep(0.4)
             phone.shot("drawer")
-            print("servers")
-            server_id, link = server_flow(srv, alice, bob, phone)
+            server_id = link = None
+            if any(want(f) for f in ("server", "expressions", "voice", "polish")):
+                print("servers")
+                server_id, link = server_flow(srv, alice, bob, phone)
             dave = None
             if want("expressions"):
                 print("expressions")
@@ -781,7 +885,11 @@ def main():
             if want("security"):
                 print("security: authenticator + app lock")
                 dave = security_flow(srv, out, browser)
-            errors = alice.errors + bob.errors + phone.errors + (dave.errors if dave else [])
+            plain = None
+            if want("files"):
+                print("files: pieces, streamed downloads, media on request")
+                plain = files_flow(srv, alice, bob, browser, out)
+            errors = alice.errors + bob.errors + phone.errors + (dave.errors if dave else []) + (plain.errors if plain else [])
             if errors:
                 print("browser errors:\n  " + "\n  ".join(errors))
             ok = not errors

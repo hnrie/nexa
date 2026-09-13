@@ -1,8 +1,9 @@
 import { Download, FileIcon, Play } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
-import { attachmentObjectURL, cachedURL } from "@/lib/mediaCache";
+import { saveAttachment } from "@/lib/download";
+import { INLINE_MAX, attachmentObjectURL, cachedURL } from "@/lib/mediaCache";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
@@ -13,6 +14,16 @@ import s from "./Chat.module.css";
 const MAX_W = 550;
 const MAX_H = 350;
 
+/** Small pictures are fetched straight away, before they are even on screen. */
+const EAGER_MAX = 2 * 1024 * 1024;
+/**
+ * Media up to this size loads by itself: video and audio straight away,
+ * pictures as they near the screen. Anything bigger waits to be asked for,
+ * since every copy of the app showing the message would otherwise download
+ * and decrypt all of it.
+ */
+const AUTO_LOAD_MAX = 25 * 1024 * 1024;
+
 function fit(w: number | undefined, h: number | undefined): { width: number; height: number } {
   if (!w || !h) return { width: 400, height: 300 };
   let r = Math.min(1, MAX_W / w, MAX_H / h);
@@ -20,24 +31,26 @@ function fit(w: number | undefined, h: number | undefined): { width: number; hei
   return { width: Math.max(1, Math.round(w * r)), height: Math.max(1, Math.round(h * r)) };
 }
 
-/** Lazily decrypts an attachment when it scrolls into view. */
-function useDecrypted(att: AttachmentMeta, eager: boolean): { url: string | null; error: boolean; load: () => void } {
+/** Decrypts an attachment once it is wanted: straight away when `eager`, otherwise when `load` is called. */
+function useDecrypted(att: AttachmentMeta, eager: boolean): { url: string | null; error: boolean; wanted: boolean; load: () => void } {
   const [url, setUrl] = useState<string | null>(cachedURL(att.blob_id) ?? null);
   const [error, setError] = useState(false);
   const [wanted, setWanted] = useState(eager);
-  const ref = useRef(false);
+  const started = useRef(false);
   useEffect(() => {
-    if (!wanted || url || ref.current) return;
-    ref.current = true;
+    if (!wanted || url || started.current) return;
+    started.current = true;
     attachmentObjectURL(att)
       .then(setUrl)
       .catch(() => setError(true));
   }, [wanted, url, att]);
-  return { url, error, load: () => setWanted(true) };
+  const load = useCallback(() => setWanted(true), []);
+  return { url, error, wanted, load };
 }
 
-function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void): void {
+function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void, enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) return;
     const el = ref.current;
     if (!el || typeof IntersectionObserver === "undefined") {
       onView();
@@ -51,7 +64,7 @@ function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void)
     }, { rootMargin: "400px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [ref, onView]);
+  }, [ref, onView, enabled]);
 }
 
 export function Lightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
@@ -74,15 +87,38 @@ export function Lightbox({ src, name, onClose }: { src: string; name: string; on
 
 function ImageAttachment({ att }: { att: AttachmentMeta }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { url, error, load } = useDecrypted(att, att.size <= 2 * 1024 * 1024);
+  const auto = att.size <= AUTO_LOAD_MAX;
+  const { url, error, wanted, load } = useDecrypted(att, att.size <= EAGER_MAX);
   const [revealed, setRevealed] = useState(!att.spoiler);
   const [open, setOpen] = useState(false);
-  useInView(ref, load);
+  useInView(ref, load, auto);
   const dims = fit(att.w, att.h);
   return (
     <>
       <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={dims} onClick={() => (revealed ? url && setOpen(true) : setRevealed(true))}>
-        {url ? <img src={url} alt={att.name} width={dims.width} height={dims.height} /> : <div className={s.imgPlaceholder}>{error ? "Could not decrypt" : "Decrypting…"}</div>}
+        {url ? (
+          <img src={url} alt={att.name} width={dims.width} height={dims.height} />
+        ) : (
+          <div className={s.imgPlaceholder}>
+            {error ? (
+              "Could not decrypt"
+            ) : wanted || auto ? (
+              "Decrypting…"
+            ) : (
+              <button
+                className={s.videoLoad}
+                onClick={(e) => {
+                  // under a spoiler, the first click only uncovers it
+                  if (!revealed) return;
+                  e.stopPropagation();
+                  load();
+                }}
+              >
+                Load image ({formatBytes(att.size)})
+              </button>
+            )}
+          </div>
+        )}
         {!revealed ? <div className={s.spoilerTag}><span>SPOILER</span></div> : null}
       </div>
       {open && url ? <Lightbox src={url} name={att.name} onClose={() => setOpen(false)} /> : null}
@@ -91,27 +127,19 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
 }
 
 function VideoAttachment({ att }: { att: AttachmentMeta }) {
-  const ref = useRef<HTMLDivElement>(null);
   // the whole file has to come down and be decrypted before it can play at all
-  const { url, error, load } = useDecrypted(att, att.size <= 25 * 1024 * 1024);
-  const [asked, setAsked] = useState(false);
-  useInView(ref, () => att.size <= 25 * 1024 * 1024 && load());
+  const auto = att.size <= AUTO_LOAD_MAX;
+  const { url, error, wanted, load } = useDecrypted(att, auto);
   const dims = fit(att.w ?? 640, att.h ?? 360);
   if (url) return <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} />;
   return (
-    <div ref={ref} className={s.videoPending} style={dims}>
+    <div className={s.videoPending} style={dims}>
       {error ? (
         <span>This video could not be decrypted.</span>
-      ) : asked || att.size <= 25 * 1024 * 1024 ? (
+      ) : wanted || auto ? (
         <span className={s.videoLoading}><Spinner size={20} /> Decrypting {att.name} ({formatBytes(att.size)})…</span>
       ) : (
-        <button
-          className={s.videoLoad}
-          onClick={() => {
-            setAsked(true);
-            load();
-          }}
-        >
+        <button className={s.videoLoad} onClick={load}>
           <Play size={20} /> Load video ({formatBytes(att.size)})
         </button>
       )}
@@ -120,15 +148,20 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
 }
 
 function AudioAttachment({ att }: { att: AttachmentMeta }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const { url, error, load } = useDecrypted(att, true);
-  useInView(ref, load);
+  const auto = att.size <= AUTO_LOAD_MAX;
+  const { url, error, wanted, load } = useDecrypted(att, auto);
   return (
-    <div ref={ref} className={s.audio}>
+    <div className={s.audio}>
       {url ? (
         <AudioPlayer src={url} name={att.name} size={att.size} duration={att.duration} />
+      ) : error ? (
+        <span className={s.fileSize}>This audio could not be decrypted.</span>
+      ) : wanted || auto ? (
+        <span className={s.fileSize}>Decrypting {att.name}…</span>
       ) : (
-        <span className={s.fileSize}>{error ? "This audio could not be decrypted." : `Decrypting ${att.name}…`}</span>
+        <button className={s.videoLoad} onClick={load}>
+          <Play size={16} /> Load {att.name} ({formatBytes(att.size)})
+        </button>
       )}
     </div>
   );
@@ -137,29 +170,28 @@ function AudioAttachment({ att }: { att: AttachmentMeta }) {
 function FileAttachment({ att }: { att: AttachmentMeta }) {
   const toast = useUI((u) => u.toast);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(0);
   const download = async () => {
     if (busy) return;
     setBusy(true);
+    setDone(0);
     try {
-      const url = await attachmentObjectURL(att);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = att.name;
-      a.click();
-    } catch {
-      toast("Could not decrypt that file.", "error");
+      await saveAttachment(att, (n) => setDone(n));
+    } catch (err) {
+      toast(err instanceof Error && err.message ? err.message : "Could not download that file.", "error");
     } finally {
       setBusy(false);
     }
   };
+  const percent = att.size > 0 ? Math.min(100, Math.floor((done / att.size) * 100)) : 0;
   return (
     <div className={s.file}>
       <FileIcon size={36} className={s.fileIcon} />
       <div className={s.fileText}>
         <span className={s.fileName} onClick={() => void download()}>{att.name}</span>
-        <span className={s.fileSize}>{formatBytes(att.size)}</span>
+        <span className={s.fileSize}>{busy ? `Downloading… ${percent}% of ${formatBytes(att.size)}` : formatBytes(att.size)}</span>
       </div>
-      <button className={s.dl} aria-label="Download" onClick={() => void download()} disabled={busy}><Download size={20} /></button>
+      <button className={s.dl} aria-label="Download" onClick={() => void download()} disabled={busy}>{busy ? <Spinner size={20} /> : <Download size={20} />}</button>
     </div>
   );
 }
@@ -169,9 +201,11 @@ export function Attachments({ list }: { list: AttachmentMeta[] }) {
     <div className={s.att}>
       {list.map((att) => {
         const t = att.type || "";
-        if (t.startsWith("image/")) return <ImageAttachment key={att.blob_id} att={att} />;
-        if (t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} />;
-        if (t.startsWith("audio/")) return <AudioAttachment key={att.blob_id} att={att} />;
+        // showing or playing a file means holding all of it, so past a point it is only offered as a download
+        const inline = att.size <= INLINE_MAX;
+        if (inline && t.startsWith("image/")) return <ImageAttachment key={att.blob_id} att={att} />;
+        if (inline && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} />;
+        if (inline && t.startsWith("audio/")) return <AudioAttachment key={att.blob_id} att={att} />;
         return <FileAttachment key={att.blob_id} att={att} />;
       })}
     </div>

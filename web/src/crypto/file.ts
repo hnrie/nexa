@@ -7,8 +7,11 @@
  * be reordered, dropped or spliced in from another file without failing the tag.
  * A zero-length input still produces one chunk, so an empty file authenticates.
  *
- * Blobs are read slice by slice so a multi-gigabyte upload never has to be
- * materialised in memory all at once.
+ * Input is read one slice at a time. Output is either produced frame by frame
+ * (encryptFrames, for streaming a large file straight into an upload) or folded
+ * into a Blob every few megabytes, so neither direction ever holds a whole
+ * large file in memory. Holding one entire was what took a 16 GB machine down
+ * when a 15 GB file was sent.
  */
 
 import { IV_LEN, TAG_LEN, bufferSource, gcmDecrypt, gcmEncrypt } from "./aes";
@@ -24,25 +27,57 @@ const LEN_PREFIX = 4;
 const FILE_AAD = utf8.enc("file/v1");
 const KEY_LEN = 32;
 
-export async function encryptFile(
+/** How many chunks are held before they are folded into a Blob. */
+const FOLD_EVERY = 8;
+
+/** The exact size of the ciphertext for `plainSize` bytes, known before encrypting. */
+export function encryptedSize(plainSize: number): number {
+  const count = Math.max(1, Math.ceil(plainSize / CHUNK));
+  return HEADER_LEN + count * (LEN_PREFIX + TAG_LEN) + plainSize;
+}
+
+export function newFileKey(): Uint8Array {
+  return randomBytes(KEY_LEN);
+}
+
+/**
+ * Yields the ciphertext of `data` in order: the header first, then one frame
+ * per chunk. Only one chunk is ever held at a time.
+ */
+export async function* encryptFrames(
   data: Blob,
+  key: Uint8Array,
   onProgress?: (done: number, total: number) => void,
-): Promise<{ key: Uint8Array; blob: Blob }> {
-  const key = randomBytes(KEY_LEN);
+): AsyncGenerator<Uint8Array> {
   const baseIv = randomBytes(BASE_IV_LEN);
   const total = data.size;
   const count = Math.max(1, Math.ceil(total / CHUNK));
-
-  const parts: BlobPart[] = [bufferSource(MAGIC), bufferSource(baseIv)];
+  yield concat(MAGIC, baseIv);
   for (let i = 0; i < count; i++) {
     const start = i * CHUNK;
     const end = Math.min(start + CHUNK, total);
     const plaintext = new Uint8Array(await data.slice(start, end).arrayBuffer());
     const ct = await gcmEncrypt(key, concat(baseIv, u32be(i)), plaintext, FILE_AAD);
-    parts.push(bufferSource(u32be(ct.length)), bufferSource(ct));
+    yield concat(u32be(ct.length), ct);
     onProgress?.(end, total);
   }
-  return { key, blob: new Blob(parts) };
+}
+
+export async function encryptFile(
+  data: Blob,
+  onProgress?: (done: number, total: number) => void,
+): Promise<{ key: Uint8Array; blob: Blob }> {
+  const key = newFileKey();
+  let acc = new Blob([]);
+  let batch: BlobPart[] = [];
+  for await (const frame of encryptFrames(data, key, onProgress)) {
+    batch.push(bufferSource(frame));
+    if (batch.length >= FOLD_EVERY) {
+      acc = new Blob([acc, ...batch]);
+      batch = [];
+    }
+  }
+  return { key, blob: new Blob([acc, ...batch]) };
 }
 
 interface ChunkSpan {
@@ -82,7 +117,8 @@ export async function decryptFile(
   const spans = await scanChunks(blob);
   const total = spans.reduce((n, s) => n + s.len - TAG_LEN, 0);
 
-  const parts: BlobPart[] = [];
+  let acc = new Blob([]);
+  let batch: BlobPart[] = [];
   let done = 0;
   for (const [i, span] of spans.entries()) {
     const ct = new Uint8Array(await blob.slice(span.start, span.start + span.len).arrayBuffer());
@@ -92,9 +128,15 @@ export async function decryptFile(
     } catch {
       throw new DecryptError("file: chunk failed to authenticate");
     }
-    parts.push(bufferSource(plaintext));
+    batch.push(bufferSource(plaintext));
+    // hand finished chunks to the browser's blob store rather than keeping
+    // every one alive in the page until the end
+    if (batch.length >= FOLD_EVERY) {
+      acc = new Blob([acc, ...batch]);
+      batch = [];
+    }
     done += plaintext.length;
     onProgress?.(done, total);
   }
-  return new Blob(parts);
+  return new Blob([acc, ...batch]);
 }

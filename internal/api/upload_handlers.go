@@ -13,10 +13,14 @@ import (
 )
 
 const (
-	// MaxChunkBytes is the most one request may carry. Cloudflare's free plan
-	// refuses a body over 100 MB, so a piece stays well under that; it is also
-	// how much has to be sent again after a dropped connection.
+	// MaxChunkBytes is the size of one piece of a resumable upload: how much has
+	// to be sent again after a dropped connection, and how much the sender has
+	// to hold in memory at once.
 	MaxChunkBytes = 32 << 20
+	// MaxSingleUploadBytes is the most a file may be and still go up in one
+	// request. Cloudflare's free plan refuses a body over 100 MB, so this sits
+	// just under that; only a file above it is worth the extra requests.
+	MaxSingleUploadBytes = 90 << 20
 	// uploadIdleLife is how long an untouched transfer is kept before its
 	// bytes are swept up.
 	uploadIdleLife = 24 * time.Hour

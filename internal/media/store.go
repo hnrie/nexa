@@ -157,15 +157,26 @@ func (m *Store) AppendSpool(id ids.ID, at int64, r io.Reader, limit int64) (int6
 	if err != nil {
 		return 0, err
 	}
-	if info.Size() != at {
+	if info.Size() < at {
+		// a hole: bytes the database counts are missing from the file
 		return info.Size(), ErrBadOffset
 	}
+	if info.Size() > at {
+		// The caller has already checked `at` against the database, which only
+		// advances once a piece is written and synced. Anything past it is what
+		// a request left behind when its connection dropped mid-body, and keeping
+		// it would refuse every retry for good.
+		if err := f.Truncate(at); err != nil {
+			return info.Size(), err
+		}
+	}
 	if _, err := f.Seek(at, io.SeekStart); err != nil {
-		return info.Size(), err
+		return at, err
 	}
 	n, err := io.Copy(f, io.LimitReader(r, limit+1))
 	if err != nil {
-		return at + n, err
+		_ = f.Truncate(at)
+		return at, err
 	}
 	if n > limit {
 		// too much arrived; put the file back how it was

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { installCrashReporting } from "./lib/crashReport";
+import { downloadsSettled } from "./lib/download";
 import "./styles/base.css";
 
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
@@ -15,7 +16,8 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (!wasControlled || reloading) return;
       reloading = true;
-      window.location.reload();
+      // not in the middle of saving a file, though: reloading would cut it off
+      void downloadsSettled().then(() => window.location.reload());
     });
     void navigator.serviceWorker
       .register("/sw.js")

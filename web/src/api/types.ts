@@ -294,7 +294,9 @@ export interface InstanceInfo {
   gif_search: boolean;
   public_url: string;
   turn_configured: boolean;
-  /** The most one request may carry; larger files go up in pieces. */
+  /** The most one upload request may carry; a larger file goes up in pieces. */
+  upload_single_bytes?: number;
+  /** The size of each of those pieces. */
   upload_chunk_bytes?: number;
   max_sticker_bytes?: number;
 }

@@ -75,7 +75,7 @@ export function applyLockPolicy(): void {
 async function loadUploadLimits(): Promise<void> {
   try {
     const info = await adminApi.instance();
-    setUploadLimits(info.max_upload_bytes, info.upload_chunk_bytes ?? 0);
+    setUploadLimits({ max: info.max_upload_bytes, single: info.upload_single_bytes, chunk: info.upload_chunk_bytes });
   } catch {
     /* the built-in defaults stand */
   }
