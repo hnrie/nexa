@@ -161,11 +161,28 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
   });
 }
 
+/** The share of an in-page save's progress bar that the download itself fills; decrypting fills the rest. */
+const FETCH_SHARE = 0.9;
+
 async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
-  const cipher = await channelsApi.downloadAttachment(att.blob_id, undefined, encryptedSize(att.size));
+  const expected = encryptedSize(att.size);
+  // the body arrives in many small pieces, so only a new whole percent is passed on
+  let shown = -1;
+  const fetched = onProgress
+    ? (got: number) => {
+        const percent = Math.floor((got / expected) * 100);
+        if (percent === shown) return;
+        shown = percent;
+        onProgress(Math.round((got / expected) * FETCH_SHARE * att.size), att.size);
+      }
+    : undefined;
+  const cipher = await channelsApi.downloadAttachment(att.blob_id, undefined, expected, fetched);
+  const decrypted = onProgress
+    ? (done: number, total: number) => onProgress(Math.round((FETCH_SHARE + (total > 0 ? done / total : 1) * (1 - FETCH_SHARE)) * att.size), att.size)
+    : undefined;
   let plain: Blob;
   try {
-    plain = await decryptFile(cipher, b64.dec(att.key), onProgress);
+    plain = await decryptFile(cipher, b64.dec(att.key), decrypted);
   } catch (err) {
     if (err instanceof DecryptError) throw new Error("This file could not be decrypted.");
     throw err;

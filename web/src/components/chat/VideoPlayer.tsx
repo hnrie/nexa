@@ -1,6 +1,7 @@
 import { Download, Maximize2, Minimize2, Pause, PictureInPicture2, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
+import { fitVideo } from "./fitMedia";
 import s from "./VideoPlayer.module.css";
 
 function clock(t: number): string {
@@ -16,6 +17,22 @@ function clock(t: number): string {
 const SPEEDS = [0.5, 1, 1.5, 2];
 /** How long the controls stay up after a tap, while the video is playing. */
 const CONTROLS_LINGER = 2800;
+
+type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+
+/**
+ * Whether anything can go full screen here. iPhone Safari has no full screen
+ * for elements, only its own player for a video element.
+ */
+function canFullscreen(): boolean {
+  if (typeof document === "undefined") return false;
+  return !!document.documentElement.requestFullscreen || (typeof HTMLVideoElement !== "undefined" && "webkitEnterFullscreen" in HTMLVideoElement.prototype);
+}
+
+/** A play() cut short by pause() rejects too, and says nothing about whether the file plays. */
+function playFailed(err: unknown): boolean {
+  return !(err instanceof DOMException && err.name === "AbortError");
+}
 
 /** Touch screens have no hover, so the controls need a tap to appear. */
 function coarsePointer(): boolean {
@@ -47,6 +64,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
   const [full, setFull] = useState(false);
   const [failed, setFailed] = useState(false);
   const [revealed, setRevealed] = useState(!spoiler);
+  const [fullOk] = useState(canFullscreen);
   // On a touch screen the controls would otherwise sit over the picture the
   // whole time, so they appear on a tap and fade out again while it plays.
   const [ui, setUi] = useState(true);
@@ -70,7 +88,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
   const toggle = useCallback(() => {
     const el = video.current;
     if (!el) return;
-    if (el.paused) void el.play().catch(() => setFailed(true));
+    if (el.paused) void el.play().catch((err: unknown) => playFailed(err) && setFailed(true));
     else el.pause();
   }, []);
 
@@ -169,7 +187,8 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
 
   const toggleFull = async () => {
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-    else await wrap.current?.requestFullscreen?.().catch(() => {});
+    else if (wrap.current?.requestFullscreen) await wrap.current.requestFullscreen().catch(() => {});
+    else (video.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
   };
   const pip = async () => {
     const el = video.current;
@@ -193,13 +212,21 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
 
   const pct = duration > 0 ? (time / duration) * 100 : 0;
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
-  const size = width && height ? { aspectRatio: `${width} / ${height}` } : undefined;
+  // full screen sizes the player itself, so the frame is only set inline
+  const frame = width && height && !full ? fitVideo(width, height) : null;
+  const size = frame ? { width: frame.width, aspectRatio: `${frame.width} / ${frame.height}` } : undefined;
+  /** Seeks to where a pointer is along the track; a drag keeps seeking while it moves. */
+  const scrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    seek(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * duration);
+  };
   return (
     <div
       ref={wrap}
       className={s.player}
       style={size}
       data-full={full}
+      data-sized={!!size}
       data-spoiler={!revealed}
       data-ui={ui}
       tabIndex={0}
@@ -220,7 +247,8 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
       {!playing && revealed && !failed ? (
         <button className={s.bigPlay} aria-label="Play" onClick={toggle}><Play size={28} fill="currentColor" /></button>
       ) : null}
-      <div className={s.bar} onClick={(e) => e.stopPropagation()} onPointerDown={reveal}>
+      {/* data-no-swipe: dragging the seek bar or volume must not pull a drawer open on a phone */}
+      <div className={s.bar} data-no-swipe onClick={(e) => e.stopPropagation()} onPointerDown={reveal}>
         <div
           className={s.track}
           role="slider"
@@ -230,8 +258,13 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
           aria-valuenow={Math.round(time)}
           tabIndex={0}
           onPointerDown={(e) => {
-            const r = e.currentTarget.getBoundingClientRect();
-            seek(((e.clientX - r.left) / r.width) * duration);
+            e.currentTarget.setPointerCapture(e.pointerId);
+            scrub(e);
+          }}
+          onPointerMove={(e) => {
+            if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+            reveal();
+            scrub(e);
           }}
         >
           <span className={s.buffered} style={{ width: `${bufPct}%` }} />
@@ -253,9 +286,11 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
           <Tooltip text="Download" side="top">
             <a className={s.ctl} href={src} download={name} aria-label="Download video" onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
           </Tooltip>
-          <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
-            <button className={s.ctl} aria-label="Full screen" onClick={() => void toggleFull()}>{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
-          </Tooltip>
+          {fullOk ? (
+            <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
+              <button className={s.ctl} aria-label="Full screen" onClick={() => void toggleFull()}>{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
+            </Tooltip>
+          ) : null}
         </div>
       </div>
     </div>

@@ -118,6 +118,7 @@
 .spoilerTag { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .spoilerTag span { padding: 6px 12px; border-radius: 20px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 14px; font-weight: 700; }
 .imgPlaceholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; }
+.loadFailed { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; text-align: center; }
 .file { display: flex; align-items: center; gap: 12px; width: 432px; max-width: 100%; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); }
 .fileIcon { color: var(--icon); flex: none; }
 .fileText { min-width: 0; flex: 1; display: flex; flex-direction: column; }
@@ -182,7 +183,7 @@
   .body[data-search="true"] > .members { display: none; }
 }
 .sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; }
-.videoPending { display: flex; align-items: center; justify-content: center; margin-top: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); font-size: 14px; text-align: center; padding: 12px; }
+.videoPending { display: flex; max-width: 100%; align-items: center; justify-content: center; margin-top: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); font-size: 14px; text-align: center; padding: 12px; }
 .videoLoading { display: inline-flex; align-items: center; gap: 8px; }
 .videoLoad { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 14px; font-weight: 600; }
 .videoLoad:hover { background: var(--brand); color: #fff; }

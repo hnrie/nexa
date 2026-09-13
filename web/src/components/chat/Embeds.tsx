@@ -60,7 +60,7 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
   const fileName = e.type === "gif" ? "animation.gif" : fileNameOf(e.url, "image");
   return (
     <>
-      <div className={[c.imgWrap, s.media].join(" ")} style={dims} onClick={() => setOpen(true)}>
+      <div className={[c.imgWrap, s.media].join(" ")} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} onClick={() => setOpen(true)}>
         <img
           src={src}
           alt={name}
@@ -125,7 +125,8 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
       {list.slice(0, 5).map((e, i) => {
         if (!e || typeof e !== "object" || typeof e.url !== "string") return null;
         if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
-        if (e.type === "video") return imagePreviews ? <VideoPlayer key={i} src={e.url} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
+        // played through this server's proxy, so the host of the file never sees who is watching
+        if (e.type === "video") return imagePreviews ? <VideoPlayer key={i} src={e.image ?? e.url} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
         if (e.type === "youtube") return <YouTubeEmbed key={i} e={e} />;
         if (e.type === "invite") return <InviteEmbed key={i} e={e} />;
         if (e.title || e.description) return <LinkEmbed key={i} e={e} />;

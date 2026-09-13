@@ -147,6 +147,25 @@ describe("attachments", () => {
     expect((await channels.downloadAttachment("77", undefined, 4).catch((e: unknown) => e)) as ApiError).toMatchObject({ code: "size_mismatch" });
   });
 
+  it("reports bytes as they arrive when asked, still checking the size", async () => {
+    const body = () =>
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(new Uint8Array(4));
+          c.enqueue(new Uint8Array(6));
+          c.close();
+        },
+      });
+    api.fetchImpl = (() => Promise.resolve(new Response(body(), { headers: { "Content-Length": "10" } }))) as unknown as typeof fetch;
+    const seen: number[] = [];
+    const blob = await channels.downloadAttachment("77", undefined, 10, (got) => seen.push(got));
+    expect(blob.size).toBe(10);
+    expect(seen).toEqual([4, 10]);
+
+    api.fetchImpl = (() => Promise.resolve(new Response(body()))) as unknown as typeof fetch;
+    expect((await channels.downloadAttachment("77", undefined, 8, () => undefined).catch((e: unknown) => e)) as ApiError).toMatchObject({ code: "size_mismatch" });
+  });
+
   it("throws an ApiError when the download fails", async () => {
     api.fetchImpl = (() =>
       Promise.resolve(

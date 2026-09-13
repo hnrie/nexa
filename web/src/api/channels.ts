@@ -84,9 +84,10 @@ export const channels = {
    * memory. With `expected`, a file of any other size is refused as soon as
    * that shows, rather than after all of it has come down: the size comes from
    * the message, and a sender could otherwise pass a huge file off as a small
-   * picture that everyone's client loads by itself.
+   * picture that everyone's client loads by itself. `onProgress` hears how
+   * many bytes have come in so far, which means reading the body piece by piece.
    */
-  async downloadAttachment(blobId: Snowflake, signal?: AbortSignal, expected?: number): Promise<Blob> {
+  async downloadAttachment(blobId: Snowflake, signal?: AbortSignal, expected?: number, onProgress?: (got: number) => void): Promise<Blob> {
     const headers: Record<string, string> = {};
     const token = api.getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -103,7 +104,7 @@ export const channels = {
         throw wrongSize();
       }
       // the browser holds a response to its stated length, so its own fast read is safe
-      return res.blob();
+      if (!onProgress) return res.blob();
     }
     const reader = res.body.getReader();
     let whole = new Blob([]);
@@ -118,6 +119,7 @@ export const channels = {
         void reader.cancel().catch(() => undefined);
         throw wrongSize();
       }
+      onProgress?.(got);
       batch.push(value as Uint8Array<ArrayBuffer>);
       batchLen += value.length;
       if (batchLen >= FOLD_BYTES) {

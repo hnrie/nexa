@@ -1,18 +1,19 @@
 import { Download, FileIcon, Play, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { DecryptError } from "@/crypto/keys";
 import type { AttachmentMeta } from "@/crypto/message";
 import { saveAttachment } from "@/lib/download";
-import { INLINE_MAX, attachmentObjectURL, cachedURL } from "@/lib/mediaCache";
+import { INLINE_MAX, acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
 import { AudioPlayer } from "./AudioPlayer";
 import { VideoPlayer } from "./VideoPlayer";
+import { fitMedia, fitVideo } from "./fitMedia";
 import s from "./Chat.module.css";
 
-const MAX_W = 550;
-const MAX_H = 350;
+export { fitMedia };
 
 /** Small pictures are fetched straight away, before they are even on screen. */
 const EAGER_MAX = 2 * 1024 * 1024;
@@ -24,32 +25,59 @@ const EAGER_MAX = 2 * 1024 * 1024;
  */
 const AUTO_LOAD_MAX = 25 * 1024 * 1024;
 
-/**
- * The size a picture or video is shown at in a message. Links to media use it
- * too, so a GIF from the picker sits in the same frame as an uploaded one.
- */
-export function fitMedia(w: number | undefined, h: number | undefined): { width: number; height: number } {
-  if (!w || !h) return { width: 400, height: 300 };
-  let r = Math.min(1, MAX_W / w, MAX_H / h);
-  if (w * r < 100 && h * r < 100) r = Math.min(100 / w, 100 / h, MAX_W / w, MAX_H / h);
-  return { width: Math.max(1, Math.round(w * r)), height: Math.max(1, Math.round(h * r)) };
-}
+type LoadError = "load" | "decrypt";
 
 /** Decrypts an attachment once it is wanted: straight away when `eager`, otherwise when `load` is called. */
-function useDecrypted(att: AttachmentMeta, eager: boolean): { url: string | null; error: boolean; wanted: boolean; load: () => void } {
+function useDecrypted(att: AttachmentMeta, eager: boolean): { url: string | null; error: LoadError | null; wanted: boolean; load: () => void; retry: () => void } {
   const [url, setUrl] = useState<string | null>(cachedURL(att.blob_id) ?? null);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<LoadError | null>(null);
   const [wanted, setWanted] = useState(eager);
   const started = useRef(false);
   useEffect(() => {
-    if (!wanted || url || started.current) return;
+    if (!wanted || url || error || started.current) return;
     started.current = true;
     attachmentObjectURL(att)
       .then(setUrl)
-      .catch(() => setError(true));
-  }, [wanted, url, att]);
+      .catch((err: unknown) => {
+        // a dropped connection is worth another try, which clearing the error starts
+        started.current = false;
+        setError(err instanceof DecryptError ? "decrypt" : "load");
+      });
+  }, [wanted, url, error, att]);
+  // Hold the URL while this is on screen, so the cache does not revoke it
+  // under a download link or a video that is still reading from it.
+  useEffect(() => {
+    if (!url) return;
+    if (!acquire(att.blob_id, url)) {
+      started.current = false;
+      setUrl(null);
+      return;
+    }
+    return () => release(att.blob_id, url);
+  }, [url, att.blob_id]);
   const load = useCallback(() => setWanted(true), []);
-  return { url, error, wanted, load };
+  const retry = useCallback(() => setError(null), []);
+  return { url, error, wanted, load, retry };
+}
+
+/** Why an attachment is not showing, with a way to try again when that could help. */
+function LoadFailed({ error, what, onRetry }: { error: LoadError; what: string; onRetry: () => void }) {
+  return (
+    <span className={s.loadFailed}>
+      {error === "decrypt" ? `This ${what} could not be decrypted.` : `This ${what} could not be loaded.`}
+      {error === "load" ? (
+        <button
+          className={s.retry}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRetry();
+          }}
+        >
+          Retry
+        </button>
+      ) : null}
+    </span>
+  );
 }
 
 function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void, enabled: boolean): void {
@@ -71,7 +99,7 @@ function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void,
   }, [ref, onView, enabled]);
 }
 
-export function Lightbox({ src, name, onClose }: { src: string; name: string; onClose: () => void }) {
+export function Lightbox({ src, name, type, onClose }: { src: string; name: string; type?: string | undefined; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -82,7 +110,8 @@ export function Lightbox({ src, name, onClose }: { src: string; name: string; on
       <button className={s.lbClose} aria-label="Close" onClick={onClose}><X size={22} /></button>
       <img src={src} alt={name} onClick={(e) => e.stopPropagation()} />
       <div className={s.lbBar} onClick={(e) => e.stopPropagation()}>
-        <a href={src} target="_blank" rel="noopener noreferrer">Open original</a>
+        {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
+        {type?.toLowerCase().startsWith("image/svg") ? null : <a href={src} target="_blank" rel="noopener noreferrer">Open original</a>}
         <a href={src} download={name}>Download</a>
       </div>
     </div>,
@@ -93,20 +122,20 @@ export function Lightbox({ src, name, onClose }: { src: string; name: string; on
 function ImageAttachment({ att }: { att: AttachmentMeta }) {
   const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
-  const { url, error, wanted, load } = useDecrypted(att, att.size <= EAGER_MAX);
+  const { url, error, wanted, load, retry } = useDecrypted(att, att.size <= EAGER_MAX);
   const [revealed, setRevealed] = useState(!att.spoiler);
   const [open, setOpen] = useState(false);
   useInView(ref, load, auto);
   const dims = fitMedia(att.w, att.h);
   return (
     <>
-      <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={dims} onClick={() => (revealed ? url && setOpen(true) : setRevealed(true))}>
+      <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} onClick={() => (revealed ? url && setOpen(true) : setRevealed(true))}>
         {url ? (
           <img src={url} alt={att.name} width={dims.width} height={dims.height} />
         ) : (
           <div className={s.imgPlaceholder}>
             {error ? (
-              "Could not decrypt"
+              <LoadFailed error={error} what="image" onRetry={retry} />
             ) : wanted || auto ? (
               "Decrypting…"
             ) : (
@@ -126,7 +155,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
         )}
         {!revealed ? <div className={s.spoilerTag}><span>SPOILER</span></div> : null}
       </div>
-      {open && url ? <Lightbox src={url} name={att.name} onClose={() => setOpen(false)} /> : null}
+      {open && url ? <Lightbox src={url} name={att.name} type={att.type} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -134,13 +163,14 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
 function VideoAttachment({ att }: { att: AttachmentMeta }) {
   // the whole file has to come down and be decrypted before it can play at all
   const auto = att.size <= AUTO_LOAD_MAX;
-  const { url, error, wanted, load } = useDecrypted(att, auto);
-  const dims = fitMedia(att.w ?? 640, att.h ?? 360);
+  const { url, error, wanted, load, retry } = useDecrypted(att, auto);
+  // the same frame the player will have, so nothing jumps when it arrives
+  const dims = fitVideo(att.w ?? 640, att.h ?? 360);
   if (url) return <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} />;
   return (
-    <div className={s.videoPending} style={dims}>
+    <div className={s.videoPending} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }}>
       {error ? (
-        <span>This video could not be decrypted.</span>
+        <LoadFailed error={error} what="video" onRetry={retry} />
       ) : wanted || auto ? (
         <span className={s.videoLoading}><Spinner size={20} /> Decrypting {att.name} ({formatBytes(att.size)})…</span>
       ) : (
@@ -154,13 +184,13 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
 
 function AudioAttachment({ att }: { att: AttachmentMeta }) {
   const auto = att.size <= AUTO_LOAD_MAX;
-  const { url, error, wanted, load } = useDecrypted(att, auto);
+  const { url, error, wanted, load, retry } = useDecrypted(att, auto);
   return (
     <div className={s.audio}>
       {url ? (
         <AudioPlayer src={url} name={att.name} size={att.size} duration={att.duration} />
       ) : error ? (
-        <span className={s.fileSize}>This audio could not be decrypted.</span>
+        <span className={s.fileSize}><LoadFailed error={error} what="audio" onRetry={retry} /></span>
       ) : wanted || auto ? (
         <span className={s.fileSize}>Decrypting {att.name}…</span>
       ) : (

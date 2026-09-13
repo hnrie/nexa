@@ -54,7 +54,12 @@ export function AudioPlayer({ src, name, size, duration: hinted }: Props) {
   const toggle = useCallback(() => {
     const el = audio.current;
     if (!el) return;
-    if (el.paused) void el.play().catch(() => setFailed(true));
+    if (el.paused) {
+      void el.play().catch((err: unknown) => {
+        // a play() cut short by pause() rejects too, and says nothing about whether the file plays
+        if (!(err instanceof DOMException && err.name === "AbortError")) setFailed(true);
+      });
+    }
     else el.pause();
   }, []);
 
@@ -104,7 +109,7 @@ export function AudioPlayer({ src, name, size, duration: hinted }: Props) {
   };
   const scrub = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    seekTo((e.clientX - r.left) / r.width);
+    seekTo(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
   };
   const onKey = (e: React.KeyboardEvent) => {
     const el = audio.current;
@@ -144,7 +149,15 @@ export function AudioPlayer({ src, name, size, duration: hinted }: Props) {
             aria-valuemax={Math.round(duration)}
             aria-valuenow={Math.round(time)}
             tabIndex={0}
-            onPointerDown={scrub}
+            // dragging along the waveform scrubs, rather than pulling a drawer open on a phone
+            data-no-swipe
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              scrub(e);
+            }}
+            onPointerMove={(e) => {
+              if (e.currentTarget.hasPointerCapture(e.pointerId)) scrub(e);
+            }}
           >
             {shape.map((h, i) => (
               <span key={i} className={s.bar} data-on={i / BARS <= pct} style={{ height: `${Math.round(h * 100)}%` }} />
