@@ -1,5 +1,5 @@
 import { Check, Copy, KeyRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Invite } from "@/api/types";
@@ -36,15 +36,19 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const key = ring.latest(channelId);
+  // only the newest request may fill in the link, so a slow earlier one cannot show old settings
+  const seq = useRef(0);
 
   const generate = async (a = age, u = uses) => {
+    const n = ++seq.current;
     setBusy(true);
     try {
-      setInvite(await channelsApi.createGroupInvite(channelId, { max_age: a, max_uses: u }));
+      const inv = await channelsApi.createGroupInvite(channelId, { max_age: a, max_uses: u });
+      if (n === seq.current) setInvite(inv);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create an invite.", "error");
+      if (n === seq.current) toast(err instanceof ApiError ? err.message : "Could not create an invite.", "error");
     } finally {
-      setBusy(false);
+      if (n === seq.current) setBusy(false);
     }
   };
   useEffect(() => {

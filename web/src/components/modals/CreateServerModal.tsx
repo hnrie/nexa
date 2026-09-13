@@ -40,9 +40,11 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
   };
 
   const join = () => {
-    const m = /(?:invite\/)?([A-Za-z0-9_-]{4,32})(?:[#?].*)?$/.exec(code.trim());
+    // a pasted link often ends in a space, which would cut the key off the end of the hash
+    const c = code.trim();
+    const m = /(?:invite\/)?([A-Za-z0-9_-]{4,32})(?:[#?].*)?$/.exec(c);
     if (!m) return toast("That doesn't look like an invite link or code.", "error");
-    const hash = code.includes("#") ? code.slice(code.indexOf("#")) : "";
+    const hash = c.includes("#") ? c.slice(c.indexOf("#")) : "";
     onClose();
     nav(`/invite/${m[1]}${hash}`);
   };

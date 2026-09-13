@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
+import { ApiError } from "@/api/client";
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { channelDisplayName } from "@/lib/names";
@@ -83,7 +84,7 @@ export function QuickSwitcher() {
     }
     for (const r of Object.values(rels)) {
       if (r.type !== "friend" || dmUsers.has(r.user.id)) continue;
-      out.push({ id: "u" + r.user.id, kind: "friend", label: r.user.display_name, sub: `@${r.user.username}`, avatarId: r.user.avatar_id, userId: r.user.id, go: () => void channelsApi.createDM([r.user.id]).then((ch) => { upsert(ch); nav(`/channels/@me/${ch.id}`); }) });
+      out.push({ id: "u" + r.user.id, kind: "friend", label: r.user.display_name, sub: `@${r.user.username}`, avatarId: r.user.avatar_id, userId: r.user.id, go: () => void channelsApi.createDM([r.user.id]).then((ch) => { upsert(ch); nav(`/channels/@me/${ch.id}`); }).catch((err: unknown) => useUI.getState().toast(err instanceof ApiError ? err.message : "Could not open the conversation.", "error")) });
     }
     const query = q.trim().toLowerCase().replace(/^[@#]/, "");
     if (!query) return out.slice(0, 10);
@@ -104,7 +105,7 @@ export function QuickSwitcher() {
     it.go();
   };
   return (
-    <Modal open onClose={() => setOpen(false)} width={560} bare>
+    <Modal open onClose={() => setOpen(false)} width={560} bare className={s.top}>
       <div className={s.box}>
         <input
           ref={inputRef}

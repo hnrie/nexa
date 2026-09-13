@@ -1,5 +1,5 @@
 import { SmilePlus, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -26,6 +26,9 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
   const [emoji, setEmoji] = useState(presence?.status_emoji ?? "");
   const [clear, setClear] = useState(0);
   const [picker, setPicker] = useState<DOMRect | null>(null);
+  // The picker closes itself on any press outside it, this button included, before the click
+  // lands; remember it was open so that click closes it rather than opening it again.
+  const pickerWasOpen = useRef(false);
 
   const save = () => {
     if (!me) return;
@@ -53,7 +56,12 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
                 type="button"
                 className={s.emojiBtn}
                 aria-label={emoji ? "Change the emoji" : "Pick an emoji"}
-                onClick={(e) => setPicker(picker ? null : e.currentTarget.getBoundingClientRect())}
+                onMouseDown={() => { pickerWasOpen.current = !!picker; }}
+                onClick={(e) => {
+                  const wasOpen = pickerWasOpen.current || !!picker;
+                  pickerWasOpen.current = false;
+                  setPicker(wasOpen ? null : e.currentTarget.getBoundingClientRect());
+                }}
                 data-testid="status-emoji"
                 data-picker-toggle={picker ? true : undefined}
               >

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
+import type { Channel } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -31,10 +32,12 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
     const clean = type === "text" ? slug(name) : name.trim();
     if (!clean || busy) return;
     setBusy(true);
+    let made: Channel | null = null;
     try {
       const body: { type: "text" | "voice"; name: string; parent_id?: string | null } = { type, name: clean };
       if (parentId) body.parent_id = parentId;
       const ch = await serversApi.createChannel(serverId, body);
+      made = ch;
       upsert(ch);
       if (priv) {
         // deny @everyone view, then give the channel its own key so members outside it never hold one
@@ -46,6 +49,20 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
       onClose();
       nav(`/channels/${serverId}/${ch.id}`);
     } catch (err) {
+      if (made && priv) {
+        // It exists but may still be open to everyone or lack its own key. Take it back down, so
+        // nothing gets posted in a channel everyone can read and trying again does not make a second one.
+        const ch = made;
+        const gone = await serversApi.deleteChannel(ch.id).then(() => true, () => false);
+        if (gone) {
+          useChannels.getState().remove(ch.id);
+        } else {
+          onClose();
+          nav(`/channels/${serverId}/${ch.id}`);
+          toast("The channel was created but may not be private yet. Check its permissions.", "error");
+          return;
+        }
+      }
       toast(err instanceof ApiError ? err.message : "Could not create the channel.", "error");
     } finally {
       setBusy(false);

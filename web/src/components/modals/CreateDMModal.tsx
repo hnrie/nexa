@@ -36,7 +36,13 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
     setBusy(true);
     try {
       if (group) {
-        for (const id of picked) upsert(await channelsApi.addRecipient(group.id, id));
+        for (const id of picked) {
+          // Someone added on an earlier try that then failed is already in, and adding them again
+          // is refused before the rest are reached, so skip them and drop each success from the picks.
+          if (useChannels.getState().byId[group.id]?.recipient_ids.includes(id)) continue;
+          upsert(await channelsApi.addRecipient(group.id, id));
+          setPicked((p) => p.filter((x) => x !== id));
+        }
         onClose();
         return;
       }

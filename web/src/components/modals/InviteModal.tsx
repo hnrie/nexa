@@ -1,5 +1,5 @@
 import { Check, Copy, KeyRound, Hash } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import type { Invite } from "@/api/types";
@@ -40,16 +40,20 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const key = ring.latest(serverId);
+  // only the newest request may fill in the link, so a slow earlier one cannot show old settings
+  const seq = useRef(0);
 
   const generate = async (ch = channel, a = age, u = uses) => {
     if (!ch) return;
+    const n = ++seq.current;
     setBusy(true);
     try {
-      setInvite(await serversApi.createInvite(ch, { max_age: a, max_uses: u }));
+      const inv = await serversApi.createInvite(ch, { max_age: a, max_uses: u });
+      if (n === seq.current) setInvite(inv);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create an invite.", "error");
+      if (n === seq.current) toast(err instanceof ApiError ? err.message : "Could not create an invite.", "error");
     } finally {
-      setBusy(false);
+      if (n === seq.current) setBusy(false);
     }
   };
 
