@@ -7,6 +7,7 @@ import { useExpressions } from "@/stores/expressions";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { GifGrid, type GifTileData } from "./GifGrid";
+import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
 type Pick = (gif: { url: string; w?: number; h?: number }) => void;
@@ -115,7 +116,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     <div className={s.body} style={{ flexDirection: "column" }}>
       <div className={s.searchRow} style={{ flexDirection: "column", alignItems: "stretch" }}>
         {enabled ? (
-          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder="Search Klipy" aria-label="Search GIFs" autoFocus />
+          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder="Search Klipy" aria-label="Search GIFs" autoFocus={focusSearchOnOpen()} />
         ) : null}
         <div className={s.gifTabs}>
           <button className={s.gifTab} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>Favorites</button>

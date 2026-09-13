@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { EmojiPicker, type EmojiPick } from "./EmojiPicker";
+import { EmojiPicker, focusSearchOnOpen, type EmojiPick } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
 export type PickerTab = "emoji" | "gif" | "sticker";
@@ -35,6 +35,9 @@ function anchoredStyle(a: DOMRect): CSSProperties {
 /** Context menus and dialogs, which live outside the picker in the page. */
 const OVER = "[data-context-menu], [data-modal-overlay]";
 
+/** The button that opened the picker, which closes it again with its own click (it carries this only while its picker is open). */
+const TOGGLE = "[data-picker-toggle]";
+
 /**
  * Whether el was opened over the picker, from inside it (a GIF's menu, the
  * question before removing a pack): it comes later in the page. One the
@@ -51,9 +54,17 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
   const ref = useRef<HTMLDivElement>(null);
   const mobile = typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches;
   useEffect(() => {
+    // On a touch screen the keyboard of the field the picker was opened from
+    // would cover the picker, so it goes down.
+    const field = document.activeElement;
+    if (!focusSearchOnOpen() && field instanceof HTMLElement && (field.matches("input, textarea") || field.isContentEditable) && !ref.current?.contains(field)) field.blur();
+  }, []);
+  useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current || ref.current.contains(e.target as Node)) return;
       if (e.target instanceof Element && openedOver(ref.current, e.target.closest(OVER))) return;
+      // closing here would let the button's click open the picker again
+      if (e.target instanceof Element && e.target.closest(TOGGLE)) return;
       onClose();
     };
     const onKey = (e: KeyboardEvent) => {

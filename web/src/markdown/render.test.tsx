@@ -97,6 +97,24 @@ describe("mentions", () => {
     expect(el.style.backgroundColor).toBe("rgba(255, 0, 0, 0.1)");
   });
 
+  it("leaves role mentions without a colour to the mention style", () => {
+    const { container } = render(<Markdown source="<@&21>" ctx={makeCtx({ roles: { "21": { name: "member", color: 0 } } })} />);
+    const el = container.querySelector(".md-mention") as HTMLElement;
+    expect(el.textContent).toBe("@member");
+    expect(el.style.color).toBe("");
+    expect(el.style.backgroundColor).toBe("");
+  });
+
+  it("opens channel mentions from the keyboard", () => {
+    const onChannelClick = vi.fn();
+    const { container } = render(<Markdown source="<#10>" ctx={makeCtx({ onChannelClick })} />);
+    const el = container.querySelector(".md-mention") as HTMLElement;
+    fireEvent.keyDown(el, { key: "a" });
+    expect(onChannelClick).not.toHaveBeenCalled();
+    fireEvent.keyDown(el, { key: "Enter" });
+    expect(onChannelClick).toHaveBeenCalledWith("10");
+  });
+
   it("renders everyone without any lookup", () => {
     const { container } = render(<Markdown source="@everyone" ctx={makeCtx()} />);
     expect(container.querySelector(".md-mention")?.textContent).toBe("@everyone");

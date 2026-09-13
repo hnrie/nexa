@@ -16,6 +16,12 @@ const MAX_DEPTH = 24;
 const MAX_URLS = 5;
 /** Above this many emoji a message is no longer rendered jumbo. */
 const MAX_JUMBO_EMOJI = 30;
+/**
+ * Only this much of a message is parsed. The composer sends at most 4000
+ * characters, but a hand-built message can be far longer, and every reader
+ * parses it several times per render.
+ */
+const MAX_SOURCE = 8000;
 
 const RE_USER = /<@!?(\d{1,32})>/y;
 const RE_CHANNEL = /<#(\d{1,32})>/y;
@@ -25,7 +31,8 @@ const RE_SHORTCODE = /:([a-z0-9_+-]{1,60}):/y;
 const RE_TIMESTAMP = /<t:(-?\d{1,19})(?::([tTdDfFR]))?>/y;
 const RE_ANGLE_URL = /<(https?:\/\/[^\s>]+)>/iy;
 const RE_URL = /https?:\/\/[^\s<]+/iy;
-const RE_MASKED = /\[([^\]\n]*)\]\(\s*(<[^>\s]+>|[^()\s]+)\s*\)/y;
+// bounded, so a line of unclosed brackets is not rescanned to its end from each one
+const RE_MASKED = /\[([^\]\n]{0,512})\]\(\s*(<[^>\s]{1,2048}>|[^()\s]{1,2048})\s*\)/y;
 const RE_FENCE_LANG = /[a-zA-Z0-9_+-]*/y;
 const RE_HEADING = /^(#{1,3}) (.*)$/;
 const RE_SUBTEXT = /^-# (.*)$/;
@@ -58,13 +65,14 @@ function runOf(s: string, i: number, ch: string): number {
  * previews want; newlines still become `br` nodes.
  */
 export function parse(src: string, opts?: { inline?: boolean }): Node[] {
-  const text = normalize(src);
+  const text = normalize(src.length > MAX_SOURCE ? src.slice(0, MAX_SOURCE) : src);
   if (text === "") return [];
   return opts?.inline ? parseInline(text, 0) : parseBlocks(text);
 }
 
 function normalize(src: string): string {
-  return src.replace(/\r\n?/g, "\n").replace(/\s+$/, "").replace(/^\n+/, "");
+  // trimEnd, because /\s+$/ retries from every space of a long run that is not at the end
+  return src.replace(/\r\n?/g, "\n").trimEnd().replace(/^\n+/, "");
 }
 
 // ---------------------------------------------------------------------------
@@ -569,14 +577,21 @@ function findPair(line: string, from: number, ch: string): number {
   return -1;
 }
 
-function countChar(s: string, ch: string, end: number): number {
-  let n = 0;
-  for (let k = 0; k < end; k++) if (s.charAt(k) === ch) n += 1;
-  return n;
-}
-
 /** Drops trailing sentence punctuation and unbalanced closing brackets. */
 function trimUrl(url: string): string {
+  // the brackets are counted once and kept up to date as the end moves back,
+  // so a long run of them costs no more than its length
+  let open = 0;
+  let close = 0;
+  let openSq = 0;
+  let closeSq = 0;
+  for (let k = 0; k < url.length; k++) {
+    const c = url.charAt(k);
+    if (c === "(") open += 1;
+    else if (c === ")") close += 1;
+    else if (c === "[") openSq += 1;
+    else if (c === "]") closeSq += 1;
+  }
   let end = url.length;
   while (end > 0) {
     const last = url.charAt(end - 1);
@@ -584,11 +599,13 @@ function trimUrl(url: string): string {
       end -= 1;
       continue;
     }
-    if (last === ")" && countChar(url, ")", end) > countChar(url, "(", end)) {
+    if (last === ")" && close > open) {
+      close -= 1;
       end -= 1;
       continue;
     }
-    if (last === "]" && countChar(url, "]", end) > countChar(url, "[", end)) {
+    if (last === "]" && closeSq > openSq) {
+      closeSq -= 1;
       end -= 1;
       continue;
     }
@@ -659,12 +676,14 @@ function nodeText(node: Node, names?: PlainTextNames): string {
     case "em":
     case "u":
     case "s":
-    case "spoiler":
     case "paragraph":
     case "quote":
     case "heading":
     case "subtext":
       return node.children.map((child) => nodeText(child, names)).join("");
+    case "spoiler":
+      // replies and notifications must not give away what it hides
+      return "[spoiler]";
     case "list":
       return node.items
         .map((item) => item.map((child) => (child.type === "list" ? "\n" + nodeText(child, names) : nodeText(child, names))).join(""))
@@ -724,7 +743,6 @@ export function extractUrls(src: string): string[] {
         case "em":
         case "u":
         case "s":
-        case "spoiler":
         case "paragraph":
         case "quote":
         case "heading":
@@ -734,6 +752,8 @@ export function extractUrls(src: string): string[] {
         case "list":
           for (const item of node.items) walk(item);
           break;
+        // a preview would show what the spoiler hides
+        case "spoiler":
         default:
           break;
       }

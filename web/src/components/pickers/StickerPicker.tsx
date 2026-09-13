@@ -5,6 +5,7 @@ import { useAuth } from "@/stores/auth";
 import { groupPacks, packImageUrl, searchStickers, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
 export interface StickerPick {
@@ -46,7 +47,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   return (
     <>
       <div className={s.searchRow}>
-        <input className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stickers" aria-label="Search stickers" autoFocus />
+        <input className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stickers" aria-label="Search stickers" autoFocus={focusSearchOnOpen()} />
       </div>
       <div className={s.body}>
         <div className={s.cats}>

@@ -517,7 +517,7 @@ export function Composer({ channel }: { channel: Channel }) {
           aria-label={placeholder}
         />
         <div className={s.btns}>
-          <button className={s.iconBtn} data-on={picker} aria-label="Select emoji" onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
+          <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label="Select emoji" onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
           <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label="Send message" onClick={() => void send()} disabled={sending || remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
         </div>
       </div>

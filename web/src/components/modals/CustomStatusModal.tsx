@@ -55,6 +55,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
                 aria-label={emoji ? "Change the emoji" : "Pick an emoji"}
                 onClick={(e) => setPicker(picker ? null : e.currentTarget.getBoundingClientRect())}
                 data-testid="status-emoji"
+                data-picker-toggle={picker ? true : undefined}
               >
                 {emoji ? <Twemoji text={emoji} className={s.emojiImg} title="" /> : <SmilePlus size={20} />}
               </button>

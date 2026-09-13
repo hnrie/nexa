@@ -269,6 +269,22 @@ describe("fuzz", () => {
     parse("_a".repeat(1999));
     expect(Date.now() - started).toBeLessThan(2000);
   });
+
+  it("is fast on long hand-built messages", () => {
+    const started = Date.now();
+    parse("https://a" + ")".repeat(32000));
+    parse("https://a" + "]".repeat(32000));
+    parse("a" + " ".repeat(32000) + "b");
+    parse("[".repeat(32000));
+    parse("[a](" + "x".repeat(32000));
+    extractUrls("https://a" + ")".repeat(64000));
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("still trims unbalanced closing brackets off a url", () => {
+    expect(extractUrls("(https://a.b/x_(y))).")).toEqual(["https://a.b/x_(y)"]);
+    expect(extractUrls("[https://a.b/[1]]]")).toEqual(["https://a.b/[1]"]);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -307,7 +323,10 @@ describe("plainText", () => {
     expect(plainText(parse("hello world"))).toBe("hello world");
   });
   it("drops formatting markers", () => {
-    expect(plainText(parse("**a** *b* ~~c~~ ||d||"))).toBe("a b c d");
+    expect(plainText(parse("**a** *b* ~~c~~"))).toBe("a b c");
+  });
+  it("hides what a spoiler covers", () => {
+    expect(plainText(parse("the butler ||did it||", { inline: true }))).toBe("the butler [spoiler]");
   });
   it("renders unresolved mentions by id", () => {
     expect(plainText(parse("<@12> <#34> <@&56>"))).toBe("@12 #34 @56");
@@ -373,6 +392,9 @@ describe("extractUrls", () => {
   it("caps at 5", () => {
     const src = ["https://a1.b", "https://a2.b", "https://a3.b", "https://a4.b", "https://a5.b", "https://a6.b"].join(" ");
     expect(extractUrls(src)).toHaveLength(5);
+  });
+  it("skips urls inside a spoiler", () => {
+    expect(extractUrls("||https://a.b/ending.png|| https://c.d")).toEqual(["https://c.d"]);
   });
   it("returns an empty array when there is nothing to find", () => {
     expect(extractUrls("no links here")).toEqual([]);

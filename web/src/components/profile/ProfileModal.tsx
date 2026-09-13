@@ -64,6 +64,9 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   const isMe = me?.id === userId;
   const user: PublicUser | undefined = isMe && me ? me : stored;
 
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
+
   useEffect(() => {
     let alive = true;
     usersApi
@@ -73,12 +76,23 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
         upsertUser(p.user);
         setMutual(p.mutual_friends);
       })
-      .catch(() => undefined);
+      // a profile already on hand is still shown; only an empty card needs to say so
+      .catch(() => {
+        if (alive) setLoadError(true);
+      });
     return () => {
       alive = false;
     };
-  }, [userId, upsertUser]);
+  }, [userId, upsertUser, retry]);
 
+  if (!user && loadError) {
+    return (
+      <Modal open onClose={onClose} title="Profile">
+        <p className={s.small}>Could not load this profile.</p>
+        <Button size="sm" onClick={() => { setLoadError(false); setRetry((r) => r + 1); }}>Retry</Button>
+      </Modal>
+    );
+  }
   if (!user) return <Modal open onClose={onClose} title="Profile"><p className={s.small}>Loading…</p></Modal>;
   const st = statusOf(presence);
   const cs = customStatus(presence);
@@ -110,16 +124,17 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
       toast(err instanceof ApiError ? err.message : "Could not accept.", "error");
     }
   };
+  const failed = (err: unknown) => toast(err instanceof ApiError ? err.message : "Could not update this person.", "error");
   const more = (e: React.MouseEvent) => {
     const r = e.currentTarget.getBoundingClientRect();
     openContextMenu({
       x: r.left,
       y: r.bottom + 4,
       items: [
-        ...(rel?.type === "friend" ? [{ id: "rm", label: "Remove Friend", danger: true, onSelect: () => void relApi.remove(userId).then(() => removeRel(userId)) }] : []),
+        ...(rel?.type === "friend" ? [{ id: "rm", label: "Remove Friend", danger: true, onSelect: () => void relApi.remove(userId).then(() => removeRel(userId), failed) }] : []),
         ...(rel?.type === "blocked"
-          ? [{ id: "unblock", label: "Unblock", onSelect: () => void relApi.unblock(userId).then(() => removeRel(userId)) }]
-          : [{ id: "block", label: "Block", danger: true, onSelect: () => void relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() })) }]),
+          ? [{ id: "unblock", label: "Unblock", onSelect: () => void relApi.unblock(userId).then(() => removeRel(userId), failed) }]
+          : [{ id: "block", label: "Block", danger: true, onSelect: () => void relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() }), failed) }]),
         { id: "copy", label: "Copy User ID", onSelect: () => void navigator.clipboard?.writeText(userId) },
       ],
     });

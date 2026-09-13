@@ -10,6 +10,14 @@ import { Twemoji } from "@/components/common/Twemoji";
 import { GROUPS, TONES, allEmoji, emojiLoaded, loadEmoji, searchEmoji, withTone, type EmojiEntry } from "./emojiIndex";
 import s from "./Picker.module.css";
 
+/**
+ * Whether opening the picker should put the cursor in its search box. On a
+ * touch screen that raises the keyboard, which covers the picker's sheet.
+ */
+export function focusSearchOnOpen(): boolean {
+  return typeof window !== "undefined" && !window.matchMedia?.("(pointer: coarse)").matches;
+}
+
 const ICONS: Record<number, React.ReactNode> = {
   [-1]: <Clock size={20} />,
   0: <Smile size={20} />,
@@ -63,7 +71,9 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
 
   useEffect(() => {
     void loadEmoji().then(() => setReady(true));
-    setTimeout(() => inputRef.current?.focus(), 0);
+    setTimeout(() => {
+      if (focusSearchOnOpen()) inputRef.current?.focus();
+    }, 0);
   }, []);
 
   const results = useMemo(() => (ready && q.trim() ? searchEmoji(q, 100) : null), [q, ready]);

@@ -2,6 +2,7 @@ import { RotateCcw, ZoomIn } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
+import { animatedByType, isAnimatedImage } from "./animatedImage";
 import s from "./ImageCrop.module.css";
 
 export interface CropResult {
@@ -25,16 +26,13 @@ interface Props {
 
 const VIEW = 320;
 
-function isAnimated(file: File): boolean {
-  return file.type === "image/gif" || file.type === "image/apng" || file.type === "image/webp";
-}
-
 /** Pan-and-zoom cropper. Animated files can be kept whole instead of flattened. */
 export function ImageCropModal({ file, aspect, round = false, title = "Edit image", maxSize = 1024, onDone, onClose }: Props) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [keepOriginal, setKeepOriginal] = useState(isAnimated(file));
+  const [animated, setAnimated] = useState(() => animatedByType(file.type));
+  const [keepOriginal, setKeepOriginal] = useState(animated);
   const [busy, setBusy] = useState(false);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const boxW = VIEW;
@@ -46,6 +44,20 @@ export function ImageCropModal({ file, aspect, round = false, title = "Edit imag
     el.onload = () => setImg(el);
     el.src = url;
     return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  // a WebP or PNG only keeps its original when the file really animates
+  useEffect(() => {
+    if (animatedByType(file.type)) return;
+    let alive = true;
+    void isAnimatedImage(file).then((yes) => {
+      if (!alive || !yes) return;
+      setAnimated(true);
+      setKeepOriginal(true);
+    });
+    return () => {
+      alive = false;
+    };
   }, [file]);
 
   // the smallest zoom that still covers the frame
@@ -149,7 +161,7 @@ export function ImageCropModal({ file, aspect, round = false, title = "Edit imag
           <input className={s.range} type="range" min={1} max={5} step={0.01} value={zoom} disabled={keepOriginal} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
           <button className={s.reset} aria-label="Reset" title="Reset" onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}><RotateCcw size={16} /></button>
         </div>
-        {isAnimated(file) ? (
+        {animated ? (
           <label className={s.keep}>
             <input type="checkbox" checked={keepOriginal} onChange={(e) => setKeepOriginal(e.target.checked)} />
             <span>Upload the original so it keeps animating (cropping would flatten it)</span>

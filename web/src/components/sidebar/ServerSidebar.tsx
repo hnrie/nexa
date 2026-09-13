@@ -41,6 +41,8 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const [drop, setDrop] = useState<Drop | null>(null);
   const voiceByChannel = useVoice((v) => v.byChannel);
   const headRef = useRef<HTMLButtonElement>(null);
+  // whether the menu was open when the header was pressed: pressing closes it, and the click that follows must not open it again
+  const wasOpen = useRef(false);
   const active = loc.pathname.match(/^\/channels\/\d+\/(\d+)/)?.[1];
   const tree = useMemo(() => channelTree(channels, serverId), [channels, serverId]);
   const canManage = canI(st, P.MANAGE_CHANNELS);
@@ -52,6 +54,10 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   );
 
   const openHeaderMenu = () => {
+    if (wasOpen.current) {
+      wasOpen.current = false;
+      return;
+    }
     if (!headRef.current) return;
     const r = headRef.current.getBoundingClientRect();
     setMenuOpen(true);
@@ -208,7 +214,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
 
   return (
     <div className={s.sidebar} onDrop={(e) => e.preventDefault()}>
-      <button ref={headRef} className={s.head} data-open={menuOpen} onClick={openHeaderMenu} aria-haspopup="menu" aria-expanded={menuOpen}>
+      <button ref={headRef} className={s.head} data-open={menuOpen} onPointerDown={() => { wasOpen.current = menuOpen; }} onClick={openHeaderMenu} aria-haspopup="menu" aria-expanded={menuOpen}>
         <span className={s.headName}>{st.server.name}</span>
         {menuOpen ? <X size={18} /> : <ChevronDown size={18} />}
       </button>

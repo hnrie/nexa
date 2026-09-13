@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { ensureShortcodes, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import type { Node, RenderCtx } from "./ast";
@@ -202,6 +202,13 @@ function Spoiler(props: { ctx: RenderCtx; children: ReactNode }): JSX.Element {
 // mentions
 // ---------------------------------------------------------------------------
 
+/** Enter or Space on a mention that works as a button. */
+function pressed(e: KeyboardEvent): boolean {
+  if (e.key !== "Enter" && e.key !== " ") return false;
+  e.preventDefault();
+  return true;
+}
+
 function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const user = props.ctx.users[props.id];
   const name = user ? user.display_name || user.username || "unknown-user" : "unknown-user";
@@ -211,6 +218,7 @@ function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
       role="button"
       tabIndex={0}
       onClick={(e) => props.ctx.onUserClick?.(props.id, e.currentTarget)}
+      onKeyDown={(e) => pressed(e) && props.ctx.onUserClick?.(props.id, e.currentTarget)}
     >
       {"@" + name}
     </span>
@@ -221,7 +229,7 @@ function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const channel = props.ctx.channels[props.id];
   const name = channel ? channel.name || "deleted-channel" : "deleted-channel";
   return (
-    <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)}>
+    <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)} onKeyDown={(e) => pressed(e) && props.ctx.onChannelClick?.(props.id)}>
       {"#" + name}
     </span>
   );
@@ -230,7 +238,8 @@ function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
 function RoleMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const role = props.ctx.roles?.[props.id];
   const name = role ? role.name || "unknown-role" : "unknown-role";
-  const style = role ? { color: hexColor(role.color), backgroundColor: rgbaColor(role.color, 0.1) } : undefined;
+  // colour 0 is a role without a colour, which looks like any other mention
+  const style = role && role.color !== 0 ? { color: hexColor(role.color), backgroundColor: rgbaColor(role.color, 0.1) } : undefined;
   return (
     <span className="md-mention" style={style}>
       {"@" + name}

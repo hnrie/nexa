@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
+import { UNSAFE_NavigationContext } from "react-router-dom";
 import { emojiUrl } from "@/api/users";
 import type { RenderCtx } from "@/markdown/ast";
 import { useChannels } from "@/stores/channels";
@@ -12,6 +13,9 @@ export function useRenderCtx(): RenderCtx {
   const channels = useChannels((c) => c.byId);
   const servers = useServers((st) => st.byId);
   const openModal = useUI((u) => u.openModal);
+  // The router's history, which stays the same from page to page. useNavigate
+  // would re-render every message on the screen each time the address changes.
+  const { navigator } = useContext(UNSAFE_NavigationContext);
   return useMemo<RenderCtx>(() => {
     const roles: Record<string, { name: string; color: number }> = {};
     for (const st of Object.values(servers)) for (const r of Object.values(st.roles)) roles[r.id] = { name: r.id === st.server.id ? "everyone" : r.name, color: r.color };
@@ -21,6 +25,11 @@ export function useRenderCtx(): RenderCtx {
       roles,
       emojiUrl,
       onUserClick: (id) => openModal("profile", { userId: id }),
+      onChannelClick: (id) => {
+        const ch = channels[id];
+        if (!ch || ch.type === "category") return;
+        navigator.push(ch.server_id ? `/channels/${ch.server_id}/${ch.id}` : `/channels/@me/${ch.id}`);
+      },
     };
-  }, [users, channels, servers, openModal]);
+  }, [users, channels, servers, openModal, navigator]);
 }
