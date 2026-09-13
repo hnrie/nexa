@@ -44,24 +44,33 @@ type Config struct {
 	// nothing asks for a captcha.
 	TurnstileSiteKey   string
 	TurnstileSecretKey string
-	LogLevel           string
-	SessionTTL         time.Duration
+	// RealtimeAppID and RealtimeAppSecret send every call through Cloudflare
+	// Realtime SFU, so nobody in a call learns another person's address.
+	// Without them calls go peer to peer.
+	RealtimeAppID     string
+	RealtimeAppSecret string
+	// RealtimeMonthlyGB is the SFU's free allowance per month. Video pauses
+	// near it and calls stop just short of it, so nothing is ever billed.
+	RealtimeMonthlyGB int64
+	LogLevel          string
+	SessionTTL        time.Duration
 }
 
 // Load builds a Config from getenv, applying defaults and validating values.
 func Load(getenv func(string) string) (Config, error) {
 	c := Config{
-		Listen:          "127.0.0.1:8090",
-		PublicURL:       "https://chat.evilion.xyz",
-		DataDir:         "./data",
-		WebDist:         "./web/dist",
-		MaxUploadBytes:  104857600,
-		MaxAvatarBytes:  10 << 20,
-		MaxEmojiBytes:   2 << 20,
-		MaxStickerBytes: 5 << 20,
-		Registration:    "open",
-		LogLevel:        "info",
-		SessionTTL:      90 * 24 * time.Hour,
+		Listen:            "127.0.0.1:8090",
+		PublicURL:         "https://chat.evilion.xyz",
+		DataDir:           "./data",
+		WebDist:           "./web/dist",
+		MaxUploadBytes:    104857600,
+		MaxAvatarBytes:    10 << 20,
+		MaxEmojiBytes:     2 << 20,
+		MaxStickerBytes:   5 << 20,
+		Registration:      "open",
+		RealtimeMonthlyGB: 1000,
+		LogLevel:          "info",
+		SessionTTL:        90 * 24 * time.Hour,
 	}
 	str := func(k string, dst *string) {
 		if v := strings.TrimSpace(getenv(k)); v != "" {
@@ -82,6 +91,8 @@ func Load(getenv func(string) string) (Config, error) {
 	str("KLIPY_API_KEY", &c.KlipyAPIKey)
 	str("TURNSTILE_SITE_KEY", &c.TurnstileSiteKey)
 	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
+	str("REALTIME_APP_ID", &c.RealtimeAppID)
+	str("REALTIME_APP_SECRET", &c.RealtimeAppSecret)
 	str("LOG_LEVEL", &c.LogLevel)
 	// Usernames are stored lowercase, so a name written with capitals would
 	// otherwise never match the account it means.
@@ -95,6 +106,7 @@ func Load(getenv func(string) string) (Config, error) {
 		{"MAX_AVATAR_BYTES", &c.MaxAvatarBytes},
 		{"MAX_EMOJI_BYTES", &c.MaxEmojiBytes},
 		{"MAX_STICKER_BYTES", &c.MaxStickerBytes},
+		{"REALTIME_MONTHLY_GB", &c.RealtimeMonthlyGB},
 	}
 	for _, kv := range ints {
 		v := strings.TrimSpace(getenv(kv.k))
@@ -147,6 +159,10 @@ func Load(getenv func(string) string) (Config, error) {
 	// With one key and not the other captchas would be silently off.
 	if (c.TurnstileSiteKey == "") != (c.TurnstileSecretKey == "") {
 		return c, fmt.Errorf("TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY: set both to turn captchas on, or neither")
+	}
+	// With one and not the other calls would quietly go peer to peer.
+	if (c.RealtimeAppID == "") != (c.RealtimeAppSecret == "") {
+		return c, fmt.Errorf("REALTIME_APP_ID and REALTIME_APP_SECRET: set both to send calls through Cloudflare Realtime, or neither")
 	}
 	c.PublicURL = strings.TrimRight(c.PublicURL, "/")
 	if !strings.HasPrefix(c.PublicURL, "http://") && !strings.HasPrefix(c.PublicURL, "https://") {

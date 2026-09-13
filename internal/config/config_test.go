@@ -27,6 +27,15 @@ func TestLoadDefaults(t *testing.T) {
 	if c.SessionTTL != 90*24*time.Hour {
 		t.Errorf("SessionTTL = %v", c.SessionTTL)
 	}
+	if c.RealtimeMonthlyGB != 1000 || c.RealtimeAppID != "" {
+		t.Errorf("Realtime defaults: %d %q", c.RealtimeMonthlyGB, c.RealtimeAppID)
+	}
+	both, err := Load(func(k string) string {
+		return map[string]string{"REALTIME_APP_ID": "app", "REALTIME_APP_SECRET": "secret", "REALTIME_MONTHLY_GB": "250"}[k]
+	})
+	if err != nil || both.RealtimeAppID != "app" || both.RealtimeAppSecret != "secret" || both.RealtimeMonthlyGB != 250 {
+		t.Errorf("Realtime keys together: %v %+v", err, both)
+	}
 }
 
 func TestLoadOverridesAndValidation(t *testing.T) {
@@ -51,7 +60,7 @@ func TestLoadOverridesAndValidation(t *testing.T) {
 		t.Errorf("PublicURL trailing slash kept: %q", c.PublicURL)
 	}
 	// half a captcha setup is refused rather than quietly leaving captchas off
-	bad := map[string]string{"REGISTRATION": "sometimes", "MAX_UPLOAD_BYTES": "abc", "SESSION_TTL_DAYS": "999999", "PUBLIC_URL": "chat.example", "LOG_LEVEL": "loud", "TURNSTILE_SITE_KEY": "site", "TURNSTILE_SECRET_KEY": "secret"}
+	bad := map[string]string{"REGISTRATION": "sometimes", "MAX_UPLOAD_BYTES": "abc", "SESSION_TTL_DAYS": "999999", "PUBLIC_URL": "chat.example", "LOG_LEVEL": "loud", "TURNSTILE_SITE_KEY": "site", "TURNSTILE_SECRET_KEY": "secret", "REALTIME_APP_ID": "app", "REALTIME_APP_SECRET": "secret", "REALTIME_MONTHLY_GB": "0"}
 	for k, v := range bad {
 		_, err := Load(func(kk string) string {
 			if kk == k {
