@@ -1,8 +1,9 @@
+import { vi } from "vitest";
 import { api } from "@/api/client";
 import type { RequestOptions } from "@/api/client";
 import type { KeyGrant, Message } from "@/api/types";
 import { b64 } from "@/crypto/bytes";
-import { channelKey } from "@/crypto/conv";
+import { channelKey, newRootKey } from "@/crypto/conv";
 import { generateIdentity } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
 import { encryptMessage } from "@/crypto/message";
@@ -133,5 +134,45 @@ describe("key manager", () => {
     expect(after?.decryptError).toBeUndefined();
     expect(after?.payload).toEqual({ t: "secret" });
     expect(useKeys.getState().waiting["conv1"]).toBeUndefined();
+  });
+
+  it("does not use a new epoch whose grants never reached the server", async () => {
+    let epoch = 0;
+    let failGrants = true;
+    api.request = <T>(method: string, path: string, body?: unknown, _opts?: RequestOptions): Promise<T> => {
+      if (method === "POST" && path === "/keys/epochs") return Promise.resolve({ conv_id: "conv1", epoch: epoch++, user_ids: ["A", "B"] } as T);
+      if (method === "POST" && path === "/keys/grants") {
+        if (failGrants) return Promise.reject(new Error("offline"));
+        putGrants.push(...(body as typeof putGrants));
+        return Promise.resolve({ inserted: (body as unknown[]).length } as T);
+      }
+      return Promise.reject(new Error(`unexpected ${method} ${path}`));
+    };
+    await useKeys.getState().init("A", alice);
+    await expect(useKeys.getState().ensureConvKey("conv1")).rejects.toThrow();
+    expect(ring.latest("conv1")).toBeUndefined();
+    expect(await keystore.loadRoots("A")).toEqual([]);
+
+    // The retry starts a fresh epoch and hands it out before using it.
+    failGrants = false;
+    const got = await useKeys.getState().ensureConvKey("conv1");
+    expect(got?.epoch).toBe(1);
+    expect(putGrants.filter((g) => g.epoch === 1).map((g) => g.user_id).sort()).toEqual(["A", "B"]);
+  });
+
+  it("keeps roots off the disk behind a passcode", async () => {
+    await keystore.saveRoot("A", "old", 0, newRootKey());
+    const lock = JSON.stringify({ v: 1, salt: "AA", wrapped: "AA", pub: "AA", params: {} });
+    vi.stubGlobal("localStorage", { getItem: (k: string) => (k === "ec.lock.A" ? lock : null), setItem: () => undefined, removeItem: () => undefined });
+    try {
+      await useKeys.getState().init("A", alice);
+      expect(await keystore.loadRoots("A")).toEqual([]);
+      expect(ring.get("old", 0)).toBeUndefined();
+      await useKeys.getState().ensureConvKey("conv1");
+      expect(ring.get("conv1", 0)).toBeDefined();
+      expect(await keystore.loadRoots("A")).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

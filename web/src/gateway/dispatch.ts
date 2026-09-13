@@ -27,7 +27,7 @@ export const dispatchHooks: {
   onReady: (() => void)[];
 } = { onMessage: [], onUnhandled: [], onReady: [] };
 
-function resetAll(keepMessagesIn?: string): void {
+export function resetAll(keepMessagesIn?: string): void {
   useMessages.getState().clearAll(keepMessagesIn);
   useChannels.getState().clear();
   useUsers.getState().clear();

@@ -125,11 +125,13 @@ interface SettingsState {
   reload: () => Promise<void>;
   patch: (partial: Partial<Settings>) => void;
   setDraft: (channelId: string, text: string) => void;
-  flush: () => Promise<void>;
+  /** Saves now; resolves false when the settings did not reach the server. */
+  flush: () => Promise<boolean>;
   reset: () => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let inflightSave: Promise<boolean> | null = null;
 
 export const useSettings = create<SettingsState>()((set, get) => ({
   settings: DEFAULT_SETTINGS,
@@ -166,24 +168,41 @@ export const useSettings = create<SettingsState>()((set, get) => ({
     get().patch({ drafts });
   },
   flush: async () => {
-    const { key, settings, version, saving } = get();
-    if (!key || saving) return;
-    set({ saving: true });
-    try {
-      const blob = await encryptSettings(key, settings);
-      const res = await usersApi.putSettings(blob, version);
-      set({ version: res.version });
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        const local = get().settings;
-        await get().reload();
-        set((s) => ({ settings: mergeSettings(s.settings, local) }));
+    // A save already under way may carry older settings, so wait for it and
+    // then send what is here now. Callers such as the passcode need to know
+    // their change really reached the server.
+    while (inflightSave) await inflightSave;
+    if (!get().key) return false;
+    const job = (async (): Promise<boolean> => {
+      set({ saving: true });
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { key, settings, version } = get();
+          if (!key) return false;
+          try {
+            const blob = await encryptSettings(key, settings);
+            const res = await usersApi.putSettings(blob, version);
+            set({ version: res.version });
+            return true;
+          } catch (err) {
+            if (!(err instanceof ApiError && err.status === 409)) return false;
+            const local = get().settings;
+            await get().reload();
+            set((s) => ({ settings: mergeSettings(s.settings, local) }));
+          }
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
         set({ saving: false });
-        void get().flush();
-        return;
       }
+    })();
+    inflightSave = job;
+    try {
+      return await job;
     } finally {
-      set({ saving: false });
+      if (inflightSave === job) inflightSave = null;
     }
   },
   reset: () => {

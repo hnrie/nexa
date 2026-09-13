@@ -4,7 +4,8 @@
  * Holds the unwrapped identity key pair and the conversation root keys for each
  * signed-in user, so a reload does not have to re-derive anything from the
  * password. Everything here is plaintext at rest inside the browser profile:
- * `clear()` is what a sign-out calls.
+ * `clear()` is what a sign-out calls, and a device with a passcode keeps
+ * neither the identity nor any roots here.
  */
 
 import type { Identity } from "./keys";
@@ -94,64 +95,101 @@ function asRoot(v: unknown): StoredRoot | null {
   return { conv, epoch, root };
 }
 
+/**
+ * Runs one piece of work against the database. A failure drops the cached
+ * connection: WebKit loses it after a long stay in the background, and every
+ * later call would otherwise fail on the same dead handle.
+ */
+async function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
+  const handle = openDb();
+  try {
+    return await fn(await handle);
+  } catch (err) {
+    if (dbHandle === handle) dbHandle = null;
+    throw err;
+  }
+}
+
+/** Deletes every root of one user through a cursor, so the sweep stays inside `tx`. */
+function deleteRootsIn(tx: IDBTransaction, userId: string): void {
+  const roots = tx.objectStore(STORE_ROOTS);
+  const cursor = roots.index(INDEX_BY_USER).openKeyCursor(IDBKeyRange.only(userId));
+  cursor.onsuccess = () => {
+    const c = cursor.result;
+    if (!c) return;
+    roots.delete(c.primaryKey);
+    c.continue();
+  };
+}
+
 export const keystore = {
-  async saveIdentity(userId: string, id: Identity): Promise<void> {
-    const db = await openDb();
-    const tx = db.transaction(STORE_IDENTITY, "readwrite");
-    const value: Identity = { publicKey: id.publicKey, privateKey: id.privateKey };
-    tx.objectStore(STORE_IDENTITY).put(value, userId);
-    await committed(tx);
+  saveIdentity(userId: string, id: Identity): Promise<void> {
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_IDENTITY, "readwrite");
+      const value: Identity = { publicKey: id.publicKey, privateKey: id.privateKey };
+      tx.objectStore(STORE_IDENTITY).put(value, userId);
+      await committed(tx);
+    });
   },
 
-  async loadIdentity(userId: string): Promise<Identity | null> {
-    const db = await openDb();
-    const tx = db.transaction(STORE_IDENTITY, "readonly");
-    return asIdentity(await request<unknown>(tx.objectStore(STORE_IDENTITY).get(userId)));
+  loadIdentity(userId: string): Promise<Identity | null> {
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_IDENTITY, "readonly");
+      return asIdentity(await request<unknown>(tx.objectStore(STORE_IDENTITY).get(userId)));
+    });
   },
 
-  async saveRoot(userId: string, conv: string, epoch: number, root: Uint8Array): Promise<void> {
-    const db = await openDb();
-    const tx = db.transaction(STORE_ROOTS, "readwrite");
-    const value: RootRecord = { userId, conv, epoch, root };
-    tx.objectStore(STORE_ROOTS).put(value, rootKeyOf(userId, conv, epoch));
-    await committed(tx);
+  saveRoot(userId: string, conv: string, epoch: number, root: Uint8Array): Promise<void> {
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_ROOTS, "readwrite");
+      const value: RootRecord = { userId, conv, epoch, root };
+      tx.objectStore(STORE_ROOTS).put(value, rootKeyOf(userId, conv, epoch));
+      await committed(tx);
+    });
   },
 
-  async loadRoots(userId: string): Promise<StoredRoot[]> {
-    const db = await openDb();
-    const tx = db.transaction(STORE_ROOTS, "readonly");
-    const index = tx.objectStore(STORE_ROOTS).index(INDEX_BY_USER);
-    const rows = await request<unknown[]>(index.getAll(userId));
-    const out: StoredRoot[] = [];
-    for (const row of rows) {
-      const parsed = asRoot(row);
-      if (parsed) out.push(parsed);
-    }
-    return out;
+  loadRoots(userId: string): Promise<StoredRoot[]> {
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_ROOTS, "readonly");
+      const index = tx.objectStore(STORE_ROOTS).index(INDEX_BY_USER);
+      const rows = await request<unknown[]>(index.getAll(userId));
+      const out: StoredRoot[] = [];
+      for (const row of rows) {
+        const parsed = asRoot(row);
+        if (parsed) out.push(parsed);
+      }
+      return out;
+    });
   },
 
   /** Removes only the identity, leaving cached conversation keys in place. */
-  async forgetIdentity(userId: string): Promise<void> {
-    const db = await openDb();
-    const tx = db.transaction(STORE_IDENTITY, "readwrite");
-    tx.objectStore(STORE_IDENTITY).delete(userId);
-    await committed(tx);
+  forgetIdentity(userId: string): Promise<void> {
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_IDENTITY, "readwrite");
+      tx.objectStore(STORE_IDENTITY).delete(userId);
+      await committed(tx);
+    });
   },
 
-  async clear(userId: string): Promise<void> {
-    const db = await openDb();
-    const tx = db.transaction([STORE_IDENTITY, STORE_ROOTS], "readwrite");
-    tx.objectStore(STORE_IDENTITY).delete(userId);
+  /**
+   * Removes every cached conversation key of one user. A passcode needs this:
+   * a root reads its messages without the identity, and the server hands the
+   * roots back as grants once the passcode brings the identity back.
+   */
+  forgetRoots(userId: string): Promise<void> {
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_ROOTS, "readwrite");
+      deleteRootsIn(tx, userId);
+      await committed(tx);
+    });
+  },
 
-    // Delete through a cursor so the whole sweep stays inside one transaction.
-    const roots = tx.objectStore(STORE_ROOTS);
-    const cursor = roots.index(INDEX_BY_USER).openKeyCursor(IDBKeyRange.only(userId));
-    cursor.onsuccess = () => {
-      const c = cursor.result;
-      if (!c) return;
-      roots.delete(c.primaryKey);
-      c.continue();
-    };
-    await committed(tx);
+  clear(userId: string): Promise<void> {
+    return withDb(async (db) => {
+      const tx = db.transaction([STORE_IDENTITY, STORE_ROOTS], "readwrite");
+      tx.objectStore(STORE_IDENTITY).delete(userId);
+      deleteRootsIn(tx, userId);
+      await committed(tx);
+    });
   },
 };

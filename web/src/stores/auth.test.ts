@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { api } from "@/api/client";
 import type { RequestOptions } from "@/api/client";
-import { b64 } from "@/crypto/bytes";
+import { b64, randomBytes } from "@/crypto/bytes";
+import { generateIdentity } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
-import { useAuth } from "./auth";
+import { hasLock } from "@/lib/appLock";
+import { logoutHooks, useAuth } from "./auth";
+import { useSettings } from "./settings";
 
 interface Captured {
   method: string;
@@ -91,5 +94,73 @@ describe("auth store", () => {
     await useAuth.getState().bootstrap();
     expect(useAuth.getState().status).toBe("locked");
     expect(useAuth.getState().me?.username).toBe("mara");
+  });
+
+  describe("passcode", () => {
+    // The real cost only slows the test down; the code path is the same.
+    const fast = { kdf: { m: 1024, t: 1, p: 1, v: 1 } } as never;
+    let settingsSaves = 0;
+    let failSettings = false;
+
+    beforeEach(async () => {
+      settingsSaves = 0;
+      failSettings = false;
+      const base = api.request;
+      api.request = <T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> => {
+        if (path === "/users/@me/settings" && method === "PUT") {
+          settingsSaves++;
+          return failSettings ? Promise.reject(new Error("offline")) : Promise.resolve({ version: settingsSaves } as T);
+        }
+        return base(method, path, body, opts);
+      };
+      const identity = generateIdentity();
+      await keystore.saveIdentity("1", identity);
+      await keystore.saveRoot("1", "conv-a", 0, randomBytes(32));
+      useSettings.getState().reset();
+      useSettings.getState().setKey(randomBytes(32));
+      useAuth.setState({ status: "ready", me: me as never, token: "tok", identity });
+    });
+
+    it("keeps no readable keys on the device once it is saved", async () => {
+      await useAuth.getState().setPasscode("2468", fast);
+      expect(settingsSaves).toBeGreaterThan(0);
+      expect(hasLock("1")).toBe(true);
+      expect(useSettings.getState().settings.appLock).not.toBeNull();
+      expect(await keystore.loadIdentity("1")).toBeNull();
+      expect(await keystore.loadRoots("1")).toEqual([]);
+    });
+
+    it("puts everything back and says so when the account never gets the policy", async () => {
+      failSettings = true;
+      await expect(useAuth.getState().setPasscode("2468", fast)).rejects.toThrow(/Could not save/);
+      expect(hasLock("1")).toBe(false);
+      expect(useSettings.getState().settings.appLock).toBeNull();
+      expect(await keystore.loadIdentity("1")).not.toBeNull();
+    });
+
+    it("keeps the passcode when removing it cannot be saved", async () => {
+      await useAuth.getState().setPasscode("2468", fast);
+      failSettings = true;
+      await expect(useAuth.getState().removePasscode()).rejects.toThrow(/Could not save/);
+      expect(hasLock("1")).toBe(true);
+      expect(useSettings.getState().settings.appLock).not.toBeNull();
+      expect(await keystore.loadIdentity("1")).toBeNull();
+    });
+  });
+
+  it("runs the sign-out hooks before the token is dropped", async () => {
+    useAuth.setState({ status: "ready", me: me as never, token: "tok" });
+    const seen: string[] = [];
+    logoutHooks.push(() => {
+      seen.push(calls.some((c) => c.path === "/auth/logout") ? "after" : "before");
+      return Promise.resolve();
+    });
+    try {
+      await useAuth.getState().logout();
+    } finally {
+      logoutHooks.length = 0;
+    }
+    expect(seen).toEqual(["before"]);
+    expect(useAuth.getState().status).toBe("anonymous");
   });
 });

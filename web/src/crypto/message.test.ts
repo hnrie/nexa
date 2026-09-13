@@ -146,6 +146,32 @@ describe("encryptMessage / decryptMessage", () => {
       await expect(decryptMessage(key, env, aad)).rejects.toBeInstanceOf(DecryptError);
     }
   });
+
+  it("rejects a payload whose content all has the wrong types", async () => {
+    for (const json of ['{"t":1}', '{"att":"x"}', '{"embeds":[null]}', '{"sticker":{"id":5}}', '{"att":[{"blob_id":"b"}],"t":{}}']) {
+      const env = await forgeEnvelope(utf8.enc(json));
+      await expect(decryptMessage(key, env, aad)).rejects.toBeInstanceOf(DecryptError);
+    }
+  });
+
+  it("drops wrongly typed fields and keeps the usable ones", async () => {
+    const good = { blob_id: "b1", name: "a.png", type: "image/png", size: 10, key: "k", w: 5 };
+    const forged = {
+      t: "hi",
+      att: [good, { ...good, size: -1 }, { ...good, name: 7 }, null, { ...good, blob_id: "b2", w: "wide", spoiler: "yes" }],
+      sticker: { id: "s", w: "x", name: {} },
+      embeds: [null, 3, { url: "https://e.x", title: { bad: true }, image_w: "9", type: "link" }],
+      flags: "3",
+      extra: 1,
+    };
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify(forged)));
+    expect(await decryptMessage(key, env, aad)).toEqual({
+      t: "hi",
+      att: [good, { blob_id: "b2", name: "a.png", type: "image/png", size: 10, key: "k" }],
+      sticker: { id: "s" },
+      embeds: [{ url: "https://e.x", type: "link" }],
+    });
+  });
 });
 
 describe("isEnvelope", () => {

@@ -1,13 +1,17 @@
 import { GatewayClient } from "./client";
-import { applyEvent } from "./dispatch";
-import { useAuth } from "@/stores/auth";
+import { applyEvent, resetAll } from "./dispatch";
+import { logoutHooks, useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
+import { useMessages } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { useVoice } from "@/stores/voice";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
 import { clearLock, hasLock } from "@/lib/appLock";
+import { clearMediaCache } from "@/lib/mediaCache";
 import { keystore } from "@/crypto/keystore";
+import { leaveVoice } from "@/voice/session";
 
 let client: GatewayClient | null = null;
 let queue: Promise<void> = Promise.resolve();
@@ -23,7 +27,15 @@ export async function startSession(): Promise<void> {
   if (!me || !identity) return;
   useSettings.getState().setKey(settingsKey);
   void loadUploadLimits();
-  await useKeys.getState().init(me.id, identity);
+  try {
+    await useKeys.getState().init(me.id, identity);
+  } catch (err) {
+    // The cached keys are only a head start: ready brings every grant again,
+    // so a key store that fails (WebKit drops it after a long background stay)
+    // must not leave the app without a connection.
+    console.warn("keystore: could not load cached keys", err);
+    useKeys.setState({ userId: me.id, identity, waiting: {} });
+  }
   if (client) return;
   client = new GatewayClient({
     url: gatewayUrl,
@@ -42,7 +54,30 @@ export function stopSession(): void {
   client = null;
   useKeys.getState().reset();
   useSettings.getState().reset();
+  // Without the keys nothing decrypted should stay readable either; unlocking
+  // loads the conversations again.
+  useMessages.getState().clearAll();
+  clearMediaCache();
 }
+
+/**
+ * Ends the session on sign-out: hangs up any call, so the microphone and the
+ * peer connections do not outlive the account, and forgets everything the
+ * account had loaded so the next person on this tab starts from nothing.
+ */
+export async function endSession(): Promise<void> {
+  try {
+    await leaveVoice(true);
+  } catch {
+    /* nothing to hang up */
+  }
+  stopSession();
+  resetAll();
+  useVoice.getState().clear();
+  useUI.setState({ activeChannelId: null, replyTo: null, editing: null, jumpTo: null, contextMenu: null, quickSwitcher: false, modals: [], modal: null });
+}
+
+logoutHooks.push(endSession);
 
 export function gateway(): GatewayClient | null {
   return client;

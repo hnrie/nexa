@@ -8,6 +8,8 @@ import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { startSession } from "@/gateway/session";
 import LockPage from "@/pages/LockPage";
+import PasscodePage from "@/pages/PasscodePage";
+import { hasLock } from "@/lib/appLock";
 import { initials } from "@/lib/avatarColor";
 import { parseInviteFragment } from "@/lib/inviteLink";
 import { keystore } from "@/crypto/keystore";
@@ -20,6 +22,23 @@ import { useUsers } from "@/stores/users";
 import s from "./InvitePage.module.css";
 import { guarded } from "@/lib/captcha";
 
+/**
+ * Where a link's key waits while its visitor logs in or registers. The key
+ * cannot ride along in `?next=`: a query string reaches the server, in the
+ * Referer of every request those pages make.
+ */
+function keyStoreName(code: string): string {
+  return `ec.inviteKey.${code}`;
+}
+
+function storedFragment(code: string): string {
+  try {
+    return sessionStorage.getItem(keyStoreName(code)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /** The public invite landing page for a server or a group chat. */
 export default function InvitePage() {
   const { code = "" } = useParams();
@@ -31,7 +50,18 @@ export default function InvitePage() {
   const alreadyIn = useServers((st) => (preview?.server ? !!st.byId[preview.server.id] : false));
   const inGroup = useChannels((c) => (preview?.group ? !!c.byId[preview.group.id] : false));
   const [error, setError] = useState<string | null>(null);
+  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fragment = parseInviteFragment(loc.hash) ? loc.hash : storedFragment(code);
+
+  useEffect(() => {
+    if (!parseInviteFragment(loc.hash)) return;
+    try {
+      sessionStorage.setItem(keyStoreName(code), loc.hash);
+    } catch {
+      /* private mode: the key is only lost if the visitor has to log in first */
+    }
+  }, [code, loc.hash]);
 
   // the page lives outside the authed shell, so it restores the session itself
   useEffect(() => {
@@ -55,6 +85,7 @@ export default function InvitePage() {
   const accept = async () => {
     if (busy || !preview) return;
     setBusy(true);
+    setAcceptError(null);
     try {
       if (preview.group) {
         const res = (await guarded("join", (captcha) => serversApi.join(code, captcha))) as unknown as { channel: { id: string; recipient_ids: string[] }; users?: { id: string }[] };
@@ -67,25 +98,33 @@ export default function InvitePage() {
       useUsers.getState().upsert(res.users);
       useChannels.getState().upsert(res.server.channels);
       useServers.getState().setFromView(res.server);
-      const key = parseInviteFragment(loc.hash);
+      const key = parseInviteFragment(fragment);
       const userId = useKeys.getState().userId;
       if (key && userId && !ring.get(res.server.id, key.epoch)) {
         ring.set(res.server.id, key.epoch, key.root);
-        await keystore.saveRoot(userId, res.server.id, key.epoch, key.root);
+        // behind a passcode the key stays off the disk; the self-grant brings it back
+        if (!hasLock(userId)) await keystore.saveRoot(userId, res.server.id, key.epoch, key.root);
         // a self-grant records the key server-side so other devices and later logins have it
         await useKeys.getState().grantTo(res.server.id, key.epoch, [userId]);
+      }
+      try {
+        sessionStorage.removeItem(keyStoreName(code));
+      } catch {
+        /* nothing was stored */
       }
       const first = res.server.channels.find((c) => c.type === "text");
       nav(first ? `/channels/${res.server.id}/${first.id}` : `/channels/${res.server.id}`, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not accept the invite.");
+      // the invite itself is still fine, so this sits by the button rather than replacing the card
+      setAcceptError(err instanceof ApiError ? err.message : "Could not accept the invite.");
     } finally {
       setBusy(false);
     }
   };
 
   if (status === "locked") return <LockPage />;
-  const next = encodeURIComponent(loc.pathname + loc.hash);
+  if (status === "pinlocked") return <PasscodePage />;
+  const next = encodeURIComponent(loc.pathname);
   const target = preview?.server ?? preview?.group;
   const icon = target ? iconUrl(target.icon_id, 96) : null;
   const isGroup = !!preview?.group;
@@ -116,7 +155,10 @@ export default function InvitePage() {
               member ? (
                 <Button block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>You're already in — Open</Button>
               ) : (
-                <Button block loading={busy} onClick={() => void accept()}>{isGroup ? "Join Group" : "Accept Invite"}</Button>
+                <>
+                  <Button block loading={busy} onClick={() => void accept()}>{isGroup ? "Join Group" : "Accept Invite"}</Button>
+                  {acceptError ? <p className={s.acceptError} role="alert">{acceptError}</p> : null}
+                </>
               )
             ) : status === "anonymous" ? (
               <div className={s.authRow}>
@@ -126,7 +168,7 @@ export default function InvitePage() {
             ) : (
               <Spinner />
             )}
-            {loc.hash.includes("k=") ? <p className={s.note}>This link carries the encryption key, so you can read the history as soon as you join.</p> : null}
+            {fragment.includes("k=") ? <p className={s.note}>This link carries the encryption key, so you can read the history as soon as you join.</p> : null}
             {isGroup ? <p className={s.note}>Group chats are end-to-end encrypted. Someone already inside has to be online to hand you the key.</p> : null}
           </>
         ) : null}

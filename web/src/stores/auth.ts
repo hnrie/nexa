@@ -8,7 +8,7 @@ import { DEFAULT_KDF, deriveAuthKey, deriveEncKey, deriveMaster, deriveSettingsK
 import { generateIdentity, unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
 import { guarded } from "@/lib/captcha";
-import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, unlockIdentity, type LockConfig } from "@/lib/appLock";
+import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, saveLock, unlockIdentity, type LockConfig } from "@/lib/appLock";
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { storage } from "@/lib/storage";
 
@@ -59,12 +59,20 @@ interface AuthState {
   setMe: (me: MeUser) => void;
 }
 
-/** Pushes settings to the server now rather than on the usual debounce. */
-async function saveSettingsNow(): Promise<void> {
-  await useSettings.getState().flush();
-  await new Promise((r) => setTimeout(r, 50));
-  await useSettings.getState().flush();
+/** Pushes settings to the server now rather than on the usual debounce, trying twice; false if they never got there. */
+async function saveSettingsNow(): Promise<boolean> {
+  if (await useSettings.getState().flush()) return true;
+  await new Promise((r) => setTimeout(r, 500));
+  return useSettings.getState().flush();
 }
+
+const SAVE_FAILED = "Could not save that to your account. Check your connection and try again.";
+
+/**
+ * Run on sign-out before the state is cleared. The gateway session registers
+ * here rather than being imported, since it already depends on this store.
+ */
+export const logoutHooks: (() => Promise<void>)[] = [];
 
 async function deriveAll(password: string, salt: Uint8Array, params: KdfParams) {
   const master = await deriveMaster(password, salt, params);
@@ -196,6 +204,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       await adoptPolicy(me.id, current, passcode, policy);
       pendingPolicy = null;
       await keystore.forgetIdentity(me.id);
+      await keystore.forgetRoots(me.id);
       set({ status: "ready", error: null });
       return;
     }
@@ -222,23 +231,46 @@ export const useAuth = create<AuthState>()((set, get) => ({
   setPasscode: async (passcode, opts) => {
     const { me, identity } = get();
     if (!me || !identity) throw new Error("Unlock your keys first.");
+    const previousLock = loadLock(me.id);
+    const previousPolicy = useSettings.getState().settings.appLock;
     const cfg = await enableLock(me.id, identity, passcode, opts);
-    // The wrapped copy is now the only one on this device; drop the readable one.
+    // The wrapped copy is now the only one on this device; drop the readable
+    // one, and the conversation keys, which would read messages without it.
     await keystore.forgetIdentity(me.id);
+    await keystore.forgetRoots(me.id);
     // The policy travels with the account, so every other device asks too. It
     // is saved right away: a reload before the debounce would come back to
     // settings that say there is no passcode, and drop the one just made.
     useSettings.getState().patch({ appLock: await policyFor(cfg, passcode) });
-    await saveSettingsNow();
+    if (await saveSettingsNow()) return;
+    // Unsaved, the next ready would find no passcode and quietly undo this
+    // one, so put things back and say so instead.
+    if (previousLock) {
+      saveLock(me.id, previousLock);
+    } else {
+      clearLock(me.id);
+      await keystore.saveIdentity(me.id, identity);
+    }
+    useSettings.getState().patch({ appLock: previousPolicy });
+    throw new Error(SAVE_FAILED);
   },
 
   removePasscode: async () => {
     const { me, identity } = get();
     if (!me) return;
+    const previousLock = loadLock(me.id);
+    const previousPolicy = useSettings.getState().settings.appLock;
     clearLock(me.id);
     if (identity) await keystore.saveIdentity(me.id, identity);
     useSettings.getState().patch({ appLock: null });
-    await saveSettingsNow();
+    if (await saveSettingsNow()) return;
+    // Unsaved, the next ready would ask for the removed passcode again.
+    if (previousLock) {
+      saveLock(me.id, previousLock);
+      await keystore.forgetIdentity(me.id);
+    }
+    useSettings.getState().patch({ appLock: previousPolicy });
+    throw new Error(SAVE_FAILED);
   },
 
   recover: async (username, recoveryKey, newPassword) => {
@@ -299,6 +331,14 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   logout: async () => {
     const me = get().me;
+    // First, while the token still works, so a call is left properly.
+    for (const hook of logoutHooks) {
+      try {
+        await hook();
+      } catch {
+        /* signing out goes ahead regardless */
+      }
+    }
     try {
       await authApi.logout();
     } catch {

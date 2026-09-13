@@ -97,7 +97,75 @@ export async function decryptMessage(
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     throw new DecryptError("malformed message payload");
   }
-  return parsed as MessagePayload;
+  return sanitizePayload(parsed as Obj);
+}
+
+type Obj = Record<string, unknown>;
+
+function isObj(x: unknown): x is Obj {
+  return typeof x === "object" && x !== null && !Array.isArray(x);
+}
+
+function isNum(x: unknown): x is number {
+  return typeof x === "number" && Number.isFinite(x);
+}
+
+function sanitizeAttachment(x: unknown): AttachmentMeta | null {
+  if (!isObj(x)) return null;
+  const { blob_id, name, type, key, size, w, h, duration, spoiler } = x;
+  if (typeof blob_id !== "string" || typeof name !== "string" || typeof type !== "string" || typeof key !== "string") return null;
+  if (typeof size !== "number" || !Number.isSafeInteger(size) || size < 0) return null;
+  const a: AttachmentMeta = { blob_id, name, type, size, key };
+  if (isNum(w)) a.w = w;
+  if (isNum(h)) a.h = h;
+  if (isNum(duration)) a.duration = duration;
+  if (typeof spoiler === "boolean") a.spoiler = spoiler;
+  return a;
+}
+
+const EMBED_STRINGS = ["url", "type", "title", "description", "site_name", "image", "video_id", "mime", "color", "invite_code"];
+const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count"];
+
+function sanitizeEmbed(e: Obj): Obj {
+  const out: Obj = {};
+  for (const k of EMBED_STRINGS) if (typeof e[k] === "string") out[k] = e[k];
+  for (const k of EMBED_NUMBERS) if (isNum(e[k])) out[k] = e[k];
+  return out;
+}
+
+/**
+ * Anyone holding the key can encrypt whatever they like, and the UI trusts
+ * these fields' types while rendering, so one wrong type would crash every
+ * client that shows the message. Only well-typed fields are kept, and a
+ * payload that had content but none of it usable counts as undecryptable.
+ */
+function sanitizePayload(p: Obj): MessagePayload {
+  const out: MessagePayload = {};
+  if (typeof p["t"] === "string") out.t = p["t"];
+  if (Array.isArray(p["att"])) {
+    const att = p["att"].map(sanitizeAttachment).filter((a): a is AttachmentMeta => a !== null);
+    if (att.length) out.att = att;
+  }
+  const st = p["sticker"];
+  if (isObj(st) && typeof st["id"] === "string") {
+    const sticker: NonNullable<MessagePayload["sticker"]> = { id: st["id"] };
+    if (typeof st["blob"] === "string") sticker.blob = st["blob"];
+    if (typeof st["name"] === "string") sticker.name = st["name"];
+    if (isNum(st["w"])) sticker.w = st["w"];
+    if (isNum(st["h"])) sticker.h = st["h"];
+    if (typeof st["animated"] === "boolean") sticker.animated = st["animated"];
+    out.sticker = sticker;
+  }
+  if (Array.isArray(p["embeds"])) {
+    const embeds = p["embeds"].filter((e): e is Obj => isObj(e) && typeof e["url"] === "string").map(sanitizeEmbed);
+    if (embeds.length) out.embeds = embeds;
+  }
+  if (isNum(p["flags"])) out.flags = p["flags"];
+  const hadContent = p["t"] !== undefined || p["att"] !== undefined || p["sticker"] !== undefined || p["embeds"] !== undefined;
+  if (hadContent && out.t === undefined && !out.att && !out.sticker && !out.embeds) {
+    throw new DecryptError("malformed message payload");
+  }
+  return out;
 }
 
 export function isEnvelope(x: unknown): x is Envelope {

@@ -156,6 +156,21 @@ describe("keystore clear", () => {
     expect(equal(rows[0]?.root ?? new Uint8Array(0), theirRoot)).toBe(true);
   });
 
+  it("forgets one user's roots but keeps the identity and other users", async () => {
+    const mine = freshUser();
+    const theirs = freshUser();
+    await keystore.saveIdentity(mine, generateIdentity());
+    await keystore.saveRoot(mine, "conv-a", 0, newRootKey());
+    await keystore.saveRoot(mine, "conv-b", 3, newRootKey());
+    await keystore.saveRoot(theirs, "conv-a", 0, newRootKey());
+
+    await keystore.forgetRoots(mine);
+
+    expect(await keystore.loadRoots(mine)).toEqual([]);
+    expect(await keystore.loadIdentity(mine)).not.toBeNull();
+    expect((await keystore.loadRoots(theirs)).length).toBe(1);
+  });
+
   it("is a no-op for a user with nothing stored", async () => {
     const userId = freshUser();
     await expect(keystore.clear(userId)).resolves.toBeUndefined();
