@@ -1,0 +1,36 @@
+import type { UnfurlResult } from "@/api/types";
+import { isOnlyMediaLinks } from "./mediaLinks";
+
+// what the GIF picker sends: a path on this server's image proxy
+const gif: UnfurlResult = { url: "/media/proxy/ma2r4F/aHR0cHM6Ly9zdGF0aWMua2xpcHkuY29t", type: "gif", image: "/media/proxy/ma2r4F/aHR0cHM6Ly9zdGF0aWMua2xpcHkuY29t" };
+const image: UnfurlResult = { url: "https://cdn.example/cat.png", type: "image" };
+const video: UnfurlResult = { url: "https://cdn.example/clip.mp4", type: "video" };
+const page: UnfurlResult = { url: "https://news.example/story", type: "link", title: "A story" };
+
+describe("isOnlyMediaLinks", () => {
+  it("hides a link that is only there to carry its picture, GIF or video", () => {
+    expect(isOnlyMediaLinks(gif.url, [gif])).toBe(true);
+    expect(isOnlyMediaLinks("  https://cdn.example/cat.png\n", [image])).toBe(true);
+    expect(isOnlyMediaLinks("https://cdn.example/cat.png https://cdn.example/clip.mp4", [image, video])).toBe(true);
+    // a redirect leaves the preview with a different address than the one typed
+    expect(isOnlyMediaLinks("http://short.example/x", [image])).toBe(true);
+  });
+
+  it("does not take any path for a media link", () => {
+    expect(isOnlyMediaLinks("/media/proxy/something-else", [gif])).toBe(false);
+    expect(isOnlyMediaLinks(`${gif.url} /shrug`, [gif])).toBe(false);
+  });
+
+  it("keeps text that says anything more", () => {
+    expect(isOnlyMediaLinks(`look at this ${image.url}`, [image])).toBe(false);
+    expect(isOnlyMediaLinks("no links here", [])).toBe(false);
+    expect(isOnlyMediaLinks("", [image])).toBe(false);
+  });
+
+  it("keeps links whose previews are not pictures, or that did not all get one", () => {
+    expect(isOnlyMediaLinks(page.url, [page])).toBe(false);
+    expect(isOnlyMediaLinks(`${image.url} ${page.url}`, [image, page])).toBe(false);
+    expect(isOnlyMediaLinks(`${image.url} https://other.example/y.png`, [image])).toBe(false);
+    expect(isOnlyMediaLinks(image.url, [])).toBe(false);
+  });
+});

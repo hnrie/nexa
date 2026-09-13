@@ -20,6 +20,7 @@ import { Embeds } from "./Embeds";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
+import { isOnlyMediaLinks } from "./mediaLinks";
 import { Reactions } from "./Reactions";
 import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -45,7 +46,8 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   if (!msg.reply_to_id) return null;
   if (!target) return <div className={s.replyLine}><span className={s.replyText}>Original message was deleted or is not loaded.</span></div>;
   const author = users[target.author_id];
-  const text = target.payload?.t ? plainText(parse(target.payload.t, { inline: true })) : target.payload?.att?.length ? "Click to see attachment" : target.decryptError ? "Encrypted message" : "";
+  const mediaOnly = !!target.payload?.t && isOnlyMediaLinks(target.payload.t, (target.payload.embeds ?? []) as UnfurlResult[]);
+  const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true })) : target.payload?.att?.length || mediaOnly ? "Click to see attachment" : target.decryptError ? "Encrypted message" : "";
   return (
     <div className={s.replyLine} onClick={() => setJumpTo({ channelId: msg.channel_id, messageId: target.id })}>
       <Avatar id={target.author_id} avatarId={author?.avatar_id ?? null} name={displayName(author)} size={16} />
@@ -86,7 +88,11 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const shift = useShiftHeld();
 
   const mentioned = !!me && (msg.mention_everyone || msg.mentions.includes(me.id)) && msg.author_id !== me.id;
-  const text = msg.payload?.t ?? "";
+  const imagePreviews = useSettings((st) => st.settings.imagePreviews);
+  const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
+  // a GIF or picture link shows only the picture, the way an uploaded one does
+  const mediaOnly = !!embeds && imagePreviews && isOnlyMediaLinks(msg.payload?.t ?? "", embeds);
+  const text = mediaOnly ? "" : (msg.payload?.t ?? "");
   const nodes = useMemo(() => (text ? parse(text) : []), [text]);
   const jumbo = useMemo(() => nodes.length > 0 && isEmojiOnly(nodes), [nodes]);
   // one to three emoji get the big treatment; a wall of them shrinks so it still fits a line
@@ -166,7 +172,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           )}
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
           {msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
-          {msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? <Embeds list={msg.payload.embeds as UnfurlResult[]} /> : null}
+          {embeds ? <Embeds list={embeds} /> : null}
           {pending === "failed" ? (
             <div className={s.failedRow}>
               <span>Message failed to send.</span>

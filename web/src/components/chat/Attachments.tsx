@@ -24,7 +24,11 @@ const EAGER_MAX = 2 * 1024 * 1024;
  */
 const AUTO_LOAD_MAX = 25 * 1024 * 1024;
 
-function fit(w: number | undefined, h: number | undefined): { width: number; height: number } {
+/**
+ * The size a picture or video is shown at in a message. Links to media use it
+ * too, so a GIF from the picker sits in the same frame as an uploaded one.
+ */
+export function fitMedia(w: number | undefined, h: number | undefined): { width: number; height: number } {
   if (!w || !h) return { width: 400, height: 300 };
   let r = Math.min(1, MAX_W / w, MAX_H / h);
   if (w * r < 100 && h * r < 100) r = Math.min(100 / w, 100 / h, MAX_W / w, MAX_H / h);
@@ -93,7 +97,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
   const [revealed, setRevealed] = useState(!att.spoiler);
   const [open, setOpen] = useState(false);
   useInView(ref, load, auto);
-  const dims = fit(att.w, att.h);
+  const dims = fitMedia(att.w, att.h);
   return (
     <>
       <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={dims} onClick={() => (revealed ? url && setOpen(true) : setRevealed(true))}>
@@ -131,7 +135,7 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
   // the whole file has to come down and be decrypted before it can play at all
   const auto = att.size <= AUTO_LOAD_MAX;
   const { url, error, wanted, load } = useDecrypted(att, auto);
-  const dims = fit(att.w ?? 640, att.h ?? 360);
+  const dims = fitMedia(att.w ?? 640, att.h ?? 360);
   if (url) return <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} />;
   return (
     <div className={s.videoPending} style={dims}>

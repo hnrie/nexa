@@ -5,9 +5,22 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/common/Button";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
+import { Lightbox, fitMedia } from "./Attachments";
+import { VideoPlayer } from "./VideoPlayer";
+import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 
-function fit(w: number | undefined, h: number | undefined, maxW = 400, maxH = 300): { width: number; height: number } | undefined {
+/** A readable name for a linked file: the last part of its address. */
+function fileNameOf(url: string, fallback: string): string {
+  try {
+    const last = new URL(url).pathname.split("/").filter(Boolean).pop();
+    return last ? decodeURIComponent(last) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function fitCard(w: number | undefined, h: number | undefined, maxW = 400, maxH = 300): { width: number; height: number } | undefined {
   if (!w || !h) return undefined;
   const r = Math.min(1, maxW / w, maxH / h);
   return { width: Math.round(w * r), height: Math.round(h * r) };
@@ -37,21 +50,35 @@ export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: num
   );
 }
 
+/** A linked picture or GIF, framed and opened exactly as an uploaded one is. */
 function ImageEmbed({ e }: { e: UnfurlResult }) {
   const src = e.image ?? e.url;
-  const dims = fit(e.image_w, e.image_h);
   const [open, setOpen] = useState(false);
+  // without a recorded size, the picture's own tells the frame what shape to be
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const dims = fitMedia(e.image_w ?? natural?.w, e.image_h ?? natural?.h);
+  const name = e.type === "gif" ? "GIF" : fileNameOf(e.url, "Image");
+  // what "Download" saves it as; a GIF from the picker arrives through the proxy, whose address says nothing
+  const fileName = e.type === "gif" ? "animation.gif" : fileNameOf(e.url, "image");
   return (
-    <div className={s.imageWrap} style={dims}>
-      <img className={s.image} src={src} alt="" loading="lazy" style={dims} onClick={() => setOpen(true)} referrerPolicy="no-referrer" />
-      {e.type === "gif" ? <span className={s.gifBadge}>GIF</span> : null}
-      <FavoriteButton url={src} {...(e.image_w ? { w: e.image_w } : {})} {...(e.image_h ? { h: e.image_h } : {})} />
-      {open ? (
-        <div className={s.lightbox} onClick={() => setOpen(false)}>
-          <img src={src} alt="" referrerPolicy="no-referrer" />
-        </div>
-      ) : null}
-    </div>
+    <>
+      <div className={[c.imgWrap, s.media].join(" ")} style={dims} onClick={() => setOpen(true)}>
+        <img
+          src={src}
+          alt={name}
+          width={dims.width}
+          height={dims.height}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onLoad={(ev) => {
+            if (!e.image_w || !e.image_h) setNatural({ w: ev.currentTarget.naturalWidth, h: ev.currentTarget.naturalHeight });
+          }}
+        />
+        {e.type === "gif" ? <span className={s.gifBadge}>GIF</span> : null}
+        <FavoriteButton url={src} {...(e.image_w ? { w: e.image_w } : {})} {...(e.image_h ? { h: e.image_h } : {})} />
+      </div>
+      {open ? <Lightbox src={src} name={fileName} onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }
 
@@ -88,7 +115,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
         </div>
         {e.image && !big ? <img className={s.thumb} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
       </div>
-      {e.image && big ? <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fit(e.image_w, e.image_h, 400, 300)} /> : null}
+      {e.image && big ? <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} /> : null}
     </div>
   );
 }
@@ -100,7 +127,7 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
       {list.slice(0, 5).map((e, i) => {
         if (!e || typeof e !== "object" || typeof e.url !== "string") return null;
         if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
-        if (e.type === "video") return imagePreviews ? <video key={i} className={s.videoDirect} src={e.url} controls preload="metadata" /> : null;
+        if (e.type === "video") return imagePreviews ? <VideoPlayer key={i} src={e.url} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
         if (e.type === "youtube") return <YouTubeEmbed key={i} e={e} />;
         if (e.type === "invite") return <InviteEmbed key={i} e={e} />;
         if (e.title || e.description) return <LinkEmbed key={i} e={e} />;

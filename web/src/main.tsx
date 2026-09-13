@@ -5,6 +5,7 @@ import App from "./App";
 import { installCrashReporting } from "./lib/crashReport";
 import { downloadsSettled } from "./lib/download";
 import { installLongPress } from "./lib/longPress";
+import { installNoZoom } from "./lib/noZoom";
 import { ensureTwemojiIndex } from "./lib/twemoji";
 import "./styles/base.css";
 
@@ -36,6 +37,7 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 
 installCrashReporting();
 installLongPress();
+installNoZoom();
 // the first emoji on screen should not have to wait for the list of pictures
 ensureTwemojiIndex();
 

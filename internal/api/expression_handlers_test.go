@@ -280,8 +280,10 @@ func TestKlipyGifSearch(t *testing.T) {
 			t.Errorf("%s should be proxied, got %q", key, u)
 		}
 	}
-	if first["url"] == first["preview"] {
-		t.Error("the small rendition should be used for the preview")
+	// nothing here is wide enough to call for a lighter copy, so the preview is
+	// the sharpest rendition there is, never the 80-pixel thumbnail
+	if first["url"] != first["preview"] {
+		t.Error("the preview should be the sharp rendition, not the thumbnail")
 	}
 	if body["next"] != "2" {
 		t.Errorf("next page: %v", body["next"])

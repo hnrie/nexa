@@ -106,7 +106,7 @@ export function GifPicker({ onPick }: { onPick: (gif: { url: string; w?: number;
           <div className={s.gifGrid}>
             {results.map((g) => (
               <div key={g.id} className={s.gifCell}>
-                <img src={g.preview} alt={g.title} loading="lazy" referrerPolicy="no-referrer" onClick={() => onPick({ url: g.url, w: g.w, h: g.h })} />
+                <img src={g.preview} alt={g.title} loading="lazy" referrerPolicy="no-referrer" style={g.w && g.h ? { aspectRatio: `${g.w} / ${g.h}` } : undefined} onClick={() => onPick({ url: g.url, w: g.w, h: g.h })} />
                 <button className={s.gifStar} data-on={favSet.has(g.url)} aria-label={favSet.has(g.url) ? "Remove favorite" : "Add favorite"} onClick={() => toggleFav({ url: g.url, w: g.w, h: g.h })}><Star size={14} /></button>
               </div>
             ))}

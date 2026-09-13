@@ -787,6 +787,41 @@ func pickKlipy(sizes map[string]map[string]klipyFile, order []string, format str
 	return klipyFile{}
 }
 
+// gifPreviewWidth is how many pixels across a picker preview needs to stay
+// sharp: a cell is a little over 200 CSS pixels wide, doubled on most phones.
+const gifPreviewWidth = 400
+
+// gifPreview picks the moving picture shown in the picker. Sharpness comes
+// first: the smallest rendition at least gifPreviewWidth across, WebP before
+// GIF since it moves the same at a fraction of the size. Only when nothing is
+// that wide does it settle for the widest there is.
+func gifPreview(sizes map[string]map[string]klipyFile) klipyFile {
+	formats := []string{"webp", "gif"}
+	for _, format := range formats {
+		var best klipyFile
+		for _, byFormat := range sizes {
+			if f, ok := byFormat[format]; ok && f.URL != "" && f.Width >= gifPreviewWidth && (best.URL == "" || f.Width < best.Width) {
+				best = f
+			}
+		}
+		if best.URL != "" {
+			return best
+		}
+	}
+	for _, format := range formats {
+		var best klipyFile
+		for _, byFormat := range sizes {
+			if f, ok := byFormat[format]; ok && f.URL != "" && (best.URL == "" || f.Width > best.Width) {
+				best = f
+			}
+		}
+		if best.URL != "" {
+			return best
+		}
+	}
+	return klipyFile{}
+}
+
 func (s *Server) klipyPage(r *http.Request, query, pos string) (gifPage, error) {
 	page := 1
 	if pos != "" {
@@ -830,7 +865,7 @@ func (s *Server) klipyPage(r *http.Request, query, pos string) (gifPage, error) 
 		if full.URL == "" {
 			continue
 		}
-		preview := pickKlipy(item.File, []string{"xs", "sm", "md"}, "gif")
+		preview := gifPreview(item.File)
 		if preview.URL == "" {
 			preview = full
 		}
