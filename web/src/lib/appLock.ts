@@ -53,6 +53,11 @@ export interface LockConfig {
   blurDelayMs: number;
   /** Consecutive wrong passcodes. */
   failures: number;
+  /**
+   * Whether the passcode is all digits, so the lock screen can offer a number
+   * pad. Records made before this was kept leave it out until the next unlock.
+   */
+  numeric?: boolean;
 }
 
 export const DEFAULT_LOCK = { autoLockMs: 5 * 60_000, lockOnBlur: false, blurDelayMs: 0 };
@@ -131,6 +136,11 @@ function verifierOf(key: Uint8Array): string {
   return b64.enc(hkdf(sha256, key, new Uint8Array(0), INFO_VERIFY, 32));
 }
 
+/** True for a passcode a phone's number pad can type. */
+export function isNumeric(passcode: string): boolean {
+  return /^\d+$/.test(passcode);
+}
+
 /** Returns why a passcode is unacceptable, or null when it is fine. */
 export function passcodeProblem(passcode: string): string | null {
   if (passcode.length < MIN_PASSCODE) return `Use at least ${MIN_PASSCODE} characters.`;
@@ -162,6 +172,7 @@ export async function enableLock(userId: string, identity: Identity, passcode: s
     lockOnBlur: opts?.lockOnBlur ?? previous?.lockOnBlur ?? DEFAULT_LOCK.lockOnBlur,
     blurDelayMs: opts?.blurDelayMs ?? previous?.blurDelayMs ?? DEFAULT_LOCK.blurDelayMs,
     failures: 0,
+    numeric: isNumeric(passcode),
   };
   saveLock(userId, cfg);
   return cfg;
@@ -203,6 +214,7 @@ export async function adoptPolicy(userId: string, identity: Identity, passcode: 
     lockOnBlur: policy.lockOnBlur,
     blurDelayMs: policy.blurDelayMs,
     failures: 0,
+    numeric: isNumeric(passcode),
   };
   saveLock(userId, next);
   return next;
@@ -219,7 +231,8 @@ export async function unlockIdentity(userId: string, passcode: string): Promise<
   const key = await passcodeKey(passcode, b64.dec(cfg.salt), cfg.params);
   try {
     const privateKey = await unwrapPrivateKey(b64.dec(cfg.wrapped), key);
-    if (cfg.failures !== 0) saveLock(userId, { ...cfg, failures: 0 });
+    const numeric = isNumeric(passcode);
+    if (cfg.failures !== 0 || cfg.numeric !== numeric) saveLock(userId, { ...cfg, failures: 0, numeric });
     return { privateKey, publicKey: b64.dec(cfg.pub) };
   } catch {
     const failures = cfg.failures + 1;

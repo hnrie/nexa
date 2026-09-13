@@ -1,5 +1,7 @@
-.page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; background: var(--bg-base); }
-.card { width: 100%; max-width: 440px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+/* The page is the scroller, since body hides overflow: a long description or a
+   big sticker grid scrolls here. The card's auto margins centre it when it fits. */
+.page { height: 100%; display: flex; align-items: flex-start; padding: 24px 16px; background: var(--bg-base); overflow-y: auto; overscroll-behavior: contain; }
+.card { margin: auto; flex-shrink: 0; width: 100%; max-width: 440px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
 .kicker { margin: 0; font-size: 14px; color: var(--text-muted); }
 .iconBox { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); font-size: 24px; font-weight: 600; overflow: hidden; margin: 8px 0; }
 .iconBox img { width: 100%; height: 100%; object-fit: cover; }

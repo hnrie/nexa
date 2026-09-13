@@ -12,7 +12,8 @@ import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, saveL
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { storage } from "@/lib/storage";
 
-export type AuthStatus = "idle" | "loading" | "anonymous" | "locked" | "pinlocked" | "ready";
+/** "offline": a token is stored, but the server or this device's key store could not be reached. */
+export type AuthStatus = "idle" | "loading" | "offline" | "anonymous" | "locked" | "pinlocked" | "ready";
 
 /** What a password got us: either we are in, or the account wants a code. */
 export type LoginOutcome = { mfa: false } | { mfa: true; backupCodesLeft: number };
@@ -35,6 +36,8 @@ interface AuthState {
   identity: Identity | null;
   settingsKey: Uint8Array | null;
   error: string | null;
+  /** Bumped whenever this device's lock settings change, so the lock timers re-read them. */
+  lockVersion: number;
   bootstrap: () => Promise<void>;
   register: (username: string, displayName: string, password: string, extra?: { invite_code?: string; registration_key?: string }) => Promise<{ recoveryKey: string }>;
   login: (username: string, password: string) => Promise<LoginOutcome>;
@@ -52,6 +55,8 @@ interface AuthState {
   setPasscode: (passcode: string, opts?: Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" | "blurDelayMs">>) => Promise<void>;
   /** Removes the passcode and goes back to keeping the keys on this device. */
   removePasscode: () => Promise<void>;
+  /** Tells the lock timers that this device's lock settings were changed. */
+  bumpLock: () => void;
   recover: (username: string, recoveryKey: string, newPassword: string) => Promise<{ recoveryKey: string }>;
   changePassword: (current: string, next: string) => Promise<void>;
   newRecoveryKey: (password: string) => Promise<string>;
@@ -99,6 +104,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   identity: null,
   settingsKey: null,
   error: null,
+  lockVersion: 0,
 
   bootstrap: async () => {
     const token = storage.get(TOKEN_KEY);
@@ -107,7 +113,9 @@ export const useAuth = create<AuthState>()((set, get) => ({
       return;
     }
     api.setToken(token);
-    set({ status: "loading", token });
+    // A retry from the offline screen stays on it until there is an answer, so
+    // the screen does not flash a spinner on every attempt.
+    set(get().status === "offline" ? { token } : { status: "loading", token });
     try {
       const me = await usersApi.me();
       if (hasLock(me.id)) {
@@ -127,7 +135,14 @@ export const useAuth = create<AuthState>()((set, get) => ({
         set({ status: "anonymous", token: null, me: null });
         return;
       }
-      set({ status: "anonymous", error: "Could not reach the server." });
+      // Only the server turning the request down means logged out. A dropped
+      // connection, a server restarting behind Cloudflare or a key store hiccup
+      // keeps the session and waits on a screen that retries.
+      if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) {
+        set({ status: "anonymous", error: err.message });
+        return;
+      }
+      set({ status: "offline", error: err instanceof ApiError || err instanceof TypeError ? "Could not reach the server." : "Could not open the keys saved on this device." });
     }
   },
 
@@ -238,6 +253,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     // one, and the conversation keys, which would read messages without it.
     await keystore.forgetIdentity(me.id);
     await keystore.forgetRoots(me.id);
+    get().bumpLock();
     // The policy travels with the account, so every other device asks too. It
     // is saved right away: a reload before the debounce would come back to
     // settings that say there is no passcode, and drop the one just made.
@@ -252,6 +268,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       await keystore.saveIdentity(me.id, identity);
     }
     useSettings.getState().patch({ appLock: previousPolicy });
+    get().bumpLock();
     throw new Error(SAVE_FAILED);
   },
 
@@ -261,6 +278,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     const previousLock = loadLock(me.id);
     const previousPolicy = useSettings.getState().settings.appLock;
     clearLock(me.id);
+    get().bumpLock();
     if (identity) await keystore.saveIdentity(me.id, identity);
     useSettings.getState().patch({ appLock: null });
     if (await saveSettingsNow()) return;
@@ -270,8 +288,11 @@ export const useAuth = create<AuthState>()((set, get) => ({
       await keystore.forgetIdentity(me.id);
     }
     useSettings.getState().patch({ appLock: previousPolicy });
+    get().bumpLock();
     throw new Error(SAVE_FAILED);
   },
+
+  bumpLock: () => set((s) => ({ lockVersion: s.lockVersion + 1 })),
 
   recover: async (username, recoveryKey, newPassword) => {
     const rkBytes = recoveryKeyToBytes(recoveryKey);

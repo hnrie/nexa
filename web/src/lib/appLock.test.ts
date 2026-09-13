@@ -5,6 +5,7 @@ import {
   clearLock,
   enableLock,
   hasLock,
+  isNumeric,
   loadLock,
   MAX_FAILURES,
   passcodeProblem,
@@ -107,6 +108,27 @@ describe("unlockIdentity", () => {
   it("reports how many tries are left in the message", async () => {
     await enableLock(USER, generateIdentity(), "1379", { kdf: FAST });
     await expect(unlockIdentity(USER, "9999")).rejects.toThrow(/9 tries left/);
+  });
+});
+
+describe("numeric", () => {
+  it("records whether the passcode is digits, so a phone offers the right keyboard", async () => {
+    const id = generateIdentity();
+    await enableLock(USER, id, "1379", { kdf: FAST });
+    expect(loadLock(USER)?.numeric).toBe(true);
+    await enableLock(USER, id, "blue42", { kdf: FAST });
+    expect(loadLock(USER)?.numeric).toBe(false);
+    expect(isNumeric("0042")).toBe(true);
+    expect(isNumeric("12 34")).toBe(false);
+  });
+
+  it("learns it on the next unlock for a record made before it was kept", async () => {
+    await enableLock(USER, generateIdentity(), "1379", { kdf: FAST });
+    const { numeric: _dropped, ...old } = loadLock(USER)!;
+    saveLock(USER, old);
+    expect(loadLock(USER)?.numeric).toBeUndefined();
+    await unlockIdentity(USER, "1379");
+    expect(loadLock(USER)?.numeric).toBe(true);
   });
 });
 

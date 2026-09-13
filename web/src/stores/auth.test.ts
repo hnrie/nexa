@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { api } from "@/api/client";
+import { api, ApiError } from "@/api/client";
 import type { RequestOptions } from "@/api/client";
 import { b64, randomBytes } from "@/crypto/bytes";
 import { generateIdentity } from "@/crypto/keys";
@@ -162,5 +162,45 @@ describe("auth store", () => {
     }
     expect(seen).toEqual(["before"]);
     expect(useAuth.getState().status).toBe("anonymous");
+  });
+
+  it("keeps the session and waits offline when the server cannot be reached", async () => {
+    localStorage.setItem("ec.token", "tok-x");
+    const answer = api.request;
+    let fail: Error | null = new TypeError("Failed to fetch");
+    api.request = <T>(method: string, path: string, body?: unknown, opts?: RequestOptions): Promise<T> =>
+      path === "/users/@me" && fail ? Promise.reject(fail) : answer<T>(method, path, body, opts);
+
+    await useAuth.getState().bootstrap();
+    expect(useAuth.getState().status).toBe("offline");
+    expect(localStorage.getItem("ec.token")).toBe("tok-x");
+
+    // a server restarting behind Cloudflare answers 502, which is not a logout either
+    fail = new ApiError(502, "http_502", "Request failed with status 502.");
+    const seen: string[] = [];
+    const unsub = useAuth.subscribe((s) => seen.push(s.status));
+    await useAuth.getState().bootstrap();
+    expect(useAuth.getState().status).toBe("offline");
+    // a retry does not flash the spinner
+    expect(seen).not.toContain("loading");
+
+    fail = null;
+    await useAuth.getState().bootstrap();
+    unsub();
+    expect(useAuth.getState().status).toBe("locked");
+  });
+
+  it("logs out only when the token is refused", async () => {
+    localStorage.setItem("ec.token", "tok-x");
+    api.request = <T>(): Promise<T> => Promise.reject(new ApiError(401, "unauthorized", "Log in again."));
+    await useAuth.getState().bootstrap();
+    expect(useAuth.getState().status).toBe("anonymous");
+    expect(localStorage.getItem("ec.token")).toBeNull();
+  });
+
+  it("bumps the lock version so the lock timers re-read their settings", () => {
+    const before = useAuth.getState().lockVersion;
+    useAuth.getState().bumpLock();
+    expect(useAuth.getState().lockVersion).toBe(before + 1);
   });
 });

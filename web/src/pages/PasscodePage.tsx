@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
-import { hasLock, MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
+import { hasLock, loadLock, MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
@@ -17,6 +17,9 @@ export default function PasscodePage() {
   const [left, setLeft] = useState(() => (me ? triesLeft(me.id) : MAX_FAILURES));
   // A device that has never been given the passcode is being set up, not unlocked.
   const [adopting] = useState(() => !!me && !hasLock(me.id));
+  // A passcode can hold letters, and a phone's number pad cannot type them, so
+  // the pad is only offered once this device knows the passcode is all digits.
+  const [numeric] = useState(() => !!me && loadLock(me.id)?.numeric === true);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => input.current?.focus(), []);
@@ -58,7 +61,7 @@ export default function PasscodePage() {
           <TextInput
             ref={input}
             type="password"
-            inputMode="numeric"
+            inputMode={numeric ? "numeric" : "text"}
             value={passcode}
             onChange={(e) => setPasscode(e.target.value)}
             autoComplete="off"

@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { FullScreenSpinner } from "@/components/common/Spinner";
 import { startSession, stopSession } from "@/gateway/session";
 import LockPage from "@/pages/LockPage";
+import OfflinePage from "@/pages/OfflinePage";
 import PasscodePage from "@/pages/PasscodePage";
 import { useAuth } from "@/stores/auth";
 
@@ -25,6 +26,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (status === "idle" || status === "loading") return <FullScreenSpinner text="Connecting…" />;
   if (status === "anonymous") return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
+  if (status === "offline") return <OfflinePage />;
   if (status === "pinlocked") return <PasscodePage />;
   if (status === "locked") return <LockPage />;
   return <>{children}</>;
@@ -38,6 +40,8 @@ export function RedirectIfAuthed({ children }: { children: ReactNode }) {
     if (status === "idle") void bootstrap();
   }, [status, bootstrap]);
   if (status === "idle" || status === "loading") return <FullScreenSpinner />;
+  // Still logged in, just not connected: the login form would only mislead.
+  if (status === "offline") return <OfflinePage />;
   if (status === "ready" || status === "locked" || status === "pinlocked") return <Navigate to="/channels/@me" replace />;
   return <>{children}</>;
 }

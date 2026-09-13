@@ -10,6 +10,7 @@ import { startSession } from "@/gateway/session";
 import LockPage from "@/pages/LockPage";
 import PasscodePage from "@/pages/PasscodePage";
 import { hasLock } from "@/lib/appLock";
+import OfflinePage from "@/pages/OfflinePage";
 import { initials } from "@/lib/avatarColor";
 import { parseInviteFragment } from "@/lib/inviteLink";
 import { keystore } from "@/crypto/keystore";
@@ -124,6 +125,7 @@ export default function InvitePage() {
 
   if (status === "locked") return <LockPage />;
   if (status === "pinlocked") return <PasscodePage />;
+  if (status === "offline") return <OfflinePage />;
   const next = encodeURIComponent(loc.pathname);
   const target = preview?.server ?? preview?.group;
   const icon = target ? iconUrl(target.icon_id, 96) : null;

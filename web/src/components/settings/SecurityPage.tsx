@@ -143,6 +143,7 @@ export default function SecurityPage() {
   const patch = (p: Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" | "blurDelayMs">>) => {
     const next = patchLock(me.id, p);
     if (next) setLock(next);
+    useAuth.getState().bumpLock();
     // keep the account's copy in step, so another device locks the same way
     if (policy) useSettings.getState().patch({ appLock: { ...policy, ...p } });
   };

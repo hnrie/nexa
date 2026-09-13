@@ -20,7 +20,7 @@ export function AppRoutes() {
       <Routes>
         <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/recover" element={<RedirectIfAuthed><RecoverPage /></RedirectIfAuthed>} />
+        <Route path="/recover" element={<RecoverPage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
         <Route path="/stickers/pack/:packId" element={<RequireAuth><StickerPackPage /></RequireAuth>} />
         <Route

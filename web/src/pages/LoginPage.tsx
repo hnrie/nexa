@@ -35,6 +35,11 @@ export default function LoginPage() {
       if (err.code === "rate_limited") return "Too many attempts. Wait a minute and try again.";
       return err.message;
     }
+    // fetch rejects with a TypeError when the request never got an answer
+    // ("Failed to fetch", "Load failed"), which says nothing about the password.
+    if (err instanceof TypeError || (typeof navigator !== "undefined" && !navigator.onLine)) {
+      return "Can't reach the server. Check your connection and try again.";
+    }
     return fallback;
   };
 

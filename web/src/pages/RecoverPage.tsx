@@ -1,15 +1,22 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/common/Button";
+import { FullScreenSpinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
+import OfflinePage from "./OfflinePage";
 import s from "./Auth.module.css";
 
 export default function RecoverPage() {
   const nav = useNavigate();
   const recover = useAuth((a) => a.recover);
+  const status = useAuth((a) => a.status);
+  const bootstrap = useAuth((a) => a.bootstrap);
+  // Recovering logs in before the new key comes back, so this page must not
+  // send a now logged-in user away until they have seen that key.
+  const justRecovered = useRef(false);
   const [username, setUsername] = useState("");
   const [key, setKey] = useState("");
   const [password, setPassword] = useState("");
@@ -19,15 +26,21 @@ export default function RecoverPage() {
   const [fresh, setFresh] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    if (status === "idle") void bootstrap();
+  }, [status, bootstrap]);
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (busy || password.length < 8 || password !== confirm) return;
     setBusy(true);
     setError(null);
+    justRecovered.current = true;
     try {
       const res = await recover(username.trim().toLowerCase(), key, password);
       setFresh(res.recoveryKey);
     } catch (err) {
+      justRecovered.current = false;
       if (err instanceof ApiError) {
         if (err.code === "invalid_credentials") setError("Username or recovery key is wrong.");
         else if (err.code === "no_recovery_key") setError("This account has no recovery key, so its messages cannot be recovered.");
@@ -41,6 +54,13 @@ export default function RecoverPage() {
       setBusy(false);
     }
   };
+
+  // Someone already logged in who lands here goes to the app.
+  if (!fresh && !justRecovered.current) {
+    if (status === "idle" || status === "loading") return <FullScreenSpinner />;
+    if (status === "offline") return <OfflinePage />;
+    if (status === "ready" || status === "locked" || status === "pinlocked") return <Navigate to="/channels/@me" replace />;
+  }
 
   if (fresh) {
     return (
