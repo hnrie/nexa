@@ -1,8 +1,8 @@
-import { channels } from "@/api/channels";
 import { uploads, type UploadSession } from "@/api/uploads";
 import { b64 } from "@/crypto/bytes";
-import { CHUNK, decryptFile, encryptedSize } from "@/crypto/file";
-import { fitsUploadLimit, setUploadLimits, uploadStaged, type Staged } from "./attachments";
+import { decryptFile } from "@/crypto/file";
+import { CHUNK, FRAME_LEN, HEADER_LEN, encryptChunks, encryptedSize } from "@/crypto/fileChunks";
+import { fitsUploadLimit, setUploadLimits, uploadStaged, type PieceJob, type PieceSender, type Staged } from "./attachments";
 
 const MiB = 1024 * 1024;
 
@@ -12,50 +12,62 @@ function pattern(n: number): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-function staged(data: Uint8Array<ArrayBuffer>, file?: File): Staged {
-  const f = file ?? new File([data], "big.bin", { type: "application/octet-stream" });
+function staged(data: Uint8Array<ArrayBuffer>): Staged {
+  const f = new File([data], "big.bin", { type: "application/octet-stream" });
   return { id: "f1", file: f, name: f.name, spoiler: false, preview: null, progress: 0, error: null };
 }
 
-async function same(blob: Blob, key: string, data: Uint8Array): Promise<boolean> {
-  const out = new Uint8Array(await (await decryptFile(blob, b64.dec(key))).arrayBuffer());
+async function same(bytes: Uint8Array, key: string, data: Uint8Array): Promise<boolean> {
+  const out = new Uint8Array(await (await decryptFile(new Blob([bytes as Uint8Array<ArrayBuffer>]), b64.dec(key))).arrayBuffer());
   return out.length === data.length && out.every((b, i) => b === data[i]);
 }
 
-/** A stand-in for the server's resumable upload endpoints, holding what has landed. */
-function fakeServer(piece: number) {
+/** What a piece's request would carry. */
+async function bodyOf(job: PieceJob): Promise<Uint8Array> {
+  const whole = await encryptChunks(job.file, job.key, job.baseIv, job.first, job.count);
+  return whole.subarray(job.skip);
+}
+
+/** A stand-in for the server's upload endpoints, holding what has landed. */
+function fakeServer() {
   let stored = new Uint8Array(0);
   let size = 0;
-  const calls: Array<{ offset: number; length: number }> = [];
-  const session = (): UploadSession => ({ id: "u1", size, received: stored.length, chunk_size: piece });
-  const land = async (body: Blob): Promise<void> => {
-    const bytes = new Uint8Array(await body.arrayBuffer());
+  const jobs: PieceJob[] = [];
+  const session = (): UploadSession => ({ id: "u1", size, received: stored.length, chunk_size: 32 * MiB });
+  const land = (bytes: Uint8Array): void => {
     const next = new Uint8Array(stored.length + bytes.length);
     next.set(stored);
     next.set(bytes, stored.length);
     stored = next;
   };
   const server = {
-    calls,
+    jobs,
     cancelled: 0,
+    single: null as Uint8Array | null,
     stored: () => stored,
-    /** Replace to misbehave; by default a piece lands and the server says so. */
-    onChunk: async (offset: number, body: Blob): Promise<number> => {
-      if (offset !== stored.length) throw new Error("409 offset_mismatch");
-      await land(body);
-      return stored.length;
-    },
     land,
+    /** Replace to misbehave; by default a piece lands and the server says so. */
+    onPiece: async (job: PieceJob, body: Uint8Array): Promise<unknown> => {
+      if (Number(job.headers?.["Upload-Offset"]) !== stored.length) throw new Error("409 offset_mismatch");
+      land(body);
+      return session();
+    },
+  };
+  const send: PieceSender = async (job, onProgress) => {
+    jobs.push(job);
+    const body = await bodyOf(job);
+    onProgress(body.length);
+    if (job.method === "POST") {
+      server.single = body;
+      return { blob_id: "b1", size: body.length, channel_id: "c1" };
+    }
+    return server.onPiece(job, body);
   };
   vi.spyOn(uploads, "create").mockImplementation(async (n) => {
     size = n;
     return session();
   });
   vi.spyOn(uploads, "status").mockImplementation(async () => session());
-  vi.spyOn(uploads, "chunk").mockImplementation(async (_id, offset, body) => {
-    calls.push({ offset, length: body.size });
-    return server.onChunk(offset, body);
-  });
   vi.spyOn(uploads, "finish").mockImplementation(async () => {
     if (stored.length !== size) throw new Error("400 incomplete");
     return { blob_id: "b1", size };
@@ -63,7 +75,7 @@ function fakeServer(piece: number) {
   vi.spyOn(uploads, "cancel").mockImplementation(async () => {
     server.cancelled += 1;
   });
-  return server;
+  return { server, send };
 }
 
 afterEach(() => {
@@ -74,125 +86,101 @@ afterEach(() => {
 describe("uploadStaged", () => {
   it("sends a file that fits in one request as one request", async () => {
     const data = pattern(CHUNK + 10);
-    let sent: Blob | null = null;
-    const single = vi.spyOn(channels, "uploadAttachment").mockImplementation(async (_ch, body) => {
-      sent = body as Blob;
-      return { blob_id: "b1", size: (body as Blob).size, channel_id: "c1" };
-    });
-    const create = vi.spyOn(uploads, "create");
-    const { meta } = await uploadStaged("c1", staged(data), () => undefined);
-    expect(single).toHaveBeenCalledTimes(1);
-    expect(create).not.toHaveBeenCalled();
-    expect(sent!.size).toBe(encryptedSize(data.length));
-    expect(await same(sent!, meta.key, data)).toBe(true);
+    const { server, send } = fakeServer();
+    const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
+    expect(server.jobs).toHaveLength(1);
+    expect(server.jobs[0]).toMatchObject({ method: "POST", path: "/channels/c1/attachments", first: 0, count: 2, skip: 0 });
+    expect(uploads.create).not.toHaveBeenCalled();
+    expect(server.single!.length).toBe(encryptedSize(data.length));
+    expect(await same(server.single!, meta.key, data)).toBe(true);
     expect(meta.size).toBe(data.length);
   });
 
-  describe("above the single-request limit", () => {
-    const piece = 1 * MiB;
-    const data = pattern(3 * CHUNK + 77);
+  describe("above the single-request limit", { timeout: 20_000 }, () => {
+    // pieces that hold one whole frame each (one more would not fit), so 5 chunks make 5 pieces
+    const data = pattern(4 * CHUNK + 77);
     const total = encryptedSize(data.length);
 
     beforeEach(() => {
-      setUploadLimits({ max: 1024 * MiB, single: 1024, chunk: piece });
-      vi.spyOn(channels, "uploadAttachment").mockRejectedValue(new Error("should not be used"));
+      setUploadLimits({ max: 1024 * MiB, single: 1024, chunk: HEADER_LEN + FRAME_LEN + 1 });
     });
 
-    it("goes up in pieces that decrypt back to the file", async () => {
-      const server = fakeServer(piece);
+    it("goes up in pieces of whole chunks that decrypt back to the file", async () => {
+      const { server, send } = fakeServer();
       const progress: number[] = [];
-      const { meta, blob_id } = await uploadStaged("c1", staged(data), (p) => progress.push(p));
+      const { meta, blob_id } = await uploadStaged("c1", staged(data), (p) => progress.push(p), send);
       expect(blob_id).toBe("b1");
       expect(uploads.create).toHaveBeenCalledWith(total);
-      expect(server.calls.length).toBe(Math.ceil(total / piece));
-      expect(server.calls.every((c) => c.length <= piece)).toBe(true);
-      expect(await same(new Blob([server.stored()]), meta.key, data)).toBe(true);
+      expect(server.jobs.map((j) => [j.first, j.count])).toEqual(Array.from({ length: 5 }, (_, i) => [i, 1]));
+      expect(server.jobs.map((j) => j.headers?.["Upload-Offset"])).toEqual(Array.from({ length: 5 }, (_, i) => String(i === 0 ? 0 : HEADER_LEN + i * FRAME_LEN)));
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
       expect(progress.at(-1)).toBe(1);
       expect(server.cancelled).toBe(0);
     });
 
-    it("reads the file only as far as the piece being sent", async () => {
-      const server = fakeServer(piece);
-      const file = new File([data], "big.bin");
-      let furthest = 0;
-      const watched = new Proxy(file, {
-        get(target, prop) {
-          if (prop === "slice") {
-            return (start?: number, end?: number) => {
-              furthest = Math.max(furthest, end ?? target.size);
-              return target.slice(start, end);
-            };
-          }
-          const v = Reflect.get(target, prop, target) as unknown;
-          return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(target) : v;
-        },
-      });
-      const seen: number[] = [];
-      const onChunk = server.onChunk;
-      server.onChunk = async (offset, body) => {
-        seen.push(furthest - offset);
-        return onChunk(offset, body);
-      };
-      await uploadStaged("c1", staged(data, watched), () => undefined);
-      // never more than the piece in hand plus the chunk being encrypted into the next one
-      expect(Math.max(...seen)).toBeLessThanOrEqual(piece + CHUNK);
+    it("fits as many whole chunks in a piece as the limit allows", async () => {
+      setUploadLimits({ chunk: HEADER_LEN + 3 * FRAME_LEN });
+      const { server, send } = fakeServer();
+      const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
+      expect(server.jobs.map((j) => [j.first, j.count])).toEqual([[0, 3], [3, 2]]);
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
     });
 
     it("sends a piece again when its request fails", async () => {
-      const server = fakeServer(piece);
-      const onChunk = server.onChunk;
+      const { server, send } = fakeServer();
+      const onPiece = server.onPiece;
       let n = 0;
-      server.onChunk = async (offset, body) => {
+      server.onPiece = async (job, body) => {
         n += 1;
         if (n === 3) throw new Error("network");
-        return onChunk(offset, body);
+        return onPiece(job, body);
       };
-      const { meta } = await uploadStaged("c1", staged(data), () => undefined);
-      expect(server.calls[3]!.offset).toBe(server.calls[2]!.offset);
-      expect(await same(new Blob([server.stored()]), meta.key, data)).toBe(true);
+      const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
+      expect(server.jobs[3]!.first).toBe(server.jobs[2]!.first);
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
     });
 
     it("does not send a piece twice when only the reply was lost", async () => {
-      const server = fakeServer(piece);
+      const { server, send } = fakeServer();
       let n = 0;
-      server.onChunk = async (offset, body) => {
+      server.onPiece = async (job, body) => {
         n += 1;
-        if (offset !== server.stored().length) throw new Error("409 offset_mismatch");
-        await server.land(body);
+        if (Number(job.headers?.["Upload-Offset"]) !== server.stored().length) throw new Error("409 offset_mismatch");
+        server.land(body);
         if (n === 2) throw new Error("network");
-        return server.stored().length;
+        return { received: server.stored().length };
       };
-      const { meta } = await uploadStaged("c1", staged(data), () => undefined);
-      expect(server.calls.length).toBe(Math.ceil(total / piece));
-      expect(server.calls[2]!.offset).toBe(2 * piece);
-      expect(await same(new Blob([server.stored()]), meta.key, data)).toBe(true);
+      const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
+      expect(server.jobs).toHaveLength(5);
+      expect(server.jobs[2]!.first).toBe(2);
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
     });
 
     it("sends only the rest of a piece that partly landed", async () => {
-      const server = fakeServer(piece);
+      const { server, send } = fakeServer();
       let n = 0;
-      server.onChunk = async (offset, body) => {
+      server.onPiece = async (job, body) => {
         n += 1;
-        if (offset !== server.stored().length) throw new Error("409 offset_mismatch");
+        if (Number(job.headers?.["Upload-Offset"]) !== server.stored().length) throw new Error("409 offset_mismatch");
         if (n === 2) {
-          await server.land(body.slice(0, 1000));
+          server.land(body.subarray(0, 1000));
           throw new Error("network");
         }
-        await server.land(body);
-        return server.stored().length;
+        server.land(body);
+        return { received: server.stored().length };
       };
-      const { meta } = await uploadStaged("c1", staged(data), () => undefined);
-      expect(server.calls[2]).toEqual({ offset: piece + 1000, length: piece - 1000 });
-      expect(await same(new Blob([server.stored()]), meta.key, data)).toBe(true);
+      const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
+      expect(server.jobs[2]).toMatchObject({ first: 1, count: 1, skip: 1000 });
+      expect(await same(server.stored(), meta.key, data)).toBe(true);
     });
 
     it("gives up after a few failures and throws the upload away", async () => {
-      const server = fakeServer(piece);
-      server.onChunk = async () => {
+      const { server, send } = fakeServer();
+      server.onPiece = async () => {
         throw new Error("network");
       };
-      await expect(uploadStaged("c1", staged(data), () => undefined)).rejects.toThrow("network");
-      expect(server.calls.length).toBe(4);
+      await expect(uploadStaged("c1", staged(data), () => undefined, send)).rejects.toThrow("network");
+      expect(server.jobs).toHaveLength(4);
       expect(server.cancelled).toBe(1);
     });
   });
@@ -201,10 +189,9 @@ describe("uploadStaged", () => {
     setUploadLimits({ max: encryptedSize(10 * MiB) });
     expect(fitsUploadLimit(10 * MiB)).toBe(true);
     expect(fitsUploadLimit(10 * MiB + 1)).toBe(false);
-    const create = vi.spyOn(uploads, "create");
-    const single = vi.spyOn(channels, "uploadAttachment");
-    await expect(uploadStaged("c1", staged(pattern(10 * MiB + 1)), () => undefined)).rejects.toThrow("limit");
-    expect(create).not.toHaveBeenCalled();
-    expect(single).not.toHaveBeenCalled();
+    const { server, send } = fakeServer();
+    await expect(uploadStaged("c1", staged(pattern(10 * MiB + 1)), () => undefined, send)).rejects.toThrow("limit");
+    expect(server.jobs).toHaveLength(0);
+    expect(uploads.create).not.toHaveBeenCalled();
   });
 });

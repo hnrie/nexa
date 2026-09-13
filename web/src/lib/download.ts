@@ -2,9 +2,9 @@
  * Saving an attachment to disk.
  *
  * A small file is decrypted in the page and handed over as a Blob. A large one
- * is handed to the service worker, which fetches and decrypts it a chunk at a
- * time while the browser's own download manager writes it out, so no copy of
- * the whole file ever sits in memory, however big it is.
+ * is handed to the download service worker, which fetches and decrypts it a
+ * chunk at a time while the browser's own download manager writes it out, so
+ * no copy of the whole file ever sits in memory, however big it is.
  */
 
 import { attachmentUrl, channels as channelsApi } from "@/api/channels";
@@ -20,7 +20,7 @@ export const STREAM_ABOVE = 64 * 1024 * 1024;
 /** Without the worker, the most that will be decrypted in the page to save. */
 const IN_PAGE_MAX = 1024 * 1024 * 1024;
 
-/** The address the worker answers downloads on; sw.ts has the other end. */
+/** The address the download worker answers on; download-sw.ts has the other end. */
 const DOWNLOAD_PATH = "/__download/";
 
 /** How long the worker has to take the job, then for the browser to come for the file. */
@@ -37,9 +37,17 @@ let streaming = 0;
 let pinger: ReturnType<typeof setInterval> | null = null;
 const waiters: Array<() => void> = [];
 
+/** The service worker that streams downloads, once it is running. */
+async function downloadWorker(): Promise<ServiceWorker | null> {
+  if (typeof navigator === "undefined" || !navigator.serviceWorker) return null;
+  const reg = await navigator.serviceWorker.getRegistration(DOWNLOAD_PATH).catch(() => undefined);
+  if (!reg?.scope.endsWith(DOWNLOAD_PATH)) return null;
+  return reg.active;
+}
+
 function hold(): void {
   streaming += 1;
-  pinger ??= setInterval(() => navigator.serviceWorker?.controller?.postMessage({ type: "keepalive" }), KEEPALIVE_MS);
+  pinger ??= setInterval(() => void downloadWorker().then((w) => w?.postMessage({ type: "keepalive" })), KEEPALIVE_MS);
 }
 
 function release(): void {
@@ -71,9 +79,9 @@ interface WorkerMessage {
  * older one that knows nothing of downloads, or the browser never came for
  * the file.
  */
-function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<"done" | "unavailable"> {
-  const worker = typeof navigator !== "undefined" ? navigator.serviceWorker?.controller : null;
-  if (!worker || typeof MessageChannel === "undefined" || typeof document === "undefined") return Promise.resolve("unavailable");
+async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<"done" | "unavailable"> {
+  const worker = await downloadWorker();
+  if (!worker || typeof MessageChannel === "undefined" || typeof document === "undefined") return "unavailable";
   const id = hex(randomBytes(16));
   const channel = new MessageChannel();
   return new Promise((resolve, reject) => {

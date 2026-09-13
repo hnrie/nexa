@@ -109,9 +109,14 @@ export default defineConfig({
     // break; they are kept for a week instead and pruned below.
     emptyOutDir: false,
     rollupOptions: {
-      input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), sw: fileURLToPath(new URL("./src/sw.ts", import.meta.url)) },
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        sw: fileURLToPath(new URL("./src/sw.ts", import.meta.url)),
+        "download-sw": fileURLToPath(new URL("./src/download-sw.ts", import.meta.url)),
+      },
       output: {
-        entryFileNames: (chunk) => (chunk.name === "sw" ? "sw.js" : "assets/[name]-[hash].js"),
+        // service workers keep fixed names at the root, where they are registered from
+        entryFileNames: (chunk) => (chunk.name === "sw" || chunk.name === "download-sw" ? "[name].js" : "assets/[name]-[hash].js"),
         manualChunks: (id) => {
           if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) return "react";
           if (id.includes("@noble") || id.includes("hash-wasm")) return "crypto";

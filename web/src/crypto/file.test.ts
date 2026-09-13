@@ -1,5 +1,5 @@
 import { equal, randomBytes, readU32be, utf8 } from "./bytes";
-import { CHUNK, decryptFile, encryptFile, encryptFrames, encryptedSize, newFileKey } from "./file";
+import { CHUNK, chunkCount, decryptFile, encryptChunks, encryptFile, encryptedSize, newBaseIv, newFileKey } from "./file";
 import { DecryptError } from "./keys";
 
 const HEADER = 4 + 8;
@@ -167,15 +167,32 @@ describe("encryptedSize / encryptFrames", () => {
     }
   });
 
-  it("yields the header, then one frame per chunk, which together decrypt", async () => {
-    const size = 2 * CHUNK + 5;
-    const data = pattern(size);
+  it("encrypts any stretch of chunks on its own, and the stretches make the whole file", async () => {
+    const size = 5 * CHUNK + 5;
+    const data = new Blob([pattern(size)]);
     const key = newFileKey();
-    const frames: Uint8Array[] = [];
-    for await (const f of encryptFrames(new Blob([data]), key)) frames.push(f);
-    expect(frames.map((f) => f.length)).toEqual([HEADER, LEN_PREFIX + CHUNK + TAG, LEN_PREFIX + CHUNK + TAG, LEN_PREFIX + 5 + TAG]);
-    const out = await bytesOf(await decryptFile(new Blob(frames as BlobPart[]), key));
-    expect(firstDiff(out, data)).toBe(-1);
+    const baseIv = newBaseIv();
+    expect(chunkCount(size)).toBe(6);
+    const whole = await encryptChunks(data, key, baseIv, 0, 6);
+    expect(whole.length).toBe(encryptedSize(size));
+    const pieces = [await encryptChunks(data, key, baseIv, 0, 2), await encryptChunks(data, key, baseIv, 2, 3), await encryptChunks(data, key, baseIv, 5, 1)];
+    expect(pieces.map((p) => p.length)).toEqual([HEADER + 2 * (LEN_PREFIX + CHUNK + TAG), 3 * (LEN_PREFIX + CHUNK + TAG), LEN_PREFIX + 5 + TAG]);
+    const joined = new Uint8Array(await new Blob(pieces as BlobPart[]).arrayBuffer());
+    expect(firstDiff(joined, whole)).toBe(-1);
+    // sent again after a failure, a stretch is byte for byte what it was
+    expect(firstDiff(await encryptChunks(data, key, baseIv, 2, 3), pieces[1]!)).toBe(-1);
+    const out = await bytesOf(await decryptFile(new Blob([whole]), key));
+    expect(firstDiff(out, pattern(size))).toBe(-1);
+  });
+
+  it("refuses chunks that are not there", async () => {
+    const data = new Blob([pattern(CHUNK + 1)]);
+    const key = newFileKey();
+    const baseIv = newBaseIv();
+    await expect(encryptChunks(data, key, baseIv, 1, 2)).rejects.toBeInstanceOf(RangeError);
+    await expect(encryptChunks(data, key, baseIv, -1, 1)).rejects.toBeInstanceOf(RangeError);
+    await expect(encryptChunks(data, key, baseIv, 0, 0)).rejects.toBeInstanceOf(RangeError);
+    await expect(encryptChunks(new Blob([]), key, baseIv, 0, 1)).resolves.toHaveLength(HEADER + LEN_PREFIX + TAG);
   });
 });
 

@@ -63,7 +63,7 @@ function parseRetryAfter(raw: string | null): number | undefined {
 }
 
 /** Builds an ApiError from a response body, falling back to `http_<status>`. */
-function errorFrom(status: number, body: string, retryAfterHeader: string | null): ApiError {
+export function errorFrom(status: number, body: string, retryAfterHeader: string | null): ApiError {
   const retryAfter = parseRetryAfter(retryAfterHeader);
   let parsed: unknown;
   try {

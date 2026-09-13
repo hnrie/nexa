@@ -56,7 +56,7 @@ func (s *Server) staticHandler() http.Handler {
 		// app's HTML instead turns a missing script into a page the browser
 		// refuses to run, and any cache in front of this, the browser's own or
 		// a CDN's, then keeps that HTML under the script's address.
-		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" {
+		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" || p == "/download-sw.js" {
 			w.Header().Set("Cache-Control", "no-store")
 			WriteError(w, ErrNotFound)
 			return

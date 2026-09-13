@@ -1,9 +1,9 @@
-import { channels as channelsApi } from "@/api/channels";
+import { ApiError, api, errorFrom } from "@/api/client";
 import { uploads as uploadsApi } from "@/api/uploads";
-import { bufferSource } from "@/crypto/aes";
 import { b64 } from "@/crypto/bytes";
-import { encryptFile, encryptFrames, encryptedSize, newFileKey } from "@/crypto/file";
+import { FRAME_LEN, HEADER_LEN, chunkCount, encryptChunks, encryptedSize, frameOffset, newBaseIv, newFileKey } from "@/crypto/fileChunks";
 import type { AttachmentMeta } from "@/crypto/message";
+import type { PieceReply, PieceRequest } from "./upload.worker";
 
 /** Fallback until the server says what it accepts. */
 export const MAX_UPLOAD = 100 * 1024 * 1024;
@@ -61,24 +61,115 @@ async function imageDims(file: File): Promise<{ w: number; h: number } | null> {
 }
 
 /**
+ * One stretch of a file to encrypt and send: chunks [first, first + count),
+ * less the first `skip` bytes the server already has.
+ */
+export interface PieceJob {
+  method: "POST" | "PATCH";
+  path: string;
+  headers?: Record<string, string>;
+  file: Blob;
+  key: Uint8Array;
+  baseIv: Uint8Array;
+  first: number;
+  count: number;
+  skip: number;
+}
+
+/** Sends a stretch, resolving with the server's answer. */
+export type PieceSender = (job: PieceJob, onProgress: (loaded: number) => void) => Promise<unknown>;
+
+/** Encrypts the stretch a job describes: exactly the bytes its request carries. */
+async function bodyOf(job: PieceJob): Promise<Uint8Array<ArrayBuffer>> {
+  const whole = await encryptChunks(job.file, job.key, job.baseIv, job.first, job.count);
+  return job.skip > 0 ? whole.slice(job.skip) : whole;
+}
+
+/** Sends from the page itself, for a browser that cannot start the worker. */
+export const sendInPage: PieceSender = async (job, onProgress) => api.upload(job.path, await bodyOf(job), { method: job.method, headers: job.headers ?? {}, onProgress });
+
+let workers = typeof Worker !== "undefined";
+
+/**
+ * Encrypts a stretch here, then hands the bytes to a worker of its own that
+ * sends them and is ended once they have landed, so no finished request's
+ * body outlives it (see upload.worker.ts).
+ */
+export const sendInWorker: PieceSender = async (job, onProgress) => {
+  if (!workers) return sendInPage(job, onProgress);
+  const body = await bodyOf(job);
+  const headers: Record<string, string> = { "Content-Type": "application/octet-stream", ...job.headers };
+  const token = api.getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return new Promise((resolve, reject) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL("./upload.worker.ts", import.meta.url), { type: "module" });
+    } catch {
+      workers = false;
+      api.upload(job.path, body, { method: job.method, headers: job.headers ?? {}, onProgress }).then(resolve, reject);
+      return;
+    }
+    let heard = false;
+    worker.onmessage = (e: MessageEvent<PieceReply>) => {
+      heard = true;
+      const reply = e.data;
+      if (reply.type === "progress") {
+        onProgress(reply.loaded);
+        return;
+      }
+      worker.terminate();
+      if (reply.type === "failed") {
+        reject(new ApiError(0, "network", "The upload could not reach the server."));
+        return;
+      }
+      if (reply.status >= 200 && reply.status < 300) {
+        try {
+          resolve(reply.text ? JSON.parse(reply.text) : undefined);
+        } catch {
+          reject(new ApiError(reply.status, "bad_response", "The server's answer could not be read."));
+        }
+        return;
+      }
+      if (reply.status === 401) api.onUnauthorized?.();
+      reject(errorFrom(reply.status, reply.text, reply.retryAfter));
+    };
+    worker.onerror = (e) => {
+      worker.terminate();
+      if (heard) {
+        reject(new ApiError(0, "worker", "The upload stopped unexpectedly."));
+        return;
+      }
+      // It never got going (an older browser, or its script would not load).
+      // The body went to it, so make the stretch again and send it from here.
+      e.preventDefault();
+      workers = false;
+      sendInPage(job, onProgress).then(resolve, reject);
+    };
+    const request: PieceRequest = { url: new URL(api.url(job.path), location.href).href, method: job.method, headers, body: body.buffer };
+    worker.postMessage(request, [body.buffer]);
+  });
+};
+
+/**
  * Encrypts and uploads a staged file, returning the metadata that rides inside the message.
  *
- * A file that fits in one request is encrypted and sent whole. Anything larger
- * is encrypted a chunk at a time and sent a piece at a time as it goes, so
- * only one piece is ever held in memory however big the file is.
+ * A file that fits in one request goes up as one request. Anything larger
+ * goes up a stretch of chunks at a time, each stretch encrypted only as it is
+ * sent. Either way the work happens in a worker that is ended afterwards, so
+ * memory holds one request's worth at most, however big the file is.
  */
-export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
+export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
   if (!fitsUploadLimit(st.file.size)) throw new Error(`That file is over this server's ${formatSize(limits.max)} limit.`);
   const total = encryptedSize(st.file.size);
-  let key: Uint8Array;
+  const key = newFileKey();
+  const baseIv = newBaseIv();
   let res: { blob_id: string; size: number };
   if (total <= limits.single) {
-    const enc = await encryptFile(st.file, (done, size) => onProgress(size ? (done / size) * 0.4 : 0));
-    key = enc.key;
-    res = await channelsApi.uploadAttachment(channelId, enc.blob, (loaded, size) => onProgress(0.4 + (size ? loaded / size : 0) * 0.6));
+    const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
+    res = (await send(job, (loaded) => onProgress(loaded / total))) as { blob_id: string; size: number };
   } else {
-    key = newFileKey();
-    res = await uploadInPieces(encryptFrames(st.file, key), total, (sent) => onProgress(sent / total));
+    res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send);
   }
   const dims = await imageDims(st.file);
   const meta: AttachmentMeta = { blob_id: res.blob_id, name: st.name || st.file.name, type: st.file.type || "application/octet-stream", size: st.file.size, key: b64.enc(key) };
@@ -100,57 +191,48 @@ function formatSize(bytes: number): string {
 const CHUNK_TRIES = 4;
 
 /**
- * Sends a file too big for one request, a piece at a time, straight from the
- * encryptor: each piece is gathered, sent and let go before the next is made.
+ * Sends a file too big for one request, a piece at a time. Each piece is a
+ * whole number of chunks, so it can be encrypted on its own when its turn
+ * comes, and again identically if it has to be sent twice.
  *
  * The server says how much has landed, so a dropped connection costs at most
  * that one piece rather than the whole transfer. Anything already spooled is
  * thrown away if the upload is abandoned.
  */
-export async function uploadInPieces(frames: AsyncIterable<Uint8Array>, total: number, onProgress: (sent: number) => void): Promise<{ blob_id: string; size: number }> {
+export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8Array, onProgress: (sent: number) => void, send: PieceSender = sendInWorker): Promise<{ blob_id: string; size: number }> {
+  const total = encryptedSize(file.size);
+  const chunks = chunkCount(file.size);
   const session = await uploadsApi.create(total);
-  const pieceSize = Math.max(1, Math.min(session.chunk_size || limits.chunk, limits.chunk));
+  const limit = Math.min(session.chunk_size || limits.chunk, limits.chunk);
+  const perPiece = Math.max(1, Math.floor((limit - HEADER_LEN) / FRAME_LEN));
   let sent = 0;
-  let pending: BlobPart[] = [];
-  let pendingLen = 0;
-
-  const flush = async (): Promise<void> => {
-    const piece = new Blob(pending);
-    pending = [];
-    pendingLen = 0;
-    const start = sent;
-    const end = start + piece.size;
-    let tries = 0;
-    while (sent < end) {
-      try {
-        const received = await uploadsApi.chunk(session.id, sent, piece.slice(sent - start), (loaded) => onProgress(sent + loaded));
-        if (received <= sent || received > end) throw new Error("The server lost track of this upload.");
-        sent = received;
-      } catch (err) {
-        tries += 1;
-        if (tries >= CHUNK_TRIES) throw err;
-        // ask where it got to, then carry on from there
-        const state = await uploadsApi.status(session.id).catch(() => null);
-        if (!state || state.received < start || state.received > end) throw err;
-        sent = state.received;
-        if (sent < end) await new Promise((r) => setTimeout(r, 400 * tries));
-      }
-      onProgress(sent);
-    }
-  };
-
   try {
-    for await (const frame of frames) {
-      let rest = frame;
-      while (rest.length > 0) {
-        const part = rest.subarray(0, pieceSize - pendingLen);
-        pending.push(bufferSource(part));
-        pendingLen += part.length;
-        rest = rest.subarray(part.length);
-        if (pendingLen === pieceSize) await flush();
+    for (let first = 0; first < chunks; first += perPiece) {
+      const count = Math.min(perPiece, chunks - first);
+      const start = first === 0 ? 0 : frameOffset(first);
+      const end = Math.min(total, frameOffset(first + count));
+      if (sent !== start) throw new Error("The upload lost its place.");
+      let tries = 0;
+      while (sent < end) {
+        try {
+          const job: PieceJob = { method: "PATCH", path: `/uploads/${session.id}`, headers: { "Upload-Offset": String(sent) }, file, key, baseIv, first, count, skip: sent - start };
+          const from = sent;
+          const reply = (await send(job, (loaded) => onProgress(from + loaded))) as { received?: number } | undefined;
+          const received = reply?.received ?? -1;
+          if (received <= sent || received > end) throw new Error("The server lost track of this upload.");
+          sent = received;
+        } catch (err) {
+          tries += 1;
+          if (tries >= CHUNK_TRIES) throw err;
+          // ask where it got to, then carry on from there
+          const state = await uploadsApi.status(session.id).catch(() => null);
+          if (!state || state.received < start || state.received > end) throw err;
+          sent = state.received;
+          if (sent < end) await new Promise((r) => setTimeout(r, 400 * tries));
+        }
+        onProgress(sent);
       }
     }
-    if (pendingLen > 0) await flush();
     if (sent !== total) throw new Error("The upload came out a different size than expected.");
     return await uploadsApi.finish(session.id);
   } catch (err) {

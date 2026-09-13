@@ -26,14 +26,4 @@ export const uploads = {
   cancel(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/uploads/${id}`);
   },
-  /** Sends one piece, returning how much has landed in total. */
-  async chunk(id: Snowflake, offset: number, body: Blob, onProgress?: (sent: number) => void, signal?: AbortSignal): Promise<number> {
-    const res = await api.upload<UploadSession>(`/uploads/${id}`, body, {
-      method: "PATCH",
-      headers: { "Upload-Offset": String(offset) },
-      ...(onProgress ? { onProgress: (loaded: number) => onProgress(loaded) } : {}),
-      ...(signal ? { signal } : {}),
-    });
-    return res.received;
-  },
 };

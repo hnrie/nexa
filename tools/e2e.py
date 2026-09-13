@@ -612,7 +612,8 @@ def files_flow(srv, alice, bob, browser, out):
 
     sent = []
     alice.page.on("request", lambda r: sent.append((r.method, r.url.split("?")[0])) if "/uploads" in r.url or "/attachments" in r.url else None)
-    alice.open_dm_from_sidebar("Bob")
+    # an earlier flow may have given Bob a friend nickname
+    alice.open_dm_from_sidebar("Bobby", "Bob")
     for path in (small, big, clip):
         alice.page.set_input_files("input[type=file]", str(path))
         # the staged card, not a toast that happens to name the file
@@ -638,12 +639,13 @@ def files_flow(srv, alice, bob, browser, out):
     assert len({u for u in fetched if "/media/attachments/" in u}) <= 1, f"nothing big should load by itself: {fetched}"
     bob.shot("files")
 
+    ready = "navigator.serviceWorker.getRegistration('/__download/').then(r => !!(r && r.scope.endsWith('/__download/') && r.active))"
     for _ in range(50):
-        if bob.page.evaluate("!!navigator.serviceWorker.controller"):
+        if bob.page.evaluate(ready):
             break
         time.sleep(0.2)
     else:
-        raise AssertionError("no service worker is controlling the page")
+        raise AssertionError("the download worker never started")
     started = time.time()
     with bob.page.expect_download(timeout=120000) as info:
         bob.page.locator("[data-id]:has-text('big.bin') button[aria-label=Download]").click()
