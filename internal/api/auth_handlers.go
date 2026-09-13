@@ -393,6 +393,7 @@ func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Store.DeleteUserSessions(r.Context(), u.ID, 0)
+	s.Bcast.CloseUserSessions(u.ID, 0)
 	// The recovery key is the way back in after losing a phone, so it clears the
 	// second factor too. It already unwraps the identity, so it grants nothing
 	// new; leaving the authenticator on would only lock the owner out for good.
@@ -441,6 +442,7 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.Store.DeleteUserSessions(r.Context(), u.ID, auth.SessionFrom(r.Context()).ID)
+	s.Bcast.CloseUserSessions(u.ID, auth.SessionFrom(r.Context()).ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -479,6 +481,7 @@ func (s *Server) handleRecoveryReplace(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	se := auth.SessionFrom(r.Context())
 	_ = s.Store.DeleteSession(r.Context(), se.ID)
+	s.Bcast.CloseSession(se.ID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -517,6 +520,7 @@ func (s *Server) handleSessionDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.Bcast.CloseSession(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

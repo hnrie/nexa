@@ -25,6 +25,10 @@ type Broadcaster interface {
 	EmitChannel(channelID ids.ID, event string, data any)
 	KeysMaybeNeeded(convID ids.ID)
 	Typing(ctx context.Context, uid, channelID ids.ID)
+	// CloseSession and CloseUserSessions disconnect the sockets of sessions
+	// that were just deleted; except 0 closes all of a user's.
+	CloseSession(sessionID ids.ID)
+	CloseUserSessions(uid, except ids.ID)
 }
 
 // NoopBroadcaster drops everything (tests, or before the gateway is wired).
@@ -35,6 +39,8 @@ func (NoopBroadcaster) EmitUsers([]ids.ID, string, any)        {}
 func (NoopBroadcaster) EmitChannel(ids.ID, string, any)        {}
 func (NoopBroadcaster) KeysMaybeNeeded(ids.ID)                 {}
 func (NoopBroadcaster) Typing(context.Context, ids.ID, ids.ID) {}
+func (NoopBroadcaster) CloseSession(ids.ID)                    {}
+func (NoopBroadcaster) CloseUserSessions(ids.ID, ids.ID)       {}
 
 // Server holds the dependencies of every handler.
 type Server struct {

@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/url"
 	"strings"
@@ -36,6 +37,8 @@ type Hub struct {
 	ViewerResolver func(ctx context.Context, channelID ids.ID) ([]ids.ID, error)
 	// Access reports whether uid may act in a server channel.
 	Access func(ctx context.Context, uid, channelID ids.ID) (bool, error)
+	// SendAccess reports whether uid may send messages, and so type, in a server channel.
+	SendAccess func(ctx context.Context, uid, channelID ids.ID) (bool, error)
 	// Interested lists extra users who should receive uid's presence (server co-members).
 	Interested func(ctx context.Context, uid ids.ID) ([]ids.ID, error)
 	// ReadyExtras adds server data to the ready payload.
@@ -61,16 +64,22 @@ func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, publicURL
 	return h
 }
 
+// sessionCheckEvery is how many sweeps pass between session re-checks.
+const sessionCheckEvery = 4
+
 // Run sweeps dead connections until ctx ends.
 func (h *Hub) Run(ctx context.Context) {
 	t := time.NewTicker(15 * time.Second)
 	defer t.Stop()
-	for {
+	for n := 1; ; n++ {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			h.sweep()
+			if n%sessionCheckEvery == 0 {
+				h.sweepSessions(ctx)
+			}
 		}
 	}
 }
@@ -89,6 +98,87 @@ func (h *Hub) sweep() {
 	h.mu.RUnlock()
 	for _, c := range stale {
 		c.close(websocket.StatusPolicyViolation, "heartbeat timeout")
+	}
+}
+
+// sweepSessions closes connections whose session was deleted or whose account
+// was disabled. Handlers that end sessions close their sockets at once; this
+// catches the rest, such as a socket that identified while its session was
+// being revoked, or sessions removed by expiry.
+func (h *Hub) sweepSessions(ctx context.Context) {
+	var all []*conn
+	h.mu.RLock()
+	for _, set := range h.conns {
+		for c := range set {
+			all = append(all, c)
+		}
+	}
+	h.mu.RUnlock()
+	gone := map[ids.ID]bool{}
+	for _, c := range all {
+		dead, checked := gone[c.session.ID]
+		if !checked {
+			dead = !h.sessionAlive(ctx, c.session.ID, c.user.ID)
+			if ctx.Err() != nil {
+				return
+			}
+			gone[c.session.ID] = dead
+		}
+		if dead {
+			c.close(CloseSessionRevoked, "session revoked")
+		}
+	}
+}
+
+// sessionAlive reports whether a session still exists for an account that may
+// log in. A failed lookup other than not-found counts as alive.
+func (h *Hub) sessionAlive(ctx context.Context, sid, uid ids.ID) bool {
+	se, err := h.st.SessionByID(ctx, sid)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && se.UserID != uid) {
+		return false
+	}
+	if err != nil {
+		return true
+	}
+	u, err := h.st.UserByID(ctx, uid)
+	if errors.Is(err, store.ErrNotFound) {
+		return false
+	}
+	return err != nil || u.Flags&(store.FlagDisabled|store.FlagDeleted) == 0
+}
+
+// CloseSession disconnects the sockets of a session that was just deleted
+// (api.Broadcaster).
+func (h *Hub) CloseSession(sid ids.ID) {
+	var hit []*conn
+	h.mu.RLock()
+	for _, set := range h.conns {
+		for c := range set {
+			if c.session.ID == sid {
+				hit = append(hit, c)
+			}
+		}
+	}
+	h.mu.RUnlock()
+	for _, c := range hit {
+		c.revoke()
+	}
+}
+
+// CloseUserSessions disconnects every socket of a user except those of one
+// session, whose sessions were just deleted; except 0 closes them all
+// (api.Broadcaster).
+func (h *Hub) CloseUserSessions(uid, except ids.ID) {
+	var hit []*conn
+	h.mu.RLock()
+	for c := range h.conns[uid] {
+		if c.session.ID != except {
+			hit = append(hit, c)
+		}
+	}
+	h.mu.RUnlock()
+	for _, c := range hit {
+		c.revoke()
 	}
 }
 

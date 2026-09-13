@@ -156,6 +156,14 @@ func (s *Server) WireServers(hub *gateway.Hub) {
 		}
 		return p.Has(perms.ViewChannel), nil
 	}
+	// typing is a promise of a message, so it needs the same right as sending one
+	hub.SendAccess = func(ctx context.Context, uid, channelID ids.ID) (bool, error) {
+		p, _, err := s.Store.ChannelPerms(ctx, channelID, uid)
+		if err != nil {
+			return false, err
+		}
+		return p.Has(needBits(NeedSend)), nil
+	}
 	hub.Interested = func(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
 		servers, err := s.Store.ServersForUser(ctx, uid)
 		if err != nil {

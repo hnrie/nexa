@@ -132,6 +132,7 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		// a disabled account loses every session immediately
 		_ = s.Store.DeleteUserSessions(r.Context(), id, 0)
 		s.Bcast.EmitUsers([]ids.ID{id}, "session_expired", map[string]any{"reason": "disabled"})
+		s.Bcast.CloseUserSessions(id, 0)
 	}
 	WriteJSON(w, http.StatusOK, store.AdminUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Flags: flags, CreatedAt: u.CreatedAt, Admin: flags&store.FlagAdmin != 0, Disabled: flags&store.FlagDisabled != 0})
 }
@@ -214,6 +215,7 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	// any tab still open for them signs out now
 	s.Bcast.EmitUsers([]ids.ID{id}, "session_expired", map[string]any{"reason": "deleted"})
+	s.Bcast.CloseUserSessions(id, 0)
 	if deleted, err := s.Store.UserByID(ctx, id); err == nil {
 		s.Bcast.UserUpdated(deleted)
 	}

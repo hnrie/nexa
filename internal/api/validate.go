@@ -3,8 +3,8 @@ package api
 import (
 	"regexp"
 	"strings"
-	"unicode"
-	"unicode/utf8"
+
+	"evilion.xyz/chat/internal/textutil"
 )
 
 var usernameRe = regexp.MustCompile(`^[a-z0-9_.]{2,32}$`)
@@ -22,25 +22,8 @@ func ValidUsername(s string) bool {
 
 // CleanText trims, strips control characters (keeping \n and \t) and
 // enforces a maximum rune count. ok is false when the result is too long.
-func CleanText(s string, max int) (out string, ok bool) {
-	if !utf8.ValidString(s) {
-		return "", false
-	}
-	var b strings.Builder
-	b.Grow(len(s))
-	for _, r := range s {
-		if r == '\n' || r == '\t' {
-			b.WriteRune(r)
-			continue
-		}
-		if unicode.IsControl(r) || r == '‎' || r == '‏' || r == '‮' {
-			continue
-		}
-		b.WriteRune(r)
-	}
-	out = strings.TrimSpace(b.String())
-	return out, utf8.RuneCountInString(out) <= max
-}
+// It lives in textutil so the gateway applies the same rules.
+func CleanText(s string, max int) (out string, ok bool) { return textutil.CleanText(s, max) }
 
 // CleanDisplayName returns a one-line display name of 1–32 runes.
 func CleanDisplayName(s string) (string, bool) {

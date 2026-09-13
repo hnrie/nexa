@@ -188,7 +188,21 @@ func (g *gw) next(t string, timeout time.Duration) map[string]any {
 		case <-deadline:
 			return nil
 		case <-g.done:
-			return nil
+			// frames that arrived before the close still count
+			for {
+				select {
+				case f := <-g.frames:
+					if f["t"] == t {
+						d, _ := f["d"].(map[string]any)
+						if d == nil {
+							d = map[string]any{"_": true}
+						}
+						return d
+					}
+				default:
+					return nil
+				}
+			}
 		}
 	}
 }

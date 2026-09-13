@@ -214,6 +214,7 @@ func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.Bcast.CloseUserSessions(u.ID, 0)
 	if deleted, err := s.Store.UserByID(r.Context(), u.ID); err == nil {
 		s.Bcast.UserUpdated(deleted)
 	}
