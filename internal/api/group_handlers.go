@@ -243,12 +243,25 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 		WriteJSON(w, http.StatusOK, map[string]any{"channel": ch})
 		return
 	}
-	subs, err := s.Store.AddParticipant(ctx, ch.ID, me.ID, me.ID)
-	if err != nil {
+	// spend the use first: two people tapping a one-use link together must
+	// not both get in
+	if err := s.Store.UseInvite(ctx, in.Code); err == store.ErrNotFound {
+		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
+		return
+	} else if err != nil {
 		WriteError(w, err)
 		return
 	}
-	_ = s.Store.UseInvite(ctx, in.Code)
+	subs, err := s.Store.AddParticipant(ctx, ch.ID, me.ID, me.ID)
+	if err != nil {
+		_ = s.Store.UnuseInvite(ctx, in.Code)
+		if err == store.ErrAlreadyExists {
+			WriteJSON(w, http.StatusOK, map[string]any{"channel": ch})
+			return
+		}
+		WriteError(w, err)
+		return
+	}
 	updated, err := s.Store.ChannelByID(ctx, ch.ID)
 	if err != nil {
 		WriteError(w, err)

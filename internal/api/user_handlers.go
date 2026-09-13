@@ -210,6 +210,12 @@ func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The password is wrong."))
 		return
 	}
+	// leave every server and group first, handing owned servers on, so none
+	// is left with an owner nobody can sign in as
+	if err := s.detachUser(r, u.ID, u.ID); err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.DeleteAccount(r.Context(), u.ID); err != nil {
 		WriteError(w, err)
 		return

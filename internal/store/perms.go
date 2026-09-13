@@ -75,6 +75,34 @@ func (s *Store) ServerPerms(ctx context.Context, serverID, uid ids.ID) (perms.Pe
 	return perms.Base(serverID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid)), nil
 }
 
+// MembersWithPerm lists the members whose server-level permissions include need.
+func (s *Store) MembersWithPerm(ctx context.Context, serverID ids.ID, need perms.Perm) ([]ids.ID, error) {
+	srv, err := s.ServerByID(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := s.Roles(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	members, err := s.allMembers(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	admins, err := s.instanceAdmins(ctx)
+	if err != nil {
+		return nil, err
+	}
+	pr, now := toPermRoles(roles), nowMs()
+	out := []ids.ID{}
+	for _, m := range members {
+		if perms.Base(serverID, pr, toPermMember(m, now), srv.OwnerID == m.UserID || admins[m.UserID]).Has(need) {
+			out = append(out, m.UserID)
+		}
+	}
+	return out, nil
+}
+
 // ChannelPerms resolves a user's permissions in a channel. DM participants get
 // every text permission; non-participants and non-members get 0.
 func (s *Store) ChannelPerms(ctx context.Context, channelID, uid ids.ID) (perms.Perm, *Channel, error) {

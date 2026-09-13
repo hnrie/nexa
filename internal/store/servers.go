@@ -144,6 +144,14 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id)); err != nil {
 			return err
 		}
+		// the icon, banner, emoji and server sticker packs go with the server
+		// (by cascade), so their images must be let go of here
+		if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM servers WHERE id = ?1
+			UNION ALL SELECT banner_id FROM servers WHERE id = ?1
+			UNION ALL SELECT blob_id FROM emojis WHERE server_id = ?1
+			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?1`, int64(id)); err != nil {
+			return err
+		}
 		for _, q := range []string{
 			`DELETE FROM key_grants WHERE conv_id = ? OR conv_id IN (SELECT id FROM channels WHERE server_id = ?)`,
 			`DELETE FROM key_epochs WHERE conv_id = ? OR conv_id IN (SELECT id FROM channels WHERE server_id = ?)`,
@@ -162,6 +170,37 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 		}
 		return nil
 	})
+}
+
+// releaseBlobRefs takes one reference off every blob id the query returns,
+// counting repeats, so an image used twice loses both of its references.
+func releaseBlobRefs(ctx context.Context, tx *sql.Tx, query string, args ...any) error {
+	rows, err := tx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	counts := map[int64]int{}
+	for rows.Next() {
+		var id sql.NullInt64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		if id.Valid {
+			counts[id.Int64]++
+		}
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	for id, n := range counts {
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - ?) WHERE id = ?`, n, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // --- members -------------------------------------------------------------
@@ -183,14 +222,63 @@ func scanMember(r rowScanner) (*Member, error) {
 	return &m, nil
 }
 
-// AddMember joins a user to a server; ErrAlreadyExists when already a member.
+// ErrBanned is returned when a banned user tries to join a server.
+var ErrBanned = errors.New("banned")
+
+// AddMember joins a user to a server; ErrAlreadyExists when already a member,
+// ErrBanned when banned.
 func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, error) {
+	var m *Member
+	err := s.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		m, err = addMember(ctx, tx, serverID, uid)
+		return err
+	})
+	return m, err
+}
+
+// JoinByInvite is AddMember spending one use of an invite in the same
+// transaction, so people joining at once cannot overrun its limit. It is
+// ErrNotFound when the invite is used up or expired; a join that fails
+// spends nothing.
+func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code string) (*Member, error) {
+	var m *Member
+	err := s.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		if m, err = addMember(ctx, tx, serverID, uid); err != nil {
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `UPDATE invites SET uses = uses + 1 WHERE code = ? AND (max_uses = 0 OR uses < max_uses) AND (expires_at IS NULL OR expires_at > ?)`, code, nowMs())
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// addMember inserts the membership unless the user is banned, checking the ban
+// in the same statement so a ban written a moment earlier always holds.
+func addMember(ctx context.Context, tx *sql.Tx, serverID, uid ids.ID) (*Member, error) {
 	now := nowMs()
-	res, err := s.db.W.ExecContext(ctx, `INSERT OR IGNORE INTO server_members (server_id, user_id, nickname, joined_at, flags) VALUES (?,?,?,?,0)`, int64(serverID), int64(uid), "", now)
+	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO server_members (server_id, user_id, nickname, joined_at, flags) SELECT ?1, ?2, '', ?3, 0 WHERE NOT EXISTS (SELECT 1 FROM bans WHERE server_id = ?1 AND user_id = ?2)`, int64(serverID), int64(uid), now)
 	if err != nil {
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
+		var banned int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM bans WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)).Scan(&banned); err != nil {
+			return nil, err
+		}
+		if banned > 0 {
+			return nil, ErrBanned
+		}
 		return nil, ErrAlreadyExists
 	}
 	return &Member{ServerID: serverID, UserID: uid, JoinedAt: now, RoleIDs: []ids.ID{}}, nil

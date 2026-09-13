@@ -124,9 +124,24 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 			flags &^= store.FlagAdmin
 		}
 	}
+	// instance admins see every private channel of the servers they are in,
+	// so gaining or losing that changes their view (and who holds the keys)
+	isAdmin := func(f int64) bool { return f&store.FlagAdmin != 0 && f&(store.FlagDisabled|store.FlagDeleted) == 0 }
+	var servers []*store.Server
+	var before []visibility
+	if isAdmin(u.Flags) != isAdmin(flags) {
+		servers, _ = s.Store.ServersForUser(r.Context(), id)
+		for _, srv := range servers {
+			vis, _ := s.snapshotVisibility(r.Context(), srv.ID)
+			before = append(before, vis)
+		}
+	}
 	if err := s.Store.SetUserFlags(r.Context(), id, flags); err != nil {
 		WriteError(w, err)
 		return
+	}
+	for i, srv := range servers {
+		s.syncVisibility(r.Context(), srv.ID, before[i], nil)
 	}
 	if req.Disabled != nil && *req.Disabled {
 		// a disabled account loses every session immediately
@@ -162,52 +177,9 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "is_admin", "Take away their admin access before deleting their account."))
 		return
 	}
-	servers, err := s.Store.ServersForUser(ctx, id)
-	if err != nil {
+	if err := s.detachUser(r, id, me.ID); err != nil {
 		WriteError(w, err)
 		return
-	}
-	for _, srv := range servers {
-		if srv.OwnerID == id {
-			next, ok := s.successor(ctx, srv, id, me.ID)
-			if !ok {
-				// nobody else is in it: there is nothing left to keep
-				if err := s.Store.DeleteServer(ctx, srv.ID); err != nil {
-					WriteError(w, err)
-					return
-				}
-				s.Bcast.EmitUsers([]ids.ID{id}, "server_delete", map[string]any{"id": srv.ID})
-				continue
-			}
-			if err := s.Store.UpdateServer(ctx, srv.ID, store.ServerPatch{OwnerID: &next}); err != nil {
-				WriteError(w, err)
-				return
-			}
-			s.audit(r, srv.ID, me.ID, "server_transfer", "user", &next, nil, "the owner's account was deleted")
-			if updated, err := s.Store.ServerByID(ctx, srv.ID); err == nil {
-				s.emitServer(ctx, srv.ID, "server_update", updated)
-				srv = updated
-			}
-		}
-		if err := s.removeMember(r, srv, id, "member_remove", map[string]any{"reason": "account_deleted"}); err != nil {
-			WriteError(w, err)
-			return
-		}
-	}
-	groups, err := s.Store.GroupDMsForUser(ctx, id)
-	if err != nil {
-		WriteError(w, err)
-		return
-	}
-	for _, gid := range groups {
-		ch, err := s.Store.ChannelByID(ctx, gid)
-		if err != nil {
-			continue
-		}
-		if err := s.removeFromGroup(r, ch, id); err != nil {
-			WriteError(w, err)
-			return
-		}
 	}
 	if err := s.Store.DeleteAccount(ctx, id); err != nil {
 		WriteError(w, err)
@@ -220,6 +192,56 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 		s.Bcast.UserUpdated(deleted)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// detachUser takes an account that is being deleted out of every server and
+// group; actor is whoever asked (an admin, or the user themselves). A server
+// it owns passes to another member (see successor) or, when nobody else is
+// in it, is deleted.
+func (s *Server) detachUser(r *http.Request, id, actor ids.ID) error {
+	ctx := r.Context()
+	servers, err := s.Store.ServersForUser(ctx, id)
+	if err != nil {
+		return err
+	}
+	for _, srv := range servers {
+		if srv.OwnerID == id {
+			next, ok := s.successor(ctx, srv, id, actor)
+			if !ok {
+				// nobody else is in it: there is nothing left to keep
+				if err := s.Store.DeleteServer(ctx, srv.ID); err != nil {
+					return err
+				}
+				s.Bcast.EmitUsers([]ids.ID{id}, "server_delete", map[string]any{"id": srv.ID})
+				continue
+			}
+			if err := s.Store.UpdateServer(ctx, srv.ID, store.ServerPatch{OwnerID: &next}); err != nil {
+				return err
+			}
+			s.audit(r, srv.ID, actor, "server_transfer", "user", &next, nil, "the owner's account was deleted")
+			if updated, err := s.Store.ServerByID(ctx, srv.ID); err == nil {
+				s.emitServer(ctx, srv.ID, "server_update", updated)
+				srv = updated
+			}
+		}
+		if err := s.removeMember(r, srv, id, "member_remove", map[string]any{"reason": "account_deleted"}); err != nil {
+			return err
+		}
+	}
+	groups, err := s.Store.GroupDMsForUser(ctx, id)
+	if err != nil {
+		return err
+	}
+	for _, gid := range groups {
+		ch, err := s.Store.ChannelByID(ctx, gid)
+		if err != nil {
+			continue
+		}
+		if err := s.removeFromGroup(r, ch, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // successor picks who takes a server over from an owner who is going: the

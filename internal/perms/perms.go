@@ -124,7 +124,9 @@ type Member struct {
 }
 
 // Base computes server-level permissions: @everyone OR the member's roles,
-// Administrator and ownership granting everything.
+// Administrator and ownership granting everything. A timed-out member keeps
+// only TimedOutKeep here too, so a moderator in timeout cannot kick, ban or
+// manage anything until it ends.
 func Base(everyoneID ids.ID, roles []Role, m Member, isOwner bool) Perm {
 	if isOwner {
 		return All
@@ -141,6 +143,9 @@ func Base(everyoneID ids.ID, roles []Role, m Member, isOwner bool) Perm {
 	}
 	if p.Has(Administrator) {
 		return All
+	}
+	if m.TimedOut {
+		p &= TimedOutKeep
 	}
 	return p
 }

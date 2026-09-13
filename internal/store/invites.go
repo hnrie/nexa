@@ -74,6 +74,12 @@ func (s *Store) UseInvite(ctx context.Context, code string) error {
 	return nil
 }
 
+// UnuseInvite gives back a use recorded for a join that did not happen.
+func (s *Store) UnuseInvite(ctx context.Context, code string) error {
+	_, err := s.db.W.ExecContext(ctx, `UPDATE invites SET uses = uses - 1 WHERE code = ? AND uses > 0`, code)
+	return err
+}
+
 // InvitesForServer lists live invites.
 func (s *Store) InvitesForServer(ctx context.Context, serverID ids.ID) ([]*Invite, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT `+inviteCols+` FROM invites WHERE server_id = ? AND (expires_at IS NULL OR expires_at > ?) AND (max_uses = 0 OR uses < max_uses) ORDER BY created_at DESC`, int64(serverID), nowMs())

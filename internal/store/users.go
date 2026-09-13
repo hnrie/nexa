@@ -270,6 +270,10 @@ func (s *Store) SetUserFlags(ctx context.Context, id ids.ID, flags int64) error 
 func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
 	return s.Tx(ctx, func(tx *sql.Tx) error {
 		anon := fmt.Sprintf("deleted-%d", int64(id))
+		// the avatar and banner are cleared below; give back their references
+		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM users WHERE id = ?1 UNION ALL SELECT banner_id FROM users WHERE id = ?1`, int64(id)); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `UPDATE users SET username = ?, display_name = 'Deleted User', auth_hash = '!', enc_private_key = x'', enc_private_key_recovery = NULL, recovery_auth_hash = NULL, avatar_id = NULL, banner_id = NULL, about_me = '', pronouns = '', status_text = '', status_emoji = '', flags = flags | ?, updated_at = ? WHERE id = ?`, anon, FlagDeleted, nowMs(), int64(id))
 		if err != nil {
 			return err

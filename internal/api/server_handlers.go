@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -82,8 +83,12 @@ func (s *Server) serverCtx(w http.ResponseWriter, r *http.Request, need perms.Pe
 		return nil, nil, 0
 	}
 	if p == 0 {
-		WriteError(w, ErrNotFound)
-		return nil, nil, 0
+		// a member whose roles carry no bits (or who is timed out) still
+		// belongs here and must be able to see and leave the server
+		if ok, _ := s.Store.IsMember(r.Context(), srv.ID, me.ID); !ok {
+			WriteError(w, ErrNotFound)
+			return nil, nil, 0
+		}
 	}
 	if need != 0 && !p.Has(need) {
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You do not have permission to do that."))
@@ -110,6 +115,21 @@ func (s *Server) emitServer(ctx context.Context, serverID ids.ID, event string, 
 	s.Bcast.EmitUsers(members, event, data)
 }
 
+// emitServerWithPerm is emitServer for events only members holding need may
+// see (invite codes, ban reasons); also names users who get it regardless.
+func (s *Server) emitServerWithPerm(ctx context.Context, serverID ids.ID, need perms.Perm, event string, data any, also ...ids.ID) {
+	targets, err := s.Store.MembersWithPerm(ctx, serverID, need)
+	if err != nil {
+		return
+	}
+	for _, id := range also {
+		if !hasID(targets, id) {
+			targets = append(targets, id)
+		}
+	}
+	s.Bcast.EmitUsers(targets, event, data)
+}
+
 // visibility maps user → set of viewable channel ids; used to diff after permission changes.
 type visibility map[ids.ID]map[ids.ID]bool
 
@@ -121,6 +141,10 @@ func (s *Server) snapshotVisibility(ctx context.Context, serverID ids.ID) (visib
 	out := visibility{}
 	for _, uid := range members {
 		vis, err := s.Store.ViewableServerChannels(ctx, serverID, uid)
+		if errors.Is(err, store.ErrNotFound) {
+			// they left while we looked; everyone else still needs syncing
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -179,8 +203,13 @@ func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before vis
 			}
 		}
 	}
-	for chID := range byID {
-		s.Bcast.KeysMaybeNeeded(byID[chID].KeyConvID)
+	// most channels share the server root: check each conversation once
+	convs := map[ids.ID]bool{}
+	for _, c := range byID {
+		convs[c.KeyConvID] = true
+	}
+	for conv := range convs {
+		s.Bcast.KeysMaybeNeeded(conv)
 	}
 }
 
@@ -960,7 +989,17 @@ func (s *Server) handleRoleCreate(w http.ResponseWriter, r *http.Request) {
 		role, _ = s.Store.RoleByID(r.Context(), role.ID)
 	}
 	s.audit(r, srv.ID, me.ID, "role_create", "role", &role.ID, map[string]any{"name": name}, "")
-	s.emitServer(r.Context(), srv.ID, "role_create", role)
+	// the new role went in at the bottom and pushed every other role up one
+	if members, err := s.Store.MemberIDs(r.Context(), srv.ID); err == nil {
+		if all, err := s.Store.Roles(r.Context(), srv.ID); err == nil {
+			for _, ro := range all {
+				if ro.ID != role.ID && ro.ID != srv.ID {
+					s.Bcast.EmitUsers(members, "role_update", ro)
+				}
+			}
+		}
+		s.Bcast.EmitUsers(members, "role_create", role)
+	}
 	WriteJSON(w, http.StatusCreated, role)
 }
 
@@ -1033,7 +1072,11 @@ func (s *Server) handleRolePatch(w http.ResponseWriter, r *http.Request) {
 		p.Permissions = req.Permissions
 		changes["permissions"] = req.Permissions
 	}
-	before, _ := s.snapshotVisibility(r.Context(), srv.ID)
+	// only a permission change can alter who sees what
+	var before visibility
+	if req.Permissions != nil {
+		before, _ = s.snapshotVisibility(r.Context(), srv.ID)
+	}
 	if err := s.Store.UpdateRole(r.Context(), role.ID, p); err != nil {
 		WriteError(w, err)
 		return
@@ -1087,7 +1130,16 @@ func (s *Server) handleRolePositions(w http.ResponseWriter, r *http.Request) {
 		if err != nil || role.ServerID != srv.ID || role.ID == srv.ID {
 			continue
 		}
-		if !perms.CanManageRole(highest, isOwner, perms.Role{ID: role.ID, Position: role.Position}) || (!isOwner && item.Position >= highest) {
+		if item.Position == role.Position {
+			continue
+		}
+		if !perms.CanManageRole(highest, isOwner, perms.Role{ID: role.ID, Position: role.Position}) {
+			// clients send the whole list renumbered, so the actor's own role and
+			// those above it show up too (shifted, when earlier deletions left
+			// gaps); those stay exactly where they are
+			continue
+		}
+		if !isOwner && item.Position >= highest {
 			WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You can only reorder roles below your highest role."))
 			return
 		}
@@ -1282,7 +1334,11 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 		rolesSet = true
 		changes["roles"] = newRoles
 	}
-	before, _ := s.snapshotVisibility(r.Context(), srv.ID)
+	// a nickname alone changes nobody's view; skip the per-member snapshot
+	var before visibility
+	if rolesSet || patch.TimeoutUntil != nil {
+		before, _ = s.snapshotVisibility(r.Context(), srv.ID)
+	}
 	if patch.Nickname != nil || patch.TimeoutUntil != nil {
 		if err := s.Store.UpdateMember(r.Context(), srv.ID, m.UserID, patch); err != nil {
 			WriteError(w, err)
@@ -1435,19 +1491,20 @@ func (s *Server) handleBanPut(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	reason, _ := CleanText(req.Reason, maxBanReason)
-	if ok, _ := s.Store.IsMember(r.Context(), srv.ID, uid); ok {
-		if !s.canActOn(r.Context(), srv, me.ID, uid) {
-			WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You cannot ban this member."))
-			return
-		}
-		if err := s.removeMember(r, srv, uid, "member_remove", map[string]any{"reason": "ban"}); err != nil {
-			WriteError(w, err)
-			return
-		}
+	if ok, _ := s.Store.IsMember(r.Context(), srv.ID, uid); ok && !s.canActOn(r.Context(), srv, me.ID, uid) {
+		WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You cannot ban this member."))
+		return
 	}
+	// the ban goes in before the removal, so a rejoin racing it is refused
 	if err := s.Store.Ban(r.Context(), &store.Ban{ServerID: srv.ID, UserID: uid, Reason: reason, BannedBy: me.ID}); err != nil {
 		WriteError(w, err)
 		return
+	}
+	if ok, _ := s.Store.IsMember(r.Context(), srv.ID, uid); ok {
+		if err := s.removeMember(r, srv, uid, "member_remove", map[string]any{"reason": "ban"}); err != nil && !errors.Is(err, store.ErrNotFound) {
+			WriteError(w, err)
+			return
+		}
 	}
 	if req.DeleteMessageDays > 0 {
 		if req.DeleteMessageDays > 7 {
@@ -1461,7 +1518,7 @@ func (s *Server) handleBanPut(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.audit(r, srv.ID, me.ID, "member_ban", "user", &uid, map[string]any{"delete_message_days": req.DeleteMessageDays}, reason)
-	s.emitServer(r.Context(), srv.ID, "ban_add", map[string]any{"server_id": srv.ID, "user_id": uid, "reason": reason})
+	s.emitServerWithPerm(r.Context(), srv.ID, perms.BanMembers, "ban_add", map[string]any{"server_id": srv.ID, "user_id": uid, "reason": reason})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1480,7 +1537,7 @@ func (s *Server) handleBanDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, srv.ID, me.ID, "member_unban", "user", &uid, nil, "")
-	s.emitServer(r.Context(), srv.ID, "ban_remove", map[string]any{"server_id": srv.ID, "user_id": uid})
+	s.emitServerWithPerm(r.Context(), srv.ID, perms.BanMembers, "ban_remove", map[string]any{"server_id": srv.ID, "user_id": uid})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1554,7 +1611,7 @@ func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
 		s.Bcast.EmitUsers(ch.Recipients, "invite_create", in)
 	} else {
 		s.audit(r, *ch.ServerID, me.ID, "invite_create", "invite", nil, map[string]any{"code": in.Code, "max_age": req.MaxAge, "max_uses": req.MaxUses}, "")
-		s.emitServer(r.Context(), *ch.ServerID, "invite_create", in)
+		s.emitServerWithPerm(r.Context(), *ch.ServerID, perms.ManageServer, "invite_create", in, me.ID)
 	}
 	WriteJSON(w, http.StatusCreated, in)
 }
@@ -1615,19 +1672,23 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	}
-	if banned, _ := s.Store.IsBanned(r.Context(), srv.ID, me.ID); banned {
+	// the ban check and the invite use happen with the insert, so neither a
+	// ban written a moment ago nor a used-up invite can be slipped past
+	member, err := s.Store.JoinByInvite(r.Context(), srv.ID, me.ID, in.Code)
+	switch {
+	case errors.Is(err, store.ErrBanned):
 		WriteError(w, E(http.StatusForbidden, "banned", "You are banned from this server."))
 		return
-	}
-	member, err := s.Store.AddMember(r.Context(), srv.ID, me.ID)
-	if err != nil && err != store.ErrAlreadyExists {
+	case errors.Is(err, store.ErrNotFound):
+		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
+		return
+	case err != nil && err != store.ErrAlreadyExists:
 		WriteError(w, err)
 		return
 	}
 	status := http.StatusOK
 	if err == nil {
 		status = http.StatusCreated
-		_ = s.Store.UseInvite(r.Context(), in.Code)
 		s.emitServer(r.Context(), srv.ID, "member_add", map[string]any{"server_id": srv.ID, "member": member, "user": me.Public()})
 		if srv.SystemChannelID != nil {
 			if ch, err := s.Store.ChannelByID(r.Context(), *srv.SystemChannelID); err == nil {
@@ -1635,6 +1696,16 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		s.Bcast.KeysMaybeNeeded(srv.ID)
+		// channels with keys of their own the newcomer can see need grants too
+		if visible, err := s.Store.ViewableServerChannels(r.Context(), srv.ID, me.ID); err == nil {
+			if chans, err := s.Store.ServerChannels(r.Context(), srv.ID); err == nil {
+				for _, c := range chans {
+					if _, ok := visible[c.ID]; ok && c.KeyConvID == c.ID {
+						s.Bcast.KeysMaybeNeeded(c.ID)
+					}
+				}
+			}
+		}
 	}
 	view, users, err := s.serverView(r.Context(), srv, me.ID)
 	if err != nil {
@@ -1674,9 +1745,15 @@ func (s *Server) handleInviteDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, err := s.Store.ServerPerms(r.Context(), *in.ServerID, me.ID)
-	if err != nil || p == 0 {
+	if err != nil {
 		WriteError(w, ErrNotFound)
 		return
+	}
+	if p == 0 {
+		if ok, _ := s.Store.IsMember(r.Context(), *in.ServerID, me.ID); !ok {
+			WriteError(w, ErrNotFound)
+			return
+		}
 	}
 	if in.InviterID != me.ID && !p.Has(perms.ManageServer) {
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot revoke this invite."))
@@ -1687,7 +1764,7 @@ func (s *Server) handleInviteDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, *in.ServerID, me.ID, "invite_delete", "invite", nil, map[string]any{"code": in.Code}, "")
-	s.emitServer(r.Context(), *in.ServerID, "invite_delete", map[string]any{"server_id": *in.ServerID, "code": in.Code})
+	s.emitServerWithPerm(r.Context(), *in.ServerID, perms.ManageServer, "invite_delete", map[string]any{"server_id": *in.ServerID, "code": in.Code}, in.InviterID)
 	w.WriteHeader(http.StatusNoContent)
 }
 

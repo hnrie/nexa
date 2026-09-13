@@ -77,6 +77,21 @@ func TestCompute(t *testing.T) {
 	}
 }
 
+func TestBaseTimeout(t *testing.T) {
+	mod := Member{UserID: uid, RoleIDs: []ids.ID{rMod}}
+	if got := Base(srv, roles, mod, false); !got.Has(KickMembers) {
+		t.Errorf("moderator base %d", got)
+	}
+	mod.TimedOut = true
+	if got := Base(srv, roles, mod, false); got != ViewChannel|ReadMessageHistory {
+		t.Errorf("timed-out moderator keeps %d", got)
+	}
+	adminRoles := append(roles, Role{ID: 7, Position: 9, Permissions: Administrator})
+	if got := Base(srv, adminRoles, Member{UserID: uid, RoleIDs: []ids.ID{7}, TimedOut: true}, false); got != All {
+		t.Errorf("administrators are not held by a timeout: %d", got)
+	}
+}
+
 func TestHierarchy(t *testing.T) {
 	if HighestPosition(roles, Member{RoleIDs: []ids.ID{rMute, rMod}}) != 5 || HighestPosition(roles, Member{}) != 0 {
 		t.Error("highest position")
