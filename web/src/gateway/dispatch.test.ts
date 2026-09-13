@@ -50,7 +50,7 @@ describe("ready after a reconnect", () => {
   it("keeps the people the open conversation shows", async () => {
     useUsers.getState().upsert([person("author"), person("mentioned"), person("stranger")]);
     const msg = { id: "10", channel_id: "c1", author_id: "author", mentions: ["mentioned"] } as unknown as DecryptedMessage;
-    useMessages.setState({ channels: { c1: { ids: ["10"], byId: { "10": msg }, hasOlder: false, loading: false, loaded: true, pending: [] } } });
+    useMessages.setState({ channels: { c1: { ids: ["10"], byId: { "10": msg }, hasOlder: false, hasNewer: false, loading: false, loaded: true, failed: 0, pending: [] } } });
     useUI.setState({ activeChannelId: "c1" });
     await applyEvent({ t: "ready", d: ready([chan("c1")], [person("friend")]) });
     const byId = useUsers.getState().byId;
