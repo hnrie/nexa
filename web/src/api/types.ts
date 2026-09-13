@@ -244,8 +244,11 @@ export interface VoiceState {
   server_mute: boolean;
   server_deaf: boolean;
   joined_at: number;
-  /** The kinds this participant publishes through the SFU (audio, video, screen, screen_audio). */
-  media?: string[];
+  /**
+   * What this participant publishes through the SFU: each kind (audio, video,
+   * screen, screen_audio) with a tag that changes when that track is published again.
+   */
+  media?: Partial<Record<"audio" | "video" | "screen" | "screen_audio", string>>;
 }
 
 export interface IceServer {

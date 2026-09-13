@@ -1,6 +1,8 @@
+import type { VoiceState } from "@/api/types";
 import { useVoice } from "./voice";
 
 const stream = {} as MediaStream;
+const state = (user_id: string, streaming: boolean, channel_id: string | null = "c1"): VoiceState => ({ user_id, channel_id, session_id: "s", self_mute: false, self_deaf: false, video: false, streaming, server_mute: false, server_deaf: false, joined_at: 1 });
 
 describe("watching screen shares", () => {
   beforeEach(() => useVoice.getState().clear());
@@ -26,15 +28,36 @@ describe("watching screen shares", () => {
 
   it("forgets a share once it ends or its sharer leaves", () => {
     const v = useVoice.getState();
+    v.applyState(state("u1", true));
     v.setRemote("u1", "screen", stream);
     v.setWatching("u1", true);
-    useVoice.getState().setRemote("u1", "screen", null);
+    useVoice.getState().applyState(state("u1", false));
     expect(useVoice.getState().watching).toEqual({});
     expect(useVoice.getState().focused).toBeNull();
+
+    useVoice.getState().applyState(state("u3", true));
+    useVoice.getState().setWatching("u3", true);
+    useVoice.getState().applyState(state("u3", true, null));
+    expect(useVoice.getState().watching).toEqual({});
 
     useVoice.getState().setRemote("u2", "screen", stream);
     useVoice.getState().setWatching("u2", true);
     useVoice.getState().removePeer("u2");
+    expect(useVoice.getState().watching).toEqual({});
+    expect(useVoice.getState().focused).toBeNull();
+  });
+
+  it("keeps watching while the share's stream drops for a moment, and after a reconnect if it is still on", () => {
+    const v = useVoice.getState();
+    v.applyState(state("u1", true));
+    v.setRemote("u1", "screen", stream);
+    v.setWatching("u1", true);
+    useVoice.getState().setRemote("u1", "screen", null);
+    expect(useVoice.getState().watching).toEqual({ u1: true });
+    expect(useVoice.getState().focused).toBe("u1:screen");
+    useVoice.getState().setAll([state("u1", true)]);
+    expect(useVoice.getState().watching).toEqual({ u1: true });
+    useVoice.getState().setAll([state("u1", false)]);
     expect(useVoice.getState().watching).toEqual({});
     expect(useVoice.getState().focused).toBeNull();
   });

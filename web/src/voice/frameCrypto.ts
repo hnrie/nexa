@@ -23,11 +23,20 @@ export function clearBytes(kind: FrameKind, keyFrame: boolean): number {
   return keyFrame ? 10 : 3;
 }
 
-/** A 4-byte salt, random per sender, then a counter: never the same IV twice under one key. */
-export function frameIv(salt: Uint8Array, counter: bigint): Uint8Array {
+/** The random part of an IV. It is long enough that no two senders under one key pick the same. */
+export const SALT_BYTES = 8;
+/** The counter after the salt; a sender that reaches it picks a new salt. */
+export const MAX_FRAME_COUNTER = 0xffffffff;
+
+/**
+ * An 8-byte salt, random per sender, then a 4-byte counter: never the same IV
+ * twice under one key. Receivers read the IV from the frame, so its layout is
+ * the sender's business.
+ */
+export function frameIv(salt: Uint8Array, counter: number): Uint8Array {
   const iv = new Uint8Array(IV_BYTES);
-  iv.set(salt.subarray(0, 4), 0);
-  new DataView(iv.buffer).setBigUint64(4, counter);
+  iv.set(salt.subarray(0, SALT_BYTES), 0);
+  new DataView(iv.buffer).setUint32(SALT_BYTES, counter);
   return iv;
 }
 

@@ -99,12 +99,21 @@ export const useVoice = create<VoiceStore>()((set) => ({
       // a user is in at most one channel: remove them everywhere first
       for (const ch of Object.keys(byChannel)) if (byChannel[ch]![vs.user_id]) drop(ch);
       if (vs.channel_id) byChannel[vs.channel_id] = { ...(byChannel[vs.channel_id] ?? {}), [vs.user_id]: vs };
-      return { byChannel };
+      // a share that ended, or left with its sharer, leaves nothing to watch;
+      // a stream that only dropped for a moment keeps being watched
+      if ((vs.channel_id && vs.streaming) || !s.watching[vs.user_id]) return { byChannel };
+      const watching = { ...s.watching };
+      delete watching[vs.user_id];
+      return { byChannel, watching, focused: s.focused === `${vs.user_id}:screen` ? null : s.focused };
     }),
   setAll: (list) => {
     const byChannel: Record<string, Record<string, VoiceState>> = {};
     for (const vs of list) if (vs.channel_id) (byChannel[vs.channel_id] ??= {})[vs.user_id] = vs;
-    set({ byChannel });
+    set((s) => {
+      const watching = Object.fromEntries(Object.entries(s.watching).filter(([uid]) => list.some((vs) => vs.user_id === uid && vs.channel_id && vs.streaming)));
+      const focusGone = !!s.focused?.endsWith(":screen") && !watching[s.focused.slice(0, -":screen".length)];
+      return { byChannel, watching, focused: focusGone ? null : s.focused };
+    });
   },
   setMine: (mine) => set({ mine }),
   setJoining: (joining) => set({ joining }),
@@ -121,15 +130,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
       delete watching[userId];
       return { peers, remote, speaking, watching, focused: s.focused?.startsWith(userId + ":") ? null : s.focused };
     }),
-  setRemote: (userId, kind, stream) =>
-    set((s) => {
-      const remote = { ...s.remote, [userId]: { ...(s.remote[userId] ?? EMPTY_MEDIA), [kind]: stream } };
-      if (kind !== "screen" || stream) return { remote };
-      // the share ended: nothing is left to watch
-      const watching = { ...s.watching };
-      delete watching[userId];
-      return { remote, watching, focused: s.focused === `${userId}:screen` ? null : s.focused };
-    }),
+  setRemote: (userId, kind, stream) => set((s) => ({ remote: { ...s.remote, [userId]: { ...(s.remote[userId] ?? EMPTY_MEDIA), [kind]: stream } } })),
   setLocalVideo: (localVideo) => set({ localVideo }),
   setLocalScreen: (localScreen) => set({ localScreen }),
   setSpeaking: (userId, on) =>

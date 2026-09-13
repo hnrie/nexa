@@ -10,6 +10,8 @@ export interface SfuPulled {
   mid?: string;
   user_id: Snowflake;
   kind: string;
+  /** The pulled track's tag, as voice states carry it. */
+  tag?: string;
   error?: string;
 }
 
@@ -18,20 +20,20 @@ export const voice = {
   ice(): Promise<{ ice_servers: IceServer[]; sfu?: boolean }> {
     return api.request("GET", "/voice/ice");
   },
-  sfuSession(): Promise<{ session_id: string }> {
-    return api.request("POST", "/voice/sfu/session");
+  sfuSession(signal?: AbortSignal): Promise<{ session_id: string }> {
+    return api.request("POST", "/voice/sfu/session", undefined, { signal });
   },
-  sfuPublish(body: { session_id: string; offer: SfuDescription; tracks: { mid: string; kind: string; bitrate?: number }[] }): Promise<{ answer: SfuDescription | null; failed: number }> {
-    return api.request("POST", "/voice/sfu/publish", body);
+  sfuPublish(body: { session_id: string; offer: SfuDescription; tracks: { mid: string; kind: string; bitrate?: number }[] }, signal?: AbortSignal): Promise<{ answer: SfuDescription | null; failed: number }> {
+    return api.request("POST", "/voice/sfu/publish", body, { signal });
   },
-  sfuSubscribe(body: { session_id: string; tracks: { user_id: Snowflake; kind: string }[] }): Promise<{ offer: SfuDescription | null; renegotiate: boolean; tracks: SfuPulled[] }> {
-    return api.request("POST", "/voice/sfu/subscribe", body);
+  sfuSubscribe(body: { session_id: string; tracks: { user_id: Snowflake; kind: string }[] }, signal?: AbortSignal): Promise<{ offer: SfuDescription | null; renegotiate: boolean; tracks: SfuPulled[] }> {
+    return api.request("POST", "/voice/sfu/subscribe", body, { signal });
   },
-  sfuRenegotiate(body: { session_id: string; description: SfuDescription }): Promise<{ description: SfuDescription | null }> {
-    return api.request("PUT", "/voice/sfu/renegotiate", body);
+  sfuRenegotiate(body: { session_id: string; description: SfuDescription }, signal?: AbortSignal): Promise<{ description: SfuDescription | null }> {
+    return api.request("PUT", "/voice/sfu/renegotiate", body, { signal });
   },
-  sfuClose(body: { session_id: string; mids: string[]; offer?: SfuDescription }): Promise<{ answer: SfuDescription | null; renegotiate: boolean }> {
-    return api.request("PUT", "/voice/sfu/close", body);
+  sfuClose(body: { session_id: string; mids: string[]; offer?: SfuDescription }, signal?: AbortSignal): Promise<{ answer: SfuDescription | null; renegotiate: boolean }> {
+    return api.request("PUT", "/voice/sfu/close", body, { signal });
   },
   participants(channelId: Snowflake): Promise<VoiceState[]> {
     return api.request<VoiceState[]>("GET", `/channels/${channelId}/voice`);

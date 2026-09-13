@@ -194,7 +194,9 @@ type sfuPulled struct {
 	Mid    string `json:"mid,omitempty"`
 	UserID ids.ID `json:"user_id"`
 	Kind   string `json:"kind"`
-	Error  string `json:"error,omitempty"`
+	// Tag is the pulled track's tag, as voice states carry it
+	Tag   string `json:"tag,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 // handleSFUSubscribe pulls tracks of people in the caller's call.
@@ -280,6 +282,7 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 			p.Error = got.ErrorCode
 		default:
 			p.Mid = got.Mid
+			p.Tag = voice.TrackTag(x.name)
 			s.Meter.Start(req.SessionID, got.Mid, realtime.Source(x.target.SFUSession, x.kind), realtime.RateFor(x.kind, x.target.ScreenBps))
 		}
 		out = append(out, p)

@@ -30,7 +30,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { currentCameraFacing, flipCamera, joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
@@ -133,7 +133,8 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     for (const p of participants) {
       const isMe = p.user_id === meId;
       const screen = isMe ? localScreen : (remote[p.user_id]?.screen ?? null);
-      if (screen) out.push({ key: `${p.user_id}:screen`, userId: p.user_id, kind: "screen", stream: screen, me: isMe });
+      // someone else's share is offered as soon as they start it; through the SFU its picture only comes once watched
+      if (screen || (!isMe && p.streaming)) out.push({ key: `${p.user_id}:screen`, userId: p.user_id, kind: "screen", stream: screen, me: isMe });
     }
     for (const p of participants) {
       const isMe = p.user_id === meId;
@@ -242,17 +243,35 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
         ) : live ? (
           <div className={s.offer}>
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
-            {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{nameOf(t.userId)} is sharing their screen</div> : null}
-            <button
-              className={s.watchBtn}
-              data-testid="watch-stream"
-              onClick={(e) => {
-                e.stopPropagation();
-                setWatching(t.userId, true);
-              }}
-            >
-              <Eye size={16} /> {place === "strip" ? "Watch" : "Watch Stream"}
-            </button>
+            {watching[t.userId] ? (
+              <>
+                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>Connecting to {nameOf(t.userId)}'s screen…</div> : null}
+                <button
+                  className={s.watchBtn}
+                  data-testid="stop-watching"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWatching(t.userId, false);
+                  }}
+                >
+                  <EyeOff size={16} /> {place === "strip" ? "Stop" : "Stop Watching"}
+                </button>
+              </>
+            ) : (
+              <>
+                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{nameOf(t.userId)} is sharing their screen</div> : null}
+                <button
+                  className={s.watchBtn}
+                  data-testid="watch-stream"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWatching(t.userId, true);
+                  }}
+                >
+                  <Eye size={16} /> {place === "strip" ? "Watch" : "Watch Stream"}
+                </button>
+              </>
+            )}
           </div>
         ) : (
           <div className={s.avatarWrap}>
@@ -317,7 +336,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   return (
     <div className={s.root} ref={rootRef} data-embedded={embedded} data-full={full}>
       <div className={s.stage}>
-        {participants.length > 10 ? <div className={s.stageNote}>Large rooms strain peer-to-peer calls.</div> : null}
+        {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>Large rooms strain peer-to-peer calls.</div> : null}
         {focusedTile ? (
           <>
             <div className={s.focus} ref={focusRef}>{renderTile(focusedTile, "focus")}</div>

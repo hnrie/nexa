@@ -118,8 +118,8 @@ func TestSFUSessionFollowsTheCall(t *testing.T) {
 		t.Fatalf("track: %+v", st)
 	}
 	r.SetTrack(u, "s1", "audio", "a1", 0)
-	if got, _ := r.Get(u); len(got.Tracks.Kinds()) != 2 || got.Tracks.Kinds()[0] != "audio" || got.Tracks.Kinds()[1] != "screen" {
-		t.Errorf("kinds: %v", got.Tracks.Kinds())
+	if got, _ := r.Get(u); len(got.Tracks.Tags()) != 2 || got.Tracks.Tags()["audio"] != TrackTag(got.Tracks.Audio) || got.Tracks.Tags()["screen"] == "" {
+		t.Errorf("tags: %v", got.Tracks.Tags())
 	}
 	// a mute toggle rejoins the same channel on the same connection: the session stays
 	r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 1000, SelfMute: true}, false)

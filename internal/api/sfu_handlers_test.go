@@ -106,7 +106,7 @@ func nextVoiceState(g *gw, match func(map[string]any) bool) map[string]any {
 }
 
 func mediaCount(ev map[string]any) int {
-	m, _ := ev["media"].([]any)
+	m, _ := ev["media"].(map[string]any)
 	return len(m)
 }
 
@@ -174,6 +174,7 @@ func TestCallsThroughTheSFU(t *testing.T) {
 		t.Fatalf("subscribe: %d %v", res.StatusCode, body)
 	}
 	results := map[string]string{}
+	tags := map[string]any{}
 	for _, x := range body["tracks"].([]any) {
 		p := x.(map[string]any)
 		key := p["user_id"].(string) + ":" + p["kind"].(string)
@@ -181,10 +182,15 @@ func TestCallsThroughTheSFU(t *testing.T) {
 			results[key] = e
 		} else if p["mid"] != nil && p["mid"] != "" {
 			results[key] = "ok"
+			tags[p["kind"].(string)] = p["tag"]
 		}
 	}
 	if results[idA+":audio"] != "ok" || results[idA+":video"] != "ok" || results[idA+":screen"] != "not_published" || results[idC+":audio"] != "not_in_call" {
 		t.Errorf("subscribe results: %v", results)
+	}
+	// what was pulled carries the tags bob saw in alice's voice state
+	if media := ev["media"].(map[string]any); tags["audio"] == nil || tags["audio"] != media["audio"] || tags["video"] != media["video"] || media["audio"] == media["video"] {
+		t.Errorf("tags: pulled %v, voice state %v", tags, media)
 	}
 	rt.mu.Lock()
 	pulled := len(rt.pulled)

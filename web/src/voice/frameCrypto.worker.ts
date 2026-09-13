@@ -5,7 +5,7 @@
  * (no key yet) or open (another key, or altered) is dropped, never passed on
  * in the clear.
  */
-import { clearBytes, frameIv, importFrameKey, openFrame, sealFrame, type FrameKind } from "./frameCrypto";
+import { MAX_FRAME_COUNTER, SALT_BYTES, clearBytes, frameIv, importFrameKey, openFrame, sealFrame, type FrameKind } from "./frameCrypto";
 
 type Op = "encrypt" | "decrypt";
 
@@ -38,8 +38,8 @@ interface WorkerScope {
 const scope = self as unknown as WorkerScope;
 const keys = new Map<number, CryptoKey>();
 let sendIndex = -1;
-const salt = crypto.getRandomValues(new Uint8Array(4));
-let counter = 0n;
+let salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+let counter = 0;
 const stats: FrameCryptoStats = { type: "stats", sealed: 0, opened: 0, dropped: 0 };
 // keys are imported in order, so frames wait behind a key change instead of racing it
 let keysReady: Promise<void> = Promise.resolve();
@@ -55,6 +55,10 @@ function transformer(op: Op, kind: FrameKind): TransformStream<EncodedFrame, Enc
         if (!key) {
           stats.dropped++;
           return;
+        }
+        if (counter > MAX_FRAME_COUNTER) {
+          salt = crypto.getRandomValues(new Uint8Array(SALT_BYTES));
+          counter = 0;
         }
         frame.data = (await sealFrame(key, sendIndex, frameIv(salt, counter++), data, clear)).buffer as ArrayBuffer;
         stats.sealed++;

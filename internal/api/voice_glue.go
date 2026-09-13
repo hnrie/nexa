@@ -34,13 +34,14 @@ type voiceStatePayload struct {
 	ServerMute   bool    `json:"server_mute"`
 	ServerDeaf   bool    `json:"server_deaf"`
 	JoinedAt     int64   `json:"joined_at"`
-	// Media lists the kinds this participant publishes through the SFU.
-	Media []string `json:"media,omitempty"`
+	// Media maps the kinds this participant publishes through the SFU to a
+	// tag that changes whenever that track is published again.
+	Media map[string]string `json:"media,omitempty"`
 }
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Kinds()}
+	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags()}
 }
 
 func leavePayload(st voice.State) voiceStatePayload {

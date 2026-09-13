@@ -1,9 +1,12 @@
 // Package voice keeps the in-memory registry of who is in which voice channel.
-// Media never touches the server: peers connect directly, so the registry only
-// exists to tell clients who to call and to carry moderation flags.
+// Media never touches the server: peers connect directly, or through
+// Cloudflare's SFU, so the registry only tells clients who is in a call, what
+// each device publishes there, and carries moderation flags.
 package voice
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"sort"
 	"sync"
 	"time"
@@ -39,7 +42,8 @@ type State struct {
 }
 
 // Tracks names what a call device publishes through the SFU, by kind. Only
-// the server knows the names; everyone else learns which kinds exist.
+// the server knows the names; everyone else learns which kinds exist, and a
+// tag for each that changes when the track does.
 type Tracks struct {
 	Audio, Video, Screen, ScreenAudio string
 }
@@ -74,15 +78,25 @@ func (t Tracks) With(kind, name string) Tracks {
 	return t
 }
 
-// Kinds lists the published kinds in a fixed order, or nil.
-func (t Tracks) Kinds() []string {
-	var out []string
+// Tags maps each published kind to its track's tag, or is nil.
+func (t Tracks) Tags() map[string]string {
+	var out map[string]string
 	for _, k := range []string{"audio", "video", "screen", "screen_audio"} {
-		if t.Get(k) != "" {
-			out = append(out, k)
+		if name := t.Get(k); name != "" {
+			if out == nil {
+				out = map[string]string{}
+			}
+			out[k] = TrackTag(name)
 		}
 	}
 	return out
+}
+
+// TrackTag names a published track to other devices without giving its name
+// away: the same track always has the same tag, and a republished one a new one.
+func TrackTag(name string) string {
+	sum := sha256.Sum256([]byte("chat-track-tag:" + name))
+	return hex.EncodeToString(sum[:6])
 }
 
 // RecentWindow is how long a channel counts as still active after its last

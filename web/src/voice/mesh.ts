@@ -220,6 +220,10 @@ export class MeshTransport implements VoiceTransport {
 
   joined(_state: VoiceState): void {}
 
+  reconnected(): void {}
+
+  moveTo(_channelId: string): void {}
+
   close(): void {
     this.closed = true;
     this.early.clear();

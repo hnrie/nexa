@@ -36,6 +36,10 @@ export interface VoiceTransport {
   setRoster(states: VoiceState[]): void;
   /** The server acknowledged this device's voice state. */
   joined(state: VoiceState): void;
+  /** The gateway reconnected, so the server forgot this call and anything it had set up for it. */
+  reconnected(): void;
+  /** A moderator moved this device's call to another channel. */
+  moveTo(channelId: string): void;
   setWatching(userId: string, on: boolean): void;
   setVolume(userId: string, pct: number): void;
   setLocalMute(userId: string, on: boolean): void;

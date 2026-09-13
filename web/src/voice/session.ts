@@ -15,11 +15,16 @@ import { useUI } from "@/stores/ui";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import { LevelMeter, audioContext, getCamera, getMic, getScreen, lastInputChoice, resumeAudio, screenBitrate, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
+import { convForChannel } from "@/components/composer/send";
+import { useKeys } from "@/stores/keys";
+import { FrameCrypto } from "./e2ee";
 import { MeshTransport, type SignalPayload } from "./mesh";
+import { SfuTransport } from "./sfu";
+import type { TransportEvents, VoiceTransport } from "./transport";
 
 interface Session {
   channelId: string;
-  transport: MeshTransport;
+  transport: VoiceTransport;
   /** The raw capture; what peers get is the gain-staged copy. */
   mic: MediaStream | null;
   micRaw: MediaStream | null;
@@ -44,7 +49,7 @@ interface Session {
 let session: Session | null = null;
 /** Keeps a new version of the app from reloading the page while in a call. */
 let releaseCall: (() => void) | null = null;
-let iceCache: { servers: RTCIceServer[]; at: number } | null = null;
+let iceCache: { servers: RTCIceServer[]; sfu: boolean; at: number } | null = null;
 /** Bumped by every join and leave, so a join still waiting on the network can tell it was overtaken. */
 let joinSeq = 0;
 /** This connection's gateway session, to tell this device's call from the same account's other devices. */
@@ -77,15 +82,17 @@ function sendState(channelId: string | null, resume = false): void {
   });
 }
 
-async function iceServers(): Promise<RTCIceServer[]> {
-  if (iceCache && Date.now() - iceCache.at < ICE_CACHE_MS) return iceCache.servers;
+/** The ICE servers, and whether calls go through Cloudflare's SFU on this server. */
+async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boolean } | null> {
+  if (iceCache && Date.now() - iceCache.at < ICE_CACHE_MS) return iceCache;
   try {
     const res = await voiceApi.ice();
-    iceCache = { servers: res.ice_servers as RTCIceServer[], at: Date.now() };
-    return iceCache.servers;
+    iceCache = { servers: res.ice_servers as RTCIceServer[], sfu: !!res.sfu, at: Date.now() };
+    return iceCache;
   } catch {
-    // Not kept: the next call should ask again rather than go without a relay.
-    return [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }];
+    // Not kept, and not guessed: a server that sends calls through the SFU
+    // must not have one go peer to peer because this request failed.
+    return null;
   }
 }
 
@@ -172,9 +179,24 @@ export async function joinVoice(channelId: string): Promise<void> {
   store.setError(null);
   store.setJoining(channelId);
   clearRing(channelId);
-  const ice = await iceServers();
+  const ice = await iceConfig();
   if (seq !== joinSeq) return; // disconnected, or joined elsewhere, while fetching
-  const transport = new MeshTransport(myId, ice, {
+  const refuse = (message: string) => {
+    store.setJoining(null);
+    store.setError(message);
+    useUI.getState().toast(message, "error");
+  };
+  if (!ice) return refuse("Could not reach the server to start the call. Check your connection and try again.");
+  if (ice.sfu) {
+    if (!FrameCrypto.supported()) return refuse("This browser cannot make encrypted calls. Update it to join.");
+    // the call's frames are sealed with the conversation's key, which has to be on this device first
+    const key = await useKeys.getState().ensureConvKey(convForChannel(channelId)).catch(() => null);
+    if (seq !== joinSeq) return;
+    if (!key) return refuse("This conversation's keys have not reached this device yet. Try again in a moment.");
+  }
+  // the session the transport's events belong to; set just below, before anything can fire
+  let s: Session;
+  const events: TransportEvents = {
     onSignal: (to, payload) => {
       const gw = gateway();
       // Losing the socket mid-call would otherwise strand the peer silently.
@@ -187,8 +209,19 @@ export async function joinVoice(channelId: string): Promise<void> {
     onPeerState: (uid, state) => useVoice.getState().setPeer(uid, state),
     onRemoteStream: (uid, kind, stream) => useVoice.getState().setRemote(uid, kind, stream),
     onSpeaking: (uid, on) => useVoice.getState().setSpeaking(uid, on),
-  });
-  const s: Session = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, announced: false };
+    onError: (code, message) => {
+      useUI.getState().toast(message, "error");
+      // near the free allowance video pauses: what was being sent is turned off, so the buttons say so,
+      // and shares being watched stop waiting for a picture that is not coming
+      if (code === "video_paused" && session === s) {
+        if (s.camera) void toggleCamera();
+        if (s.screen) void toggleScreen();
+        for (const uid of Object.keys(useVoice.getState().watching)) useVoice.getState().setWatching(uid, false);
+      }
+    },
+  };
+  const transport: VoiceTransport = ice.sfu ? new SfuTransport(myId, channelId, ice.servers, events) : new MeshTransport(myId, ice.servers, events);
+  s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, announced: false };
   session = s;
   releaseCall ??= holdReload();
   let mic: MediaStream | null = null;
@@ -468,6 +501,11 @@ export function inVoice(): string | null {
   return session?.channelId ?? null;
 }
 
+/** Whether this call goes through the SFU rather than peer to peer. */
+export function callThroughSfu(): boolean {
+  return session?.transport instanceof SfuTransport;
+}
+
 /** Live link quality for the indicator. */
 export function voiceStats(): Promise<{ rtt: number; loss: number }> | null {
   return session ? session.transport.stats() : null;
@@ -520,10 +558,16 @@ export function handleVoiceEvent(e: GatewayEvent): void {
             // moved by a moderator: rebuild peers for the new room
             for (const id of session.transport.peerIds()) session.transport.removePeer(id), store.removePeer(id);
             session.channelId = vs.channel_id;
+            session.transport.moveTo(vs.channel_id);
+            // an encrypted call needs the new room's key here; the transport picks it up once it arrives
+            void useKeys.getState().ensureConvKey(convForChannel(vs.channel_id)).catch(() => {});
           }
-          for (const p of participantsOf(useVoice.getState().byChannel, vs.channel_id)) {
+          const everyone = participantsOf(useVoice.getState().byChannel, vs.channel_id);
+          for (const p of everyone) {
             if (p.user_id !== myId) session.transport.addPeer(p.user_id);
           }
+          session.transport.setRoster(everyone);
+          session.transport.joined(vs);
           applyTransmit();
         } else if (!elsewhere && session && (vs.old_channel_id === session.channelId || !vs.old_channel_id)) {
           // disconnected server-side (kick, channel deleted, moderator)
@@ -543,6 +587,8 @@ export function handleVoiceEvent(e: GatewayEvent): void {
         playSound("leave");
       }
       syncPeers();
+      // cameras, shares and what people publish change without anyone joining or leaving
+      session.transport.setRoster(participantsOf(useVoice.getState().byChannel, session.channelId));
       return;
     }
     case "voice_signal":
@@ -589,6 +635,7 @@ export function onReadyVoice(list: VoiceState[], sessionId?: string): void {
   if (s?.announced) {
     for (const id of s.transport.peerIds()) s.transport.removePeer(id), useVoice.getState().removePeer(id);
     useVoice.getState().setMine(null);
+    s.transport.reconnected();
     sendState(s.channelId, true);
   }
 }
