@@ -8,7 +8,10 @@ export type NotificationLevel = "all" | "mentions" | "none";
 
 export interface VoiceSettings {
   inputDeviceId: string | null;
+  /** The chosen microphone's name, so it can be found again when its id changes. */
+  inputDeviceLabel: string | null;
   outputDeviceId: string | null;
+  outputDeviceLabel: string | null;
   inputVolume: number;
   outputVolume: number;
   mode: "vad" | "ptt";
@@ -80,7 +83,9 @@ export const DEFAULT_SETTINGS: Settings = {
   drafts: {},
   voice: {
     inputDeviceId: null,
+    inputDeviceLabel: null,
     outputDeviceId: null,
+    outputDeviceLabel: null,
     inputVolume: 100,
     outputVolume: 100,
     mode: "vad",

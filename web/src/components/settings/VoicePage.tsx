@@ -5,7 +5,7 @@ import { Field } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
-import { LevelMeter, audioContext, describeInput, getMic, listDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
+import { LevelMeter, audioContext, describeInput, getMic, lastInputChoice, listDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
 import { inVoice } from "@/voice/session";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
@@ -27,6 +27,7 @@ export default function VoicePage() {
   const [testLevel, setTestLevel] = useState(0);
   const [sentLevel, setSentLevel] = useState(0);
   const [diag, setDiag] = useState("");
+  const [wrongDevice, setWrongDevice] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null } | null>(null);
   const set = (partial: Partial<VoiceSettings>) => patch({ voice: { ...settings, ...partial } });
@@ -50,6 +51,7 @@ export default function VoicePage() {
     setTesting(false);
     setTestLevel(0);
     setSentLevel(0);
+    setWrongDevice(false);
   };
   useEffect(() => stopTest, []);
   const startTest = async () => {
@@ -70,6 +72,7 @@ export default function VoicePage() {
       testRef.current = { stream, meter, timer, sent: sent.stream, sentMeter, gain: sent.gain };
       setTesting(true);
       setDiag(describeInput(ctx, stream, sent.stream, settings.inputVolume));
+      setWrongDevice(lastInputChoice() === "missing");
       // permission granted: device labels are now readable
       listDevices().then(setDevices).catch(() => {});
     } catch (err) {
@@ -103,13 +106,28 @@ export default function VoicePage() {
       <div className={st.form}>
         <div className={st.twoCol} style={{ gridTemplateColumns: "1fr 1fr" }}>
           <Field label="Input device">
-            <Select value={settings.inputDeviceId ?? ""} onChange={(e) => set({ inputDeviceId: e.target.value || null })}>
+            <Select
+              value={settings.inputDeviceId ?? ""}
+              data-testid="input-device"
+              onChange={(e) => {
+                const id = e.target.value || null;
+                const chosen = devices?.inputs.find((d) => d.deviceId === id);
+                set({ inputDeviceId: id, inputDeviceLabel: chosen?.label || null });
+              }}
+            >
               <option value="">Default</option>
               {devices?.inputs.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Microphone")}</option>)}
             </Select>
           </Field>
           <Field label="Output device">
-            <Select value={settings.outputDeviceId ?? ""} onChange={(e) => set({ outputDeviceId: e.target.value || null })}>
+            <Select
+              value={settings.outputDeviceId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value || null;
+                const chosen = devices?.outputs.find((d) => d.deviceId === id);
+                set({ outputDeviceId: id, outputDeviceLabel: chosen?.label || null });
+              }}
+            >
               <option value="">Default</option>
               {devices?.outputs.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Speaker")}</option>)}
             </Select>
@@ -137,6 +155,11 @@ export default function VoicePage() {
                 </div>
                 <p className={st.hint} style={{ marginTop: 6 }}>Top: your microphone. Bottom: what the call sends.</p>
               </>
+            ) : null}
+            {wrongDevice ? (
+              <div className={st.dangerBox} style={{ marginTop: 8 }} data-testid="wrong-device">
+                The microphone you picked is not available right now, so this is the system default. Pick it again above if it is plugged in.
+              </div>
             ) : null}
             {diag ? <pre className={v.diag} data-testid="mic-diagnostics">{diag}</pre> : null}
           </div>

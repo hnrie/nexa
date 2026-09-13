@@ -34,15 +34,63 @@ export function screenBitrate(q: StreamQuality): number {
   }
 }
 
-export async function getMic(v: VoiceSettings): Promise<MediaStream> {
-  const audio: MediaTrackConstraints = {
+/** Why the microphone that opened is the one that opened. */
+export type InputChoice = "default" | "chosen" | "matched-by-name" | "missing";
+
+let lastChoice: InputChoice = "default";
+
+/** How the last microphone was picked, for the settings page to explain. */
+export function lastInputChoice(): InputChoice {
+  return lastChoice;
+}
+
+function micConstraints(v: VoiceSettings): MediaTrackConstraints {
+  return {
     echoCancellation: v.echoCancellation,
     noiseSuppression: v.noiseSuppression,
     autoGainControl: v.autoGain,
     channelCount: 1,
-    sampleRate: 48000,
   };
-  if (v.inputDeviceId) audio.deviceId = { ideal: v.inputDeviceId };
+}
+
+/**
+ * Opens the microphone the person chose.
+ *
+ * The device is asked for exactly, not as a preference: a preference is
+ * silently ignored when the id no longer matches anything, and the call then
+ * carries a different microphone than the one on screen. When the id has gone
+ * stale the device is looked up again by name, which also covers the same
+ * microphone on another computer, where ids never match.
+ */
+export async function getMic(v: VoiceSettings): Promise<MediaStream> {
+  const audio = micConstraints(v);
+  if (!v.inputDeviceId && !v.inputDeviceLabel) {
+    lastChoice = "default";
+    return navigator.mediaDevices.getUserMedia({ audio, video: false });
+  }
+  if (v.inputDeviceId) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: v.inputDeviceId } }, video: false });
+      lastChoice = "chosen";
+      return stream;
+    } catch (err) {
+      if (err instanceof DOMException && err.name !== "OverconstrainedError" && err.name !== "NotFoundError") throw err;
+    }
+  }
+  if (v.inputDeviceLabel) {
+    try {
+      const all = await navigator.mediaDevices.enumerateDevices();
+      const match = all.find((d) => d.kind === "audioinput" && d.label === v.inputDeviceLabel && d.deviceId && d.deviceId !== "default");
+      if (match) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: { ...audio, deviceId: { exact: match.deviceId } }, video: false });
+        lastChoice = "matched-by-name";
+        return stream;
+      }
+    } catch {
+      /* fall through to the default below */
+    }
+  }
+  lastChoice = "missing";
   return navigator.mediaDevices.getUserMedia({ audio, video: false });
 }
 
@@ -158,6 +206,19 @@ export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: num
   }
 }
 
+function choiceWords(c: InputChoice): string {
+  switch (c) {
+    case "chosen":
+      return "the one you picked";
+    case "matched-by-name":
+      return "found again by name after its id changed";
+    case "missing":
+      return "NOT AVAILABLE — this is the system default instead";
+    default:
+      return "system default";
+  }
+}
+
 /** What the microphone and the call are actually doing, in words. */
 export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaStream, inputVolume: number): string {
   const track = mic.getAudioTracks()[0];
@@ -170,6 +231,7 @@ export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaSt
     `processing: echo=${String(st.echoCancellation ?? "?")} noise=${String(st.noiseSuppression ?? "?")} gain=${String(st.autoGainControl ?? "?")}`,
     `audio engine: ${ctx.state}, ${Math.round(ctx.sampleRate)} Hz`,
     `input volume: ${inputVolume}% (${sent === mic ? "sent straight through" : "through the slider"})`,
+    `chosen device: ${choiceWords(lastChoice)}`,
     `sent track: ${out?.readyState ?? "none"}`,
   ];
   return lines.join("\n");

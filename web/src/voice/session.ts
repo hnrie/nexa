@@ -13,7 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { LevelMeter, audioContext, getCamera, getMic, getScreen, screenBitrate, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
+import { LevelMeter, audioContext, getCamera, getMic, getScreen, lastInputChoice, screenBitrate, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { MeshTransport, type SignalPayload } from "./mesh";
 
 interface Session {
@@ -133,6 +133,10 @@ export async function joinVoice(channelId: string): Promise<void> {
   try {
     s.micRaw = await getMic(useSettings.getState().settings.voice);
     s.mic = withInputGain(s, s.micRaw);
+    if (lastInputChoice() === "missing") {
+      // Better to say so than to carry a microphone nobody is talking into.
+      useUI.getState().toast("The microphone you picked is not available, so this call is using the system default.", "error");
+    }
   } catch {
     useUI.getState().toast("Microphone access was denied. You can listen, but nobody can hear you.", "error");
   }
