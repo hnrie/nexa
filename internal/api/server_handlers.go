@@ -187,6 +187,9 @@ func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before vis
 // --- servers -------------------------------------------------------------
 
 func (s *Server) handleServerCreate(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCaptcha(w, r, "create_server") {
+		return
+	}
 	me := auth.UserFrom(r.Context())
 	var req struct {
 		Name string `json:"name"`
@@ -1594,6 +1597,9 @@ func (s *Server) handleInvitePreview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCaptcha(w, r, "join") {
+		return
+	}
 	me := auth.UserFrom(r.Context())
 	in, err := s.Store.InviteByCode(r.Context(), r.PathValue("code"))
 	if err != nil {

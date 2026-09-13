@@ -99,6 +99,9 @@ type registerReq struct {
 }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCaptcha(w, r, "register") {
+		return
+	}
 	var req registerReq
 	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
 		WriteError(w, err)
@@ -198,6 +201,9 @@ func keyBundle(u *store.User) map[string]any {
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCaptcha(w, r, "login") {
+		return
+	}
 	start := time.Now()
 	fail := func() {
 		if d := time.Since(start); d < minLoginTime {
@@ -308,6 +314,9 @@ func (s *Server) verifyRecovery(w http.ResponseWriter, r *http.Request, username
 }
 
 func (s *Server) handleRecoverBegin(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCaptcha(w, r, "recover") {
+		return
+	}
 	var req struct {
 		Username        string `json:"username"`
 		RecoveryAuthKey []byte `json:"recovery_auth_key"`

@@ -10,6 +10,7 @@ import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
+import { guarded } from "@/lib/captcha";
 
 export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const nav = useNavigate();
@@ -25,7 +26,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
     if (!clean || busy) return;
     setBusy(true);
     try {
-      const view = await serversApi.create(clean);
+      const view = await guarded("create_server", (captcha) => serversApi.create(clean, captcha));
       useChannels.getState().upsert(view.channels);
       useServers.getState().setFromView(view);
       onClose();

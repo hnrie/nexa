@@ -62,6 +62,9 @@ func (s *Server) emitRelationship(r *http.Request, a, b *store.User) {
 }
 
 func (s *Server) handleFriendRequest(w http.ResponseWriter, r *http.Request) {
+	if !s.requireCaptcha(w, r, "friend_request") {
+		return
+	}
 	me := auth.UserFrom(r.Context())
 	var req struct {
 		Username string `json:"username"`

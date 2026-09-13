@@ -294,6 +294,8 @@ export interface InstanceInfo {
   gif_search: boolean;
   public_url: string;
   turn_configured: boolean;
+  /** Set when the actions bots abuse need a Turnstile captcha. */
+  captcha?: { provider: "turnstile"; site_key: string } | null;
   /** The most one upload request may carry; a larger file goes up in pieces. */
   upload_single_bytes?: number;
   /** The size of each of those pieces. */

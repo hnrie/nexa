@@ -1,15 +1,15 @@
-import { api } from "./client";
+import { api, captchaOptions } from "./client";
 import type { AuthResponse, KdfParamsJson, LoginResponse, LoginResult, MfaStatus, RegisterRequest, Session, TotpSetup } from "./types";
 
 export const auth = {
-  register(body: RegisterRequest): Promise<AuthResponse> {
-    return api.request<AuthResponse>("POST", "/auth/register", body);
+  register(body: RegisterRequest, captcha?: string | null): Promise<AuthResponse> {
+    return api.request<AuthResponse>("POST", "/auth/register", body, captchaOptions(captcha));
   },
   kdf(username: string): Promise<{ salt: string; params: KdfParamsJson }> {
     return api.request("GET", "/auth/kdf", undefined, { query: { username } });
   },
-  login(username: string, auth_key: string): Promise<LoginResult> {
-    return api.request<LoginResult>("POST", "/auth/login", { username, auth_key });
+  login(username: string, auth_key: string, captcha?: string | null): Promise<LoginResult> {
+    return api.request<LoginResult>("POST", "/auth/login", { username, auth_key }, captchaOptions(captcha));
   },
   loginMfa(ticket: string, body: { code?: string; backup_code?: string }): Promise<LoginResponse> {
     return api.request<LoginResponse>("POST", "/auth/login/mfa", { ticket, ...body });
@@ -29,8 +29,8 @@ export const auth = {
   newBackupCodes(auth_key: string): Promise<{ backup_codes: string[] }> {
     return api.request("POST", "/auth/mfa/backup", { auth_key });
   },
-  recoverBegin(username: string, recovery_auth_key: string): Promise<{ public_key: string; enc_private_key_recovery: string }> {
-    return api.request("POST", "/auth/recover/begin", { username, recovery_auth_key });
+  recoverBegin(username: string, recovery_auth_key: string, captcha?: string | null): Promise<{ public_key: string; enc_private_key_recovery: string }> {
+    return api.request("POST", "/auth/recover/begin", { username, recovery_auth_key }, captchaOptions(captcha));
   },
   recoverFinish(body: {
     username: string;

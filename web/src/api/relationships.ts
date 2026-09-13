@@ -1,12 +1,12 @@
-import { api } from "./client";
+import { api, captchaOptions } from "./client";
 import type { Channel, PublicUser, Relationship, Snowflake } from "./types";
 
 export const relationships = {
   list(): Promise<Relationship[]> {
     return api.request<Relationship[]>("GET", "/users/@me/relationships");
   },
-  request(username: string): Promise<{ type: string; user: PublicUser }> {
-    return api.request("POST", "/users/@me/relationships", { username });
+  request(username: string, captcha?: string | null): Promise<{ type: string; user: PublicUser }> {
+    return api.request("POST", "/users/@me/relationships", { username }, captchaOptions(captcha));
   },
   accept(id: Snowflake): Promise<{ type: string; user: PublicUser; channel?: Channel }> {
     return api.request("PUT", `/users/@me/relationships/${id}`);

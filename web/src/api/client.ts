@@ -25,6 +25,11 @@ export class ApiError extends Error {
   }
 }
 
+/** Options carrying a captcha token for a guarded request, when there is one. */
+export function captchaOptions(captcha: string | null | undefined): RequestOptions | undefined {
+  return captcha ? { headers: { "X-Captcha-Token": captcha } } : undefined;
+}
+
 export interface RequestOptions {
   /** Send this body as-is instead of JSON-encoding `body`. */
   raw?: BodyInit;

@@ -34,6 +34,15 @@ func (s *Server) admin(h http.HandlerFunc) http.Handler {
 }
 
 // handleInstanceInfo is public: the register page needs to know the policy.
+// captchaInfo is what a browser needs to show the captcha: the provider and
+// its public site key, never the secret. Nil when captchas are off.
+func (s *Server) captchaInfo() map[string]string {
+	if !s.captchaEnabled() {
+		return nil
+	}
+	return map[string]string{"provider": "turnstile", "site_key": s.Cfg.TurnstileSiteKey}
+}
+
 func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 	mode, key := s.registrationPolicy(r.Context())
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -48,6 +57,7 @@ func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 		"max_sticker_bytes":   s.Cfg.MaxStickerBytes,
 		"upload_chunk_bytes":  MaxChunkBytes,
 		"upload_single_bytes": MaxSingleUploadBytes,
+		"captcha":             s.captchaInfo(),
 	})
 }
 

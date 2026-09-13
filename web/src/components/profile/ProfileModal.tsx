@@ -20,6 +20,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import s from "./Profile.module.css";
+import { guarded } from "@/lib/captcha";
 
 function themeOf(u: PublicUser | undefined): string {
   return profileTheme(u?.accent_color, u?.accent_color_2, u?.id);
@@ -95,7 +96,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   };
   const addFriend = async () => {
     try {
-      const res = await relApi.request(user.username);
+      const res = await guarded("friend_request", (captcha) => relApi.request(user.username, captcha));
       setRel({ user: res.user, type: res.type as "friend" | "outgoing", nickname: "", created_at: Date.now() });
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not send the request.", "error");

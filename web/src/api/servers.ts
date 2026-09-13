@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, captchaOptions } from "./client";
 import type { AuditEntry, Ban, Channel, Invite, InvitePreview, Member, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerView, Snowflake } from "./types";
 
 type Progress = (loaded: number, total: number) => void;
@@ -45,8 +45,8 @@ function upload<T>(path: string, file: Blob, onProgress?: Progress): Promise<T> 
 }
 
 export const servers = {
-  create(name: string): Promise<ServerView> {
-    return api.request<ServerView>("POST", "/servers", { name });
+  create(name: string, captcha?: string | null): Promise<ServerView> {
+    return api.request<ServerView>("POST", "/servers", { name }, captchaOptions(captcha));
   },
   get(id: Snowflake): Promise<{ server: ServerView; users: PublicUser[] }> {
     return api.request("GET", `/servers/${id}`);
@@ -152,8 +152,8 @@ export const servers = {
     return api.request<InvitePreview>("GET", `/invites/${encodeURIComponent(code)}`);
   },
   /** Accepts a server or group invite; the payload says which came back. */
-  join(code: string): Promise<{ server: ServerView; users: PublicUser[] }> {
-    return api.request("POST", `/invites/${encodeURIComponent(code)}`);
+  join(code: string, captcha?: string | null): Promise<{ server: ServerView; users: PublicUser[] }> {
+    return api.request("POST", `/invites/${encodeURIComponent(code)}`, undefined, captchaOptions(captcha));
   },
   deleteInvite(code: string): Promise<void> {
     return api.request<void>("DELETE", `/invites/${encodeURIComponent(code)}`);

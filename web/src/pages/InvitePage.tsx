@@ -18,6 +18,7 @@ import { useKeys } from "@/stores/keys";
 import { useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 import s from "./InvitePage.module.css";
+import { guarded } from "@/lib/captcha";
 
 /** The public invite landing page for a server or a group chat. */
 export default function InvitePage() {
@@ -56,13 +57,13 @@ export default function InvitePage() {
     setBusy(true);
     try {
       if (preview.group) {
-        const res = (await serversApi.join(code)) as unknown as { channel: { id: string; recipient_ids: string[] }; users?: { id: string }[] };
+        const res = (await guarded("join", (captcha) => serversApi.join(code, captcha))) as unknown as { channel: { id: string; recipient_ids: string[] }; users?: { id: string }[] };
         if (res.users) useUsers.getState().upsert(res.users as never);
         useChannels.getState().upsert(res.channel as never);
         nav(`/channels/@me/${res.channel.id}`, { replace: true });
         return;
       }
-      const res = await serversApi.join(code);
+      const res = await guarded("join", (captcha) => serversApi.join(code, captcha));
       useUsers.getState().upsert(res.users);
       useChannels.getState().upsert(res.server.channels);
       useServers.getState().setFromView(res.server);

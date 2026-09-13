@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { installCrashReporting } from "./lib/crashReport";
 import { downloadsSettled } from "./lib/download";
+import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
 import { installNoZoom } from "./lib/noZoom";
 import { ensureTwemojiIndex } from "./lib/twemoji";
@@ -37,6 +38,8 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 
 installCrashReporting();
 installLongPress();
+// whether the actions bots abuse need a captcha here, known before anyone signs in
+void loadCaptchaConfig();
 installNoZoom();
 // the first emoji on screen should not have to wait for the list of pictures
 ensureTwemojiIndex();

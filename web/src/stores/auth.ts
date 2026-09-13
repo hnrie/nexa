@@ -7,6 +7,7 @@ import { b64, randomBytes } from "@/crypto/bytes";
 import { DEFAULT_KDF, deriveAuthKey, deriveEncKey, deriveMaster, deriveSettingsKey, newRecoveryKey, recoveryKeyToBytes, recoveryToKeys, type KdfParams } from "@/crypto/kdf";
 import { generateIdentity, unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
+import { guarded } from "@/lib/captcha";
 import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, unlockIdentity, type LockConfig } from "@/lib/appLock";
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { storage } from "@/lib/storage";
@@ -129,7 +130,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     const identity = generateIdentity();
     const recovery = newRecoveryKey();
     const rk = recoveryToKeys(recovery.bytes);
-    const res = await authApi.register({
+    const body = {
       username,
       display_name: displayName,
       auth_key: b64.enc(authKey),
@@ -140,7 +141,8 @@ export const useAuth = create<AuthState>()((set, get) => ({
       enc_private_key_recovery: b64.enc(await wrapPrivateKey(identity.privateKey, rk.encKey)),
       recovery_auth_key: b64.enc(rk.authKey),
       ...(extra ?? {}),
-    });
+    };
+    const res = await guarded("register", (captcha) => authApi.register(body, captcha));
     await finishLogin(set, res.user, res.token, identity);
     return { recoveryKey: recovery.display };
   },
@@ -148,7 +150,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   login: async (username, password) => {
     const kdf = await authApi.kdf(username);
     const { authKey, encKey } = await deriveAll(password, b64.dec(kdf.salt), toParams(kdf.params));
-    const res = await authApi.login(username, b64.enc(authKey));
+    const res = await guarded("login", (captcha) => authApi.login(username, b64.enc(authKey), captcha));
     if (isMfaChallenge(res)) {
       pendingMfa = { username, encKey, ticket: res.ticket };
       return { mfa: true, backupCodesLeft: res.backup_codes_left };
@@ -242,7 +244,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
   recover: async (username, recoveryKey, newPassword) => {
     const rkBytes = recoveryKeyToBytes(recoveryKey);
     const rk = recoveryToKeys(rkBytes);
-    const begin = await authApi.recoverBegin(username, b64.enc(rk.authKey));
+    const begin = await guarded("recover", (captcha) => authApi.recoverBegin(username, b64.enc(rk.authKey), captcha));
     const privateKey = await unwrapPrivateKey(b64.dec(begin.enc_private_key_recovery), rk.encKey);
     const salt = randomBytes(16);
     const { authKey, encKey } = await deriveAll(newPassword, salt, DEFAULT_KDF);

@@ -39,6 +39,14 @@ code, pre, kbd { font-family: var(--font-mono); }
   input, textarea, [contenteditable="true"], [contenteditable=""] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 }
 
+/* Turnstile captcha (lib/captcha.ts): out of sight unless it wants a click */
+.captcha-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.6); opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+.captcha-overlay.captcha-shown { opacity: 1; pointer-events: auto; }
+.captcha-sheet { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; padding: 20px; border-radius: var(--radius-md, 8px); background: var(--bg-floating); box-shadow: var(--shadow-high); }
+.captcha-title { font-size: 16px; font-weight: 600; color: var(--text-strong); }
+.captcha-cancel { min-height: 40px; padding: 0 16px; border-radius: var(--radius-xs); color: var(--text-muted); }
+.captcha-cancel:hover { color: var(--text); background: var(--bg-hover); }
+
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 

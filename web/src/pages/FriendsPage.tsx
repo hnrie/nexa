@@ -15,6 +15,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "@/components/friends/Friends.module.css";
+import { guarded } from "@/lib/captcha";
 
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
@@ -200,7 +201,7 @@ function AddFriend() {
     setBusy(true);
     setMsg(null);
     try {
-      const res = await relApi.request(username);
+      const res = await guarded("friend_request", (captcha) => relApi.request(username, captcha));
       setRel({ user: res.user, type: res.type as Relationship["type"], nickname: "", created_at: Date.now() });
       setMsg({ ok: true, text: res.type === "friend" ? `You and ${res.user.display_name} are now friends!` : `Success! Your friend request to ${res.user.display_name} was sent.` });
       setValue("");
