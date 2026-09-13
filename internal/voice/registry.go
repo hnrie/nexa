@@ -23,18 +23,31 @@ type State struct {
 	ServerMute bool   `json:"server_mute"`
 	ServerDeaf bool   `json:"server_deaf"`
 	JoinedAt   int64  `json:"joined_at"`
+	// ConnID is the gateway connection that owns this state. A session is
+	// shared by every tab and reconnect of a device, so it cannot say which
+	// socket is actually in the call.
+	ConnID ids.ID `json:"-"`
+	// Suppress is set when the channel denies Speak; it silences the user
+	// like a server mute but belongs to the channel, not to a moderator.
+	Suppress bool `json:"-"`
 }
+
+// RecentWindow is how long a channel counts as still active after its last
+// participant left, so a quick rejoin resumes the call instead of starting one.
+const RecentWindow = time.Minute
 
 // Registry is safe for concurrent use.
 type Registry struct {
 	mu        sync.RWMutex
 	byUser    map[ids.ID]*State
 	byChannel map[ids.ID]map[ids.ID]*State
+	// emptiedAt records when a channel lost its last participant (unix ms).
+	emptiedAt map[ids.ID]int64
 }
 
 // New creates an empty registry.
 func New() *Registry {
-	return &Registry{byUser: map[ids.ID]*State{}, byChannel: map[ids.ID]map[ids.ID]*State{}}
+	return &Registry{byUser: map[ids.ID]*State{}, byChannel: map[ids.ID]map[ids.ID]*State{}, emptiedAt: map[ids.ID]int64{}}
 }
 
 // Get returns a user's state.
@@ -72,21 +85,33 @@ func (r *Registry) Count(ch ids.ID) int {
 	return len(r.byChannel[ch])
 }
 
+// RecentlyActive reports whether a channel has participants or lost its last
+// one within RecentWindow.
+func (r *Registry) RecentlyActive(ch ids.ID) bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if len(r.byChannel[ch]) > 0 {
+		return true
+	}
+	at, ok := r.emptiedAt[ch]
+	return ok && time.Now().UnixMilli()-at < RecentWindow.Milliseconds()
+}
+
 // Join puts a user in a channel (moving them if they were elsewhere) and
-// returns the state they left, if any. Moderation flags survive a move within
-// the same registry; self flags come from the new state.
-func (r *Registry) Join(st State) *State {
+// returns the state they left, if any. Moderation flags survive only when
+// keepModeration is set, which the caller does for moves within one server:
+// nobody elsewhere could lift them. Self flags come from the new state.
+func (r *Registry) Join(st State, keepModeration bool) *State {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var old *State
 	if prev, ok := r.byUser[st.UserID]; ok {
 		cp := *prev
 		old = &cp
-		delete(r.byChannel[prev.ChannelID], st.UserID)
-		if len(r.byChannel[prev.ChannelID]) == 0 {
-			delete(r.byChannel, prev.ChannelID)
+		r.removeLocked(prev)
+		if keepModeration {
+			st.ServerMute, st.ServerDeaf = prev.ServerMute, prev.ServerDeaf
 		}
-		st.ServerMute, st.ServerDeaf = prev.ServerMute, prev.ServerDeaf
 	}
 	if st.JoinedAt == 0 {
 		st.JoinedAt = time.Now().UnixMilli()
@@ -119,12 +144,12 @@ func (r *Registry) Leave(uid ids.ID) (State, bool) {
 	return r.leaveLocked(uid)
 }
 
-// LeaveSession removes a user only when the given session holds their state.
-func (r *Registry) LeaveSession(uid, session ids.ID) (State, bool) {
+// LeaveConn removes a user only when the given connection holds their state.
+func (r *Registry) LeaveConn(uid, connID ids.ID) (State, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	st, ok := r.byUser[uid]
-	if !ok || st.SessionID != session {
+	if !ok || st.ConnID != connID {
 		return State{}, false
 	}
 	return r.leaveLocked(uid)
@@ -136,11 +161,26 @@ func (r *Registry) leaveLocked(uid ids.ID) (State, bool) {
 		return State{}, false
 	}
 	delete(r.byUser, uid)
-	delete(r.byChannel[st.ChannelID], uid)
-	if len(r.byChannel[st.ChannelID]) == 0 {
-		delete(r.byChannel, st.ChannelID)
-	}
+	r.removeLocked(st)
 	return *st, true
+}
+
+// removeLocked takes a state out of its channel and notes when the channel
+// empties. Entries older than the window are pruned here so the map stays
+// as small as the number of calls that ended in the last minute.
+func (r *Registry) removeLocked(st *State) {
+	delete(r.byChannel[st.ChannelID], st.UserID)
+	if len(r.byChannel[st.ChannelID]) > 0 {
+		return
+	}
+	delete(r.byChannel, st.ChannelID)
+	now := time.Now().UnixMilli()
+	for ch, at := range r.emptiedAt {
+		if now-at >= RecentWindow.Milliseconds() {
+			delete(r.emptiedAt, ch)
+		}
+	}
+	r.emptiedAt[st.ChannelID] = now
 }
 
 // In lists every state in any of the given channels.
@@ -172,5 +212,6 @@ func (r *Registry) ClearChannel(ch ids.ID) []State {
 		delete(r.byUser, uid)
 	}
 	delete(r.byChannel, ch)
+	delete(r.emptiedAt, ch)
 	return out
 }

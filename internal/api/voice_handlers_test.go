@@ -89,6 +89,13 @@ func TestVoiceChannels(t *testing.T) {
 	if ev := gc.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "channel_full" {
 		t.Errorf("full channel: %v", ev)
 	}
+	// a refused move changes nothing, not even the mute sent with it
+	if res, body = do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokA, map[string]any{"mute": true, "channel_id": general}); res.StatusCode != 400 {
+		t.Errorf("move to a text channel: %d %v", res.StatusCode, body)
+	}
+	if ev := gb.next("voice_state", 500*time.Millisecond); ev != nil {
+		t.Errorf("a refused request must not mute: %v", ev)
+	}
 	// moderation: alice server-mutes bob, then moves him to a new channel
 	if res, body = do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokC, map[string]any{"mute": true}); res.StatusCode != 403 {
 		t.Errorf("member mutes: %d %v", res.StatusCode, body)
@@ -124,6 +131,11 @@ func TestVoiceChannels(t *testing.T) {
 	}
 	if !saw["leave"] || !saw["join"] {
 		t.Errorf("move events: %v", saw)
+	}
+	// bob himself only hears the join, which his client treats as a move;
+	// a leave of his own channel would make it hang up
+	if ev := gb.next("voice_state", 3*time.Second); ev == nil || ev["channel_id"] != lounge {
+		t.Errorf("moved member's first event should be the join: %v", ev)
 	}
 	for i := 0; i < 2; i++ {
 		ga.next("voice_state", 3*time.Second) // alice's copies of the move
@@ -173,6 +185,10 @@ func TestDMCalls(t *testing.T) {
 	gb.op(t, "voice_state", map[string]any{"channel_id": dm})
 	if ev := ga.next("voice_state", 3*time.Second); ev == nil || ev["user_id"] != idB {
 		t.Fatal("bob joins call")
+	}
+	// answering tells bob's other devices to stop ringing
+	if ev := gb.next("call_end", 3*time.Second); ev == nil || ev["reason"] != "answered" || ev["user_id"] != idB {
+		t.Errorf("answered event: %v", ev)
 	}
 	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
 	gb.op(t, "voice_state", map[string]any{"channel_id": nil})
@@ -259,4 +275,188 @@ func TestVoiceICEWithoutTURN(t *testing.T) {
 			t.Errorf("nothing should be minted without a key: %v", body)
 		}
 	}
+}
+
+// nextVoice waits for a voice_state about one user in a channel, or for their
+// leave when channel is empty, skipping any other voice events on the way.
+func (g *gw) nextVoice(uid, channel string, timeout time.Duration) map[string]any {
+	deadline := time.Now().Add(timeout)
+	for {
+		left := time.Until(deadline)
+		if left <= 0 {
+			return nil
+		}
+		ev := g.next("voice_state", left)
+		if ev == nil {
+			return nil
+		}
+		if ev["user_id"] != uid {
+			continue
+		}
+		if (channel == "" && ev["channel_id"] == nil) || (channel != "" && ev["channel_id"] == channel) {
+			return ev
+		}
+	}
+}
+
+// TestVoiceBelongsToOneConnection checks that other sockets of the same
+// session (a second tab, a socket reaped after a reconnect) cannot end the
+// call, and that picking the call up elsewhere tells the old socket.
+func TestVoiceBelongsToOneConnection(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "Voice")
+	general := channelNamed(view, "general")["id"].(string)
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	ga1 := connectGW(t, ts, tokA)
+	ga2 := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+
+	ga1.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idA, voiceCh, 3*time.Second); ev == nil {
+		t.Fatal("alice joins")
+	}
+	ga1.nextVoice(idA, voiceCh, 3*time.Second)
+	// closing the other tab leaves the call alone
+	ga2.close()
+	if ev := gb.nextVoice(idA, "", time.Second); ev != nil {
+		t.Errorf("closing another socket must not end the call: %v", ev)
+	}
+	// a reconnect picks the call up on a new socket; the old one is told
+	ga3 := connectGW(t, ts, tokA)
+	ga3.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "resume": true})
+	if ev := ga1.next("voice_state", 3*time.Second); ev == nil || ev["channel_id"] != nil || ev["old_channel_id"] != voiceCh {
+		t.Errorf("the socket that lost the call hears it left: %v", ev)
+	}
+	if ev := gb.next("voice_state", 3*time.Second); ev == nil || ev["channel_id"] != voiceCh {
+		t.Errorf("others only see alice still in the call: %v", ev)
+	}
+	// signals reach only the socket in the call
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	ga3.nextVoice(idB, voiceCh, 3*time.Second)
+	gb.op(t, "voice_signal", map[string]any{"to": idA, "payload": map[string]any{"type": "offer"}})
+	if ev := ga3.next("voice_signal", 3*time.Second); ev == nil || ev["from"] != idB {
+		t.Errorf("signal to the socket in the call: %v", ev)
+	}
+	if ev := ga1.next("voice_signal", 500*time.Millisecond); ev != nil {
+		t.Errorf("signal must not reach the old socket: %v", ev)
+	}
+	// the old socket can neither hang up nor, by closing, end the call
+	ga1.op(t, "voice_state", map[string]any{"channel_id": nil})
+	ga1.close()
+	if ev := gb.nextVoice(idA, "", time.Second); ev != nil {
+		t.Errorf("the old socket must not end the call: %v", ev)
+	}
+	ga3.op(t, "voice_state", map[string]any{"channel_id": nil})
+	if ev := gb.nextVoice(idA, "", 3*time.Second); ev == nil {
+		t.Error("the socket in the call hangs up")
+	}
+}
+
+// TestDMCallResumeAndBlock checks that rejoining a call that just ended posts
+// no second call message, and that a block stops calls both ways.
+func TestDMCallResumeAndBlock(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	friend(t, ts, tokA, "bob", tokB, idA)
+	_, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB}})
+	dm := body["id"].(string)
+	ga := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+
+	ga.op(t, "voice_state", map[string]any{"channel_id": dm})
+	if ev := gb.next("message_create", 3*time.Second); ev == nil || ev["type"] != "system_call" {
+		t.Fatalf("call message: %v", ev)
+	}
+	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.next("call_end", 3*time.Second)
+	// the socket blips and the client rejoins: bob still rings, no new message
+	ga.op(t, "voice_state", map[string]any{"channel_id": dm, "resume": true})
+	if ev := gb.next("call_ring", 3*time.Second); ev == nil {
+		t.Error("a resumed call still rings")
+	}
+	if ev := gb.next("message_create", 500*time.Millisecond); ev != nil {
+		t.Errorf("a resumed call posts no second message: %v", ev)
+	}
+	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.next("call_end", 3*time.Second)
+
+	if res, body := do(t, ts, "PUT", "/api/v1/users/@me/blocks/"+idB, tokA, nil); res.StatusCode >= 300 {
+		t.Fatalf("block: %d %v", res.StatusCode, body)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": dm})
+	if ev := gb.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "blocked" {
+		t.Errorf("blocked caller: %v", ev)
+	}
+	if ev := ga.next("call_ring", 500*time.Millisecond); ev != nil {
+		t.Errorf("the blocker must not ring: %v", ev)
+	}
+	ga.op(t, "voice_state", map[string]any{"channel_id": dm})
+	if ev := ga.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "blocked" {
+		t.Errorf("the blocker cannot call either: %v", ev)
+	}
+}
+
+// TestVoiceModerationScope checks that server mutes stay in their server, that
+// a channel denying Speak silences people, and that a kick ends the call.
+func TestVoiceModerationScope(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "Voice")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	own := createServer(t, ts, tokB, "Bob's")
+	ownVoice := channelNamed(own, "General")["id"].(string)
+	ga := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+
+	res, body := do(t, ts, "POST", "/api/v1/servers/"+sid+"/channels", tokA, map[string]any{"type": "voice", "name": "Stage"})
+	if res.StatusCode >= 300 {
+		t.Fatalf("stage: %d %v", res.StatusCode, body)
+	}
+	stage := body["id"].(string)
+	if res, body = do(t, ts, "PUT", "/api/v1/channels/"+stage+"/permissions/"+sid, tokA, map[string]any{"type": "role", "deny": permStr(perms.Speak)}); res.StatusCode != 200 {
+		t.Fatalf("deny speak: %d %v", res.StatusCode, body)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": stage})
+	if ev := gb.nextVoice(idB, stage, 3*time.Second); ev == nil || ev["server_mute"] != true {
+		t.Errorf("no Speak silences: %v", ev)
+	}
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["server_mute"] != false {
+		t.Errorf("Speak allowed again elsewhere: %v", ev)
+	}
+	if res, body = do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/members/"+idB+"/voice", tokA, map[string]any{"mute": true}); res.StatusCode != 200 {
+		t.Fatalf("mute: %d %v", res.StatusCode, body)
+	}
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil || ev["server_mute"] != true {
+		t.Fatalf("mute event: %v", ev)
+	}
+	// the mute does not follow bob into his own server
+	gb.op(t, "voice_state", map[string]any{"channel_id": ownVoice})
+	if ev := gb.nextVoice(idB, ownVoice, 3*time.Second); ev == nil || ev["server_mute"] != false {
+		t.Errorf("mute must stay behind: %v", ev)
+	}
+	// back in alice's server and kicked: the call ends for everyone
+	gb.op(t, "voice_state", map[string]any{"channel_id": voiceCh})
+	if ev := gb.nextVoice(idB, voiceCh, 3*time.Second); ev == nil {
+		t.Fatal("bob rejoins")
+	}
+	if res, _ = do(t, ts, "DELETE", "/api/v1/servers/"+sid+"/members/"+idB, tokA, nil); res.StatusCode != 204 {
+		t.Fatalf("kick: %d", res.StatusCode)
+	}
+	if ev := gb.nextVoice(idB, "", 3*time.Second); ev == nil || ev["old_channel_id"] != voiceCh {
+		t.Errorf("a kick ends the call: %v", ev)
+	}
+	res, body = do(t, ts, "GET", "/api/v1/channels/"+voiceCh+"/voice", tokA, nil)
+	if res.StatusCode != 200 || len(body["_list"].([]any)) != 0 {
+		t.Errorf("no ghost after a kick: %d %v", res.StatusCode, body)
+	}
+	_ = ga
 }

@@ -37,7 +37,7 @@ type voiceStatePayload struct {
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt}
+	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt}
 }
 
 func leavePayload(st voice.State) voiceStatePayload {
@@ -62,13 +62,11 @@ func (s *Server) WireVoice(hub *gateway.Hub) {
 		return
 	}
 	hub.VoiceOp = s.handleVoiceOp
-	hub.OnConnClose = func(ctx context.Context, uid, session ids.ID) {
-		if st, ok := s.Voice.LeaveSession(uid, session); ok {
-			s.broadcastVoiceLeave(ctx, st)
-		}
-	}
-	hub.OnDisconnect = func(ctx context.Context, uid ids.ID) {
-		if st, ok := s.Voice.Leave(uid); ok {
+	// Only the socket that holds the call ends it by closing. Another tab of
+	// the same session, or a dead socket reaped after a reconnect already
+	// rejoined, must leave the live call alone.
+	hub.OnConnClose = func(ctx context.Context, uid, connID ids.ID) {
+		if st, ok := s.Voice.LeaveConn(uid, connID); ok {
 			s.broadcastVoiceLeave(ctx, st)
 		}
 	}
@@ -114,12 +112,27 @@ func (s *Server) broadcastVoiceLeave(ctx context.Context, st voice.State) {
 	}
 }
 
+// emitConn sends to one connection, or to all of the user's when the
+// broadcaster cannot address a single one.
+func (s *Server) emitConn(uid, connID ids.ID, event string, data any) {
+	if h, ok := s.Bcast.(interface {
+		EmitConn(uid, connID ids.ID, event string, data any)
+	}); ok {
+		h.EmitConn(uid, connID, event, data)
+		return
+	}
+	s.Bcast.EmitUsers([]ids.ID{uid}, event, data)
+}
+
 type voiceStateReq struct {
 	ChannelID *ids.ID `json:"channel_id"`
 	SelfMute  bool    `json:"self_mute"`
 	SelfDeaf  bool    `json:"self_deaf"`
 	Video     bool    `json:"video"`
 	Streaming bool    `json:"streaming"`
+	// Resume is set when a client rejoins the call it was in after a
+	// reconnect; that is not a new call and deserves no new call message.
+	Resume bool `json:"resume"`
 }
 
 type voiceSignalReq struct {
@@ -142,7 +155,9 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			return
 		}
 		if req.ChannelID == nil {
-			if st, ok := s.Voice.Leave(me.ID); ok {
+			// a hang-up only counts from the connection in the call, so a
+			// second device or a displaced tab cannot end it for the other
+			if st, ok := s.Voice.LeaveConn(me.ID, c.ID()); ok {
 				s.broadcastVoiceLeave(ctx, st)
 			}
 			return
@@ -152,33 +167,59 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			voiceErr(c, "not_found", "That channel does not exist.")
 			return
 		}
-		if ok, code, msg := s.canJoinVoice(ctx, me, ch); !ok {
+		p, ok, code, msg := s.canJoinVoice(ctx, me, ch)
+		if !ok {
 			voiceErr(c, code, msg)
 			return
 		}
 		wasEmpty := s.Voice.Count(ch.ID) == 0
-		cur, inSame := s.Voice.Get(me.ID)
-		inSame = inSame && cur.ChannelID == ch.ID
-		old := s.Voice.Join(voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming})
+		resumed := req.Resume || s.Voice.RecentlyActive(ch.ID)
+		cur, had := s.Voice.Get(me.ID)
+		inSame := had && cur.ChannelID == ch.ID
+		// server mutes belong to one server: they follow a move inside it,
+		// but nobody could lift them in a DM call or in another server
+		keep := inSame
+		if had && !inSame && ch.ServerID != nil {
+			if prev, err := s.Store.ChannelByID(ctx, cur.ChannelID); err == nil && prev.ServerID != nil && *prev.ServerID == *ch.ServerID {
+				keep = true
+			}
+		}
+		old := s.Voice.Join(voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak)}, keep)
 		if old != nil && old.ChannelID != ch.ID {
 			s.broadcastVoiceLeave(ctx, *old)
+		} else if old != nil && old.ConnID != c.ID() {
+			// the call moved to this connection (another device or tab picked
+			// it up): the one that held it hears that it is no longer in it
+			s.emitConn(me.ID, old.ConnID, "voice_state", leavePayload(*old))
 		}
 		st, _ := s.Voice.Get(me.ID)
 		audience := s.voiceAudience(ctx, ch)
 		s.Bcast.EmitUsers(audience, "voice_state", statePayload(st))
+		if s.isDM(ch) && !inSame && !wasEmpty {
+			// answering: this user's other devices stop ringing
+			s.Bcast.EmitUsers([]ids.ID{me.ID}, "call_end", map[string]any{"channel_id": ch.ID, "user_id": me.ID, "reason": "answered"})
+		}
 		if s.isDM(ch) && wasEmpty && !inSame {
-			// joining an empty DM starts a call: ring the others
+			// joining an empty DM starts a call: ring the others, except
+			// anyone who blocked the caller
 			others := []ids.ID{}
 			for _, id := range ch.Recipients {
-				if id != me.ID {
-					others = append(others, id)
+				if id == me.ID {
+					continue
 				}
+				if _, blockedMe, err := s.Store.Blocked(ctx, me.ID, id); err != nil || blockedMe {
+					continue
+				}
+				others = append(others, id)
 			}
 			s.Bcast.EmitUsers(others, "call_ring", map[string]any{"channel_id": ch.ID, "from": me.ID})
-			m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "system_call", Mentions: []ids.ID{}}
-			if err := s.Store.InsertMessage(ctx, m); err == nil {
-				m.MentionRoles = []ids.ID{}
-				s.Bcast.EmitChannel(ch.ID, "message_create", m)
+			// a rejoin after a reconnect or a restart is the same call
+			if !resumed {
+				m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "system_call", Mentions: []ids.ID{}}
+				if err := s.Store.InsertMessage(ctx, m); err == nil {
+					m.MentionRoles = []ids.ID{}
+					s.Bcast.EmitChannel(ch.ID, "message_create", m)
+				}
 			}
 		}
 	case gateway.OpVoiceSignal:
@@ -196,48 +237,69 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			voiceErr(c, "not_in_voice", "Join a voice channel first.")
 			return
 		}
+		if mine.ConnID != c.ID() {
+			// a device that no longer holds the call; its leave is on the way
+			return
+		}
 		target, ok := s.Voice.Get(req.To)
 		if !ok || target.ChannelID != mine.ChannelID {
 			voiceErr(c, "peer_gone", "That user is not in your voice channel.")
 			return
 		}
-		s.Bcast.EmitUsers([]ids.ID{req.To}, "voice_signal", map[string]any{"from": me.ID, "channel_id": mine.ChannelID, "payload": req.Payload})
+		// only the target's device in the call may answer; another device of
+		// the same person would negotiate a second connection under one id
+		s.emitConn(req.To, target.ConnID, "voice_signal", map[string]any{"from": me.ID, "channel_id": mine.ChannelID, "payload": req.Payload})
 	}
 }
 
-// canJoinVoice checks channel type, membership, Connect, timeouts and the user limit.
-func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Channel) (bool, string, string) {
+// canJoinVoice checks channel type, membership, blocks, Connect, timeouts and
+// the user limit, and returns the caller's permissions in the channel.
+func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Channel) (perms.Perm, bool, string, string) {
 	if ch.Type == "subchat" {
-		return false, "no_call", "A subchat has no call of its own. Use the conversation it belongs to."
+		return 0, false, "no_call", "A subchat has no call of its own. Use the conversation it belongs to."
 	}
 	if s.isDM(ch) {
+		member := false
 		for _, id := range ch.Recipients {
 			if id == me.ID {
-				if blocked, err := s.Store.DMBlocked(ctx, ch, me.ID); err != nil || blocked {
-					return false, "blocked", "You cannot call this user."
-				}
-				return true, "", ""
+				member = true
 			}
 		}
-		return false, "not_found", "That channel does not exist."
+		if !member {
+			return 0, false, "not_found", "That channel does not exist."
+		}
+		cur, ok := s.Voice.Get(me.ID)
+		if ch.Type == "dm" && !(ok && cur.ChannelID == ch.ID) {
+			// a block in either direction stops new calls, like it stops
+			// messaging; mute toggles inside a call already running still pass
+			for _, other := range ch.Recipients {
+				if other == me.ID {
+					continue
+				}
+				if ab, ba, err := s.Store.Blocked(ctx, me.ID, other); err != nil || ab || ba {
+					return 0, false, "blocked", "You cannot call this user."
+				}
+			}
+		}
+		return perms.All, true, "", ""
 	}
 	if ch.Type != "voice" {
-		return false, "not_voice", "That is not a voice channel."
+		return 0, false, "not_voice", "That is not a voice channel."
 	}
 	p, _, err := s.Store.ChannelPerms(ctx, ch.ID, me.ID)
 	if err != nil || p == 0 {
-		return false, "not_found", "That channel does not exist."
+		return 0, false, "not_found", "That channel does not exist."
 	}
 	if !p.Has(perms.Connect) {
-		return false, "missing_permission", "You cannot connect to that channel."
+		return p, false, "missing_permission", "You cannot connect to that channel."
 	}
 	if cur, ok := s.Voice.Get(me.ID); ok && cur.ChannelID == ch.ID {
-		return true, "", ""
+		return p, true, "", ""
 	}
 	if ch.UserLimit > 0 && s.Voice.Count(ch.ID) >= ch.UserLimit && !p.Has(perms.MoveMembers) {
-		return false, "channel_full", "That voice channel is full."
+		return p, false, "channel_full", "That voice channel is full."
 	}
-	return true, "", ""
+	return p, true, "", ""
 }
 
 func (s *Server) handleVoiceICE(w http.ResponseWriter, r *http.Request) {
@@ -426,6 +488,37 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		deaf = &b
 		changes["deaf"] = b
 	}
+	// Validate the whole request before changing anything, so a refused move
+	// cannot leave a mute applied with no audit entry.
+	var dest *store.Channel
+	var destPerms perms.Perm
+	disconnect := false
+	if v, ok := raw["channel_id"]; ok {
+		if !actorPerms.Has(perms.MoveMembers) {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Move Members."))
+			return
+		}
+		if string(v) == "null" {
+			disconnect = true
+			changes["channel_id"] = nil
+		} else {
+			var target ids.ID
+			if json.Unmarshal(v, &target) != nil {
+				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "channel_id is malformed."))
+				return
+			}
+			dest, err = s.Store.ChannelByID(r.Context(), target)
+			if err != nil || dest.ServerID == nil || *dest.ServerID != srv.ID || dest.Type != "voice" {
+				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "The destination must be a voice channel of this server."))
+				return
+			}
+			if destPerms, _, err = s.Store.ChannelPerms(r.Context(), dest.ID, uid); err != nil || !destPerms.Has(perms.Connect) {
+				WriteError(w, E(http.StatusBadRequest, "cannot_connect", "That member cannot connect to the destination."))
+				return
+			}
+			changes["channel_id"] = dest.ID
+		}
+	}
 	if mute != nil || deaf != nil {
 		updated, _ := s.Voice.Update(uid, func(x *voice.State) {
 			if mute != nil {
@@ -437,40 +530,21 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		})
 		s.Bcast.EmitUsers(s.voiceAudience(r.Context(), cur), "voice_state", statePayload(updated))
 	}
-	if v, ok := raw["channel_id"]; ok {
-		if !actorPerms.Has(perms.MoveMembers) {
-			WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Move Members."))
-			return
+	if disconnect {
+		if left, ok := s.Voice.Leave(uid); ok {
+			s.broadcastVoiceLeave(r.Context(), left)
 		}
-		if string(v) == "null" {
-			if left, ok := s.Voice.Leave(uid); ok {
-				s.broadcastVoiceLeave(r.Context(), left)
+	} else if dest != nil && dest.ID != cur.ID {
+		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {
+			old := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak)}, true)
+			if old != nil {
+				// The moved member must not hear this leave: their client takes
+				// a leave of its own channel as a disconnect and drops the call.
+				// The join below moves them instead.
+				s.Bcast.EmitUsers(withoutID(s.voiceAudience(r.Context(), cur), uid), "voice_state", leavePayload(*old))
 			}
-			changes["channel_id"] = nil
-		} else {
-			var target ids.ID
-			if json.Unmarshal(v, &target) != nil {
-				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "channel_id is malformed."))
-				return
-			}
-			dest, err := s.Store.ChannelByID(r.Context(), target)
-			if err != nil || dest.ServerID == nil || *dest.ServerID != srv.ID || dest.Type != "voice" {
-				WriteError(w, E(http.StatusBadRequest, "invalid_channel", "The destination must be a voice channel of this server."))
-				return
-			}
-			if p, _, err := s.Store.ChannelPerms(r.Context(), dest.ID, uid); err != nil || !p.Has(perms.Connect) {
-				WriteError(w, E(http.StatusBadRequest, "cannot_connect", "That member cannot connect to the destination."))
-				return
-			}
-			if dest.ID != cur.ID {
-				old := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, JoinedAt: st.JoinedAt})
-				if old != nil {
-					s.broadcastVoiceLeave(r.Context(), *old)
-				}
-				moved, _ := s.Voice.Get(uid)
-				s.Bcast.EmitUsers(s.voiceAudience(r.Context(), dest), "voice_state", statePayload(moved))
-			}
-			changes["channel_id"] = dest.ID
+			moved, _ := s.Voice.Get(uid)
+			s.Bcast.EmitUsers(append(withoutID(s.voiceAudience(r.Context(), dest), uid), uid), "voice_state", statePayload(moved))
 		}
 	}
 	s.audit(r, srv.ID, me.ID, "member_voice", "user", &uid, changes, "")
@@ -482,13 +556,65 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, statePayload(final))
 }
 
+func withoutID(list []ids.ID, id ids.ID) []ids.ID {
+	out := make([]ids.ID, 0, len(list))
+	for _, x := range list {
+		if x != id {
+			out = append(out, x)
+		}
+	}
+	return out
+}
+
 // voiceChannelDeleted kicks everyone out of a channel that no longer exists.
+// A DM's recipients are on the channel itself, so this also works after the
+// conversation was deleted.
 func (s *Server) voiceChannelDeleted(ctx context.Context, ch *store.Channel) {
 	if s.Voice == nil {
 		return
 	}
 	audience := s.voiceAudience(ctx, ch)
-	for _, st := range s.Voice.ClearChannel(ch.ID) {
+	cleared := s.Voice.ClearChannel(ch.ID)
+	for _, st := range cleared {
 		s.Bcast.EmitUsers(audience, "voice_state", leavePayload(st))
+	}
+	if len(cleared) > 0 && s.isDM(ch) {
+		s.Bcast.EmitUsers(audience, "call_end", map[string]any{"channel_id": ch.ID, "reason": "ended"})
+	}
+}
+
+// voiceServerDeleted kicks everyone out of the voice channels of a deleted
+// server. The channels and members are read before the deletion.
+func (s *Server) voiceServerDeleted(chans []*store.Channel, members []ids.ID) {
+	if s.Voice == nil {
+		return
+	}
+	for _, ch := range chans {
+		if ch.Type != "voice" {
+			continue
+		}
+		for _, st := range s.Voice.ClearChannel(ch.ID) {
+			s.Bcast.EmitUsers(members, "voice_state", leavePayload(st))
+		}
+	}
+}
+
+// dropVoice ends a user's call when it is in a channel they are losing access
+// to (a kick, ban, timeout or leaving a group). Run it while the user can still
+// see the channel so they hear the leave with everyone else.
+func (s *Server) dropVoice(ctx context.Context, uid ids.ID, losing func(*store.Channel) bool) {
+	if s.Voice == nil {
+		return
+	}
+	st, ok := s.Voice.Get(uid)
+	if !ok {
+		return
+	}
+	ch, err := s.Store.ChannelByID(ctx, st.ChannelID)
+	if err != nil || !losing(ch) {
+		return
+	}
+	if left, ok := s.Voice.LeaveConn(uid, st.ConnID); ok {
+		s.broadcastVoiceLeave(ctx, left)
 	}
 }

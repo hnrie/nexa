@@ -79,6 +79,7 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, err)
 			return
 		}
+		s.voiceChannelDeleted(r.Context(), ch)
 		s.Bcast.EmitUsers(recipients, "channel_delete", map[string]any{"id": ch.ID})
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -98,6 +99,7 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	s.voiceChannelDeleted(r.Context(), ch)
 	s.Bcast.EmitUsers(recipients, "channel_delete", map[string]any{"id": ch.ID})
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -169,6 +171,8 @@ func (s *Server) leaveGroup(w http.ResponseWriter, r *http.Request, ch *store.Ch
 // needed, deleting the group if nobody is left, and telling everyone.
 func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID) error {
 	ctx := r.Context()
+	// out of the group's call first, while they are still a recipient to hear it
+	s.dropVoice(ctx, uid, func(c *store.Channel) bool { return c.ID == ch.ID })
 	subs, err := s.Store.RemoveParticipant(ctx, ch.ID, uid)
 	if err != nil {
 		return err

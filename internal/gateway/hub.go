@@ -49,8 +49,8 @@ type Hub struct {
 	VoiceOp func(ctx context.Context, c *Conn, op string, data []byte)
 	// OnDisconnect runs when a user's last connection closes (voice cleanup).
 	OnDisconnect func(ctx context.Context, uid ids.ID)
-	// OnConnClose runs when any connection closes; voice states belong to one session.
-	OnConnClose func(ctx context.Context, uid, sessionID ids.ID)
+	// OnConnClose runs when any connection closes; voice states belong to one connection.
+	OnConnClose func(ctx context.Context, uid, connID ids.ID)
 }
 
 // New creates a hub.
@@ -258,6 +258,19 @@ func (h *Hub) EmitUsers(userIDs []ids.ID, t string, d any) {
 		seen[uid] = true
 		for c := range h.conns[uid] {
 			c.enqueue(frame)
+		}
+	}
+}
+
+// EmitConn sends an event to one connection of a user, if it is still open.
+func (h *Hub) EmitConn(uid, connID ids.ID, t string, d any) {
+	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.conns[uid] {
+		if c.id == connID {
+			c.enqueue(frame)
+			return
 		}
 	}
 }

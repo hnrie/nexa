@@ -63,10 +63,15 @@ func (x *Conn) User() *store.User { return x.c.user }
 // SessionID returns the session id.
 func (x *Conn) SessionID() ids.ID { return x.c.session.ID }
 
+// ID identifies this one connection. Every tab and every reconnect of a device
+// shares the session, so state owned by a single socket is keyed by this.
+func (x *Conn) ID() ids.ID { return x.c.id }
+
 // Send enqueues a frame to this connection only.
 func (x *Conn) Send(t string, d any) { x.c.enqueue(ServerFrame{T: t, S: x.c.hub.nextSeq(), D: d}) }
 
 type conn struct {
+	id      ids.ID
 	hub     *Hub
 	ws      *websocket.Conn
 	user    *store.User
@@ -193,7 +198,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = ws.Close(4001, "authentication failed")
 		return
 	}
-	c := &conn{hub: h, ws: ws, user: user, session: session, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
+	c := &conn{id: ids.New(), hub: h, ws: ws, user: user, session: session, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
 		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst)}
 	c.beat.Store(time.Now().UnixMilli())
 
@@ -218,7 +223,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	last := h.unregister(c)
 	c.close(websocket.StatusNormalClosure, "bye")
 	if h.OnConnClose != nil {
-		h.OnConnClose(context.Background(), user.ID, session.ID)
+		h.OnConnClose(context.Background(), user.ID, c.id)
 	}
 	if last {
 		bg := context.Background()

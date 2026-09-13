@@ -392,10 +392,12 @@ func (s *Server) handleServerDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	members, _ := s.Store.MemberIDs(r.Context(), srv.ID)
+	chans, _ := s.Store.ServerChannels(r.Context(), srv.ID)
 	if err := s.Store.DeleteServer(r.Context(), srv.ID); err != nil {
 		WriteError(w, err)
 		return
 	}
+	s.voiceServerDeleted(chans, members)
 	s.Bcast.EmitUsers(members, "server_delete", map[string]any{"id": srv.ID})
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -404,6 +406,8 @@ func (s *Server) handleServerDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) removeMember(r *http.Request, srv *store.Server, uid ids.ID, event string, extra map[string]any) error {
 	ctx := r.Context()
 	visible, _ := s.Store.ViewableServerChannels(ctx, srv.ID, uid)
+	// out of the server's calls first, while everyone in them can still be told
+	s.dropVoice(ctx, uid, func(ch *store.Channel) bool { return ch.ServerID != nil && *ch.ServerID == srv.ID })
 	if err := s.Store.RemoveMember(ctx, srv.ID, uid); err != nil {
 		return err
 	}
@@ -1328,6 +1332,10 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, err)
 			return
 		}
+	}
+	if patch.TimeoutUntil != nil && *patch.TimeoutUntil != nil {
+		// a timed-out member cannot connect or speak, so they leave the call too
+		s.dropVoice(r.Context(), m.UserID, func(ch *store.Channel) bool { return ch.ServerID != nil && *ch.ServerID == srv.ID })
 	}
 	updated, _ := s.Store.Member(r.Context(), srv.ID, m.UserID)
 	s.audit(r, srv.ID, me.ID, "member_update", "user", &m.UserID, changes, "")

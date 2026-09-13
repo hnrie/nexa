@@ -40,7 +40,8 @@ function me(): string | undefined {
   return useAuth.getState().me?.id;
 }
 
-function sendState(channelId: string | null): void {
+/** `resume` marks a rejoin after a reconnect, so the server does not treat it as a new call. */
+function sendState(channelId: string | null, resume = false): void {
   const local = useVoiceLocal.getState();
   const st = useVoice.getState();
   gateway()?.send("voice_state", {
@@ -49,6 +50,7 @@ function sendState(channelId: string | null): void {
     self_deaf: local.deafened,
     video: !!st.localVideo,
     streaming: !!st.localScreen,
+    ...(resume ? { resume: true } : {}),
   });
 }
 
@@ -426,7 +428,7 @@ export function onReadyVoice(list: VoiceState[]): void {
   if (s) {
     for (const id of s.transport.peerIds()) s.transport.removePeer(id), useVoice.getState().removePeer(id);
     useVoice.getState().setMine(null);
-    sendState(s.channelId);
+    sendState(s.channelId, true);
   }
 }
 
