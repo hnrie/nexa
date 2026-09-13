@@ -13,7 +13,9 @@ interface VoiceLocalState {
 export const useVoiceLocal = create<VoiceLocalState>()((set) => ({
   muted: false,
   deafened: false,
-  toggleMute: () => set((s) => ({ muted: !s.muted, deafened: s.deafened && !s.muted ? false : s.deafened })),
+  // Deafening also mutes, so unmuting has to undeafen too, or the mic shows on
+  // while nothing is sent and nothing is heard.
+  toggleMute: () => set((s) => (s.muted ? { muted: false, deafened: false } : { muted: true })),
   toggleDeafen: () => set((s) => (s.deafened ? { deafened: false, muted: false } : { deafened: true, muted: true })),
   setMuted: (muted) => set({ muted }),
   setDeafened: (deafened) => set({ deafened }),

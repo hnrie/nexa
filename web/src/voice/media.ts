@@ -187,22 +187,34 @@ export function audioContext(): AudioContext {
 }
 
 /**
+ * Wakes the shared AudioContext during a tap or key press. iOS only lets a
+ * suspended context start inside a gesture, and without a live microphone
+ * (say its permission was refused) nothing else would ever get it running.
+ */
+export function resumeAudio(): void {
+  if (sharedCtx && sharedCtx.state !== "running") void sharedCtx.resume().catch(() => {});
+}
+
+/**
  * The stream a call would send: the microphone through the input slider. At
  * 100% there is nothing to apply, so the microphone's own track goes out
  * untouched rather than through a graph that could go wrong.
  */
-export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: number): { stream: MediaStream; gain: GainNode | null } {
-  if (inputVolume === 100) return { stream: mic, gain: null };
+export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: number): { stream: MediaStream; gain: GainNode | null; source: MediaStreamAudioSourceNode | null } {
+  if (inputVolume === 100) return { stream: mic, gain: null, source: null };
   try {
     const src = ctx.createMediaStreamSource(mic);
     const gain = ctx.createGain();
     gain.gain.value = Math.max(0, inputVolume) / 100;
     const dest = ctx.createMediaStreamDestination();
     src.connect(gain).connect(dest);
-    if (dest.stream.getAudioTracks().length === 0) return { stream: mic, gain: null };
-    return { stream: dest.stream, gain };
+    if (dest.stream.getAudioTracks().length === 0) {
+      src.disconnect();
+      return { stream: mic, gain: null, source: null };
+    }
+    return { stream: dest.stream, gain, source: src };
   } catch {
-    return { stream: mic, gain: null };
+    return { stream: mic, gain: null, source: null };
   }
 }
 

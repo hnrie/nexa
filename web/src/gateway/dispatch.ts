@@ -114,7 +114,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       for (const view of servers) useServers.getState().setFromView(view);
       useExpressions.getState().setAllEmojis(d.emojis ?? []);
       useExpressions.getState().setPacks(d.sticker_packs ?? []);
-      onReadyVoice(d.voice_states ?? []);
+      onReadyVoice(d.voice_states ?? [], d.session_id);
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
       // The account's passcode policy only arrives with the settings, so this

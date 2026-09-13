@@ -35,8 +35,14 @@ interface Peer {
   videoSender: RTCRtpSender | null;
   screenSenders: RTCRtpSender[];
   playback: { source: MediaStreamAudioSourceNode; gain: GainNode; el: HTMLAudioElement; meter: LevelMeter; timer: ReturnType<typeof setInterval> } | null;
+  /** The sound of their screen share, kept so volume, deafen and watching reach it. */
+  screenAudio: { stream: MediaStream; track: MediaStreamTrack | undefined; source: MediaStreamAudioSourceNode; gain: GainNode; el: HTMLAudioElement } | null;
   speaking: boolean;
   restartTimer: ReturnType<typeof setTimeout> | null;
+  /** ICE restarts tried since the connection last worked. */
+  restarts: number;
+  /** Fires when a renegotiation offer never got an answer. */
+  offerTimer: ReturnType<typeof setTimeout> | null;
   /** A negotiation we had to skip because the exchange was mid-flight. */
   renegotiate: boolean;
   /** Fires if the connection never comes up, so the peer can be rebuilt. */
@@ -57,6 +63,13 @@ const EARLY_SIGNAL_LIMIT = 32;
 const CONNECT_DEADLINE_MS = 12_000;
 /** How many rebuilds before leaving the tile showing trouble. */
 const MAX_REBUILDS = 3;
+/** How long a connection that dropped gets to recover before it is rebuilt. */
+const DROP_DEADLINE_MS = 20_000;
+/** How often, and how many times, to restart ICE on a dropped connection. */
+const ICE_RESTART_MS = 4_000;
+const MAX_ICE_RESTARTS = 3;
+/** How long a renegotiation offer may go unanswered before it is taken back and sent again. */
+const OFFER_DEADLINE_MS = 10_000;
 
 export class MeshTransport {
   private peers = new Map<string, Peer>();
@@ -73,7 +86,10 @@ export class MeshTransport {
   /** Signals that beat the roster: an offer can arrive before we know the sender. */
   private early = new Map<string, SignalPayload[]>();
   private localMutes = new Set<string>();
+  /** Whose screen shares are being watched; the others' share audio stays silent. */
+  private watching = new Set<string>();
   private screenBitrate = 5_000_000;
+  private audioGateOpen = true;
   private closed = false;
 
   constructor(
@@ -90,9 +106,23 @@ export class MeshTransport {
     for (const p of this.peers.values()) this.syncSenders(p);
   }
 
+  /**
+   * Voice activity's gate: while shut the senders carry nothing, but the
+   * track itself stays live so the local meter can still hear speech start.
+   */
+  setAudioGate(open: boolean): void {
+    if (this.audioGateOpen === open) return;
+    this.audioGateOpen = open;
+    if (!this.audioTrack) return;
+    for (const p of this.peers.values()) if (p.audioSender) void p.audioSender.replaceTrack(open ? this.audioTrack : null).catch(() => {});
+  }
+
   setLocalVideo(track: MediaStreamTrack | null): void {
     this.videoTrack = track;
-    this.videoStream = new MediaStream(track ? [track] : []);
+    // The stream keeps its id across camera toggles: the sender is reused, so
+    // its msid never changes and the other side must still recognise it.
+    for (const t of this.videoStream.getTracks()) this.videoStream.removeTrack(t);
+    if (track) this.videoStream.addTrack(track);
     for (const p of this.peers.values()) this.syncSenders(p);
   }
 
@@ -113,22 +143,28 @@ export class MeshTransport {
   addPeer(userId: string, attempts = 0): void {
     if (this.closed || this.peers.has(userId) || userId === this.meId) return;
     const pc = new RTCPeerConnection({ iceServers: this.ice, bundlePolicy: "max-bundle" });
-    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], playback: null, speaking: false, restartTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
+    const peer: Peer = { userId, pc, polite: lower(this.meId, userId), makingOffer: false, ignoreOffer: false, remoteStreams: {}, pendingCandidates: [], audioSender: null, videoSender: null, screenSenders: [], playback: null, screenAudio: null, speaking: false, restartTimer: null, restarts: 0, offerTimer: null, renegotiate: false, watchdog: null, attempts, ops: Promise.resolve() };
     this.peers.set(userId, peer);
     pc.onicecandidate = (e) => this.events.onSignal(userId, { candidate: e.candidate ? e.candidate.toJSON() : null });
     pc.onnegotiationneeded = () => this.enqueue(peer, () => this.negotiate(peer));
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "connected" && peer.watchdog) {
-        clearTimeout(peer.watchdog);
+      const state = pc.connectionState;
+      if (state === "connected") {
+        if (peer.watchdog) clearTimeout(peer.watchdog);
+        if (peer.restartTimer) clearTimeout(peer.restartTimer);
         peer.watchdog = null;
+        peer.restartTimer = null;
+        peer.restarts = 0;
+        peer.attempts = 0;
+      } else if (state === "disconnected" || state === "failed") {
+        // A phone moving between Wi-Fi and cellular sits in "disconnected" for
+        // a long time before the browser calls it failed, so recovery starts
+        // there. If restarting ICE does not bring it back, the peer is rebuilt
+        // rather than left saying reconnecting.
+        if (!peer.watchdog) peer.watchdog = setTimeout(() => this.rebuild(userId, peer.attempts), DROP_DEADLINE_MS);
+        if (!peer.restartTimer) this.scheduleRestart(peer, state === "failed" ? 1500 : ICE_RESTART_MS);
       }
-      this.events.onPeerState(userId, pc.connectionState);
-      if (pc.connectionState === "failed" && !peer.restartTimer) {
-        peer.restartTimer = setTimeout(() => {
-          peer.restartTimer = null;
-          if (pc.connectionState === "failed" && !peer.polite) pc.restartIce();
-        }, 1500);
-      }
+      this.events.onPeerState(userId, state);
     };
     pc.ontrack = (e) => this.onTrack(peer, e);
     this.syncSenders(peer);
@@ -156,6 +192,20 @@ export class MeshTransport {
     this.addPeer(userId, attempts + 1);
   }
 
+  /** Restarts ICE on a dropped connection a few times, from the impolite side so both ends don't offer at once. */
+  private scheduleRestart(peer: Peer, delay: number): void {
+    if (peer.polite) return;
+    peer.restartTimer = setTimeout(() => {
+      peer.restartTimer = null;
+      if (this.closed || this.peers.get(peer.userId) !== peer) return;
+      const state = peer.pc.connectionState;
+      if ((state !== "disconnected" && state !== "failed") || peer.restarts >= MAX_ICE_RESTARTS) return;
+      peer.restarts++;
+      peer.pc.restartIce();
+      this.scheduleRestart(peer, ICE_RESTART_MS);
+    }, delay);
+  }
+
   /** Replays, in order, anything this peer sent before we knew about them. */
   private drainEarly(userId: string): void {
     const waiting = this.early.get(userId);
@@ -169,7 +219,9 @@ export class MeshTransport {
     if (!p) return;
     this.peers.delete(userId);
     this.teardownPlayback(p);
+    this.teardownScreenAudio(p);
     if (p.restartTimer) clearTimeout(p.restartTimer);
+    if (p.offerTimer) clearTimeout(p.offerTimer);
     p.pc.onicecandidate = null;
     p.pc.onnegotiationneeded = null;
     p.pc.ontrack = null;
@@ -267,13 +319,35 @@ export class MeshTransport {
     peer.renegotiate = false;
     try {
       peer.makingOffer = true;
+      const renegotiating = !!pc.remoteDescription;
       await pc.setLocalDescription();
       this.events.onSignal(peer.userId, { description: pc.localDescription!.toJSON(), streams: this.streamIds() });
+      if (renegotiating) this.armOfferTimer(peer);
     } catch (err) {
       console.warn("voice: negotiation failed", err);
     } finally {
       peer.makingOffer = false;
     }
+  }
+
+  /**
+   * An offer that is never answered (refused by the server, lost on the way)
+   * would leave the peer in have-local-offer for good, and every later change
+   * would wait behind it. So it is taken back and made again. The first
+   * exchange is left to the connect watchdog instead.
+   */
+  private armOfferTimer(peer: Peer): void {
+    if (peer.offerTimer) clearTimeout(peer.offerTimer);
+    peer.offerTimer = setTimeout(() => {
+      peer.offerTimer = null;
+      if (this.closed || this.peers.get(peer.userId) !== peer) return;
+      this.enqueue(peer, async () => {
+        if (peer.pc.signalingState !== "have-local-offer") return;
+        console.warn("voice: offer to", peer.userId, "went unanswered, sending it again");
+        await peer.pc.setLocalDescription({ type: "rollback" });
+        await this.negotiate(peer);
+      });
+    }, OFFER_DEADLINE_MS);
   }
 
   // --- senders -----------------------------------------------------------
@@ -282,26 +356,38 @@ export class MeshTransport {
     const pc = peer.pc;
     // audio: one sender, replaced in place so renegotiation is rare
     if (this.audioTrack) {
-      if (peer.audioSender) void peer.audioSender.replaceTrack(this.audioTrack);
-      else peer.audioSender = pc.addTrack(this.audioTrack, this.audioStream);
+      const sent = this.audioGateOpen ? this.audioTrack : null;
+      if (peer.audioSender) void peer.audioSender.replaceTrack(sent);
+      else {
+        peer.audioSender = pc.addTrack(this.audioTrack, this.audioStream);
+        if (!sent) void peer.audioSender.replaceTrack(null);
+      }
     } else if (peer.audioSender) {
       void peer.audioSender.replaceTrack(null);
     }
+    // Video keeps its sender and only pauses it: a removed track leaves its
+    // m-line behind for good, so every camera toggle would grow the offer
+    // until the server refused it as too large.
     if (this.videoTrack) {
-      if (peer.videoSender) void peer.videoSender.replaceTrack(this.videoTrack);
-      else {
+      if (peer.videoSender) {
+        this.setSending(pc, peer.videoSender, true);
+        void peer.videoSender.replaceTrack(this.videoTrack);
+      } else {
         peer.videoSender = pc.addTrack(this.videoTrack, this.videoStream);
         this.capBitrate(peer.videoSender, 2_500_000);
       }
     } else if (peer.videoSender) {
-      pc.removeTrack(peer.videoSender);
-      peer.videoSender = null;
+      if (peer.videoSender.track) void peer.videoSender.replaceTrack(null);
+      this.setSending(pc, peer.videoSender, false);
     }
     const screenTracks = this.screen ? this.screen.getTracks() : [];
     const wanted = new Set(screenTracks.map((t) => t.id));
     for (const s of [...peer.screenSenders]) {
       if (!s.track || !wanted.has(s.track.id)) {
-        pc.removeTrack(s);
+        // a stopped transceiver's m-line can be reused by the next share
+        const tr = pc.getTransceivers().find((x) => x.sender === s);
+        if (tr && typeof tr.stop === "function") tr.stop();
+        else pc.removeTrack(s);
         peer.screenSenders = peer.screenSenders.filter((x) => x !== s);
       }
     }
@@ -312,6 +398,15 @@ export class MeshTransport {
         peer.screenSenders.push(sender);
       }
     }
+  }
+
+  /** Turns sending on or off for a sender's transceiver, keeping whatever it receives. */
+  private setSending(pc: RTCPeerConnection, sender: RTCRtpSender, on: boolean): void {
+    const tr = pc.getTransceivers().find((x) => x.sender === sender);
+    if (!tr || tr.direction === "stopped") return;
+    const receiving = tr.direction === "sendrecv" || tr.direction === "recvonly";
+    const next: RTCRtpTransceiverDirection = on ? (receiving ? "sendrecv" : "sendonly") : receiving ? "recvonly" : "inactive";
+    if (tr.direction !== next) tr.direction = next;
   }
 
   private capBitrate(sender: RTCRtpSender, maxBitrate: number): void {
@@ -344,6 +439,7 @@ export class MeshTransport {
     }
     e.track.onended = () => this.events.onRemoteStream(peer.userId, kind, null);
     stream.onremovetrack = () => {
+      if (kind === "screen" && peer.screenAudio?.stream === stream && stream.getAudioTracks().length === 0) this.teardownScreenAudio(peer);
       if (stream.getTracks().length === 0) this.events.onRemoteStream(peer.userId, kind, null);
     };
   }
@@ -375,6 +471,7 @@ export class MeshTransport {
   }
 
   private attachScreenAudio(peer: Peer, stream: MediaStream): void {
+    this.teardownScreenAudio(peer);
     const ctx = audioContext();
     const el = document.createElement("audio");
     el.srcObject = new MediaStream(stream.getAudioTracks());
@@ -385,13 +482,31 @@ export class MeshTransport {
     void el.play().catch(() => {});
     const source = ctx.createMediaStreamSource(el.srcObject as MediaStream);
     const gain = ctx.createGain();
-    gain.gain.value = this.effectiveGain(peer.userId);
+    gain.gain.value = this.screenGain(peer.userId);
     source.connect(gain).connect(ctx.destination);
-    stream.getAudioTracks()[0]?.addEventListener("ended", () => {
-      source.disconnect();
-      gain.disconnect();
-      el.remove();
-    });
+    const track = stream.getAudioTracks()[0];
+    peer.screenAudio = { stream, track, source, gain, el };
+    track?.addEventListener(
+      "ended",
+      () => {
+        if (peer.screenAudio?.track === track) this.teardownScreenAudio(peer);
+      },
+      { once: true },
+    );
+  }
+
+  private teardownScreenAudio(peer: Peer): void {
+    const sa = peer.screenAudio;
+    if (!sa) return;
+    try {
+      sa.source.disconnect();
+      sa.gain.disconnect();
+    } catch {
+      /* already gone */
+    }
+    sa.el.srcObject = null;
+    sa.el.remove();
+    peer.screenAudio = null;
   }
 
   private teardownPlayback(peer: Peer): void {
@@ -408,7 +523,6 @@ export class MeshTransport {
     pb.el.srcObject = null;
     pb.el.remove();
     peer.playback = null;
-    for (const el of document.querySelectorAll(`audio[data-voice-screen="${peer.userId}"]`)) el.remove();
     if (peer.speaking) {
       peer.speaking = false;
       this.events.onSpeaking(peer.userId, false);
@@ -422,10 +536,22 @@ export class MeshTransport {
     return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 
+  /** A share is offered, not forced: its sound only plays while it is watched. */
+  private screenGain(userId: string): number {
+    return this.watching.has(userId) ? this.effectiveGain(userId) : 0;
+  }
+
   private applyGains(): void {
     for (const p of this.peers.values()) {
       if (p.playback) p.playback.gain.gain.value = this.effectiveGain(p.userId);
+      if (p.screenAudio) p.screenAudio.gain.gain.value = this.screenGain(p.userId);
     }
+  }
+
+  setWatching(userId: string, on: boolean): void {
+    if (on) this.watching.add(userId);
+    else this.watching.delete(userId);
+    this.applyGains();
   }
 
   setVolume(userId: string, pct: number): void {
