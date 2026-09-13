@@ -101,39 +101,47 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// leaveGroup removes the caller from a group DM, handing ownership on if needed.
+// leaveGroup removes the caller from a group DM.
 func (s *Server) leaveGroup(w http.ResponseWriter, r *http.Request, ch *store.Channel, me *store.User) {
-	ctx := r.Context()
-	if err := s.Store.RemoveParticipant(ctx, ch.ID, me.ID); err != nil {
+	if err := s.removeFromGroup(r, ch, me.ID); err != nil {
 		WriteError(w, err)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// removeFromGroup takes someone out of a group DM, handing ownership on if
+// needed, deleting the group if nobody is left, and telling everyone.
+func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID) error {
+	ctx := r.Context()
+	if err := s.Store.RemoveParticipant(ctx, ch.ID, uid); err != nil {
+		return err
+	}
 	remaining := make([]ids.ID, 0, len(ch.Recipients))
 	for _, id := range ch.Recipients {
-		if id != me.ID {
+		if id != uid {
 			remaining = append(remaining, id)
 		}
 	}
 	if len(remaining) == 0 {
 		_ = s.Store.DeleteChannel(ctx, ch.ID)
-		s.Bcast.EmitUsers([]ids.ID{me.ID}, "channel_delete", map[string]any{"id": ch.ID})
-		w.WriteHeader(http.StatusNoContent)
-		return
+		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
+		return nil
 	}
-	if ch.OwnerID != nil && *ch.OwnerID == me.ID {
+	if ch.OwnerID != nil && *ch.OwnerID == uid {
 		next := remaining[0]
 		_ = s.Store.UpdateChannel(ctx, ch.ID, store.ChannelPatch{OwnerID: &next})
 	}
-	s.systemMessage(r, ch, me.ID, "system_member_remove", []ids.ID{me.ID}, nil)
+	s.systemMessage(r, ch, uid, "system_member_remove", []ids.ID{uid}, nil)
 	if updated, err := s.Store.ChannelByID(ctx, ch.ID); err == nil {
 		s.Bcast.EmitUsers(remaining, "channel_update", updated)
 	}
-	s.Bcast.EmitUsers([]ids.ID{me.ID}, "channel_delete", map[string]any{"id": ch.ID})
+	s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 	// whoever is left keeps talking under a fresh key
 	tr := true
 	_ = s.Store.SetKeyFlags(ctx, ch.ID, &tr, nil)
 	s.Bcast.EmitUsers(remaining, "key_rotation_needed", map[string]any{"conv_id": ch.ID})
-	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 // groupInvitePreview answers the public preview for a group DM invite.

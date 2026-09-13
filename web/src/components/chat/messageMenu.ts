@@ -9,6 +9,7 @@ import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { isInstanceAdmin } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 
 export interface MenuHooks {
@@ -19,6 +20,8 @@ export function canDelete(msg: DecryptedMessage): boolean {
   const me = useAuth.getState().me;
   if (!me) return false;
   if (msg.author_id === me.id) return true;
+  // whoever runs the instance can take down any message
+  if (isInstanceAdmin(me.id)) return true;
   const ch = useChannels.getState().byId[msg.channel_id];
   return !!ch && ch.type === "group_dm" && ch.owner_id === me.id;
 }

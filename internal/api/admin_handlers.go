@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -16,6 +17,7 @@ func (s *Server) adminRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/admin/stats", s.admin(s.handleAdminStats))
 	mux.Handle("GET /api/v1/admin/users", s.admin(s.handleAdminUsers))
 	mux.Handle("PATCH /api/v1/admin/users/{id}", s.admin(s.handleAdminUserPatch))
+	mux.Handle("DELETE /api/v1/admin/users/{id}", s.admin(s.handleAdminUserDelete))
 	mux.Handle("GET /api/v1/admin/settings", s.admin(s.handleAdminSettings))
 	mux.Handle("PATCH /api/v1/admin/settings", s.admin(s.handleAdminSettingsPatch))
 }
@@ -122,6 +124,113 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		s.Bcast.EmitUsers([]ids.ID{id}, "session_expired", map[string]any{"reason": "disabled"})
 	}
 	WriteJSON(w, http.StatusOK, store.AdminUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Flags: flags, CreatedAt: u.CreatedAt, Admin: flags&store.FlagAdmin != 0, Disabled: flags&store.FlagDisabled != 0})
+}
+
+// handleAdminUserDelete deletes someone's account as they could themselves:
+// their name and profile go, and what they wrote stays under Deleted User.
+// They are taken out of every server and group first, and a server they own
+// passes to another member rather than being left without an owner.
+func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	ctx := r.Context()
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	u, err := s.Store.UserByID(ctx, id)
+	if err != nil || u.Flags&store.FlagDeleted != 0 {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if id == me.ID {
+		WriteError(w, E(http.StatusBadRequest, "self", "Delete your own account from your settings instead."))
+		return
+	}
+	if u.Flags&store.FlagAdmin != 0 {
+		WriteError(w, E(http.StatusBadRequest, "is_admin", "Take away their admin access before deleting their account."))
+		return
+	}
+	servers, err := s.Store.ServersForUser(ctx, id)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	for _, srv := range servers {
+		if srv.OwnerID == id {
+			next, ok := s.successor(ctx, srv, id, me.ID)
+			if !ok {
+				// nobody else is in it: there is nothing left to keep
+				if err := s.Store.DeleteServer(ctx, srv.ID); err != nil {
+					WriteError(w, err)
+					return
+				}
+				s.Bcast.EmitUsers([]ids.ID{id}, "server_delete", map[string]any{"id": srv.ID})
+				continue
+			}
+			if err := s.Store.UpdateServer(ctx, srv.ID, store.ServerPatch{OwnerID: &next}); err != nil {
+				WriteError(w, err)
+				return
+			}
+			s.audit(r, srv.ID, me.ID, "server_transfer", "user", &next, nil, "the owner's account was deleted")
+			if updated, err := s.Store.ServerByID(ctx, srv.ID); err == nil {
+				s.emitServer(ctx, srv.ID, "server_update", updated)
+				srv = updated
+			}
+		}
+		if err := s.removeMember(r, srv, id, "member_remove", map[string]any{"reason": "account_deleted"}); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
+	groups, err := s.Store.GroupDMsForUser(ctx, id)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	for _, gid := range groups {
+		ch, err := s.Store.ChannelByID(ctx, gid)
+		if err != nil {
+			continue
+		}
+		if err := s.removeFromGroup(r, ch, id); err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
+	if err := s.Store.DeleteAccount(ctx, id); err != nil {
+		WriteError(w, err)
+		return
+	}
+	// any tab still open for them signs out now
+	s.Bcast.EmitUsers([]ids.ID{id}, "session_expired", map[string]any{"reason": "deleted"})
+	if deleted, err := s.Store.UserByID(ctx, id); err == nil {
+		s.Bcast.UserUpdated(deleted)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// successor picks who takes a server over from an owner who is going: the
+// admin doing it if they are a member, otherwise whoever ranks highest.
+func (s *Server) successor(ctx context.Context, srv *store.Server, leaving, admin ids.ID) (ids.ID, bool) {
+	members, err := s.Store.MemberIDs(ctx, srv.ID)
+	if err != nil {
+		return 0, false
+	}
+	var best ids.ID
+	bestRank, found := 0, false
+	for _, m := range members {
+		if m == leaving {
+			continue
+		}
+		if m == admin {
+			return m, true
+		}
+		if rank, _ := s.actorHighest(ctx, srv, m); !found || rank > bestRank {
+			best, bestRank, found = m, rank, true
+		}
+	}
+	return best, found
 }
 
 func (s *Server) adminSettingsView(r *http.Request) map[string]any {

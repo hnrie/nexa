@@ -61,6 +61,18 @@ export default function AdminPage() {
       toast(err instanceof ApiError ? err.message : "Could not save the key.", "error");
     }
   };
+  const deleteUser = async (u: AdminUser) => {
+    setBusy(u.id);
+    try {
+      await adminApi.deleteUser(u.id);
+      setUsers((cur) => cur?.filter((x) => x.id !== u.id) ?? null);
+      toast(`@${u.username}'s account was deleted.`, "success");
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : "Could not delete that account.", "error");
+    } finally {
+      setBusy(null);
+    }
+  };
   const patchUser = async (u: AdminUser, body: { disabled?: boolean; admin?: boolean }) => {
     setBusy(u.id);
     try {
@@ -126,6 +138,24 @@ export default function AdminPage() {
             <div style={{ display: "flex", gap: 6 }}>
               <Button size="sm" variant="secondary" disabled={busy === u.id} onClick={() => void patchUser(u, { admin: !u.admin })}>{u.admin ? "Remove admin" : "Make admin"}</Button>
               <Button size="sm" variant={u.disabled ? "positive" : "danger"} disabled={busy === u.id} onClick={() => (u.disabled ? void patchUser(u, { disabled: false }) : openModal("confirm", { title: `Disable @${u.username}`, body: "They are logged out everywhere and cannot log in until re-enabled. Their messages stay.", confirmLabel: "Disable", danger: true, onConfirm: () => patchUser(u, { disabled: true }) }))}>{u.disabled ? "Enable" : "Disable"}</Button>
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={busy === u.id || u.admin}
+                title={u.admin ? "Remove their admin access first." : undefined}
+                data-testid="admin-delete-user"
+                onClick={() =>
+                  openModal("confirm", {
+                    title: `Delete @${u.username}`,
+                    body: "Their account is deleted for good: they are signed out, taken out of every server and group, and their profile is wiped. Messages they sent stay, shown as Deleted User. Any server they own passes to you if you are in it, or else to its highest-ranked member.",
+                    confirmLabel: "Delete Account",
+                    danger: true,
+                    onConfirm: () => deleteUser(u),
+                  })
+                }
+              >
+                Delete
+              </Button>
             </div>
           ) : <span className={s.memberSub}>you</span>}
         </div>

@@ -138,6 +138,24 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 	return c, nil
 }
 
+// GroupDMsForUser lists every group DM the user is in, hidden ones included.
+func (s *Store) GroupDMsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT c.id FROM channels c JOIN dm_participants p ON p.channel_id = c.id WHERE c.type = 'group_dm' AND p.user_id = ?`, int64(uid))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ids.ID{}
+	for rows.Next() {
+		var id ids.ID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 // DMChannelsForUser lists the DMs and group DMs the user is in.
 func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels c WHERE c.type IN ('dm','group_dm','subchat') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ? AND p.hidden = 0) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))

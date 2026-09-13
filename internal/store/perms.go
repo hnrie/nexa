@@ -27,6 +27,34 @@ func toPermMember(m *Member, now int64) perms.Member {
 	return perms.Member{UserID: m.UserID, RoleIDs: m.RoleIDs, TimedOut: m.TimeoutUntil != nil && *m.TimeoutUntil > now}
 }
 
+// IsInstanceAdmin reports whether an account runs this instance. In any server
+// it is a member of, such an account holds every permission its owner does.
+func (s *Store) IsInstanceAdmin(ctx context.Context, uid ids.ID) bool {
+	var flags int64
+	if err := s.db.R.QueryRowContext(ctx, `SELECT flags FROM users WHERE id = ?`, int64(uid)).Scan(&flags); err != nil {
+		return false
+	}
+	return flags&FlagAdmin != 0 && flags&(FlagDisabled|FlagDeleted) == 0
+}
+
+// instanceAdmins is IsInstanceAdmin for everyone at once.
+func (s *Store) instanceAdmins(ctx context.Context) (map[ids.ID]bool, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[ids.ID]bool{}
+	for rows.Next() {
+		var id ids.ID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
 // ServerPerms resolves a user's server-level permissions (0 for non-members).
 func (s *Store) ServerPerms(ctx context.Context, serverID, uid ids.ID) (perms.Perm, error) {
 	srv, err := s.ServerByID(ctx, serverID)
@@ -44,7 +72,7 @@ func (s *Store) ServerPerms(ctx context.Context, serverID, uid ids.ID) (perms.Pe
 	if err != nil {
 		return 0, err
 	}
-	return perms.Base(serverID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid), nil
+	return perms.Base(serverID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid)), nil
 }
 
 // ChannelPerms resolves a user's permissions in a channel. DM participants get
@@ -81,7 +109,7 @@ func (s *Store) ChannelPerms(ctx context.Context, channelID, uid ids.ID) (perms.
 	if err != nil {
 		return 0, ch, err
 	}
-	return perms.Compute(*ch.ServerID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid, toPermOverwrites(ows)), ch, nil
+	return perms.Compute(*ch.ServerID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid), toPermOverwrites(ows)), ch, nil
 }
 
 // ChannelViewers lists the members who can view a server channel.
@@ -113,11 +141,15 @@ func (s *Store) channelViewers(ctx context.Context, serverID, channelID ids.ID) 
 	if err != nil {
 		return nil, err
 	}
+	admins, err := s.instanceAdmins(ctx)
+	if err != nil {
+		return nil, err
+	}
 	pr, po := toPermRoles(roles), toPermOverwrites(ows)
 	now := nowMs()
 	out := []ids.ID{}
 	for _, m := range members {
-		if perms.Compute(serverID, pr, toPermMember(m, now), srv.OwnerID == m.UserID, po).Has(perms.ViewChannel) {
+		if perms.Compute(serverID, pr, toPermMember(m, now), srv.OwnerID == m.UserID || admins[m.UserID], po).Has(perms.ViewChannel) {
 			out = append(out, m.UserID)
 		}
 	}
@@ -149,6 +181,7 @@ func (s *Store) ChannelsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, erro
 	}
 	out := []ids.ID{}
 	now := nowMs()
+	admin := s.IsInstanceAdmin(ctx, uid)
 	for _, srv := range servers {
 		m, err := s.Member(ctx, srv.ID, uid)
 		if err != nil {
@@ -171,7 +204,7 @@ func (s *Store) ChannelsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, erro
 			if ch.Type == "category" {
 				continue
 			}
-			if perms.Compute(srv.ID, pr, pm, srv.OwnerID == uid, toPermOverwrites(ows[ch.ID])).Has(perms.ViewChannel) {
+			if perms.Compute(srv.ID, pr, pm, srv.OwnerID == uid || admin, toPermOverwrites(ows[ch.ID])).Has(perms.ViewChannel) {
 				out = append(out, ch.ID)
 			}
 		}
@@ -202,9 +235,10 @@ func (s *Store) ViewableServerChannels(ctx context.Context, serverID, uid ids.ID
 		return nil, err
 	}
 	pr, pm := toPermRoles(roles), toPermMember(m, nowMs())
+	privileged := srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid)
 	out := map[ids.ID]perms.Perm{}
 	for _, ch := range chans {
-		p := perms.Compute(serverID, pr, pm, srv.OwnerID == uid, toPermOverwrites(ows[ch.ID]))
+		p := perms.Compute(serverID, pr, pm, privileged, toPermOverwrites(ows[ch.ID]))
 		if p.Has(perms.ViewChannel) {
 			out[ch.ID] = p
 		}

@@ -358,6 +358,10 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 	if !allowed && !s.isDM(ch) && s.ChannelAccess != nil {
 		allowed, _ = s.ChannelAccess(r.Context(), me, ch, NeedManage)
 	}
+	// whoever runs the instance can take down any message they can see
+	if !allowed && me.Flags&store.FlagAdmin != 0 {
+		allowed = true
+	}
 	if !allowed {
 		WriteError(w, ErrForbidden)
 		return

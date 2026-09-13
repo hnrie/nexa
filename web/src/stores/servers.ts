@@ -1,7 +1,12 @@
 import { create } from "zustand";
 import type { Member, Role, Server, ServerView } from "@/api/types";
 import { ALL, compute, has, highestPosition, P, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
+
+/** The flag bit marking an account that runs the instance. */
+const USER_FLAG_ADMIN = 1;
+import { useAuth } from "./auth";
 import { useChannels } from "./channels";
+import { useUsers } from "./users";
 
 export interface ServerState {
   server: Server;
@@ -145,9 +150,19 @@ function recomputeMine(st: ServerState): bigint {
   return serverPerms(st, st.me.user_id);
 }
 
+/**
+ * Whether an account runs this instance. Like the server's owner, it holds
+ * every permission in any server it is a member of; the server agrees.
+ */
+export function isInstanceAdmin(userId: string): boolean {
+  const me = useAuth.getState().me;
+  const flags = me?.id === userId ? me.flags : useUsers.getState().byId[userId]?.flags;
+  return ((flags ?? 0) & USER_FLAG_ADMIN) !== 0;
+}
+
 /** Server-level permissions of a user from local state. */
 export function serverPerms(st: ServerState, userId: string): bigint {
-  if (st.server.owner_id === userId) return ALL;
+  if (st.server.owner_id === userId || isInstanceAdmin(userId)) return ALL;
   const m = st.members[userId];
   return compute(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(m, userId), false, undefined);
 }
@@ -155,12 +170,14 @@ export function serverPerms(st: ServerState, userId: string): bigint {
 /** A user's permissions in a channel of the server, from local state. */
 export function channelPerms(st: ServerState, channelId: string, userId: string): bigint {
   const ch = useChannels.getState().byId[channelId];
-  const isOwner = st.server.owner_id === userId;
+  const isOwner = st.server.owner_id === userId || isInstanceAdmin(userId);
   return compute(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(st.members[userId], userId), isOwner, ch?.overwrites);
 }
 
 export function memberHighest(st: ServerState, userId: string): { highest: number; isOwner: boolean } {
   const isOwner = st.server.owner_id === userId;
+  // above every role, as on the server, but still answerable to the owner
+  if (!isOwner && isInstanceAdmin(userId)) return { highest: 2 ** 30 - 1, isOwner: false };
   return { highest: highestPosition(toPermRoles(Object.values(st.roles)), toPermMember(st.members[userId], userId)), isOwner };
 }
 
