@@ -19,6 +19,8 @@ const (
 	defaultKDF    = `{"m":65536,"t":3,"p":1,"v":1}`
 	maxWrappedKey = 512
 	maxUserAgent  = 256
+	// time between the two steps of account recovery: enough to pick a new password
+	recoverTicketTTL = 15 * time.Minute
 )
 
 type kdfParams struct {
@@ -329,7 +331,10 @@ func (s *Server) handleRecoverBegin(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"public_key": u.PublicKey, "enc_private_key_recovery": u.EncPrivateKeyRecovery})
+	// Finishing signs the account in, so it asks for this ticket: without it a
+	// script could skip the captcha above by going straight to the second step.
+	tk := s.signTicket(ticket{Purpose: "recover", User: u.ID.String(), Exp: time.Now().Add(recoverTicketTTL).Unix()})
+	WriteJSON(w, http.StatusOK, map[string]any{"public_key": u.PublicKey, "enc_private_key_recovery": u.EncPrivateKeyRecovery, "ticket": tk})
 }
 
 func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
@@ -342,13 +347,24 @@ func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
 		NewEncPrivateKey         []byte          `json:"new_enc_private_key"`
 		NewRecoveryAuthKey       []byte          `json:"new_recovery_auth_key"`
 		NewEncPrivateKeyRecovery []byte          `json:"new_enc_private_key_recovery"`
+		Ticket                   string          `json:"ticket"`
 	}
 	if err := ReadJSON(w, r, &req, 16<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
+	expired := E(http.StatusUnauthorized, "recover_expired", "That recovery timed out. Please start again.")
+	tk, ok := s.readTicket(req.Ticket, "recover")
+	if !ok {
+		WriteError(w, expired)
+		return
+	}
 	u, ok := s.verifyRecovery(w, r, req.Username, req.RecoveryAuthKey)
 	if !ok {
+		return
+	}
+	if tk.User != u.ID.String() {
+		WriteError(w, expired)
 		return
 	}
 	if len(req.NewAuthKey) != 32 || len(req.NewKDFSalt) < 16 || len(req.NewKDFSalt) > 64 || !validKDF(req.NewKDFParams) || len(req.NewEncPrivateKey) == 0 || len(req.NewEncPrivateKey) > maxWrappedKey {

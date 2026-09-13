@@ -29,7 +29,8 @@ export const auth = {
   newBackupCodes(auth_key: string): Promise<{ backup_codes: string[] }> {
     return api.request("POST", "/auth/mfa/backup", { auth_key });
   },
-  recoverBegin(username: string, recovery_auth_key: string, captcha?: string | null): Promise<{ public_key: string; enc_private_key_recovery: string }> {
+  /** The ticket it returns is needed to finish, a few minutes later at most. */
+  recoverBegin(username: string, recovery_auth_key: string, captcha?: string | null): Promise<{ public_key: string; enc_private_key_recovery: string; ticket: string }> {
     return api.request("POST", "/auth/recover/begin", { username, recovery_auth_key }, captchaOptions(captcha));
   },
   recoverFinish(body: {
@@ -41,6 +42,7 @@ export const auth = {
     new_enc_private_key: string;
     new_recovery_auth_key?: string;
     new_enc_private_key_recovery?: string;
+    ticket: string;
   }): Promise<LoginResponse> {
     return api.request<LoginResponse>("POST", "/auth/recover/finish", body);
   },

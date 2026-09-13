@@ -56,16 +56,31 @@ func (s *Server) requireCaptcha(w http.ResponseWriter, r *http.Request, action s
 	}
 	defer res.Body.Close()
 	var out struct {
-		Success bool   `json:"success"`
-		Action  string `json:"action"`
+		Success  bool   `json:"success"`
+		Action   string `json:"action"`
+		Hostname string `json:"hostname"`
+		Metadata struct {
+			// Cloudflare's test secret keys pass every token, for no action on
+			// example.com, and say so here. A real secret never answers this.
+			Testing bool `json:"result_with_testing_key"`
+		} `json:"metadata"`
 	}
 	if res.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&out) != nil {
 		return unavailable()
 	}
-	// a token solved for one action is no good for another
-	if !out.Success || (out.Action != "" && out.Action != action) {
+	// A token counts only for the action it was solved for, and only when it
+	// was solved on this site: one made for a friend request, or on a page
+	// someone else put the widget on, does not sign anybody in.
+	if !out.Success || (!out.Metadata.Testing && (out.Action != action || !s.captchaSite(out.Hostname))) {
 		WriteError(w, E(http.StatusForbidden, "captcha_failed", "The captcha check failed. Please try again."))
 		return false
 	}
 	return true
+}
+
+// captchaSite reports whether Cloudflare saw the captcha solved on this
+// instance's own hostname, the one in PUBLIC_URL.
+func (s *Server) captchaSite(hostname string) bool {
+	u, err := url.Parse(s.Cfg.PublicURL)
+	return err == nil && u.Hostname() != "" && strings.EqualFold(hostname, u.Hostname())
 }

@@ -139,6 +139,10 @@ func Load(getenv func(string) string) (Config, error) {
 	default:
 		return c, fmt.Errorf("LOG_LEVEL: expected debug|info|warn|error, got %q", c.LogLevel)
 	}
+	// With one key and not the other captchas would be silently off.
+	if (c.TurnstileSiteKey == "") != (c.TurnstileSecretKey == "") {
+		return c, fmt.Errorf("TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY: set both to turn captchas on, or neither")
+	}
 	c.PublicURL = strings.TrimRight(c.PublicURL, "/")
 	if !strings.HasPrefix(c.PublicURL, "http://") && !strings.HasPrefix(c.PublicURL, "https://") {
 		return c, fmt.Errorf("PUBLIC_URL: must start with http:// or https://, got %q", c.PublicURL)

@@ -258,8 +258,9 @@ func TestRecoveryKeyClearsSecondFactor(t *testing.T) {
 	token, _ := register(t, ts, "alice")
 	enableTOTP(t, ts, token)
 
+	_, begin := do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "alice", "recovery_auth_key": b64(key32b)})
 	res, body := do(t, ts, "POST", "/api/v1/auth/recover/finish", "", map[string]any{
-		"username": "alice", "recovery_auth_key": b64(key32b),
+		"username": "alice", "recovery_auth_key": b64(key32b), "ticket": begin["ticket"],
 		"new_auth_key": b64(key32), "new_kdf_salt": b64(salt16),
 		"new_kdf_params":      map[string]int{"m": 65536, "t": 3, "p": 1, "v": 1},
 		"new_enc_private_key": b64(wrapped),

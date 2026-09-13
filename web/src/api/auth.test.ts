@@ -63,6 +63,7 @@ describe("auth", () => {
       new_kdf_salt: "U0FM",
       new_kdf_params: params,
       new_enc_private_key: "S0VZ",
+      ticket: "VElDS0VU",
     };
     await auth.recoverFinish(body);
     expect(one(calls)).toMatchObject({ method: "POST", path: "/auth/recover/finish", body });

@@ -44,7 +44,8 @@ func TestLoadOverridesAndValidation(t *testing.T) {
 	if c.PublicURL != "http://localhost:8090" {
 		t.Errorf("PublicURL trailing slash kept: %q", c.PublicURL)
 	}
-	bad := map[string]string{"REGISTRATION": "sometimes", "MAX_UPLOAD_BYTES": "abc", "SESSION_TTL_DAYS": "0", "PUBLIC_URL": "chat.example", "LOG_LEVEL": "loud"}
+	// half a captcha setup is refused rather than quietly leaving captchas off
+	bad := map[string]string{"REGISTRATION": "sometimes", "MAX_UPLOAD_BYTES": "abc", "SESSION_TTL_DAYS": "0", "PUBLIC_URL": "chat.example", "LOG_LEVEL": "loud", "TURNSTILE_SITE_KEY": "site", "TURNSTILE_SECRET_KEY": "secret"}
 	for k, v := range bad {
 		_, err := Load(func(kk string) string {
 			if kk == k {

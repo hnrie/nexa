@@ -259,6 +259,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       new_enc_private_key: b64.enc(await wrapPrivateKey(privateKey, encKey)),
       new_recovery_auth_key: b64.enc(frk.authKey),
       new_enc_private_key_recovery: b64.enc(await wrapPrivateKey(privateKey, frk.encKey)),
+      ticket: begin.ticket,
     });
     await finishLogin(set, res.user, res.token, { publicKey: b64.dec(begin.public_key), privateKey });
     return { recoveryKey: fresh.display };

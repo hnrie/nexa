@@ -214,12 +214,37 @@ func TestRecoveryFlow(t *testing.T) {
 	if res.StatusCode != 200 || body["enc_private_key_recovery"] != b64([]byte("wrapped-recovery")) || body["public_key"] != b64(pub32) {
 		t.Fatalf("begin: %d %v", res.StatusCode, body)
 	}
-	if res, body = do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "alice", "recovery_auth_key": b64(key32)}); res.StatusCode != 401 {
+	ticket, _ := body["ticket"].(string)
+	if ticket == "" {
+		t.Fatalf("begin hands out the ticket finishing needs: %v", body)
+	}
+	if res, body = do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "alice", "recovery_auth_key": b64(key32)}); res.StatusCode != 401 || body["ticket"] != nil {
 		t.Errorf("wrong recovery key: %d %v", res.StatusCode, body)
 	}
 	newKey := bytes.Repeat([]byte{3}, 32)
 	newRec := bytes.Repeat([]byte{4}, 32)
-	res, body = do(t, ts, "POST", "/api/v1/auth/recover/finish", "", map[string]any{"username": "alice", "recovery_auth_key": b64(key32b), "new_auth_key": b64(newKey), "new_kdf_salt": b64(salt16), "new_kdf_params": map[string]int{"m": 65536, "t": 3, "p": 1, "v": 1}, "new_enc_private_key": b64([]byte("rw2")), "new_recovery_auth_key": b64(newRec), "new_enc_private_key_recovery": b64([]byte("rr2"))})
+	finish := map[string]any{"username": "alice", "recovery_auth_key": b64(key32b), "new_auth_key": b64(newKey), "new_kdf_salt": b64(salt16), "new_kdf_params": map[string]int{"m": 65536, "t": 3, "p": 1, "v": 1}, "new_enc_private_key": b64([]byte("rw2")), "new_recovery_auth_key": b64(newRec), "new_enc_private_key_recovery": b64([]byte("rr2"))}
+	// going straight to the second step, which signs in, skips begin and its captcha: refused
+	if res, body = do(t, ts, "POST", "/api/v1/auth/recover/finish", "", finish); res.StatusCode != 401 || errCode(body) != "recover_expired" {
+		t.Fatalf("finish without a ticket: %d %v", res.StatusCode, body)
+	}
+	finish["ticket"] = "forged." + ticket
+	if res, body = do(t, ts, "POST", "/api/v1/auth/recover/finish", "", finish); res.StatusCode != 401 || errCode(body) != "recover_expired" {
+		t.Fatalf("finish with a forged ticket: %d %v", res.StatusCode, body)
+	}
+	// a ticket opens only the account it was given for
+	register(t, ts, "mallory")
+	mallory := map[string]any{}
+	for k, v := range finish {
+		mallory[k] = v
+	}
+	mallory["username"] = "mallory"
+	mallory["ticket"] = ticket
+	if res, body = do(t, ts, "POST", "/api/v1/auth/recover/finish", "", mallory); res.StatusCode != 401 || errCode(body) != "recover_expired" {
+		t.Fatalf("finish with someone else's ticket: %d %v", res.StatusCode, body)
+	}
+	finish["ticket"] = ticket
+	res, body = do(t, ts, "POST", "/api/v1/auth/recover/finish", "", finish)
 	if res.StatusCode != 200 || body["token"] == nil || body["enc_private_key"] != b64([]byte("rw2")) {
 		t.Fatalf("finish: %d %v", res.StatusCode, body)
 	}
