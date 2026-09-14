@@ -555,9 +555,7 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
     s.screenPending = true;
     let stream: MediaStream;
     try {
-      const capture = await getScreen(res, fps, audio);
-      stream = capture.stream;
-      if (capture.droppedEchoingAudio) useUI.getState().toast("Your screen is shared without sound: this computer can't leave the call's own audio out of it, so everyone would hear themselves echo.", "info");
+      stream = await getScreen(res, fps, audio);
     } catch {
       s.screenPending = false;
       return; // the user cancelled the picker

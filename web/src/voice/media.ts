@@ -117,25 +117,7 @@ export function shareAudioRequested(): boolean {
   return shareAudioAsked;
 }
 
-/**
- * Whether a captured audio track is the whole system's sound with this app's
- * own playback still in it. restrictOwnAudio is only a request: where the
- * system cannot honour it the capture keeps the call's sound, and everyone
- * else would hear themselves echo back through the share.
- */
-export function echoesOwnAudio(settings: MediaTrackSettings & { restrictOwnAudio?: boolean }): boolean {
-  const id = typeof settings.deviceId === "string" ? settings.deviceId : "";
-  if (!id.startsWith("loopback")) return false;
-  return settings.restrictOwnAudio !== true && id !== "loopbackWithoutChrome";
-}
-
-export interface ScreenCapture {
-  stream: MediaStream;
-  /** Sound was asked for and came, but with the call in it, so it was left out. */
-  droppedEchoingAudio: boolean;
-}
-
-export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio = true): Promise<ScreenCapture> {
+export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio = true): Promise<MediaStream> {
   const video = shareVideoConstraints(res, fps);
   // System audio where the browser allows it (Chrome asks per window or tab).
   // restrictOwnAudio leaves this app's own sound out of it, the call included:
@@ -146,18 +128,11 @@ export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio =
   const opts = { video, audio, systemAudio: withAudio ? "include" : "exclude", surfaceSwitching: "include", selfBrowserSurface: "exclude" } as DisplayMediaStreamOptions & { systemAudio: string; surfaceSwitching: string; selfBrowserSurface: string };
   shareAudioAsked = withAudio;
   const stream = await navigator.mediaDevices.getDisplayMedia(opts);
-  let droppedEchoingAudio = false;
-  for (const t of stream.getAudioTracks()) {
-    if (!echoesOwnAudio(t.getSettings())) continue;
-    t.stop();
-    stream.removeTrack(t);
-    droppedEchoingAudio = true;
-  }
   // Under a squeezed connection the encoder gives up detail or smoothness.
   // Whoever picked 60 fps wants motion kept; anything slower is usually text.
   const track = stream.getVideoTracks()[0];
   if (track && "contentHint" in track) track.contentHint = fps >= 60 ? "motion" : "detail";
-  return { stream, droppedEchoingAudio };
+  return stream;
 }
 
 export interface Devices {
