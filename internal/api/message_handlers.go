@@ -459,7 +459,7 @@ func (s *Server) handleMessageBulkDelete(w http.ResponseWriter, r *http.Request)
 // wrote in a channel: a group DM's owner, anyone with Manage Messages in a
 // server channel, and whoever runs the instance.
 func (s *Server) canDeleteOthers(r *http.Request, ch *store.Channel, me *store.User) bool {
-	if ch.Type == "group_dm" && ch.OwnerID != nil && *ch.OwnerID == me.ID {
+	if ch.Type == "group_dm" && ownsGroup(ch, me) {
 		return true
 	}
 	if !s.isDM(ch) && s.ChannelAccess != nil {

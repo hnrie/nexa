@@ -68,6 +68,16 @@ func (s *Server) canAccess(r *http.Request, u *store.User, ch *store.Channel, ne
 	return false, nil
 }
 
+// managesGroup says whether someone may do what a group's owner does: the
+// owner, and whoever runs the instance, as in any server they are part of.
+func managesGroup(ch *store.Channel, me *store.User) bool {
+	return ownsGroup(ch, me) || me.Flags&store.FlagAdmin != 0
+}
+
+func ownsGroup(ch *store.Channel, me *store.User) bool {
+	return ch.OwnerID != nil && *ch.OwnerID == me.ID
+}
+
 // isDM covers every conversation that is not part of a server, subchats
 // included: they share the same membership rules.
 func (s *Server) isDM(ch *store.Channel) bool { return store.IsDMLike(ch.Type) }

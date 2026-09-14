@@ -70,7 +70,7 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 			s.leaveGroup(w, r, ch, me)
 			return
 		}
-		if ch.OwnerID == nil || *ch.OwnerID != me.ID {
+		if !managesGroup(ch, me) {
 			WriteError(w, E(http.StatusForbidden, "not_owner", "Only the group's owner can delete it."))
 			return
 		}

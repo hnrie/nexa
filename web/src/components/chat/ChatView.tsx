@@ -2,7 +2,7 @@ import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pi
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
-import { Avatar, statusLabel } from "@/components/common/Avatar";
+import { statusLabel } from "@/components/common/Avatar";
 import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -11,13 +11,14 @@ import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { activityLine } from "@/lib/activity";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
-import { useUsers, displayName } from "@/stores/users";
+import { useUsers } from "@/stores/users";
 import { conversationOf, useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useIsMobile, useIsNarrow } from "@/hooks/useIsMobile";
 import { useMemo } from "react";
 import { useServers } from "@/stores/servers";
 import { isPrivateChannel } from "@/lib/perms";
+import { GroupMemberList } from "./GroupMemberList";
 import { MemberList } from "./MemberList";
 import { CallBanner } from "@/components/voice/CallBanner";
 import { SearchPanel } from "@/components/search/SearchPanel";
@@ -227,21 +228,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
-        {convo.type === "group_dm" && (drawer || membersOpen) ? (
-          <aside className={s.members} data-open={drawer ? membersOpen : undefined}>
-            <div className={s.mHead}>Members — {convo.recipient_ids.length}</div>
-            {convo.recipient_ids.map((id) => {
-              const u = users[id];
-              const st = statusOf(presence[id]);
-              return (
-                <button key={id} className={s.mRow} data-offline={st === "offline"} onClick={() => openModal("profile", { userId: id })}>
-                  <Avatar id={id} avatarId={u?.avatar_id ?? null} name={displayName(u)} size={32} status={st} />
-                  <span className={s.mName}>{displayName(u)}{channel.owner_id === id ? " 👑" : ""}</span>
-                </button>
-              );
-            })}
-          </aside>
-        ) : null}
+        {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}
       </div>
     </div>
   );

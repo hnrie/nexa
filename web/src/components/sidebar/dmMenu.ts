@@ -7,6 +7,7 @@ import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
+import { isInstanceAdmin } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -58,6 +59,13 @@ export async function purgeDM(channelId: string, nav?: (p: string) => void): Pro
   }
 }
 
+/** Whether you may do what a group's owner does: you own it, or you run this instance. */
+export function managesGroup(ch: Channel | undefined): boolean {
+  const me = useAuth.getState().me;
+  if (!ch || ch.type !== "group_dm" || !me) return false;
+  return ch.owner_id === me.id || isInstanceAdmin(me.id);
+}
+
 export interface DMMenuCtx {
   nav: (path: string) => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
@@ -71,7 +79,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
   const settings = useSettings.getState().settings;
   const muted = settings.notifications.muted.includes(channelId);
   const group = ch.type === "group_dm";
-  const owner = group && ch.owner_id === me?.id;
+  const owner = managesGroup(ch);
   const name = nameOf(ch);
   const reads = useReadStates.getState();
   const items: ContextMenuItem[] = [

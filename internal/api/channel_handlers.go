@@ -205,7 +205,7 @@ func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
 		p.Name = &name
 	}
 	if req.OwnerID != nil {
-		if ch.OwnerID == nil || *ch.OwnerID != me.ID {
+		if !managesGroup(ch, me) {
 			WriteError(w, E(http.StatusForbidden, "not_owner", "Only the group owner can transfer ownership."))
 			return
 		}
@@ -329,9 +329,13 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	isOwner := ch.OwnerID != nil && *ch.OwnerID == me.ID
-	if uid != me.ID && !isOwner {
+	if uid != me.ID && !managesGroup(ch, me) {
 		WriteError(w, E(http.StatusForbidden, "not_owner", "Only the group owner can remove others."))
+		return
+	}
+	// an instance admin outranks everyone in a group but its owner, as in a server
+	if uid != me.ID && ch.OwnerID != nil && *ch.OwnerID == uid {
+		WriteError(w, E(http.StatusForbidden, "is_owner", "The group's owner cannot be removed. Transfer ownership first."))
 		return
 	}
 	subs, err := s.Store.RemoveParticipant(r.Context(), ch.ID, uid)

@@ -133,3 +133,70 @@ func TestAdminDeletesAnAccount(t *testing.T) {
 		t.Errorf("deleting twice: %d", res.StatusCode)
 	}
 }
+
+func TestInstanceAdminManagesGroupsTheyAreIn(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice") // first account is the admin
+	tokB, idB := register(t, ts, "bob")
+	tokC, idC := register(t, ts, "carol")
+	tokD, idD := register(t, ts, "dave")
+	friend(t, ts, tokB, "alice", tokA, idB)
+	friend(t, ts, tokB, "carol", tokC, idB)
+	friend(t, ts, tokB, "dave", tokD, idB)
+	res, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokB, map[string]any{"recipient_ids": []string{idA, idC, idD}, "name": "bob's"})
+	if res.StatusCode != 201 || body["owner_id"] != idB {
+		t.Fatalf("group: %d %v", res.StatusCode, body)
+	}
+	g := body["id"].(string)
+
+	// an ordinary member can do none of what the owner does to others
+	if res, body = do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idD, tokC, nil); res.StatusCode != 403 || errCode(body) != "not_owner" {
+		t.Errorf("member removing another: %d %v", res.StatusCode, body)
+	}
+	if res, body = do(t, ts, "PATCH", "/api/v1/channels/"+g, tokC, map[string]any{"owner_id": idC}); res.StatusCode != 403 {
+		t.Errorf("member taking ownership: %d %v", res.StatusCode, body)
+	}
+
+	// the admin removes members, but not the owner, who outranks her as in a server
+	if res, body = do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idD, tokA, nil); res.StatusCode != 204 {
+		t.Errorf("admin removing a member: %d %v", res.StatusCode, body)
+	}
+	if res, body = do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idB, tokA, nil); res.StatusCode != 403 || errCode(body) != "is_owner" {
+		t.Errorf("admin removing the owner: %d %v", res.StatusCode, body)
+	}
+
+	// she can hand the group on, after which the old owner is a member like any other
+	if res, body = do(t, ts, "PATCH", "/api/v1/channels/"+g, tokA, map[string]any{"owner_id": idC}); res.StatusCode != 200 || body["owner_id"] != idC {
+		t.Fatalf("admin transferring ownership: %d %v", res.StatusCode, body)
+	}
+	if res, body = do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idB, tokA, nil); res.StatusCode != 204 {
+		t.Errorf("admin removing the former owner: %d %v", res.StatusCode, body)
+	}
+
+	// subchats in the group are hers to rename, and the group hers to delete
+	res, body = do(t, ts, "POST", "/api/v1/channels/"+g+"/subchats", tokC, map[string]any{"name": "carol's corner"})
+	if res.StatusCode != 201 {
+		t.Fatalf("subchat: %d %v", res.StatusCode, body)
+	}
+	sub := body["id"].(string)
+	if res, body = do(t, ts, "PATCH", "/api/v1/channels/"+sub, tokA, map[string]any{"name": "renamed"}); res.StatusCode != 200 || body["name"] != "renamed" {
+		t.Errorf("admin renaming a subchat: %d %v", res.StatusCode, body)
+	}
+	if res, body = do(t, ts, "DELETE", "/api/v1/channels/"+g+"?purge=true", tokA, nil); res.StatusCode != 204 {
+		t.Errorf("admin deleting the group: %d %v", res.StatusCode, body)
+	}
+	if res, _ = do(t, ts, "GET", "/api/v1/channels/"+g, tokC, nil); res.StatusCode != 404 {
+		t.Errorf("the group is gone for its owner too: %d", res.StatusCode)
+	}
+
+	// a group she is not in stays out of reach
+	friend(t, ts, tokC, "dave", tokD, idC)
+	res, body = do(t, ts, "POST", "/api/v1/users/@me/channels", tokC, map[string]any{"recipient_ids": []string{idB, idD}})
+	if res.StatusCode != 201 {
+		t.Fatalf("second group: %d %v", res.StatusCode, body)
+	}
+	other := body["id"].(string)
+	if res, _ = do(t, ts, "DELETE", "/api/v1/channels/"+other+"/recipients/"+idD, tokA, nil); res.StatusCode != 404 {
+		t.Errorf("admin outside the group: %d", res.StatusCode)
+	}
+}
