@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -13,10 +14,13 @@ import (
 
 // Config is the complete runtime configuration of chatd.
 type Config struct {
-	Listen          string
-	PublicURL       string
-	DataDir         string
-	WebDist         string
+	Listen    string
+	PublicURL string
+	DataDir   string
+	WebDist   string
+	// DesktopDir holds published desktop app installers and update manifests,
+	// served at /desktop/. It defaults to "desktop" inside DataDir.
+	DesktopDir      string
 	MaxUploadBytes  int64
 	MaxAvatarBytes  int64
 	MaxEmojiBytes   int64
@@ -81,6 +85,10 @@ func Load(getenv func(string) string) (Config, error) {
 	str("PUBLIC_URL", &c.PublicURL)
 	str("DATA_DIR", &c.DataDir)
 	str("WEB_DIST", &c.WebDist)
+	str("DESKTOP_DIR", &c.DesktopDir)
+	if c.DesktopDir == "" {
+		c.DesktopDir = filepath.Join(c.DataDir, "desktop")
+	}
 	str("REGISTRATION", &c.Registration)
 	str("REGISTRATION_KEY", &c.RegistrationKey)
 	str("ADMIN_USERNAME", &c.AdminUsername)

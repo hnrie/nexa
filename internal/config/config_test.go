@@ -30,6 +30,20 @@ func TestLoadDefaults(t *testing.T) {
 	if c.RealtimeMonthlyGB != 1000 || c.RealtimeAppID != "" {
 		t.Errorf("Realtime defaults: %d %q", c.RealtimeMonthlyGB, c.RealtimeAppID)
 	}
+	if c.DesktopDir != filepath.Join("data", "desktop") {
+		t.Errorf("DesktopDir = %q", c.DesktopDir)
+	}
+	// the desktop releases follow the data folder unless given a folder of their own
+	moved, err := Load(func(k string) string { return map[string]string{"DATA_DIR": "/srv/chat"}[k] })
+	if err != nil || moved.DesktopDir != filepath.Join("/srv/chat", "desktop") {
+		t.Errorf("DesktopDir with DATA_DIR: %v %q", err, moved.DesktopDir)
+	}
+	own, err := Load(func(k string) string {
+		return map[string]string{"DATA_DIR": "/srv/chat", "DESKTOP_DIR": "/srv/releases"}[k]
+	})
+	if err != nil || own.DesktopDir != "/srv/releases" {
+		t.Errorf("DESKTOP_DIR: %v %q", err, own.DesktopDir)
+	}
 	both, err := Load(func(k string) string {
 		return map[string]string{"REALTIME_APP_ID": "app", "REALTIME_APP_SECRET": "secret", "REALTIME_MONTHLY_GB": "250"}[k]
 	})

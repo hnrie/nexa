@@ -31,6 +31,8 @@ const (
 	OpVoiceState  = "voice_state"
 	OpVoiceSignal = "voice_signal"
 	OpSubscribe   = "subscribe_members"
+	// OpActivities replaces this connection's activities (from the desktop app's Rich Presence server).
+	OpActivities = "activities"
 )
 
 // Server events.
@@ -86,6 +88,8 @@ type Presence struct {
 	StatusText      string `json:"status_text"`
 	StatusEmoji     string `json:"status_emoji"`
 	StatusExpiresAt *int64 `json:"status_expires_at"`
+	// Activities are what the user is doing right now (games, music, video), newest connection's first.
+	Activities []Activity `json:"activities,omitempty"`
 }
 
 // ReadyPayload is sent once after a successful identify.
@@ -118,6 +122,11 @@ type presenceData struct {
 	StatusEmoji     *string `json:"status_emoji"`
 	StatusExpiresAt *int64  `json:"status_expires_at"`
 	ClearStatus     bool    `json:"clear_status"`
+}
+
+// activitiesData is the payload of the activities op; an empty list clears them.
+type activitiesData struct {
+	Activities []json.RawMessage `json:"activities"`
 }
 
 type typingData struct {

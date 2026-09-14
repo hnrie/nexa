@@ -88,6 +88,7 @@ func main() {
 	srv.Bcast = hub
 	srv.WireServers(hub)
 	srv.WireVoice(hub)
+	srv.WireActivities(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 
 	ctx, cancel := context.WithCancel(context.Background())

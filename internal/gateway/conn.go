@@ -38,6 +38,12 @@ const (
 	// Each presence op writes to the database and fans out to every co-member.
 	presenceEvery = 2 * time.Second
 	presenceBurst = 5
+	// Activity changes reach co-members at most this often, like Discord's
+	// five updates per twenty seconds; the latest waits for its turn.
+	activityEvery = 4 * time.Second
+	activityBurst = 5
+	// maxActivityBytes bounds one activity as sent.
+	maxActivityBytes = 8 << 10
 	// Voice signals are relayed to one peer, so their bytes are budgeted to
 	// keep a flood from filling that peer's send buffer.
 	signalBytesRate  = 128 << 10
@@ -86,6 +92,16 @@ type conn struct {
 	ops         *rate.Limiter
 	presence    *rate.Limiter
 	signalBytes *rate.Limiter
+
+	// Activities this connection reported, resolved and cleaned. Payloads that
+	// arrive while one is being resolved wait in actPending, latest only.
+	actMu      sync.Mutex
+	acts       []Activity
+	actsAt     time.Time
+	actPending *[]json.RawMessage
+	actBusy    bool
+	actLimit   *rate.Limiter
+	actTimer   *time.Timer
 
 	// Until ready is queued the connection is registered but not live: events
 	// wait in pending, so nothing emitted while ready is built is lost or
@@ -199,7 +215,8 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := &conn{id: ids.New(), hub: h, ws: ws, user: user, session: session, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
-		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst)}
+		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst),
+		actLimit: rate.NewLimiter(rate.Every(activityEvery), activityBurst)}
 	c.beat.Store(time.Now().UnixMilli())
 
 	// Register before building ready, so events fired meanwhile are held for
@@ -224,6 +241,10 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.close(websocket.StatusNormalClosure, "bye")
 	if h.OnConnClose != nil {
 		h.OnConnClose(context.Background(), user.ID, c.id)
+	}
+	// what this connection was doing ends with it; the user's other devices may still say something
+	if c.dropActivities() && !last {
+		h.broadcastUser(context.Background(), user.ID)
 	}
 	if last {
 		bg := context.Background()
@@ -349,6 +370,16 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		c.user = u
 		h.broadcastPresence(ctx, u)
+	case OpActivities:
+		c.beat.Store(time.Now().UnixMilli())
+		var d activitiesData
+		if err := json.Unmarshal(f.D, &d); err != nil {
+			return
+		}
+		if len(d.Activities) > maxActivities {
+			d.Activities = d.Activities[:maxActivities]
+		}
+		c.queueActivities(d.Activities)
 	case OpTyping:
 		var d typingData
 		if err := json.Unmarshal(f.D, &d); err != nil || d.ChannelID.IsZero() {

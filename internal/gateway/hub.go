@@ -14,6 +14,7 @@ import (
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/rpcapps"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -51,6 +52,16 @@ type Hub struct {
 	OnDisconnect func(ctx context.Context, uid ids.ID)
 	// OnConnClose runs when any connection closes; voice states belong to one connection.
 	OnConnClose func(ctx context.Context, uid, connID ids.ID)
+	// ProxyURL rewrites an activity's image to this server's media proxy, so
+	// viewers never fetch it from Discord or a third party themselves.
+	ProxyURL func(raw string) string
+	// Apps names Discord Rich Presence applications and their art (nil: activities show as sent).
+	Apps AppLookup
+}
+
+// AppLookup finds a Discord Rich Presence application.
+type AppLookup interface {
+	Lookup(ctx context.Context, id string) (*rpcapps.App, error)
 }
 
 // New creates a hub.
@@ -426,6 +437,10 @@ func (h *Hub) PresenceOf(ctx context.Context, u *store.User) Presence {
 	default:
 		p.Status = "online"
 	}
+	// someone invisible shows no activity either
+	if p.Status != "offline" {
+		p.Activities = h.activitiesOf(u.ID)
+	}
 	return p
 }
 
@@ -434,6 +449,7 @@ func (h *Hub) selfPresence(ctx context.Context, u *store.User) Presence {
 	p := h.PresenceOf(ctx, u)
 	if u.PresencePref == "invisible" && h.Online(u.ID) {
 		p.Status = "invisible"
+		p.Activities = h.activitiesOf(u.ID)
 	}
 	return p
 }

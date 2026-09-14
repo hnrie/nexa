@@ -10,10 +10,12 @@ import (
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/config"
+	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/ratelimit"
 	"evilion.xyz/chat/internal/realtime"
+	"evilion.xyz/chat/internal/rpcapps"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/unfurl"
 	"evilion.xyz/chat/internal/voice"
@@ -69,6 +71,10 @@ type Server struct {
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
+	// Apps looks up Discord Rich Presence applications for activities.
+	Apps *rpcapps.Cache
+	// activityHub resolves activity previews the way the gateway shows them.
+	activityHub *gateway.Hub
 	// Voice tracks who is in which voice channel (set by WireVoice).
 	Voice *voice.Registry
 	// Realtime sends calls through Cloudflare Realtime SFU when configured, and
