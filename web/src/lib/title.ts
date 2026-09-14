@@ -5,7 +5,8 @@ import { useSettings } from "@/stores/settings";
 
 const BASE = "Evilion Chat";
 
-function compute(): string {
+/** Everything waiting for this user: messages in conversations, mentions elsewhere. */
+export function unreadTotal(): number {
   const channels = useChannels.getState().byId;
   const reads = useReadStates.getState().byChannel;
   const settings = useSettings.getState().settings;
@@ -15,6 +16,11 @@ function compute(): string {
     // a conversation counts its waiting messages; elsewhere only mentions do
     n += ch.type === "dm" || ch.type === "group_dm" ? conversationCount(ch, rs, settings) : (rs?.mentions ?? 0);
   }
+  return n;
+}
+
+function compute(): string {
+  const n = unreadTotal();
   return n > 0 ? `(${n > 99 ? "99+" : n}) ${BASE}` : BASE;
 }
 

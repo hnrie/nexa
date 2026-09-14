@@ -1,0 +1,22 @@
+/* a Rich Presence activity: the card in a profile, and the line under a name */
+.card { display: flex; flex-direction: column; gap: 10px; }
+.heading { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.art { position: relative; flex: none; width: 72px; height: 72px; }
+.large { width: 72px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg-active); display: block; }
+.fallback { width: 72px; height: 72px; border-radius: var(--radius-sm); background: var(--bg-active); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.small { position: absolute; right: -6px; bottom: -6px; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--bg-raised); border: 3px solid var(--bg-raised); box-sizing: content-box; }
+.text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 18px; color: var(--text); }
+.title { font-weight: 600; color: var(--text-strong); }
+.title, .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.muted { color: var(--text-muted); }
+a.title:hover, a.line:hover { text-decoration: underline; }
+.clock { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.progress { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.bar { height: 4px; border-radius: 2px; background: var(--bg-active); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: inherit; background: var(--text-strong); transition: width 1s linear; }
+.buttons { display: flex; flex-direction: column; gap: 6px; }
+.button { display: flex; align-items: center; justify-content: center; min-height: 32px; padding: 6px 12px; border-radius: var(--radius-xs); background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); font-size: 14px; font-weight: 500; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.button:hover { background: var(--bg-active); text-decoration: none; }
+.list { display: flex; flex-direction: column; gap: 16px; }
+@media (pointer: coarse) { .button { min-height: 40px; } }

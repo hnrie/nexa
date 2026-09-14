@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import { lazyPage } from "@/lib/lazyChunk";
 import { isTopLayer } from "@/components/common/Modal";
 import { useAuth } from "@/stores/auth";
+import { desktopBridge } from "@/lib/desktopBridge";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import s from "./Settings.module.css";
 
 const AccountPage = lazyPage(() => import("./AccountPage"));
@@ -16,6 +18,7 @@ const NotificationsPage = lazyPage(() => import("./NotificationsPage"));
 const StickersPage = lazyPage(() => import("./StickersPage"));
 const VoicePage = lazyPage(() => import("./VoicePage"));
 const AdminPage = lazyPage(() => import("./AdminPage"));
+const DesktopPage = lazyPage(() => import("./DesktopPage"));
 
 const NAV: { head: string; items: { id: string; label: string }[] }[] = [
   { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "security", label: "Security" }, { id: "devices", label: "Devices" }] },
@@ -26,7 +29,11 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   const [page, setPage] = useState(initial);
   const logout = useAuth((a) => a.logout);
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
-  const nav = isAdmin ? [...NAV, { head: "Instance", items: [{ id: "admin", label: "Instance Admin" }] }] : NAV;
+  const inApp = !!desktopBridge();
+  const mobile = useIsMobile();
+  const appItems = inApp ? [{ id: "desktop", label: "Desktop App" }] : [];
+  const base = NAV.map((g) => (g.head === "App Settings" ? { ...g, items: [...g.items, ...appItems] } : g));
+  const nav = isAdmin ? [...base, { head: "Instance", items: [{ id: "admin", label: "Instance Admin" }] }] : base;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -39,7 +46,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const body =
-    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "admin" && isAdmin ? <AdminPage /> : <AccountPage onClose={onClose} />;
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage /> : <AccountPage onClose={onClose} />;
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings" data-modal-layer="">
       <div className={s.navWrap}>
@@ -53,6 +60,9 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
             </div>
           ))}
           <div className={s.navSep} />
+          {!inApp && !mobile ? (
+            <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">Get the Desktop App</button>
+          ) : null}
           <button className={[s.navItem, s.danger].join(" ")} onClick={() => void logout()}>Log Out</button>
         </nav>
       </div>

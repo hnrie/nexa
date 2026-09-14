@@ -1,0 +1,12 @@
+/* the invitation to install the desktop app, above the main column in a desktop browser */
+.banner { flex: none; display: flex; align-items: center; gap: 12px; min-height: 40px; padding: 4px 8px 4px 16px; background: var(--brand); color: var(--on-brand); font-size: 14px; }
+.icon { flex: none; display: flex; }
+.text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text b { font-weight: 600; }
+.download { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: var(--radius-xs); background: #fff; color: var(--brand-active); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.download:hover { background: rgba(255, 255, 255, 0.9); text-decoration: none; }
+.other { flex: none; color: var(--on-brand); font-size: 13px; font-weight: 500; opacity: 0.9; white-space: nowrap; }
+.other:hover { opacity: 1; text-decoration: underline; }
+.close { flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--on-brand); }
+.close:hover { background: rgba(255, 255, 255, 0.16); }
+@media (max-width: 900px) { .other { display: none; } }

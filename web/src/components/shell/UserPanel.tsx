@@ -1,4 +1,6 @@
-import { Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Settings } from "lucide-react";
+import { Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Settings } from "lucide-react";
+import { desktopBridge } from "@/lib/desktopBridge";
+import { useDesktop } from "@/stores/desktop";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -22,6 +24,7 @@ export function UserPanel() {
   const presence = usePresence((p) => (me ? p.byUser[me.id] : undefined));
   const setPresence = usePresence((p) => p.set);
   const openModal = useUI((u) => u.openModal);
+  const update = useDesktop((x) => x.update);
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
@@ -72,6 +75,13 @@ export function UserPanel() {
             {deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
           </button>
         </Tooltip>
+        {update?.status === "ready" ? (
+          <Tooltip text={`Restart to update to ${update.version ?? "the new version"}`}>
+            <button className={[s.icon, s.update].join(" ")} onClick={() => void desktopBridge()?.updates.restart()} aria-label="Restart to update" data-testid="update-ready">
+              <Download size={20} />
+            </button>
+          </Tooltip>
+        ) : null}
         <Tooltip text="User Settings">
           <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label="User Settings">
             <Settings size={20} />

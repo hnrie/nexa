@@ -6,7 +6,8 @@ import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectSubchats, useChannels } from "@/stores/channels";
-import { customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activityLine } from "@/lib/activity";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -75,7 +76,8 @@ export function DMSidebar() {
             const other = ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0] ?? "";
             const u = users[other];
             const st = customStatus(presence[other]);
-            sub = st ? `${st.emoji ? st.emoji + " " : ""}${st.text}` : "";
+            const act = activitiesOf(presence[other])[0];
+            sub = st ? `${st.emoji ? st.emoji + " " : ""}${st.text}` : act ? activityLine(act) : "";
             avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
           } else {
             sub = `${ch.recipient_ids.length} Members`;

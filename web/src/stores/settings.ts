@@ -55,6 +55,8 @@ export interface Settings {
   linkPreviews: boolean;
   imagePreviews: boolean;
   developerMode: boolean;
+  /** Show what the desktop app hears from games and music (Rich Presence) to others. */
+  shareActivity: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: Settings = {
   linkPreviews: true,
   imagePreviews: true,
   developerMode: false,
+  shareActivity: true,
   sidebarWidth: 240,
   showMembers: true,
   recentEmoji: [],

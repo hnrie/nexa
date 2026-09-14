@@ -7,7 +7,8 @@ import { Avatar } from "@/components/common/Avatar";
 import { memberName } from "@/lib/names";
 import { memberMenuItems } from "@/components/server/memberMenu";
 import { useAuth } from "@/stores/auth";
-import { statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, statusOf, usePresence } from "@/stores/presence";
+import { activityLine } from "@/lib/activity";
 import { useChannels } from "@/stores/channels";
 import { isInstanceAdmin, memberColor, permRolesOf, rolesByPosition, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
@@ -174,6 +175,9 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
                 <span className={s.sub}>
                   {p.status_emoji ? <Twemoji text={p.status_emoji} className={s.statusEmoji} /> : null} {p.status_text}
                 </span>
+              ) : activitiesOf(p)[0] ? (
+                // with no custom status, what they are doing takes the line, as on Discord
+                <span className={s.sub} data-testid="member-activity">{activityLine(activitiesOf(p)[0]!)}</span>
               ) : null}
             </span>
           </button>

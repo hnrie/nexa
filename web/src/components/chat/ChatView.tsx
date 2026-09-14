@@ -8,7 +8,8 @@ import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
-import { customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activityLine } from "@/lib/activity";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { conversationOf, useChannels } from "@/stores/channels";
@@ -111,6 +112,7 @@ export function ChatView({ channel }: { channel: Channel }) {
   const other = convo.type === "dm" ? convo.recipient_ids.find((id) => id !== me?.id) : undefined;
   const otherStatus = other ? statusOf(presence[other]) : "offline";
   const cs = other ? customStatus(presence[other]) : null;
+  const act = other ? activitiesOf(presence[other])[0] : undefined;
 
   return (
     <div className={s.chat}>
@@ -124,7 +126,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             <span className={s.hParentText}>in {channelDisplayName(convo, users, me?.id, nicknames)}</span>
           </button>
         ) : channel.type === "dm" ? (
-          <span className={s.hSub}>{cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : statusLabel(otherStatus)}</span>
+          <span className={s.hSub}>{cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(otherStatus)}</span>
         ) : isServer ? (
           channel.topic ? <button className={[s.hSub, s.hTopic].join(" ")} title={channel.topic} onClick={() => openModal("channelTopic", { channelId: channel.id })}>{channel.topic}</button> : null
         ) : (

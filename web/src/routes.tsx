@@ -13,6 +13,7 @@ const DMPage = lazyPage(() => import("@/pages/DMPage"));
 const ServerPage = lazyPage(() => import("@/pages/ServerPage"));
 const InvitePage = lazyPage(() => import("@/pages/InvitePage"));
 const StickerPackPage = lazyPage(() => import("@/pages/StickerPackPage"));
+const DownloadPage = lazyPage(() => import("@/pages/DownloadPage"));
 
 export function AppRoutes() {
   return (
@@ -22,6 +23,7 @@ export function AppRoutes() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/recover" element={<RecoverPage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
+        <Route path="/download" element={<DownloadPage />} />
         <Route path="/stickers/pack/:packId" element={<RequireAuth><StickerPackPage /></RequireAuth>} />
         <Route
           path="/channels/*"

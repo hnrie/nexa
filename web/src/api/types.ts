@@ -415,6 +415,35 @@ export interface Presence {
   status_text: string;
   status_emoji: string;
   status_expires_at: number | null;
+  /** What they are doing right now, heard from programs on their computer by the desktop app. */
+  activities?: Activity[];
+}
+
+/** 0 playing, 2 listening, 3 watching, 5 competing (Discord's Rich Presence types). */
+export type ActivityType = 0 | 2 | 3 | 5;
+
+/**
+ * A Rich Presence activity as chatd sends it: cleaned to Discord's limits,
+ * with its images already on this server's media proxy.
+ */
+export interface Activity {
+  application_id?: string;
+  name: string;
+  type: ActivityType;
+  /** Which text the one-line summary uses: 0 the name, 1 the state, 2 the details. */
+  status_display_type?: 0 | 1 | 2;
+  details?: string;
+  details_url?: string;
+  state?: string;
+  state_url?: string;
+  /** Milliseconds. A start alone counts up; a start and an end draw a progress bar. */
+  timestamps?: { start?: number; end?: number };
+  assets?: { large_image?: string; large_text?: string; large_url?: string; small_image?: string; small_text?: string; small_url?: string };
+  party?: { id?: string; size?: [number, number] };
+  buttons?: { label: string; url: string }[];
+  instance?: boolean;
+  icon_url?: string;
+  created_at: number;
 }
 
 export interface SettingsBlob {

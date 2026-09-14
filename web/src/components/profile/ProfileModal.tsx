@@ -15,7 +15,8 @@ import { profileTheme } from "@/lib/avatarColor";
 import { Markdown } from "@/markdown";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
+import { ActivityList } from "@/components/activity/ActivityCard";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
@@ -96,6 +97,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   if (!user) return <Modal open onClose={onClose} title="Profile"><p className={s.small}>Loading…</p></Modal>;
   const st = statusOf(presence);
   const cs = customStatus(presence);
+  const activities = activitiesOf(presence);
   const banner = bannerUrl(user.banner_id, 600);
 
   const message = async () => {
@@ -185,6 +187,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
           </div>
         </div>
         <div className={s.body}>
+          {activities.length ? <ActivityList activities={activities} /> : null}
           {user.about_me ? (
             <div className={s.section}>
               <h4>About Me</h4>

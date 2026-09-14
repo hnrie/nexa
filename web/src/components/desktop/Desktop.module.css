@@ -1,0 +1,36 @@
+/* the desktop app's own pieces of the page: the screen picker and the Rich Presence list */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.tab { height: 36px; border-radius: var(--radius-xs); background: var(--bg-raised); color: var(--text); font-size: 14px; font-weight: 600; }
+.tab:hover { background: var(--bg-active); }
+.tab[data-on="true"] { outline: 2px solid var(--brand); outline-offset: -2px; background: var(--bg-selected); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-height: min(52vh, 420px); overflow-y: auto; padding: 2px; }
+.source { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text); text-align: left; min-width: 0; }
+.source:hover { background: var(--bg-active); }
+.source[data-on="true"] { outline: 2px solid var(--brand); outline-offset: -2px; background: var(--bg-selected); }
+.thumb { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-xs); background: #000; object-fit: contain; display: block; }
+.sourceName { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; font-weight: 500; }
+.sourceName img { width: 16px; height: 16px; flex: none; }
+.sourceName span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
+.audio { margin-top: 12px; }
+
+.status { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); font-size: 14px; line-height: 1.4; color: var(--text); }
+.status svg { flex: none; margin-top: 1px; }
+.status[data-tone="good"] svg { color: var(--positive); }
+.status[data-tone="warn"] svg { color: var(--warning); }
+.status[data-tone="muted"] svg { color: var(--text-muted); }
+.statusText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.apps { display: flex; flex-direction: column; gap: 12px; }
+.app { padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; flex-direction: column; gap: 10px; }
+.appHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* the switch beside a program's name is just the switch, without a settings row's rule and padding */
+.appHead > label { flex: none; padding: 0; margin: 0; border: 0; min-height: 0; }
+.appName { min-width: 0; font-size: 15px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appSub { font-size: 12px; color: var(--text-muted); }
+.appIdle { font-size: 13px; color: var(--text-muted); }
+.app[data-hidden="true"] .preview { opacity: 0.45; }
+.version { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.versionText { font-size: 14px; color: var(--text); }
+.versionText small { display: block; color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+.progress { height: 4px; border-radius: 2px; background: var(--bg-active); overflow: hidden; margin-top: 8px; }
+.progress i { display: block; height: 100%; background: var(--brand); transition: width 300ms linear; }

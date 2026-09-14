@@ -3,6 +3,8 @@
 .rail { grid-column: 1; min-width: 0; }
 .sidebar { grid-column: 2; min-width: 0; display: flex; flex-direction: column; }
 .main { grid-column: 3; min-width: 0; display: flex; flex-direction: column; background: var(--bg-raised); border-top-left-radius: var(--radius-md); overflow: hidden; position: relative; }
+.page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.page > * { flex: 1; min-height: 0; }
 .backdrop { display: none; }
 .connection { position: absolute; top: 0; left: 0; right: 0; z-index: 30; padding: 6px 12px; text-align: center; font-size: 13px; font-weight: 600; color: #fff; background: var(--warning); color: #111; }
 .connection[data-state="closed"] { background: var(--danger); color: #fff; }

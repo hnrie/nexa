@@ -59,6 +59,8 @@ export default function PrivacyPage() {
       <h3 className={s.h5}>Link previews</h3>
       <Toggle checked={settings.linkPreviews} onChange={(v) => patch({ linkPreviews: v })} label="Fetch link previews when I send links" description="Your device asks the server to look up the page you linked and attaches the preview to your encrypted message. Turn this off if you do not want the server to see the links you send." />
       <Toggle checked={settings.imagePreviews} onChange={(v) => patch({ imagePreviews: v })} label="Show embedded images and GIFs from links" description="Direct image links load straight from their site, which reveals your address to that site, as in any browser." />
+      <h3 className={s.h5}>Activity</h3>
+      <Toggle checked={settings.shareActivity !== false} onChange={(v) => patch({ shareActivity: v })} label="Share my activity" description="In the desktop app, your Rich Presence (RPC) shows on your profile to people who can see your status." />
       <h3 className={s.h5}>Your data</h3>
       <p className={s.hint} style={{ marginBottom: 8 }}>Download everything: your profile, friends, servers and every message you hold keys for, decrypted on this device into a zip. Nothing is decrypted on the server.</p>
       <Button size="sm" variant="secondary" loading={exporting} onClick={() => void runExport()} data-testid="export-data">Export my data</Button>

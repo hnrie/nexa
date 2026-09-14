@@ -10,7 +10,8 @@ import { Button } from "@/components/common/Button";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
+import { activityLine } from "@/lib/activity";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -106,7 +107,8 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   const meId = useAuth((a) => a.me?.id);
   const status = statusOf(p);
   const cs = customStatus(p);
-  const sub = rel.type === "incoming" ? "Incoming Friend Request" : rel.type === "outgoing" ? "Outgoing Friend Request" : rel.type === "blocked" ? "Blocked" : cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : statusLabel(status);
+  const act = activitiesOf(p)[0];
+  const sub = rel.type === "incoming" ? "Incoming Friend Request" : rel.type === "outgoing" ? "Outgoing Friend Request" : rel.type === "blocked" ? "Blocked" : cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(status);
 
   const message = async () => {
     try {

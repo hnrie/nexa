@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Presence } from "@/api/types";
+import type { Activity, Presence } from "@/api/types";
 
 export type StatusKind = "online" | "idle" | "dnd" | "offline" | "invisible";
 
@@ -32,4 +32,10 @@ export function customStatus(p: Presence | undefined): { text: string; emoji: st
   if (p.status_expires_at !== null && p.status_expires_at < Date.now()) return null;
   if (!p.status_text && !p.status_emoji) return null;
   return { text: p.status_text, emoji: p.status_emoji };
+}
+
+/** What someone is doing right now; nothing while they show as offline. */
+export function activitiesOf(p: Presence | undefined): Activity[] {
+  if (!p || p.status === "offline") return [];
+  return p.activities ?? [];
 }

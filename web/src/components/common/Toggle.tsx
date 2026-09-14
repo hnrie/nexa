@@ -6,9 +6,11 @@ interface Props {
   label?: string;
   description?: string;
   disabled?: boolean;
+  /** Names a switch that has no visible label. */
+  ariaLabel?: string;
 }
 
-export function Toggle({ checked, onChange, label, description, disabled }: Props) {
+export function Toggle({ checked, onChange, label, description, disabled, ariaLabel }: Props) {
   return (
     <label className={s.row} data-disabled={disabled}>
       {label !== undefined ? (
@@ -18,7 +20,7 @@ export function Toggle({ checked, onChange, label, description, disabled }: Prop
         </span>
       ) : null}
       <span className={s.switch} data-on={checked}>
-        <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
+        <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} aria-label={label || ariaLabel} />
         <span className={s.knob} />
       </span>
     </label>
