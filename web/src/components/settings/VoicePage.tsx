@@ -5,7 +5,7 @@ import { Field } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
-import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, lastInputChoice, listDevices, realDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
+import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, holdAudio, lastInputChoice, listDevices, realDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
 import { inVoice } from "@/voice/session";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
@@ -25,7 +25,7 @@ export default function VoicePage() {
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
   const aliveRef = useRef(true);
-  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null } | null>(null);
+  const testRef = useRef<{ stream: MediaStream; meter: LevelMeter; timer: ReturnType<typeof setInterval>; sent?: MediaStream; sentMeter?: LevelMeter; gain?: GainNode | null; release: () => void } | null>(null);
   const set = (partial: Partial<VoiceSettings>) => patch({ voice: { ...settings, ...partial } });
 
   useEffect(() => {
@@ -43,6 +43,7 @@ export default function VoicePage() {
     t.sentMeter?.close();
     t.sent?.getTracks().forEach((x) => x.stop());
     t.stream.getTracks().forEach((x) => x.stop());
+    t.release();
     testRef.current = null;
     setTesting(false);
     setTestLevel(0);
@@ -81,7 +82,7 @@ export default function VoicePage() {
         setTestLevel(meter.level());
         setSentLevel(sentMeter.level());
       }, 60);
-      testRef.current = { stream, meter, timer, sent: sent.stream, sentMeter, gain: sent.gain };
+      testRef.current = { stream, meter, timer, sent: sent.stream, sentMeter, gain: sent.gain, release: holdAudio() };
       setTesting(true);
       setDiag(describeInput(ctx, stream, sent.stream, settings.inputVolume));
       setWrongDevice(lastInputChoice() === "missing");

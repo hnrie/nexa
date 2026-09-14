@@ -18,7 +18,7 @@ import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import { SpeakingGate } from "./speaking";
 import { shareBitrate } from "./shareQuality";
-import { LevelMeter, audioContext, getCamera, getMic, getScreen, lastInputChoice, resumeAudio, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
+import { LevelMeter, audioContext, getCamera, getMic, getScreen, holdAudio, lastInputChoice, resumeAudio, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { convForChannel } from "@/components/composer/send";
 import { useKeys } from "@/stores/keys";
 import { useUsers } from "@/stores/users";
@@ -58,6 +58,8 @@ interface Session {
 let session: Session | null = null;
 /** Keeps a new version of the app from reloading the page while in a call. */
 let releaseCall: (() => void) | null = null;
+/** Keeps the call's audio running (a home-screen app lets it go otherwise). */
+let releaseAudio: (() => void) | null = null;
 let iceCache: { servers: RTCIceServer[]; sfu: boolean; guests: boolean; at: number } | null = null;
 /** Bumped by every join and leave, so a join still waiting on the network can tell it was overtaken. */
 let joinSeq = 0;
@@ -369,6 +371,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false };
   session = s;
   releaseCall ??= holdReload();
+  releaseAudio ??= holdAudio();
   let mic: MediaStream | null = null;
   try {
     mic = await getMic(useSettings.getState().settings.voice);
@@ -420,6 +423,8 @@ export async function leaveVoice(notify = true): Promise<void> {
   session = null;
   releaseCall?.();
   releaseCall = null;
+  releaseAudio?.();
+  releaseAudio = null;
   stopQuality();
   stopRelay();
   if (s) {

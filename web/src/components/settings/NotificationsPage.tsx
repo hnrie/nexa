@@ -3,7 +3,7 @@ import { Button } from "@/components/common/Button";
 import { Toggle } from "@/components/common/Toggle";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { showNotification } from "@/lib/notify";
-import { playSound } from "@/lib/sounds";
+import { playSound, soundTrouble, type SoundName } from "@/lib/sounds";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
@@ -13,6 +13,7 @@ export default function NotificationsPage() {
   const patch = useSettings((x) => x.patch);
   const toast = useUI((x) => x.toast);
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">(typeof Notification === "undefined" ? "unsupported" : Notification.permission);
+  const [soundHint, setSoundHint] = useState<string | null>(null);
   // the desktop app has its own switch, on until turned off, and never needs to ask
   const inApp = !!desktopBridge();
   const enable = async (v: boolean) => {
@@ -22,6 +23,10 @@ export default function NotificationsPage() {
       if (p !== "granted") return;
     }
     patch({ notifications: { ...st.notifications, ...(inApp ? { app: v } : { desktop: v }) } });
+  };
+  // a sound that will not start says why, since a silent button tells nobody anything
+  const testSound = async (name: SoundName) => {
+    setSoundHint((await playSound(name)) ? null : soundTrouble());
   };
   const testNotification = async () => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") {
@@ -41,16 +46,21 @@ export default function NotificationsPage() {
       <Toggle checked={st.notifications.sounds} onChange={(v) => patch({ notifications: { ...st.notifications, sounds: v } })} label="Sounds" description="Play a sound for new messages, mentions, friend requests and calls." />
       <h3 className={s.h5}>Test</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button size="sm" variant="secondary" onClick={() => playSound("message")}>Message</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("mention")}>Mention</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("friend")}>Friend request</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("ring")}>Incoming call</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("outgoing")}>Outgoing call</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("leave")}>Leave call</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("mute")}>Mute</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("unmute")}>Unmute</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("message")}>Message</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("mention")}>Mention</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("friend")}>Friend request</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("ring")}>Incoming call</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("outgoing")}>Outgoing call</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("leave")}>Leave call</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("mute")}>Mute</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("unmute")}>Unmute</Button>
         <Button size="sm" variant="secondary" onClick={() => void testNotification()}>Desktop notification</Button>
       </div>
+      {soundHint ? (
+        <p className={s.hint} style={{ marginTop: 12 }} role="status" data-testid="sound-trouble">
+          {soundHint}
+        </p>
+      ) : null}
     </>
   );
 }

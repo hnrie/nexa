@@ -3,6 +3,7 @@
  * settings applied, plus a small RMS level meter used for voice activity and
  * the settings page.
  */
+import { AudioKeeper, isHomeScreenApp } from "@/lib/audioKeeper";
 import type { ShareFps, ShareResolution, VoiceSettings } from "@/stores/settings";
 import { shareVideoConstraints } from "./shareQuality";
 
@@ -209,17 +210,53 @@ export function sensitivityToThreshold(db: number): number {
   return Math.min(1, Math.max(0.005, Math.pow(10, db / 20) * 4));
 }
 
-let sharedCtx: AudioContext | null = null;
+let sharedKeeper: AudioKeeper | null = null;
+/** Calls and microphone tests using the shared context. */
+let audioHolds = 0;
+
+/** How long a home-screen app keeps the context with nothing holding it: a call can take a while to begin after the tap that starts it. */
+const UNHELD_MS = 10_000;
+/** How long it stays after the last call or test ends, for the next one close behind. */
+const IDLE_MS = 2000;
 
 /**
  * One AudioContext for meters and playback. The rate is left to the device:
  * asking for 48 kHz makes Chrome resample some USB microphones, and a few of
- * them come out silent when it does.
+ * them come out silent when it does. In a home-screen app on iOS it is let go
+ * whenever no call or test holds it (see audioKeeper).
  */
 export function audioContext(): AudioContext {
-  if (!sharedCtx) sharedCtx = new AudioContext();
-  if (sharedCtx.state === "suspended") void sharedCtx.resume();
-  return sharedCtx;
+  if (!sharedKeeper) {
+    const k = new AudioKeeper(new AudioContext());
+    sharedKeeper = k;
+    if (typeof document !== "undefined") {
+      const away = () => {
+        if (isHomeScreenApp() && audioHolds === 0) k.release();
+      };
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") away();
+      });
+      window.addEventListener("pagehide", away);
+    }
+  }
+  void sharedKeeper.want();
+  if (audioHolds === 0) sharedKeeper.releaseLater(() => audioHolds === 0, UNHELD_MS);
+  return sharedKeeper.ac;
+}
+
+/** Keeps the shared context running for a call or a microphone test until the returned function is called. Calling it again does nothing. */
+export function holdAudio(): () => void {
+  audioHolds += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    audioHolds -= 1;
+    const k = sharedKeeper;
+    if (audioHolds > 0 || !k) return;
+    if (isHomeScreenApp() && typeof document !== "undefined" && document.visibilityState === "hidden") k.release();
+    else k.releaseLater(() => audioHolds === 0, IDLE_MS);
+  };
 }
 
 /**
@@ -228,7 +265,7 @@ export function audioContext(): AudioContext {
  * (say its permission was refused) nothing else would ever get it running.
  */
 export function resumeAudio(): void {
-  if (sharedCtx && sharedCtx.state !== "running") void sharedCtx.resume().catch(() => {});
+  if (sharedKeeper && sharedKeeper.ac.state !== "running") void sharedKeeper.want();
 }
 
 /**

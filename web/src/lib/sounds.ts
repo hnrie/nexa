@@ -1,37 +1,78 @@
+import { AudioKeeper, isHomeScreenApp } from "./audioKeeper";
+
 export type SoundName = "message" | "mention" | "friend" | "ring" | "outgoing" | "join" | "leave" | "mute" | "unmute";
 
-let ctx: AudioContext | null = null;
+/** A sound that cannot start within this long is dropped rather than played late. */
+const STALE_MS = 1500;
+/** How long a home-screen app keeps audio running after the last sound, for the next one close behind. */
+const IDLE_MS = 2000;
+/** A context the device refuses to start is swapped for a new one at most this often; taps in between try the same one again. */
+const REPLACE_MS = 30_000;
 
-function audio(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return null;
-  if (!ctx) {
-    const ac = new Ctor();
-    ctx = ac;
-    // iOS suspends the context again after a phone call or Siri, and only a tap can wake it
-    ac.onstatechange = () => (ac.state === "running" ? disarmUnlock() : armUnlock());
-  }
-  if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
-  return ctx;
+let keeper: AudioKeeper | null = null;
+/** When every sound played so far will have finished, in ms since the epoch. */
+let quietFrom = 0;
+/** Sounds waiting for audio to start. */
+let starting = 0;
+/** Why the last sound that could not play did not, for the settings page. */
+let trouble: { state: string; problem: string | null } | null = null;
+let replacedAt = -Infinity;
+
+function contextClass(): typeof AudioContext | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 }
 
-const UNLOCK_EVENTS = ["pointerdown", "touchend", "keydown"] as const;
+/** The context sounds play through, made on first use (see audioKeeper for when it runs). */
+function audio(): AudioKeeper | null {
+  if (keeper && keeper.ac.state !== "closed") return keeper;
+  const Ctor = contextClass();
+  if (!Ctor) return null;
+  const k = new AudioKeeper(new Ctor());
+  keeper = k;
+  k.ac.addEventListener("statechange", () => {
+    if (keeper !== k) return;
+    const state = k.ac.state as string;
+    if (state === "running") {
+      disarmUnlock();
+      if (k.released) return;
+      startLoops();
+      restLater();
+    } else if (k.released || state === "closed") disarmUnlock();
+    // iOS suspends the context again after a phone call or Siri, and only a tap can wake it
+    else armUnlock();
+  });
+  watchVisibility();
+  if (preloadWanted) decodeAll();
+  return k;
+}
+
+const UNLOCK_EVENTS = ["pointerdown", "touchend", "click", "keydown"] as const;
 let unlockWanted = false;
 let unlockArmed = false;
 
 /**
  * Starts the context from inside a tap or key press. Sounds mostly play from
- * gateway events, and iOS Safari keeps Web Audio silent until a gesture has
- * started it, which resume() outside one cannot do. A one-sample silent
- * buffer is what makes WebKit count the gesture.
+ * gateway events, and iOS keeps Web Audio silent until a gesture has started
+ * it, which resume() outside one cannot do. A one-sample silent buffer is what
+ * makes WebKit count the gesture. A click counts on its own, as VoiceOver
+ * activates things without any touches.
  */
 function unlock(): void {
-  const ac = audio();
-  if (!ac) {
+  const k = audio();
+  if (!k) {
     disarmUnlock();
     return;
   }
+  const ac = k.ac;
+  void k.want().then((ok) => {
+    // a context the device would not start is let go, and the next tap makes a new one
+    if (!ok && k.refused && keeper === k && ac.state === "suspended" && Date.now() - replacedAt >= REPLACE_MS) {
+      replacedAt = Date.now();
+      keeper = null;
+      void ac.close().catch(() => undefined);
+    }
+  });
   try {
     const src = ac.createBufferSource();
     src.buffer = ac.createBuffer(1, 1, 22050);
@@ -58,10 +99,36 @@ function disarmUnlock(): void {
 /** Lets the next tap or key press start audio, and again whenever the system suspends it. */
 export function installAudioUnlock(): void {
   unlockWanted = true;
-  if (ctx?.state !== "running") armUnlock();
+  if (keeper?.ac.state !== "running") armUnlock();
 }
 
-function tone(ac: AudioContext, freq: number, start: number, dur: number, type: OscillatorType = "sine", gain = 0.18): void {
+let watching = false;
+
+/** A home-screen app lets its audio go when it goes to the background; a ring still going carries on when it is back. */
+function watchVisibility(): void {
+  if (watching || typeof document === "undefined") return;
+  watching = true;
+  document.addEventListener("visibilitychange", () => {
+    if (!keeper || !isHomeScreenApp()) return;
+    if (document.visibilityState === "hidden") keeper.release();
+    else if (loops.size > 0) void keeper.want();
+  });
+  window.addEventListener("pagehide", () => {
+    if (isHomeScreenApp()) keeper?.release();
+  });
+}
+
+function hiddenHomeScreenApp(): boolean {
+  return isHomeScreenApp() && typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
+/** In a home-screen app, lets audio go once the last sound has finished and nothing rings. */
+function restLater(): void {
+  keeper?.releaseLater(() => loops.size === 0 && starting === 0 && Date.now() >= quietFrom, Math.max(0, quietFrom - Date.now()) + IDLE_MS);
+}
+
+/** Schedules one tone; returns when it will have finished, in seconds from now. */
+function tone(ac: AudioContext, freq: number, start: number, dur: number, type: OscillatorType = "sine", gain = 0.18): number {
   const o = ac.createOscillator();
   const g = ac.createGain();
   o.type = type;
@@ -72,6 +139,7 @@ function tone(ac: AudioContext, freq: number, start: number, dur: number, type: 
   o.connect(g).connect(ac.destination);
   o.start(ac.currentTime + start);
   o.stop(ac.currentTime + start + dur + 0.02);
+  return start + dur + 0.02;
 }
 
 /**
@@ -91,28 +159,49 @@ const FILES: Partial<Record<SoundName, string>> = {
 
 /** How loud the recordings play; they are mastered near full scale. */
 const FILE_GAIN = 0.7;
-/** A sound still loading after this long is dropped rather than played late. */
-const STALE_MS = 1500;
 
+const fetched = new Map<SoundName, Promise<ArrayBuffer | null>>();
 const buffers = new Map<SoundName, AudioBuffer>();
 const loading = new Map<SoundName, Promise<AudioBuffer | null>>();
+let preloadWanted = false;
 
-function loadBuffer(ac: AudioContext, name: SoundName): Promise<AudioBuffer | null> {
+function fetchBytes(name: SoundName): Promise<ArrayBuffer | null> {
   const url = FILES[name];
   if (!url) return Promise.resolve(null);
+  let p = fetched.get(name);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .catch(() => {
+        // not remembered: a later sound tries again
+        fetched.delete(name);
+        return null;
+      });
+    fetched.set(name, p);
+  }
+  return p;
+}
+
+/** A recording, decoded; null when it cannot be had or there is no context to decode it with yet. */
+function loadBuffer(name: SoundName): Promise<AudioBuffer | null> {
+  if (!FILES[name]) return Promise.resolve(null);
   const have = buffers.get(name);
   if (have) return Promise.resolve(have);
   let p = loading.get(name);
   if (!p) {
-    p = fetch(url)
-      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((data) => ac.decodeAudioData(data))
+    p = fetchBytes(name)
+      .then((data) => {
+        const ac = keeper?.ac;
+        if (!data || !ac) return Promise.reject(new Error("nothing to decode"));
+        // decoding takes the bytes over, and one that fails leaves them for the next try
+        return ac.decodeAudioData(data.slice(0));
+      })
       .then((buf) => {
         buffers.set(name, buf);
+        fetched.delete(name);
         return buf;
       })
       .catch(() => {
-        // not remembered: a later sound tries again
         loading.delete(name);
         return null;
       });
@@ -121,11 +210,20 @@ function loadBuffer(ac: AudioContext, name: SoundName): Promise<AudioBuffer | nu
   return p;
 }
 
-/** Fetches and decodes the recordings ahead of time, so the first message plays at once. */
+function decodeAll(): void {
+  for (const name of Object.keys(FILES) as SoundName[]) void loadBuffer(name);
+}
+
+/**
+ * Fetches and decodes the recordings ahead of time, so the first message plays
+ * at once. A home-screen app decodes them once a tap has made its context: it
+ * makes none before then.
+ */
 export function preloadSounds(): void {
-  const ac = audio();
-  if (!ac) return;
-  for (const name of Object.keys(FILES) as SoundName[]) void loadBuffer(ac, name);
+  preloadWanted = true;
+  for (const name of Object.keys(FILES) as SoundName[]) void fetchBytes(name);
+  if (keeper) decodeAll();
+  else if (!isHomeScreenApp()) void audio()?.want();
 }
 
 function playBuffer(ac: AudioContext, buf: AudioBuffer, loop = false): AudioBufferSourceNode {
@@ -139,90 +237,135 @@ function playBuffer(ac: AudioContext, buf: AudioBuffer, loop = false): AudioBuff
   return src;
 }
 
-function synth(ac: AudioContext, name: SoundName): void {
+/** Plays a synthesised sound; returns its length in seconds. */
+function synth(ac: AudioContext, name: SoundName): number {
   switch (name) {
     case "message":
       tone(ac, 880, 0, 0.09);
-      tone(ac, 1174.7, 0.09, 0.12);
-      break;
+      return tone(ac, 1174.7, 0.09, 0.12);
     case "mention":
       tone(ac, 784, 0, 0.08);
       tone(ac, 987.8, 0.09, 0.08);
-      tone(ac, 1318.5, 0.18, 0.16);
-      break;
+      return tone(ac, 1318.5, 0.18, 0.16);
     case "friend":
       // a bright rising three, warmer than a mention's
       tone(ac, 587.3, 0, 0.1, "triangle", 0.2);
       tone(ac, 880, 0.1, 0.1, "triangle", 0.2);
-      tone(ac, 1174.7, 0.2, 0.22, "triangle", 0.2);
-      break;
+      return tone(ac, 1174.7, 0.2, 0.22, "triangle", 0.2);
     case "join":
       tone(ac, 523.3, 0, 0.08, "triangle");
-      tone(ac, 784, 0.08, 0.12, "triangle");
-      break;
+      return tone(ac, 784, 0.08, 0.12, "triangle");
     case "leave":
       tone(ac, 784, 0, 0.08, "triangle");
-      tone(ac, 523.3, 0.08, 0.12, "triangle");
-      break;
+      return tone(ac, 523.3, 0.08, 0.12, "triangle");
     case "mute":
       tone(ac, 440, 0, 0.07, "square", 0.08);
-      tone(ac, 330, 0.07, 0.1, "square", 0.08);
-      break;
+      return tone(ac, 330, 0.07, 0.1, "square", 0.08);
     case "unmute":
       tone(ac, 330, 0, 0.07, "square", 0.08);
-      tone(ac, 440, 0.07, 0.1, "square", 0.08);
-      break;
+      return tone(ac, 440, 0.07, 0.1, "square", 0.08);
     case "ring":
     case "outgoing":
       tone(ac, 659.3, 0, 0.25, "sine", 0.15);
-      tone(ac, 880, 0.3, 0.25, "sine", 0.15);
-      break;
+      return tone(ac, 880, 0.3, 0.25, "sine", 0.15);
   }
 }
 
-export function playSound(name: SoundName): void {
-  const ac = audio();
-  if (!ac) return;
-  const buf = buffers.get(name);
-  if (buf) {
-    playBuffer(ac, buf);
-    return;
-  }
-  if (!FILES[name]) {
-    synth(ac, name);
-    return;
-  }
+/** Plays a sound. Resolves with whether it could start, which the settings page's test buttons report. */
+export function playSound(name: SoundName): Promise<boolean> {
+  return play(name).catch(() => false);
+}
+
+async function play(name: SoundName): Promise<boolean> {
+  // a home-screen app in the background stays quiet rather than start audio there
+  if (hiddenHomeScreenApp()) return false;
+  const k = audio();
+  if (!k) return false;
   const asked = Date.now();
-  void loadBuffer(ac, name).then((loaded) => {
-    if (Date.now() - asked > STALE_MS) return;
-    if (loaded) playBuffer(ac, loaded);
-    else synth(ac, name);
+  starting++;
+  try {
+    const [running, buf] = await Promise.all([k.started(STALE_MS), loadBuffer(name)]);
+    if (!running || keeper !== k || k.released || Date.now() - asked > STALE_MS) {
+      trouble = { state: k.ac.state, problem: k.problem };
+      // the next tap may start what this could not
+      if (keeper === k && !k.released && k.ac.state !== "running") armUnlock();
+      return false;
+    }
+    trouble = null;
+    let seconds: number;
+    if (buf) {
+      playBuffer(k.ac, buf);
+      seconds = buf.duration;
+    } else seconds = synth(k.ac, name);
+    quietFrom = Math.max(quietFrom, Date.now() + seconds * 1000);
+    return true;
+  } finally {
+    starting--;
+    restLater();
+  }
+}
+
+/** Why the last sound could not play, for the settings page to say. */
+export function soundTrouble(): string {
+  if (!contextClass()) return "This browser can't play sounds.";
+  if (trouble?.state === "running") return "The sound took too long to load. Check the connection and try again.";
+  const detail = trouble ? ` (${trouble.problem ?? `audio stayed ${trouble.state}`})` : "";
+  if (isHomeScreenApp()) return `The sound couldn't start${detail}. Since iOS 26, sound in apps added to the Home Screen can stop working until the phone restarts. Restarting brings it back, and ${location.host} opened in Safari isn't affected.`;
+  return `The sound couldn't start${detail}. Tap the page and try again, and check that the volume is up.`;
+}
+
+interface Loop {
+  name: SoundName;
+  /** The context it plays in, once begun. */
+  ac: AudioContext | null;
+  source: AudioBufferSourceNode | null;
+  timer: ReturnType<typeof setInterval> | null;
+}
+
+/** Rings and outgoing tones going on. */
+const loops = new Set<Loop>();
+
+/** Begins every loop not yet playing in the context now running, a new one after a refused context included. */
+function startLoops(): void {
+  const k = keeper;
+  if (!k || k.released || k.ac.state !== "running") return;
+  for (const l of loops) if (l.ac !== k.ac) beginLoop(l, k.ac);
+}
+
+function beginLoop(l: Loop, ac: AudioContext): void {
+  l.ac = ac;
+  void loadBuffer(l.name).then((buf) => {
+    if (!loops.has(l) || l.ac !== ac || ac.state === "closed") return;
+    if (buf) {
+      l.source = playBuffer(ac, buf, true);
+      return;
+    }
+    synth(ac, l.name);
+    l.timer = setInterval(() => {
+      // tones asked for while it is stopped would all come out at once when it starts
+      if (ac.state === "running") synth(ac, l.name);
+    }, 1500);
   });
 }
 
 /** Plays a sound over and over until the returned function is called. */
 function loop(name: SoundName): () => void {
-  const ac = audio();
-  if (!ac) return () => {};
-  let stopped = false;
-  let source: AudioBufferSourceNode | null = null;
-  let timer: ReturnType<typeof setInterval> | null = null;
-  void loadBuffer(ac, name).then((buf) => {
-    if (stopped) return;
-    if (buf) source = playBuffer(ac, buf, true);
-    else {
-      synth(ac, name);
-      timer = setInterval(() => synth(ac, name), 1500);
-    }
-  });
+  const k = audio();
+  if (!k) return () => {};
+  const l: Loop = { name, ac: null, source: null, timer: null };
+  loops.add(l);
+  // it waits for audio as long as it goes on: the tap that answers a ring may be what starts it
+  if (!hiddenHomeScreenApp()) void k.want();
+  startLoops();
   return () => {
-    stopped = true;
-    if (timer) clearInterval(timer);
+    if (!loops.delete(l)) return;
+    if (l.timer) clearInterval(l.timer);
     try {
-      source?.stop();
+      l.source?.stop();
     } catch {
       /* never started */
     }
+    restLater();
   };
 }
 
