@@ -89,8 +89,14 @@ export interface DisplaySourceRequest {
 export interface EvilionDesktop {
   version: string;
   platform: "win32" | "darwin" | "linux";
-  /** Whether a screen share here can carry the computer's sound without the call's own (app 1.0.1 and later). */
+  /** Whether a screen share here can carry the computer's sound (app 1.0.1 and later). */
   shareAudio?: boolean;
+  /**
+   * What that sound leaves out (app 1.0.2 and later): "own" is everything but
+   * the app, so the call cannot echo; "all" includes the app, on systems that
+   * cannot leave it out; "none" is no sound.
+   */
+  shareAudioMode?: "own" | "all" | "none" | string;
   rpc: {
     getState(): Promise<RpcState>;
     setEnabled(on: boolean): Promise<void>;

@@ -60,7 +60,10 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
   const [resolution, setResolution] = useState<ShareResolution>(voice.shareResolution);
   const [fps, setFps] = useState<ShareFps>(voice.shareFps);
   // the desktop app knows when this computer cannot share sound without the call echoing in it
-  const audioSupported = desktopBridge()?.shareAudio !== false;
+  const bridge = desktopBridge();
+  const audioSupported = bridge?.shareAudio !== false;
+  // an older Windows 10 shares the call's own sound too, which the dialog says rather than hides
+  const audioHasCall = bridge?.shareAudioMode === "all";
   const [audio, setAudio] = useState((voice.shareAudio ?? true) && audioSupported);
   const mbps = shareBitrate(resolution, fps) / 1_000_000;
 
@@ -94,7 +97,13 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
             disabled={!audioSupported}
             onChange={setAudio}
             label="Share audio"
-            description={audioSupported ? "Everyone watching hears what you're sharing. The call's own sound is left out." : "This computer can't share its sound without the call echoing back in it, so shares from here are silent."}
+            description={
+              !audioSupported
+                ? "This computer can't share its sound."
+                : audioHasCall
+                  ? "Everyone watching hears what your computer plays. This version of Windows can't leave the call itself out, so people may hear themselves; Windows 10 22H2 or later can."
+                  : "Everyone watching hears what you're sharing. The call's own sound is left out."
+            }
           />
         </div>
         <p className={s.shareHint}>

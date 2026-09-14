@@ -9,7 +9,8 @@ import { IPC, type DesktopSettings, type DisplaySourceRequest, type Identity, ty
 const arg = (name: string): string => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? "";
 const origin = arg("evilion-origin");
 const version = arg("evilion-version");
-const shareAudio = arg("evilion-share-audio") === "1";
+const shareAudioMode = arg("evilion-share-audio");
+const shareAudio = shareAudioMode === "own" || shareAudioMode === "all";
 
 function listen<T>(channel: string) {
   return (cb: (payload: T) => void): (() => void) => {
@@ -24,6 +25,7 @@ if (origin && location.origin === origin) {
     version,
     platform: process.platform,
     shareAudio,
+    shareAudioMode,
     rpc: {
       getState: (): Promise<RpcState> => ipcRenderer.invoke(IPC.rpcGetState),
       setEnabled: (on: boolean): Promise<void> => ipcRenderer.invoke(IPC.rpcSetEnabled, !!on),

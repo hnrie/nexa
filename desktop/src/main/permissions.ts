@@ -51,10 +51,8 @@ const pending = new Map<string, { resolve: (sourceId: string | null, audio: bool
  * Electron it is experimental, and a window picked there could end up as the
  * whole screen.
  *
- * Sound comes as system loopback, where the platform has it and the share
- * asked for sound. When the page also asks for restrictOwnAudio, Electron
- * captures everything but this app's own playback, so a call never hears
- * itself back through the share.
+ * Sound comes from system loopback when the share asked for it, leaving this
+ * app's own playback out wherever the system can (see shareAudioMode).
  */
 export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void {
   const wayland = process.platform === "linux" && (process.env.XDG_SESSION_TYPE === "wayland" || !!process.env.WAYLAND_DISPLAY);
@@ -79,7 +77,8 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
             return;
           }
           const requestId = randomUUID();
-          const audio = request.audioRequested && loopbackAudio();
+          const mode = shareAudioMode();
+          const audio = request.audioRequested && mode !== "none";
           const req: DisplaySourceRequest = {
             requestId,
             audio,
@@ -96,7 +95,9 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
             clearTimeout(timer);
             pending.delete(requestId);
             const source = sources.find((s) => s.id === sourceId);
-            callback(source ? { video: source, ...(withAudio && audio ? { audio: "loopback" as const } : {}) } : {});
+            // Electron hands any device name over to Chromium; its typings only list "loopback" and "loopbackWithMute"
+            const device = (mode === "own" ? "loopbackWithoutChrome" : "loopback") as "loopback";
+            callback(source ? { video: source, ...(withAudio && audio ? { audio: device } : {}) } : {});
           };
           pending.set(requestId, { resolve: answer });
           win.webContents.send(IPC.displaySources, req);
@@ -110,20 +111,35 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
 }
 
 /**
- * Whether this computer can share its sound without the call's own sound in
- * it. Only a loopback that leaves this app out is offered: Windows 10 2004
- * (build 19041) and later, and macOS 14.2 and later. Older systems capture
- * the call along with everything else, which everyone else then hears echo
- * back, so their shares go without sound. EVILION_FORCE_LOOPBACK offers it
- * anyway, for testing the page's own check.
+ * What sound a screen share can carry on this computer.
+ *
+ * "own": everything the computer plays except this app, so nobody in the call
+ * hears themselves come back through the share. Chromium's
+ * loopbackWithoutChrome capture does this with Windows' process loopback
+ * (excluding this app's process tree) and with ScreenCaptureKit on macOS.
+ * It is asked for by name: asking for plain "loopback" with the page's
+ * restrictOwnAudio constraint is meant to get the same, but the constraint
+ * never reaches Electron's handler, so the call leaked into every share.
+ * Windows 10 22H2 (build 19045) and later honour it, which Vesktop found in
+ * practice although Microsoft documents build 20348; macOS 13 and later,
+ * measured on this build's Mac (the app's own sound at silence, other
+ * programs still heard).
+ *
+ * "all": the whole system's sound, this app included, where the exclusion is
+ * not there (older Windows 10). Sharing sound still works; the call may echo.
+ *
+ * "none": no system sound can be shared (Linux, macOS before 13).
  */
-export function loopbackAudio(): boolean {
-  if (process.env.EVILION_FORCE_LOOPBACK) return true;
-  const [major = 0, minor = 0, build = 0] = os.release().split(".").map(Number);
-  if (process.platform === "win32") return major > 10 || (major === 10 && build >= 19041);
-  // Darwin 23.2 is macOS 14.2
-  if (process.platform === "darwin") return major > 23 || (major === 23 && minor >= 2);
-  return false;
+export type ShareAudioMode = "own" | "all" | "none";
+
+export function shareAudioMode(): ShareAudioMode {
+  const forced = process.env.EVILION_SHARE_AUDIO_MODE;
+  if (forced === "own" || forced === "all" || forced === "none") return forced;
+  const [major = 0, , build = 0] = os.release().split(".").map(Number);
+  if (process.platform === "win32") return build >= 19045 ? "own" : "all";
+  // Darwin 22 is macOS 13
+  if (process.platform === "darwin") return major >= 22 ? "own" : "none";
+  return "none";
 }
 
 /** The page chose a source (null: the person cancelled). */
