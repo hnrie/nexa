@@ -1,5 +1,27 @@
-.card { position: relative; width: 600px; max-width: 100%; background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
-.card[data-variant="panel"] { width: 100%; border-radius: 0; min-height: 100%; }
+/*
+ * Profiles, laid out the way Discord lays them out. --av is the avatar's size
+ * (set by the card); the banner has a hole cut out where the avatar sits, so
+ * the ring around the avatar is the card itself, not a border in a colour.
+ */
+.card {
+  --ring: 6px;
+  --av-left: 16px;
+  /* the buttons, chips and status bubble drawn on the card */
+  --profile-accent: var(--brand);
+  --profile-chip: var(--bg-active);
+  --profile-chip-hover: color-mix(in srgb, var(--bg-active), var(--text) 14%);
+  --bubble-bg: var(--bg-surface);
+  position: relative;
+  width: 600px;
+  max-width: 100%;
+  background: var(--bg-floating);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  color: var(--text);
+}
+.card[data-variant="modal"] { --ring: 7px; --av-left: 24px; }
+.card[data-variant="panel"] { width: 100%; min-height: 100%; border-radius: 0; background: var(--bg-raised); }
+
 /*
  * A profile theme: the whole card runs from the first colour to the second,
  * and the colours the card's parts are drawn with turn to read on it
@@ -10,46 +32,117 @@
   --text: #f5f5f7; --text-strong: #ffffff; --text-subtle: rgba(255, 255, 255, 0.86); --text-muted: rgba(255, 255, 255, 0.72);
   --bg-surface: rgba(0, 0, 0, 0.3); --bg-raised: rgba(0, 0, 0, 0.34); --bg-input: rgba(0, 0, 0, 0.26); --bg-hover: rgba(255, 255, 255, 0.1); --bg-active: rgba(255, 255, 255, 0.18);
   --border: rgba(255, 255, 255, 0.24); --border-subtle: rgba(255, 255, 255, 0.14); --text-brand: #ffffff; --link: #d5e6ff;
+  --profile-chip: rgba(0, 0, 0, 0.28); --profile-chip-hover: rgba(0, 0, 0, 0.4); --bubble-bg: rgba(0, 0, 0, 0.42);
+  --profile-accent: color-mix(in srgb, var(--profile-top), #fff 18%);
 }
 .card[data-themed="dark"] {
   --text: #1d1e22; --text-strong: #000000; --text-subtle: rgba(0, 0, 0, 0.74); --text-muted: rgba(0, 0, 0, 0.62);
   --bg-surface: rgba(255, 255, 255, 0.5); --bg-raised: rgba(255, 255, 255, 0.46); --bg-input: rgba(255, 255, 255, 0.52); --bg-hover: rgba(0, 0, 0, 0.06); --bg-active: rgba(0, 0, 0, 0.12);
   --border: rgba(0, 0, 0, 0.18); --border-subtle: rgba(0, 0, 0, 0.12); --text-brand: #1d1e22; --link: #0b4ea2;
+  --profile-chip: rgba(255, 255, 255, 0.55); --profile-chip-hover: rgba(255, 255, 255, 0.78); --bubble-bg: rgba(255, 255, 255, 0.8);
+  --profile-accent: color-mix(in srgb, var(--profile-top), #000 45%);
 }
-.close { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; }
-.close:hover { background: rgba(0, 0, 0, 0.65); }
-.banner { aspect-ratio: 5 / 2; background: var(--brand); background-size: cover; background-position: center; }
-.card[data-variant="panel"] .banner { aspect-ratio: auto; height: 120px; }
-.head { position: relative; padding: 0 16px 12px; }
-.avatar { position: absolute; top: -50px; left: 16px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); }
-/* on a theme the ring around the avatar is the card's own top colour */
-.card[data-themed] .avatar { border-color: var(--profile-top); background: var(--profile-top); }
-.actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; min-height: 52px; }
-.card[data-variant="panel"] .actions { min-height: 44px; }
-.names { margin-top: 12px; }
-.display { font-size: 20px; font-weight: 700; color: var(--text-strong); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.displayText { min-width: 0; overflow-wrap: anywhere; }
-.user { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; color: var(--text); }
-.sep { color: var(--text-muted); }
-.pronouns { font-size: 14px; color: var(--text-subtle); cursor: default; }
-.status { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; color: var(--text); }
-.statusEmoji { width: 18px; height: 18px; object-fit: contain; flex: none; }
-.body { margin: 0 16px 16px; padding: 12px; background: var(--bg-raised); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto; }
-.card[data-variant="panel"] .body { max-height: none; overflow: visible; }
-.section h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
-.section p { margin: 0; font-size: 14px; color: var(--text); }
-.sinceRow { display: flex; flex-wrap: wrap; gap: 12px 32px; }
-.about { font-size: 14px; color: var(--text); }
-.mutual { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px; margin: 0 -6px; border-radius: var(--radius-xs); font-size: 14px; color: var(--text); text-align: left; }
-.mutual:hover { background: var(--bg-hover); }
-.mutual + .mutual { margin-top: 2px; }
-.mutualIcon { width: 24px; height: 24px; border-radius: 30%; object-fit: cover; flex: none; }
-.mutualInitial { width: 24px; height: 24px; border-radius: 30%; flex: none; display: flex; align-items: center; justify-content: center; background: var(--bg-active); font-size: 11px; font-weight: 700; }
-.badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--bg-active); color: var(--text-subtle); text-transform: uppercase; }
-.small { font-size: 13px; color: var(--text-muted); }
-.nickBtn { font-size: 12px; font-weight: 500; color: var(--text-brand); }
-.nickBtn:hover { text-decoration: underline; }
-.nickInput { height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid var(--brand); color: var(--text); font-size: 14px; }
-.note { width: 100%; min-height: 56px; padding: 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid transparent; color: var(--text); font-size: 14px; resize: vertical; }
+/* the main button is the theme's own colour made deep enough for white text, as Discord's is */
+@supports (color: oklch(from red l c h)) {
+  .card[data-themed="light"] { --profile-accent: oklch(from var(--profile-top) calc(l + 0.2) calc(c + 0.08) h); }
+  .card[data-themed="dark"] { --profile-accent: oklch(from var(--profile-top) calc(l - 0.32) calc(c + 0.1) h); }
+}
+
+.top { position: relative; aspect-ratio: 17 / 6; }
+.banner {
+  --hole: calc(var(--av) / 2 + var(--ring));
+  position: absolute;
+  inset: 0;
+  background: var(--brand);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: radial-gradient(circle at calc(var(--av-left) + var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
+  mask-image: radial-gradient(circle at calc(var(--av-left) + var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
+}
+.bannerBtns { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 8px; }
+.bannerBtn { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); color: #fff; transition: background var(--transition); }
+.bannerBtn:hover { background: rgba(0, 0, 0, 0.72); }
+/* 60% of the avatar over the banner, 40% below it */
+.avatar { position: absolute; left: var(--av-left); bottom: calc(var(--av) * -0.4); z-index: 1; line-height: 0; }
+
+/* a custom status is a thought bubble beside the avatar, across the banner's edge */
+.bubble { position: absolute; z-index: 1; left: calc(var(--av-left) + var(--av) + 14px); right: 16px; top: calc(100% - 18px); display: flex; pointer-events: none; }
+.bubble::before, .bubble::after { content: ""; position: absolute; border-radius: 50%; background: var(--bubble-bg); }
+.bubble::before { width: 10px; height: 10px; left: -6px; top: -8px; }
+.bubble::after { width: 5px; height: 5px; left: -13px; top: -14px; }
+.bubbleText {
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--bubble-bg);
+  color: var(--text-strong);
+  font-size: 14px;
+  line-height: 18px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.card[data-variant="modal"] .bubbleText { -webkit-line-clamp: 3; }
+.bubbleEmoji { display: inline-block; width: 18px; height: 18px; margin-right: 6px; vertical-align: -4px; object-fit: contain; }
+
+.info { position: relative; display: flex; flex-direction: column; gap: 12px; padding: calc(var(--av) * 0.4 + 12px) 16px 16px; }
+.card[data-variant="modal"] .info { gap: 16px; padding: calc(var(--av) * 0.4 + 16px) 24px 24px; }
+.ident { min-width: 0; }
+.nameRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.display { margin: 0; min-width: 0; font-size: 20px; line-height: 26px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+.card[data-variant="modal"] .display { font-size: 24px; line-height: 30px; }
+.noteBtn { display: inline-flex; padding: 2px; border-radius: 4px; color: var(--text-muted); flex: none; }
+.noteBtn:hover { color: var(--text-strong); }
+.user { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 2px; font-size: 14px; line-height: 20px; color: var(--text); }
+.card[data-variant="modal"] .user { font-size: 16px; line-height: 22px; }
+.sep { color: var(--text); }
+.pronouns { cursor: default; }
+.chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--profile-chip); color: var(--text-strong); font-size: 12px; font-weight: 600; }
+
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.primary { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: 8px; background: var(--profile-accent); color: #fff; font-size: 15px; font-weight: 600; transition: filter var(--transition); }
+.primary:hover:not(:disabled) { filter: brightness(1.1); }
+.primary:disabled { opacity: 0.65; cursor: default; }
+.square { width: 36px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--profile-chip); color: var(--text-strong); transition: background var(--transition); }
+.square:hover { background: var(--profile-chip-hover); }
+
+.mutualRow { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; max-width: 100%; font-size: 14px; line-height: 20px; color: var(--text); text-align: left; }
+.mutualRow:hover > span:last-child { text-decoration: underline; }
+.stack { display: flex; flex: none; }
+.stackItem + .stackItem { margin-left: -6px; }
+/* each small avatar gives way to the one overlapping it, the way the big one gives way to its dot */
+.stackItem:not(:last-child) {
+  -webkit-mask-image: radial-gradient(circle at calc(100% + 4px) 50%, transparent 12px, #000 12.5px);
+  mask-image: radial-gradient(circle at calc(100% + 4px) 50%, transparent 12px, #000 12.5px);
+}
+
+.section { min-width: 0; }
+.section h3 { margin: 0 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-strong); }
+.section p { margin: 0; font-size: 14px; line-height: 18px; color: var(--text); }
+.sinceRow { display: flex; flex-wrap: wrap; gap: 12px 40px; }
+.about { font-size: 14px; line-height: 18px; color: var(--text); overflow-wrap: anywhere; }
+.about[data-clamp] { max-height: 108px; overflow: hidden; }
+.about[data-overflow] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+.moreLink { margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.moreLink:hover { text-decoration: underline; }
+.note { display: block; width: calc(100% + 16px); min-height: 32px; margin: 0 -8px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text); font-size: 14px; line-height: 18px; resize: none; field-sizing: content; }
 .note::placeholder { color: var(--text-muted); }
-.note:focus { border-color: var(--brand); outline: none; }
+.note:hover { background: var(--bg-hover); }
+.note:focus { background: var(--bg-input); outline: none; }
+
+.listItem { display: flex; align-items: center; gap: 12px; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 8px; border-radius: 8px; font-size: 15px; font-weight: 500; color: var(--text-strong); text-align: left; }
+.listItem:hover { background: var(--bg-hover); }
+.listIcon { width: 32px; height: 32px; border-radius: 30%; object-fit: cover; flex: none; }
+.listInitial { width: 32px; height: 32px; border-radius: 30%; flex: none; display: flex; align-items: center; justify-content: center; background: var(--profile-chip); font-size: 13px; font-weight: 700; }
+
+.fullBtn { width: 100%; height: 36px; border-radius: 8px; background: var(--profile-chip); color: var(--text-strong); font-size: 14px; font-weight: 600; transition: background var(--transition); }
+.fullBtn:hover { background: var(--profile-chip-hover); }
+
+.small { font-size: 13px; color: var(--text-muted); }

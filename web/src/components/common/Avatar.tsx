@@ -17,6 +17,8 @@ interface Props {
   kind?: "avatar" | "icon";
   /** Marks someone talking in a call, for a ring drawn by the caller's own styles. */
   "data-speaking"?: boolean;
+  /** A presence dot of this size instead of the one that goes with the avatar's size, as a profile's big avatar has. */
+  dotSize?: number;
 }
 
 /**
@@ -30,9 +32,11 @@ export function statusGeometry(size: number): { dot: number; ring: number } {
 }
 
 /** A user or group avatar with an optional presence dot. Animated avatars play as-is. */
-export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style, kind = "avatar", "data-speaking": speaking }: Props) {
+export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style, kind = "avatar", "data-speaking": speaking, dotSize }: Props) {
   const url = kind === "icon" ? iconUrl(avatarId, size) : avatarUrl(avatarId, size);
-  const { dot, ring } = statusGeometry(size);
+  const geometry = statusGeometry(size);
+  const dot = dotSize ?? geometry.dot;
+  const ring = dotSize ? Math.max(2, Math.round(dotSize * 0.28)) : geometry.ring;
   // the dot sits in the corner and bites a ring out of the picture, so it reads on any background
   const vars = status ? ({ "--dot": `${dot}px`, "--cut": `${dot / 2 + ring}px` } as CSSProperties) : undefined;
   const cut = status ? s.cut : "";
