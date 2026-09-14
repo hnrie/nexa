@@ -1,5 +1,5 @@
-import { api } from "./client";
-import type { Emoji, GifPage, Snowflake, Sticker, StickerPack } from "./types";
+import { api, ApiError } from "./client";
+import type { Emoji, GifPage, Snowflake, Sticker, StickerInfo, StickerPack } from "./types";
 
 type Progress = (loaded: number, total: number) => void;
 
@@ -51,6 +51,15 @@ export const expressions = {
   },
   setStickerPositions(packId: Snowflake, list: { id: Snowflake; position: number }[]): Promise<StickerPack> {
     return api.request<StickerPack>("PATCH", `/stickers/packs/${packId}/stickers`, list);
+  },
+  /** The public pack a sticker comes from, or null when its pack is not public (or it is gone). */
+  async stickerInfo(stickerId: Snowflake): Promise<StickerInfo | null> {
+    try {
+      return await api.request<StickerInfo>("GET", `/stickers/${stickerId}`);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
   },
   install(packId: Snowflake): Promise<StickerPack> {
     return api.request<StickerPack>("PUT", `/stickers/packs/${packId}/install`);

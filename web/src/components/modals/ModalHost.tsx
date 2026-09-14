@@ -16,6 +16,8 @@ import { ServerProfileModal } from "./ServerProfileModal";
 import { ChannelTopicModal } from "./ChannelTopicModal";
 import { IncomingCallHost } from "@/components/voice/IncomingCall";
 import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
+import type { StickerInfo } from "@/api/types";
+import { StickerPackModal } from "./StickerPackModal";
 
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
 const ProfileModal = lazyPage(() => import("@/components/profile/ProfileModal"));
@@ -63,6 +65,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "serverNotifications" ? <ServerNotificationsModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}
       {modal?.kind === "shareScreen" ? <ShareScreenModal onClose={close} /> : null}
       {modal?.kind === "channelTopic" ? <ChannelTopicModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
+      {modal?.kind === "stickerPack" ? <StickerPackModal onClose={close} info={modal.props?.["info"] as StickerInfo} stickerId={String(modal.props?.["stickerId"])} /> : null}
       {modal?.kind === "serverProfile" ? <ServerProfileModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={modal.props?.["userId"] as string | undefined} /> : null}
       <Suspense fallback={null}>
         {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} /> : null}

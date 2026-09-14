@@ -10,6 +10,7 @@ import { Lightbox, fitMedia } from "./Attachments";
 import { VideoPlayer } from "./VideoPlayer";
 import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
+import { imageNameFromUrl } from "@/lib/imageActions";
 
 /** A readable name for a linked file: the last part of its address. */
 function fileNameOf(url: string, fallback: string): string {
@@ -68,6 +69,8 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
           height={dims.height}
           loading="lazy"
           referrerPolicy="no-referrer"
+          data-image-src={src}
+          data-image-name={fileName}
           onLoad={(ev) => {
             if (!e.image_w || !e.image_h) setNatural({ w: ev.currentTarget.naturalWidth, h: ev.currentTarget.naturalHeight });
           }}
@@ -111,9 +114,9 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
           {e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null}
           {e.description ? <div className={s.desc}>{e.description}</div> : null}
         </div>
-        {e.image && !big ? <img className={s.thumb} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" /> : null}
+        {e.image && !big ? <img className={s.thumb} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} /> : null}
       </div>
-      {e.image && big ? <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} /> : null}
+      {e.image && big ? <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} /> : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { humanizeMentions } from "@/components/composer/mentions";
 import { compareIds } from "@/lib/ids";
+import { copyImage, saveImage, type ImageTarget } from "@/lib/imageActions";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
@@ -42,13 +43,25 @@ export function canEdit(msg: DecryptedMessage): boolean {
   return !!me && msg.author_id === me.id && (msg.type === "default" || msg.type === "reply") && !!msg.payload;
 }
 
-export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks): ContextMenuItem[] {
+/** Copy Image and Save Image, for a picture a menu was opened on. */
+export function imageMenuItems(image: ImageTarget): ContextMenuItem[] {
+  const ui = useUI.getState();
+  // a browser's own refusal says nothing useful; the helpers' own errors do
+  const failed = (err: unknown, fallback: string) => ui.toast(err instanceof Error && !(err instanceof DOMException) && err.message ? err.message : fallback, "error");
+  return [
+    { id: "copy-image", label: "Copy Image", onSelect: () => void copyImage(image.src).then(() => ui.toast("Image copied.", "success"), (err: unknown) => failed(err, "Could not copy the picture.")) },
+    { id: "save-image", label: "Save Image", onSelect: () => void saveImage(image.src, image.name).catch((err: unknown) => failed(err, "Could not save the picture.")) },
+  ];
+}
+
+/** The menu for a message; opened on one of its pictures, the picture's own actions come first. */
+export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?: ImageTarget | null): ContextMenuItem[] {
   const ui = useUI.getState();
   const dev = useSettings.getState().settings.developerMode;
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
-  const items: ContextMenuItem[] = [
-    { id: "react", label: "Add Reaction", onSelect: hooks.openReactionPicker, separatorAfter: true },
-  ];
+  const items: ContextMenuItem[] = image ? imageMenuItems(image) : [];
+  if (items.length) items[items.length - 1]!.separatorAfter = true;
+  items.push({ id: "react", label: "Add Reaction", onSelect: hooks.openReactionPicker, separatorAfter: true });
   if (canEdit(msg)) items.push({ id: "edit", label: "Edit Message", onSelect: () => ui.setEditing({ channelId: msg.channel_id, messageId: msg.id }) });
   items.push({ id: "reply", label: "Reply", onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: true });
   items.push({

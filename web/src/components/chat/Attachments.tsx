@@ -9,6 +9,7 @@ import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
 import { AudioPlayer } from "./AudioPlayer";
+import { imageMenuItems } from "./messageMenu";
 import { VideoPlayer } from "./VideoPlayer";
 import { fitMedia, fitVideo } from "./fitMedia";
 import s from "./Chat.module.css";
@@ -100,6 +101,7 @@ function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void,
 }
 
 export function Lightbox({ src, name, type, onClose }: { src: string; name: string; type?: string | undefined; onClose: () => void }) {
+  const openContextMenu = useUI((u) => u.openContextMenu);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -113,7 +115,16 @@ export function Lightbox({ src, name, type, onClose }: { src: string; name: stri
   return createPortal(
     <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name}>
       <button className={s.lbClose} aria-label="Close" onClick={onClose}><X size={22} /></button>
-      <img src={src} alt={name} onClick={(e) => e.stopPropagation()} />
+      <img
+        src={src}
+        alt={name}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src, name }) });
+        }}
+      />
       <div className={s.lbBar} onClick={(e) => e.stopPropagation()}>
         {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
         {type?.toLowerCase().startsWith("image/svg") ? null : <a href={src} target="_blank" rel="noopener noreferrer">Open original</a>}
@@ -136,7 +147,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
     <>
       <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} onClick={() => (revealed ? url && setOpen(true) : setRevealed(true))}>
         {url ? (
-          <img src={url} alt={att.name} width={dims.width} height={dims.height} />
+          <img src={url} alt={att.name} width={dims.width} height={dims.height} data-image-src={url} data-image-name={att.name} />
         ) : (
           <div className={s.imgPlaceholder}>
             {error ? (

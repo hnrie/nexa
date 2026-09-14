@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -352,5 +353,59 @@ func TestPackDeleteReachesInstallers(t *testing.T) {
 	}
 	if b, _ := srv.Store.BlobByID(context.Background(), blob); b == nil || b.RefCount != 0 {
 		t.Errorf("references after delete: %+v", b)
+	}
+}
+
+func TestStickerInfoShowsOnlyPublicPacks(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, _ := register(t, ts, "bob")
+	res, body := do(t, ts, "POST", "/api/v1/stickers/packs", tokA, map[string]any{"name": "Cats", "description": "meow"})
+	if res.StatusCode != 201 {
+		t.Fatalf("create pack: %d %v", res.StatusCode, body)
+	}
+	pack := body["id"].(string)
+	res, raw := rawPost(t, ts.URL+"/api/v1/stickers/packs/"+pack+"/stickers?name=Grumpy", tokA, "image/png", pngBytes(64, 48))
+	if res.StatusCode != 201 {
+		t.Fatalf("add sticker: %d %s", res.StatusCode, raw)
+	}
+	var sticker map[string]any
+	_ = json.Unmarshal(raw, &sticker)
+	sid := sticker["id"].(string)
+	if res, _ = rawPost(t, ts.URL+"/api/v1/stickers/packs/"+pack+"/stickers?name=Happy", tokA, "image/png", pngBytes(48, 48)); res.StatusCode != 201 {
+		t.Fatalf("add sticker 2: %d", res.StatusCode)
+	}
+
+	// a private pack is not shown, not even to whoever made it
+	for _, tok := range []string{tokA, tokB} {
+		if res, _ = do(t, ts, "GET", "/api/v1/stickers/"+sid, tok, nil); res.StatusCode != 404 {
+			t.Errorf("sticker from a private pack: %d", res.StatusCode)
+		}
+	}
+	if res, _ = do(t, ts, "GET", "/api/v1/stickers/123456789", tokB, nil); res.StatusCode != 404 {
+		t.Errorf("unknown sticker: %d", res.StatusCode)
+	}
+
+	// public: the pack with all its stickers, and who made them
+	if res, body = do(t, ts, "PATCH", "/api/v1/stickers/packs/"+pack, tokA, map[string]any{"public": true}); res.StatusCode != 200 {
+		t.Fatalf("make public: %d %v", res.StatusCode, body)
+	}
+	res, body = do(t, ts, "GET", "/api/v1/stickers/"+sid, tokB, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("sticker info: %d %v", res.StatusCode, body)
+	}
+	p := body["pack"].(map[string]any)
+	if body["sticker"].(map[string]any)["name"] != "Grumpy" || p["name"] != "Cats" || len(p["stickers"].([]any)) != 2 || p["installed"] != false {
+		t.Errorf("sticker info: %v", body)
+	}
+	users := body["users"].([]any)
+	if len(users) != 1 || users[0].(map[string]any)["id"] != idA || users[0].(map[string]any)["username"] != "alice" {
+		t.Errorf("creators: %v", users)
+	}
+	if res, _ = do(t, ts, "PUT", "/api/v1/stickers/packs/"+pack+"/install", tokB, nil); res.StatusCode != 200 {
+		t.Fatalf("install: %d", res.StatusCode)
+	}
+	if _, body = do(t, ts, "GET", "/api/v1/stickers/"+sid, tokB, nil); body["pack"].(map[string]any)["installed"] != true {
+		t.Errorf("installed after installing: %v", body["pack"])
 	}
 }

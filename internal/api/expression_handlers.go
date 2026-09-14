@@ -42,6 +42,7 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/v1/stickers/packs/{id}/stickers", s.authed(s.handleStickerPositions))
 	mux.Handle("PATCH /api/v1/stickers/packs/{id}/stickers/{sid}", s.authed(s.handleStickerPatch))
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}/stickers/{sid}", s.authed(s.handleStickerDelete))
+	mux.Handle("GET /api/v1/stickers/{sid}", s.authed(s.handleStickerInfo))
 	mux.Handle("PUT /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(true)))
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(false)))
 	mux.Handle("GET /api/v1/gif/status", s.authed(s.handleGifStatus))
@@ -347,6 +348,53 @@ func (s *Server) handlePackGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	WriteJSON(w, http.StatusOK, p)
+}
+
+// handleStickerInfo tells someone who saw a sticker in a message where it
+// comes from. Only a public pack is shown, with every sticker in it and who
+// made them. A sticker from any other pack stays the picture and name its
+// message already carries, so it is answered as not found.
+func (s *Server) handleStickerInfo(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	sid, err := ids.Parse(r.PathValue("sid"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	st, err := s.Store.StickerByID(r.Context(), sid)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	p, err := s.Store.PackByID(r.Context(), st.PackID)
+	if err != nil || !p.Public {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	installed, _ := s.Store.Installers(r.Context(), p.ID)
+	for _, id := range installed {
+		if id == me.ID {
+			p.Installed = true
+		}
+	}
+	want := map[ids.ID]bool{st.CreatorID: true}
+	if p.OwnerUserID != nil {
+		want[*p.OwnerUserID] = true
+	}
+	for _, x := range p.Stickers {
+		want[x.CreatorID] = true
+	}
+	list := make([]ids.ID, 0, len(want))
+	for id := range want {
+		list = append(list, id)
+	}
+	users := []store.PublicUser{}
+	if byID, err := s.Store.UsersByIDs(r.Context(), list); err == nil {
+		for _, u := range byID {
+			users = append(users, u.Public())
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"sticker": st, "pack": p, "users": users})
 }
 
 func (s *Server) handlePackPatch(w http.ResponseWriter, r *http.Request) {

@@ -15,6 +15,7 @@ import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
 import { useShiftHeld } from "@/hooks/useShiftHeld";
 import { stickerUrl } from "@/api/users";
+import { imageTarget, type ImageTarget } from "@/lib/imageActions";
 import type { MessagePayload } from "@/crypto/message";
 import { Attachments } from "./Attachments";
 import { Embeds } from "./Embeds";
@@ -23,6 +24,7 @@ import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
 import { isOnlyMediaLinks } from "./mediaLinks";
 import { Reactions } from "./Reactions";
+import { StickerPopout } from "./StickerPopout";
 import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
 import { MSG_FLAG_PINNED } from "@/api/types";
@@ -107,9 +109,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     return n <= 3 ? 48 : n <= 8 ? 36 : 28;
   }, [jumbo, nodes]);
 
-  const openMenu = useCallback((x: number, y: number) => {
+  const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null) => {
     setMenuOpen(true);
-    openContextMenu({ x, y, items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }) });
+    openContextMenu({ x, y, items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
     const unsub = useUI.subscribe((state) => {
       if (!state.contextMenu) {
         setMenuOpen(false);
@@ -167,7 +169,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           if (pickable) pick(e);
           return;
         }
-        openMenu(e.clientX, e.clientY);
+        openMenu(e.clientX, e.clientY, imageTarget(e.target));
       }}
     >
       {pickable ? (
@@ -242,9 +244,38 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   );
 });
 
-/** A sticker in a message: 160 px, keeps its aspect, named on hover. */
+/** A sticker in a message: 160 px, keeps its aspect; a click shows its name and, for a public pack, the pack. */
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const close = useCallback(() => setAnchor(null), []);
   if (!sticker.blob) return <span className={s.edited}>[sticker]</span>;
   const w = sticker.w && sticker.h ? Math.round((160 * sticker.w) / sticker.h) : 160;
-  return <img className={s.sticker} src={stickerUrl(sticker.blob, 160)} alt={sticker.name ?? "sticker"} title={sticker.name} width={Math.min(160, w)} height={160} loading="lazy" draggable={false} />;
+  const toggle = (el: HTMLElement) => setAnchor((cur) => (cur ? null : el));
+  return (
+    <>
+      <img
+        className={s.sticker}
+        src={stickerUrl(sticker.blob, 160)}
+        alt={sticker.name ?? "sticker"}
+        width={Math.min(160, w)}
+        height={160}
+        loading="lazy"
+        draggable={false}
+        role="button"
+        tabIndex={0}
+        aria-label={sticker.name ? `Sticker: ${sticker.name}` : "Sticker"}
+        aria-expanded={!!anchor}
+        data-testid="message-sticker"
+        data-image-src={stickerUrl(sticker.blob)}
+        data-image-name={sticker.name || "sticker"}
+        onClick={(e) => toggle(e.currentTarget)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          toggle(e.currentTarget);
+        }}
+      />
+      {anchor ? <StickerPopout sticker={sticker} anchor={anchor} onClose={close} /> : null}
+    </>
+  );
 }

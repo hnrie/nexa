@@ -91,6 +91,13 @@ describe("picking messages to delete", () => {
   });
   const labels = (m: DecryptedMessage) => buildMessageMenu(m, { openReactionPicker: () => {} }).map((i) => i.id);
 
+  it("puts a picture's Copy Image and Save Image first when opened on one", () => {
+    const withImage = buildMessageMenu(msg("200", "1"), { openReactionPicker: () => {} }, { src: "blob:x", name: "cat.png" });
+    expect(withImage.slice(0, 3).map((i) => i.id)).toEqual(["copy-image", "save-image", "react"]);
+    expect(withImage[1]!.separatorAfter).toBe(true);
+    expect(labels(msg("200", "1"))).not.toContain("copy-image");
+  });
+
   it("offers Select Messages wherever deleting is offered", () => {
     expect(labels(msg("200", "3"))).toContain("select");
     expect(labels(msg("200", "1"))).not.toContain("select");

@@ -197,7 +197,8 @@
   .toolbar { right: 8px; }
   .pinsPop { left: 8px; right: 8px; width: auto; max-width: none; }
 }
-.sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; }
+.sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; cursor: pointer; border-radius: var(--radius-xs); }
+.sticker:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .videoPending { display: flex; max-width: 100%; align-items: center; justify-content: center; margin-top: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); font-size: 14px; text-align: center; padding: 12px; }
 .videoLoading { display: inline-flex; align-items: center; gap: 8px; }
 .videoLoad { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 14px; font-weight: 600; }

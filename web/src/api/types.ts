@@ -217,6 +217,14 @@ export interface StickerPack {
   installed: boolean;
 }
 
+/** Where a sticker seen in a message comes from: only ever a public pack. */
+export interface StickerInfo {
+  sticker: Sticker;
+  pack: StickerPack;
+  /** Whoever made the pack's stickers. */
+  users: PublicUser[];
+}
+
 export interface GifResult {
   id: string;
   url: string;

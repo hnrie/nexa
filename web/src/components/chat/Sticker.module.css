@@ -1,0 +1,9 @@
+/* the card a click on a sticker in a message opens; drawn on the page, like tooltips and menus */
+.popout { position: fixed; z-index: 350; width: 240px; max-width: calc(100vw - 8px); padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: pop 120ms ease-out; }
+@keyframes pop { from { opacity: 0; transform: translateY(4px); } }
+.head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.preview { width: 48px; height: 48px; flex: none; object-fit: contain; }
+.text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name { font-size: 15px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pending { display: flex; justify-content: center; height: 32px; align-items: center; color: var(--text-muted); }
