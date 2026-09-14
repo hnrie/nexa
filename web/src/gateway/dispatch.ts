@@ -162,6 +162,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "message_delete_bulk":
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
+      for (const id of e.d.ids) useReadStates.getState().dropUnread(e.d.channel_id, id);
       return;
     case "reaction_add":
     case "reaction_remove":

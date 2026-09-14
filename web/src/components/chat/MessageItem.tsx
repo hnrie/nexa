@@ -1,4 +1,4 @@
-import { Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
+import { Check, Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
@@ -9,6 +9,7 @@ import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useRelationships } from "@/stores/relationships";
+import { rangeBetween, useSelection } from "@/stores/selection";
 import { useUsers, displayName } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
@@ -26,7 +27,7 @@ import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, canPin, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, canPick, canPin, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
 import s from "./Chat.module.css";
 
 interface Props {
@@ -87,6 +88,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const [menuOpen, setMenuOpen] = useState(false);
   const friendNickname = useRelationships((r) => r.byUser[msg.author_id]?.nickname);
   const shift = useShiftHeld();
+  const selecting = useSelection((x) => x.channelId === msg.channel_id);
+  const picked = useSelection((x) => x.channelId === msg.channel_id && !!x.picked[msg.id]);
+  const pickable = selecting && !pending && canPick(msg);
 
   const mentioned = !!me && (msg.mention_everyone || msg.mentions.includes(me.id)) && msg.author_id !== me.id;
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
@@ -114,6 +118,21 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     });
   }, [msg, openContextMenu]);
 
+  /** While picking, a tap anywhere on the row ticks it; Shift ticks everything from the last one. */
+  const pick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sel = useSelection.getState();
+    if (e.shiftKey && sel.anchor && sel.anchor !== msg.id) {
+      const ch = useMessages.getState().channels[msg.channel_id];
+      const range = rangeBetween(ch?.ids ?? [], sel.anchor, msg.id).filter((id) => {
+        const m = ch?.byId[id];
+        return !!m && canPick(m);
+      });
+      sel.addRange(range, msg.id);
+    } else sel.toggle(msg.id);
+  };
+
   if (msg.type.startsWith("system_")) return <SystemMessage msg={msg} />;
 
   const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : "Unknown User");
@@ -137,12 +156,25 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       data-pending={pending === "sending"}
       data-failed={pending === "failed"}
       data-menu={menuOpen}
+      data-pickable={pickable || undefined}
+      data-picked={picked || undefined}
+      onClickCapture={pickable ? pick : undefined}
       onContextMenu={(e) => {
         if (pending) return;
         e.preventDefault();
+        if (selecting) {
+          // a long press or right click while picking ticks the row instead of opening its menu
+          if (pickable) pick(e);
+          return;
+        }
         openMenu(e.clientX, e.clientY);
       }}
     >
+      {pickable ? (
+        <button type="button" className={s.pick} role="checkbox" aria-checked={picked} aria-label={picked ? "Unselect message" : "Select message"} data-testid="pick-message">
+          {picked ? <Check size={14} strokeWidth={3} /> : null}
+        </button>
+      ) : null}
       {isReply ? <ReplyPreview msg={msg} /> : null}
       {showHeader ? (
         <>
@@ -184,7 +216,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         </div>
       )}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
-      {!pending && !editing ? (
+      {!pending && !editing && !selecting ? (
         <div className={s.toolbar} role="toolbar" data-shift={shift}>
           <ToolButton label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
           {canEdit(msg) ? (

@@ -20,6 +20,8 @@ const (
 	maxAttachments   = 10
 	maxNonce         = 64
 	maxEmojiLen      = 64
+	// maxBulkDelete bounds one bulk delete; the client sends bigger selections in batches.
+	maxBulkDelete = 100
 )
 
 func (s *Server) messageRoutes(mux *http.ServeMux) {
@@ -28,6 +30,7 @@ func (s *Server) messageRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/channels/{id}/messages/{mid}", s.authed(s.handleMessageGet))
 	mux.Handle("PATCH /api/v1/channels/{id}/messages/{mid}", s.authed(s.handleMessageEdit))
 	mux.Handle("DELETE /api/v1/channels/{id}/messages/{mid}", s.authed(s.handleMessageDelete))
+	mux.Handle("POST /api/v1/channels/{id}/messages/bulk-delete", s.authed(s.handleMessageBulkDelete))
 	mux.Handle("POST /api/v1/channels/{id}/messages/{mid}/ack", s.authed(s.handleAck))
 	mux.Handle("PUT /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.authed(s.handleReactionAdd))
 	mux.Handle("DELETE /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.authed(s.handleReactionRemove))
@@ -389,18 +392,7 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	allowed := m.AuthorID == me.ID
-	if !allowed && ch.Type == "group_dm" && ch.OwnerID != nil && *ch.OwnerID == me.ID {
-		allowed = true
-	}
-	if !allowed && !s.isDM(ch) && s.ChannelAccess != nil {
-		allowed, _ = s.ChannelAccess(r.Context(), me, ch, NeedManage)
-	}
-	// whoever runs the instance can take down any message they can see
-	if !allowed && me.Flags&store.FlagAdmin != 0 {
-		allowed = true
-	}
-	if !allowed {
+	if m.AuthorID != me.ID && !s.canDeleteOthers(r, ch, me) {
 		WriteError(w, ErrForbidden)
 		return
 	}
@@ -410,6 +402,72 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.Bcast.EmitChannel(ch.ID, "message_delete", map[string]any{"id": mid, "channel_id": ch.ID})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleMessageBulkDelete removes up to maxBulkDelete messages of one channel.
+// Every message is checked before anything goes: one the caller may not
+// delete refuses the whole request. Ids already gone, or from another
+// channel, are skipped; the response lists the ones deleted.
+func (s *Server) handleMessageBulkDelete(w http.ResponseWriter, r *http.Request) {
+	ch, me := s.channel(w, r, NeedView)
+	if ch == nil {
+		return
+	}
+	var body struct {
+		IDs []ids.ID `json:"ids"`
+	}
+	if err := ReadJSON(w, r, &body, 16<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	list := dedupeIDs(body.IDs, maxBulkDelete+1)
+	if len(list) == 0 || len(list) > maxBulkDelete {
+		WriteError(w, E(http.StatusBadRequest, "bad_ids", "Pick between 1 and 100 messages to delete."))
+		return
+	}
+	authors, err := s.Store.MessageAuthors(r.Context(), ch.ID, list)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	found := make([]ids.ID, 0, len(authors))
+	others := false
+	for _, id := range list {
+		author, ok := authors[id]
+		if !ok {
+			continue
+		}
+		found = append(found, id)
+		others = others || author != me.ID
+	}
+	if others && !s.canDeleteOthers(r, ch, me) {
+		WriteError(w, ErrForbidden)
+		return
+	}
+	deleted, err := s.Store.DeleteMessages(r.Context(), ch.ID, found)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if len(deleted) > 0 {
+		s.Bcast.EmitChannel(ch.ID, "message_delete_bulk", map[string]any{"channel_id": ch.ID, "ids": deleted})
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"ids": deleted})
+}
+
+// canDeleteOthers says whether the caller may remove messages other people
+// wrote in a channel: a group DM's owner, anyone with Manage Messages in a
+// server channel, and whoever runs the instance.
+func (s *Server) canDeleteOthers(r *http.Request, ch *store.Channel, me *store.User) bool {
+	if ch.Type == "group_dm" && ch.OwnerID != nil && *ch.OwnerID == me.ID {
+		return true
+	}
+	if !s.isDM(ch) && s.ChannelAccess != nil {
+		if ok, _ := s.ChannelAccess(r.Context(), me, ch, NeedManage); ok {
+			return true
+		}
+	}
+	return me.Flags&store.FlagAdmin != 0
 }
 
 func (s *Server) handleAck(w http.ResponseWriter, r *http.Request) {

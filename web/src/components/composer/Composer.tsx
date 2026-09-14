@@ -9,6 +9,7 @@ import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
+import { useSelection } from "@/stores/selection";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { canI, useServers } from "@/stores/servers";
@@ -427,6 +428,8 @@ export function Composer({ channel }: { channel: Channel }) {
       if (!hasFiles(e) || e.defaultPrevented) return;
       e.preventDefault();
       if (inOwnLayer(e.target instanceof Element ? e.target : null)) return;
+      // while picking messages the composer is out of sight, so a file must not slip into it
+      if (useSelection.getState().channelId) return;
       if (e.dataTransfer?.files.length) dropElsewhere.current?.(e.dataTransfer.files);
     };
     window.addEventListener("dragover", onWindowDragOver);

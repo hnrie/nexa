@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strconv"
 	"testing"
 	"time"
 
@@ -221,4 +222,124 @@ func TestDuplicateAttachmentIsAttachedOnce(t *testing.T) {
 		t.Errorf("ref count after delete: %v %+v", err, b)
 	}
 	_ = tokB
+}
+
+// Several messages go in one request, and only when every one of them is the
+// caller's to delete: one that is not refuses the lot.
+func TestBulkDeleteTakesOnlyWhatYouMayDelete(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	tokC, idC := register(t, ts, "carol")
+	tokD, _ := register(t, ts, "dave")
+	view := createServer(t, ts, tokA, "Tidy")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	code := inviteFor(t, ts, tokA, general)
+	join(t, ts, tokB, code)
+	join(t, ts, tokC, code)
+	epoch := createEpoch(t, ts, tokA, sid)
+	send := func(tok, text string) string {
+		t.Helper()
+		res, body := sendMsg(t, ts, tok, general, sid, epoch, text, "", nil)
+		if res.StatusCode != 201 {
+			t.Fatalf("send: %d %v", res.StatusCode, body)
+		}
+		return body["id"].(string)
+	}
+	b1, b2, b3 := send(tokB, "one"), send(tokB, "two"), send(tokB, "three")
+	a1 := send(tokA, "alice's")
+	bulk := "/api/v1/channels/" + general + "/messages/bulk-delete"
+	exists := func(mid string) bool {
+		res, _ := do(t, ts, "GET", "/api/v1/channels/"+general+"/messages/"+mid, tokA, nil)
+		return res.StatusCode == 200
+	}
+
+	// someone else's message in the pick refuses the whole request
+	if res, body := do(t, ts, "POST", bulk, tokB, map[string]any{"ids": []string{b1, a1}}); res.StatusCode != 403 {
+		t.Errorf("member deleting another's message in bulk: %d %v", res.StatusCode, body)
+	}
+	if !exists(b1) || !exists(a1) {
+		t.Fatal("a refused bulk delete removed something")
+	}
+
+	// your own go, and everyone in the channel hears about it once
+	ga := connectGW(t, ts, tokA)
+	res, body := do(t, ts, "POST", bulk, tokB, map[string]any{"ids": []string{b1, b2, b1}})
+	if res.StatusCode != 200 || len(body["ids"].([]any)) != 2 {
+		t.Fatalf("own messages: %d %v", res.StatusCode, body)
+	}
+	ev := ga.next("message_delete_bulk", 3*time.Second)
+	if ev == nil || ev["channel_id"] != general || len(ev["ids"].([]any)) != 2 {
+		t.Errorf("bulk delete event: %v", ev)
+	}
+	if exists(b1) || exists(b2) {
+		t.Error("own messages still there")
+	}
+
+	// ids that are already gone, or from another channel, are skipped rather than refused
+	res, body = do(t, ts, "POST", "/api/v1/servers/"+sid+"/channels", tokA, map[string]any{"type": "text", "name": "other"})
+	if res.StatusCode != 201 {
+		t.Fatal(body)
+	}
+	other := body["id"].(string)
+	res, body = sendMsg(t, ts, tokB, other, sid, epoch, "elsewhere", "", nil)
+	if res.StatusCode != 201 {
+		t.Fatal(body)
+	}
+	elsewhere := body["id"].(string)
+	res, body = do(t, ts, "POST", bulk, tokB, map[string]any{"ids": []string{b1, elsewhere, b3}})
+	if res.StatusCode != 200 || len(body["ids"].([]any)) != 1 || body["ids"].([]any)[0] != b3 {
+		t.Errorf("gone and foreign ids: %d %v", res.StatusCode, body)
+	}
+	if res, _ := do(t, ts, "GET", "/api/v1/channels/"+other+"/messages/"+elsewhere, tokA, nil); res.StatusCode != 200 {
+		t.Error("a message from another channel was deleted")
+	}
+
+	// Manage Messages deletes anyone's
+	mod := createRole(t, ts, tokA, sid, "Mod", perms.DefaultEveryone|perms.ManageMessages)
+	if res, body := do(t, ts, "PUT", "/api/v1/servers/"+sid+"/members/"+idC+"/roles/"+mod, tokA, nil); res.StatusCode != 200 {
+		t.Fatalf("assign mod: %d %v", res.StatusCode, body)
+	}
+	b4 := send(tokB, "four")
+	if res, body := do(t, ts, "POST", bulk, tokC, map[string]any{"ids": []string{b4, a1}}); res.StatusCode != 200 || len(body["ids"].([]any)) != 2 {
+		t.Errorf("moderator: %d %v", res.StatusCode, body)
+	}
+
+	// nothing, too many, and a channel you cannot see
+	if res, body := do(t, ts, "POST", bulk, tokB, map[string]any{"ids": []string{}}); res.StatusCode != 400 {
+		t.Errorf("empty pick: %d %v", res.StatusCode, body)
+	}
+	many := make([]string, 101)
+	for i := range many {
+		many[i] = strconv.Itoa(1000 + i)
+	}
+	if res, body := do(t, ts, "POST", bulk, tokB, map[string]any{"ids": many}); res.StatusCode != 400 {
+		t.Errorf("more than 100: %d %v", res.StatusCode, body)
+	}
+	if res, _ := do(t, ts, "POST", bulk, tokD, map[string]any{"ids": []string{b3}}); res.StatusCode != 404 {
+		t.Errorf("outsider: %d", res.StatusCode)
+	}
+
+	// in a group DM the owner may delete anyone's, the others only their own
+	friend(t, ts, tokA, "bob", tokB, idA)
+	friend(t, ts, tokA, "carol", tokC, idA)
+	res, body = do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB, idC}})
+	if res.StatusCode != 201 {
+		t.Fatalf("group: %d %v", res.StatusCode, body)
+	}
+	g := body["id"].(string)
+	createEpoch(t, ts, tokA, g)
+	_, body = sendMsg(t, ts, tokB, g, g, 0, "bob in the group", "", nil)
+	gb := body["id"].(string)
+	_, body = sendMsg(t, ts, tokC, g, g, 0, "carol in the group", "", nil)
+	gc := body["id"].(string)
+	gbulk := "/api/v1/channels/" + g + "/messages/bulk-delete"
+	if res, _ := do(t, ts, "POST", gbulk, tokC, map[string]any{"ids": []string{gb, gc}}); res.StatusCode != 403 {
+		t.Errorf("group member deleting another's: %d", res.StatusCode)
+	}
+	if res, body := do(t, ts, "POST", gbulk, tokA, map[string]any{"ids": []string{gb, gc}}); res.StatusCode != 200 || len(body["ids"].([]any)) != 2 {
+		t.Errorf("group owner: %d %v", res.StatusCode, body)
+	}
+	_ = idB
 }

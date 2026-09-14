@@ -1,5 +1,5 @@
 import { channels as channelsApi } from "@/api/channels";
-import { messages as messagesApi } from "@/api/messages";
+import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { humanizeMentions } from "@/components/composer/mentions";
 import { compareIds } from "@/lib/ids";
@@ -7,6 +7,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
+import { useSelection } from "@/stores/selection";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
@@ -72,6 +73,7 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks): Conte
   items.push({ id: "link", label: "Copy Message Link", onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
   if (dev) items.push({ id: "id", label: "Copy Message ID", onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
   if (canDelete(msg)) {
+    items.push({ id: "select", label: "Select Messages", onSelect: () => startSelecting(msg) });
     items.push({
       id: "delete",
       label: "Delete Message",
@@ -124,6 +126,33 @@ export async function deleteMessageNow(msg: DecryptedMessage): Promise<void> {
     useMessages.getState().remove(msg.channel_id, msg.id);
   } catch (err) {
     useUI.getState().toast(err instanceof Error ? err.message : "Could not delete the message.", "error");
+  }
+}
+
+/** Whether a message can be ticked while picking messages to delete. */
+export function canPick(msg: DecryptedMessage): boolean {
+  return !msg.type.startsWith("system_") && canDelete(msg);
+}
+
+/** Starts picking messages to delete in the message's channel, with that message ticked. */
+export function startSelecting(msg: DecryptedMessage): void {
+  const ui = useUI.getState();
+  if (ui.editing?.channelId === msg.channel_id) ui.setEditing(null);
+  useSelection.getState().start(msg.channel_id, canPick(msg) ? msg.id : undefined);
+}
+
+/**
+ * Deletes the picked messages, a batch per request. Each batch that goes is
+ * taken off the screen and out of the selection straight away, so a failure
+ * part way leaves only what is still there picked, ready to try again.
+ */
+export async function deleteMessagesNow(channelId: string, ids: string[]): Promise<void> {
+  for (let i = 0; i < ids.length; i += BULK_DELETE_MAX) {
+    const batch = ids.slice(i, i + BULK_DELETE_MAX);
+    await messagesApi.removeMany(channelId, batch);
+    // ids the server skipped were already gone, so the whole batch leaves the screen
+    useMessages.getState().removeMany(channelId, batch);
+    useSelection.getState().drop(batch);
   }
 }
 

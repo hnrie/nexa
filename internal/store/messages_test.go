@@ -311,3 +311,44 @@ func TestUnreadCountStopsAtTheMost(t *testing.T) {
 		t.Errorf("your own messages are never unread: %+v", states[0])
 	}
 }
+
+// A bulk delete runs as one transaction over one channel: it releases blobs,
+// moves last_message_id back, and skips ids that are gone or belong elsewhere.
+func TestDeleteMessagesInOneChannel(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b, c := mkUser(t, s, "a"), mkUser(t, s, "b"), mkUser(t, s, "c")
+	dm, _, _ := s.CreateDM(ctx, a.ID, b.ID)
+	other, _, _ := s.CreateDM(ctx, a.ID, c.ID)
+	keep := mkMsg(t, s, dm.ID, a.ID, "keep")
+	one := mkMsg(t, s, dm.ID, b.ID, "one")
+	blob := &Blob{SHA256: "bulk", Size: 5, Mime: "application/octet-stream", Kind: "attachment", Encrypted: true}
+	_ = s.InsertBlob(ctx, blob)
+	two := &Message{ChannelID: dm.ID, AuthorID: a.ID, Ciphertext: json.RawMessage(`{"v":1}`), Attachments: []Attachment{{BlobID: blob.ID, Size: 5}}}
+	if err := s.InsertMessage(ctx, two); err != nil {
+		t.Fatal(err)
+	}
+	elsewhere := mkMsg(t, s, other.ID, a.ID, "elsewhere")
+
+	authors, err := s.MessageAuthors(ctx, dm.ID, []ids.ID{one.ID, two.ID, elsewhere.ID, 424242})
+	if err != nil || len(authors) != 2 || authors[one.ID] != b.ID || authors[two.ID] != a.ID {
+		t.Fatalf("authors: %v %v", err, authors)
+	}
+	deleted, err := s.DeleteMessages(ctx, dm.ID, []ids.ID{one.ID, two.ID, elsewhere.ID, 424242})
+	if err != nil || len(deleted) != 2 {
+		t.Fatalf("delete: %v %v", err, deleted)
+	}
+	if bl, _ := s.BlobByID(ctx, blob.ID); bl.RefCount != 0 {
+		t.Errorf("blob still referenced: %d", bl.RefCount)
+	}
+	ch, _ := s.ChannelByID(ctx, dm.ID)
+	if ch.LastMessageID == nil || *ch.LastMessageID != keep.ID {
+		t.Errorf("last message should fall back to the one kept: %v", ch.LastMessageID)
+	}
+	if _, err := s.MessageByID(ctx, elsewhere.ID, a.ID); err != nil {
+		t.Errorf("another channel's message went too: %v", err)
+	}
+	if deleted, err := s.DeleteMessages(ctx, dm.ID, []ids.ID{one.ID}); err != nil || len(deleted) != 0 {
+		t.Errorf("deleting again: %v %v", err, deleted)
+	}
+}

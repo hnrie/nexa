@@ -101,7 +101,12 @@ function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void,
 
 export function Lightbox({ src, name, type, onClose }: { src: string; name: string; type?: string | undefined; onClose: () => void }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // the lightbox takes this Escape; it does not also stop picking messages under it
+      e.stopPropagation();
+      onClose();
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);

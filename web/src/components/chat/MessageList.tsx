@@ -9,6 +9,7 @@ import { formatDateDivider, sameDay } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
+import { useSelection } from "@/stores/selection";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -71,7 +72,10 @@ export function MessageList({ channel }: { channel: Channel }) {
   const jumpTo = useUI((u) => u.jumpTo);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const compact = useSettings((st) => st.settings.messageDisplay === "compact");
+  const selecting = useSelection((x) => x.channelId === channel.id);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** The row at the top of the view, and how far down it sat, as picking began or ended. */
+  const pickAnchor = useRef<{ id: string; top: number } | null>(null);
   const atBottom = useRef(true);
   const prepend = useRef<{ height: number } | null>(null);
   const [newBelow, setNewBelow] = useState(false);
@@ -173,6 +177,36 @@ export function MessageList({ channel }: { channel: Channel }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [channel.id]);
+
+  // Picking moves every row over for its check, which rewraps long messages
+  // and would slide what is being read out of view. The row at the top is
+  // noted before the change lands (a store subscription runs before React
+  // renders) and put back where it was after.
+  useEffect(
+    () =>
+      useSelection.subscribe((next, prev) => {
+        if ((next.channelId === channel.id) === (prev.channelId === channel.id)) return;
+        const el = scrollRef.current;
+        if (!el || atBottom.current) return;
+        const box = el.getBoundingClientRect();
+        for (const row of el.querySelectorAll<HTMLElement>("[data-id]")) {
+          const r = row.getBoundingClientRect();
+          if (r.bottom > box.top) {
+            pickAnchor.current = { id: row.dataset.id!, top: r.top - box.top };
+            return;
+          }
+        }
+      }),
+    [channel.id],
+  );
+  useLayoutEffect(() => {
+    const a = pickAnchor.current;
+    const el = scrollRef.current;
+    pickAnchor.current = null;
+    if (!a || !el) return;
+    const row = el.querySelector<HTMLElement>(`[data-id="${a.id}"]`);
+    if (row) el.scrollTop += row.getBoundingClientRect().top - el.getBoundingClientRect().top - a.top;
+  }, [selecting]);
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -307,7 +341,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   }, []);
 
   return (
-    <div className={[s.listWrap, compact ? s.compact : ""].join(" ")}>
+    <div className={[s.listWrap, compact ? s.compact : ""].join(" ")} data-selecting={selecting || undefined}>
       {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>New messages</span><span>Jump to present</span></div> : null}
       <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="">
         <div className={s.inner}>

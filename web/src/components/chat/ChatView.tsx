@@ -23,10 +23,12 @@ import { SearchPanel } from "@/components/search/SearchPanel";
 import sc from "@/components/search/Search.module.css";
 import { VoiceView } from "@/components/voice/VoiceView";
 import { useVoice } from "@/stores/voice";
+import { useSelection } from "@/stores/selection";
 import { joinVoice, toggleCamera } from "@/voice/session";
 import { MessageList } from "./MessageList";
 import { SubchatPanel } from "./SubchatPanel";
 import { PinsPanel } from "./PinsPanel";
+import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
 import s from "./Chat.module.css";
 
@@ -85,7 +87,12 @@ export function ChatView({ channel }: { channel: Channel }) {
     setSubchats(false);
     setSearchOpen(false);
     setSearchQuery("");
+    // picking belongs to the channel it started in too
+    return () => {
+      if (useSelection.getState().channelId === channel.id) useSelection.getState().clear();
+    };
   }, [channel.id]);
+  const selecting = useSelection((x) => x.channelId === channel.id);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -206,8 +213,12 @@ export function ChatView({ channel }: { channel: Channel }) {
         {/* the composer belongs to the conversation's column, so the member list and search run the full height beside it */}
         <div className={s.main}>
           <MessageList key={channel.id} channel={channel} />
-          <TypingBar channelId={channel.id} />
-          <Composer channel={channel} />
+          {/* the composer stays mounted underneath, so a draft and its attachments survive picking */}
+          <div className={s.composerSlot} hidden={selecting}>
+            <TypingBar channelId={channel.id} />
+            <Composer channel={channel} />
+          </div>
+          {selecting ? <SelectionBar channelId={channel.id} /> : null}
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}

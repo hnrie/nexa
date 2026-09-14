@@ -305,16 +305,85 @@ func (s *Store) DeleteMessage(ctx context.Context, id ids.ID) error {
 			}
 			return err
 		}
-		// one reference per attachment row, however many rows share a blob
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.message_id = ? AND a.blob_id = blobs.id)) WHERE id IN (SELECT blob_id FROM attachments WHERE message_id = ?)`, int64(id), int64(id)); err != nil {
+		if err := deleteMessageTx(ctx, tx, id); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE id = ?`, int64(id)); err != nil {
-			return err
-		}
-		_, err := tx.ExecContext(ctx, `UPDATE channels SET last_message_id = (SELECT max(id) FROM messages WHERE channel_id = ?) WHERE id = ? AND last_message_id = ?`, chID, chID, int64(id))
-		return err
+		return fixLastMessageTx(ctx, tx, ids.ID(chID))
 	})
+}
+
+// MessageAuthors returns who wrote each listed message that is in the channel;
+// ids that are gone or belong to another channel are left out.
+func (s *Store) MessageAuthors(ctx context.Context, chID ids.ID, list []ids.ID) (map[ids.ID]ids.ID, error) {
+	out := make(map[ids.ID]ids.ID, len(list))
+	if len(list) == 0 {
+		return out, nil
+	}
+	args := []any{int64(chID)}
+	for _, id := range list {
+		args = append(args, int64(id))
+	}
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id, author_id FROM messages WHERE channel_id = ? AND id IN (`+placeholders(len(list))+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, author int64
+		if err := rows.Scan(&id, &author); err != nil {
+			return nil, err
+		}
+		out[ids.ID(id)] = ids.ID(author)
+	}
+	return out, rows.Err()
+}
+
+// DeleteMessages removes several messages of one channel in a single
+// transaction, releasing their attachment blobs and fixing the channel's
+// last_message_id. Ids that are gone or belong to another channel are
+// skipped; the ones actually deleted are returned.
+func (s *Store) DeleteMessages(ctx context.Context, chID ids.ID, list []ids.ID) ([]ids.ID, error) {
+	deleted := make([]ids.ID, 0, len(list))
+	err := s.Tx(ctx, func(tx *sql.Tx) error {
+		deleted = deleted[:0]
+		for _, id := range list {
+			var n int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM messages WHERE id = ? AND channel_id = ?`, int64(id), int64(chID)).Scan(&n); err != nil {
+				return err
+			}
+			if n == 0 {
+				continue
+			}
+			if err := deleteMessageTx(ctx, tx, id); err != nil {
+				return err
+			}
+			deleted = append(deleted, id)
+		}
+		if len(deleted) == 0 {
+			return nil
+		}
+		return fixLastMessageTx(ctx, tx, chID)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return deleted, nil
+}
+
+// deleteMessageTx drops one message row, releasing one blob reference per
+// attachment row, however many rows share a blob.
+func deleteMessageTx(ctx context.Context, tx *sql.Tx, id ids.ID) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.message_id = ? AND a.blob_id = blobs.id)) WHERE id IN (SELECT blob_id FROM attachments WHERE message_id = ?)`, int64(id), int64(id)); err != nil {
+		return err
+	}
+	_, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE id = ?`, int64(id))
+	return err
+}
+
+// fixLastMessageTx points the channel's last_message_id at its newest remaining message.
+func fixLastMessageTx(ctx context.Context, tx *sql.Tx, chID ids.ID) error {
+	_, err := tx.ExecContext(ctx, `UPDATE channels SET last_message_id = (SELECT max(id) FROM messages WHERE channel_id = ?) WHERE id = ?`, int64(chID), int64(chID))
+	return err
 }
 
 // AddReaction records a reaction; added is false when it already existed.

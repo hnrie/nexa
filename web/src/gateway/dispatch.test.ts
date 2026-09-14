@@ -2,6 +2,7 @@ import { api } from "@/api/client";
 import type { Channel, PublicUser, ReadyPayload } from "@/api/types";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
+import { useReadStates } from "@/stores/readStates";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -67,5 +68,13 @@ describe("typing", () => {
     useTyping.getState().clear();
     await applyEvent({ t: "typing", d: { channel_id: "c1", user_id: "u2", ts: Date.now() - 60_000 } } as Parameters<typeof applyEvent>[0]);
     expect(useTyping.getState().byChannel["c1"]?.["u2"]).toBeGreaterThan(Date.now());
+  });
+});
+
+describe("message_delete_bulk", () => {
+  it("takes the deleted messages out of the unread count, as a single delete does", async () => {
+    useReadStates.setState({ byChannel: { c1: { lastReadId: "10", mentions: 0, unread: 3 } } });
+    await applyEvent({ t: "message_delete_bulk", d: { channel_id: "c1", ids: ["11", "12", "5"] } } as Parameters<typeof applyEvent>[0]);
+    expect(useReadStates.getState().byChannel["c1"]?.unread).toBe(1);
   });
 });

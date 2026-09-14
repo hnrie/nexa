@@ -156,8 +156,32 @@
 .lbClose:hover { background: rgba(255, 255, 255, 0.15); }
 .lbBar a, .lbBar button { color: #fff; font-size: 14px; font-weight: 600; opacity: 0.85; }
 .lbBar a:hover, .lbBar button:hover { opacity: 1; text-decoration: underline; }
+/* picking messages to delete: every row moves over for a round check in the gutter */
+.composerSlot { flex: none; display: flex; flex-direction: column; }
+.composerSlot[hidden] { display: none; }
+/* a Shift-click picks a range of messages, not a range of text */
+.listWrap[data-selecting="true"] { -webkit-user-select: none; user-select: none; }
+.listWrap[data-selecting="true"] .msg { padding-left: 108px; }
+.listWrap[data-selecting="true"] .avatar { left: 52px; }
+.listWrap[data-selecting="true"] .gutterTime { display: none; }
+.listWrap[data-selecting="true"] .system { padding-left: 108px; }
+.listWrap[data-selecting="true"] .sysIcon { left: 60px; }
+.msg[data-pickable="true"] { cursor: pointer; }
+.msg[data-picked="true"], .msg[data-picked="true"]:hover { background: var(--bg-selected); }
+.pick { position: absolute; left: 16px; top: 3px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 2px solid var(--border-strong); color: var(--on-brand); transition: background-color var(--transition), border-color var(--transition); }
+/* on a row with a name, the check lines up with the avatar's middle */
+.msg[data-group-start="true"] .pick { top: 11px; }
+.msg[data-reply="true"] .pick { top: 35px; }
+.msg[data-pickable="true"]:not([data-picked="true"]):hover .pick { border-color: var(--text-muted); }
+.msg[data-picked="true"] .pick { background: var(--brand); border-color: var(--brand); }
+.selectBar { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px 0 4px; background: var(--bg-composer); border-radius: var(--radius-sm); }
+.selectCancel { flex: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--icon); }
+.selectCancel:hover { color: var(--text); background: var(--bg-hover); }
+.selectCount { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.selectDelete { flex: none; }
 .compact .msg { padding-left: 80px; margin-top: 0 !important; }
 .compact .avatar { display: none; }
+.listWrap[data-selecting="true"].compact .msg { padding-left: 116px; }
 .compact .headerRow { display: inline; margin-right: 6px; }
 .compact .content { display: inline; }
 .compact .gutterTime { opacity: 1; top: 4px; }
@@ -169,6 +193,12 @@
   .avatar { left: 12px; }
   .msg[data-reply="true"] .avatar { top: 26px; }
   .gutterTime { display: none; }
+  .listWrap[data-selecting="true"] .msg { padding-left: 98px; }
+  .listWrap[data-selecting="true"] .avatar { left: 46px; }
+  .listWrap[data-selecting="true"].compact .msg { padding-left: 48px; }
+  .listWrap[data-selecting="true"] .system { padding-left: 98px; }
+  .listWrap[data-selecting="true"] .sysIcon { left: 54px; }
+  .pick { left: 12px; }
   .file { width: 100%; }
   .toolbar { right: 8px; }
   .pinsPop { left: 8px; right: 8px; width: auto; max-width: none; }

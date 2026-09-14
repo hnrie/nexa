@@ -8,6 +8,9 @@ export interface HistoryQuery {
   limit?: number;
 }
 
+/** The most messages one bulk delete takes; the server refuses more. */
+export const BULK_DELETE_MAX = 100;
+
 const reactionPath = (channelId: Snowflake, mid: Snowflake, emoji: string): string =>
   `/channels/${channelId}/messages/${mid}/reactions/${encodeURIComponent(emoji)}`;
 
@@ -28,6 +31,10 @@ export const messages = {
   },
   remove(channelId: Snowflake, mid: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${channelId}/messages/${mid}`);
+  },
+  /** Deletes up to BULK_DELETE_MAX messages of one channel; answers with the ids that went. */
+  removeMany(channelId: Snowflake, ids: Snowflake[]): Promise<{ ids: Snowflake[] }> {
+    return api.request<{ ids: Snowflake[] }>("POST", `/channels/${channelId}/messages/bulk-delete`, { ids });
   },
   ack(channelId: Snowflake, mid: Snowflake): Promise<ReadState> {
     return api.request<ReadState>("POST", `/channels/${channelId}/messages/${mid}/ack`);
