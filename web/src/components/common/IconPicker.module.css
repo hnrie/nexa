@@ -1,0 +1,14 @@
+.wrap { position: relative; width: 80px; height: 80px; flex: none; }
+.icon { position: relative; width: 80px; height: 80px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--bg-active); border: 2px dashed var(--border-strong); color: var(--text-strong); }
+.icon[data-square] { border-radius: 30%; }
+.icon:disabled { cursor: default; border-style: solid; }
+.icon img { width: 100%; height: 100%; object-fit: cover; }
+.initials { font-size: 26px; font-weight: 700; }
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; opacity: 0; transition: opacity var(--transition); }
+.icon:not(:disabled):hover .overlay, .icon:focus-visible .overlay { opacity: 1; }
+/* without an icon yet the upload hint stays in view */
+.icon:not(:has(img)) .overlay { opacity: 1; background: transparent; color: var(--text-muted); }
+.icon:not(:has(img)):not(:disabled) .initials { display: none; }
+/* someone who cannot change it sees the initials, without the upload hint */
+.remove { position: absolute; top: -2px; right: -2px; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-medium); }
+.remove:hover { background: var(--danger); color: #fff; }

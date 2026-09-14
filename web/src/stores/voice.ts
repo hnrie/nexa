@@ -26,6 +26,12 @@ interface VoiceStore {
   speaking: Record<string, boolean>;
   /** My input level 0..1, for the settings meter. */
   level: number;
+  /**
+   * The call's connection, measured every few seconds by the session: round
+   * trip in ms and the share of packets lost. Kept here rather than in the
+   * views, which come and go with the sidebar and started over grey each time.
+   */
+  quality: { rtt: number; loss: number } | null;
   /** Per-user playback volume, 0–200 (percent). Persisted locally. */
   volumes: Record<string, number>;
   /** The volume of someone's screen share sound, apart from their voice, 0–200. Persisted locally. */
@@ -55,6 +61,7 @@ interface VoiceStore {
   setLocalScreen: (s: MediaStream | null) => void;
   setSpeaking: (userId: string, on: boolean) => void;
   setLevel: (n: number) => void;
+  setQuality: (q: { rtt: number; loss: number } | null) => void;
   setVolume: (userId: string, pct: number) => void;
   setLocalMute: (userId: string, on: boolean) => void;
   setStreamVolume: (userId: string, pct: number) => void;
@@ -87,6 +94,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   localScreen: null,
   speaking: {},
   level: 0,
+  quality: null,
   volumes: loadVolumes(),
   streamVolumes: loadVolumes("voiceStreamVolumes"),
   streamMutes: {},
@@ -147,6 +155,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
       return { speaking: { ...s.speaking, [userId]: on } };
     }),
   setLevel: (level) => set({ level }),
+  setQuality: (quality) => set({ quality }),
   setVolume: (userId, pct) =>
     set((s) => {
       const volumes = { ...s.volumes, [userId]: Math.max(0, Math.min(200, Math.round(pct))) };
@@ -181,8 +190,8 @@ export const useVoice = create<VoiceStore>()((set) => ({
       return { watching, focused: s.focused === key ? null : s.focused };
     }),
   setError: (error) => set({ error }),
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, focused: null, watching: {} }),
-  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, ringing: {}, focused: null, watching: {}, error: null }),
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {} }),
+  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null }),
 }));
 
 /** A channel's participants in join order. */

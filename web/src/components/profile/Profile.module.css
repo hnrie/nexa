@@ -1,24 +1,55 @@
 .card { position: relative; width: 600px; max-width: 100%; background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
+.card[data-variant="panel"] { width: 100%; border-radius: 0; min-height: 100%; }
+/*
+ * A profile theme: the whole card runs from the first colour to the second,
+ * and the colours the card's parts are drawn with turn to read on it
+ * (data-themed says which way the text goes).
+ */
+.card[data-themed] { background: linear-gradient(180deg, var(--profile-top) 0%, var(--profile-bottom) 100%); }
+.card[data-themed="light"] {
+  --text: #f5f5f7; --text-strong: #ffffff; --text-subtle: rgba(255, 255, 255, 0.86); --text-muted: rgba(255, 255, 255, 0.72);
+  --bg-surface: rgba(0, 0, 0, 0.3); --bg-raised: rgba(0, 0, 0, 0.34); --bg-input: rgba(0, 0, 0, 0.26); --bg-hover: rgba(255, 255, 255, 0.1); --bg-active: rgba(255, 255, 255, 0.18);
+  --border: rgba(255, 255, 255, 0.24); --border-subtle: rgba(255, 255, 255, 0.14); --text-brand: #ffffff; --link: #d5e6ff;
+}
+.card[data-themed="dark"] {
+  --text: #1d1e22; --text-strong: #000000; --text-subtle: rgba(0, 0, 0, 0.74); --text-muted: rgba(0, 0, 0, 0.62);
+  --bg-surface: rgba(255, 255, 255, 0.5); --bg-raised: rgba(255, 255, 255, 0.46); --bg-input: rgba(255, 255, 255, 0.52); --bg-hover: rgba(0, 0, 0, 0.06); --bg-active: rgba(0, 0, 0, 0.12);
+  --border: rgba(0, 0, 0, 0.18); --border-subtle: rgba(0, 0, 0, 0.12); --text-brand: #1d1e22; --link: #0b4ea2;
+}
 .close { position: absolute; top: 10px; right: 10px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; background: rgba(0, 0, 0, 0.45); color: #fff; }
 .close:hover { background: rgba(0, 0, 0, 0.65); }
 .banner { aspect-ratio: 5 / 2; background: var(--brand); background-size: cover; background-position: center; }
+.card[data-variant="panel"] .banner { aspect-ratio: auto; height: 120px; }
 .head { position: relative; padding: 0 16px 12px; }
 .avatar { position: absolute; top: -50px; left: 16px; border: 6px solid var(--bg-surface); border-radius: 50%; background: var(--bg-surface); }
+/* on a theme the ring around the avatar is the card's own top colour */
+.card[data-themed] .avatar { border-color: var(--profile-top); background: var(--profile-top); }
 .actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 12px; min-height: 52px; }
+.card[data-variant="panel"] .actions { min-height: 44px; }
 .names { margin-top: 12px; }
-.display { font-size: 20px; font-weight: 700; color: var(--text-strong); display: flex; align-items: center; gap: 8px; }
-.user { font-size: 14px; color: var(--text); }
-.pronouns { font-size: 14px; color: var(--text-muted); }
-.status { margin-top: 8px; font-size: 14px; color: var(--text); }
+.display { font-size: 20px; font-weight: 700; color: var(--text-strong); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.displayText { min-width: 0; overflow-wrap: anywhere; }
+.user { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 14px; color: var(--text); }
+.sep { color: var(--text-muted); }
+.pronouns { font-size: 14px; color: var(--text-subtle); cursor: default; }
+.status { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 14px; color: var(--text); }
+.statusEmoji { width: 18px; height: 18px; object-fit: contain; flex: none; }
 .body { margin: 0 16px 16px; padding: 12px; background: var(--bg-raised); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto; }
+.card[data-variant="panel"] .body { max-height: none; overflow: visible; }
 .section h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
 .section p { margin: 0; font-size: 14px; color: var(--text); }
+.sinceRow { display: flex; flex-wrap: wrap; gap: 12px 32px; }
 .about { font-size: 14px; color: var(--text); }
-.mutual { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.mutual { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px; margin: 0 -6px; border-radius: var(--radius-xs); font-size: 14px; color: var(--text); text-align: left; }
+.mutual:hover { background: var(--bg-hover); }
+.mutual + .mutual { margin-top: 2px; }
+.mutualIcon { width: 24px; height: 24px; border-radius: 30%; object-fit: cover; flex: none; }
+.mutualInitial { width: 24px; height: 24px; border-radius: 30%; flex: none; display: flex; align-items: center; justify-content: center; background: var(--bg-active); font-size: 11px; font-weight: 700; }
 .badge { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--bg-active); color: var(--text-subtle); text-transform: uppercase; }
 .small { font-size: 13px; color: var(--text-muted); }
-.nickBtn { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--text-brand); }
+.nickBtn { font-size: 12px; font-weight: 500; color: var(--text-brand); }
 .nickBtn:hover { text-decoration: underline; }
-.nickInput { margin-left: 8px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid var(--brand); color: var(--text); font-size: 14px; }
+.nickInput { height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid var(--brand); color: var(--text); font-size: 14px; }
 .note { width: 100%; min-height: 56px; padding: 8px; border-radius: var(--radius-xs); background: var(--bg-input); border: 1px solid transparent; color: var(--text); font-size: 14px; resize: vertical; }
+.note::placeholder { color: var(--text-muted); }
 .note:focus { border-color: var(--brand); outline: none; }

@@ -37,7 +37,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
@@ -237,7 +237,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   const openContextMenu = useUI((u) => u.openContextMenu);
   const openModal = useUI((u) => u.openModal);
   const [canFlip, setCanFlip] = useState(false);
-  const [quality, setQuality] = useState<{ rtt: number; loss: number } | null>(null);
+  const quality = useVoice((v) => (v.mine?.channel_id === channel.id ? v.quality : null));
   /** What the browser has full screen, if anything. */
   const [fsEl, setFsEl] = useState<Element | null>(null);
   /** The call covering the app, where the browser cannot go full screen itself (iPhone). */
@@ -257,12 +257,6 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   useEffect(() => {
     void hasSeveralCameras().then(setCanFlip);
   }, [localVideo]);
-
-  useEffect(() => {
-    if (!connected) return;
-    const t = setInterval(() => void voiceStats()?.then(setQuality), 3000);
-    return () => clearInterval(t);
-  }, [connected]);
 
   const tiles = useMemo<Tile[]>(() => {
     const out: Tile[] = [];
@@ -293,7 +287,8 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   const grid = useBoxSize(gridRef, connected && !focusedTile);
   // a short stage (a small call panel, a phone on its side) gives the focused stream all of it rather than a sliver above the strip
   const stage = useBoxSize(stageRef, connected && !!focusedTile);
-  const showStrip = tiles.length > 1 && stage.h >= 240;
+  // a focused screen share has the stage to itself; people stay a click away on Unfocus
+  const showStrip = tiles.length > 1 && stage.h >= 240 && focusedTile?.kind !== "screen";
   const layout = fitGrid(tiles.length, grid.w, grid.h, GAP);
   // the focused stream is a frame of its own shape, as large as fits, so its label and buttons sit on the picture
   const focusBox = useBoxSize(focusRef, connected && !!focusedTile);
@@ -551,23 +546,33 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
         {place !== "strip" && (playing || (t.me && t.kind === "screen")) ? (
           <div className={s.tileBtns} onClick={(e) => e.stopPropagation()}>
             {t.me && t.kind === "screen" ? (
-              <button className={s.tileBtn} aria-label="Stop sharing" title="Stop sharing" onClick={() => void toggleScreen()}><MonitorX size={18} /></button>
+              <Tooltip text="Stop Sharing" side="bottom">
+                <button className={s.tileBtn} aria-label="Stop sharing" onClick={() => void toggleScreen()}><MonitorX size={18} /></button>
+              </Tooltip>
             ) : null}
             {live && watching[t.userId] ? (
-              <button className={s.tileBtn} aria-label="Stop watching" title="Stop watching" data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={18} /></button>
+              <Tooltip text="Stop Watching" side="bottom">
+                <button className={s.tileBtn} aria-label="Stop watching" data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={18} /></button>
+              </Tooltip>
             ) : null}
             {playing && !full ? (
-              <button className={s.tileBtn} aria-label={place === "focus" ? "Unfocus" : "Focus"} title={place === "focus" ? "Unfocus" : "Focus"} onClick={() => setFocused(place === "focus" ? null : t.key)}>
-                {place === "focus" ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-              </button>
+              <Tooltip text={place === "focus" ? "Unfocus" : "Focus"} side="bottom">
+                <button className={s.tileBtn} aria-label={place === "focus" ? "Unfocus" : "Focus"} onClick={() => setFocused(place === "focus" ? null : t.key)}>
+                  {place === "focus" ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+              </Tooltip>
             ) : null}
             {playing && (canPip || webkitPip) && t.stream ? (
-              <button className={s.tileBtn} aria-label="Picture in picture" title="Picture in picture" onClick={() => pip(t)}><PictureInPicture2 size={18} /></button>
+              <Tooltip text="Picture in Picture" side="bottom">
+                <button className={s.tileBtn} aria-label="Picture in picture" onClick={() => pip(t)}><PictureInPicture2 size={18} /></button>
+              </Tooltip>
             ) : null}
             {playing ? (
-              <button className={s.tileBtn} aria-label={full ? "Exit full screen" : "Full screen"} title={full ? "Exit full screen" : "Full screen"} data-testid="tile-fullscreen" onClick={() => fullscreenTile(t)}>
-                {full ? <Minimize size={18} /> : <Maximize size={18} />}
-              </button>
+              <Tooltip text={full ? "Exit Full Screen" : "Full Screen"} side="bottom">
+                <button className={s.tileBtn} aria-label={full ? "Exit full screen" : "Full screen"} data-testid="tile-fullscreen" onClick={() => fullscreenTile(t)}>
+                  {full ? <Minimize size={18} /> : <Maximize size={18} />}
+                </button>
+              </Tooltip>
             ) : null}
           </div>
         ) : null}

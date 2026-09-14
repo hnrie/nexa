@@ -1,5 +1,4 @@
 import { MonitorUp, PhoneOff, Signal, Video } from "lucide-react";
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip } from "@/components/common/Tooltip";
 import { channelDisplayName } from "@/lib/names";
@@ -10,7 +9,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
-import { leaveVoice, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { leaveVoice, toggleCamera, toggleScreen } from "@/voice/session";
 import s from "./Voice.module.css";
 import { cameraMenuItems } from "./deviceMenus";
 
@@ -26,17 +25,9 @@ export function VoiceStatus() {
   const server = useServers((st) => (channel?.server_id ? st.byId[channel.server_id] : undefined));
   const users = useUsers((u) => u.byId);
   const meId = useAuth((a) => a.me?.id);
-  const [quality, setQuality] = useState<{ rtt: number; loss: number } | null>(null);
+  // measured by the call itself, so switching sidebars (which remounts this) keeps the colour it had
+  const quality = useVoice((v) => v.quality);
   const openModal = useUI((u) => u.openModal);
-
-  useEffect(() => {
-    if (!mine) {
-      setQuality(null);
-      return;
-    }
-    const t = setInterval(() => void voiceStats()?.then(setQuality), 3000);
-    return () => clearInterval(t);
-  }, [mine]);
 
   if (!channelId) return null;
   const name = channel ? channelDisplayName(channel, users, meId) : "…";

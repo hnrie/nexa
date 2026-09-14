@@ -56,9 +56,13 @@
   --shadow-low: 0 1px 4px rgba(0, 0, 0, 0.14);
   --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.16);
   --shadow-high: 0 12px 24px rgba(0, 0, 0, 0.24);
-  --font: "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  /* text boxes that should draw emoji as Twemoji, like the messages they become */
-  --font-with-emoji: "Twemoji Text", var(--font);
+  --tooltip-bg: #111214;
+  --tooltip-text: #f2f3f5;
+  --tooltip-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  /* Twemoji first: its face only covers emoji code points (fonts.css), so every name, status, menu
+     and text box draws emoji with the same artwork the messages use, and letters keep Noto Sans */
+  --font: "Twemoji Text", "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-with-emoji: var(--font);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --rail-w: 72px;
   --sidebar-w: 240px;
@@ -115,6 +119,9 @@
   --shadow-low: 0 1px 4px rgba(0, 0, 0, 0.08);
   --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.08);
   --shadow-high: 0 12px 36px rgba(0, 0, 0, 0.12);
+  --tooltip-bg: #ffffff;
+  --tooltip-text: #060607;
+  --tooltip-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 8px 16px rgba(0, 0, 0, 0.16);
   color-scheme: light;
 }
 

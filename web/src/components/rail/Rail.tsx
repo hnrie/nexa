@@ -149,7 +149,7 @@ export function Rail() {
                 {ch.type === "dm" ? (
                   <Avatar id={other} avatarId={users[other]?.avatar_id ?? null} name={name} size={48} />
                 ) : ch.icon_id ? (
-                  <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={48} />
+                  <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={48} kind="icon" />
                 ) : (
                   <span className={s.groupIcon}><Users size={24} /></span>
                 )}

@@ -92,6 +92,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
     },
   ];
   if (group) {
+    items.push({ id: "edit", label: "Edit Group", onSelect: () => ctx.openModal("editGroup", { channelId }) });
     items.push({ id: "invite", label: "Invite People", onSelect: () => ctx.openModal("groupInvite", { channelId }) });
     items.push({ id: "add", label: "Add Friends", onSelect: () => ctx.openModal("createDM", { groupId: channelId }) });
   } else {

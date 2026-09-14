@@ -5,9 +5,8 @@ import { Field } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
-import { LevelMeter, audioContext, describeInput, getMic, lastInputChoice, listDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
+import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, lastInputChoice, listDevices, realDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
 import { inVoice } from "@/voice/session";
-import { SHARE_FRAME_RATES, SHARE_RESOLUTIONS } from "@/voice/shareQuality";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
 
@@ -132,8 +131,8 @@ export default function VoicePage() {
                 set({ inputDeviceId: id, inputDeviceLabel: chosen?.label || null });
               }}
             >
-              <option value="">Default</option>
-              {devices?.inputs.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Microphone")}</option>)}
+              <option value="">{defaultDeviceLabel(devices?.inputs ?? [])}</option>
+              {realDevices(devices?.inputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Microphone")}</option>)}
             </Select>
           </Field>
           <Field label="Output device">
@@ -145,8 +144,8 @@ export default function VoicePage() {
                 set({ outputDeviceId: id, outputDeviceLabel: chosen?.label || null });
               }}
             >
-              <option value="">Default</option>
-              {devices?.outputs.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Speaker")}</option>)}
+              <option value="">{defaultDeviceLabel(devices?.outputs ?? [])}</option>
+              {realDevices(devices?.outputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Speaker")}</option>)}
             </Select>
           </Field>
         </div>
@@ -211,20 +210,6 @@ export default function VoicePage() {
         <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label="Noise suppression" description="Filters keyboard clatter and fans with the browser's built-in suppressor." />
         <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label="Echo cancellation" />
         <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label="Automatic gain control" />
-        <h5 className={st.h5}>Screen share</h5>
-        <div className={[st.twoCol, st.twoEqual].join(" ")}>
-          <Field label="Resolution">
-            <Select value={settings.shareResolution} onChange={(e) => set({ shareResolution: e.target.value as VoiceSettings["shareResolution"] })}>
-              {SHARE_RESOLUTIONS.map((r) => <option key={r.value} value={r.value}>{r.value === "source" ? "Source (your screen's own)" : r.label}</option>)}
-            </Select>
-          </Field>
-          <Field label="Frame rate">
-            <Select value={settings.shareFps} onChange={(e) => set({ shareFps: Number(e.target.value) as VoiceSettings["shareFps"] })}>
-              {SHARE_FRAME_RATES.map((f) => <option key={f} value={f}>{f} fps</option>)}
-            </Select>
-          </Field>
-        </div>
-        <p className={st.hint}>Free for everyone, up to source resolution at 60 fps. Sharing asks each time, starting from these.</p>
         <Field label="Camera">
           <Select
             value={settings.cameraDeviceId ?? ""}
@@ -236,8 +221,8 @@ export default function VoicePage() {
               set({ cameraDeviceId: id, cameraDeviceLabel: chosen?.label || null });
             }}
           >
-            <option value="">{devices?.cameras.length ? "Default" : "No camera found"}</option>
-            {devices?.cameras.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Camera")}</option>)}
+            <option value="">{devices?.cameras.length ? defaultDeviceLabel(devices.cameras) : "No camera found"}</option>
+            {realDevices(devices?.cameras ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Camera")}</option>)}
           </Select>
         </Field>
       </div>

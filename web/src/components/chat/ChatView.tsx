@@ -1,8 +1,8 @@
-import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, Users, Video } from "lucide-react";
+import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
-import { statusLabel } from "@/components/common/Avatar";
+import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
 import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -30,9 +30,13 @@ import { joinVoice, toggleCamera } from "@/voice/session";
 import { MessageList } from "./MessageList";
 import { SubchatPanel } from "./SubchatPanel";
 import { PinsPanel } from "./PinsPanel";
+import { ProfileCard } from "@/components/profile/ProfileCard";
+import { storage } from "@/lib/storage";
 import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
 import s from "./Chat.module.css";
+
+const PROFILE_PANEL_KEY = "ec:dmProfilePanel";
 
 export function ChatView({ channel }: { channel: Channel }) {
   const me = useAuth((a) => a.me);
@@ -50,8 +54,21 @@ export function ChatView({ channel }: { channel: Channel }) {
   const [subchats, setSubchats] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // The profile of the person a DM is with, in a column beside it, as Discord shows it, remembered on
+  // this device. Where it would cover the chat (a narrow window) it only opens when asked, each time.
+  const [profileWide, setProfileWide] = useState(() => storage.get(PROFILE_PANEL_KEY) !== "0");
+  const [profileNarrow, setProfileNarrow] = useState(false);
   const mobile = useIsMobile();
   const drawer = useIsNarrow();
+  const profileOpen = drawer ? profileNarrow : profileWide;
+  const toggleProfile = () => {
+    if (drawer) {
+      setProfileNarrow((open) => !open);
+      return;
+    }
+    storage.set(PROFILE_PANEL_KEY, profileWide ? "0" : "1");
+    setProfileWide(!profileWide);
+  };
   const membersOpen = drawer ? rightOpen : membersOpenDesktop;
   const toggleMembers = () => (drawer ? setRightOpen(!rightOpen) : toggleMembersDesktop());
   // The drawer's member list is mounted only while open, and for its slide-out
@@ -89,6 +106,7 @@ export function ChatView({ channel }: { channel: Channel }) {
     setSubchats(false);
     setSearchOpen(false);
     setSearchQuery("");
+    setProfileNarrow(false);
     // picking belongs to the channel it started in too
     return () => {
       if (useSelection.getState().channelId === channel.id) useSelection.getState().clear();
@@ -119,15 +137,33 @@ export function ChatView({ channel }: { channel: Channel }) {
     <div className={s.chat}>
       <header className={s.header}>
         <PageHeaderButtons />
-        <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? (priv ? <span className={s.lockHash}><Hash size={22} /><Lock size={11} className={s.lock} /></span> : <Hash size={22} />) : <Users size={22} />}</span>
-        <span className={s.hName}>{name}</span>
+        {channel.type === "group_dm" ? (
+          // a group's icon and name open its settings, as Discord's header does
+          <button className={s.hGroup} onClick={() => openModal("editGroup", { channelId: channel.id })} aria-label="Edit group" data-testid="edit-group">
+            <span className={s.hIcon}>{channel.icon_id ? <Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={24} kind="icon" /> : <Users size={22} />}</span>
+            <span className={s.hName}>{name}</span>
+          </button>
+        ) : (
+          <>
+            <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? (priv ? <span className={s.lockHash}><Hash size={22} /><Lock size={11} className={s.lock} /></span> : <Hash size={22} />) : <Users size={22} />}</span>
+            <span className={s.hName}>{name}</span>
+          </>
+        )}
         {isSub ? (
           <button className={s.hParent} onClick={() => nav(`/channels/@me/${convo.id}`)} data-testid="subchat-parent">
             <ChevronLeft size={14} />
             <span className={s.hParentText}>in {channelDisplayName(convo, users, me?.id, nicknames)}</span>
           </button>
         ) : channel.type === "dm" ? (
-          <span className={s.hSub}>{cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(otherStatus)}</span>
+          // the status reads in its own colour; a custom status or activity keeps a dot of it in front
+          cs || act ? (
+            <span className={[s.hSub, s.hStatus].join(" ")} data-testid="dm-status">
+              <StatusDot status={otherStatus} size={10} />
+              <span className={s.hStatusText}>{cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : ""}</span>
+            </span>
+          ) : (
+            <span className={s.hSub} data-status={otherStatus} data-testid="dm-status">{statusLabel(otherStatus)}</span>
+          )
         ) : isServer ? (
           channel.topic ? <button className={[s.hSub, s.hTopic].join(" ")} title={channel.topic} onClick={() => openModal("channelTopic", { channelId: channel.id })}>{channel.topic}</button> : null
         ) : (
@@ -182,6 +218,11 @@ export function ChatView({ channel }: { channel: Channel }) {
             <button className={s.hBtn} aria-label="Add friends" onClick={() => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id })}><UserPlus size={22} /></button>
           </Tooltip>
         ) : null}
+        {!mobile && channel.type === "dm" && other ? (
+          <Tooltip text={profileOpen ? "Hide User Profile" : "Show User Profile"} side="bottom">
+            <button className={s.hBtn} data-on={profileOpen} aria-label={profileOpen ? "Hide User Profile" : "Show User Profile"} aria-pressed={profileOpen} onClick={toggleProfile} data-testid="toggle-profile"><UserRound size={22} /></button>
+          </Tooltip>
+        ) : null}
         {!mobile && (convo.type === "group_dm" || isServer) ? (
           <Tooltip text="Member List" side="bottom">
             <button className={s.hBtn} data-on={membersOpen} aria-label="Member List" onClick={toggleMembers}><Users size={22} /></button>
@@ -210,11 +251,12 @@ export function ChatView({ channel }: { channel: Channel }) {
         ) : null}
       </header>
       {subchats && !isServer ? <SubchatPanel parent={convo} activeId={channel.id} onClose={() => setSubchats(false)} /> : null}
-      {!isServer ? <CallBanner channelId={convo.id} /> : null}
-      {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
       <div className={s.body} data-search={searchOpen}>
-        {/* the composer belongs to the conversation's column, so the member list and search run the full height beside it */}
+        {/* The call and the composer belong to the conversation's column, so the member list, search and the
+            profile run the full height beside them, and pinned messages open at the top rather than under the call. */}
         <div className={s.main}>
+          {!isServer ? <CallBanner channelId={convo.id} /> : null}
+          {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
           <MessageList key={channel.id} channel={channel} />
           {/* the composer stays mounted underneath, so a draft and its attachments survive picking */}
           <div className={s.composerSlot} hidden={selecting}>
@@ -229,6 +271,11 @@ export function ChatView({ channel }: { channel: Channel }) {
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
         {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}
+        {!mobile && channel.type === "dm" && other && profileOpen && !searchOpen ? (
+          <aside className={s.profilePanel} aria-label="User profile" data-testid="dm-profile-panel">
+            <ProfileCard key={other} userId={other} variant="panel" />
+          </aside>
+        ) : null}
       </div>
     </div>
   );

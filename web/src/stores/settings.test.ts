@@ -107,3 +107,12 @@ describe("screen share settings", () => {
     expect(v.shareFps).toBe(15);
   });
 });
+
+describe("device settings", () => {
+  it("treats a saved Chromium alias as the system's own device", async () => {
+    await loadFrom({ doc: { voice: { inputDeviceId: "communications", inputDeviceLabel: "Communications - Headset", outputDeviceId: "default", cameraDeviceId: "cam1", cameraDeviceLabel: "Webcam" } }, version: 1 });
+    const v = useSettings.getState().settings.voice;
+    expect([v.inputDeviceId, v.inputDeviceLabel, v.outputDeviceId]).toEqual([null, null, null]);
+    expect([v.cameraDeviceId, v.cameraDeviceLabel]).toEqual(["cam1", "Webcam"]);
+  });
+});

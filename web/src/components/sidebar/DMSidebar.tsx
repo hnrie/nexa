@@ -82,7 +82,7 @@ export function DMSidebar() {
           } else {
             sub = `${ch.recipient_ids.length} Members`;
             const url = iconUrl(ch.icon_id, 32);
-            avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} /> : <span className={s.groupIcon}><Users size={18} /></span>;
+            avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} kind="icon" /> : <span className={s.groupIcon}><Users size={18} /></span>;
           }
           const subs = activeConvo === ch.id ? selectSubchats(channels, ch.id) : [];
           return (

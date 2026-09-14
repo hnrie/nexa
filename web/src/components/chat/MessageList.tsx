@@ -306,6 +306,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     return (
       <div className={s.empty}>
+        {channel.type === "group_dm" && channel.icon_id ? <div className={s.emptyAvatar}><Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={80} kind="icon" /></div> : null}
         <h2 className={s.emptyName}>{channel.server_id ? `Welcome to #${name}!` : name}</h2>
         <p className={s.emptyText}>{channel.server_id ? <>This is the start of the <b>#{name}</b> channel.{channel.topic ? ` ${channel.topic}` : ""}</> : <>Welcome to the beginning of the <b>{name}</b> group.</>} Messages here are end-to-end encrypted.</p>
       </div>

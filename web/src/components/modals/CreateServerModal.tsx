@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { Button } from "@/components/common/Button";
+import { IconPicker } from "@/components/common/IconPicker";
+import { initials } from "@/lib/avatarColor";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
@@ -19,6 +21,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<"create" | "join">("create");
   const [name, setName] = useState(() => (me ? `${me.display_name || me.username}'s server` : "My server"));
   const [code, setCode] = useState("");
+  const [icon, setIcon] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
 
   const create = async () => {
@@ -29,6 +32,14 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
       const view = await guarded("create_server", (captcha) => serversApi.create(clean, captcha));
       useChannels.getState().upsert(view.channels);
       useServers.getState().setFromView(view);
+      // the icon goes up once the server exists; a failure there still leaves the server made
+      if (icon) {
+        try {
+          useServers.getState().updateServer(await serversApi.uploadIcon(view.id, icon));
+        } catch (err) {
+          toast(err instanceof ApiError ? `The server was made, but its icon did not upload: ${err.message}` : "The server was made, but its icon did not upload.", "error");
+        }
+      }
       onClose();
       const general = view.channels.find((c) => c.type === "text");
       nav(general ? `/channels/${view.id}/${general.id}` : `/channels/${view.id}`);
@@ -66,6 +77,9 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
     <Modal open onClose={onClose} title="Create Your Server" width={440} footer={<><Button variant="ghost" onClick={() => setMode("join")}>Have an invite already?</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>Create</Button></>}>
       <div className={s.form}>
         <p className={s.hint}>Your server is where you and your friends hang out. Make yours and start talking. Everything in it is end-to-end encrypted.</p>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <IconPicker currentUrl={null} picked={icon} onPick={setIcon} onRemove={() => setIcon(null)} initials={initials(name || "S")} label="Server icon" testId="server-icon" />
+        </div>
         <Field label="Server name" required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="server-name" />
         </Field>

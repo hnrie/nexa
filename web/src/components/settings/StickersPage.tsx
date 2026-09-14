@@ -12,6 +12,7 @@ import { useAuth } from "@/stores/auth";
 import { useExpressions, packImageUrl } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
+import { promptText } from "@/components/modals/PromptModal";
 import st from "./Settings.module.css";
 import s from "@/components/server/PackEditor.module.css";
 
@@ -53,7 +54,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
   }, [tab, q]);
 
   const create = async () => {
-    const name = window.prompt(kind === "emoji" ? "Name your emoji pack" : "Name your sticker pack", kind === "emoji" ? "My emoji" : "My stickers");
+    const name = await promptText(kind === "emoji" ? "Create Emoji Pack" : "Create Sticker Pack", { label: "Pack name", initial: kind === "emoji" ? "My emoji" : "My stickers", maxLength: 60 }, "Create");
     if (!name?.trim()) return;
     try {
       const pack = await expressionsApi.createPack({ name: name.trim(), kind });

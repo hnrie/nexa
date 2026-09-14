@@ -20,8 +20,8 @@ function coarsePointer(): boolean {
 
 const GAP = 8;
 
-/** Places the bubble beside the trigger, nudged back on screen if it would not fit. */
-function place(anchor: DOMRect, box: DOMRect, side: Side): { left: number; top: number } {
+/** Places the bubble beside the trigger, nudged back on screen if it would not fit, with where its arrow points. */
+function place(anchor: DOMRect, box: DOMRect, side: Side): { left: number; top: number; side: Side; arrow: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   let left = anchor.left + anchor.width / 2 - box.width / 2;
@@ -32,12 +32,20 @@ function place(anchor: DOMRect, box: DOMRect, side: Side): { left: number; top: 
     left = side === "left" ? anchor.left - box.width - GAP : anchor.right + GAP;
   }
   // a bubble above the very top of the window flips below, and the reverse
-  if (side === "top" && top < 4) top = anchor.bottom + GAP;
-  if (side === "bottom" && top + box.height > vh - 4) top = anchor.top - box.height - GAP;
-  return {
-    left: Math.max(4, Math.min(left, vw - box.width - 4)),
-    top: Math.max(4, Math.min(top, vh - box.height - 4)),
-  };
+  let placed = side;
+  if (side === "top" && top < 4) {
+    top = anchor.bottom + GAP;
+    placed = "bottom";
+  } else if (side === "bottom" && top + box.height > vh - 4) {
+    top = anchor.top - box.height - GAP;
+    placed = "top";
+  }
+  left = Math.max(4, Math.min(left, vw - box.width - 4));
+  top = Math.max(4, Math.min(top, vh - box.height - 4));
+  // the arrow stays on the trigger's middle even when the bubble was pushed along the edge
+  const along = placed === "top" || placed === "bottom" ? anchor.left + anchor.width / 2 - left : anchor.top + anchor.height / 2 - top;
+  const length = placed === "top" || placed === "bottom" ? box.width : box.height;
+  return { left, top, side: placed, arrow: Math.max(10, Math.min(length - 10, along)) };
 }
 
 /**
@@ -50,7 +58,7 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
   const bubble = useRef<HTMLSpanElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
-  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  const [at, setAt] = useState<{ left: number; top: number; side: Side; arrow: number } | null>(null);
 
   const clear = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -95,7 +103,8 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
               ref={bubble}
               className={s.tip}
               role="tooltip"
-              style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}
+              data-side={at?.side ?? side}
+              style={at ? ({ left: at.left, top: at.top, "--arrow": `${at.arrow}px` } as React.CSSProperties) : { left: -9999, top: -9999 }}
             >
               {text}
             </span>,

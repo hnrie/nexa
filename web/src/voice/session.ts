@@ -63,6 +63,30 @@ let installed = false;
 let ringTimers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Stops the outgoing tone once the people called have been rung for as long as they are. */
 let callingTimer: ReturnType<typeof setTimeout> | null = null;
+/** Measures the call's connection for everything that shows it (see useVoice's quality). */
+let qualityTimer: ReturnType<typeof setInterval> | null = null;
+const QUALITY_EVERY_MS = 3000;
+
+function startQuality(s: Session): void {
+  stopQuality();
+  const measure = () => {
+    if (session !== s) return;
+    void s.transport
+      .stats()
+      .then((q) => {
+        // no round trip yet means nothing is connected to measure: unknown, not a perfect 0 ms
+        if (session === s) useVoice.getState().setQuality(q.rtt > 0 ? q : null);
+      })
+      .catch(() => {});
+  };
+  measure();
+  qualityTimer = setInterval(measure, QUALITY_EVERY_MS);
+}
+
+function stopQuality(): void {
+  if (qualityTimer) clearInterval(qualityTimer);
+  qualityTimer = null;
+}
 
 /** Calling a DM or group nobody else is in yet: the outgoing tone plays until someone picks up. */
 function startCallingTone(): void {
@@ -286,6 +310,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   applyTransmit();
   s.announced = true;
   sendState(channelId);
+  startQuality(s);
   playSound("join");
   const convo = useChannels.getState().byId[channelId];
   const others = participantsOf(useVoice.getState().byChannel, channelId).filter((p) => p.user_id !== me());
@@ -299,6 +324,7 @@ export async function leaveVoice(notify = true): Promise<void> {
   session = null;
   releaseCall?.();
   releaseCall = null;
+  stopQuality();
   if (s) {
     stopMeter(s);
     disconnectInput(s);

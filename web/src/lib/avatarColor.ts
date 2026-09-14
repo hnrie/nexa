@@ -22,3 +22,29 @@ export function profileTheme(primary: number | null | undefined, secondary: numb
   if (primary !== null && primary !== undefined) return hex(primary);
   return fallbackId ? avatarColor(fallbackId) : "var(--brand)";
 }
+
+const hexOf = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
+
+/** Relative luminance of a #rrggbb colour, 0 (black) to 1 (white). */
+export function luminance(hex: string): number {
+  const n = parseInt(hex.replace(/^#/, ""), 16);
+  const lin = (c: number) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+}
+
+/**
+ * A profile's theme, as Discord's: with two colours the whole card is a
+ * gradient from the first to the second, and its text turns dark on a light
+ * pair and light on a dark one. One colour only colours the banner.
+ */
+export function profileThemeOf(primary: number | null | undefined, secondary: number | null | undefined): { top: string; bottom: string; text: "light" | "dark" } | null {
+  if (primary === null || primary === undefined || secondary === null || secondary === undefined) return null;
+  const top = hexOf(primary);
+  const bottom = hexOf(secondary);
+  // text is read over the whole card, so both ends count
+  const light = (luminance(top) + luminance(bottom)) / 2 > 0.45;
+  return { top, bottom, text: light ? "dark" : "light" };
+}

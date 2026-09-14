@@ -163,6 +163,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       onClickCapture={pickable ? pick : undefined}
       onContextMenu={(e) => {
         if (pending) return;
+        // a right click in the edit box is for the text: spelling suggestions, cut, copy and paste
+        if (e.target instanceof Element && e.target.closest("textarea, input, [contenteditable='true']")) return;
         e.preventDefault();
         if (selecting) {
           // a long press or right click while picking ticks the row instead of opening its menu

@@ -4,16 +4,23 @@ import { humanizeMentions } from "@/components/composer/mentions";
 import { editMessage } from "@/components/composer/send";
 import { useAutosize } from "@/components/composer/useAutosize";
 import type { DecryptedMessage } from "@/stores/messages";
+import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./Chat.module.css";
 
 export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
-  const setEditing = useUI((u) => u.setEditing);
+  const endEdit = useUI((u) => u.endEdit);
+  const setEditDraft = useUI((u) => u.setEditDraft);
   const toast = useUI((u) => u.toast);
-  const [text, setText] = useState(() => humanizeMentions(msg.payload?.t ?? "", users));
+  // an edit left behind in another conversation comes back with what was typed
+  const [text, setText] = useState(() => {
+    const parked = useUI.getState().editDrafts[msg.channel_id];
+    return parked?.messageId === msg.id && parked.text !== null ? parked.text : humanizeMentions(msg.payload?.t ?? "", users);
+  });
   const [busy, setBusy] = useState(false);
+  const spellcheck = useSettings((st) => st.settings.spellcheck !== false);
   const ref = useRef<HTMLTextAreaElement>(null);
   // Phone keyboards have no Shift+Enter, so there return adds a line, as in
   // the composer, and saving and cancelling get real buttons.
@@ -33,13 +40,14 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
     setBusy(true);
     try {
       await editMessage(msg.channel_id, msg.id, body);
-      setEditing(null);
+      endEdit(msg.channel_id, msg.id);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Could not save the edit.", "error");
     } finally {
       setBusy(false);
     }
   };
+  const cancel = () => endEdit(msg.channel_id, msg.id);
   return (
     <div className={s.edit}>
       <textarea
@@ -47,12 +55,16 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
         className={s.editTa}
         value={text}
         rows={1}
-        onChange={(e) => setText(e.target.value)}
+        spellCheck={spellcheck}
+        onChange={(e) => {
+          setText(e.target.value);
+          setEditDraft(msg.channel_id, msg.id, e.target.value);
+        }}
         disabled={busy}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
             e.preventDefault();
-            setEditing(null);
+            cancel();
           } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !touch) {
             e.preventDefault();
             void save();
@@ -61,12 +73,12 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       />
       {touch ? (
         <div className={s.editActions}>
-          <Button variant="secondary" className={s.editBtn} onClick={() => setEditing(null)}>Cancel</Button>
+          <Button variant="secondary" className={s.editBtn} onClick={cancel}>Cancel</Button>
           <Button className={s.editBtn} loading={busy} onClick={() => void save()}>Save</Button>
         </div>
       ) : (
         <div className={s.editHint}>
-          escape to <b onClick={() => setEditing(null)}>cancel</b> • enter to <b onClick={() => void save()}>save</b>
+          escape to <b onClick={cancel}>cancel</b> • enter to <b onClick={() => void save()}>save</b>
         </div>
       )}
     </div>

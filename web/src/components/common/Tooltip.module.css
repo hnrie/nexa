@@ -1,4 +1,14 @@
 .wrap { position: relative; display: inline-flex; }
-/* drawn on the page itself, so nothing it labels can clip or cover it */
-.tip { position: fixed; z-index: 400; padding: 6px 10px; background: var(--bg-floating); color: var(--text); font-size: 13px; font-weight: 600; line-height: 1.25; border-radius: var(--radius-xs); box-shadow: var(--shadow-high); white-space: nowrap; pointer-events: none; animation: fade 120ms ease-out; }
-@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+/* drawn on the page itself, so nothing it labels can clip or cover it: a dark bubble with an arrow, as Discord's */
+.tip {
+  position: fixed; z-index: 400; max-width: 260px; padding: 7px 12px;
+  background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: var(--tooltip-shadow);
+  font-size: 14px; font-weight: 600; line-height: 18px; text-align: center; white-space: normal; overflow-wrap: break-word;
+  border-radius: 6px; pointer-events: none; animation: tipIn 110ms ease-out;
+}
+.tip::after { content: ""; position: absolute; width: 0; height: 0; border: 5px solid transparent; }
+.tip[data-side="top"]::after { top: 100%; left: calc(var(--arrow, 50%) - 5px); border-top-color: var(--tooltip-bg); }
+.tip[data-side="bottom"]::after { bottom: 100%; left: calc(var(--arrow, 50%) - 5px); border-bottom-color: var(--tooltip-bg); }
+.tip[data-side="left"]::after { left: 100%; top: calc(var(--arrow, 50%) - 5px); border-left-color: var(--tooltip-bg); }
+.tip[data-side="right"]::after { right: 100%; top: calc(var(--arrow, 50%) - 5px); border-right-color: var(--tooltip-bg); }
+@keyframes tipIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }

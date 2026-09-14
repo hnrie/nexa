@@ -135,6 +135,28 @@ export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio =
   return stream;
 }
 
+/** The devices of a kind the person can pick, leaving out Chromium's own "default" and "communications" aliases. */
+export function realDevices(list: MediaDeviceInfo[]): MediaDeviceInfo[] {
+  return list.filter((d) => d.deviceId && d.deviceId !== "default" && d.deviceId !== "communications");
+}
+
+/**
+ * The name of the device the system uses when none is picked. Chromium lists
+ * it as "Default - <name>"; Firefox and Safari put it first. Null while the
+ * browser keeps device names hidden (nothing allowed yet).
+ */
+export function defaultDeviceName(list: MediaDeviceInfo[]): string | null {
+  const alias = list.find((d) => d.deviceId === "default");
+  if (alias) return alias.label.replace(/^default\s*-\s*/i, "").trim() || null;
+  return realDevices(list)[0]?.label.trim() || null;
+}
+
+/** "Default (MacBook Pro Microphone)", or just "Default" when the name is not known. */
+export function defaultDeviceLabel(list: MediaDeviceInfo[]): string {
+  const name = defaultDeviceName(list);
+  return name ? `Default (${name})` : "Default";
+}
+
 export interface Devices {
   inputs: MediaDeviceInfo[];
   outputs: MediaDeviceInfo[];

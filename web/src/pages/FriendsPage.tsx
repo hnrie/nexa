@@ -1,4 +1,4 @@
-import { Check, MessageSquare, MoreVertical, Search, UserPlus, Users, X } from "lucide-react";
+import { Check, MessageSquare, MoreVertical, Phone, Search, UserPlus, Users, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -7,6 +7,9 @@ import { relationships as relApi } from "@/api/relationships";
 import type { Relationship } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { Tooltip } from "@/components/common/Tooltip";
+import { audioContext } from "@/voice/media";
+import { joinVoice } from "@/voice/session";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -110,14 +113,27 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   const act = activitiesOf(p)[0];
   const sub = rel.type === "incoming" ? "Incoming Friend Request" : rel.type === "outgoing" ? "Outgoing Friend Request" : rel.type === "blocked" ? "Blocked" : cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(status);
 
-  const message = async () => {
+  /** Opens (or makes) the DM with them; returns its id, or null when that failed. */
+  const openDM = async (): Promise<string | null> => {
     try {
       const ch = await channelsApi.createDM([rel.user.id]);
       upsertChannel(ch);
       nav(`/channels/@me/${ch.id}`);
+      return ch.id;
     } catch (err) {
       toast(err instanceof ApiError ? err.message : "Could not open a conversation.", "error");
+      return null;
     }
+  };
+  const message = async () => {
+    await openDM();
+  };
+  // straight into a call with them, ringing them the way the call button in the DM does
+  const call = async () => {
+    // audio has to start inside the tap (iOS), before waiting on the conversation
+    audioContext();
+    const id = await openDM();
+    if (id) await joinVoice(id);
   };
   const accept = async () => {
     try {
@@ -149,7 +165,8 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       y: e.clientY,
       items: [
         { id: "profile", label: "Profile", onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
-        { id: "msg", label: "Message", onSelect: () => void message(), separatorAfter: true },
+        { id: "msg", label: "Message", onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
+        ...(rel.type === "friend" ? [{ id: "call", label: "Start Voice Call", onSelect: () => void call(), separatorAfter: true }] : []),
         ...(rel.type === "friend" ? [{ id: "rm", label: "Remove Friend", danger: true, onSelect: () => void remove("Friend removed.") }] : []),
         ...(rel.type !== "blocked"
           ? [{ id: "block", label: "Block", danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" })) }]
@@ -172,18 +189,19 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       <div className={s.actions}>
         {rel.type === "friend" ? (
           <>
-            <button className={s.act} title="Message" aria-label="Message" onClick={() => void message()}><MessageSquare size={20} /></button>
-            <button className={s.act} title="More" aria-label="More" onClick={more}><MoreVertical size={20} /></button>
+            <Tooltip text="Message"><button className={s.act} aria-label="Message" onClick={() => void message()}><MessageSquare size={20} /></button></Tooltip>
+            <Tooltip text="Start Voice Call"><button className={s.act} aria-label="Start Voice Call" onClick={() => void call()} data-testid="friend-call"><Phone size={20} /></button></Tooltip>
+            <Tooltip text="More"><button className={s.act} aria-label="More" onClick={more}><MoreVertical size={20} /></button></Tooltip>
           </>
         ) : rel.type === "incoming" ? (
           <>
-            <button className={[s.act, s.ok].join(" ")} title="Accept" aria-label="Accept" onClick={() => void accept()}><Check size={20} /></button>
-            <button className={[s.act, s.no].join(" ")} title="Ignore" aria-label="Ignore" onClick={() => void remove("Request ignored.")}><X size={20} /></button>
+            <Tooltip text="Accept"><button className={[s.act, s.ok].join(" ")} aria-label="Accept" onClick={() => void accept()}><Check size={20} /></button></Tooltip>
+            <Tooltip text="Ignore"><button className={[s.act, s.no].join(" ")} aria-label="Ignore" onClick={() => void remove("Request ignored.")}><X size={20} /></button></Tooltip>
           </>
         ) : rel.type === "outgoing" ? (
-          <button className={[s.act, s.no].join(" ")} title="Cancel" aria-label="Cancel" onClick={() => void remove("Request cancelled.")}><X size={20} /></button>
+          <Tooltip text="Cancel"><button className={[s.act, s.no].join(" ")} aria-label="Cancel" onClick={() => void remove("Request cancelled.")}><X size={20} /></button></Tooltip>
         ) : (
-          <button className={[s.act, s.no].join(" ")} title="Unblock" aria-label="Unblock" onClick={() => void remove("Unblocked.")}><X size={20} /></button>
+          <Tooltip text="Unblock"><button className={[s.act, s.no].join(" ")} aria-label="Unblock" onClick={() => void remove("Unblocked.")}><X size={20} /></button></Tooltip>
         )}
       </div>
       {meId ? null : null}

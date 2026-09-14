@@ -67,6 +67,7 @@ export function Composer({ channel }: { channel: Channel }) {
   const drafts = useSettings((st) => st.settings.drafts);
   const settingsLoaded = useSettings((st) => st.loaded);
   const tone = useSettings((st) => st.settings.skinTone);
+  const spellcheck = useSettings((st) => st.settings.spellcheck !== false);
   const msgs = useMessages((m) => m.channels[channel.id]);
   const serverState = useServers((st) => (channel.server_id ? st.byId[channel.server_id] : undefined));
   const isServer = !!channel.server_id;
@@ -518,6 +519,7 @@ export function Composer({ channel }: { channel: Channel }) {
           }}
           placeholder={placeholder}
           rows={1}
+          spellCheck={spellcheck}
           maxLength={MAX_LEN + 500}
           aria-label={placeholder}
         />

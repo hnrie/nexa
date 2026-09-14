@@ -7,6 +7,7 @@ import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import st from "@/components/settings/Settings.module.css";
 import { PackEditor } from "../PackEditor";
+import { promptText } from "@/components/modals/PromptModal";
 
 /** Server settings → Stickers: packs owned by this server, managed with Manage Expressions. */
 export default function ServerStickersPage({ serverId }: { serverId: string }) {
@@ -19,7 +20,7 @@ export default function ServerStickersPage({ serverId }: { serverId: string }) {
   const list = useMemo(() => Object.values(packs).filter((p) => p.server_id === serverId).sort((a, b) => b.updated_at - a.updated_at), [packs, serverId]);
 
   const create = async () => {
-    const name = window.prompt("Name the server's sticker pack", `${server?.server.name ?? "Server"} stickers`);
+    const name = await promptText("Create Server Pack", { label: "Pack name", initial: `${server?.server.name ?? "Server"} stickers`, maxLength: 60 }, "Create");
     if (!name?.trim()) return;
     try {
       const pack = await expressionsApi.createPack({ name: name.trim(), server_id: serverId });

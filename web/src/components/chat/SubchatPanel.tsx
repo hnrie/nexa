@@ -10,6 +10,7 @@ import { selectSubchats, useChannels } from "@/stores/channels";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import s from "./Chat.module.css";
+import { promptText } from "@/components/modals/PromptModal";
 
 /** Menu for one subchat row: rename, or delete for everyone. */
 export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: Record<string, unknown>) => void; nav: (p: string) => void }): ContextMenuItem[] {
@@ -34,10 +35,11 @@ export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: 
     {
       id: "rename",
       label: "Rename Subchat",
-      onSelect: () => {
-        const next = window.prompt("Rename this subchat", ch.name)?.trim();
-        if (next && next !== ch.name) void rename(next);
-      },
+      onSelect: () =>
+        void promptText("Rename Subchat", { label: "Subchat name", initial: ch.name, maxLength: 100 }, "Rename").then((value) => {
+          const next = value?.trim();
+          if (next && next !== ch.name) void rename(next);
+        }),
     },
     {
       id: "delete",

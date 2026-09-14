@@ -6,11 +6,12 @@
 @import "@fontsource/jetbrains-mono/600.css";
 
 /*
- * Twemoji as a colour font, for text boxes: a textarea cannot hold pictures,
- * so the chatbox draws its emoji with this instead and shows the same artwork
- * the messages do. It covers emoji code points only, so letters, digits and
- * punctuation (and the text symbols ©, ® and ™) keep the app's own font, and
- * it is only downloaded once an emoji is on screen in a box that uses it.
+ * Twemoji as a colour font, first in the app's font stack: text boxes cannot
+ * hold pictures, and names, statuses and menus are plain text, so they draw
+ * their emoji with this and show the same artwork the messages do. It covers
+ * emoji code points only, so letters, digits and punctuation (and the text
+ * symbols ©, ® and ™) keep Noto Sans, and it is only downloaded once an emoji
+ * is on screen.
  */
 @font-face {
   font-family: "Twemoji Text";

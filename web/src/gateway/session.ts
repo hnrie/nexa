@@ -93,7 +93,7 @@ export async function endSession(): Promise<void> {
   stopSession();
   resetAll();
   useVoice.getState().clear();
-  useUI.setState({ activeChannelId: null, replyTo: null, editing: null, jumpTo: null, contextMenu: null, quickSwitcher: false, modals: [], modal: null });
+  useUI.setState({ activeChannelId: null, replyTo: null, editing: null, editDrafts: {}, jumpTo: null, contextMenu: null, quickSwitcher: false, modals: [], modal: null });
 }
 
 logoutHooks.push(endSession);

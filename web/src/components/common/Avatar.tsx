@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { avatarUrl } from "@/api/users";
+import { avatarUrl, iconUrl } from "@/api/users";
 import { avatarColor, initials } from "@/lib/avatarColor";
 import type { StatusKind } from "@/stores/presence";
 import s from "./Avatar.module.css";
@@ -13,6 +13,10 @@ interface Props {
   className?: string;
   square?: boolean;
   style?: CSSProperties;
+  /** A group's icon is a picture of its own kind; a person's avatar is the default. */
+  kind?: "avatar" | "icon";
+  /** Marks someone talking in a call, for a ring drawn by the caller's own styles. */
+  "data-speaking"?: boolean;
 }
 
 /**
@@ -26,14 +30,14 @@ export function statusGeometry(size: number): { dot: number; ring: number } {
 }
 
 /** A user or group avatar with an optional presence dot. Animated avatars play as-is. */
-export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style }: Props) {
-  const url = avatarUrl(avatarId, size);
+export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style, kind = "avatar", "data-speaking": speaking }: Props) {
+  const url = kind === "icon" ? iconUrl(avatarId, size) : avatarUrl(avatarId, size);
   const { dot, ring } = statusGeometry(size);
   // the dot sits in the corner and bites a ring out of the picture, so it reads on any background
   const vars = status ? ({ "--dot": `${dot}px`, "--cut": `${dot / 2 + ring}px` } as CSSProperties) : undefined;
   const cut = status ? s.cut : "";
   return (
-    <span className={[s.wrap, className ?? ""].join(" ")} style={{ width: size, height: size, ...vars, ...style }}>
+    <span className={[s.wrap, className ?? ""].join(" ")} style={{ width: size, height: size, ...vars, ...style }} data-speaking={speaking === undefined ? undefined : speaking}>
       {url ? (
         <img className={[s.img, square ? s.square : "", cut].join(" ")} src={url} alt="" width={size} height={size} draggable={false} loading="lazy" />
       ) : (

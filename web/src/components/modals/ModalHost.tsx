@@ -7,6 +7,8 @@ import { CustomStatusModal } from "./CustomStatusModal";
 import { QuickSwitcher } from "./QuickSwitcher";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { CreateServerModal } from "./CreateServerModal";
+import { EditGroupModal } from "./EditGroupModal";
+import { PromptModal, type PromptField } from "./PromptModal";
 import { InviteModal } from "./InviteModal";
 import { GroupInviteModal } from "./GroupInviteModal";
 import { CreateChannelModal } from "./CreateChannelModal";
@@ -60,6 +62,17 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "createServer" ? <CreateServerModal onClose={close} /> : null}
       {modal?.kind === "invite" ? <InviteModal onClose={close} serverId={String(modal.props?.["serverId"])} channelId={modal.props?.["channelId"] as string | undefined} /> : null}
       {modal?.kind === "groupInvite" ? <GroupInviteModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
+      {modal?.kind === "editGroup" ? <EditGroupModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
+      {modal?.kind === "prompt" ? (
+        <PromptModal
+          onClose={close}
+          title={String(modal.props?.["title"] ?? "")}
+          fields={(modal.props?.["fields"] as PromptField[] | undefined) ?? []}
+          confirmLabel={modal.props?.["confirmLabel"] as string | undefined}
+          allowEmpty={Boolean(modal.props?.["allowEmpty"])}
+          resolve={modal.props?.["resolve"] as (v: Record<string, string> | null) => void}
+        />
+      ) : null}
       {modal?.kind === "createChannel" ? <CreateChannelModal onClose={close} serverId={String(modal.props?.["serverId"])} parentId={modal.props?.["parentId"] as string | undefined} /> : null}
       {modal?.kind === "createCategory" ? <CreateCategoryModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}
       {modal?.kind === "serverNotifications" ? <ServerNotificationsModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}

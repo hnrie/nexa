@@ -8,6 +8,7 @@ import { gateway } from "@/gateway/session";
 import { useAuth } from "@/stores/auth";
 import { customStatus, statusOf, usePresence, type StatusKind } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
+import { useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
 import { micMenuItems } from "@/components/voice/deviceMenus";
@@ -31,6 +32,8 @@ export function UserPanel() {
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const toggleDeafen = useVoiceLocal((v) => v.toggleDeafen);
+  // in a call, the ring the call draws round whoever talks goes round your own picture here too
+  const speaking = useVoice((v) => !!me && !!v.mine && !!v.speaking[me.id]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -60,7 +63,7 @@ export function UserPanel() {
   return (
     <div className={s.panel} ref={ref}>
       <button className={s.me} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
-        <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status={status} />
+        <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status={status} className={s.avatar} data-speaking={speaking} />
         <span className={s.text}>
           <span className={s.name}>{me.display_name}</span>
           <span className={s.sub}>{custom ? `${custom.emoji ? custom.emoji + " " : ""}${custom.text}` : statusLabel(status)}</span>

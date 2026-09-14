@@ -13,6 +13,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 import p from "../PackEditor.module.css";
+import { promptText } from "@/components/modals/PromptModal";
 
 const ACCEPT = "image/png,image/gif,image/webp,image/jpeg";
 const NO_EMOJI: Emoji[] = [];
@@ -66,7 +67,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
     }
   };
   const rename = async (e: Emoji) => {
-    const next = window.prompt("Emoji name (letters, numbers, underscores)", e.name);
+    const next = await promptText("Rename Emoji", { label: "Emoji name", hint: "Letters, numbers and underscores.", initial: e.name, maxLength: 32 }, "Rename");
     if (next === null || next.trim() === e.name) return;
     try {
       await expressionsApi.renameEmoji(serverId, e.id, next.trim());

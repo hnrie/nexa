@@ -57,6 +57,8 @@ export interface Settings {
   messageDisplay: "cozy" | "compact";
   reducedMotion: boolean;
   underlineLinks: boolean;
+  /** Underline misspelled words while typing, with suggestions on a right click. */
+  spellcheck: boolean;
   linkPreviews: boolean;
   imagePreviews: boolean;
   developerMode: boolean;
@@ -87,6 +89,7 @@ export const DEFAULT_SETTINGS: Settings = {
   messageDisplay: "cozy",
   reducedMotion: false,
   underlineLinks: false,
+  spellcheck: true,
   linkPreviews: true,
   imagePreviews: true,
   developerMode: false,
@@ -135,12 +138,18 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
   };
 }
 
+const isAlias = (id: string | null | undefined) => id === "default" || id === "communications";
+
 /** Merges voice settings, turning the one "stream quality" older versions saved into a size and frame rate. */
 function mergeVoice(base: VoiceSettings, incoming: Partial<VoiceSettings> | undefined): VoiceSettings {
   const { streamQuality, ...rest } = (incoming ?? {}) as Partial<VoiceSettings> & { streamQuality?: unknown };
   const old = rest.shareResolution ? null : fromStreamQuality(streamQuality);
   const voice = { ...base, ...rest, ...(old ?? {}) };
   delete (voice as { streamQuality?: unknown }).streamQuality;
+  // Chromium's "default" and "communications" entries are no longer offered, so one saved earlier means the system's own device
+  if (isAlias(voice.inputDeviceId)) Object.assign(voice, { inputDeviceId: null, inputDeviceLabel: null });
+  if (isAlias(voice.outputDeviceId)) Object.assign(voice, { outputDeviceId: null, outputDeviceLabel: null });
+  if (isAlias(voice.cameraDeviceId)) Object.assign(voice, { cameraDeviceId: null, cameraDeviceLabel: null });
   return voice;
 }
 

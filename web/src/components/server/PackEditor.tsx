@@ -13,6 +13,7 @@ import { useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
 import { SaveBar } from "./SettingsLayer";
 import s from "./PackEditor.module.css";
+import { promptFields } from "@/components/modals/PromptModal";
 
 const ACCEPT = "image/png,image/gif,image/webp,image/apng";
 const MAX_STICKER = 5 * 1024 * 1024;
@@ -165,11 +166,17 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       setBusy(false);
     }
   };
-  const rename = (st: Sticker) => {
-    const next = window.prompt("Sticker name", st.name);
-    if (next === null) return;
-    const tags = window.prompt("Tags (space separated, used by search)", st.tags);
-    if (tags === null) return;
+  const rename = async (st: Sticker) => {
+    const values = await promptFields({
+      title: `Edit ${isEmoji ? "Emoji" : "Sticker"}`,
+      fields: [
+        { key: "name", label: "Name", initial: st.name, maxLength: 30 },
+        { key: "tags", label: "Tags", hint: "Space separated, used by search.", initial: st.tags, maxLength: 200 },
+      ],
+    });
+    if (!values) return;
+    const next = values["name"] ?? "";
+    const tags = values["tags"] ?? "";
     void expressionsApi
       .patchSticker(pack.id, st.id, { name: next.trim().slice(0, 30) || st.name, tags: tags.trim().slice(0, 200) })
       .then(() => expressionsApi.pack(pack.id))

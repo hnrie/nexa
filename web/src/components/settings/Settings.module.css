@@ -9,7 +9,10 @@
 .navSep { height: 1px; margin: 8px 10px; background: var(--border); }
 .danger { color: var(--danger); }
 .contentWrap { flex: 1 1 800px; display: flex; overflow-y: auto; background: var(--bg-raised); }
-.content { width: 740px; max-width: 100%; padding: 60px 40px 80px; }
+/* Generous room under the last setting, so it never ends pressed against the window edge (or under a save
+   bar). The page grows with what it holds (flex-start): stretched to the window's height, as it was, its
+   content ran out past its own padding and the room under the last setting never existed. */
+.content { width: 740px; max-width: 100%; padding: 60px 40px 160px; align-self: flex-start; }
 .closeCol { position: sticky; top: 60px; align-self: flex-start; padding: 60px 0 0 20px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .close { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--text-muted); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
 .close:hover { color: var(--text); border-color: var(--text); background: var(--bg-hover); }
@@ -40,7 +43,7 @@
 .preview { align-self: start; position: sticky; top: 60px; }
 .uploadRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .bannerPick { aspect-ratio: 5 / 2; border-radius: var(--radius-sm); background: var(--brand); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; padding: 8px; gap: 8px; }
-.themePreview { height: 56px; border-radius: var(--radius-sm); margin-top: 12px; }
+.previewCard { border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-medium); }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .swatch { width: 40px; height: 40px; border-radius: var(--radius-xs); border: 2px solid transparent; position: relative; overflow: hidden; }
 .swatch[data-on="true"] { border-color: var(--text-strong); }
@@ -84,7 +87,7 @@
   .navHead, .navSep { display: none; }
   .navItem { height: 36px; white-space: nowrap; }
   .contentWrap { flex: 1; }
-  .content { padding: 16px 16px 80px; }
+  .content { padding: 16px 16px calc(120px + env(safe-area-inset-bottom)); }
   .closeCol { position: fixed; top: 8px; right: 8px; padding: 0; z-index: 3; }
   .closeCol .close { width: 32px; height: 32px; background: var(--bg-surface); }
   .esc { display: none; }

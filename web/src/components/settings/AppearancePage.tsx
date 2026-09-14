@@ -62,6 +62,8 @@ export default function AppearancePage() {
       <h3 className={s.h5}>Accessibility</h3>
       <Toggle checked={st.reducedMotion} onChange={(v) => patch({ reducedMotion: v })} label="Reduced motion" description="Disables animations and transitions." />
       <Toggle checked={st.underlineLinks} onChange={(v) => patch({ underlineLinks: v })} label="Always underline links" description="Makes links easier to spot in messages." />
+      <h3 className={s.h5}>Typing</h3>
+      <Toggle checked={st.spellcheck !== false} onChange={(v) => patch({ spellcheck: v })} label="Spell check" description="Underlines misspelled words in the message box and while editing. Right-click one for suggestions, or to add it to your dictionary." />
     </>
   );
 }

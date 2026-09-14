@@ -52,6 +52,12 @@ interface UIState {
   activeChannelId: string | null;
   replyTo: { channelId: string; messageId: string; ping: boolean } | null;
   editing: { channelId: string; messageId: string } | null;
+  /**
+   * Edits in progress, by channel: the message and what has been typed so far.
+   * Going to another conversation parks the edit here, and coming back opens it
+   * again with the same text; saving or cancelling ends it.
+   */
+  editDrafts: Record<string, { messageId: string; text: string | null }>;
   jumpTo: { channelId: string; messageId: string } | null;
   toasts: Toast[];
   focused: boolean;
@@ -69,6 +75,9 @@ interface UIState {
   setActiveChannel: (id: string | null) => void;
   setReplyTo: (r: UIState["replyTo"]) => void;
   setEditing: (e: UIState["editing"]) => void;
+  setEditDraft: (channelId: string, messageId: string, text: string) => void;
+  /** Ends the edit of that one message: its kept text goes, and the open edit closes only if it is this one. */
+  endEdit: (channelId: string, messageId: string) => void;
   setJumpTo: (j: UIState["jumpTo"]) => void;
   toast: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: (id: number) => void;
@@ -90,6 +99,7 @@ export const useUI = create<UIState>()((set) => ({
   activeChannelId: null,
   replyTo: null,
   editing: null,
+  editDrafts: {},
   jumpTo: null,
   toasts: [],
   focused: true,
@@ -114,16 +124,41 @@ export const useUI = create<UIState>()((set) => ({
   openContextMenu: (contextMenu) => set({ contextMenu }),
   closeContextMenu: () => set({ contextMenu: null }),
   setQuickSwitcher: (quickSwitcher) => set({ quickSwitcher }),
-  // Re-activating the open channel keeps a reply or edit in progress; only
-  // one that belongs to another channel is dropped.
+  // Re-activating the open channel keeps a reply or edit in progress; a reply
+  // that belongs to another channel is dropped, and an edit waits in
+  // editDrafts until its channel is opened again.
   setActiveChannel: (id) =>
-    set((s) =>
-      s.activeChannelId === id
-        ? s
-        : { activeChannelId: id, replyTo: s.replyTo?.channelId === id ? s.replyTo : null, editing: s.editing?.channelId === id ? s.editing : null },
-    ),
+    set((s) => {
+      if (s.activeChannelId === id) return s;
+      // an edit being left behind is kept, even one nothing was typed into yet (null: the message's own text)
+      let editDrafts = s.editDrafts;
+      if (s.editing && s.editing.channelId !== id && editDrafts[s.editing.channelId]?.messageId !== s.editing.messageId) {
+        editDrafts = { ...editDrafts, [s.editing.channelId]: { messageId: s.editing.messageId, text: null } };
+      }
+      const parked = id ? editDrafts[id] : undefined;
+      const editing = s.editing?.channelId === id ? s.editing : id && parked ? { channelId: id, messageId: parked.messageId } : null;
+      return { activeChannelId: id, replyTo: s.replyTo?.channelId === id ? s.replyTo : null, editing, editDrafts };
+    }),
   setReplyTo: (replyTo) => set({ replyTo }),
-  setEditing: (editing) => set({ editing }),
+  // ending an edit (or starting another in the same channel) forgets the text kept for the old one
+  setEditing: (editing) =>
+    set((s) => {
+      const channelId = editing?.channelId ?? s.editing?.channelId;
+      if (!channelId || s.editDrafts[channelId]?.messageId === editing?.messageId) return { editing };
+      const editDrafts = { ...s.editDrafts };
+      delete editDrafts[channelId];
+      return { editing, editDrafts };
+    }),
+  setEditDraft: (channelId, messageId, text) => set((s) => ({ editDrafts: { ...s.editDrafts, [channelId]: { messageId, text } } })),
+  // a save that finishes after its channel was left must not close another channel's edit, or leave its own text to come back
+  endEdit: (channelId, messageId) =>
+    set((s) => {
+      const editing = s.editing?.channelId === channelId && s.editing.messageId === messageId ? null : s.editing;
+      if (s.editDrafts[channelId]?.messageId !== messageId) return editing === s.editing ? s : { editing };
+      const editDrafts = { ...s.editDrafts };
+      delete editDrafts[channelId];
+      return { editing, editDrafts };
+    }),
   setJumpTo: (jumpTo) => set({ jumpTo }),
   toast: (text, kind = "info") => {
     toastSeq += 1;
