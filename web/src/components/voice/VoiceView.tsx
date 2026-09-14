@@ -35,7 +35,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
+import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
@@ -212,6 +212,8 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   const watching = useVoice((v) => v.watching);
   const setWatching = useVoice((v) => v.setWatching);
   const volumes = useVoice((v) => v.volumes);
+  const streamVolumes = useVoice((v) => v.streamVolumes);
+  const streamMutes = useVoice((v) => v.streamMutes);
   const localMutes = useVoice((v) => v.localMutes);
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
@@ -393,7 +395,16 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
       items.push({ id: "focus", label: focused === t.key ? "Unfocus" : "Focus", onSelect: () => setFocused(focused === t.key ? null : t.key) });
       items.push({ id: "fullscreen", label: tileIsFull(t) ? "Exit Full Screen" : "Full Screen", onSelect: () => fullscreenTile(t) });
     }
-    if (!t.me) {
+    if (!t.me && t.kind === "screen") {
+      // a stream's sound has its own level: turning a loud game down leaves the person's voice alone
+      const vol = streamVolumes[t.userId] ?? 100;
+      items[items.length - 1]!.separatorAfter = true;
+      items.push(
+        { id: "stream-volume", label: "Stream Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setStreamVolume(t.userId, v) } },
+        { id: "stream-mute", label: streamMutes[t.userId] ? "Unmute Stream" : "Mute Stream", onSelect: () => setStreamLocalMute(t.userId, !streamMutes[t.userId]) },
+        { id: "stream-reset", label: "Reset Stream Volume", disabled: vol === 100, onSelect: () => setStreamVolume(t.userId, 100) },
+      );
+    } else if (!t.me) {
       const vol = volumes[t.userId] ?? 100;
       items[items.length - 1]!.separatorAfter = true;
       items.push(
@@ -515,7 +526,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
           </span>
           {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
           {t.kind !== "screen" && (vs?.self_deaf || vs?.server_deaf) ? <HeadphoneOff size={14} className={s.tileIcon} data-server={!!vs?.server_deaf} /> : null}
-          {t.kind !== "screen" && localMutes[t.userId] ? <VolumeX size={14} className={s.tileIcon} /> : null}
+          {(t.kind === "screen" ? streamMutes[t.userId] : localMutes[t.userId]) ? <VolumeX size={14} className={s.tileIcon} /> : null}
           {!t.me && peerState !== "connected" && t.kind !== "screen" ? <span className={s.tileState}>{peerState === "failed" ? "reconnecting…" : "connecting…"}</span> : null}
         </div>
         {place !== "strip" && (playing || (t.me && t.kind === "screen")) ? (

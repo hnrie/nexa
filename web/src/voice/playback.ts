@@ -32,6 +32,9 @@ export class Playback {
   private masterVolume = 100;
   private volumes = new Map<string, number>();
   private localMutes = new Set<string>();
+  /** A screen share's sound has its own level and mute, apart from the person's voice. */
+  private streamVolumes = new Map<string, number>();
+  private streamMutes = new Set<string>();
   /** Whose screen shares are being watched; the others' share audio stays silent. */
   private watching = new Set<string>();
 
@@ -147,9 +150,10 @@ export class Playback {
     return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 
-  /** A share is offered, not forced: its sound only plays while it is watched. */
+  /** A share is offered, not forced: its sound only plays while it is watched, at the stream's own level. */
   private screenGain(userId: string): number {
-    return this.watching.has(userId) ? this.effectiveGain(userId) : 0;
+    if (!this.watching.has(userId) || this.outputMuted || this.streamMutes.has(userId)) return 0;
+    return ((this.streamVolumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 
   private applyGains(): void {
@@ -175,6 +179,17 @@ export class Playback {
   setLocalMute(userId: string, on: boolean): void {
     if (on) this.localMutes.add(userId);
     else this.localMutes.delete(userId);
+    this.applyGains();
+  }
+
+  setStreamVolume(userId: string, pct: number): void {
+    this.streamVolumes.set(userId, pct);
+    this.applyGains();
+  }
+
+  setStreamMuted(userId: string, on: boolean): void {
+    if (on) this.streamMutes.add(userId);
+    else this.streamMutes.delete(userId);
     this.applyGains();
   }
 

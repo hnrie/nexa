@@ -1,4 +1,4 @@
-import type { Message } from "@/api/types";
+import type { Message, Relationship } from "@/api/types";
 import { avatarUrl } from "@/api/users";
 import { dispatchHooks } from "@/gateway/dispatch";
 import { channelDisplayName } from "@/lib/names";
@@ -7,9 +7,10 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { usePresence } from "@/stores/presence";
-import { useSettings } from "@/stores/settings";
+import { useSettings, type Settings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
+import { desktopBridge } from "./desktopBridge";
 import { installAudioUnlock, playSound } from "./sounds";
 
 let navigateTo: ((path: string) => void) | null = null;
@@ -20,28 +21,47 @@ export function setNotificationNavigator(fn: ((path: string) => void) | null): v
 }
 
 /**
+ * Whether new messages show a notification. The desktop app shows them
+ * unless they were turned off there; a browser only once the person has
+ * allowed them, which the settings page asks for.
+ */
+export function notificationsEnabled(settings: Settings): boolean {
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return false;
+  return desktopBridge() ? settings.notifications.app !== false : settings.notifications.desktop;
+}
+
+/**
  * Shows a notification the way this browser allows. Chrome on Android and
  * iOS home-screen apps refuse the Notification constructor and only take one
  * through the service worker, which then hands the click back (see sw.ts).
- * Resolves false when neither way works.
+ * The desktop app shows them natively through the constructor, and a click
+ * brings its window back even from the tray. Resolves false when neither way
+ * works.
  */
 export async function showNotification(title: string, opts: NotificationOptions, path?: string): Promise<boolean> {
-  try {
-    const reg = await navigator.serviceWorker?.getRegistration("/");
-    if (reg?.active) {
-      await reg.showNotification(title, { ...opts, data: { path } });
-      return true;
+  const bridge = desktopBridge();
+  if (!bridge) {
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration("/");
+      if (reg?.active) {
+        await reg.showNotification(title, { ...opts, data: { path } });
+        return true;
+      }
+    } catch {
+      /* no usable worker: try the constructor */
     }
-  } catch {
-    /* no usable worker: try the constructor */
   }
   try {
     const n = new Notification(title, opts);
     n.onclick = () => {
-      window.focus();
+      // window.focus() cannot bring the app's window back from the tray or a minimised taskbar button
+      if (bridge?.focusWindow) bridge.focusWindow();
+      else window.focus();
       if (path) navigateTo?.(path);
       n.close();
     };
+    // the desktop app also asks for attention the way its system does, until the window is looked at
+    bridge?.requestAttention?.();
     return true;
   } catch {
     return false;
@@ -78,7 +98,7 @@ function onMessage(m: Message, mine: boolean): void {
   const myPresence = usePresence.getState().byUser[me.id];
   if (myPresence?.status === "dnd") return;
   if (settings.notifications.sounds) playSound(mentioned ? "mention" : "message");
-  if (!settings.notifications.desktop || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  if (!notificationsEnabled(settings)) return;
   const users = useUsers.getState().byId;
   const ch = useChannels.getState().byId[m.channel_id];
   const author = displayName(users[m.author_id]);
@@ -87,11 +107,23 @@ function onMessage(m: Message, mine: boolean): void {
   void showNotification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
 }
 
+/** A new friend request plays its own sound, and notifies while the app is not being looked at. */
+function onFriendRequest(r: Relationship): void {
+  const me = useAuth.getState().me;
+  if (!me || usePresence.getState().byUser[me.id]?.status === "dnd") return;
+  const settings = useSettings.getState().settings;
+  if (settings.notifications.sounds) playSound("friend");
+  if (document.visibilityState === "visible" && document.hasFocus()) return;
+  if (!notificationsEnabled(settings)) return;
+  void showNotification("Friend Request", { body: `${displayName(r.user)} sent you a friend request.`, tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
+}
+
 let installed = false;
 export function installNotifications(): void {
   if (installed) return;
   installed = true;
   dispatchHooks.onMessage.push(onMessage);
+  dispatchHooks.onFriendRequest.push(onFriendRequest);
   // a phone can only play sounds once a tap has let the page make noise
   installAudioUnlock();
   // a notification shown by the service worker is clicked there, which sends the chat to open back here

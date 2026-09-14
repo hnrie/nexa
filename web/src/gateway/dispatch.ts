@@ -18,14 +18,16 @@ import { decryptForStore } from "@/lib/decrypt";
 import { users as usersApi } from "@/api/users";
 import { channels as channelsApi } from "@/api/channels";
 import { ring } from "@/lib/keyring";
-import type { Message, PublicUser, ServerView } from "@/api/types";
+import type { Message, PublicUser, Relationship, ServerView } from "@/api/types";
 
 /** Hooks other layers register: notifications, voice, servers (later phases). */
 export const dispatchHooks: {
   onMessage: ((m: Message, mine: boolean) => void)[];
   onUnhandled: ((e: GatewayEvent) => void)[];
   onReady: (() => void)[];
-} = { onMessage: [], onUnhandled: [], onReady: [] };
+  /** Someone new asked to be friends (not a request already known before). */
+  onFriendRequest: ((r: Relationship) => void)[];
+} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [] };
 
 // Channels are not cleared here: ready replaces them in one step, because a
 // call whose channel vanished from the store even for a moment is ended.
@@ -240,10 +242,13 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         if (me) useAuth.getState().setMe({ ...me, ...e.d, flags: me.flags });
       }
       return;
-    case "relationship_add":
+    case "relationship_add": {
+      const before = useRelationships.getState().byUser[e.d.user.id]?.type;
       useRelationships.getState().set(e.d);
       useUsers.getState().upsert(e.d.user);
+      if (e.d.type === "incoming" && before !== "incoming") for (const h of dispatchHooks.onFriendRequest) h(e.d);
       return;
+    }
     case "relationship_remove":
       useRelationships.getState().remove(e.d.user_id);
       return;

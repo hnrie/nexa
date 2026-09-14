@@ -166,6 +166,8 @@
 .shareValue { font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .shareNote { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .shareHint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+/* the switch sits flush with the choices above it, without a settings row's rule and padding */
+.shareAudio > label { padding: 0; margin: 0; border: 0; min-height: 0; }
 
 /* settings meter */
 .meter { height: 8px; border-radius: 4px; background: var(--bg-input); overflow: hidden; margin-top: 8px; position: relative; }

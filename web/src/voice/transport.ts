@@ -43,6 +43,9 @@ export interface VoiceTransport {
   setWatching(userId: string, on: boolean): void;
   setVolume(userId: string, pct: number): void;
   setLocalMute(userId: string, on: boolean): void;
+  /** The level of someone's screen share sound, apart from their voice. */
+  setStreamVolume(userId: string, pct: number): void;
+  setStreamMuted(userId: string, on: boolean): void;
   setOutputMuted(on: boolean): void;
   setMasterVolume(pct: number): void;
   setOutputDevice(deviceId: string | null): Promise<void>;

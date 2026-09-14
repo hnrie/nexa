@@ -2,21 +2,23 @@ import { Monitor, MonitorUp } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
-import { Toggle } from "@/components/common/Toggle";
 import type { DisplaySourceRequest } from "@/lib/desktopBridge";
+import { shareAudioRequested } from "@/voice/media";
 import s from "./Desktop.module.css";
 
 /**
  * The desktop app's screen and window picker, asked for by getDisplayMedia
  * after the Share Your Screen dialog. Browsers have their own; the app shows
- * this one.
+ * this one. Whether the share carries sound was already chosen in that
+ * dialog, so the picker only asks what to share.
  */
 export function DisplayPicker({ request, onChoose }: { request: DisplaySourceRequest; onChoose: (sourceId: string | null, withAudio: boolean) => void }) {
   const screens = request.sources.filter((x) => x.kind === "screen");
   const windows = request.sources.filter((x) => x.kind === "window");
   const [tab, setTab] = useState<"screen" | "window">(screens.length ? "screen" : "window");
   const [picked, setPicked] = useState<string | null>(screens.length === 1 ? screens[0]!.id : null);
-  const [audio, setAudio] = useState(request.audio);
+  // an older app offers sound whether or not the share asked for it
+  const audio = request.audio && shareAudioRequested();
   const shown = tab === "screen" ? screens : windows;
 
   return (
@@ -60,11 +62,6 @@ export function DisplayPicker({ request, onChoose }: { request: DisplaySourceReq
           ))}
         </div>
       )}
-      {request.audio ? (
-        <div className={s.audio}>
-          <Toggle checked={audio} onChange={setAudio} label="Share sound" description="Everyone watching hears what your computer plays." />
-        </div>
-      ) : null}
     </Modal>
   );
 }

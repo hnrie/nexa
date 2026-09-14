@@ -86,16 +86,54 @@ export async function hasSeveralCameras(): Promise<boolean> {
 /** Whether this browser can share a screen at all; phone browsers cannot. */
 export const canShareScreen = typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
 
-export async function getScreen(res: ShareResolution, fps: ShareFps): Promise<MediaStream> {
+let shareAudioAsked = false;
+
+/** Whether the share being picked right now asked for sound; the desktop app's picker follows it. */
+export function shareAudioRequested(): boolean {
+  return shareAudioAsked;
+}
+
+/**
+ * Whether a captured audio track is the whole system's sound with this app's
+ * own playback still in it. restrictOwnAudio is only a request: where the
+ * system cannot honour it the capture keeps the call's sound, and everyone
+ * else would hear themselves echo back through the share.
+ */
+export function echoesOwnAudio(settings: MediaTrackSettings & { restrictOwnAudio?: boolean }): boolean {
+  const id = typeof settings.deviceId === "string" ? settings.deviceId : "";
+  if (!id.startsWith("loopback")) return false;
+  return settings.restrictOwnAudio !== true && id !== "loopbackWithoutChrome";
+}
+
+export interface ScreenCapture {
+  stream: MediaStream;
+  /** Sound was asked for and came, but with the call in it, so it was left out. */
+  droppedEchoingAudio: boolean;
+}
+
+export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio = true): Promise<ScreenCapture> {
   const video = shareVideoConstraints(res, fps);
-  // system audio where the browser allows it; Chrome asks per window/tab
-  const opts = { video, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 2 }, systemAudio: "include", surfaceSwitching: "include", selfBrowserSurface: "exclude" } as DisplayMediaStreamOptions & { systemAudio: string; surfaceSwitching: string; selfBrowserSurface: string };
+  // System audio where the browser allows it (Chrome asks per window or tab).
+  // restrictOwnAudio leaves this app's own sound out of it, the call included:
+  // without it everyone in the call hears themselves come back through the
+  // share. Chrome honours it for system audio on Windows, and the desktop app
+  // swaps its loopback for one that skips its own playback.
+  const audio = withAudio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 2, restrictOwnAudio: true, suppressLocalAudioPlayback: false } : false;
+  const opts = { video, audio, systemAudio: withAudio ? "include" : "exclude", surfaceSwitching: "include", selfBrowserSurface: "exclude" } as DisplayMediaStreamOptions & { systemAudio: string; surfaceSwitching: string; selfBrowserSurface: string };
+  shareAudioAsked = withAudio;
   const stream = await navigator.mediaDevices.getDisplayMedia(opts);
+  let droppedEchoingAudio = false;
+  for (const t of stream.getAudioTracks()) {
+    if (!echoesOwnAudio(t.getSettings())) continue;
+    t.stop();
+    stream.removeTrack(t);
+    droppedEchoingAudio = true;
+  }
   // Under a squeezed connection the encoder gives up detail or smoothness.
   // Whoever picked 60 fps wants motion kept; anything slower is usually text.
   const track = stream.getVideoTracks()[0];
   if (track && "contentHint" in track) track.contentHint = fps >= 60 ? "motion" : "detail";
-  return stream;
+  return { stream, droppedEchoingAudio };
 }
 
 export interface Devices {

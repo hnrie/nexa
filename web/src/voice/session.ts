@@ -260,6 +260,8 @@ export async function joinVoice(channelId: string): Promise<void> {
   const voiceStore = useVoice.getState();
   for (const uid of Object.keys(voiceStore.localMutes)) transport.setLocalMute(uid, true);
   for (const [uid, pct] of Object.entries(voiceStore.volumes)) transport.setVolume(uid, pct);
+  for (const [uid, pct] of Object.entries(voiceStore.streamVolumes)) transport.setStreamVolume(uid, pct);
+  for (const [uid, on] of Object.entries(voiceStore.streamMutes)) if (on) transport.setStreamMuted(uid, true);
   for (const uid of Object.keys(voiceStore.watching)) transport.setWatching(uid, true);
   transport.setOutputMuted(useVoiceLocal.getState().deafened);
   transport.setMasterVolume(useSettings.getState().settings.voice.outputVolume);
@@ -472,13 +474,13 @@ export async function toggleCamera(): Promise<void> {
  * not given), unless one is already running. Call it straight from a click:
  * the browser only opens its screen picker during a user gesture.
  */
-export async function startScreen(quality?: { resolution: ShareResolution; fps: ShareFps }): Promise<void> {
+export async function startScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
   if (session?.screen) return;
   await toggleScreen(quality);
 }
 
 /** Stops a share, or starts one the way startScreen does. */
-export async function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps }): Promise<void> {
+export async function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
   const s = session;
   if (!s || s.screenPending) return;
   if (s.screen) {
@@ -490,10 +492,13 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
     const v = useSettings.getState().settings.voice;
     const res = quality?.resolution ?? v.shareResolution;
     const fps = quality?.fps ?? v.shareFps;
+    const audio = quality?.audio ?? v.shareAudio ?? true;
     s.screenPending = true;
     let stream: MediaStream;
     try {
-      stream = await getScreen(res, fps);
+      const capture = await getScreen(res, fps, audio);
+      stream = capture.stream;
+      if (capture.droppedEchoingAudio) useUI.getState().toast("Your screen is shared without sound: this computer can't leave the call's own audio out of it, so everyone would hear themselves echo.", "info");
     } catch {
       s.screenPending = false;
       return; // the user cancelled the picker
@@ -516,6 +521,17 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
 export function setUserVolume(userId: string, pct: number): void {
   useVoice.getState().setVolume(userId, pct);
   session?.transport.setVolume(userId, pct);
+}
+
+/** The volume of someone's screen share sound, leaving their voice as it is. */
+export function setStreamVolume(userId: string, pct: number): void {
+  useVoice.getState().setStreamVolume(userId, pct);
+  session?.transport.setStreamVolume(userId, pct);
+}
+
+export function setStreamLocalMute(userId: string, on: boolean): void {
+  useVoice.getState().setStreamMute(userId, on);
+  session?.transport.setStreamMuted(userId, on);
 }
 
 export function setUserLocalMute(userId: string, on: boolean): void {

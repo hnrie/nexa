@@ -89,6 +89,8 @@ export interface DisplaySourceRequest {
 export interface EvilionDesktop {
   version: string;
   platform: "win32" | "darwin" | "linux";
+  /** Whether a screen share here can carry the computer's sound without the call's own (app 1.0.1 and later). */
+  shareAudio?: boolean;
   rpc: {
     getState(): Promise<RpcState>;
     setEnabled(on: boolean): Promise<void>;
@@ -119,6 +121,10 @@ export interface EvilionDesktop {
   chooseDisplaySource(requestId: string, sourceId: string | null, withAudio: boolean): void;
   /** Mute or Deafen chosen from the tray icon. */
   onTrayAction(cb: (action: "mute" | "deafen") => void): () => void;
+  /** Brings the window back from the tray or the taskbar and focuses it (app 1.0.1 and later). */
+  focusWindow?(): void;
+  /** Flashes the taskbar button or bounces the Dock icon until the window is looked at (app 1.0.1 and later). */
+  requestAttention?(): void;
 }
 
 export function desktopBridge(): EvilionDesktop | null {

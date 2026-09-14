@@ -1,11 +1,19 @@
 import { conversationCount } from "@/lib/unread";
 import { useChannels } from "@/stores/channels";
 import { useReadStates } from "@/stores/readStates";
+import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 
 const BASE = "Evilion Chat";
 
-/** Everything waiting for this user: messages in conversations, mentions elsewhere. */
+/** Friend requests waiting for an answer. */
+export function pendingFriendRequests(): number {
+  let n = 0;
+  for (const r of Object.values(useRelationships.getState().byUser)) if (r.type === "incoming") n += 1;
+  return n;
+}
+
+/** Everything waiting for this user: messages in conversations, mentions elsewhere, and friend requests. */
 export function unreadTotal(): number {
   const channels = useChannels.getState().byId;
   const reads = useReadStates.getState().byChannel;
@@ -16,7 +24,7 @@ export function unreadTotal(): number {
     // a conversation counts its waiting messages; elsewhere only mentions do
     n += ch.type === "dm" || ch.type === "group_dm" ? conversationCount(ch, rs, settings) : (rs?.mentions ?? 0);
   }
-  return n;
+  return n + pendingFriendRequests();
 }
 
 function compute(): string {
@@ -33,10 +41,12 @@ export function installTitleBadge(): () => void {
   const a = useChannels.subscribe(apply);
   const b = useReadStates.subscribe(apply);
   const c = useSettings.subscribe(apply);
+  const d = useRelationships.subscribe(apply);
   return () => {
     a();
     b();
     c();
+    d();
     document.title = BASE;
   };
 }

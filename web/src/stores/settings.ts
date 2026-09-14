@@ -27,6 +27,8 @@ export interface VoiceSettings {
   /** Screen share size and frame rate; the share dialog starts from the last ones used. */
   shareResolution: ShareResolution;
   shareFps: ShareFps;
+  /** Whether a screen share carries what the computer plays. */
+  shareAudio: boolean;
 }
 
 /**
@@ -62,7 +64,11 @@ export interface Settings {
   recentEmoji: string[];
   favoriteGifs: { url: string; w?: number; h?: number }[];
   skinTone: number;
-  notifications: { desktop: boolean; sounds: boolean; perChannel: Record<string, NotificationLevel>; muted: string[] };
+  /**
+   * desktop: notifications in a browser, which has to be allowed first.
+   * app: notifications in the desktop app, on unless turned off.
+   */
+  notifications: { desktop: boolean; app: boolean; sounds: boolean; perChannel: Record<string, NotificationLevel>; muted: string[] };
   drafts: Record<string, string>;
   voice: VoiceSettings;
   serverPositions: string[];
@@ -87,7 +93,7 @@ export const DEFAULT_SETTINGS: Settings = {
   recentEmoji: [],
   favoriteGifs: [],
   skinTone: 0,
-  notifications: { desktop: false, sounds: true, perChannel: {}, muted: [] },
+  notifications: { desktop: false, app: true, sounds: true, perChannel: {}, muted: [] },
   drafts: {},
   voice: {
     inputDeviceId: null,
@@ -105,6 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
     autoGain: true,
     shareResolution: "1080p",
     shareFps: 30,
+    shareAudio: true,
   },
   serverPositions: [],
   collapsedCategories: [],

@@ -12,7 +12,6 @@
 .sourceName img { width: 16px; height: 16px; flex: none; }
 .sourceName span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
-.audio { margin-top: 12px; }
 
 .status { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); font-size: 14px; line-height: 1.4; color: var(--text); }
 .status svg { flex: none; margin-top: 1px; }

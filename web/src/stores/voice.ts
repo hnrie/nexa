@@ -28,6 +28,10 @@ interface VoiceStore {
   level: number;
   /** Per-user playback volume, 0–200 (percent). Persisted locally. */
   volumes: Record<string, number>;
+  /** The volume of someone's screen share sound, apart from their voice, 0–200. Persisted locally. */
+  streamVolumes: Record<string, number>;
+  /** Screen shares whose sound is muted just here, apart from the person's voice. */
+  streamMutes: Record<string, boolean>;
   /** Users muted locally (only for me). */
   localMutes: Record<string, boolean>;
   /** Incoming DM calls, by channel. */
@@ -53,6 +57,8 @@ interface VoiceStore {
   setLevel: (n: number) => void;
   setVolume: (userId: string, pct: number) => void;
   setLocalMute: (userId: string, on: boolean) => void;
+  setStreamVolume: (userId: string, pct: number) => void;
+  setStreamMute: (userId: string, on: boolean) => void;
   setRinging: (channelId: string, from: string | null) => void;
   setFocused: (key: string | null) => void;
   /** Starts or stops watching someone's screen share; watching one brings it to the front. */
@@ -62,9 +68,9 @@ interface VoiceStore {
   clear: () => void;
 }
 
-function loadVolumes(): Record<string, number> {
+function loadVolumes(key = "voiceVolumes"): Record<string, number> {
   try {
-    const raw = storage.get("voiceVolumes");
+    const raw = storage.get(key);
     return raw ? (JSON.parse(raw) as Record<string, number>) : {};
   } catch {
     return {};
@@ -82,6 +88,8 @@ export const useVoice = create<VoiceStore>()((set) => ({
   speaking: {},
   level: 0,
   volumes: loadVolumes(),
+  streamVolumes: loadVolumes("voiceStreamVolumes"),
+  streamMutes: {},
   localMutes: {},
   ringing: {},
   focused: null,
@@ -146,6 +154,13 @@ export const useVoice = create<VoiceStore>()((set) => ({
       return { volumes };
     }),
   setLocalMute: (userId, on) => set((s) => ({ localMutes: { ...s.localMutes, [userId]: on } })),
+  setStreamVolume: (userId, pct) =>
+    set((s) => {
+      const streamVolumes = { ...s.streamVolumes, [userId]: Math.max(0, Math.min(200, Math.round(pct))) };
+      storage.set("voiceStreamVolumes", JSON.stringify(streamVolumes));
+      return { streamVolumes };
+    }),
+  setStreamMute: (userId, on) => set((s) => ({ streamMutes: { ...s.streamMutes, [userId]: on } })),
   setRinging: (channelId, from) =>
     set((s) => {
       const ringing = { ...s.ringing };

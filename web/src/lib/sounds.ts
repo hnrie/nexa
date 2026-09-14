@@ -1,4 +1,4 @@
-export type SoundName = "message" | "mention" | "ring" | "join" | "leave" | "mute" | "unmute";
+export type SoundName = "message" | "mention" | "friend" | "ring" | "join" | "leave" | "mute" | "unmute";
 
 let ctx: AudioContext | null = null;
 let ringTimer: ReturnType<typeof setInterval> | null = null;
@@ -88,6 +88,12 @@ export function playSound(name: SoundName): void {
       tone(ac, 784, 0, 0.08);
       tone(ac, 987.8, 0.09, 0.08);
       tone(ac, 1318.5, 0.18, 0.16);
+      break;
+    case "friend":
+      // a bright rising three, warmer than a mention's
+      tone(ac, 587.3, 0, 0.1, "triangle", 0.2);
+      tone(ac, 880, 0.1, 0.1, "triangle", 0.2);
+      tone(ac, 1174.7, 0.2, 0.22, "triangle", 0.2);
       break;
     case "join":
       tone(ac, 523.3, 0, 0.08, "triangle");

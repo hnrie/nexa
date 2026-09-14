@@ -6,7 +6,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
 import { initials } from "@/lib/avatarColor";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
-import { badgeText, serverUnread, unreadConversations } from "@/lib/unread";
+import { badgeText, conversationCount, serverUnread, unreadConversations } from "@/lib/unread";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useReadStates, isUnread } from "@/stores/readStates";
@@ -26,6 +26,14 @@ export function orderedServerIds(order: string[], positions: string[]): string[]
   const out = positions.filter((id) => known.has(id));
   for (const id of order) if (!out.includes(id)) out.push(id);
   return out;
+}
+
+/** What Home's badge counts, read out: "3 unread messages and 1 friend request". */
+export function homeLabel(messages: number, requests: number): string {
+  const parts: string[] = [];
+  if (messages > 0) parts.push(`${messages} unread ${messages === 1 ? "message" : "messages"}`);
+  if (requests > 0) parts.push(`${requests} ${requests === 1 ? "friend request" : "friend requests"}`);
+  return parts.join(" and ");
 }
 
 /** How many waiting conversations the rail shows under home; the DM list has the rest. */
@@ -54,11 +62,17 @@ export function Rail() {
   const [over, setOver] = useState<{ id: string; after: boolean } | null>(null);
   const railRef = useRef<HTMLElement>(null);
 
+  // Home works like a server: a pill while something is waiting, and a count of
+  // every message waiting in a conversation plus the friend requests to answer
   let unread = false;
+  let homeCount = 0;
   for (const ch of Object.values(channels)) {
     if (ch.type !== "dm" && ch.type !== "group_dm") continue;
     if (isUnread(reads[ch.id], ch.last_message_id)) unread = true;
+    homeCount += conversationCount(ch, reads[ch.id], settings);
   }
+  const friendRequests = useMemo(() => Object.values(rels).filter((r) => r.type === "incoming").length, [rels]);
+  homeCount += friendRequests;
   // like the people themselves waiting at the door: who sent something, and how much
   const waiting = unreadConversations(channels, reads, settings, openConvo).slice(0, MAX_WAITING);
 
@@ -103,13 +117,14 @@ export function Rail() {
 
   return (
     <nav className={s.rail} aria-label="Servers" ref={railRef} onDragEnd={() => { setDragId(null); setOver(null); }}>
-      <div className={s.item} data-selected={home} data-unread={unread && !home}>
+      <div className={s.item} data-selected={home} data-unread={(unread || friendRequests > 0) && !home} data-testid="home">
         <span className={s.pill} />
         <Tooltip text="Direct Messages" side="right">
-          <button className={s.btn} aria-label="Direct Messages" onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
+          <button className={s.btn} aria-label={homeCount > 0 ? `Direct Messages, ${homeLabel(homeCount - friendRequests, friendRequests)}` : "Direct Messages"} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
             <MessageCircle size={28} strokeWidth={2.2} />
           </button>
         </Tooltip>
+        {homeCount > 0 ? <span className={s.badge} aria-hidden="true" data-testid="home-count">{badgeText(homeCount)}</span> : null}
       </div>
       {waiting.map(({ channel: ch, count }) => {
         const name = channelDisplayName(ch, users, meId, nicknames);

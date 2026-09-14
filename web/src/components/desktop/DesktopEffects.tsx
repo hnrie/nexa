@@ -6,6 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useDesktop } from "@/stores/desktop";
 import { useReadStates } from "@/stores/readStates";
+import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
@@ -76,7 +77,7 @@ export function DesktopEffects() {
       bridge.setBadge(n);
     };
     count();
-    offs.push(useChannels.subscribe(count), useReadStates.subscribe(count), useSettings.subscribe(count));
+    offs.push(useChannels.subscribe(count), useReadStates.subscribe(count), useSettings.subscribe(count), useRelationships.subscribe(count));
 
     let inCall = false;
     offs.push(

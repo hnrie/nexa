@@ -2,6 +2,8 @@ import { MonitorUp } from "lucide-react";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
+import { Toggle } from "@/components/common/Toggle";
+import { desktopBridge } from "@/lib/desktopBridge";
 import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
 import { SHARE_FRAME_RATES, SHARE_RESOLUTIONS, shareBitrate } from "@/voice/shareQuality";
 import { startScreen } from "@/voice/session";
@@ -57,12 +59,16 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
   const patch = useSettings((x) => x.patch);
   const [resolution, setResolution] = useState<ShareResolution>(voice.shareResolution);
   const [fps, setFps] = useState<ShareFps>(voice.shareFps);
+  // the desktop app knows when this computer cannot share sound without the call echoing in it
+  const audioSupported = desktopBridge()?.shareAudio !== false;
+  const [audio, setAudio] = useState((voice.shareAudio ?? true) && audioSupported);
   const mbps = shareBitrate(resolution, fps) / 1_000_000;
 
   const goLive = () => {
-    if (resolution !== voice.shareResolution || fps !== voice.shareFps) patch({ voice: { ...voice, shareResolution: resolution, shareFps: fps } });
+    const keepAudio = audioSupported ? audio : (voice.shareAudio ?? true);
+    if (resolution !== voice.shareResolution || fps !== voice.shareFps || keepAudio !== (voice.shareAudio ?? true)) patch({ voice: { ...voice, shareResolution: resolution, shareFps: fps, shareAudio: keepAudio } });
     // straight from the click: the browser only opens its picker during a gesture
-    void startScreen({ resolution, fps });
+    void startScreen({ resolution, fps, audio });
     onClose();
   };
 
@@ -82,6 +88,15 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
       <div className={s.shareForm}>
         <Choices label="Resolution" id="share-res" options={SHARE_RESOLUTIONS.map((r) => ({ value: r.value, title: r.label, note: RESOLUTION_NOTES[r.value] }))} value={resolution} onChange={setResolution} />
         <Choices label="Frame rate" id="share-fps" options={SHARE_FRAME_RATES.map((f) => ({ value: f, title: `${f} fps`, note: FPS_NOTES[f] }))} value={fps} onChange={setFps} />
+        <div className={s.shareAudio} data-testid="share-audio">
+          <Toggle
+            checked={audio}
+            disabled={!audioSupported}
+            onChange={setAudio}
+            label="Share audio"
+            description={audioSupported ? "Everyone watching hears what you're sharing. The call's own sound is left out." : "This computer can't share its sound without the call echoing back in it, so shares from here are silent."}
+          />
+        </div>
         <p className={s.shareHint}>
           {resolution === "source" ? "Shares at your screen's own resolution. " : ""}Uses up to {Number.isInteger(mbps) ? mbps : mbps.toFixed(1)} Mbps of upload. Your browser asks what to share next.
         </p>

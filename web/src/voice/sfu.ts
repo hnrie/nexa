@@ -682,6 +682,14 @@ export class SfuTransport implements VoiceTransport {
     this.playback.setVolume(userId, pct);
   }
 
+  setStreamVolume(userId: string, pct: number): void {
+    this.playback.setStreamVolume(userId, pct);
+  }
+
+  setStreamMuted(userId: string, on: boolean): void {
+    this.playback.setStreamMuted(userId, on);
+  }
+
   setLocalMute(userId: string, on: boolean): void {
     this.playback.setLocalMute(userId, on);
   }
