@@ -1,0 +1,66 @@
+appId: xyz.evilion.chat
+productName: Evilion Chat
+copyright: Copyright © 2026 Evilion
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - dist-app/**
+  - package.json
+  - "!node_modules/**"
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - tray*.png
+      - trayTemplate*.png
+      - badge.png
+      - icon.png
+asar: true
+compression: maximum
+artifactName: "Evilion-Chat-${version}-${os}-${arch}.${ext}"
+publish:
+  provider: generic
+  url: https://chat.evilion.xyz/desktop/
+  channel: latest
+mac:
+  category: public.app-category.social-networking
+  icon: resources/icon.png
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  extendInfo:
+    NSMicrophoneUsageDescription: Evilion Chat uses the microphone for voice calls.
+    NSCameraUsageDescription: Evilion Chat uses the camera for video calls.
+dmg:
+  artifactName: "Evilion-Chat-${version}-mac-${arch}.${ext}"
+win:
+  icon: resources/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: "Evilion-Chat-Setup-${version}-win-${arch}.${ext}"
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  shortcutName: Evilion Chat
+linux:
+  icon: resources/icon.png
+  category: Network;Chat;InstantMessaging
+  executableName: evilion-chat
+  maintainer: Evilion <evilionx3@proton.me>
+  synopsis: Evilion Chat for your computer
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  desktop:
+    entry:
+      StartupWMClass: Evilion Chat

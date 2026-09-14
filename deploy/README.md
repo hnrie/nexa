@@ -35,3 +35,24 @@ bash backup.sh                                          # consistent DB + media 
 Settings live in `chatd.env` (documented in `chatd.env.example`); restart after
 editing. The database is `data/chat.db` (SQLite, WAL mode) and uploads live in
 `data/media/`; back them up with `backup.sh`, never by copying the live files.
+
+## Desktop app
+
+The desktop app (`desktop/`, Electron) is a window on the live site plus a
+Discord-compatible Rich Presence server and an updater. Its installers are built
+on this Mac and served by chatd from `DESKTOP_DIR` (default `data/desktop`) at
+`/desktop/`; the download page (`/download`) and the banner read
+`/api/v1/desktop/latest`.
+
+```
+# bump "version" in desktop/package.json first, then:
+make desktop            # desktop/dist: Windows .exe, macOS .dmg/.zip (Intel and Apple Silicon), Linux .AppImage/.deb
+make publish-desktop    # copies them and the update manifests into data/desktop; no restart needed
+```
+
+Running apps find the new version within six hours (or at once from Settings →
+Desktop App → Check for updates). Windows and the AppImage install it on restart;
+the Mac build swaps itself in on restart (it is not signed, so macOS's own
+updater cannot); a .deb only says a new version is out. Builds are unsigned:
+Windows shows "Windows protected your PC" (More info → Run anyway) and macOS
+wants a right-click → Open the first time; the download page says so.
