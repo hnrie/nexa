@@ -46,6 +46,8 @@ export type GatewayEvent =
   | { t: "voice_state"; d: VoiceState }
   | { t: "voice_signal"; d: { from: Snowflake; channel_id: Snowflake; payload: unknown } }
   | { t: "voice_error"; d: { code: string; message: string } }
+  /** After a reconnect: whether the server kept this device's call for it, or it starts over. */
+  | { t: "voice_resumed"; d: { channel_id: Snowflake; kept: boolean } }
   | { t: "call_ring"; d: { channel_id: Snowflake; from: Snowflake } }
   | { t: "call_end"; d: { channel_id: Snowflake; user_id?: Snowflake; reason: "declined" | "ended" } }
   | { t: "key_grant"; d: KeyGrant }

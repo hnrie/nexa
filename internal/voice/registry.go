@@ -269,6 +269,45 @@ func (r *Registry) Leave(uid ids.ID) (State, bool) {
 	return r.leaveLocked(uid)
 }
 
+// Detach lets go of the connection holding a call without ending the call:
+// its SFU session and tracks stay, with no connection (ConnID 0), for the same
+// device to pick up with Resume. It reports whether connID held it.
+func (r *Registry) Detach(uid, connID ids.ID) (State, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.byUser[uid]
+	if !ok || connID.IsZero() || st.ConnID != connID {
+		return State{}, false
+	}
+	st.ConnID = 0
+	return *st, true
+}
+
+// Resume hands a call to a new connection of the device that holds it: the
+// same session, proving itself with the SFU session only that device knows.
+func (r *Registry) Resume(uid, sessionID ids.ID, sfuSession string, connID ids.ID) (State, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.byUser[uid]
+	if !ok || sfuSession == "" || st.SessionID != sessionID || st.SFUSession != sfuSession {
+		return State{}, false
+	}
+	st.ConnID = connID
+	return *st, true
+}
+
+// LeaveDetached ends a call nobody picked up: it is still without a
+// connection, on the same SFU session it was detached with.
+func (r *Registry) LeaveDetached(uid ids.ID, sfuSession string) (State, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.byUser[uid]
+	if !ok || !st.ConnID.IsZero() || st.SFUSession != sfuSession {
+		return State{}, false
+	}
+	return r.leaveLocked(uid)
+}
+
 // LeaveConn removes a user only when the given connection holds their state.
 func (r *Registry) LeaveConn(uid, connID ids.ID) (State, bool) {
 	r.mu.Lock()

@@ -33,6 +33,10 @@ export const voice = {
   sfuRenegotiate(body: { session_id: string; description: SfuDescription }, signal?: AbortSignal): Promise<{ description: SfuDescription | null }> {
     return api.request("PUT", "/voice/sfu/renegotiate", body, { signal });
   },
+  /** An ICE restart's offer, carried by one track the session already publishes. */
+  sfuRestart(body: { session_id: string; offer: SfuDescription; mid: string; kind: string }, signal?: AbortSignal): Promise<{ answer: SfuDescription | null }> {
+    return api.request("PUT", "/voice/sfu/restart", body, { signal });
+  },
   sfuClose(body: { session_id: string; mids: string[]; offer?: SfuDescription }, signal?: AbortSignal): Promise<{ answer: SfuDescription | null; renegotiate: boolean }> {
     return api.request("PUT", "/voice/sfu/close", body, { signal });
   },

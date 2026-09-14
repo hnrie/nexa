@@ -296,6 +296,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "voice_state":
     case "voice_signal":
     case "voice_error":
+    case "voice_resumed":
     case "call_ring":
     case "call_end":
       handleVoiceEvent(e);

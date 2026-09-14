@@ -144,3 +144,42 @@ func TestSFUSessionFollowsTheCall(t *testing.T) {
 		t.Errorf("a new session hands back the one it replaces: %q %v", old, ok)
 	}
 }
+
+func TestDetachAndResume(t *testing.T) {
+	r := New()
+	u, ch := ids.ID(1), ids.ID(10)
+	r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 1000}, false)
+	r.SetSFU(u, ch, 1000, "s1")
+	r.SetTrack(u, "s1", "audio", "a1", 0)
+	if _, ok := r.Detach(u, 999); ok {
+		t.Fatal("a connection that does not hold the call cannot detach it")
+	}
+	if st, ok := r.Detach(u, 1000); !ok || !st.ConnID.IsZero() {
+		t.Fatalf("detach: %+v %v", st, ok)
+	}
+	// still in the call, with its session and tracks, for everyone else
+	if got, ok := r.Get(u); !ok || got.SFUSession != "s1" || got.Tracks.Audio != "a1" || r.Count(ch) != 1 {
+		t.Fatalf("detached call: %+v", got)
+	}
+	// only the device holding the SFU session picks it up
+	if _, ok := r.Resume(u, 100, "s2", 3000); ok {
+		t.Error("a wrong SFU session resumed the call")
+	}
+	if _, ok := r.Resume(u, 101, "s1", 3000); ok {
+		t.Error("another session resumed the call")
+	}
+	if st, ok := r.Resume(u, 100, "s1", 3000); !ok || st.ConnID != 3000 || st.Tracks.Audio != "a1" {
+		t.Fatalf("resume: %+v %v", st, ok)
+	}
+	// a resumed call is not ended by the grace running out
+	if _, ok := r.LeaveDetached(u, "s1"); ok {
+		t.Error("a resumed call was ended")
+	}
+	r.Detach(u, 3000)
+	if _, ok := r.LeaveDetached(u, "s0"); ok {
+		t.Error("a detach from an older session ended the call")
+	}
+	if st, ok := r.LeaveDetached(u, "s1"); !ok || st.UserID != u || r.Count(ch) != 0 {
+		t.Errorf("grace over: %+v %v", st, ok)
+	}
+}

@@ -10,6 +10,7 @@ import { ApiError } from "@/api/client";
 import { voice as voiceApi, type SfuDescription } from "@/api/voice";
 import type { VoiceState } from "@/api/types";
 import { FrameCrypto, voiceKeysFor } from "./e2ee";
+import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
 import { Playback } from "./playback";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 
@@ -42,6 +43,17 @@ interface Want {
   tag: string;
 }
 
+/** A pulled voice's counters, as getStats has them, and when. */
+interface VoiceCounts {
+  at: number;
+  received: number;
+  lost: number;
+  concealed: number;
+  samples: number;
+  jbDelay: number;
+  jbEmitted: number;
+}
+
 /** What was last reported for someone, so only changes are reported. */
 interface Shown {
   audio: MediaStream | null;
@@ -51,9 +63,23 @@ interface Shown {
 
 /** The camera is capped here, and the server charges pulls of it at this rate. */
 const CAMERA_BPS = 1_500_000;
-/** How long a dropped connection gets before ICE is restarted. */
-const RECOVER_AFTER_MS = 5_000;
-const MAX_ICE_RESTARTS = 3;
+/**
+ * How long a dropped connection gets before ICE is restarted, and how often
+ * restarts are tried while it stays down. A blip comes back by itself well
+ * within the first; a changed network (Wi-Fi to mobile) needs the restart.
+ * The connection itself is kept while the SFU keeps its tracks (see
+ * TRACKS_GONE_MS): a network that returns by then picks it straight back up.
+ */
+const RECOVER_AFTER_MS = 3_000;
+const RESTART_EVERY_MS = 8_000;
+/** Restarts that were answered yet never reconnected, before the connection is made again from nothing. */
+const MAX_ICE_RESTARTS = 4;
+/**
+ * Cloudflare lets go of tracks after 30 s without their media. A connection
+ * down this long (its media stopped a few seconds before it noticed) comes
+ * back to tracks that are gone, silent both ways, so it is made again instead.
+ */
+const TRACKS_GONE_MS = 20_000;
 /** How often the key ring is checked for a rotated key. */
 const KEY_CHECK_MS = 4_000;
 /** How long a request to chatd may take before the step gives up on it. */
@@ -66,7 +92,8 @@ const RETRY_BASE_MS = 1_000;
  * is what someone who joined a moment ago looks like.
  */
 const PULL_RETRY_BASE_MS = 400;
-const RETRY_MAX_MS = 30_000;
+/** In a call a long wait is a long silence: retries never wait more than this. */
+const RETRY_MAX_MS = 8_000;
 /** A failure this long after the last one starts the wait from the beginning again. */
 const FAILURES_FORGOTTEN_MS = 60_000;
 /**
@@ -83,6 +110,24 @@ const MAX_REPULLS = 3;
 /** A track with too few packets to judge is counted again after this long, doubling up to the most. */
 const BYPASS_RECHECK_MS = 1_000;
 const BYPASS_RECHECK_MAX_MS = { audio: 8_000, video: 20_000 };
+/** How often each pulled voice's losses are measured, and the most often a listener tells the speaker. */
+const LOSS_CHECK_MS = 2_000;
+const LOSS_REPORT_MS = 4_000;
+/**
+ * Losses are told when they last: over the checks kept (the last six seconds,
+ * some 300 packets), so the odd loss on a good link does not turn copies on.
+ * Heavy losses are told from one check (two seconds, some 100 packets).
+ */
+const LOSS_CHECKS_KEPT = 3;
+const LOSS_SPAN_MIN_PACKETS = 150;
+const LOSS_SPAN_MIN_MISSED = 6;
+const LOSS_HEAVY = 0.08;
+const LOSS_HEAVY_MIN_PACKETS = 40;
+const LOSS_HEAVY_MIN_MISSED = 4;
+/** This device's own voice is measured once it sent this many packets since the last check. */
+const UPLINK_MIN_PACKETS = 40;
+/** A pulled voice's first seconds are not counted: packets lost while a track starts say nothing about the link. */
+const LOSS_GRACE_MS = 4_000;
 /** After the server pauses video, this device leaves it alone this long before asking again. */
 const VIDEO_PAUSE_MS = 10 * 60_000;
 const VIDEO_PAUSED = "Video is paused until next month to keep calls free.";
@@ -172,10 +217,22 @@ export class SfuTransport implements VoiceTransport {
   private repulls = new Map<string, number>();
   private recoverTimer: ReturnType<typeof setTimeout> | null = null;
   private iceRestarts = 0;
+  /** When this connection, having been up, went down; null while it is up (or never was). */
+  private downSince: number | null = null;
+  private wasUp = false;
   private retry: { timer: ReturnType<typeof setTimeout>; rebuild: boolean } | null = null;
   private failures = 0;
   private lastFailure = 0;
   private videoPausedUntil = 0;
+  private lossTimer: ReturnType<typeof setInterval>;
+  /** Per pulled voice (by mid), the counters at the last few checks, oldest first. */
+  private lossSeen = new Map<string, VoiceCounts[]>();
+  /** When this device last told each speaker about losses. */
+  private lossTold = new Map<string, number>();
+  /** This device's voice at the last check: packets sent, and lost as the SFU reports. */
+  private voiceSent: { ssrc: number; sent: number; lost: number } | null = null;
+  /** How many copies this device's voice frames carry, from what listeners report. */
+  private copies = new CopyPlanner((depth) => this.crypto.setRedundancy(depth));
 
   constructor(
     private readonly meId: string,
@@ -189,6 +246,7 @@ export class SfuTransport implements VoiceTransport {
     this.refreshKeys();
     this.keyTimer = setInterval(() => this.refreshKeys(), KEY_CHECK_MS);
     this.bypassTimer = setInterval(() => void this.checkBypass(), 1_000);
+    this.lossTimer = setInterval(() => void this.checkLoss(), LOSS_CHECK_MS);
   }
 
   // --- the connection ----------------------------------------------------
@@ -316,6 +374,8 @@ export class SfuTransport implements VoiceTransport {
     if (this.retry) clearTimeout(this.retry.timer);
     this.retry = null;
     this.iceRestarts = 0;
+    this.downSince = null;
+    this.wasUp = false;
     const old = this.pc;
     old.ontrack = null;
     old.onconnectionstatechange = null;
@@ -339,36 +399,77 @@ export class SfuTransport implements VoiceTransport {
       if (this.recoverTimer) clearTimeout(this.recoverTimer);
       this.recoverTimer = null;
       this.iceRestarts = 0;
-    } else if ((state === "disconnected" || state === "failed") && !this.recoverTimer) {
-      this.recoverTimer = setTimeout(() => this.recover(pc), state === "failed" ? 0 : RECOVER_AFTER_MS);
+      this.failures = 0;
+      const downFor = this.downSince === null ? 0 : Date.now() - this.downSince;
+      this.downSince = null;
+      this.wasUp = true;
+      if (downFor >= TRACKS_GONE_MS) this.retryLater(true, 0);
+    } else if (state === "disconnected" || state === "failed") {
+      if (this.wasUp && this.downSince === null) this.downSince = Date.now();
+      if (!this.recoverTimer) this.recoverTimer = setTimeout(() => this.recover(pc), state === "failed" ? 0 : RECOVER_AFTER_MS);
     }
   }
 
-  /** A connection that stayed down: restart ICE a few times, then rebuild. */
+  /** The network looks back (the page came online, the gateway reconnected): a connection still down tries again now. */
+  nudge(): void {
+    const pc = this.pc;
+    if (this.closed) return;
+    if (this.retry?.rebuild) {
+      clearTimeout(this.retry.timer);
+      this.retry = null;
+      this.failures = 0;
+      this.rebuild();
+      return;
+    }
+    if (pc.connectionState !== "disconnected" && pc.connectionState !== "failed") return;
+    if (this.recoverTimer) clearTimeout(this.recoverTimer);
+    this.recover(pc);
+  }
+
+  /** The SFU session this device's call holds, for resuming it on a new gateway connection. */
+  currentSession(): string | null {
+    return this.sessionId;
+  }
+
+  /**
+   * A connection that stayed down: restart ICE, keeping the session, its
+   * tracks and everyone's pulls, while the connection stays open to come back
+   * by itself. Only restarts that were answered and still did not reconnect,
+   * or a session the SFU no longer has, make it again from nothing.
+   */
   private recover(pc: RTCPeerConnection): void {
     this.recoverTimer = null;
     if (pc !== this.pc || this.closed) return;
     const state = pc.connectionState;
     if (state !== "disconnected" && state !== "failed") return;
-    if (this.iceRestarts >= MAX_ICE_RESTARTS || !this.sessionId) {
-      this.retryLater(true);
+    const anchor = (["audio", "video", "screen", "screen_audio"] as const).find((k) => this.published.has(k) && this.senders[k]?.mid);
+    if (this.iceRestarts >= MAX_ICE_RESTARTS || !this.sessionId || !anchor) {
+      this.retryLater(true, 0);
       return;
     }
-    this.iceRestarts++;
+    this.recoverTimer = setTimeout(() => this.recover(pc), RESTART_EVERY_MS);
+    const session = this.sessionId;
+    const mid = this.senders[anchor]!.mid!;
     void this.enqueue(async () => {
-      const session = this.sessionId;
-      if (!session) return;
-      pc.restartIce();
-      const offer = await pc.createOffer({ iceRestart: true });
-      this.live(pc);
-      await pc.setLocalDescription(offer);
-      this.live(pc);
-      const res = await voiceApi.sfuRenegotiate({ session_id: session, description: description(pc.localDescription) }, timeout());
-      this.live(pc);
-      if (!res.description) throw new Error("no answer to the ICE restart");
-      await pc.setRemoteDescription(res.description);
+      try {
+        pc.restartIce();
+        const offer = await pc.createOffer({ iceRestart: true });
+        this.live(pc);
+        await pc.setLocalDescription(offer);
+        this.live(pc);
+        const res = await voiceApi.sfuRestart({ session_id: session, offer: description(pc.localDescription), mid, kind: anchor }, timeout());
+        this.live(pc);
+        if (!res.answer) throw new Error("no answer to the ICE restart");
+        await pc.setRemoteDescription(res.answer);
+        this.iceRestarts++;
+      } catch (err) {
+        if (err instanceof Stale) throw err;
+        if (pc.signalingState === "have-local-offer") await pc.setLocalDescription({ type: "rollback" }).catch(() => {});
+        // a session the SFU let go of cannot come back; anything else (the network still down) waits for the next try
+        if (err instanceof ApiError && (err.code === "sfu_session_gone" || err.code === "not_in_voice")) throw err;
+        console.warn("voice: ICE restart did not go through", err);
+      }
     });
-    this.recoverTimer = setTimeout(() => this.recover(pc), RECOVER_AFTER_MS * 2);
   }
 
   // --- publishing --------------------------------------------------------
@@ -423,7 +524,8 @@ export class SfuTransport implements VoiceTransport {
       if (this.senders[kind]) continue;
       const tr = pc.addTransceiver(this.trackFor(kind) ?? media(kind), { direction: "sendonly" });
       if (media(kind) === "video") preferVp8(tr);
-      this.crypto.protectSender(tr.sender, media(kind));
+      // the microphone's frames carry copies of the ones before when listeners lose packets
+      this.crypto.protectSender(tr.sender, media(kind), kind === "audio");
       if (kind === "video") capBitrate(tr.sender, CAMERA_BPS);
       if (kind === "screen") capBitrate(tr.sender, this.screenBitrate);
       this.senders[kind] = tr;
@@ -530,7 +632,86 @@ export class SfuTransport implements VoiceTransport {
     return [...this.peers];
   }
 
-  handleSignal(_from: string, _payload: SignalPayload): void {}
+  /** A listener says how much of this device's voice it loses, conceals and waits for; copies go out while that calls for them. */
+  handleSignal(from: string, payload: SignalPayload): void {
+    const num = (v: unknown, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : null);
+    const loss = num(payload?.voice_loss, 1);
+    if (loss === null) return;
+    const span = num(payload.voice_span, 60_000);
+    this.copies.report(from, { loss, conceal: num(payload.voice_conceal, 1) ?? loss, delay: num(payload.voice_delay, 60_000) ?? 0, ...(span === null ? {} : { span }) }, Date.now());
+  }
+
+  /** Measures what each pulled voice loses, and tells its speaker when it is enough to matter. */
+  private async checkLoss(): Promise<void> {
+    if (this.closed || !this.sessionId) return;
+    const pc = this.pc;
+    const report = await pc.getStats().catch(() => null);
+    if (!report || pc !== this.pc || this.closed) return;
+    const now = Date.now();
+    let mine: { ssrc: number; sent: number } | null = null;
+    const lostBySsrc = new Map<number, number>();
+    for (const r of report.values() as IterableIterator<RTCStats & { kind?: string; mid?: string; ssrc?: number; packetsSent?: number; packetsLost?: number }>) {
+      if (r.type === "candidate-pair" && (r as RTCIceCandidatePairStats).nominated && (r as RTCIceCandidatePairStats).state === "succeeded") {
+        const rtt = (r as RTCIceCandidatePairStats).currentRoundTripTime;
+        if (typeof rtt === "number") this.copies.roundTrip(rtt * 1000);
+      }
+      if (r.type === "outbound-rtp" && r.kind === "audio" && r.mid !== undefined && r.mid === this.senders.audio?.mid && r.ssrc !== undefined) mine = { ssrc: r.ssrc, sent: r.packetsSent ?? 0 };
+      if (r.type === "remote-inbound-rtp" && r.kind === "audio" && r.ssrc !== undefined && typeof r.packetsLost === "number") lostBySsrc.set(r.ssrc, r.packetsLost);
+    }
+    // what the SFU lost of this device's voice since the last check, from the receiver reports it sends every second
+    const lost = mine ? lostBySsrc.get(mine.ssrc) : undefined;
+    if (mine && lost !== undefined) {
+      const was = this.voiceSent;
+      this.voiceSent = { ssrc: mine.ssrc, sent: mine.sent, lost };
+      if (was && was.ssrc === mine.ssrc && mine.sent - was.sent >= UPLINK_MIN_PACKETS) this.copies.uplink(Math.max(0, Math.min(1, (lost - was.lost) / (mine.sent - was.sent))), now);
+    }
+    for (const r of report.values() as IterableIterator<RTCStats>) {
+      if (r.type !== "inbound-rtp" || (r as RTCInboundRtpStreamStats).kind !== "audio") continue;
+      const s = r as RTCInboundRtpStreamStats & { mid?: string; concealedSamples?: number; totalSamplesReceived?: number; jitterBufferDelay?: number; jitterBufferEmittedCount?: number };
+      const p = s.mid ? this.byMid.get(s.mid) : undefined;
+      if (!p || p.kind !== "audio" || !s.mid) continue;
+      const counts: VoiceCounts = {
+        at: now,
+        received: s.packetsReceived ?? 0,
+        lost: Math.max(0, s.packetsLost ?? 0),
+        concealed: s.concealedSamples ?? 0,
+        samples: s.totalSamplesReceived ?? 0,
+        jbDelay: s.jitterBufferDelay ?? 0,
+        jbEmitted: s.jitterBufferEmittedCount ?? 0,
+      };
+      const seen = this.lossSeen.get(s.mid) ?? [];
+      const last = seen[seen.length - 1];
+      // counters that went back are a new stream: what came before says nothing about it
+      const kept = last && counts.received >= last.received ? seen : [];
+      this.lossSeen.set(s.mid, [...kept, counts].slice(-LOSS_CHECKS_KEPT));
+      const told = this.lossTold.get(p.userId) ?? 0;
+      if (kept.length === 0 || p.arrivedAt === undefined || now - p.arrivedAt < LOSS_GRACE_MS || now - told < LOSS_REPORT_MS) continue;
+      const over = (from: VoiceCounts) => {
+        const received = counts.received - from.received;
+        // packets that never came; ones that came too late to play are jitter, and a copy would come later still
+        const missed = Math.max(0, counts.lost - from.lost);
+        return { from, total: received + missed, missed, loss: received + missed > 0 ? missed / (received + missed) : 0 };
+      };
+      const recent = over(kept[kept.length - 1]!);
+      // since this speaker was last told, so reports do not overlap and each says what the stretch after the one before was like
+      const span = over(kept.find((c) => c.at >= told) ?? kept[0]!);
+      const tell =
+        recent.total >= LOSS_HEAVY_MIN_PACKETS && recent.missed >= LOSS_HEAVY_MIN_MISSED && recent.loss >= LOSS_HEAVY
+          ? recent
+          : span.total >= LOSS_SPAN_MIN_PACKETS && span.missed >= LOSS_SPAN_MIN_MISSED && span.loss >= LOSS_ONE_COPY
+            ? span
+            : null;
+      if (!tell) continue;
+      this.lossTold.set(p.userId, now);
+      const samples = counts.samples - tell.from.samples;
+      const emitted = counts.jbEmitted - tell.from.jbEmitted;
+      const conceal = samples > 0 ? Math.max(0, Math.min(1, (counts.concealed - tell.from.concealed) / samples)) : tell.loss;
+      const wait = emitted > 0 ? ((counts.jbDelay - tell.from.jbDelay) / emitted) * 1000 : 0;
+      const share = (v: number) => Math.round(v * 1000) / 1000;
+      this.events.onSignal(p.userId, { voice_loss: share(tell.loss), voice_conceal: share(conceal), voice_delay: Math.round(wait + (this.copies.rtt() ?? 0)), voice_span: now - tell.from.at });
+    }
+    this.copies.update(now);
+  }
 
   setRoster(states: VoiceState[]): void {
     this.roster = new Map(states.filter((s) => s.channel_id === this.channelId).map((s) => [s.user_id, s]));
@@ -833,6 +1014,7 @@ export class SfuTransport implements VoiceTransport {
     this.generation++;
     clearInterval(this.keyTimer);
     clearInterval(this.bypassTimer);
+    clearInterval(this.lossTimer);
     if (this.recoverTimer) clearTimeout(this.recoverTimer);
     if (this.retry) clearTimeout(this.retry.timer);
     this.retry = null;

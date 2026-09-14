@@ -203,8 +203,12 @@ function stopRelay(): void {
   relayedTo.clear();
 }
 
-/** `resume` marks a rejoin after a reconnect, so the server does not treat it as a new call. */
-function sendState(channelId: string | null, resume = false): void {
+/**
+ * `resume` marks a rejoin after a reconnect, so the server does not treat it
+ * as a new call; with `sfuSession` it asks for the very call this device
+ * still holds, which the server keeps a while for it.
+ */
+function sendState(channelId: string | null, resume = false, sfuSession?: string): void {
   const local = useVoiceLocal.getState();
   const st = useVoice.getState();
   gateway()?.send("voice_state", {
@@ -216,6 +220,7 @@ function sendState(channelId: string | null, resume = false): void {
     // how this device connects, so the server can turn away a page set up for the other kind
     ...(channelId ? { sfu: session?.transport instanceof SfuTransport } : {}),
     ...(resume ? { resume: true } : {}),
+    ...(resume && sfuSession ? { sfu_session: sfuSession } : {}),
   });
 }
 
@@ -836,6 +841,15 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       if (session && e.d.channel_id === session.channelId) session.transport.handleSignal(e.d.from, e.d.payload as SignalPayload);
       return;
     }
+    case "voice_resumed": {
+      const s = session;
+      // kept: the call went on all along; otherwise the server let it go, and it starts over as after any reconnect
+      if (!s || e.d.kept || s.channelId !== e.d.channel_id) return;
+      for (const id of s.transport.peerIds()) s.transport.removePeer(id), store.removePeer(id);
+      store.setMine(null);
+      s.transport.reconnected();
+      return;
+    }
     case "voice_error":
       if (SIGNAL_ERRORS.has(e.d.code)) {
         console.warn("voice: signal refused:", e.d.code);
@@ -887,12 +901,24 @@ export function onReadyVoice(list: VoiceState[], sessionId?: string): void {
   // after a reconnect the server has forgotten us: rejoin the room we were in
   // (a join still asking for the mic announces itself when it gets there)
   const s = session;
-  if (s?.announced) {
-    for (const id of s.transport.peerIds()) s.transport.removePeer(id), useVoice.getState().removePeer(id);
-    useVoice.getState().setMine(null);
-    s.transport.reconnected();
-    sendState(s.channelId, true);
+  if (!s?.announced) return;
+  // Media through the SFU never went through the gateway: the call carries on while it reconnects,
+  // and the server kept it for this device. Ask for it back as it is; voice_resumed says whether it was.
+  const held = s.transport.currentSession?.() ?? null;
+  if (held) {
+    syncPeers();
+    const everyone = participantsOf(useVoice.getState().byChannel, s.channelId);
+    for (const p of everyone) if (p.user_id !== me()) s.transport.addPeer(p.user_id);
+    s.transport.setRoster(everyone);
+    sendState(s.channelId, true, held);
+    // the network is back, so a connection that dropped with it tries again now
+    s.transport.nudge?.();
+    return;
   }
+  for (const id of s.transport.peerIds()) s.transport.removePeer(id), useVoice.getState().removePeer(id);
+  useVoice.getState().setMine(null);
+  s.transport.reconnected();
+  sendState(s.channelId, true);
 }
 
 /** Declines an incoming DM call. */
@@ -970,6 +996,8 @@ export function installVoice(): void {
   window.addEventListener("beforeunload", () => {
     if (session?.announced) sendState(null);
   });
+  // a call whose connection dropped with the network tries again the moment the network is back
+  window.addEventListener("online", () => session?.transport.nudge?.());
   // a channel that disappears takes its call with it
   useChannels.subscribe((st, prev) => {
     const s = session;

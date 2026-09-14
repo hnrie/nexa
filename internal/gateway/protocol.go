@@ -81,6 +81,8 @@ const (
 	EvSessionExpired     = "session_expired"
 	// EvGuestEnded tells a guest why their time in the call is over, just before the socket closes.
 	EvGuestEnded = "guest_ended"
+	// EvVoiceResumed answers a device resuming its call after a reconnect: kept, or start over.
+	EvVoiceResumed = "voice_resumed"
 )
 
 // Presence is a user's visible status.

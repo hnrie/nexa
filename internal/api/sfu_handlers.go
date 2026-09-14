@@ -30,6 +30,7 @@ func (s *Server) sfuRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/voice/sfu/subscribe", s.callAuthed(s.handleSFUSubscribe))
 	mux.Handle("PUT /api/v1/voice/sfu/renegotiate", s.callAuthed(s.handleSFURenegotiate))
 	mux.Handle("PUT /api/v1/voice/sfu/close", s.callAuthed(s.handleSFUClose))
+	mux.Handle("PUT /api/v1/voice/sfu/restart", s.callAuthed(s.handleSFURestart))
 }
 
 // sfuCaller returns the caller and their call on this device, answering the
@@ -323,6 +324,51 @@ func (s *Server) handleSFURenegotiate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"description": d})
+}
+
+type sfuRestartReq struct {
+	SessionID string                       `json:"session_id"`
+	Offer     *realtime.SessionDescription `json:"offer"`
+	// Mid and Kind name one track the session already publishes. Cloudflare
+	// takes an ICE restart's offer only along with a track, and the same
+	// track announced again changes nothing for the people pulling it.
+	Mid  string `json:"mid"`
+	Kind string `json:"kind"`
+}
+
+// handleSFURestart answers an ICE restart: a device whose network changed
+// keeps its session, its tracks and everyone's pulls, and only finds a new
+// path to the SFU.
+func (s *Server) handleSFURestart(w http.ResponseWriter, r *http.Request) {
+	_, st, ok := s.sfuCaller(w, r)
+	if !ok {
+		return
+	}
+	var req sfuRestartReq
+	if err := ReadJSON(w, r, &req, maxSDPBytes+4<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if req.SessionID == "" || req.SessionID != st.SFUSession {
+		WriteError(w, E(http.StatusConflict, "sfu_session_gone", "That call session has ended. Start it again."))
+		return
+	}
+	if !validDescription(req.Offer, "offer") || req.Mid == "" || len(req.Mid) > 16 || !realtime.ValidKind(req.Kind) {
+		WriteError(w, E(http.StatusBadRequest, "bad_request", "A restart needs an offer and a published track's mid and kind."))
+		return
+	}
+	name := st.Tracks.Get(req.Kind)
+	if name == "" {
+		WriteError(w, E(http.StatusConflict, "not_published", "That track is not published."))
+		return
+	}
+	res, err := s.Realtime.AddTracks(r.Context(), req.SessionID, req.Offer, []realtime.Track{{Location: "local", Mid: req.Mid, TrackName: name}})
+	if err != nil {
+		s.Log.Warn("sfu restart", "err", err)
+		sfuUnavailable(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"answer": res.Description})
 }
 
 type sfuCloseReq struct {

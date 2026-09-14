@@ -21,6 +21,12 @@ import (
 
 const maxSignalBytes = 64 << 10
 
+// voiceGrace is how long a call through the SFU outlives the gateway
+// connection that held it. Media does not go through the gateway, so a phone
+// changing networks or a socket that stalled keeps talking meanwhile, and its
+// device picks the call up on the new connection with a resume.
+var voiceGrace = 20 * time.Second
+
 // voiceStatePayload is what clients receive; channel_id is null when a user leaves.
 type voiceStatePayload struct {
 	UserID       ids.ID  `json:"user_id"`
@@ -102,6 +108,16 @@ func (s *Server) WireVoice(hub *gateway.Hub) {
 	// the same session, or a dead socket reaped after a reconnect already
 	// rejoined, must leave the live call alone.
 	hub.OnConnClose = func(ctx context.Context, uid, connID ids.ID) {
+		if st, ok := s.Voice.Get(uid); ok && st.ConnID == connID && st.SFUSession != "" {
+			if held, ok := s.Voice.Detach(uid, connID); ok {
+				time.AfterFunc(voiceGrace, func() {
+					if left, ok := s.Voice.LeaveDetached(uid, held.SFUSession); ok {
+						s.broadcastVoiceLeave(context.Background(), left)
+					}
+				})
+				return
+			}
+		}
 		if st, ok := s.Voice.LeaveConn(uid, connID); ok {
 			s.broadcastVoiceLeave(ctx, st)
 		}
@@ -184,6 +200,9 @@ type voiceStateReq struct {
 	Resume bool `json:"resume"`
 	// SFU says the device connects through the SFU rather than peer to peer.
 	SFU bool `json:"sfu"`
+	// SFUSession, with Resume, is the SFU session the device still holds: the
+	// proof that it is the device whose call waits for it after a reconnect.
+	SFUSession string `json:"sfu_session"`
 }
 
 type voiceSignalReq struct {
@@ -244,6 +263,23 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 				voiceErr(c, "sfu_off", "Calls here have changed. Join again.")
 			}
 			return
+		}
+		// The device holding this call through the SFU, back on a new gateway
+		// connection: the call is handed to it as it is, media and all, rather
+		// than ended and started over. The page hears first whether that worked.
+		if req.Resume && req.SFUSession != "" {
+			if inSame {
+				if st, ok := s.Voice.Resume(me.ID, c.SessionID(), req.SFUSession, c.ID()); ok {
+					st, _ = s.Voice.Update(me.ID, func(x *voice.State) {
+						x.SelfMute, x.SelfDeaf, x.Video, x.Streaming = req.SelfMute, req.SelfDeaf, req.Video, req.Streaming
+					})
+					c.Send(gateway.EvVoiceResumed, map[string]any{"channel_id": ch.ID, "kept": true})
+					s.sfuSyncLive(st)
+					s.Bcast.EmitUsers(s.voiceAudience(ctx, ch), "voice_state", statePayload(st))
+					return
+				}
+			}
+			c.Send(gateway.EvVoiceResumed, map[string]any{"channel_id": ch.ID, "kept": false})
 		}
 		// server mutes belong to one server: they follow a move inside it,
 		// but nobody could lift them in a DM call or in another server

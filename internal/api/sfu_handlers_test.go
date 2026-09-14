@@ -267,3 +267,117 @@ func TestSFUOffWithoutKeys(t *testing.T) {
 		t.Errorf("ice without the SFU: %v", body)
 	}
 }
+
+func TestSFUIceRestart(t *testing.T) {
+	srv, ts := newTestServer(t)
+	_, cf := newRealtimeStandIn(t)
+	srv.Realtime = realtime.New("app", "secret")
+	srv.Realtime.Base = cf.URL
+	srv.Meter = realtime.NewMeter(srv.Store, 1000)
+	tokA, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tokA, "Calls")
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	ga := connectGW(t, ts, tokA)
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
+	ga.next("voice_state", 3*time.Second)
+	_, body := do(t, ts, "POST", "/api/v1/voice/sfu/session", tokA, nil)
+	sess, _ := body["session_id"].(string)
+	restart := func(session, mid, kind string) (int, map[string]any) {
+		res, body := do(t, ts, "PUT", "/api/v1/voice/sfu/restart", tokA, map[string]any{"session_id": session, "offer": offerSDP, "mid": mid, "kind": kind})
+		return res.StatusCode, body
+	}
+	// nothing published yet: nothing to carry the restart
+	if code, body := restart(sess, "0", "audio"); code != 409 || errCode(body) != "not_published" {
+		t.Errorf("restart before publishing: %d %v", code, body)
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/voice/sfu/publish", tokA, map[string]any{"session_id": sess, "offer": offerSDP, "tracks": []map[string]any{{"mid": "0", "kind": "audio"}}}); res.StatusCode != 200 {
+		t.Fatalf("publish: %d %v", res.StatusCode, body)
+	}
+	if code, body := restart(sess, "0", "audio"); code != 200 || body["answer"] == nil {
+		t.Errorf("restart: %d %v", code, body)
+	}
+	if code, body := restart("another", "0", "audio"); code != 409 || errCode(body) != "sfu_session_gone" {
+		t.Errorf("restart of another session: %d %v", code, body)
+	}
+	if code, _ := restart(sess, "", "audio"); code != 400 {
+		t.Errorf("restart without a mid: %d", code)
+	}
+}
+
+func TestCallSurvivesAGatewayReconnect(t *testing.T) {
+	srv, ts := newTestServer(t)
+	rt, cf := newRealtimeStandIn(t)
+	srv.Realtime = realtime.New("app", "secret")
+	srv.Realtime.Base = cf.URL
+	srv.Meter = realtime.NewMeter(srv.Store, 1000)
+	prev := voiceGrace
+	voiceGrace = 600 * time.Millisecond
+	t.Cleanup(func() { voiceGrace = prev })
+
+	tokA, idA := register(t, ts, "alice")
+	tokB, _ := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "Calls")
+	general := channelNamed(view, "general")["id"].(string)
+	voiceCh := channelNamed(view, "General")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	gb := connectGW(t, ts, tokB)
+	ga := connectGW(t, ts, tokA)
+	ga.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
+	ga.next("voice_state", 3*time.Second)
+	gb.next("voice_state", 3*time.Second)
+	_, body := do(t, ts, "POST", "/api/v1/voice/sfu/session", tokA, nil)
+	sess := body["session_id"].(string)
+	do(t, ts, "POST", "/api/v1/voice/sfu/publish", tokA, map[string]any{"session_id": sess, "offer": offerSDP, "tracks": []map[string]any{{"mid": "0", "kind": "audio"}}})
+	gb.next("voice_state", 3*time.Second)
+
+	// alice's gateway drops; her call waits for her, media and all
+	ga.close()
+	if ev := gb.next("voice_state", 300*time.Millisecond); ev != nil && ev["channel_id"] == nil {
+		t.Fatalf("alice left at once: %v", ev)
+	}
+	ga2 := connectGW(t, ts, tokA)
+	ga2.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true, "resume": true, "sfu_session": sess, "self_mute": true})
+	if ev := ga2.next("voice_resumed", 3*time.Second); ev == nil || ev["kept"] != true {
+		t.Fatalf("resume not kept: %v", ev)
+	}
+	if ev := gb.next("voice_state", 3*time.Second); ev == nil || ev["user_id"] != idA || ev["channel_id"] != voiceCh || ev["self_mute"] != true || ev["media"] == nil {
+		t.Fatalf("bob's view after the resume: %v", ev)
+	}
+	time.Sleep(900 * time.Millisecond)
+	if st, ok := srv.Voice.Get(mustParseID(t, idA)); !ok || st.SFUSession != sess {
+		t.Fatalf("the grace running out ended a resumed call: %+v %v", st, ok)
+	}
+	if rt.wasClosed(sess) {
+		t.Error("the resumed session was closed at the SFU")
+	}
+
+	// a resume with the wrong session starts over, and says so first
+	ga2.close()
+	ga3 := connectGW(t, ts, tokA)
+	ga3.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true, "resume": true, "sfu_session": "not-it"})
+	if ev := ga3.next("voice_resumed", 3*time.Second); ev == nil || ev["kept"] != false {
+		t.Fatalf("a wrong session was kept: %v", ev)
+	}
+	if st, _ := srv.Voice.Get(mustParseID(t, idA)); st.SFUSession != "" {
+		t.Errorf("the start-over kept the old session: %+v", st)
+	}
+
+	// nobody coming back: the call ends once the grace is over
+	ga3.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "sfu": true})
+	_, body = do(t, ts, "POST", "/api/v1/voice/sfu/session", tokA, nil)
+	sess2 := body["session_id"].(string)
+	ga3.close()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		ev := gb.next("voice_state", time.Until(deadline))
+		if ev == nil {
+			t.Fatal("the call never ended after the grace")
+		}
+		if ev["user_id"] == idA && ev["channel_id"] == nil {
+			break
+		}
+	}
+	if !rt.wasClosed(sess2) {
+		t.Error("the abandoned session was not closed at the SFU")
+	}
+}

@@ -68,8 +68,14 @@ export class FrameCrypto {
     this.post({ type: "keys", keys: k.keys, send: k.send });
   }
 
-  protectSender(sender: RTCRtpSender, kind: FrameKind): void {
-    this.protect(sender, "encrypt", kind);
+  /** How many earlier frames each outgoing voice frame carries copies of, 0 to 2. */
+  setRedundancy(depth: number): void {
+    this.post({ type: "redundancy", depth });
+  }
+
+  /** `voice` marks the microphone's sender, whose frames carry copies for lossy links. */
+  protectSender(sender: RTCRtpSender, kind: FrameKind, voice = false): void {
+    this.protect(sender, "encrypt", kind, undefined, voice);
   }
 
   /** `id` names this receiver in onSeen; it must be new for every receiver, since a mid can come round again. */
@@ -85,13 +91,14 @@ export class FrameCrypto {
     this.worker.terminate();
   }
 
-  private protect(end: RTCRtpSender | RTCRtpReceiver, op: "encrypt" | "decrypt", kind: FrameKind, id?: string): void {
+  private protect(end: RTCRtpSender | RTCRtpReceiver, op: "encrypt" | "decrypt", kind: FrameKind, id?: string, voice = false): void {
+    const extra = { ...(id === undefined ? {} : { id }), ...(voice ? { voice } : {}) };
     if (FrameCrypto.scriptTransform()) {
-      end.transform = new RTCRtpScriptTransform(this.worker, id === undefined ? { op, kind } : { op, kind, id });
+      end.transform = new RTCRtpScriptTransform(this.worker, { op, kind, ...extra });
       return;
     }
     const { readable, writable } = (end as unknown as LegacyEncoded).createEncodedStreams();
-    this.worker.postMessage({ type: "stream", op, kind, ...(id === undefined ? {} : { id }), readable, writable } satisfies FrameCryptoMessage, [readable as unknown as Transferable, writable as unknown as Transferable]);
+    this.worker.postMessage({ type: "stream", op, kind, ...extra, readable, writable } satisfies FrameCryptoMessage, [readable as unknown as Transferable, writable as unknown as Transferable]);
   }
 
   private post(msg: FrameCryptoMessage): void {

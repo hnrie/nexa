@@ -12,6 +12,13 @@ export interface SignalPayload {
   candidate?: RTCIceCandidateInit | null;
   /** Which of my stream ids carries which kind, so the receiver can label tracks. */
   streams?: Partial<Record<MediaKind, string>>;
+  /** Through the SFU: the share of your voice's packets this listener is losing, so you send copies, */
+  voice_loss?: number;
+  /** and the share of your audio it is concealing, and how long it waits to play it (ms), so copies that make things worse go back; */
+  voice_conceal?: number;
+  voice_delay?: number;
+  /** all over this stretch of time before the report (ms). */
+  voice_span?: number;
 }
 
 export interface TransportEvents {
@@ -40,6 +47,10 @@ export interface VoiceTransport {
   reconnected(): void;
   /** A moderator moved this device's call to another channel. */
   moveTo(channelId: string): void;
+  /** The network looks back: whatever is down tries again now. */
+  nudge?(): void;
+  /** The SFU session of this device's call, which a reconnect can resume; null peer to peer. */
+  currentSession?(): string | null;
   setWatching(userId: string, on: boolean): void;
   setVolume(userId: string, pct: number): void;
   setLocalMute(userId: string, on: boolean): void;
