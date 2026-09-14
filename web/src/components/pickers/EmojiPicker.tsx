@@ -7,7 +7,8 @@ import { twemojiCandidates } from "@/lib/twemoji";
 import { emojiToken, packEmoji, packImageUrl, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
-import { TONES, emojiGroups, emojiLoaded, loadEmoji, searchEmoji, withTone, type EmojiEntry } from "./emojiIndex";
+import { Twemoji } from "@/components/common/Twemoji";
+import { TONE_NAMES, emojiGroups, emojiLoaded, loadEmoji, searchEmoji, spriteStyle, withTone, type EmojiEntry } from "./emojiIndex";
 import s from "./Picker.module.css";
 
 /**
@@ -50,8 +51,10 @@ type Row = { kind: "head"; key: string; title: string; top: number } | { kind: "
 
 const CELL = 40;
 const HEAD = 32;
+/** How big an emoji is drawn inside its cell. */
+const PICTURE = 32;
 /** How far past the visible part rows are drawn, so a fast scroll does not show gaps. */
-const OVERSCAN = 240;
+const OVERSCAN = 600;
 const GRID_PADDING = 16;
 
 /**
@@ -84,10 +87,12 @@ const CellButton = memo(function CellButton({ cell, tone, hover, onPick }: { cel
   const enter = () => hover.set(cell);
   if (cell.kind === "unicode") {
     const text = withTone(cell.e, tone);
-    const src = unicodeSrc(text);
+    // a piece of a sprite sheet: an SVG picture per cell stalled fast scrolling (see tools/twemoji_sprites.py)
+    const sprite = spriteStyle(text, PICTURE);
+    const src = sprite ? undefined : unicodeSrc(text);
     return (
       <button className={s.cell} data-emoji={text} data-label={cell.e.label} title={`:${cell.e.shortcodes[0] ?? cell.e.label}:`} onMouseEnter={enter} onFocus={enter} onClick={() => onPick(cell)}>
-        {src ? <img className={s.cellImg} src={src} alt={text} draggable={false} decoding="async" /> : <span>{text}</span>}
+        {sprite ? <span className={s.sprite} style={sprite} role="img" aria-label={text} /> : src ? <img className={s.cellImg} src={src} alt={text} draggable={false} decoding="async" /> : <span>{text}</span>}
       </button>
     );
   }
@@ -131,6 +136,79 @@ function Inspector({ hover, tone }: { hover: HoverStore; tone: number }) {
   );
 }
 
+/** The raised hand in each skin tone, as the tone button draws them. */
+const HANDS = ["\u270b", "\u270b\u{1f3fb}", "\u270b\u{1f3fc}", "\u270b\u{1f3fd}", "\u270b\u{1f3fe}", "\u270b\u{1f3ff}"];
+
+/**
+ * The skin tone button beside the search box: a hand in the chosen tone that
+ * opens a column of hands in every tone over the grid, as Discord's does.
+ */
+function ToneSelector({ tone, onChange }: { tone: number; onChange: (tone: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    menu.current?.querySelector<HTMLButtonElement>("[aria-checked=true]")?.focus();
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    // Escape closes this before it reaches the picker's own handler, which would close the whole picker
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      wrap.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    };
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
+
+  const move = (e: React.KeyboardEvent) => {
+    const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const items = [...(menu.current?.querySelectorAll<HTMLButtonElement>("[role=menuitemradio]") ?? [])];
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    items[(at + step + items.length) % items.length]?.focus();
+  };
+
+  return (
+    <div className={s.toneWrap} ref={wrap}>
+      <button className={s.tone} aria-label="Skin tone" title="Skin tone" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="skin-tone">
+        <Twemoji text={HANDS[tone] ?? HANDS[0]!} className={s.toneHand} />
+      </button>
+      {open ? (
+        <div className={s.toneMenu} role="menu" aria-label="Skin tone" ref={menu} onKeyDown={move}>
+          {HANDS.map((hand, i) => (
+            <button
+              key={hand}
+              className={s.toneOption}
+              role="menuitemradio"
+              aria-checked={i === tone}
+              aria-label={`${TONE_NAMES[i]} skin tone`}
+              title={`${TONE_NAMES[i]} skin tone`}
+              data-testid={`skin-tone-${i}`}
+              onClick={() => {
+                onChange(i);
+                setOpen(false);
+              }}
+            >
+              <Twemoji text={hand} className={s.toneHand} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** The first row that ends below y. */
 function firstRowBelow(rows: Row[], y: number): number {
   let lo = 0;
@@ -151,7 +229,6 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
   const customByServer = useExpressions((x) => x.emojis);
   const servers = useServers((x) => x.byId);
   const packs = useExpressions((x) => x.packs);
-  const [toneOpen, setToneOpen] = useState(false);
   const tone = useSettings((st) => st.settings.skinTone);
   const recent = useSettings((st) => st.settings.recentEmoji);
   const patch = useSettings((st) => st.patch);
@@ -231,10 +308,17 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
     setScrollTop(0);
   }, [q]);
 
+  // one update per frame however many scroll events arrive in it
+  const scrollFrame = useRef(0);
   const onScroll = useCallback(() => {
-    const el = gridRef.current;
-    if (el) setScrollTop(el.scrollTop);
+    if (scrollFrame.current) return;
+    scrollFrame.current = requestAnimationFrame(() => {
+      scrollFrame.current = 0;
+      const el = gridRef.current;
+      if (el) setScrollTop(el.scrollTop);
+    });
   }, []);
+  useEffect(() => () => cancelAnimationFrame(scrollFrame.current), []);
 
   const pick = useCallback(
     (cell: Cell) => {
@@ -278,18 +362,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
     <>
       <div className={s.searchRow}>
         <input ref={inputRef} className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find the perfect emoji" aria-label="Search emoji" />
-        <button className={s.tone} aria-label="Skin tone" onClick={() => setToneOpen((v) => !v)}>
-          <span className={s.toneDot} style={{ background: TONES[tone] ?? TONES[0] }} />
-          {toneOpen ? (
-            <span className={s.toneMenu}>
-              {TONES.map((c, i) => (
-                <button key={c} className={s.tone} aria-label={`Skin tone ${i}`} onClick={(ev) => { ev.stopPropagation(); patch({ skinTone: i }); setToneOpen(false); }}>
-                  <span className={s.toneDot} style={{ background: c }} />
-                </button>
-              ))}
-            </span>
-          ) : null}
-        </button>
+        <ToneSelector tone={tone} onChange={(i) => patch({ skinTone: i })} />
       </div>
       <div className={s.body}>
         <div className={s.cats}>

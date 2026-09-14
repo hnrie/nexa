@@ -5,6 +5,7 @@
 .text b { font-weight: 600; }
 .download { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: var(--radius-xs); background: #fff; color: var(--brand-active); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .download:hover { background: rgba(255, 255, 255, 0.9); text-decoration: none; }
+.download:disabled { cursor: default; opacity: 0.85; }
 .other { flex: none; color: var(--on-brand); font-size: 13px; font-weight: 500; opacity: 0.9; white-space: nowrap; }
 .other:hover { opacity: 1; text-decoration: underline; }
 .close { flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--on-brand); }

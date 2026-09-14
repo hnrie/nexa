@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { showNotification } from "./notify";
+import { messageAlert, showNotification } from "./notify";
 
 function withWorker(reg: unknown) {
   Object.defineProperty(navigator, "serviceWorker", { value: { getRegistration: () => Promise.resolve(reg) }, configurable: true });
@@ -34,5 +34,20 @@ describe("showNotification", () => {
       throw new TypeError("Illegal constructor");
     };
     expect(await showNotification("Ann", { body: "hi" })).toBe(false);
+  });
+});
+
+describe("messageAlert", () => {
+  it("stays quiet in the conversation being looked at", () => {
+    expect(messageAlert(true, true)).toEqual({ sound: false, popup: false });
+  });
+
+  it("only sounds for another conversation while the app is in front", () => {
+    expect(messageAlert(true, false)).toEqual({ sound: true, popup: false });
+  });
+
+  it("notifies whenever the app is not in front, even for the open conversation", () => {
+    expect(messageAlert(false, true)).toEqual({ sound: true, popup: true });
+    expect(messageAlert(false, false)).toEqual({ sound: true, popup: true });
   });
 });

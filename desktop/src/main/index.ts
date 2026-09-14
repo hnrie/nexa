@@ -5,9 +5,9 @@
 import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import { IPC, type DesktopSettings, type Identity } from "../shared/bridge";
+import { IPC, type DesktopSettings, type Identity, type WindowState } from "../shared/bridge";
 import { BASE, ORIGIN, isAppUrl } from "./config";
-import { chooseDisplaySource, handleDisplayMedia, lockPermissions } from "./permissions";
+import { chooseDisplaySource, handleDisplayMedia, lockPermissions, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
 import { SettingsStore } from "./settings";
 import { createTray } from "./tray";
@@ -64,7 +64,7 @@ async function start(): Promise<void> {
     hidden: launchedHidden && settings.get("startMinimized"),
     ...(process.platform === "linux" ? { icon: resourcePath("icon.png") } : {}),
   });
-  handleDisplayMedia(() => win);
+  handleDisplayMedia(() => win, log);
   applicationMenu(() => win, () => void updater?.check());
 
   win.on("close", (e) => {
@@ -79,6 +79,8 @@ async function start(): Promise<void> {
   win.on("closed", () => {
     win = null;
   });
+  // the page decides whether to notify from this rather than document.hasFocus()
+  for (const event of ["focus", "blur", "show", "hide", "minimize", "restore"] as const) win.on(event as "focus", () => toPage(IPC.windowState, windowState()));
 
   createTray({
     show: showWindow,
@@ -162,10 +164,13 @@ function registerIpc(): void {
   });
 
   on(IPC.setBadge, (count: number) => setBadge(Math.max(0, Math.floor(Number(count) || 0))));
-  on(IPC.setCallActive, (active: boolean) => win?.webContents.setBackgroundThrottling(!active));
+  // the window is never slowed down in the background any more (see createMainWindow), in a call or not
+  on(IPC.setCallActive, () => {});
   // a notification clicked while the window sits in the tray or minimised brings it back
   on(IPC.focusWindow, () => showWindow());
   on(IPC.requestAttention, () => requestAttention());
+  handle(IPC.windowGetState, () => windowState());
+  handle(IPC.shareAudioFailed, () => shareAudioFailed(log));
   on(IPC.displayChoose, (requestId: string, sourceId: string | null, withAudio: boolean) => chooseDisplaySource(String(requestId), sourceId === null ? null : String(sourceId), !!withAudio));
 }
 
@@ -186,6 +191,11 @@ function requestAttention(): void {
   w.once("focus", () => {
     if (!w.isDestroyed()) w.flashFrame(false);
   });
+}
+
+function windowState(): WindowState {
+  if (!win || win.isDestroyed()) return { focused: false, visible: false, minimized: false };
+  return { focused: win.isFocused(), visible: win.isVisible(), minimized: win.isMinimized() };
 }
 
 function desktopSettings(): DesktopSettings {

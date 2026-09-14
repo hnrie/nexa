@@ -4,13 +4,14 @@
  * web/src/lib/desktopBridge.ts describes this object to the page.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import { IPC, type DesktopSettings, type DisplaySourceRequest, type Identity, type RpcActivity, type RpcState, type UpdateState } from "../shared/bridge";
+import { IPC, type DesktopSettings, type DisplaySourceRequest, type Identity, type RpcActivity, type RpcState, type UpdateState, type WindowState } from "../shared/bridge";
 
 const arg = (name: string): string => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? "";
 const origin = arg("evilion-origin");
 const version = arg("evilion-version");
 const shareAudioMode = arg("evilion-share-audio");
 const shareAudio = shareAudioMode === "own" || shareAudioMode === "all";
+const windowAudio = arg("evilion-window-audio") === "1";
 
 function listen<T>(channel: string) {
   return (cb: (payload: T) => void): (() => void) => {
@@ -26,6 +27,7 @@ if (origin && location.origin === origin) {
     platform: process.platform,
     shareAudio,
     shareAudioMode,
+    windowAudio,
     rpc: {
       getState: (): Promise<RpcState> => ipcRenderer.invoke(IPC.rpcGetState),
       setEnabled: (on: boolean): Promise<void> => ipcRenderer.invoke(IPC.rpcSetEnabled, !!on),
@@ -53,5 +55,8 @@ if (origin && location.origin === origin) {
     onTrayAction: listen<"mute" | "deafen">(IPC.trayAction),
     focusWindow: (): void => ipcRenderer.send(IPC.focusWindow),
     requestAttention: (): void => ipcRenderer.send(IPC.requestAttention),
+    getWindowState: (): Promise<WindowState> => ipcRenderer.invoke(IPC.windowGetState),
+    shareAudioFailed: (): Promise<boolean> => ipcRenderer.invoke(IPC.shareAudioFailed),
+    onWindowState: listen<WindowState>(IPC.windowState),
   });
 }

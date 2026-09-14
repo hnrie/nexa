@@ -6,6 +6,7 @@
 import { app, BrowserWindow, Menu, clipboard, screen, shell, type ContextMenuParams, type WebContents } from "electron";
 import path from "node:path";
 import { BASE, ORIGIN, START_URL, isAppUrl } from "./config";
+import { windowAudioSupported } from "./appAudio";
 import { shareAudioMode } from "./permissions";
 import type { SettingsStore } from "./settings";
 
@@ -51,8 +52,13 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: true,
+      // A chat app works while it is not looked at. Hidden (minimised, in the
+      // tray, or covered by another window), Chromium slows a page's timers
+      // to once a minute; the connection's heartbeat fell behind, the server
+      // hung up, and messages sent meanwhile never raised a notification.
+      backgroundThrottling: false,
       // the preload only offers the bridge to pages of this origin
-      additionalArguments: [`--evilion-origin=${ORIGIN}`, `--evilion-version=${app.getVersion()}`, `--evilion-share-audio=${shareAudioMode()}`],
+      additionalArguments: [`--evilion-origin=${ORIGIN}`, `--evilion-version=${app.getVersion()}`, `--evilion-share-audio=${shareAudioMode()}`, `--evilion-window-audio=${shareAudioMode() === "own" && windowAudioSupported() ? "1" : "0"}`],
     },
   });
   if (saved?.maximized) win.maximize();

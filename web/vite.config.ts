@@ -23,6 +23,14 @@ function twemoji(): Plugin {
     configureServer(server) {
       server.middlewares.use("/twemoji", (req, res, next) => {
         const name = (req.url ?? "").replace(/^\//, "").split("?")[0] ?? "";
+        // the same list a build writes, so the dev server never asks for pictures the set lacks
+        if (name === "available.json") {
+          void readdir(TWEMOJI_DIR).then((files) => {
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(files.filter((n) => n.endsWith(".svg")).map((n) => n.slice(0, -4))));
+          }, next);
+          return;
+        }
         const file = `${TWEMOJI_DIR}/${name}`;
         if (!/^[0-9a-f-]+\.svg$/.test(name) || !existsSync(file)) return next();
         res.setHeader("Content-Type", "image/svg+xml");

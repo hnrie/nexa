@@ -1,6 +1,7 @@
 import type { Emoji, PublicUser } from "@/api/types";
 import { emojiUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
+import { Twemoji } from "@/components/common/Twemoji";
 import type { EmojiEntry } from "@/components/pickers/emojiIndex";
 import { withTone } from "@/components/pickers/emojiIndex";
 import { useEffect, useRef } from "react";
@@ -37,7 +38,7 @@ export function Autocomplete({ items, index, onHover, onPick, tone }: { items: A
             </>
           ) : it.kind === "emoji" ? (
             <>
-              <span className={s.acEmoji}>{withTone(it.entry, tone)}</span>
+              <Twemoji text={withTone(it.entry, tone)} className={s.acEmojiImg} fallbackClassName={s.acEmoji} />
               <span>:{it.entry.shortcodes[0] ?? it.entry.label}:</span>
             </>
           ) : it.kind === "customEmoji" ? (

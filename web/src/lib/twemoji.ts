@@ -107,6 +107,11 @@ export function onTwemojiIndexReady(fn: () => void): () => void {
  * artwork is known, only the spellings that exist are offered at all.
  */
 export function twemojiCandidates(text: string): string[] {
+  return twemojiFiles(text).map((c) => `${TWEMOJI_BASE}/${c}.svg`);
+}
+
+/** The artwork files an emoji may be drawn from (names without the extension), best first. */
+export function twemojiFiles(text: string): string[] {
   const codes: string[] = [];
   const first = twemojiCode(text);
   if (first) codes.push(first);
@@ -115,6 +120,5 @@ export function twemojiCandidates(text: string): string[] {
     if (stripped && stripped !== first) codes.push(stripped);
   }
   const known = available;
-  const usable = known ? codes.filter((c) => known.has(c)) : codes;
-  return usable.map((c) => `${TWEMOJI_BASE}/${c}.svg`);
+  return known ? codes.filter((c) => known.has(c)) : codes;
 }

@@ -58,7 +58,15 @@ PATCH = """
     const c = document.createElement('canvas'); c.width = 1280; c.height = 720;
     const g = c.getContext('2d'); let n = 0;
     setInterval(() => { g.fillStyle = '#223'; g.fillRect(0, 0, 1280, 720); g.fillStyle = '#5865f2'; g.fillRect((n += 8) % 1280, 200, 240, 240); g.fillStyle = '#fff'; g.font = '64px sans-serif'; g.fillText('shared screen', 420, 600); }, 66);
-    return c.captureStream(15);
+    const stream = c.captureStream(15);
+    // the share's sound: a steady tone, as a video or game would play
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator(); osc.frequency.value = 440;
+    const gain = ctx.createGain(); gain.gain.value = 0.3;
+    const dest = ctx.createMediaStreamDestination();
+    osc.connect(gain).connect(dest); osc.start();
+    stream.addTrack(dest.stream.getAudioTracks()[0]);
+    return stream;
   };
 })();
 """
@@ -133,10 +141,12 @@ def wait_until(fn, timeout, step=0.5):
 
 
 LEVEL = """
-async (userId) => {
-  // what the call actually plays for someone: the stream on its element, measured like the speaking ring
-  const el = document.querySelector(`audio[data-voice-peer='${userId}']`);
+async ([userId, attr]) => {
+  // what the call actually plays for someone: the stream on its element, measured like the speaking ring,
+  // and whether the call lets it through (sound is held silent until its frames are known to open)
+  const el = document.querySelector(`audio[${attr || 'data-voice-peer'}='${userId}']`);
   if (!el || !el.srcObject) return { el: false };
+  const held = el.getAttribute('data-held');
   const ctx = new AudioContext();
   const src = ctx.createMediaStreamSource(el.srcObject);
   const an = ctx.createAnalyser(); an.fftSize = 2048; src.connect(an);
@@ -149,18 +159,21 @@ async (userId) => {
     peak = Math.max(peak, Math.sqrt(sum / buf.length));
   }
   src.disconnect(); await ctx.close();
-  return { el: true, peak, ctx: ctx.state };
+  return { el: true, peak, ctx: ctx.state, held };
 }
 """
 
 
-def level(sess, user_id):
-    return sess.page.evaluate(LEVEL, user_id)
+def level(sess, user_id, attr="data-voice-peer"):
+    return sess.page.evaluate(LEVEL, [user_id, attr])
 
 
-def hears(sess, user_id, timeout=40):
-    """True once what this browser plays for user_id has sound in it (the fake microphone beeps)."""
-    return wait_until(lambda: (level(sess, user_id).get("peak") or 0) > 0.01, timeout, 0.5)
+def hears(sess, user_id, timeout=40, attr="data-voice-peer"):
+    """True once what this browser plays for user_id has sound in it (the fake microphone beeps) and it is not held silent."""
+    def ok():
+        lv = level(sess, user_id, attr)
+        return (lv.get("peak") or 0) > 0.01 and lv.get("held") != "true"
+    return wait_until(ok, timeout, 0.5)
 
 
 def join(sess, name, phone=False):
@@ -311,6 +324,7 @@ try:
         bob.page.click("[data-testid=watch-stream]")
         bob.page.wait_for_function("() => { const v = document.querySelector('[data-place=focus][data-kind=screen] video'); return v && v.videoWidth > 0 && v.currentTime > 0; }", timeout=30000)
         check(len(pulled_screen("bob")) == 1, f"watching pulls it: bob sees the share in {time.time() - t0:.1f}s")
+        check(hears(bob, alice_id, 20, "data-voice-screen"), f"and hears its sound, opened and let through: {level(bob, alice_id, 'data-voice-screen')}")
         bob.shot("watching")
         closes = len([x for x in sfu["bob"] if x[2].endswith("/close")])
         bob.page.hover("[data-place=focus]")
@@ -334,6 +348,8 @@ try:
         b.close()
 finally:
     srv.stop()
+bypass = [line for line in chatter if "without decryption" in line]
+print("tracks pulled again for skipping decryption:", bypass or "none")
 print("console warnings/errors:")
 for line in chatter[:40]:
     print("  ", line)

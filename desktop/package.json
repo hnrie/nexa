@@ -1,7 +1,7 @@
 {
   "name": "evilion-chat-desktop",
   "productName": "Evilion Chat",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Evilion Chat for your computer, with Rich Presence that works alongside Discord.",
   "author": "Evilion <evilionx3@proton.me>",
   "homepage": "https://chat.evilion.xyz",
@@ -23,6 +23,7 @@
     "electron-builder": "26.15.3",
     "electron-updater": "6.8.9",
     "esbuild": "0.28.2",
+    "koffi": "3.2.1",
     "typescript": "5.9.3",
     "vitest": "3.2.7",
     "ws": "8.21.3"

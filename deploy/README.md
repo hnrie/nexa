@@ -50,7 +50,7 @@ make desktop            # desktop/dist: Windows .exe, macOS .dmg/.zip (Intel and
 make publish-desktop    # copies them and the update manifests into data/desktop; no restart needed
 ```
 
-Running apps find the new version within six hours (or at once from Settings →
+Running apps find the new version within a minute and show "A new version is here" across the top (or at once from Settings →
 Desktop App → Check for updates). Windows and the AppImage install it on restart;
 the Mac build swaps itself in on restart (it is not signed, so macOS's own
 updater cannot); a .deb only says a new version is out. Builds are unsigned:

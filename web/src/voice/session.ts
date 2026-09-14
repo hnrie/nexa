@@ -7,6 +7,7 @@ import type { VoiceState } from "@/api/types";
 import type { GatewayEvent } from "@/gateway/events";
 import { gateway } from "@/gateway/session";
 import { holdReload } from "@/lib/busy";
+import { desktopBridge } from "@/lib/desktopBridge";
 import { playSound, startCalling, startRinging, stopCalling, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -553,14 +554,20 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
     const fps = quality?.fps ?? v.shareFps;
     const audio = quality?.audio ?? v.shareAudio ?? true;
     s.screenPending = true;
-    let stream: MediaStream;
+    let stream: MediaStream | null = null;
     try {
       stream = await getScreen(res, fps, audio);
-    } catch {
-      s.screenPending = false;
-      return; // the user cancelled the picker
+    } catch (err) {
+      // Cancelling the picker rejects with NotAllowedError. A share whose sound could not start
+      // rejects as a whole: the desktop app then falls back to safer sound and shares the same
+      // source again, without asking, and the share goes ahead.
+      const soundFailed = audio && err instanceof DOMException && (err.name === "NotReadableError" || err.name === "AbortError");
+      const again = soundFailed ? await desktopBridge()?.shareAudioFailed?.().catch(() => false) : false;
+      if (again && session === s) stream = await getScreen(res, fps, audio).catch(() => null);
+      if (!stream && soundFailed && session === s) useUI.getState().toast("Your screen share could not start with its sound. Try again, or turn Share audio off.", "error");
     }
     s.screenPending = false;
+    if (!stream) return;
     if (session !== s) {
       // hung up while the picker was open
       stream.getTracks().forEach((t) => t.stop());

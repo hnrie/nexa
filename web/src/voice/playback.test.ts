@@ -73,4 +73,24 @@ describe("screen share sound", () => {
     expect(screen!.gain.value).toBe(0);
     expect(voice!.gain.value).toBe(0);
   });
+
+  it("keeps sound not yet known to be opened silent until it is let go", () => {
+    const p = new Playback(() => {});
+    p.attachVoice("u1", new FakeStream() as unknown as MediaStream, true);
+    p.attachScreenAudio("u1", new FakeStream() as unknown as MediaStream, true);
+    const [voice, screen] = gains;
+    p.setWatching("u1", true);
+    p.setVolume("u1", 150);
+    expect(voice!.gain.value).toBe(0);
+    expect(screen!.gain.value).toBe(0);
+    p.setHeld("u1", "voice", false);
+    expect(voice!.gain.value).toBeCloseTo(1.5);
+    expect(screen!.gain.value).toBe(0);
+    p.setHeld("u1", "screen", false);
+    expect(screen!.gain.value).toBe(1);
+    // attached again without holding, it plays at once
+    p.setHeld("u1", "voice", true);
+    p.attachVoice("u1", new FakeStream() as unknown as MediaStream);
+    expect(gains[2]!.gain.value).toBeCloseTo(1.5);
+  });
 });

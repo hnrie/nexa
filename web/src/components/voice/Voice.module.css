@@ -69,13 +69,15 @@
 .controlsEnd { justify-content: flex-end; }
 .controlsMain { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .ctl { width: 52px; height: 52px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); transition: background-color 120ms ease; }
-.ctl:hover { background: var(--bg-active); }
+/* hover lifts a control a shade lighter; the translucent active colour darkened it against the black stage */
+.ctl:hover { background: color-mix(in srgb, var(--bg-surface), #fff 14%); }
 /* a control with choices: the button, and a small arrow on its corner that opens them */
 .ctlGroup { position: relative; display: inline-flex; flex: none; }
 .ctlGroup > .ctlMenuWrap { position: absolute; right: -6px; bottom: -4px; }
 .ctlMenu { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-floating); color: var(--text-strong); border: 2px solid #000; box-shadow: var(--shadow-low); }
-.ctlMenu:hover { background: var(--bg-active); }
+.ctlMenu:hover { background: color-mix(in srgb, var(--bg-floating), #fff 14%); }
 .ctl[data-off="true"], .ctl[data-on="true"] { background: #fff; color: #000; }
+.ctl[data-off="true"]:hover, .ctl[data-on="true"]:hover { background: #e3e3e6; }
 .narrowOnly { display: none; }
 .leave { background: var(--danger); color: #fff; }
 .leave:hover { background: var(--danger-hover); }

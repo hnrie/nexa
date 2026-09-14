@@ -37,12 +37,19 @@ export class Playback {
   private streamMutes = new Set<string>();
   /** Whose screen shares are being watched; the others' share audio stays silent. */
   private watching = new Set<string>();
+  /**
+   * Sound held silent until it is known to be opened ("voice:<id>", "screen:<id>"):
+   * a track whose frames skip decryption plays noise at full volume.
+   */
+  private held = new Set<string>();
 
   constructor(private onSpeaking: (userId: string, speaking: boolean) => void) {}
 
-  /** Starts playing someone's voice, replacing what played for them before. */
-  attachVoice(userId: string, stream: MediaStream): void {
+  /** Starts playing someone's voice, replacing what played for them before; `held` keeps it silent until setHeld lets it go. */
+  attachVoice(userId: string, stream: MediaStream, held = false): void {
     this.detachVoice(userId);
+    if (held) this.held.add(`voice:${userId}`);
+    else this.held.delete(`voice:${userId}`);
     const ctx = audioContext();
     // Chrome only delivers remote WebRTC audio into WebAudio when an element also plays it
     const el = document.createElement("audio");
@@ -50,6 +57,7 @@ export class Playback {
     el.muted = true;
     el.autoplay = true;
     el.setAttribute("data-voice-peer", userId);
+    el.setAttribute("data-held", String(held));
     document.body.appendChild(el);
     void el.play().catch(() => {});
     const source = ctx.createMediaStreamSource(stream);
@@ -61,8 +69,8 @@ export class Playback {
     const out: VoiceOut = { source, gain, el, meter, timer: null, speaking: false };
     out.timer = setInterval(() => {
       const loud = gate.update(meter.level() > 0.02, Date.now());
-      // someone muted just here shows no ring, straight away
-      const on = loud && !this.localMutes.has(userId);
+      // someone muted just here shows no ring, straight away, and neither does sound not yet known to be theirs
+      const on = loud && !this.localMutes.has(userId) && !this.held.has(`voice:${userId}`);
       if (on !== out.speaking) {
         out.speaking = on;
         this.onSpeaking(userId, on);
@@ -88,15 +96,18 @@ export class Playback {
     if (out.speaking) this.onSpeaking(userId, false);
   }
 
-  /** Plays the sound of someone's screen share, while it is watched. */
-  attachScreenAudio(userId: string, stream: MediaStream): void {
+  /** Plays the sound of someone's screen share, while it is watched; `held` as for attachVoice. */
+  attachScreenAudio(userId: string, stream: MediaStream, held = false): void {
     this.detachScreenAudio(userId);
+    if (held) this.held.add(`screen:${userId}`);
+    else this.held.delete(`screen:${userId}`);
     const ctx = audioContext();
     const el = document.createElement("audio");
     el.srcObject = new MediaStream(stream.getAudioTracks());
     el.muted = true;
     el.autoplay = true;
     el.setAttribute("data-voice-screen", userId);
+    el.setAttribute("data-held", String(held));
     document.body.appendChild(el);
     void el.play().catch(() => {});
     const source = ctx.createMediaStreamSource(el.srcObject as MediaStream);
@@ -145,14 +156,25 @@ export class Playback {
 
   // --- levels --------------------------------------------------------------
 
+  /** Holds someone's voice or share sound silent, or lets it play. */
+  setHeld(userId: string, kind: "voice" | "screen", held: boolean): void {
+    const key = `${kind}:${userId}`;
+    if (held === this.held.has(key)) return;
+    if (held) this.held.add(key);
+    else this.held.delete(key);
+    // said on the element too, where a test (or someone debugging) can see it
+    (kind === "voice" ? this.voices : this.screens).get(userId)?.el.setAttribute("data-held", String(held));
+    this.applyGains();
+  }
+
   private effectiveGain(userId: string): number {
-    if (this.outputMuted || this.localMutes.has(userId)) return 0;
+    if (this.outputMuted || this.localMutes.has(userId) || this.held.has(`voice:${userId}`)) return 0;
     return ((this.volumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 
   /** A share is offered, not forced: its sound only plays while it is watched, at the stream's own level. */
   private screenGain(userId: string): number {
-    if (!this.watching.has(userId) || this.outputMuted || this.streamMutes.has(userId)) return 0;
+    if (!this.watching.has(userId) || this.outputMuted || this.streamMutes.has(userId) || this.held.has(`screen:${userId}`)) return 0;
     return ((this.streamVolumes.get(userId) ?? 100) / 100) * (this.masterVolume / 100);
   }
 

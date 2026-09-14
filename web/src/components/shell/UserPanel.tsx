@@ -2,7 +2,7 @@ import { Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Settin
 import { desktopBridge } from "@/lib/desktopBridge";
 import { useDesktop } from "@/stores/desktop";
 import { useEffect, useRef, useState } from "react";
-import { Avatar, statusLabel } from "@/components/common/Avatar";
+import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
 import { gateway } from "@/gateway/session";
 import { useAuth } from "@/stores/auth";
@@ -12,11 +12,11 @@ import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
 import { micMenuItems } from "@/components/voice/deviceMenus";
 
-const OPTIONS: { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string; color: string }[] = [
-  { value: "online", label: "Online", color: "var(--status-online)" },
-  { value: "idle", label: "Idle", color: "var(--status-idle)" },
-  { value: "dnd", label: "Do Not Disturb", sub: "You will not receive any desktop notifications.", color: "var(--status-dnd)" },
-  { value: "invisible", label: "Invisible", sub: "You will appear offline but keep full access.", color: "var(--status-offline)" },
+const OPTIONS: { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string }[] = [
+  { value: "online", label: "Online" },
+  { value: "idle", label: "Idle" },
+  { value: "dnd", label: "Do Not Disturb", sub: "You will not receive any desktop notifications." },
+  { value: "invisible", label: "Invisible", sub: "You will appear offline but keep full access." },
 ];
 
 export function UserPanel() {
@@ -118,7 +118,7 @@ export function UserPanel() {
           <div className={s.sep} />
           {OPTIONS.map((o) => (
             <button key={o.value} className={s.opt} onClick={() => choose(o.value)} role="menuitemradio" aria-checked={status === o.value}>
-              <span className={s.dot} style={{ background: o.color }} />
+              <StatusDot status={o.value} size={12} />
               <span className={s.optText}>
                 <span>{o.label}</span>
                 {o.sub ? <span className={s.optSub}>{o.sub}</span> : null}

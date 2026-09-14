@@ -1,4 +1,5 @@
-import { hasTwemoji, twemojiIndexSettledPromise } from "@/lib/twemoji";
+import type { CSSProperties } from "react";
+import { hasTwemoji, twemojiFiles, twemojiIndexSettledPromise } from "@/lib/twemoji";
 
 export interface EmojiEntry {
   unicode: string;
@@ -8,6 +9,39 @@ export interface EmojiEntry {
   tags: string[];
   shortcodes: string[];
   skins?: { tone: number | number[]; unicode: string }[];
+}
+
+/** Where each picture sits in the picker's sprite sheets (tools/twemoji_sprites.py writes it). */
+interface SpriteIndex {
+  cell: number;
+  pad: number;
+  pitch: number;
+  cols: number;
+  sheets: Record<string, { w: number; h: number }>;
+  at: Record<string, [string, number]>;
+}
+
+/** The sheets themselves, as the build names them. */
+const SHEETS: Record<string, string> = Object.fromEntries(
+  Object.entries(import.meta.glob("../../assets/twemoji-sprites/*.webp", { eager: true, query: "?url", import: "default" }) as Record<string, string>).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".webp".length), url]),
+);
+
+/** Skin tone modifiers, light to dark. */
+const TONE_MODIFIERS: Record<string, number> = { "1F3FB": 1, "1F3FC": 2, "1F3FD": 3, "1F3FE": 4, "1F3FF": 5 };
+
+/**
+ * The skin tone of a variant, read from its code points: one tone, or one per
+ * person in a group. The compact data set leaves the tone field out, and
+ * without it every variant was dropped and choosing a tone changed nothing.
+ */
+export function toneOf(hexcode: string): number | number[] | undefined {
+  const tones = hexcode
+    .toUpperCase()
+    .split("-")
+    .map((h) => TONE_MODIFIERS[h])
+    .filter((t): t is number => t !== undefined);
+  if (tones.length === 0) return undefined;
+  return tones.length === 1 ? tones[0] : tones;
 }
 
 interface CompactEmoji {
@@ -37,6 +71,7 @@ let grouped: { id: number; name: string; items: EmojiEntry[] }[] = [];
 let all: EmojiEntry[] = [];
 let byShortcode = new Map<string, EmojiEntry>();
 let byUnicode = new Map<string, EmojiEntry>();
+let sprites: SpriteIndex | null = null;
 
 /**
  * Loads the dataset once (separate chunk, ~700 KB before compression),
@@ -53,7 +88,10 @@ export function loadEmoji(): Promise<EmojiEntry[]> {
     import("emojibase-data/en/shortcodes/iamcal.json"),
     import("emojibase-data/en/shortcodes/emojibase.json"),
     twemojiIndexSettledPromise(),
-  ]).then(([data, primary, secondary]) => {
+    // a picture's place in the sheets; the picker draws single pictures until it is here
+    import("@/assets/twemoji-sprites/index.json").catch(() => null),
+  ]).then(([data, primary, secondary, , spriteIndex]) => {
+    if (spriteIndex) sprites = spriteIndex.default as unknown as SpriteIndex;
     const list = (data.default as unknown as CompactEmoji[]).filter((e) => e.group !== undefined && e.group !== 2);
     const first = primary.default as unknown as Record<string, string | string[]>;
     const second = secondary.default as unknown as Record<string, string | string[]>;
@@ -70,7 +108,9 @@ export function loadEmoji(): Promise<EmojiEntry[]> {
       .map((e) => {
         const shortcodes = codes[e.hexcode] ?? [];
         const entry: EmojiEntry = { unicode: e.unicode, hexcode: e.hexcode, label: e.label, group: e.group ?? 0, tags: e.tags ?? [], shortcodes };
-        const skins = e.skins?.filter((s) => s.tone !== undefined && hasTwemoji(s.unicode)).map((s) => ({ tone: s.tone as number | number[], unicode: s.unicode }));
+        const skins = e.skins
+          ?.map((s) => ({ tone: s.tone ?? toneOf(s.hexcode), unicode: s.unicode }))
+          .filter((s): s is { tone: number | number[]; unicode: string } => s.tone !== undefined && hasTwemoji(s.unicode));
         if (skins?.length) entry.skins = skins;
         return entry;
       });
@@ -149,4 +189,29 @@ export function withTone(e: EmojiEntry, tone: number): string {
   return hit?.unicode ?? e.unicode;
 }
 
-export const TONES = ["#ffcc22", "#fadcbc", "#e0bb95", "#bf8f68", "#9b643d", "#594539"];
+/** The skin tones in the order the picker offers them, default first. */
+export const TONE_NAMES = ["Default", "Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"];
+
+/**
+ * The CSS that draws an emoji from the sprite sheets at a size, or null when
+ * it is not in them (or they have not loaded), and a single picture must do.
+ */
+export function spriteStyle(text: string, size: number): CSSProperties | null {
+  if (!sprites) return null;
+  const index = sprites;
+  const file = twemojiFiles(text).find((f) => index.at[f]);
+  const at = file ? sprites.at[file] : undefined;
+  const sheet = at ? sprites.sheets[at[0]] : undefined;
+  const url = at ? SHEETS[at[0]] : undefined;
+  if (!at || !sheet || !url) return null;
+  const scale = size / sprites.cell;
+  const col = at[1] % sprites.cols;
+  const row = Math.floor(at[1] / sprites.cols);
+  return {
+    width: size,
+    height: size,
+    backgroundImage: `url(${url})`,
+    backgroundPosition: `${-(col * sprites.pitch + sprites.pad) * scale}px ${-(row * sprites.pitch + sprites.pad) * scale}px`,
+    backgroundSize: `${sheet.w * scale}px ${sheet.h * scale}px`,
+  };
+}

@@ -86,6 +86,13 @@ export interface DisplaySourceRequest {
   audio: boolean;
 }
 
+/** Where the app's window is, as the window system says (app 1.0.3 and later). */
+export interface WindowState {
+  focused: boolean;
+  visible: boolean;
+  minimized: boolean;
+}
+
 export interface EvilionDesktop {
   version: string;
   platform: "win32" | "darwin" | "linux";
@@ -97,6 +104,8 @@ export interface EvilionDesktop {
    * cannot leave it out; "none" is no sound.
    */
   shareAudioMode?: "own" | "all" | "none" | string;
+  /** Sharing a window carries just that program's sound (app 1.0.3 and later, on Windows 10 2004+ and macOS 14.2+). */
+  windowAudio?: boolean;
   rpc: {
     getState(): Promise<RpcState>;
     setEnabled(on: boolean): Promise<void>;
@@ -131,6 +140,15 @@ export interface EvilionDesktop {
   focusWindow?(): void;
   /** Flashes the taskbar button or bounces the Dock icon until the window is looked at (app 1.0.1 and later). */
   requestAttention?(): void;
+  /** Whether the window is focused, shown and not minimised; the page's own document.hasFocus() can be wrong in the app (1.0.3 and later). */
+  getWindowState?(): Promise<WindowState>;
+  /**
+   * A share failed to start after its sound was chosen. True when the app has
+   * fallen back to safer sound and asking again shares the same source
+   * straight away, without the picker (app 1.0.3 and later).
+   */
+  shareAudioFailed?(): Promise<boolean>;
+  onWindowState?(cb: (state: WindowState) => void): () => void;
 }
 
 export function desktopBridge(): EvilionDesktop | null {

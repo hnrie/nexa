@@ -6,7 +6,7 @@ import { convForChannel } from "@/components/composer/send";
 import { voiceFrameKey } from "@/crypto/conv";
 import { ring } from "@/lib/keyring";
 import type { FrameKind } from "./frameCrypto";
-import type { FrameCryptoMessage, FrameCryptoStats } from "./frameCrypto.worker";
+import type { FrameCryptoMessage, FrameCryptoSeen, FrameCryptoStats } from "./frameCrypto.worker";
 
 interface LegacyEncoded {
   createEncodedStreams(): { readable: ReadableStream; writable: WritableStream };
@@ -35,6 +35,8 @@ export function voiceKeysFor(channelId: string): VoiceKeys | null {
 export class FrameCrypto {
   private worker: Worker;
   private latest: FrameCryptoStats = { type: "stats", sealed: 0, opened: 0, dropped: 0 };
+  /** Told when a receiver's first frame goes through its transform, and when the first one opens. */
+  onSeen: ((id: string, opened: boolean) => void) | null = null;
 
   /** Whether this browser can encrypt call frames at all. */
   static supported(): boolean {
@@ -52,8 +54,9 @@ export class FrameCrypto {
 
   constructor() {
     this.worker = new Worker(new URL("./frameCrypto.worker.ts", import.meta.url), { type: "module" });
-    this.worker.onmessage = (e: MessageEvent<FrameCryptoStats>) => {
+    this.worker.onmessage = (e: MessageEvent<FrameCryptoStats | FrameCryptoSeen>) => {
       if (e.data?.type === "stats") this.latest = e.data;
+      else if (e.data?.type === "seen") this.onSeen?.(e.data.id, e.data.opened);
     };
   }
 
@@ -65,8 +68,9 @@ export class FrameCrypto {
     this.protect(sender, "encrypt", kind);
   }
 
-  protectReceiver(receiver: RTCRtpReceiver, kind: FrameKind): void {
-    this.protect(receiver, "decrypt", kind);
+  /** `id` names this receiver in onSeen; it must be new for every receiver, since a mid can come round again. */
+  protectReceiver(receiver: RTCRtpReceiver, kind: FrameKind, id?: string): void {
+    this.protect(receiver, "decrypt", kind, id);
   }
 
   stats(): FrameCryptoStats {
@@ -77,13 +81,13 @@ export class FrameCrypto {
     this.worker.terminate();
   }
 
-  private protect(end: RTCRtpSender | RTCRtpReceiver, op: "encrypt" | "decrypt", kind: FrameKind): void {
+  private protect(end: RTCRtpSender | RTCRtpReceiver, op: "encrypt" | "decrypt", kind: FrameKind, id?: string): void {
     if (FrameCrypto.scriptTransform()) {
-      end.transform = new RTCRtpScriptTransform(this.worker, { op, kind });
+      end.transform = new RTCRtpScriptTransform(this.worker, id === undefined ? { op, kind } : { op, kind, id });
       return;
     }
     const { readable, writable } = (end as unknown as LegacyEncoded).createEncodedStreams();
-    this.worker.postMessage({ type: "stream", op, kind, readable, writable } satisfies FrameCryptoMessage, [readable as unknown as Transferable, writable as unknown as Transferable]);
+    this.worker.postMessage({ type: "stream", op, kind, ...(id === undefined ? {} : { id }), readable, writable } satisfies FrameCryptoMessage, [readable as unknown as Transferable, writable as unknown as Transferable]);
   }
 
   private post(msg: FrameCryptoMessage): void {

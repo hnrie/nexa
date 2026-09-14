@@ -118,6 +118,48 @@
   color-scheme: light;
 }
 
+/* A call's stage is black in every theme, as Discord's is. In the light theme
+   its controls, tiles and labels keep the dark palette, or they come out pale
+   on black: grey buttons whose muted state barely differs and whose icons
+   vanish on hover. Only what the light theme changes is put back; the accent
+   colour carries through. */
+[data-theme="light"] [data-dark-scope] {
+  --bg-base: #2c2d32;
+  --bg-raised: #323339;
+  --bg-surface: #393a41;
+  --bg-floating: #34353b;
+  --bg-input: #242429;
+  --bg-composer: #393a41;
+  --bg-hover: rgba(151, 151, 159, 0.08);
+  --bg-selected: rgba(151, 151, 159, 0.12);
+  --bg-active: rgba(151, 151, 159, 0.16);
+  --bg-message-hover: rgba(151, 151, 159, 0.06);
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  --text: #f3f3f4;
+  --text-strong: #ffffff;
+  --text-subtle: #c5c6ca;
+  --text-muted: #abacb2;
+  --text-channel: #999aa1;
+  --text-placeholder: #6c6d76;
+  --icon: #b5bac1;
+  --mention-fg: #cdd7ff;
+  --positive: #3d9e60;
+  --positive-hover: #2f7f4c;
+  --warning: #fdb833;
+  --danger: #da3e44;
+  --danger-hover: #b5343a;
+  --status-offline: #82838b;
+  --border-subtle: rgba(151, 151, 159, 0.12);
+  --border: rgba(151, 151, 159, 0.2);
+  --border-strong: rgba(151, 151, 159, 0.44);
+  --scroll-thumb: rgba(151, 151, 159, 0.28);
+  --scroll-thumb-hover: rgba(151, 151, 159, 0.45);
+  --shadow-low: 0 1px 4px rgba(0, 0, 0, 0.14);
+  --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.16);
+  --shadow-high: 0 12px 24px rgba(0, 0, 0, 0.24);
+  color-scheme: dark;
+}
+
 [data-theme="ash"] {
   --bg-base: #1a1a1e;
   --bg-raised: #232428;

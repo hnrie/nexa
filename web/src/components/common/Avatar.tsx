@@ -15,24 +15,40 @@ interface Props {
   style?: CSSProperties;
 }
 
+/**
+ * How big a presence dot is on an avatar of this size, and how wide a ring it
+ * cuts out of the picture around itself: 10 px with a 3 px ring on a 32 px
+ * avatar, as Discord draws it, growing more slowly than the avatar after that.
+ */
+export function statusGeometry(size: number): { dot: number; ring: number } {
+  const dot = Math.round(Math.max(8, Math.min(size * 0.3125, 10 + (size - 32) * 0.125)));
+  return { dot, ring: Math.max(2, Math.round(dot * 0.3)) };
+}
+
 /** A user or group avatar with an optional presence dot. Animated avatars play as-is. */
 export function Avatar({ id, avatarId, name, size = 32, status = null, className, square = false, style }: Props) {
   const url = avatarUrl(avatarId, size);
-  const dot = Math.max(8, Math.round(size * 0.3125));
+  const { dot, ring } = statusGeometry(size);
+  // the dot sits in the corner and bites a ring out of the picture, so it reads on any background
+  const vars = status ? ({ "--dot": `${dot}px`, "--cut": `${dot / 2 + ring}px` } as CSSProperties) : undefined;
+  const cut = status ? s.cut : "";
   return (
-    <span className={[s.wrap, className ?? ""].join(" ")} style={{ width: size, height: size, ...style }}>
+    <span className={[s.wrap, className ?? ""].join(" ")} style={{ width: size, height: size, ...vars, ...style }}>
       {url ? (
-        <img className={[s.img, square ? s.square : ""].join(" ")} src={url} alt="" width={size} height={size} draggable={false} loading="lazy" />
+        <img className={[s.img, square ? s.square : "", cut].join(" ")} src={url} alt="" width={size} height={size} draggable={false} loading="lazy" />
       ) : (
-        <span className={[s.fallback, square ? s.square : ""].join(" ")} style={{ background: avatarColor(id), fontSize: Math.max(10, size * 0.42) }} aria-hidden="true">
+        <span className={[s.fallback, square ? s.square : "", cut].join(" ")} style={{ background: avatarColor(id), fontSize: Math.max(10, size * 0.42) }} aria-hidden="true">
           {initials(name)}
         </span>
       )}
-      {status ? (
-        <span className={[s.status, s[status]].join(" ")} style={{ width: dot, height: dot, borderWidth: Math.max(2, Math.round(dot * 0.25)) }} title={statusLabel(status)} />
-      ) : null}
+      {status ? <span className={[s.status, s[status]].join(" ")} title={statusLabel(status)} data-status={status} /> : null}
     </span>
   );
+}
+
+/** A presence dot on its own, drawn in the same shapes as on avatars: for menus that list the statuses. */
+export function StatusDot({ status, size = 10, className }: { status: StatusKind; size?: number; className?: string }) {
+  return <span className={[s.status, s.alone, s[status], className ?? ""].join(" ")} style={{ "--dot": `${size}px` } as CSSProperties} aria-hidden="true" />;
 }
 
 export function statusLabel(st: StatusKind): string {

@@ -12,7 +12,8 @@ const common = {
   sourcemap: production ? false : "inline",
   minify: production,
   legalComments: "none",
-  external: ["electron"],
+  // koffi's per-platform packages hold native modules; the Windows one ships in resources/koffi instead
+  external: ["electron", "@koromix/*"],
   logLevel: "warning",
 };
 await Promise.all([

@@ -5,6 +5,7 @@ import { DMSidebar } from "@/components/sidebar/DMSidebar";
 import { ServerSidebar } from "@/components/sidebar/ServerSidebar";
 import { ModalHost } from "@/components/modals/ModalHost";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
+import { UpdateBanner } from "@/components/shell/UpdateBanner";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -159,6 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection}>{connection === "connecting" ? "Connecting…" : "Disconnected — reconnecting…"}</div>
         ) : null}
+        <UpdateBanner />
         <DownloadBanner />
         {/* the page takes what the banner leaves */}
         <div className={s.page}>{children}</div>

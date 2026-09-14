@@ -163,6 +163,19 @@ describe("GatewayClient", () => {
     expect(client.status).toBe("connecting");
   });
 
+  it("keeps a socket whose heartbeat is answered within the same millisecond", () => {
+    const { client } = make();
+    client.connect();
+    const ws = FakeWS.instances[0]!;
+    ws.open();
+    vi.advanceTimersByTime(1000);
+    // answered at once, as a server on the same machine does
+    ws.message({ t: "heartbeat_ack", d: {} });
+    vi.advanceTimersByTime(8000);
+    expect(client.status).toBe("open");
+    expect(FakeWS.instances).toHaveLength(1);
+  });
+
   it("wake() retries at once while backing off, and probes an open socket", () => {
     const { client } = make();
     client.connect();

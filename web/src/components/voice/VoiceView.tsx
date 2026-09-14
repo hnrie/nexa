@@ -577,7 +577,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
 
   if (!connected) {
     return (
-      <div className={s.root} ref={rootRef} data-embedded={embedded}>
+      <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="">
         <div className={s.lobby}>
           <div className={s.lobbyTitle}>{channel.type === "voice" ? channel.name : "Voice call"}</div>
           <div className={s.lobbySub}>{participants.length === 0 ? "No one is here yet." : `${participants.length} in voice`}</div>
@@ -596,7 +596,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
 
   const level = quality ? (quality.loss > 0.05 || quality.rtt > 400 ? "bad" : quality.rtt > 150 ? "ok" : "good") : "unknown";
   return (
-    <div className={s.root} ref={rootRef} data-embedded={embedded} data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined}>
+    <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="" data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined}>
       <div
         className={s.stage}
         ref={stageRef}

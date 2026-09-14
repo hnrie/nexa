@@ -1,9 +1,29 @@
 .wrap { position: relative; display: inline-block; flex-shrink: 0; }
 .img, .fallback { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; user-select: none; }
 .square { border-radius: 30%; }
-.status { position: absolute; right: -2px; bottom: -2px; border-radius: 50%; border-style: solid; border-color: var(--bg-base); box-sizing: border-box; background: var(--status-offline); }
+/* the ring around the presence dot, cut out of the picture rather than painted in a colour that only matches one background */
+.cut {
+  -webkit-mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
+  mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
+}
+.status { position: absolute; right: 0; bottom: 0; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--status-offline); }
+.alone { position: static; display: inline-block; flex: none; }
 .online { background: var(--status-online); }
-.idle { background: var(--status-idle); }
-.dnd { background: var(--status-dnd); }
-.invisible { background: var(--status-offline); }
-.offline { background: var(--status-offline); }
+/* idle is a crescent moon */
+.idle {
+  background: var(--status-idle);
+  -webkit-mask-image: radial-gradient(circle calc(var(--dot) * 0.375) at calc(var(--dot) * 0.25) calc(var(--dot) * 0.25), transparent 98%, #000 100%);
+  mask-image: radial-gradient(circle calc(var(--dot) * 0.375) at calc(var(--dot) * 0.25) calc(var(--dot) * 0.25), transparent 98%, #000 100%);
+}
+/* do not disturb has a bar through it */
+.dnd {
+  background: var(--status-dnd);
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% 37.5% no-repeat, linear-gradient(#000 0 0) bottom / 100% 37.5% no-repeat, linear-gradient(#000 0 0) left / 25% 100% no-repeat, linear-gradient(#000 0 0) right / 25% 100% no-repeat;
+  mask: linear-gradient(#000 0 0) top / 100% 37.5% no-repeat, linear-gradient(#000 0 0) bottom / 100% 37.5% no-repeat, linear-gradient(#000 0 0) left / 25% 100% no-repeat, linear-gradient(#000 0 0) right / 25% 100% no-repeat;
+}
+/* offline (and invisible) is a hollow ring */
+.invisible, .offline {
+  background: var(--status-offline);
+  -webkit-mask-image: radial-gradient(circle closest-side, transparent 50%, #000 calc(50% + 0.5px));
+  mask-image: radial-gradient(circle closest-side, transparent 50%, #000 calc(50% + 0.5px));
+}

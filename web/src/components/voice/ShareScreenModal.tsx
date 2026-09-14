@@ -64,6 +64,8 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
   const audioSupported = bridge?.shareAudio !== false;
   // an older Windows 10 shares the call's own sound too, which the dialog says rather than hides
   const audioHasCall = bridge?.shareAudioMode === "all";
+  // and when a shared window carries just its own program's sound
+  const windowAudio = bridge?.windowAudio === true;
   const [audio, setAudio] = useState((voice.shareAudio ?? true) && audioSupported);
   const mbps = shareBitrate(resolution, fps) / 1_000_000;
 
@@ -101,8 +103,10 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
               !audioSupported
                 ? "This computer can't share its sound."
                 : audioHasCall
-                  ? "Everyone watching hears what your computer plays. This version of Windows can't leave the call itself out, so people may hear themselves; Windows 10 22H2 or later can."
-                  : "Everyone watching hears what you're sharing. The call's own sound is left out."
+                  ? "Everyone watching hears what your computer plays. This version of Windows can't leave the call itself out, so people may hear themselves; Windows 10 version 2004 or later can."
+                  : windowAudio
+                    ? "Share a window and everyone watching hears just that app. Share a whole screen and they hear everything your computer plays. The call's own sound is always left out."
+                    : "Everyone watching hears what you're sharing. The call's own sound is left out."
             }
           />
         </div>

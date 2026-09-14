@@ -34,8 +34,12 @@ export class GatewayClient {
   private heartbeat: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
-  /** When the socket last delivered anything at all. */
-  private lastFrameAt = 0;
+  /**
+   * How many frames the socket has delivered. A heartbeat counts as answered
+   * once this moves; comparing times failed when the answer came back within
+   * the same millisecond, and a healthy socket was thrown away.
+   */
+  private framesSeen = 0;
   private queue: string[] = [];
   private ready = false;
 
@@ -88,7 +92,6 @@ export class GatewayClient {
     this.ws = ws;
     ws.onopen = () => {
       if (this.ws !== ws) return;
-      this.lastFrameAt = Date.now();
       ws.send(JSON.stringify({ op: "identify", d: { token } }));
       this.setStatus("open");
       this.flush();
@@ -96,7 +99,7 @@ export class GatewayClient {
     };
     ws.onmessage = (ev: MessageEvent) => {
       if (this.ws !== ws) return;
-      this.lastFrameAt = Date.now();
+      this.framesSeen++;
       let parsed: unknown;
       try {
         parsed = JSON.parse(typeof ev.data === "string" ? ev.data : "") as unknown;
@@ -168,10 +171,10 @@ export class GatewayClient {
     if (!ws || this._status !== "open") return;
     ws.send(JSON.stringify({ op: "heartbeat" }));
     if (this.ackTimer !== null) return;
-    const sentAt = Date.now();
+    const seen = this.framesSeen;
     this.ackTimer = this.timers().set(() => {
       this.ackTimer = null;
-      if (this.ws !== ws || this.lastFrameAt > sentAt) return;
+      if (this.ws !== ws || this.framesSeen > seen) return;
       // The connection is gone without saying so. Stop listening to it; its
       // close event, if one ever comes, is ignored like any stale socket's.
       this.ws = null;

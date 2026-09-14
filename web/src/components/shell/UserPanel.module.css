@@ -15,8 +15,7 @@
 .sep { height: 1px; background: var(--border); margin: 6px 4px; }
 .opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border-radius: var(--radius-xs); color: var(--text-subtle); font-size: 14px; font-weight: 500; text-align: left; }
 .opt:hover { background: var(--brand); color: #fff; }
-.opt:hover .dot, .opt:hover .optSub { color: inherit; }
-.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.opt:hover .optSub { color: inherit; }
 .optText { display: flex; flex-direction: column; }
 .optSub { font-size: 12px; color: var(--text-muted); font-weight: 400; }
 .danger { color: var(--danger); }

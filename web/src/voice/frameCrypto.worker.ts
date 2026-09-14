@@ -11,7 +11,7 @@ type Op = "encrypt" | "decrypt";
 
 export type FrameCryptoMessage =
   | { type: "keys"; keys: { index: number; raw: Uint8Array }[]; send: number }
-  | { type: "stream"; op: Op; kind: FrameKind; readable: ReadableStream; writable: WritableStream };
+  | { type: "stream"; op: Op; kind: FrameKind; id?: string; readable: ReadableStream; writable: WritableStream };
 
 export interface FrameCryptoStats {
   type: "stats";
@@ -20,19 +20,30 @@ export interface FrameCryptoStats {
   dropped: number;
 }
 
+/**
+ * The first frame through one receiver's transform, and the first one that
+ * opened. A receiver whose packets never show up here is playing them
+ * without opening them: sealed frames decoded as they are, which is loud noise.
+ */
+export interface FrameCryptoSeen {
+  type: "seen";
+  id: string;
+  opened: boolean;
+}
+
 interface EncodedFrame {
   data: ArrayBuffer;
   type?: string;
 }
 
 interface TransformEvent {
-  transformer: { readable: ReadableStream<EncodedFrame>; writable: WritableStream<EncodedFrame>; options: { op: Op; kind: FrameKind } };
+  transformer: { readable: ReadableStream<EncodedFrame>; writable: WritableStream<EncodedFrame>; options: { op: Op; kind: FrameKind; id?: string } };
 }
 
 interface WorkerScope {
   onmessage: ((e: MessageEvent<FrameCryptoMessage>) => void) | null;
   onrtctransform: ((e: TransformEvent) => void) | null;
-  postMessage(msg: FrameCryptoStats): void;
+  postMessage(msg: FrameCryptoStats | FrameCryptoSeen): void;
 }
 
 const scope = self as unknown as WorkerScope;
@@ -44,7 +55,10 @@ const stats: FrameCryptoStats = { type: "stats", sealed: 0, opened: 0, dropped: 
 // keys are imported in order, so frames wait behind a key change instead of racing it
 let keysReady: Promise<void> = Promise.resolve();
 
-function transformer(op: Op, kind: FrameKind): TransformStream<EncodedFrame, EncodedFrame> {
+function transformer(op: Op, kind: FrameKind, id?: string): TransformStream<EncodedFrame, EncodedFrame> {
+  // what this receiver has reported so far: any frame at all, and one that opened
+  let reportedFrame = false;
+  let reportedOpened = false;
   return new TransformStream({
     async transform(frame, controller) {
       await keysReady;
@@ -64,6 +78,11 @@ function transformer(op: Op, kind: FrameKind): TransformStream<EncodedFrame, Enc
         stats.sealed++;
       } else {
         const opened = await openFrame(keys, data, clear);
+        if (id !== undefined && (!reportedFrame || (opened && !reportedOpened))) {
+          reportedFrame = true;
+          if (opened) reportedOpened = true;
+          scope.postMessage({ type: "seen", id, opened: !!opened });
+        }
         if (!opened) {
           stats.dropped++;
           return;
@@ -76,8 +95,8 @@ function transformer(op: Op, kind: FrameKind): TransformStream<EncodedFrame, Enc
   });
 }
 
-function pipe(readable: ReadableStream<EncodedFrame>, writable: WritableStream<EncodedFrame>, op: Op, kind: FrameKind): void {
-  readable.pipeThrough(transformer(op, kind)).pipeTo(writable).catch(() => {
+function pipe(readable: ReadableStream<EncodedFrame>, writable: WritableStream<EncodedFrame>, op: Op, kind: FrameKind, id?: string): void {
+  readable.pipeThrough(transformer(op, kind, id)).pipeTo(writable).catch(() => {
     /* the track ended */
   });
 }
@@ -93,13 +112,13 @@ scope.onmessage = (e) => {
       sendIndex = msg.send & 0xff;
     });
   } else if (msg.type === "stream") {
-    pipe(msg.readable, msg.writable, msg.op, msg.kind);
+    pipe(msg.readable, msg.writable, msg.op, msg.kind, msg.id);
   }
 };
 
 scope.onrtctransform = (e) => {
   const { readable, writable, options } = e.transformer;
-  pipe(readable, writable, options.op, options.kind);
+  pipe(readable, writable, options.op, options.kind, options.id);
 };
 
 setInterval(() => scope.postMessage(stats), 2000);

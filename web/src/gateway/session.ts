@@ -12,6 +12,7 @@ import { clearLock, hasLock } from "@/lib/appLock";
 import { clearMediaCache } from "@/lib/mediaCache";
 import { keystore } from "@/crypto/keystore";
 import { leaveVoice } from "@/voice/session";
+import { workerClearTimeout, workerSetTimeout } from "@/lib/workerTimers";
 
 let client: GatewayClient | null = null;
 let queue: Promise<void> = Promise.resolve();
@@ -45,6 +46,9 @@ export async function startSession(): Promise<void> {
       queue = queue.then(() => applyEvent(e)).catch(() => undefined);
     },
     onStatus: (s) => useUI.getState().setConnection(s),
+    // heartbeats keep their pace in a hidden window, where the page's own timers slow to once a minute
+    setTimeoutImpl: workerSetTimeout,
+    clearTimeoutImpl: workerClearTimeout,
   });
   client.connect();
   window.addEventListener("online", wakeGateway);

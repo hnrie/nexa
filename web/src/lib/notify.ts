@@ -5,6 +5,7 @@ import { channelDisplayName } from "@/lib/names";
 import { parse, plainText } from "@/markdown";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
+import { useDesktop } from "@/stores/desktop";
 import { useMessages } from "@/stores/messages";
 import { usePresence } from "@/stores/presence";
 import { useSettings, type Settings } from "@/stores/settings";
@@ -68,6 +69,29 @@ export async function showNotification(title: string, opts: NotificationOptions,
   }
 }
 
+/**
+ * Whether the app is in front of the person: its window (or tab) focused and
+ * showing. The browser is asked rather than a stored flag, because a window
+ * can regain focus without firing the event that flag listens for.
+ */
+export function appOnScreen(): boolean {
+  // the desktop app says where its window is; inside it the page is never hidden, and its focus reading was seen to stay true
+  const w = useDesktop.getState().window;
+  if (w) return w.focused && w.visible && !w.minimized;
+  return typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+}
+
+/**
+ * What a new message does: nothing in the conversation being looked at, a
+ * sound anywhere else, and a notification whenever the app is not in front of
+ * the person (unfocused, minimised, in the tray, a background tab). While it
+ * is in front of them the unread badge and the sound are enough.
+ */
+export function messageAlert(onScreen: boolean, viewingChannel: boolean): { sound: boolean; popup: boolean } {
+  if (onScreen && viewingChannel) return { sound: false, popup: false };
+  return { sound: true, popup: !onScreen };
+}
+
 function previewOf(m: Message): string {
   const stored = useMessages.getState().channels[m.channel_id]?.byId[m.id];
   const p = stored?.payload;
@@ -90,15 +114,12 @@ function onMessage(m: Message, mine: boolean): void {
   const mentioned = m.mention_everyone || m.mentions.includes(me.id);
   if (level === "mentions" && !mentioned) return;
   const ui = useUI.getState();
-  // Ask the browser rather than trusting a stored flag: a window can regain
-  // focus without firing the event we listen for, and a chat you are looking
-  // at should never make a noise.
-  const looking = ui.activeChannelId === m.channel_id && document.visibilityState === "visible" && document.hasFocus();
-  if (looking) return;
+  const alert = messageAlert(appOnScreen(), ui.activeChannelId === m.channel_id);
+  if (!alert.sound && !alert.popup) return;
   const myPresence = usePresence.getState().byUser[me.id];
   if (myPresence?.status === "dnd") return;
-  if (settings.notifications.sounds) playSound(mentioned ? "mention" : "message");
-  if (!notificationsEnabled(settings)) return;
+  if (alert.sound && settings.notifications.sounds) playSound(mentioned ? "mention" : "message");
+  if (!alert.popup || !notificationsEnabled(settings)) return;
   const users = useUsers.getState().byId;
   const ch = useChannels.getState().byId[m.channel_id];
   const author = displayName(users[m.author_id]);
@@ -113,7 +134,7 @@ function onFriendRequest(r: Relationship): void {
   if (!me || usePresence.getState().byUser[me.id]?.status === "dnd") return;
   const settings = useSettings.getState().settings;
   if (settings.notifications.sounds) playSound("friend");
-  if (document.visibilityState === "visible" && document.hasFocus()) return;
+  if (appOnScreen()) return;
   if (!notificationsEnabled(settings)) return;
   void showNotification("Friend Request", { body: `${displayName(r.user)} sent you a friend request.`, tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
 }

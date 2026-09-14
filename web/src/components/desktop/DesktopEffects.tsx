@@ -100,6 +100,18 @@ export function DesktopEffects() {
     void bridge.updates.getState().then((u) => useDesktop.getState().setUpdate(u));
     offs.push(bridge.updates.onState((u) => useDesktop.getState().setUpdate(u)));
 
+    // The window system's word on whether the app is in front, for notifications and read marks.
+    // The page never counts as hidden here (the app keeps it running at full speed), and its own
+    // focus reading was seen to stay true with another app in front.
+    const onWindow = (w: { focused: boolean; visible: boolean; minimized: boolean }) => {
+      useDesktop.getState().setWindow(w);
+      useUI.getState().setFocused(w.focused && w.visible && !w.minimized);
+    };
+    if (bridge.getWindowState && bridge.onWindowState) {
+      void bridge.getWindowState().then(onWindow);
+      offs.push(bridge.onWindowState(onWindow));
+    }
+
     return () => {
       for (const off of offs) off();
     };

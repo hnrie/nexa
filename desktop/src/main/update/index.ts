@@ -3,8 +3,11 @@
  *
  * Windows (NSIS) and the Linux AppImage use electron-updater; the Mac build
  * uses its own updater (see mac.ts); a .deb can only be told there is a new
- * version. Checks run shortly after start and every six hours; downloads
- * happen in the background and install on restart.
+ * version. Checks run shortly after start and then every minute, so a new
+ * version is announced (the page shows a banner) soon after it is published;
+ * downloads happen in the background and install on restart. A check that
+ * fails waits longer before the next one, so a broken download is not fetched
+ * again every minute.
  */
 import { app, net } from "electron";
 import { EventEmitter } from "node:events";
@@ -12,8 +15,10 @@ import type { UpdateState } from "../../shared/bridge";
 import { compareVersions, parseManifest } from "./manifest";
 import { canReplace, installMacUpdate, stageMacUpdate, type MacUpdate } from "./mac";
 
-const FIRST_CHECK_MS = 15_000;
-const EVERY_MS = 6 * 3600_000;
+const FIRST_CHECK_MS = 10_000;
+const EVERY_MS = 60_000;
+/** The longest a run of failed checks waits before trying again. */
+const MAX_BACKOFF_MS = 15 * 60_000;
 
 type AutoUpdater = typeof import("electron-updater").autoUpdater;
 
@@ -27,6 +32,9 @@ export class Updater extends EventEmitter {
   private auto: AutoUpdater | null = null;
   private mac: MacUpdate | null = null;
   private busy = false;
+  /** Failed checks in a row, and when the next background check may run. */
+  private failures = 0;
+  private nextAt = 0;
 
   constructor(
     /** Where releases are published, e.g. https://chat.evilion.xyz/desktop/ */
@@ -47,8 +55,10 @@ export class Updater extends EventEmitter {
 
   start(): void {
     if (!app.isPackaged && !process.env.EVILION_UPDATE_TEST) return;
-    setTimeout(() => void this.check(), FIRST_CHECK_MS);
-    this.timer = setInterval(() => void this.check(), EVERY_MS);
+    setTimeout(() => void this.check({ quiet: true }), FIRST_CHECK_MS);
+    this.timer = setInterval(() => {
+      if (Date.now() >= this.nextAt) void this.check({ quiet: true });
+    }, EVERY_MS);
   }
 
   stop(): void {
@@ -61,16 +71,26 @@ export class Updater extends EventEmitter {
     this.emit("state", this.state);
   }
 
-  async check(): Promise<void> {
+  /**
+   * Looks for a newer version. The minute-by-minute checks are quiet: they do
+   * not flash "Checking…" in the settings page, and while an update is
+   * already being downloaded or waits to be installed they leave it alone.
+   * One asked for from the settings page or a menu always runs.
+   */
+  async check({ quiet = false }: { quiet?: boolean } = {}): Promise<void> {
     if (this.busy || this.state.status === "ready") return;
     this.busy = true;
-    this.set({ status: "checking", lastCheck: Date.now() });
+    if (!quiet || this.state.status === "error") this.set({ status: "checking", lastCheck: Date.now() });
     try {
       if (this.kind === "auto") await this.checkAuto();
       else if (this.kind === "mac") await this.checkMac();
       else await this.checkManual();
+      this.failures = 0;
+      this.nextAt = 0;
     } catch (err) {
       this.log("update check failed", { err: String(err) });
+      this.failures++;
+      this.nextAt = Date.now() + Math.min(MAX_BACKOFF_MS, EVERY_MS * 2 ** this.failures);
       this.set({ status: "error", error: err instanceof Error ? err.message : String(err), lastCheck: Date.now() });
     } finally {
       this.busy = false;

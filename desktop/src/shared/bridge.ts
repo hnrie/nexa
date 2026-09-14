@@ -65,6 +65,13 @@ export interface DisplaySourceRequest {
   audio: boolean;
 }
 
+/** Where the app's window is, as its own window system says: a page's own idea of focus is not reliable here. */
+export interface WindowState {
+  focused: boolean;
+  visible: boolean;
+  minimized: boolean;
+}
+
 export interface Identity {
   id: string;
   username: string;
@@ -95,4 +102,7 @@ export const IPC = {
   trayAction: "tray:action",
   focusWindow: "app:focus-window",
   requestAttention: "app:request-attention",
+  windowGetState: "app:get-window-state",
+  shareAudioFailed: "display:share-audio-failed",
+  windowState: "app:window-state",
 } as const;

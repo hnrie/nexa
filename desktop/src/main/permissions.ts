@@ -3,11 +3,14 @@
  * clipboard, for Evilion Chat's own origin and nothing else. On macOS the
  * system asks the person the first time the microphone or camera is wanted.
  */
-import { desktopCapturer, session, systemPreferences, type BrowserWindow } from "electron";
+import { desktopCapturer, session, systemPreferences, type BrowserWindow, type DesktopCapturerSource } from "electron";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
+import { WINDOWS_PROCESS_LOOPBACK_BUILD, windowAudioDevice } from "./appAudio";
 import { isAppUrl, originOf, ORIGIN } from "./config";
+
+type Log = (msg: string, extra?: Record<string, unknown>) => void;
 
 const ALLOWED = new Set(["media", "notifications", "clipboard-sanitized-write", "clipboard-read", "fullscreen", "display-capture", "speaker-selection", "pointerLock"]);
 
@@ -45,6 +48,53 @@ export function lockPermissions(): void {
 const pending = new Map<string, { resolve: (sourceId: string | null, audio: boolean) => void }>();
 
 /**
+ * Sound that would not start on this computer this session. Chromium fails
+ * the whole share when its sound source cannot start, so after the page says
+ * so the next try uses the next safest kind: one program's sound, then the
+ * computer's without this app, then all of it.
+ */
+let noProgramAudio = false;
+let noOwnExclusion = false;
+/** The last share answered with sound, and which kind it was, for the page to say it failed. */
+let lastAnswer: { sourceId: string; sound: ShareSound; at: number } | null = null;
+/** A share that failed for its sound and is being tried again: answered with the same source, without the picker. */
+let retry: { sourceId: string; until: number } | null = null;
+
+/**
+ * The page's share failed to start after sound was chosen. Returns whether
+ * trying again makes sense, in which case the next request (within half a
+ * minute) shares the same source with safer sound, without asking again.
+ */
+export function shareAudioFailed(log: Log): boolean {
+  const last = lastAnswer;
+  lastAnswer = null;
+  if (!last || Date.now() - last.at > 60_000) return false;
+  if (last.sound.kind === "program") noProgramAudio = true;
+  else if (last.sound.kind === "own") noOwnExclusion = true;
+  else return false;
+  log("share audio failed to start; falling back", { device: last.sound.device });
+  retry = { sourceId: last.sourceId, until: Date.now() + 30_000 };
+  return true;
+}
+
+/** The audio device a share asks Chromium for: one program, everything but this app, or everything. */
+interface ShareSound {
+  device: string;
+  kind: "program" | "own" | "all";
+}
+
+/** The sound a share of this source carries. */
+async function audioDevice(source: DesktopCapturerSource, mode: ShareAudioMode, log: Log): Promise<ShareSound> {
+  if (mode === "all" || noOwnExclusion) return { device: "loopback", kind: "all" };
+  // a window shares just its program's sound where the system can capture one program
+  if (!noProgramAudio) {
+    const program = await windowAudioDevice(source.id, log);
+    if (program) return { device: program, kind: "program" };
+  }
+  return { device: "loopbackWithoutChrome", kind: "own" };
+}
+
+/**
  * Answers the page's getDisplayMedia: the page shows its picker with the
  * screens and windows sent here, and exactly the one chosen is shared (on
  * Wayland the portal asks instead). macOS's own picker is not used: in
@@ -52,9 +102,11 @@ const pending = new Map<string, { resolve: (sourceId: string | null, audio: bool
  * whole screen.
  *
  * Sound comes from system loopback when the share asked for it, leaving this
- * app's own playback out wherever the system can (see shareAudioMode).
+ * app's own playback out wherever the system can (see shareAudioMode). A
+ * window carries just its own program's sound where the system can capture
+ * one program (see appAudio.ts).
  */
-export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void {
+export function handleDisplayMedia(getWindow: () => BrowserWindow | null, log: Log = () => {}): void {
   const wayland = process.platform === "linux" && (process.env.XDG_SESSION_TYPE === "wayland" || !!process.env.WAYLAND_DISPLAY);
   session.defaultSession.setDisplayMediaRequestHandler(
     (request, callback) => {
@@ -76,9 +128,34 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
             callback({});
             return;
           }
-          const requestId = randomUUID();
           const mode = shareAudioMode();
           const audio = request.audioRequested && mode !== "none";
+          lastAnswer = null;
+          const answerWith = async (source: DesktopCapturerSource | undefined, withAudio: boolean) => {
+            // only the share being answered now can be the one whose sound fails; a cancelled or silent one is none
+            lastAnswer = null;
+            if (!source) {
+              callback({});
+              return;
+            }
+            if (!withAudio || !audio) {
+              callback({ video: source });
+              return;
+            }
+            const sound = await audioDevice(source, mode, log);
+            lastAnswer = { sourceId: source.id, sound, at: Date.now() };
+            log("share", { source: source.id, audio: sound.device });
+            // Electron hands any device name over to Chromium; its typings only list "loopback" and "loopbackWithMute"
+            callback({ video: source, audio: sound.device as "loopback" });
+          };
+          // the same share again, after its sound failed to start: no second trip through the picker
+          const again = retry && Date.now() < retry.until ? sources.find((s) => s.id === retry!.sourceId) : undefined;
+          retry = null;
+          if (again) {
+            await answerWith(again, true);
+            return;
+          }
+          const requestId = randomUUID();
           const req: DisplaySourceRequest = {
             requestId,
             audio,
@@ -94,10 +171,10 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
           const answer = (sourceId: string | null, withAudio: boolean) => {
             clearTimeout(timer);
             pending.delete(requestId);
-            const source = sources.find((s) => s.id === sourceId);
-            // Electron hands any device name over to Chromium; its typings only list "loopback" and "loopbackWithMute"
-            const device = (mode === "own" ? "loopbackWithoutChrome" : "loopback") as "loopback";
-            callback(source ? { video: source, ...(withAudio && audio ? { audio: device } : {}) } : {});
+            void answerWith(
+              sources.find((s) => s.id === sourceId),
+              withAudio,
+            ).catch(() => callback({}));
           };
           pending.set(requestId, { resolve: answer });
           win.webContents.send(IPC.displaySources, req);
@@ -120,13 +197,15 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
  * It is asked for by name: asking for plain "loopback" with the page's
  * restrictOwnAudio constraint is meant to get the same, but the constraint
  * never reaches Electron's handler, so the call leaked into every share.
- * Windows 10 22H2 (build 19045) and later honour it, which Vesktop found in
- * practice although Microsoft documents build 20348; macOS 13 and later,
- * measured on this build's Mac (the app's own sound at silence, other
- * programs still heard).
+ * Windows 10 2004 (build 19041) and later have the process loopback it is
+ * built on: OBS captures single programs from that build, Vesktop users
+ * report it working on 19044, Microsoft documents 20348. A share whose
+ * sound will not start is tried again with plain loopback (shareAudioFailed).
+ * macOS 13 and later, measured on this build's Mac (the app's own sound at
+ * silence, other programs still heard).
  *
  * "all": the whole system's sound, this app included, where the exclusion is
- * not there (older Windows 10). Sharing sound still works; the call may echo.
+ * not there (Windows 10 before 2004). Sharing sound still works; the call may echo.
  *
  * "none": no system sound can be shared (Linux, macOS before 13).
  */
@@ -136,7 +215,7 @@ export function shareAudioMode(): ShareAudioMode {
   const forced = process.env.EVILION_SHARE_AUDIO_MODE;
   if (forced === "own" || forced === "all" || forced === "none") return forced;
   const [major = 0, , build = 0] = os.release().split(".").map(Number);
-  if (process.platform === "win32") return build >= 19045 ? "own" : "all";
+  if (process.platform === "win32") return build >= WINDOWS_PROCESS_LOOPBACK_BUILD ? "own" : "all";
   // Darwin 22 is macOS 13
   if (process.platform === "darwin") return major >= 22 ? "own" : "none";
   return "none";

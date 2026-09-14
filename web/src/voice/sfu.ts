@@ -25,6 +25,15 @@ interface Pulled {
   mid: string;
   /** The received track, once it has arrived. */
   track: MediaStreamTrack | null;
+  /** This receiver's name in the frame crypto worker, new for every receiver. */
+  cryptoId?: string;
+  /** When the track arrived, whether any of its frames reached the worker yet, and whether one opened. */
+  arrivedAt?: number;
+  seen?: boolean;
+  opened?: boolean;
+  /** When its packets are next counted, and how long the wait after that grows to while none come (a camera that is off). */
+  checkAt?: number;
+  checkEvery?: number;
 }
 
 interface Want {
@@ -60,6 +69,20 @@ const PULL_RETRY_BASE_MS = 400;
 const RETRY_MAX_MS = 30_000;
 /** A failure this long after the last one starts the wait from the beginning again. */
 const FAILURES_FORGOTTEN_MS = 60_000;
+/**
+ * A pulled track that has received this many packets without one frame
+ * reaching the decryption worker is playing sealed frames as they are, which
+ * Chromium can end up doing when packets beat the receiver's transform. Such
+ * a track is let go and pulled again.
+ */
+const BYPASS_PACKETS = 25;
+/** How long a new track gets before its packets are counted against it. */
+const BYPASS_GRACE_MS = 1_500;
+/** Pulling the same track again stops after this many tries; it stays silent. */
+const MAX_REPULLS = 3;
+/** A track with too few packets to judge is counted again after this long, doubling up to the most. */
+const BYPASS_RECHECK_MS = 1_000;
+const BYPASS_RECHECK_MAX_MS = { audio: 8_000, video: 20_000 };
 /** After the server pauses video, this device leaves it alone this long before asking again. */
 const VIDEO_PAUSE_MS = 10 * 60_000;
 const VIDEO_PAUSED = "Video is paused until next month to keep calls free.";
@@ -143,6 +166,10 @@ export class SfuTransport implements VoiceTransport {
 
   private keyVersion = "";
   private keyTimer: ReturnType<typeof setInterval>;
+  private bypassTimer: ReturnType<typeof setInterval>;
+  private receiverSeq = 0;
+  /** How often each person's track of each kind has been pulled again for skipping decryption. */
+  private repulls = new Map<string, number>();
   private recoverTimer: ReturnType<typeof setTimeout> | null = null;
   private iceRestarts = 0;
   private retry: { timer: ReturnType<typeof setTimeout>; rebuild: boolean } | null = null;
@@ -158,8 +185,10 @@ export class SfuTransport implements VoiceTransport {
   ) {
     this.playback = new Playback(events.onSpeaking);
     this.pc = this.newConnection();
+    this.crypto.onSeen = (id, opened) => this.onFramesSeen(id, opened);
     this.refreshKeys();
     this.keyTimer = setInterval(() => this.refreshKeys(), KEY_CHECK_MS);
+    this.bypassTimer = setInterval(() => void this.checkBypass(), 1_000);
   }
 
   // --- the connection ----------------------------------------------------
@@ -626,16 +655,90 @@ export class SfuTransport implements VoiceTransport {
   private onTrack(e: RTCTrackEvent): void {
     const mid = e.transceiver.mid;
     const p = mid ? this.byMid.get(mid) : undefined;
-    if (!p) return;
+    const cryptoId = `${mid ?? "-"}#${++this.receiverSeq}`;
     try {
-      this.crypto.protectReceiver(e.receiver, media(p.kind));
+      // Every receiver gets its transform at once, even one this call does not know: Chromium lets
+      // frames skip a receiver that has none for good, and the mid may be handed out again later.
+      this.crypto.protectReceiver(e.receiver, p ? media(p.kind) : e.track.kind === "video" ? "video" : "audio", cryptoId);
     } catch (err) {
       // a track that cannot be opened is not played: what arrives is sealed
       console.warn("voice: cannot decrypt a pulled track", err);
       return;
     }
+    if (!p) return;
     p.track = e.track;
+    p.cryptoId = cryptoId;
+    p.arrivedAt = Date.now();
+    p.seen = false;
+    p.opened = false;
+    p.checkAt = 0;
+    p.checkEvery = undefined;
     this.present();
+  }
+
+  /** The worker saw a pulled track's first frame, or its first opened one: its sound can play. */
+  private onFramesSeen(id: string, opened: boolean): void {
+    for (const p of this.pulled.values()) {
+      if (p.cryptoId !== id) continue;
+      p.seen = true;
+      if (opened && !p.opened) {
+        p.opened = true;
+        this.repulls.delete(slot(p.userId, p.kind));
+        if (p.kind === "audio") this.playback.setHeld(p.userId, "voice", false);
+        if (p.kind === "screen_audio") this.playback.setHeld(p.userId, "screen", false);
+      }
+      return;
+    }
+  }
+
+  /** Whether a pulled track's sound is still waiting to be known as opened. */
+  private held(userId: string, kind: PubKind): boolean {
+    const p = this.pulled.get(slot(userId, kind));
+    return !!p && !p.opened;
+  }
+
+  /**
+   * Finds pulled tracks whose packets arrive but never reach the decryption
+   * worker, and pulls them again. Their sound was held silent all along.
+   */
+  private async checkBypass(): Promise<void> {
+    if (this.closed || !this.sessionId) return;
+    const now = Date.now();
+    const suspects = [...this.pulled.values()].filter(
+      (p) => p.track && p.cryptoId && !p.seen && p.arrivedAt !== undefined && now - p.arrivedAt > BYPASS_GRACE_MS && (this.repulls.get(slot(p.userId, p.kind)) ?? 0) < MAX_REPULLS,
+    );
+    // stats are only gathered for a track that is due: one that never gets packets waits longer each time
+    if (!suspects.some((p) => (p.checkAt ?? 0) <= now)) return;
+    const pc = this.pc;
+    const report = await pc.getStats().catch(() => null);
+    if (!report || pc !== this.pc || this.closed) return;
+    const packets = new Map<string, number>();
+    report.forEach((r) => {
+      const s = r as RTCInboundRtpStreamStats & { mid?: string };
+      if (s.type === "inbound-rtp" && s.mid) packets.set(s.mid, (packets.get(s.mid) ?? 0) + (s.packetsReceived ?? 0));
+    });
+    const skipping = suspects.filter((p) => !p.seen && this.pulled.get(slot(p.userId, p.kind)) === p && (packets.get(p.mid) ?? 0) >= BYPASS_PACKETS);
+    for (const p of suspects) {
+      if (skipping.includes(p)) continue;
+      p.checkEvery = Math.min(BYPASS_RECHECK_MAX_MS[media(p.kind)], (p.checkEvery ?? BYPASS_RECHECK_MS / 2) * 2);
+      p.checkAt = now + p.checkEvery;
+    }
+    if (skipping.length === 0) return;
+    const again: Pulled[] = [];
+    for (const p of skipping) {
+      const key = slot(p.userId, p.kind);
+      const tries = this.repulls.get(key) ?? 0;
+      if (tries >= MAX_REPULLS) continue;
+      this.repulls.set(key, tries + 1);
+      console.warn(`voice: a pulled ${p.kind} track played without decryption (${packets.get(p.mid)} packets); pulling it again`);
+      again.push(p);
+    }
+    if (again.length === 0) return;
+    void this.enqueue(async () => {
+      const still = again.filter((p) => this.pulled.get(slot(p.userId, p.kind)) === p);
+      if (still.length) await this.unsubscribe(still);
+      this.scheduleSync();
+    });
   }
 
   /** Reports what can be heard and seen of each person, where that changed. */
@@ -661,13 +764,13 @@ export class SfuTransport implements VoiceTransport {
         screen: streamOf(prev.screen, screen ? (screenAudio ? [screen, screenAudio] : [screen]) : []),
       };
       if (next.audio !== prev.audio) {
-        if (next.audio) this.playback.attachVoice(userId, next.audio);
+        if (next.audio) this.playback.attachVoice(userId, next.audio, this.held(userId, "audio"));
         else this.playback.detachVoice(userId);
         this.events.onRemoteStream(userId, "audio", next.audio);
       }
       if (next.video !== prev.video) this.events.onRemoteStream(userId, "video", next.video);
       if (next.screen !== prev.screen) {
-        if (next.screen?.getAudioTracks().length) this.playback.attachScreenAudio(userId, next.screen);
+        if (next.screen?.getAudioTracks().length) this.playback.attachScreenAudio(userId, next.screen, this.held(userId, "screen_audio"));
         else this.playback.detachScreenAudio(userId);
         this.events.onRemoteStream(userId, "screen", next.screen);
       }
@@ -729,6 +832,7 @@ export class SfuTransport implements VoiceTransport {
     this.closed = true;
     this.generation++;
     clearInterval(this.keyTimer);
+    clearInterval(this.bypassTimer);
     if (this.recoverTimer) clearTimeout(this.recoverTimer);
     if (this.retry) clearTimeout(this.retry.timer);
     this.retry = null;
