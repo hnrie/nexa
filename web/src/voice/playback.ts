@@ -5,6 +5,7 @@
  * watched. Shared by both call transports.
  */
 import { LevelMeter, audioContext } from "./media";
+import { SpeakingGate } from "./speaking";
 
 interface VoiceOut {
   source: MediaStreamAudioSourceNode;
@@ -53,9 +54,12 @@ export class Playback {
     gain.gain.value = this.effectiveGain(userId);
     source.connect(gain).connect(ctx.destination);
     const meter = new LevelMeter(ctx, stream);
+    const gate = new SpeakingGate();
     const out: VoiceOut = { source, gain, el, meter, timer: null, speaking: false };
     out.timer = setInterval(() => {
-      const on = meter.level() > 0.02 && !this.localMutes.has(userId);
+      const loud = gate.update(meter.level() > 0.02, Date.now());
+      // someone muted just here shows no ring, straight away
+      const on = loud && !this.localMutes.has(userId);
       if (on !== out.speaking) {
         out.speaking = on;
         this.onSpeaking(userId, on);

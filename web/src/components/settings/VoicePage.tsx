@@ -7,15 +7,9 @@ import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
 import { LevelMeter, audioContext, describeInput, getMic, lastInputChoice, listDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
 import { inVoice } from "@/voice/session";
+import { SHARE_FRAME_RATES, SHARE_RESOLUTIONS } from "@/voice/shareQuality";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
-
-const QUALITIES: { v: VoiceSettings["streamQuality"]; label: string }[] = [
-  { v: "720p30", label: "720p · 30 fps (light)" },
-  { v: "1080p30", label: "1080p · 30 fps" },
-  { v: "1080p60", label: "1080p · 60 fps" },
-  { v: "source", label: "Source resolution · 60 fps" },
-];
 
 /** User settings → Voice & Video. */
 export default function VoicePage() {
@@ -218,11 +212,19 @@ export default function VoicePage() {
         <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label="Echo cancellation" />
         <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label="Automatic gain control" />
         <h5 className={st.h5}>Screen share</h5>
-        <Field label="Stream quality" hint="Everyone gets the same options here: 1080p at 60 fps and source resolution are free.">
-          <Select value={settings.streamQuality} onChange={(e) => set({ streamQuality: e.target.value as VoiceSettings["streamQuality"] })}>
-            {QUALITIES.map((q) => <option key={q.v} value={q.v}>{q.label}</option>)}
-          </Select>
-        </Field>
+        <div className={[st.twoCol, st.twoEqual].join(" ")}>
+          <Field label="Resolution">
+            <Select value={settings.shareResolution} onChange={(e) => set({ shareResolution: e.target.value as VoiceSettings["shareResolution"] })}>
+              {SHARE_RESOLUTIONS.map((r) => <option key={r.value} value={r.value}>{r.value === "source" ? "Source (your screen's own)" : r.label}</option>)}
+            </Select>
+          </Field>
+          <Field label="Frame rate">
+            <Select value={settings.shareFps} onChange={(e) => set({ shareFps: Number(e.target.value) as VoiceSettings["shareFps"] })}>
+              {SHARE_FRAME_RATES.map((f) => <option key={f} value={f}>{f} fps</option>)}
+            </Select>
+          </Field>
+        </div>
+        <p className={st.hint}>Free for everyone, up to source resolution at 60 fps. Sharing asks each time, starting from these.</p>
         <Field label="Camera">
           <Select value="" onChange={() => {}} disabled>
             <option value="">{devices?.cameras.length ? `${devices.cameras.length} camera${devices.cameras.length === 1 ? "" : "s"} available (the browser picks the default)` : "No camera found"}</option>

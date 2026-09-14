@@ -1,6 +1,14 @@
 .root { display: flex; flex-direction: column; height: 100%; min-height: 0; background: #000; color: #fff; position: relative; }
-.root[data-embedded="true"] { height: 50vh; min-height: 280px; border-bottom: 1px solid var(--border-subtle); }
-.root[data-full="true"] { height: 100vh; }
+/* above a conversation the call takes the share of its height the grab bar was dragged to (lib/callPanel.ts keeps the numbers) */
+.root[data-embedded="true"] { flex: none; height: calc(var(--call-share, 0.5) * 100%); min-height: 150px; max-height: calc(100% - 240px); border-bottom: 1px solid var(--border-subtle); }
+/* where the browser cannot go full screen itself (iPhone), the call covers the app, clear of the notch and home indicator */
+.root[data-page-full="true"] { position: fixed; inset: 0; z-index: 90; height: auto; min-height: 0; max-height: none; border: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+.root:fullscreen { padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
+
+/* the grab bar between a call and the conversation under it */
+.resizer { position: absolute; left: 0; right: 0; bottom: -7px; z-index: 6; height: 14px; display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; outline: none; }
+.resizer::before { content: ""; width: 40px; height: 4px; border-radius: 2px; background: var(--border-strong); transition: background-color var(--transition), width var(--transition); }
+.resizer:hover::before, .resizer:focus-visible::before, .resizer[data-dragging="true"]::before { width: 64px; background: var(--brand); }
 .lobby { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: var(--bg-raised); color: var(--text); }
 .lobbyTitle { font-size: 24px; font-weight: 600; color: var(--text-strong); }
 .lobbySub { font-size: 14px; color: var(--text-muted); }
@@ -20,9 +28,15 @@
 .tile { position: relative; flex: none; border-radius: var(--radius-sm); background: var(--bg-surface); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 2px transparent; transition: box-shadow 120ms ease; cursor: default; }
 .tile[data-place="focus"] { width: 100%; height: 100%; background: #000; }
 .tile[data-place="strip"] { width: 171px; height: 96px; }
-.tile[data-speaking="true"]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 3px #3d9e60; pointer-events: none; }
+/* the speaking ring comes on quickly and fades out gently, so the gaps between words never make it flash */
+.tile::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--positive); pointer-events: none; opacity: 0; transition: opacity 240ms ease-out; }
+.tile[data-speaking="true"]::after { opacity: 1; transition-duration: 80ms; }
 .tile[data-kind="video"], .tile[data-kind="screen"] { cursor: pointer; }
-.video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+.video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; -webkit-touch-callout: none; }
+/* what a stream's picture sits in; a focused share can be pinched into (StreamSurface) */
+.surface { position: absolute; inset: 0; overflow: hidden; }
+.surface[data-zoomable="true"] { touch-action: none; }
+.surface[data-zoomed="true"] .video { will-change: transform; }
 .tile[data-kind="screen"] .video, .tile[data-place="focus"] .video { object-fit: contain; }
 .video[data-mirror="true"] { transform: scaleX(-1); }
 .avatarWrap { display: flex; align-items: center; justify-content: center; }
@@ -48,13 +62,16 @@
 .tileBtn:hover { background: var(--brand); }
 
 /* the control bar */
-.controls { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 16px 16px; }
+.controls { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); }
+/* a call above a conversation is nowhere near the home indicator */
+.root[data-embedded="true"]:not([data-full="true"]) .controls { padding-bottom: 16px; }
 .controlsSide { display: flex; align-items: center; min-width: 0; }
 .controlsEnd { justify-content: flex-end; }
 .controlsMain { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .ctl { width: 52px; height: 52px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); transition: background-color 120ms ease; }
 .ctl:hover { background: var(--bg-active); }
 .ctl[data-off="true"], .ctl[data-on="true"] { background: #fff; color: #000; }
+.narrowOnly { display: none; }
 .leave { background: var(--danger); color: #fff; }
 .leave:hover { background: var(--danger-hover); }
 .sideBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); }
@@ -65,10 +82,24 @@
 .quality[data-level="ok"] .qualityDot { background: var(--warning); }
 .quality[data-level="bad"] .qualityDot { background: var(--danger); }
 
-/* Touch screens have no hover, so a stream's own buttons stay in view. */
+/* Touch screens have no hover: a tap focuses a stream, and the focused one keeps its buttons in view.
+   On the small tiles of a grid they would only cover the picture and catch the tap meant for it. */
 @media (hover: none) {
-  .tileBtns { opacity: 1; }
+  .tile[data-place="focus"] .tileBtns { opacity: 1; }
+  .tile[data-place="grid"] .tileBtns { display: none; }
 }
+/* finger-sized targets */
+@media (pointer: coarse) {
+  .tileBtns { gap: 8px; }
+  .tileBtn { width: 44px; height: 44px; }
+  .watchBtn { height: 44px; padding: 0 16px; }
+  .tile[data-place="strip"] .watchBtn { height: 32px; padding: 0 10px; }
+  .resizer { height: 28px; bottom: -14px; }
+  .resizer::before { width: 48px; }
+}
+/* a stream full screen on its own keeps its label and buttons clear of a notch */
+.tile:fullscreen .tileBar { left: max(8px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom)); }
+.tile:fullscreen .tileBtns { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); opacity: 1; }
 
 /* voice status block above the user panel */
 .status { flex: none; margin: 0 8px; padding: 8px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 6px; }
@@ -92,8 +123,8 @@
 .participants { display: flex; flex-direction: column; padding: 0 0 4px 22px; }
 .participant { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 14px; width: 100%; text-align: left; }
 .participant:hover { background: var(--bg-hover); color: var(--text); }
-.participant[data-speaking="true"] .pAvatar { box-shadow: 0 0 0 2px #3d9e60; }
-.pAvatar { border-radius: 50%; flex: none; }
+.pAvatar { border-radius: 50%; flex: none; box-shadow: 0 0 0 2px transparent; transition: box-shadow 240ms ease-out; }
+.participant[data-speaking="true"] .pAvatar { box-shadow: 0 0 0 2px var(--positive); transition-duration: 80ms; }
 .pName { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pIcons { display: flex; gap: 4px; color: var(--text-muted); }
 .pIcons [data-server="true"] { color: var(--danger); }
@@ -123,6 +154,19 @@
 .ringDecline { background: var(--danger); }
 .ringDecline:hover { background: var(--danger-hover); }
 
+/* the share dialog: a row of choices each for resolution and frame rate */
+.shareForm { display: flex; flex-direction: column; gap: 16px; }
+.shareGroup { display: flex; flex-direction: column; gap: 8px; }
+.shareLabel { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-subtle); }
+.shareOptions { display: grid; gap: 8px; }
+.shareOption { min-width: 0; min-height: 56px; padding: 8px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: var(--radius-xs); background: var(--bg-raised); color: var(--text); transition: background-color var(--transition); }
+.shareOption:hover { background: var(--bg-active); }
+.shareOption[data-on="true"] { outline: 2px solid var(--brand); outline-offset: -2px; background: var(--bg-selected); }
+.shareOption:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.shareValue { font-size: 16px; font-weight: 600; color: var(--text-strong); }
+.shareNote { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.shareHint { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+
 /* settings meter */
 .meter { height: 8px; border-radius: 4px; background: var(--bg-input); overflow: hidden; margin-top: 8px; position: relative; }
 .meterFill { height: 100%; background: var(--positive); transition: width 60ms linear; }
@@ -131,15 +175,26 @@
 .keyCapture[data-capturing="true"] { border-color: var(--brand); }
 
 @media (max-width: 767px) {
-  .root[data-embedded="true"] { height: 46vh; min-height: 260px; }
   .stage { padding: 6px; gap: 6px; }
   .strip { height: 72px; }
   .tile[data-place="strip"] { width: 128px; height: 72px; }
   /* one row of controls that shrinks to fit rather than wrapping over itself */
   .controls { grid-template-columns: minmax(0, 1fr); padding: 6px 8px calc(10px + env(safe-area-inset-bottom)); }
+  .root[data-embedded="true"]:not([data-full="true"]) .controls { padding-bottom: 10px; }
   .controlsSide { display: none; }
-  .controlsMain { gap: clamp(6px, 2.5vw, 12px); }
-  .ctl { width: clamp(40px, 12vw, 52px); height: clamp(40px, 12vw, 52px); }
+  .narrowOnly { display: flex; }
+  .controlsMain { gap: clamp(6px, 2.2vw, 12px); }
+  .ctl { width: clamp(40px, 11.5vw, 52px); height: clamp(40px, 11.5vw, 52px); }
   .ctl svg { width: 20px; height: 20px; }
-  .tileBtn { width: 36px; height: 36px; }
+}
+/* a phone on its side is wide but short: the controls and strip give the picture its height back */
+@media (max-height: 520px) {
+  .stage { padding: 4px 6px; gap: 4px; }
+  .strip { height: 60px; }
+  .tile[data-place="strip"] { width: 107px; height: 60px; }
+  .controls { padding: 4px 12px calc(6px + env(safe-area-inset-bottom)); }
+  .root[data-embedded="true"]:not([data-full="true"]) .controls { padding-bottom: 6px; }
+  .ctl { width: 42px; height: 42px; }
+  .ctl svg { width: 20px; height: 20px; }
+  .controlsMain { gap: 10px; }
 }

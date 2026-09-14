@@ -15,6 +15,7 @@ import { ServerNotificationsModal } from "./ServerNotificationsModal";
 import { ServerProfileModal } from "./ServerProfileModal";
 import { ChannelTopicModal } from "./ChannelTopicModal";
 import { IncomingCallHost } from "@/components/voice/IncomingCall";
+import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
 
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
 const ProfileModal = lazyPage(() => import("@/components/profile/ProfileModal"));
@@ -60,6 +61,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "createChannel" ? <CreateChannelModal onClose={close} serverId={String(modal.props?.["serverId"])} parentId={modal.props?.["parentId"] as string | undefined} /> : null}
       {modal?.kind === "createCategory" ? <CreateCategoryModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}
       {modal?.kind === "serverNotifications" ? <ServerNotificationsModal onClose={close} serverId={String(modal.props?.["serverId"])} /> : null}
+      {modal?.kind === "shareScreen" ? <ShareScreenModal onClose={close} /> : null}
       {modal?.kind === "channelTopic" ? <ChannelTopicModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "serverProfile" ? <ServerProfileModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={modal.props?.["userId"] as string | undefined} /> : null}
       <Suspense fallback={null}>

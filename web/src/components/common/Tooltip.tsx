@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { portalRoot } from "@/hooks/usePortalRoot";
 import s from "./Tooltip.module.css";
 
 type Side = "top" | "right" | "bottom" | "left";
@@ -98,7 +99,8 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
             >
               {text}
             </span>,
-            document.body,
+            // tooltips come and go too often to each follow full screen; they look where to mount as they open
+            portalRoot(),
           )
         : null}
     </span>

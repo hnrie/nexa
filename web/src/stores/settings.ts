@@ -2,9 +2,12 @@ import { create } from "zustand";
 import { users as usersApi } from "@/api/users";
 import { ApiError } from "@/api/client";
 import { decryptSettings, encryptSettings } from "@/lib/settingsCrypto";
+import { fromStreamQuality } from "@/voice/shareQuality";
 
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system";
 export type NotificationLevel = "all" | "mentions" | "none";
+export type ShareResolution = "720p" | "1080p" | "1440p" | "source";
+export type ShareFps = 15 | 30 | 60;
 
 export interface VoiceSettings {
   inputDeviceId: string | null;
@@ -21,7 +24,9 @@ export interface VoiceSettings {
   noiseSuppression: boolean;
   echoCancellation: boolean;
   autoGain: boolean;
-  streamQuality: "720p30" | "1080p30" | "1080p60" | "source";
+  /** Screen share size and frame rate; the share dialog starts from the last ones used. */
+  shareResolution: ShareResolution;
+  shareFps: ShareFps;
 }
 
 /**
@@ -95,7 +100,8 @@ export const DEFAULT_SETTINGS: Settings = {
     noiseSuppression: true,
     echoCancellation: true,
     autoGain: true,
-    streamQuality: "1080p30",
+    shareResolution: "1080p",
+    shareFps: 30,
   },
   serverPositions: [],
   collapsedCategories: [],
@@ -110,8 +116,17 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     ...base,
     ...inc,
     notifications: { ...base.notifications, ...(inc.notifications ?? {}) },
-    voice: { ...base.voice, ...(inc.voice ?? {}) },
+    voice: mergeVoice(base.voice, inc.voice),
   };
+}
+
+/** Merges voice settings, turning the one "stream quality" older versions saved into a size and frame rate. */
+function mergeVoice(base: VoiceSettings, incoming: Partial<VoiceSettings> | undefined): VoiceSettings {
+  const { streamQuality, ...rest } = (incoming ?? {}) as Partial<VoiceSettings> & { streamQuality?: unknown };
+  const old = rest.shareResolution ? null : fromStreamQuality(streamQuality);
+  const voice = { ...base, ...rest, ...(old ?? {}) };
+  delete (voice as { streamQuality?: unknown }).streamQuality;
+  return voice;
 }
 
 interface SettingsState {

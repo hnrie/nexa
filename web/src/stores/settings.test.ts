@@ -90,3 +90,20 @@ describe("settings sync", () => {
     expect(server.doc["theme"]).toBe("onyx");
   });
 });
+
+describe("screen share settings", () => {
+  it("carries an older stream quality over to a size and frame rate", async () => {
+    await loadFrom({ doc: { voice: { streamQuality: "1080p60" } }, version: 1 });
+    const v = useSettings.getState().settings.voice;
+    expect(v.shareResolution).toBe("1080p");
+    expect(v.shareFps).toBe(60);
+    expect("streamQuality" in v).toBe(false);
+  });
+
+  it("keeps a size and frame rate already chosen", async () => {
+    await loadFrom({ doc: { voice: { streamQuality: "720p30", shareResolution: "1440p", shareFps: 15 } }, version: 1 });
+    const v = useSettings.getState().settings.voice;
+    expect(v.shareResolution).toBe("1440p");
+    expect(v.shareFps).toBe(15);
+  });
+});

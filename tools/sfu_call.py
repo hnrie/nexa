@@ -300,6 +300,7 @@ try:
 
         print("== alice's share is pulled only while watched", flush=True)
         a.click("[data-testid=screen-share]")
+        a.click("[data-testid=go-live]")
         bob.page.wait_for_selector("[data-testid=watch-stream]", timeout=30000)
         carol.page.wait_for_selector("[data-testid=watch-stream]", timeout=30000)
         pause(3)

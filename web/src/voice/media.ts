@@ -3,36 +3,8 @@
  * settings applied, plus a small RMS level meter used for voice activity and
  * the settings page.
  */
-import type { VoiceSettings } from "@/stores/settings";
-
-export type StreamQuality = VoiceSettings["streamQuality"];
-
-export function qualityConstraints(q: StreamQuality): { width?: number; height?: number; frameRate: number } {
-  switch (q) {
-    case "720p30":
-      return { width: 1280, height: 720, frameRate: 30 };
-    case "1080p60":
-      return { width: 1920, height: 1080, frameRate: 60 };
-    case "source":
-      return { frameRate: 60 };
-    default:
-      return { width: 1920, height: 1080, frameRate: 30 };
-  }
-}
-
-/** Bitrate cap for a screen share at a quality, in bits per second. */
-export function screenBitrate(q: StreamQuality): number {
-  switch (q) {
-    case "720p30":
-      return 2_500_000;
-    case "1080p60":
-      return 8_000_000;
-    case "source":
-      return 12_000_000;
-    default:
-      return 5_000_000;
-  }
-}
+import type { ShareFps, ShareResolution, VoiceSettings } from "@/stores/settings";
+import { shareVideoConstraints } from "./shareQuality";
 
 /** Why the microphone that opened is the one that opened. */
 export type InputChoice = "default" | "chosen" | "matched-by-name" | "missing";
@@ -114,14 +86,16 @@ export async function hasSeveralCameras(): Promise<boolean> {
 /** Whether this browser can share a screen at all; phone browsers cannot. */
 export const canShareScreen = typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function";
 
-export async function getScreen(q: StreamQuality): Promise<MediaStream> {
-  const c = qualityConstraints(q);
-  const video: MediaTrackConstraints = { frameRate: { ideal: c.frameRate, max: c.frameRate } };
-  if (c.width) video.width = { ideal: c.width };
-  if (c.height) video.height = { ideal: c.height };
+export async function getScreen(res: ShareResolution, fps: ShareFps): Promise<MediaStream> {
+  const video = shareVideoConstraints(res, fps);
   // system audio where the browser allows it; Chrome asks per window/tab
   const opts = { video, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48000, channelCount: 2 }, systemAudio: "include", surfaceSwitching: "include", selfBrowserSurface: "exclude" } as DisplayMediaStreamOptions & { systemAudio: string; surfaceSwitching: string; selfBrowserSurface: string };
-  return navigator.mediaDevices.getDisplayMedia(opts);
+  const stream = await navigator.mediaDevices.getDisplayMedia(opts);
+  // Under a squeezed connection the encoder gives up detail or smoothness.
+  // Whoever picked 60 fps wants motion kept; anything slower is usually text.
+  const track = stream.getVideoTracks()[0];
+  if (track && "contentHint" in track) track.contentHint = fps >= 60 ? "motion" : "detail";
+  return stream;
 }
 
 export interface Devices {

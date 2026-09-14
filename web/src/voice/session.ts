@@ -10,11 +10,13 @@ import { holdReload } from "@/lib/busy";
 import { playSound, startRinging, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { useSettings } from "@/stores/settings";
+import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { LevelMeter, audioContext, getCamera, getMic, getScreen, lastInputChoice, resumeAudio, screenBitrate, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
+import { SpeakingGate } from "./speaking";
+import { shareBitrate } from "./shareQuality";
+import { LevelMeter, audioContext, getCamera, getMic, getScreen, lastInputChoice, resumeAudio, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { convForChannel } from "@/components/composer/send";
 import { useKeys } from "@/stores/keys";
 import { FrameCrypto } from "./e2ee";
@@ -42,6 +44,8 @@ interface Session {
   /** Whether voice activity currently hears speech, and until when it keeps listening after. */
   vadOpen: boolean;
   vadHoldUntil: number;
+  /** Keeps this device's own speaking ring steady between words. */
+  speaking: SpeakingGate;
   /** The server has been told about this call, so leaving has to tell it too. */
   announced: boolean;
 }
@@ -227,7 +231,7 @@ export async function joinVoice(channelId: string): Promise<void> {
     },
   };
   const transport: VoiceTransport = ice.sfu ? new SfuTransport(myId, channelId, ice.servers, events) : new MeshTransport(myId, ice.servers, events);
-  s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, announced: false };
+  s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false };
   session = s;
   releaseCall ??= holdReload();
   let mic: MediaStream | null = null;
@@ -335,7 +339,9 @@ function startMeter(s: Session): void {
       s.vadOpen = open;
       applyTransmit();
     }
-    const speaking = shouldTransmit() && gateOpen() && level > threshold;
+    // the ring holds through the gaps between words, but a muted mic is out at once
+    const loud = s.speaking.update(level > threshold, now);
+    const speaking = shouldTransmit() && gateOpen() && loud;
     useVoice.getState().setSpeaking(myId, speaking);
   }, 80);
 }
@@ -347,6 +353,7 @@ function stopMeter(s: Session): void {
   s.meterTimer = null;
   s.vadOpen = false;
   s.vadHoldUntil = 0;
+  s.speaking.reset();
 }
 
 /** Swap the microphone after a device or processing setting change. */
@@ -460,7 +467,18 @@ export async function toggleCamera(): Promise<void> {
   sendState(s.channelId);
 }
 
-export async function toggleScreen(): Promise<void> {
+/**
+ * Starts a share at the given size and frame rate (the last ones chosen when
+ * not given), unless one is already running. Call it straight from a click:
+ * the browser only opens its screen picker during a user gesture.
+ */
+export async function startScreen(quality?: { resolution: ShareResolution; fps: ShareFps }): Promise<void> {
+  if (session?.screen) return;
+  await toggleScreen(quality);
+}
+
+/** Stops a share, or starts one the way startScreen does. */
+export async function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps }): Promise<void> {
   const s = session;
   if (!s || s.screenPending) return;
   if (s.screen) {
@@ -469,11 +487,13 @@ export async function toggleScreen(): Promise<void> {
     s.transport.setLocalScreen(null);
     useVoice.getState().setLocalScreen(null);
   } else {
-    const q = useSettings.getState().settings.voice.streamQuality;
+    const v = useSettings.getState().settings.voice;
+    const res = quality?.resolution ?? v.shareResolution;
+    const fps = quality?.fps ?? v.shareFps;
     s.screenPending = true;
     let stream: MediaStream;
     try {
-      stream = await getScreen(q);
+      stream = await getScreen(res, fps);
     } catch {
       s.screenPending = false;
       return; // the user cancelled the picker
@@ -487,7 +507,7 @@ export async function toggleScreen(): Promise<void> {
     s.screen = stream;
     const video = stream.getVideoTracks()[0];
     if (video) video.onended = () => void toggleScreen();
-    s.transport.setLocalScreen(stream, screenBitrate(q));
+    s.transport.setLocalScreen(stream, shareBitrate(res, fps));
     useVoice.getState().setLocalScreen(stream);
   }
   sendState(s.channelId);

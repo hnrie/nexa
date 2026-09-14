@@ -18,12 +18,17 @@ import {
   VideoOff,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
+import { CALL_PANEL_DEFAULT, CALL_PANEL_KEY, clampCallPanel, readCallPanel } from "@/lib/callPanel";
+import { callFullscreenWay, enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay, unlockOrientation } from "@/lib/fullscreen";
 import { memberName } from "@/lib/names";
+import { storage } from "@/lib/storage";
+import { pinchView, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
 import { memberColor, useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
@@ -34,28 +39,50 @@ import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice,
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
-/** A video element bound to a MediaStream. */
-export function StreamVideo({ stream, muted = true, mirror = false, className, onDoubleClick }: { stream: MediaStream; muted?: boolean; mirror?: boolean; className?: string; onDoubleClick?: () => void }) {
+/** A video element bound to a MediaStream, that keeps playing through whatever pauses it on iOS. */
+export function StreamVideo({ stream, muted = true, mirror = false, className, onAspect }: { stream: MediaStream; muted?: boolean; mirror?: boolean; className?: string; onAspect?: (ratio: number) => void }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const aspect = useRef(onAspect);
+  aspect.current = onAspect;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.srcObject = stream;
-    void el.play().catch(() => {});
+    // iOS pauses a video when the page is hidden and when its own player closes; a call's picture just carries on
+    const play = () => {
+      if (el.paused && el.srcObject && document.visibilityState === "visible") void el.play().catch(() => {});
+    };
+    const measure = () => {
+      if (el.videoWidth > 0 && el.videoHeight > 0) aspect.current?.(el.videoWidth / el.videoHeight);
+    };
+    play();
+    el.addEventListener("pause", play);
+    el.addEventListener("webkitendfullscreen", play);
+    el.addEventListener("loadedmetadata", measure);
+    el.addEventListener("resize", measure);
+    document.addEventListener("visibilitychange", play);
     return () => {
+      el.removeEventListener("pause", play);
+      el.removeEventListener("webkitendfullscreen", play);
+      el.removeEventListener("loadedmetadata", measure);
+      el.removeEventListener("resize", measure);
+      document.removeEventListener("visibilitychange", play);
       el.srcObject = null;
     };
   }, [stream]);
-  return <video ref={ref} className={className} autoPlay playsInline muted={muted} data-mirror={mirror} onDoubleClick={onDoubleClick} />;
+  return <video ref={ref} className={className} autoPlay playsInline muted={muted} data-mirror={mirror} />;
 }
 
 type Tile = { key: string; userId: string; kind: "avatar" | "video" | "screen"; stream: MediaStream | null; me: boolean };
 
 /** Space between tiles, and around the stage. */
 const GAP = 8;
+/** Two taps on the same thing this close together are a double tap. */
+const DOUBLE_TAP_MS = 350;
 
-const canFullscreen = typeof document !== "undefined" && !!document.fullscreenEnabled;
-const canPip = typeof document !== "undefined" && "pictureInPictureEnabled" in document && !!(document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled;
+const canPip = typeof document !== "undefined" && !!(document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled;
+/** Safari (macOS and iOS) floats a video its own way. */
+const webkitPip = typeof HTMLVideoElement !== "undefined" && "webkitSetPresentationMode" in HTMLVideoElement.prototype;
 
 function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): { w: number; h: number } {
   const [size, setSize] = useState({ w: 0, h: 0 });
@@ -72,13 +99,99 @@ function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): 
   return size;
 }
 
-function ControlButton({ label, onClick, children, on, off, danger, testId }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string }) {
+function ControlButton({ label, onClick, children, on, off, danger, testId, className }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string }) {
   return (
     <Tooltip text={label} side="top">
-      <button className={[s.ctl, danger ? s.leave : ""].join(" ")} data-on={on || undefined} data-off={off || undefined} aria-label={label} aria-pressed={on || off ? true : undefined} onClick={onClick} data-testid={testId}>
+      <button className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")} data-on={on || undefined} data-off={off || undefined} aria-label={label} aria-pressed={on || off ? true : undefined} onClick={onClick} data-testid={testId}>
         {children}
       </button>
     </Tooltip>
+  );
+}
+
+const middle = (list: { x: number; y: number }[]) => ({ x: list.reduce((a, p) => a + p.x, 0) / list.length, y: list.reduce((a, p) => a + p.y, 0) / list.length });
+const spread = (list: { x: number; y: number }[]) => (list.length < 2 ? 0 : Math.hypot(list[0]!.x - list[1]!.x, list[0]!.y - list[1]!.y));
+
+/**
+ * Holds a stream's picture. When `zoomable` (a focused screen share) two
+ * fingers pinch into it and one drags it around once zoomed in: a desktop
+ * share is unreadable on a phone otherwise. The view is written straight onto
+ * the video rather than through React, so it keeps up with the fingers.
+ */
+function StreamSurface({ zoomable, children }: { zoomable: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const view = useRef<View>({ scale: 1, x: 0, y: 0 });
+  const points = useRef(new Map<number, { x: number; y: number }>());
+  const gesture = useRef<{ start: View; from: { x: number; y: number }; spread: number } | null>(null);
+
+  const apply = useCallback(() => {
+    const el = ref.current;
+    const video = el?.querySelector("video");
+    if (!el || !video) return;
+    const v = view.current;
+    video.style.transform = v.scale > 1 ? `translate(${v.x}px, ${v.y}px) scale(${v.scale})` : "";
+    el.dataset.zoomed = String(v.scale > 1);
+  }, []);
+
+  const reset = useCallback(() => {
+    view.current = { scale: 1, x: 0, y: 0 };
+    points.current.clear();
+    gesture.current = null;
+    apply();
+  }, [apply]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // a double tap on the tile asks for the whole picture back
+    el.addEventListener("ec-zoom-reset", reset);
+    return () => el.removeEventListener("ec-zoom-reset", reset);
+  }, [reset]);
+  useEffect(() => {
+    if (!zoomable) reset();
+  }, [zoomable, reset]);
+
+  const at = (e: ReactPointerEvent) => {
+    const r = ref.current!.getBoundingClientRect();
+    return { x: e.clientX - r.left - r.width / 2, y: e.clientY - r.top - r.height / 2 };
+  };
+  const restart = () => {
+    const list = [...points.current.values()];
+    gesture.current = list.length ? { start: { ...view.current }, from: middle(list), spread: spread(list) } : null;
+  };
+  const lift = (e: ReactPointerEvent) => {
+    if (!points.current.delete(e.pointerId)) return;
+    restart();
+  };
+
+  return (
+    <div
+      ref={ref}
+      className={s.surface}
+      data-zoomable={zoomable || undefined}
+      data-no-swipe={zoomable || undefined}
+      onPointerDown={(e) => {
+        if (!zoomable || e.pointerType !== "touch") return;
+        points.current.set(e.pointerId, at(e));
+        if (points.current.size > 1 || view.current.scale > 1) e.currentTarget.setPointerCapture?.(e.pointerId);
+        restart();
+      }}
+      onPointerMove={(e) => {
+        if (!points.current.has(e.pointerId)) return;
+        points.current.set(e.pointerId, at(e));
+        const g = gesture.current;
+        const el = ref.current;
+        if (!g || !el) return;
+        const list = [...points.current.values()];
+        const factor = list.length > 1 && g.spread > 0 ? spread(list) / g.spread : 1;
+        view.current = pinchView(g.start, g.from, middle(list), factor, { width: el.clientWidth, height: el.clientHeight });
+        apply();
+      }}
+      onPointerUp={lift}
+      onPointerCancel={lift}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -109,11 +222,19 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   const openModal = useUI((u) => u.openModal);
   const [canFlip, setCanFlip] = useState(false);
   const [quality, setQuality] = useState<{ rtt: number; loss: number } | null>(null);
-  const [full, setFull] = useState(false);
+  /** What the browser has full screen, if anything. */
+  const [fsEl, setFsEl] = useState<Element | null>(null);
+  /** The call covering the app, where the browser cannot go full screen itself (iPhone). */
+  const [pageFull, setPageFull] = useState(false);
+  /** Each stream's own shape, so a focused portrait camera is not squeezed into a wide frame. */
+  const [aspects, setAspects] = useState<Record<string, number>>({});
   const rootRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef<HTMLDivElement>(null);
   const tileRefs = useRef(new Map<string, HTMLDivElement>());
+  const lastTap = useRef<{ key: string; at: number } | null>(null);
+  const lastPointer = useRef("mouse");
   const connected = mine?.channel_id === channel.id;
   const participants = useMemo(() => participantsOf(byChannel, channel.id), [byChannel, channel.id]);
 
@@ -144,6 +265,9 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     return out;
   }, [participants, remote, localVideo, localScreen, meId]);
 
+  const isLive = (t: Tile) => t.kind === "screen" && !t.me;
+  const showsStream = (t: Tile) => !!t.stream && (t.kind === "video" || t.me || !!watching[t.userId]);
+
   const focusedTile = focused ? tiles.find((t) => t.key === focused) : undefined;
   // a focused tile that has gone (a camera turned off, someone left) lets go of the layout
   useEffect(() => {
@@ -151,42 +275,113 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   }, [focused, focusedTile, setFocused]);
 
   const grid = useBoxSize(gridRef, connected && !focusedTile);
+  // a short stage (a small call panel, a phone on its side) gives the focused stream all of it rather than a sliver above the strip
+  const stage = useBoxSize(stageRef, connected && !!focusedTile);
+  const showStrip = tiles.length > 1 && stage.h >= 240;
   const layout = fitGrid(tiles.length, grid.w, grid.h, GAP);
-  // the focused stream is a 16:9 frame as large as fits, so its label and buttons sit on the picture
+  // the focused stream is a frame of its own shape, as large as fits, so its label and buttons sit on the picture
   const focusBox = useBoxSize(focusRef, connected && !!focusedTile);
-  const focusFit = fitGrid(1, focusBox.w, focusBox.h, 0);
+  const focusAspect = Math.min(21 / 9, Math.max(9 / 21, (focusedTile && aspects[focusedTile.key]) || 16 / 9));
+  const focusFit = fitGrid(1, focusBox.w, focusBox.h, 0, focusAspect);
+  const noteAspect = useCallback((key: string, ratio: number) => setAspects((cur) => (Math.abs((cur[key] ?? 0) - ratio) < 0.01 ? cur : { ...cur, [key]: ratio })), []);
 
+  useEffect(
+    () =>
+      onFullscreenChange(() => {
+        const el = fullscreenElement();
+        setFsEl(el);
+        if (!el) unlockOrientation();
+      }),
+    [],
+  );
+  // hanging up lets go of covering the app
   useEffect(() => {
-    const on = () => setFull(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", on);
-    return () => document.removeEventListener("fullscreenchange", on);
-  }, []);
+    if (!connected) setPageFull(false);
+  }, [connected]);
+  useEffect(() => {
+    if (!pageFull) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || document.querySelector("[data-modal-layer]") || useUI.getState().contextMenu) return;
+      e.stopPropagation();
+      setPageFull(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [pageFull]);
+
+  // a phone showing someone's picture stays awake, the way a video call app does
+  useWakeLock(connected && tiles.some(showsStream));
 
   const nameOf = (uid: string) => memberName(serverState?.members[uid]?.nickname, users[uid], uid === meId ? "You" : "Unknown User");
-  const isLive = (t: Tile) => t.kind === "screen" && !t.me;
-  const showsStream = (t: Tile) => !!t.stream && (t.kind === "video" || t.me || !!watching[t.userId]);
+  const callFull = (!!fsEl && fsEl === rootRef.current) || pageFull;
 
-  const toggleFull = (el?: HTMLElement | null) => {
-    const target = el ?? rootRef.current;
-    if (!target) return;
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void target.requestFullscreen?.();
-  };
-  /** Full-screens one stream, focusing it first so it fills the frame. */
-  const fullscreenTile = (key: string) => {
-    setFocused(key);
-    requestAnimationFrame(() => toggleFull(tileRefs.current.get(key) ?? rootRef.current));
-  };
-  const pip = async (stream: MediaStream) => {
-    const el = document.createElement("video");
-    el.srcObject = stream;
-    el.muted = true;
-    await el.play().catch(() => {});
-    try {
-      await el.requestPictureInPicture();
-    } catch {
-      /* not supported */
+  const toggleCallFull = () => {
+    if (fullscreenElement()) {
+      void exitElementFullscreen().catch(() => {});
+      return;
     }
+    if (pageFull) {
+      setPageFull(false);
+      return;
+    }
+    const root = rootRef.current;
+    if (callFullscreenWay() === "element" && root) void enterElementFullscreen(root).catch(() => setPageFull(true));
+    else setPageFull(true);
+  };
+
+  /** Whether this tile is what fills the screen right now. */
+  const tileIsFull = (t: Tile) => (!!fsEl && fsEl === tileRefs.current.get(t.key)) || (pageFull && focused === t.key);
+
+  /**
+   * Puts one stream full screen the best way this browser has: the tile itself
+   * where elements can go full screen (turning a phone sideways for a wide
+   * picture), the system player on an iPhone, or else focused with the call
+   * covering the app.
+   */
+  const fullscreenTile = (t: Tile) => {
+    if (tileIsFull(t)) {
+      if (fullscreenElement()) void exitElementFullscreen().catch(() => {});
+      else setPageFull(false);
+      return;
+    }
+    const way = streamFullscreenWay();
+    const video = tileRefs.current.get(t.key)?.querySelector("video") ?? null;
+    // the system player has to open inside the tap, on the video that is already playing
+    if (way === "video" && video && enterVideoFullscreen(video)) return;
+    const wide = !!video && video.videoWidth > video.videoHeight;
+    setFocused(t.key);
+    if (way === "element") {
+      requestAnimationFrame(() => {
+        const el = tileRefs.current.get(t.key);
+        if (!el) return;
+        void enterElementFullscreen(el)
+          .then(() => (wide ? lockLandscape() : false))
+          .catch(() => setPageFull(true));
+      });
+      return;
+    }
+    setPageFull(true);
+  };
+
+  const pip = (t: Tile) => {
+    const own = tileRefs.current.get(t.key)?.querySelector("video") as (HTMLVideoElement & { webkitSetPresentationMode?: (mode: string) => void }) | null;
+    if (webkitPip && own) {
+      // Safari only floats a video that is on the page, and only inside the tap
+      if (typeof own.requestPictureInPicture === "function") void own.requestPictureInPicture().catch(() => own.webkitSetPresentationMode?.("picture-in-picture"));
+      else own.webkitSetPresentationMode?.("picture-in-picture");
+      return;
+    }
+    if (!t.stream) return;
+    // elsewhere a video of its own keeps floating after this page moves on
+    const el = document.createElement("video");
+    el.srcObject = t.stream;
+    el.muted = true;
+    void el
+      .play()
+      .then(() => el.requestPictureInPicture())
+      .catch(() => {
+        /* not supported */
+      });
   };
 
   const tileMenu = (e: MouseEvent, t: Tile) => {
@@ -194,7 +389,10 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     const items: ContextMenuItem[] = [{ id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: t.userId }) }];
     if (t.kind === "screen" && t.me) items.push({ id: "stop-share", label: "Stop Sharing", onSelect: () => void toggleScreen() });
     if (isLive(t)) items.push({ id: "watch", label: watching[t.userId] ? "Stop Watching" : "Watch Stream", onSelect: () => setWatching(t.userId, !watching[t.userId]) });
-    if (showsStream(t)) items.push({ id: "focus", label: focused === t.key ? "Unfocus" : "Focus", onSelect: () => setFocused(focused === t.key ? null : t.key) });
+    if (showsStream(t)) {
+      items.push({ id: "focus", label: focused === t.key ? "Unfocus" : "Focus", onSelect: () => setFocused(focused === t.key ? null : t.key) });
+      items.push({ id: "fullscreen", label: tileIsFull(t) ? "Exit Full Screen" : "Full Screen", onSelect: () => fullscreenTile(t) });
+    }
     if (!t.me) {
       const vol = volumes[t.userId] ?? 100;
       items[items.length - 1]!.separatorAfter = true;
@@ -207,6 +405,37 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
+  /**
+   * A click or tap focuses a stream; a double click or tap puts it full
+   * screen, or back to the whole picture when zoomed in. It is watched on the
+   * whole stage, because the first click moves its tile to the focused spot
+   * and the second may land beside it. A mouse keeps the system's
+   * double-click speed (the click's count); taps are timed here, since iOS
+   * does not reliably send dblclick.
+   */
+  const onStageClick = (e: MouseEvent) => {
+    const el = (e.target as Element).closest<HTMLElement>("[data-tile]");
+    const t = el ? tiles.find((x) => x.key === el.dataset.tile) : undefined;
+    const now = performance.now();
+    const last = lastTap.current;
+    const double = !!last && (lastPointer.current === "mouse" ? e.detail >= 2 : now - last.at < DOUBLE_TAP_MS);
+    if (double) {
+      lastTap.current = null;
+      const first = tiles.find((x) => x.key === last.key);
+      if (!first || !showsStream(first)) return;
+      const zoomed = tileRefs.current.get(first.key)?.querySelector<HTMLElement>("[data-zoomed='true']");
+      if (zoomed) zoomed.dispatchEvent(new Event("ec-zoom-reset"));
+      else fullscreenTile(first);
+      return;
+    }
+    if (!t || !showsStream(t)) {
+      lastTap.current = null;
+      return;
+    }
+    lastTap.current = { key: t.key, at: now };
+    if (el?.dataset.place !== "focus") setFocused(t.key);
+  };
+
   const renderTile = (t: Tile, place: "grid" | "focus" | "strip") => {
     const vs = byChannel[channel.id]?.[t.userId];
     const isSpeaking = !!speaking[t.userId] && t.kind !== "screen";
@@ -214,6 +443,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     const peerState = t.me ? "connected" : (peers[t.userId] ?? "new");
     const live = isLive(t);
     const playing = showsStream(t);
+    const full = playing && tileIsFull(t);
     const box = place === "grid" ? layout : place === "focus" ? focusFit : null;
     const size: CSSProperties | undefined = box && box.width > 0 ? { width: box.width, height: box.height } : undefined;
     const tileH = box?.height ?? 96;
@@ -232,14 +462,14 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
         data-speaking={isSpeaking}
         data-peer-state={peerState}
         data-user={t.userId}
+        data-tile={t.key}
+        data-no-swipe={full || undefined}
         onContextMenu={(e) => tileMenu(e, t)}
-        onClick={() => {
-          if (place !== "focus" && playing) setFocused(t.key);
-        }}
-        onDoubleClick={() => playing && canFullscreen && fullscreenTile(t.key)}
       >
         {playing && t.stream ? (
-          <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video" && currentCameraFacing() === "user"} className={s.video} />
+          <StreamSurface zoomable={place === "focus" && t.kind === "screen"}>
+            <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video" && currentCameraFacing() === "user"} className={s.video} onAspect={(r) => noteAspect(t.key, r)} />
+          </StreamSurface>
         ) : live ? (
           <div className={s.offer}>
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
@@ -291,21 +521,23 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
         {place !== "strip" && (playing || (t.me && t.kind === "screen")) ? (
           <div className={s.tileBtns} onClick={(e) => e.stopPropagation()}>
             {t.me && t.kind === "screen" ? (
-              <button className={s.tileBtn} aria-label="Stop sharing" title="Stop sharing" onClick={() => void toggleScreen()}><MonitorX size={16} /></button>
+              <button className={s.tileBtn} aria-label="Stop sharing" title="Stop sharing" onClick={() => void toggleScreen()}><MonitorX size={18} /></button>
             ) : null}
             {live && watching[t.userId] ? (
-              <button className={s.tileBtn} aria-label="Stop watching" title="Stop watching" data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={16} /></button>
+              <button className={s.tileBtn} aria-label="Stop watching" title="Stop watching" data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={18} /></button>
             ) : null}
-            {playing ? (
+            {playing && !full ? (
               <button className={s.tileBtn} aria-label={place === "focus" ? "Unfocus" : "Focus"} title={place === "focus" ? "Unfocus" : "Focus"} onClick={() => setFocused(place === "focus" ? null : t.key)}>
-                {place === "focus" ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                {place === "focus" ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
               </button>
             ) : null}
-            {playing && canPip && t.stream ? (
-              <button className={s.tileBtn} aria-label="Picture in picture" title="Picture in picture" onClick={() => void pip(t.stream!)}><PictureInPicture2 size={16} /></button>
+            {playing && (canPip || webkitPip) && t.stream ? (
+              <button className={s.tileBtn} aria-label="Picture in picture" title="Picture in picture" onClick={() => pip(t)}><PictureInPicture2 size={18} /></button>
             ) : null}
-            {playing && canFullscreen ? (
-              <button className={s.tileBtn} aria-label="Full screen" title="Full screen" data-testid="tile-fullscreen" onClick={() => fullscreenTile(t.key)}><Maximize size={16} /></button>
+            {playing ? (
+              <button className={s.tileBtn} aria-label={full ? "Exit full screen" : "Full screen"} title={full ? "Exit full screen" : "Full screen"} data-testid="tile-fullscreen" onClick={() => fullscreenTile(t)}>
+                {full ? <Minimize size={18} /> : <Maximize size={18} />}
+              </button>
             ) : null}
           </div>
         ) : null}
@@ -334,13 +566,20 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
 
   const level = quality ? (quality.loss > 0.05 || quality.rtt > 400 ? "bad" : quality.rtt > 150 ? "ok" : "good") : "unknown";
   return (
-    <div className={s.root} ref={rootRef} data-embedded={embedded} data-full={full}>
-      <div className={s.stage}>
+    <div className={s.root} ref={rootRef} data-embedded={embedded} data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined}>
+      <div
+        className={s.stage}
+        ref={stageRef}
+        onPointerDown={(e) => {
+          lastPointer.current = e.pointerType;
+        }}
+        onClick={onStageClick}
+      >
         {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>Large rooms strain peer-to-peer calls.</div> : null}
         {focusedTile ? (
           <>
             <div className={s.focus} ref={focusRef}>{renderTile(focusedTile, "focus")}</div>
-            {tiles.length > 1 ? <div className={s.strip}>{tiles.filter((t) => t.key !== focusedTile.key).map((t) => renderTile(t, "strip"))}</div> : null}
+            {showStrip ? <div className={s.strip}>{tiles.filter((t) => t.key !== focusedTile.key).map((t) => renderTile(t, "strip"))}</div> : null}
           </>
         ) : (
           <div className={s.grid} ref={gridRef}>
@@ -363,18 +602,109 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
             <ControlButton label="Switch camera" onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>
           ) : null}
           {canShareScreen ? (
-            <ControlButton label={localScreen ? "Stop sharing" : "Share your screen"} on={!!localScreen} onClick={() => void toggleScreen()} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
+            <ControlButton label={localScreen ? "Stop sharing" : "Share your screen"} on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
           ) : null}
+          {/* phones have no side column for it, so full screen joins the row there */}
+          <ControlButton label={callFull ? "Exit full screen" : "Full screen"} on={callFull} onClick={toggleCallFull} className={s.narrowOnly} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
           <ControlButton label="Disconnect" danger onClick={() => void leaveVoice()} testId="voice-leave"><PhoneOff size={22} /></ControlButton>
         </div>
         <div className={[s.controlsSide, s.controlsEnd].join(" ")}>
-          {canFullscreen ? (
-            <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
-              <button className={s.sideBtn} aria-label={full ? "Exit full screen" : "Full screen"} onClick={() => toggleFull()}>{full ? <Minimize size={20} /> : <Maximize size={20} />}</button>
-            </Tooltip>
-          ) : null}
+          <Tooltip text={callFull ? "Exit full screen" : "Full screen"} side="top">
+            <button className={s.sideBtn} aria-label={callFull ? "Exit full screen" : "Full screen"} onClick={toggleCallFull} data-testid="call-fullscreen">{callFull ? <Minimize size={20} /> : <Maximize size={20} />}</button>
+          </Tooltip>
         </div>
       </div>
+      {embedded && !callFull ? <CallResizer root={rootRef} /> : null}
     </div>
+  );
+}
+
+/**
+ * The grab bar under a call above a conversation: drag it (mouse, finger or
+ * arrow keys) to share the height between the call and the chat. The share is
+ * written straight onto the panel while dragging and saved on this device when
+ * let go. A double click or double tap puts it back.
+ */
+function CallResizer({ root }: { root: React.RefObject<HTMLDivElement | null> }) {
+  const [share, setShare] = useState(() => readCallPanel(storage.get(CALL_PANEL_KEY)));
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ id: number; top: number; height: number; y: number; moved: boolean; share: number } | null>(null);
+  const lastTap = useRef(0);
+
+  useLayoutEffect(() => {
+    root.current?.style.setProperty("--call-share", String(share));
+  }, [root, share]);
+
+  const containerHeight = () => root.current?.parentElement?.getBoundingClientRect().height ?? 0;
+  const commit = (next: number) => {
+    const clamped = clampCallPanel(next, containerHeight());
+    setShare(clamped);
+    root.current?.style.setProperty("--call-share", String(clamped));
+    storage.set(CALL_PANEL_KEY, String(clamped));
+  };
+  const reset = () => commit(CALL_PANEL_DEFAULT);
+
+  const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !root.current) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { id: e.pointerId, top: root.current.getBoundingClientRect().top, height: containerHeight(), y: e.clientY, moved: false, share };
+    setDragging(true);
+  };
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId || !(d.height > 0)) return;
+    if (Math.abs(e.clientY - d.y) > 3) d.moved = true;
+    if (!d.moved) return;
+    d.share = clampCallPanel((e.clientY - d.top) / d.height, d.height);
+    root.current?.style.setProperty("--call-share", String(d.share));
+  };
+  const onUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    drag.current = null;
+    setDragging(false);
+    if (d.moved) {
+      commit(d.share);
+      return;
+    }
+    if (e.pointerType === "mouse") return;
+    const now = performance.now();
+    if (now - lastTap.current < DOUBLE_TAP_MS) {
+      lastTap.current = 0;
+      reset();
+    } else lastTap.current = now;
+  };
+  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === "ArrowUp" ? -0.05 : e.key === "ArrowDown" ? 0.05 : e.key === "PageUp" ? -0.2 : e.key === "PageDown" ? 0.2 : 0;
+    if (step) commit(share + step);
+    else if (e.key === "Home") commit(0);
+    else if (e.key === "End") commit(1);
+    else if (e.key === "Enter") reset();
+    else return;
+    e.preventDefault();
+  };
+
+  return (
+    <div
+      className={s.resizer}
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize call"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(share * 100)}
+      title="Drag to resize, double-click to reset"
+      tabIndex={0}
+      data-dragging={dragging || undefined}
+      data-native-press=""
+      data-testid="call-resizer"
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+      onDoubleClick={reset}
+      onKeyDown={onKey}
+    />
   );
 }

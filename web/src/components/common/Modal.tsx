@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { usePortalRoot } from "@/hooks/usePortalRoot";
 import s from "./Modal.module.css";
 
 /** Only the most recently opened dialog reacts to Escape; portals mount in order, so the last in the DOM is on top. */
@@ -24,6 +25,7 @@ interface Props {
 
 export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const portalRoot = usePortalRoot();
   // Held in a ref so a caller passing a fresh function on every render does
   // not re-run the effect below: that put the caret back on the dialog after
   // every keystroke, so a field could only ever take one character.
@@ -63,6 +65,6 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
         {footer ? <div className={s.footer}>{footer}</div> : null}
       </div>
     </div>,
-    document.body,
+    portalRoot,
   );
 }

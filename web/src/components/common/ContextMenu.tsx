@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePortalRoot } from "@/hooks/usePortalRoot";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import s from "./ContextMenu.module.css";
 
@@ -38,6 +39,7 @@ export function ContextMenuHost() {
   const ref = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const portalRoot = usePortalRoot();
 
   useLayoutEffect(() => {
     if (!menu || !ref.current) {
@@ -120,6 +122,6 @@ export function ContextMenuHost() {
         ))}
       </div>
     </>,
-    document.body,
+    portalRoot,
   );
 }
