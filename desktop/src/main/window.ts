@@ -6,6 +6,7 @@
 import { app, BrowserWindow, Menu, clipboard, screen, shell, type ContextMenuParams, type WebContents } from "electron";
 import path from "node:path";
 import { BASE, ORIGIN, START_URL, isAppUrl } from "./config";
+import { loopbackAudio } from "./permissions";
 import type { SettingsStore } from "./settings";
 
 /** Hands a link to the system, for the web schemes only. */
@@ -51,7 +52,7 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
       webSecurity: true,
       spellcheck: true,
       // the preload only offers the bridge to pages of this origin
-      additionalArguments: [`--evilion-origin=${ORIGIN}`, `--evilion-version=${app.getVersion()}`],
+      additionalArguments: [`--evilion-origin=${ORIGIN}`, `--evilion-version=${app.getVersion()}`, `--evilion-share-audio=${loopbackAudio() ? 1 : 0}`],
     },
   });
   if (saved?.maximized) win.maximize();

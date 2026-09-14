@@ -215,6 +215,24 @@ describe.skipIf(process.platform === "win32")("the Rich Presence server", () => 
     expect(((await again.next()).json as { data: { user: { id: string } } }).data.user.id).toBe("999");
   });
 
+  it("gives Discord its name back at once when the app is ending", async () => {
+    const { env, at } = socketEnv();
+    await fakeDiscord(at(0));
+    const moves: unknown[] = [];
+    const svc = service(env, { rememberMove: (m) => moves.push(m) });
+    await svc.start();
+    const app = await program(at(0));
+    await app.next();
+    expect(moves[0]).toEqual({ from: at(0), to: at(9) });
+    // nothing is awaited: the process may end right after this returns
+    svc.stopForExit();
+    expect(moves.at(-1)).toBeNull();
+    expect(fs.existsSync(at(9))).toBe(false);
+    expect(await probe(at(0))).toBe("listening");
+    const again = await program(at(0));
+    expect(((await again.next()).json as { data: { user: { id: string } } }).data.user.id).toBe("999");
+  });
+
   it("keeps answering a program when Discord quits under it", async () => {
     const { env, at } = socketEnv();
     const discord = await fakeDiscord(at(0));

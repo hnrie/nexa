@@ -9,6 +9,7 @@ import { IPC, type DesktopSettings, type DisplaySourceRequest, type Identity, ty
 const arg = (name: string): string => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? "";
 const origin = arg("evilion-origin");
 const version = arg("evilion-version");
+const shareAudio = arg("evilion-share-audio") === "1";
 
 function listen<T>(channel: string) {
   return (cb: (payload: T) => void): (() => void) => {
@@ -22,6 +23,7 @@ if (origin && location.origin === origin) {
   contextBridge.exposeInMainWorld("evilionDesktop", {
     version,
     platform: process.platform,
+    shareAudio,
     rpc: {
       getState: (): Promise<RpcState> => ipcRenderer.invoke(IPC.rpcGetState),
       setEnabled: (on: boolean): Promise<void> => ipcRenderer.invoke(IPC.rpcSetEnabled, !!on),
@@ -47,5 +49,7 @@ if (origin && location.origin === origin) {
     onDisplaySources: listen<DisplaySourceRequest>(IPC.displaySources),
     chooseDisplaySource: (requestId: string, sourceId: string | null, withAudio: boolean): void => ipcRenderer.send(IPC.displayChoose, String(requestId), sourceId === null ? null : String(sourceId), !!withAudio),
     onTrayAction: listen<"mute" | "deafen">(IPC.trayAction),
+    focusWindow: (): void => ipcRenderer.send(IPC.focusWindow),
+    requestAttention: (): void => ipcRenderer.send(IPC.requestAttention),
   });
 }

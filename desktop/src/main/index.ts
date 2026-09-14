@@ -72,6 +72,10 @@ async function start(): Promise<void> {
     e.preventDefault();
     win?.hide();
   });
+  // Windows signing out or shutting down closes the window itself; the tray must not hold that up
+  win.on("session-end", () => {
+    quitting = true;
+  });
   win.on("closed", () => {
     win = null;
   });
@@ -159,7 +163,29 @@ function registerIpc(): void {
 
   on(IPC.setBadge, (count: number) => setBadge(Math.max(0, Math.floor(Number(count) || 0))));
   on(IPC.setCallActive, (active: boolean) => win?.webContents.setBackgroundThrottling(!active));
+  // a notification clicked while the window sits in the tray or minimised brings it back
+  on(IPC.focusWindow, () => showWindow());
+  on(IPC.requestAttention, () => requestAttention());
   on(IPC.displayChoose, (requestId: string, sourceId: string | null, withAudio: boolean) => chooseDisplaySource(String(requestId), sourceId === null ? null : String(sourceId), !!withAudio));
+}
+
+/**
+ * Draws the eye to a notification the way the system does, while the window
+ * is not being looked at: the taskbar button flashes on Windows (and Linux
+ * where the window manager supports it) until the window is focused, and the
+ * Dock icon bounces once on macOS.
+ */
+function requestAttention(): void {
+  if (!win || win.isDestroyed() || win.isFocused()) return;
+  if (process.platform === "darwin") {
+    app.dock?.bounce("informational");
+    return;
+  }
+  win.flashFrame(true);
+  const w = win;
+  w.once("focus", () => {
+    if (!w.isDestroyed()) w.flashFrame(false);
+  });
 }
 
 function desktopSettings(): DesktopSettings {
@@ -211,35 +237,35 @@ function setBadge(count: number): void {
 
 /**
  * Stops Rich Presence once, so Discord's socket goes back to its own name
- * before the process ends; a stop that hangs does not keep the app open.
+ * before the process ends. It never waits: a quit held up to wait for it never
+ * finished when the system was the one ending the app (a shutdown, a logout,
+ * a kill), and the app stayed running.
  */
-function stopRpc(): Promise<void> {
+function stopRpc(): void {
   const stopping = rpc;
   rpc = null;
-  if (!stopping) return Promise.resolve();
-  return Promise.race([stopping.stop().catch((err) => log("rpc stop failed", { err: String(err) })), new Promise<void>((r) => setTimeout(r, 3000))]);
+  try {
+    stopping?.stopForExit();
+  } catch (err) {
+    log("rpc stop failed", { err: String(err) });
+  }
 }
 
 function quitForUpdate(install: () => void): void {
   log("quitting to update");
   quitting = true;
-  void stopRpc().finally(() => {
-    settings.flush();
-    install();
-  });
+  stopRpc();
+  settings.flush();
+  install();
 }
 
 app.on("activate", () => showWindow());
 app.on("before-quit", () => {
   quitting = true;
 });
-app.on("will-quit", (e) => {
-  if (!rpc) return;
-  e.preventDefault();
-  void stopRpc().finally(() => {
-    settings.flush();
-    app.quit();
-  });
+app.on("will-quit", () => {
+  stopRpc();
+  settings.flush();
 });
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

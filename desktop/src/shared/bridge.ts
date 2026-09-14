@@ -93,4 +93,6 @@ export const IPC = {
   displaySources: "display:sources",
   displayChoose: "display:choose",
   trayAction: "tray:action",
+  focusWindow: "app:focus-window",
+  requestAttention: "app:request-attention",
 } as const;

@@ -5,6 +5,7 @@
  */
 import { desktopCapturer, session, systemPreferences, type BrowserWindow } from "electron";
 import { randomUUID } from "node:crypto";
+import os from "node:os";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
 import { isAppUrl, originOf, ORIGIN } from "./config";
 
@@ -29,7 +30,12 @@ export function lockPermissions(): void {
     }
     callback(true);
   });
-  ses.setPermissionCheckHandler((_wc, permission, requestingOrigin) => requestingOrigin === ORIGIN && ALLOWED.has(permission));
+  ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    // Electron hands the origin over as a URL with a trailing slash ("https://host/"), and
+    // empty for some checks; compared as it came, every check failed and notifications stayed off
+    const origin = originOf(requestingOrigin) || originOf(details.requestingUrl) || originOf(details.embeddingOrigin) || originOf(wc?.getURL());
+    return origin === ORIGIN && ALLOWED.has(permission);
+  });
   // nothing is ever loaded from anywhere else as a page, and downloads keep the system's own save flow
   ses.on("will-download", (_e, item) => {
     if (!isAppUrl(item.getURL()) && !item.getURL().startsWith("blob:") && !item.getURL().startsWith("data:")) item.cancel();
@@ -39,9 +45,16 @@ export function lockPermissions(): void {
 const pending = new Map<string, { resolve: (sourceId: string | null, audio: boolean) => void }>();
 
 /**
- * Answers the page's getDisplayMedia. On macOS 15 and later the system's own
- * picker is used; elsewhere the page shows its picker with the screens and
- * windows sent here, and Wayland's portal shows its own.
+ * Answers the page's getDisplayMedia: the page shows its picker with the
+ * screens and windows sent here, and exactly the one chosen is shared (on
+ * Wayland the portal asks instead). macOS's own picker is not used: in
+ * Electron it is experimental, and a window picked there could end up as the
+ * whole screen.
+ *
+ * Sound comes as system loopback, where the platform has it and the share
+ * asked for sound. When the page also asks for restrictOwnAudio, Electron
+ * captures everything but this app's own playback, so a call never hears
+ * itself back through the share.
  */
 export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void {
   const wayland = process.platform === "linux" && (process.env.XDG_SESSION_TYPE === "wayland" || !!process.env.WAYLAND_DISPLAY);
@@ -66,7 +79,7 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
             return;
           }
           const requestId = randomUUID();
-          const audio = process.platform === "win32";
+          const audio = request.audioRequested && loopbackAudio();
           const req: DisplaySourceRequest = {
             requestId,
             audio,
@@ -93,8 +106,24 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null): void 
         }
       })();
     },
-    { useSystemPicker: true },
   );
+}
+
+/**
+ * Whether this computer can share its sound without the call's own sound in
+ * it. Only a loopback that leaves this app out is offered: Windows 10 2004
+ * (build 19041) and later, and macOS 14.2 and later. Older systems capture
+ * the call along with everything else, which everyone else then hears echo
+ * back, so their shares go without sound. EVILION_FORCE_LOOPBACK offers it
+ * anyway, for testing the page's own check.
+ */
+export function loopbackAudio(): boolean {
+  if (process.env.EVILION_FORCE_LOOPBACK) return true;
+  const [major = 0, minor = 0, build = 0] = os.release().split(".").map(Number);
+  if (process.platform === "win32") return major > 10 || (major === 10 && build >= 19041);
+  // Darwin 23.2 is macOS 14.2
+  if (process.platform === "darwin") return major > 23 || (major === 23 && minor >= 2);
+  return false;
 }
 
 /** The page chose a source (null: the person cancelled). */

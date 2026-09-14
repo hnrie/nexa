@@ -3,6 +3,7 @@
  * transports, a session per connected program, and the activities they report.
  */
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import type { Identity, RpcActivity, RpcApp, RpcState } from "../../shared/bridge";
 import { DiscordLocator, restartDiscordWindows, type Moved } from "./discord";
 import type { Frame } from "./frame";
@@ -107,6 +108,31 @@ export class RpcService extends EventEmitter {
     // Discord gets its own name back only once ours is gone
     this.locator.restore();
     this.changed();
+  }
+
+  /**
+   * What has to happen before the process ends, all at once: programs are
+   * let go, our socket is removed and Discord's gets its own name back. The
+   * servers finish closing with the process. Nothing here waits, because an
+   * exit that has to wait (a shutdown, a logout, a kill) may never come back.
+   */
+  stopForExit(): void {
+    for (const e of [...this.entries.values()]) e.session.end();
+    this.entries.clear();
+    const own = this.ipc?.path ?? null;
+    void this.ipc?.close();
+    void this.ws?.close();
+    this.ipc = null;
+    this.ws = null;
+    // a socket file stays until its server has closed; Discord's can only take the name once ours is gone
+    if (own && this.platform !== "win32") {
+      try {
+        fs.rmSync(own, { force: true });
+      } catch {
+        /* already gone */
+      }
+    }
+    this.locator.restore();
   }
 
   private addSession(conn: AppConnection, clientId: string): { handle(frame: Frame): void; end(): void } {
