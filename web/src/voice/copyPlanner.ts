@@ -20,7 +20,9 @@
  * Listeners' losses alone do not count, and neither does a longer wait alone:
  * the losses that call for copies are often still growing when copies start,
  * and a path that changes (a phone moving onto mobile data) waits longer by
- * itself.
+ * itself. Nor are copies tried on an uplink that is full already: losing much
+ * of this device's voice while every reply is slow (a queue). Opus's own FEC
+ * covers what such a link drops, and copies would only fill it more.
  */
 
 export interface VoiceReport {
@@ -80,6 +82,13 @@ const UPLINK_JUMP = [1.5, 0.15] as const;
 const UPLINK_FAR_JUMP = [2, 0.25] as const;
 /** Copies that passed their trial stop when the uplink loses far more and this device's round trip grows this much: an upload filling it, say. */
 const QUEUE_RTT_MS = 100;
+/**
+ * An uplink losing this much, while the latest round trip is this much over
+ * the lowest in RTT_FLOOR_MS, is full: nothing is tried on it.
+ */
+const FULL_UPLINK_LOSS = 0.1;
+const FULL_RTT_MS = 150;
+const RTT_FLOOR_MS = 120_000;
 /** After copies make things worse, none go out for this long, so the link drains before anything else is tried. */
 export const COOLDOWN_MS = 20_000;
 /**
@@ -112,8 +121,8 @@ export class CopyPlanner {
   private heard = new Map<string, Heard[]>();
   /** What the SFU said it lost of this device's voice at recent checks, oldest first. */
   private uplinks: { loss: number; at: number }[] = [];
-  /** This device's round trip to the SFU at the last few checks, oldest first. */
-  private rtts: number[] = [];
+  /** This device's round trip to the SFU at recent checks, oldest first. */
+  private rtts: { ms: number; at: number }[] = [];
   private changedAt = Number.NEGATIVE_INFINITY;
   /** More copies being tried: how each listener was before, and what the uplink lost then. */
   private trial: { to: number; at: number; before: Map<string, Summary>; uplink: number | null } | null = null;
@@ -139,8 +148,8 @@ export class CopyPlanner {
   }
 
   /** This device's round trip to the SFU, as measured now. */
-  roundTrip(ms: number): void {
-    this.rtts = [...this.rtts.slice(-2), ms];
+  roundTrip(ms: number, now: number): void {
+    this.rtts = [...this.rtts.filter((r) => now - r.at <= RTT_FLOOR_MS), { ms, at: now }];
   }
 
   /**
@@ -148,7 +157,14 @@ export class CopyPlanner {
    * every reply slow, while jitter or one slow reply does not.
    */
   rtt(): number | null {
-    return this.rtts.length > 0 ? Math.min(...this.rtts) : null;
+    return this.rtts.length > 0 ? Math.min(...this.rtts.slice(-3).map((r) => r.ms)) : null;
+  }
+
+  /** Whether this device's uplink is full already: losing much of its voice, with the latest reply slow for the path. */
+  private uplinkFull(now: number): boolean {
+    const latest = this.rtts.at(-1);
+    const recent = this.uplinks.filter((u) => u.at >= now - UPLINK_BEFORE_MS).map((u) => u.loss);
+    return latest !== undefined && recent.length > 0 && average(recent) >= FULL_UPLINK_LOSS && latest.ms >= Math.min(...this.rtts.map((r) => r.ms)) + FULL_RTT_MS;
   }
 
   update(now: number): void {
@@ -187,7 +203,7 @@ export class CopyPlanner {
           const current = reports.filter((r) => began(r) >= this.changedAt + LAG_MS);
           if (current.length > 0) before.set(from, mean(current));
         }
-        if (before.size === 0) return;
+        if (before.size === 0 || this.uplinkFull(now)) return;
         this.trial = { to: want, at: now, before, uplink };
       }
       this.set(want, now);

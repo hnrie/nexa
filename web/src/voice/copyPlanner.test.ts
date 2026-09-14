@@ -118,11 +118,11 @@ describe("copies of voice frames", () => {
 
   it("keep going when audio waits longer on a path that changed but loses no more", () => {
     const t = planner();
-    t.p.roundTrip(40);
+    t.p.roundTrip(40, t.at());
     t.report(0.08, 0.12, 100);
     expect(t.p.depth).toBe(2);
     // onto mobile data: a longer round trip and a bigger jitter buffer, but the same losses, most of them covered now
-    for (let i = 0; i < 3; i++) t.p.roundTrip(200);
+    for (let i = 0; i < 3; i++) t.p.roundTrip(200, t.at());
     t.wait(SETTLE_MS);
     t.report(0.09, 0.01, 350);
     t.wait(SETTLE_MS);
@@ -147,7 +147,7 @@ describe("copies of voice frames", () => {
 
   it("that passed stop when this device's uplink starts losing far more and its round trip grows", () => {
     const t = planner();
-    t.p.roundTrip(40);
+    t.p.roundTrip(40, t.at());
     t.p.uplink(0.04, t.at());
     t.report(0.06, 0.05, 100);
     for (let i = 0; i < 8; i++) {
@@ -164,19 +164,35 @@ describe("copies of voice frames", () => {
     t.wait(10);
     expect(t.p.depth).toBe(2);
     // an upload fills it: more lost, and every reply slower
-    for (let i = 0; i < 3; i++) t.p.roundTrip(300);
+    for (let i = 0; i < 3; i++) t.p.roundTrip(300, t.at());
     t.wait(2_000);
     t.p.uplink(0.35, t.at());
     t.wait(10);
     expect(t.p.depth).toBe(0);
   });
 
+  it("are not tried on an uplink that is full already, but are on one that only loses packets", () => {
+    const full = planner();
+    for (let i = 0; i < 5; i++) full.p.roundTrip(42, full.at() - 10_000 + i * 2_000);
+    // a link too narrow for the voice alone: a quarter lost, and replies wait in its queue
+    full.p.roundTrip(366, full.at());
+    full.p.uplink(0.26, full.at());
+    full.report(0.27, 0.02, 400);
+    expect(full.p.depth).toBe(0);
+    // the queue drains, the losses stay: a lossy radio link, not a full one
+    for (let i = 0; i < 3; i++) full.p.roundTrip(45, full.at());
+    full.wait(2_000);
+    full.p.uplink(0.27, full.at());
+    full.report(0.27, 0.1, 100);
+    expect(full.p.depth).toBe(2);
+  });
+
   it("do not count one slow round trip", () => {
     const t = planner();
-    t.p.roundTrip(40);
+    t.p.roundTrip(40, t.at());
     t.report(0.04, 0.03);
-    t.p.roundTrip(400);
-    t.p.roundTrip(45);
+    t.p.roundTrip(400, t.at());
+    t.p.roundTrip(45, t.at());
     t.wait(TRIAL_MS);
     expect(t.p.depth).toBe(1);
   });
@@ -212,7 +228,7 @@ describe("copies of voice frames", () => {
 
   it("that passed stop when the link starts queueing later", () => {
     const t = planner();
-    t.p.roundTrip(40);
+    t.p.roundTrip(40, t.at());
     t.report(0.06, 0.05, 100);
     t.wait(SETTLE_MS);
     t.report(0.06, 0.01, 130);

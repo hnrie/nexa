@@ -653,7 +653,7 @@ export class SfuTransport implements VoiceTransport {
     for (const r of report.values() as IterableIterator<RTCStats & { kind?: string; mid?: string; ssrc?: number; packetsSent?: number; packetsLost?: number }>) {
       if (r.type === "candidate-pair" && (r as RTCIceCandidatePairStats).nominated && (r as RTCIceCandidatePairStats).state === "succeeded") {
         const rtt = (r as RTCIceCandidatePairStats).currentRoundTripTime;
-        if (typeof rtt === "number") this.copies.roundTrip(rtt * 1000);
+        if (typeof rtt === "number") this.copies.roundTrip(rtt * 1000, now);
       }
       if (r.type === "outbound-rtp" && r.kind === "audio" && r.mid !== undefined && r.mid === this.senders.audio?.mid && r.ssrc !== undefined) mine = { ssrc: r.ssrc, sent: r.packetsSent ?? 0 };
       if (r.type === "remote-inbound-rtp" && r.kind === "audio" && r.ssrc !== undefined && typeof r.packetsLost === "number") lostBySsrc.set(r.ssrc, r.packetsLost);
