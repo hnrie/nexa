@@ -73,6 +73,9 @@ func (x *Conn) SessionID() ids.ID { return x.c.session.ID }
 // shares the session, so state owned by a single socket is keyed by this.
 func (x *Conn) ID() ids.ID { return x.c.id }
 
+// Guest returns the guest on this connection, or nil for an account.
+func (x *Conn) Guest() *store.Guest { return x.c.guest }
+
 // Send enqueues a frame to this connection only.
 func (x *Conn) Send(t string, d any) { x.c.enqueue(ServerFrame{T: t, S: x.c.hub.nextSeq(), D: d}) }
 
@@ -82,12 +85,15 @@ type conn struct {
 	ws      *websocket.Conn
 	user    *store.User
 	session *store.Session
-	send    chan ServerFrame
-	closed  chan struct{}
-	once    sync.Once
-	beat    atomic.Int64
-	typing  map[ids.ID]time.Time
-	typMu   sync.Mutex
+	// guest is set on a connection from a guest link: its user is a stand-in,
+	// and all it may do is heartbeat and be in its one call
+	guest  *store.Guest
+	send   chan ServerFrame
+	closed chan struct{}
+	once   sync.Once
+	beat   atomic.Int64
+	typing map[ids.ID]time.Time
+	typMu  sync.Mutex
 
 	ops         *rate.Limiter
 	presence    *rate.Limiter
@@ -210,11 +216,15 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var idd identifyData
 	_ = json.Unmarshal(frame.D, &idd)
 	user, session := h.auth.Resolve(ctx, idd.Token)
+	var guest *store.Guest
+	if user == nil {
+		user, session, guest = h.auth.ResolveGuest(ctx, idd.Token)
+	}
 	if user == nil {
 		_ = ws.Close(4001, "authentication failed")
 		return
 	}
-	c := &conn{id: ids.New(), hub: h, ws: ws, user: user, session: session, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
+	c := &conn{id: ids.New(), hub: h, ws: ws, user: user, session: session, guest: guest, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
 		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst),
 		actLimit: rate.NewLimiter(rate.Every(activityEvery), activityBurst)}
 	c.beat.Store(time.Now().UnixMilli())
@@ -222,7 +232,12 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Register before building ready, so events fired meanwhile are held for
 	// this connection instead of reaching nobody.
 	first := h.register(c)
-	ready, err := h.buildReady(ctx, user, session)
+	var ready *ReadyPayload
+	if guest != nil {
+		ready, err = h.buildGuestReady(ctx, guest, session)
+	} else {
+		ready, err = h.buildReady(ctx, user, session)
+	}
 	if err != nil {
 		h.log.Error("ready", "user", user.ID, "err", err)
 		h.unregister(c)
@@ -230,7 +245,8 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c.goLive(ServerFrame{T: EvReady, S: h.nextSeq(), D: ready})
-	if first {
+	// a guest has no presence: nobody lists them anywhere but in the call
+	if first && guest == nil {
 		h.broadcastPresence(ctx, user)
 	}
 
@@ -243,10 +259,10 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.OnConnClose(context.Background(), user.ID, c.id)
 	}
 	// what this connection was doing ends with it; the user's other devices may still say something
-	if c.dropActivities() && !last {
+	if c.dropActivities() && !last && guest == nil {
 		h.broadcastUser(context.Background(), user.ID)
 	}
-	if last {
+	if last && guest == nil {
 		bg := context.Background()
 		if u, err := h.st.UserByID(bg, user.ID); err == nil {
 			h.broadcastPresence(bg, u)
@@ -310,6 +326,13 @@ func (c *conn) readLoop(ctx context.Context) {
 
 func (c *conn) handle(ctx context.Context, f ClientFrame) {
 	h := c.hub
+	if c.guest != nil {
+		switch f.Op {
+		case OpHeartbeat, OpVoiceState, OpVoiceSignal:
+		default:
+			return
+		}
+	}
 	switch f.Op {
 	case OpHeartbeat:
 		c.beat.Store(time.Now().UnixMilli())
@@ -496,6 +519,20 @@ func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.
 		}
 	}
 	return others, true
+}
+
+// buildGuestReady is everything a guest is told: who they are, and their one
+// call (filled in by GuestReady). No conversations, people or servers.
+func (h *Hub) buildGuestReady(ctx context.Context, g *store.Guest, session *store.Session) (*ReadyPayload, error) {
+	p := &ReadyPayload{SessionID: session.ID, Users: []store.PublicUser{}, Channels: []*store.Channel{}, Relationships: []store.RelationshipView{}, ReadStates: []*store.ReadState{},
+		Presences: []Presence{}, KeyGrants: []*store.KeyGrant{}, Servers: []any{}, Emojis: []*store.Emoji{}, StickerPacks: []*store.StickerPack{}, VoiceStates: []any{}}
+	p.User = map[string]any{"id": g.ID, "username": "", "display_name": g.DisplayName, "avatar_id": nil, "flags": store.FlagGuest, "created_at": g.CreatedAt}
+	if h.GuestReady != nil {
+		if err := h.GuestReady(ctx, g, p); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
 }
 
 // buildReady assembles the initial state for a user.

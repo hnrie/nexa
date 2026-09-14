@@ -77,6 +77,12 @@ func (s *Server) staticHandler() http.Handler {
 				return
 			}
 		}
+		// A guest link says what it is when pasted elsewhere, and nothing about whose call it is.
+		if code, ok := strings.CutPrefix(p, "/call/"); ok && code != "" && !strings.Contains(code, "/") {
+			if s.serveGuestCallPage(w, r, dist) {
+				return
+			}
+		}
 		index := filepath.Join(dist, "index.html")
 		f, err := os.Open(index)
 		if err != nil {
@@ -169,6 +175,39 @@ func (s *Server) serveInvitePage(w http.ResponseWriter, r *http.Request, dist, c
 	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
 	tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
 
+	body := string(raw)
+	if i := strings.Index(body, "</head>"); i >= 0 {
+		body = body[:i] + tags.String() + "\n" + body[i:]
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-cache, must-revalidate")
+	h.Set("CDN-Cache-Control", "no-store")
+	h.Set("Content-Security-Policy", CSP)
+	if r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return true
+	}
+	_, _ = w.Write([]byte(body))
+	return true
+}
+
+// serveGuestCallPage renders index.html with preview tags for a guest link:
+// an invitation to a voice call, with no name, server or people in it, since
+// the link says nothing about where it leads to whoever does not open it.
+func (s *Server) serveGuestCallPage(w http.ResponseWriter, r *http.Request, dist string) bool {
+	raw, err := os.ReadFile(filepath.Join(dist, "index.html"))
+	if err != nil {
+		return false
+	}
+	const title, desc = "Join a voice call", "You're invited to a voice call. No account needed: pick a name and join."
+	var tags strings.Builder
+	tags.WriteString("\n<title>" + escapeAttr(title) + "</title>")
+	for _, m := range [][2]string{{"og:type", "website"}, {"og:site_name", s.issuer()}, {"og:title", title}, {"og:description", desc}} {
+		tags.WriteString("\n<meta property=\"" + m[0] + "\" content=\"" + escapeAttr(m[1]) + "\">")
+	}
+	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
+	tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
 	body := string(raw)
 	if i := strings.Index(body, "</head>"); i >= 0 {
 		body = body[:i] + tags.String() + "\n" + body[i:]

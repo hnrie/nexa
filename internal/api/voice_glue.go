@@ -37,11 +37,34 @@ type voiceStatePayload struct {
 	// Media maps the kinds this participant publishes through the SFU to a
 	// tag that changes whenever that track is published again.
 	Media map[string]string `json:"media,omitempty"`
+	// User is enough of the participant to show them in the call. Guests are
+	// told nothing else about anyone, and nobody else knows a guest otherwise.
+	User *callUser `json:"user,omitempty"`
+	// Guest marks someone in through a guest link, with the key epoch their
+	// link carried, so the people in the call can hand them newer keys.
+	Guest *guestMark `json:"guest,omitempty"`
+}
+
+type callUser struct {
+	ID          ids.ID  `json:"id"`
+	DisplayName string  `json:"display_name"`
+	AvatarID    *ids.ID `json:"avatar_id"`
+	Flags       int64   `json:"flags"`
+}
+
+type guestMark struct {
+	Epoch int `json:"epoch"`
 }
 
 func statePayload(st voice.State) voiceStatePayload {
 	ch := st.ChannelID
-	return voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags()}
+	out := voiceStatePayload{UserID: st.UserID, ChannelID: &ch, SessionID: st.SessionID, SelfMute: st.SelfMute, SelfDeaf: st.SelfDeaf, Video: st.Video, Streaming: st.Streaming, ServerMute: st.ServerMute || st.Suppress, ServerDeaf: st.ServerDeaf, JoinedAt: st.JoinedAt, Media: st.Tracks.Tags(),
+		User: &callUser{ID: st.UserID, DisplayName: st.Name, AvatarID: st.AvatarID}}
+	if st.Guest {
+		out.User.Flags = store.FlagGuest
+		out.Guest = &guestMark{Epoch: st.GuestEpoch}
+	}
+	return out
 }
 
 func leavePayload(st voice.State) voiceStatePayload {
@@ -50,7 +73,7 @@ func leavePayload(st voice.State) voiceStatePayload {
 }
 
 func (s *Server) voiceRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/voice/ice", s.authed(s.handleVoiceICE))
+	mux.Handle("GET /api/v1/voice/ice", s.callAuthed(s.handleVoiceICE))
 	mux.Handle("GET /api/v1/channels/{id}/voice", s.authed(s.handleVoiceParticipants))
 	mux.Handle("POST /api/v1/channels/{id}/call/decline", s.authed(s.handleCallDecline))
 	mux.Handle("PATCH /api/v1/servers/{id}/members/{uid}/voice", s.authed(s.handleVoiceModerate))
@@ -72,7 +95,9 @@ func (s *Server) WireVoice(hub *gateway.Hub) {
 	if hub == nil {
 		return
 	}
+	s.hub = hub
 	hub.VoiceOp = s.handleVoiceOp
+	hub.GuestReady = s.guestReady
 	// Only the socket that holds the call ends it by closing. Another tab of
 	// the same session, or a dead socket reaped after a reconnect already
 	// rejoined, must leave the live call alone.
@@ -102,13 +127,21 @@ func (s *Server) WireVoice(hub *gateway.Hub) {
 	}
 }
 
-// voiceAudience lists who should hear about a channel's voice changes.
+// voiceAudience lists who should hear about a channel's voice changes: whoever
+// can see the channel, and the guests in its call, who hear about nothing else.
 func (s *Server) voiceAudience(ctx context.Context, ch *store.Channel) []ids.ID {
+	var out []ids.ID
 	if s.isDM(ch) {
-		return ch.Recipients
+		out = append(out, ch.Recipients...)
+	} else {
+		out, _ = s.Store.ChannelViewers(ctx, ch.ID)
 	}
-	viewers, _ := s.Store.ChannelViewers(ctx, ch.ID)
-	return viewers
+	for _, st := range s.Voice.Participants(ch.ID) {
+		if st.Guest {
+			out = append(out, st.UserID)
+		}
+	}
+	return out
 }
 
 func (s *Server) broadcastVoiceLeave(ctx context.Context, st voice.State) {
@@ -118,6 +151,10 @@ func (s *Server) broadcastVoiceLeave(ctx context.Context, st voice.State) {
 		return
 	}
 	audience := s.voiceAudience(ctx, ch)
+	if st.Guest {
+		// a guest who was put out of the call hears it too
+		audience = append(audience, st.UserID)
+	}
 	s.Bcast.EmitUsers(audience, "voice_state", leavePayload(st))
 	if s.isDM(ch) && s.Voice.Count(ch.ID) == 0 {
 		s.Bcast.EmitUsers(audience, "call_end", map[string]any{"channel_id": ch.ID, "reason": "ended"})
@@ -161,6 +198,7 @@ func voiceErr(c *gateway.Conn, code, msg string) {
 // handleVoiceOp serves the voice_state and voice_signal gateway ops.
 func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, data []byte) {
 	me := c.User()
+	guest := c.Guest()
 	switch op {
 	case gateway.OpVoiceState:
 		var req voiceStateReq
@@ -176,6 +214,11 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			}
 			return
 		}
+		// a guest's link is for one call, and no other channel exists for them
+		if guest != nil && *req.ChannelID != guest.ChannelID {
+			voiceErr(c, "not_found", "That channel does not exist.")
+			return
+		}
 		ch, err := s.Store.ChannelByID(ctx, *req.ChannelID)
 		if err != nil {
 			voiceErr(c, "not_found", "That channel does not exist.")
@@ -186,8 +229,9 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			voiceErr(c, code, msg)
 			return
 		}
-		wasEmpty := s.Voice.Count(ch.ID) == 0
-		resumed := req.Resume || s.Voice.RecentlyActive(ch.ID)
+		// guests waiting in a call do not make it one: the first account to join still starts it
+		wasEmpty := s.Voice.MemberCount(ch.ID) == 0
+		resumed := req.Resume || (s.Voice.RecentlyActive(ch.ID) && s.Voice.Count(ch.ID) == s.Voice.MemberCount(ch.ID))
 		cur, had := s.Voice.Get(me.ID)
 		inSame := had && cur.ChannelID == ch.ID
 		// Everyone in a call has to connect the same way. A page set up for
@@ -209,7 +253,11 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 				keep = true
 			}
 		}
-		old := s.Voice.Join(voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak)}, keep)
+		next := voice.State{UserID: me.ID, ChannelID: ch.ID, SessionID: c.SessionID(), ConnID: c.ID(), SelfMute: req.SelfMute, SelfDeaf: req.SelfDeaf, Video: req.Video, Streaming: req.Streaming, Suppress: !p.Has(perms.Speak), Name: me.DisplayName, AvatarID: me.AvatarID}
+		if guest != nil {
+			next.Guest, next.GuestEpoch = true, guest.Epoch
+		}
+		old := s.Voice.Join(next, keep)
 		if old != nil && old.ChannelID != ch.ID {
 			s.broadcastVoiceLeave(ctx, *old)
 		} else if old != nil && old.ConnID != c.ID() {
@@ -222,11 +270,12 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		s.sfuSyncLive(st)
 		audience := s.voiceAudience(ctx, ch)
 		s.Bcast.EmitUsers(audience, "voice_state", statePayload(st))
-		if s.isDM(ch) && !inSame && !wasEmpty {
+		if guest == nil && s.isDM(ch) && !inSame && !wasEmpty {
 			// answering: this user's other devices stop ringing
 			s.Bcast.EmitUsers([]ids.ID{me.ID}, "call_end", map[string]any{"channel_id": ch.ID, "user_id": me.ID, "reason": "answered"})
 		}
-		if s.isDM(ch) && wasEmpty && !inSame {
+		// a guest never rings anyone: the link lets them wait in the call, not call people
+		if guest == nil && s.isDM(ch) && wasEmpty && !inSame {
 			// joining an empty DM starts a call: ring the others, except
 			// anyone who blocked the caller
 			others := []ids.ID{}
@@ -282,6 +331,9 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 // canJoinVoice checks channel type, membership, blocks, Connect, timeouts and
 // the user limit, and returns the caller's permissions in the channel.
 func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Channel) (perms.Perm, bool, string, string) {
+	if me.Flags&store.FlagGuest != 0 {
+		return s.canGuestJoinVoice(ctx, me, ch)
+	}
 	if ch.Type == "subchat" {
 		return 0, false, "no_call", "A subchat has no call of its own. Use the conversation it belongs to."
 	}
@@ -349,7 +401,7 @@ func (s *Server) handleVoiceICE(w http.ResponseWriter, r *http.Request) {
 	if relay := s.cloudflareTURN(r); relay != nil {
 		servers = append(servers, relay...)
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"ice_servers": servers, "sfu": s.Realtime != nil})
+	WriteJSON(w, http.StatusOK, map[string]any{"ice_servers": servers, "sfu": s.Realtime != nil, "guests": s.guestsOn()})
 }
 
 // turnTTL is how long a minted relay credential lasts, and turnReuse how long
@@ -384,15 +436,28 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 	if me == nil {
 		return nil
 	}
-	turnCache.Lock()
-	if hit, ok := turnCache.m[me.ID]; ok && time.Since(hit.at) < turnReuse {
-		servers := hit.servers
+	ttl := turnTTL
+	guest := auth.GuestFrom(r.Context())
+	if guest != nil {
+		// a guest's relay lasts no longer than the guest may stay, and is minted fresh rather than handed out again
+		ttl = time.Until(time.UnixMilli(guest.ExpiresAt))
+		if ttl > turnTTL {
+			ttl = turnTTL
+		}
+		if ttl < time.Minute {
+			return nil
+		}
+	} else {
+		turnCache.Lock()
+		if hit, ok := turnCache.m[me.ID]; ok && time.Since(hit.at) < turnReuse {
+			servers := hit.servers
+			turnCache.Unlock()
+			return servers
+		}
 		turnCache.Unlock()
-		return servers
 	}
-	turnCache.Unlock()
 
-	body, _ := json.Marshal(map[string]any{"ttl": int(turnTTL.Seconds()), "customIdentifier": me.ID.String()})
+	body, _ := json.Marshal(map[string]any{"ttl": int(ttl.Seconds()), "customIdentifier": me.ID.String()})
 	url := "https://rtc.live.cloudflare.com/v1/turn/keys/" + urlpkg.PathEscape(s.Cfg.TurnKeyID) + "/credentials/generate-ice-servers"
 	req, err := http.NewRequestWithContext(r.Context(), "POST", url, bytes.NewReader(body))
 	if err != nil {
@@ -426,12 +491,14 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 		}
 		list = []map[string]any{one}
 	}
-	turnCache.Lock()
-	turnCache.m[me.ID] = struct {
-		at      time.Time
-		servers []map[string]any
-	}{time.Now(), list}
-	turnCache.Unlock()
+	if guest == nil {
+		turnCache.Lock()
+		turnCache.m[me.ID] = struct {
+			at      time.Time
+			servers []map[string]any
+		}{time.Now(), list}
+		turnCache.Unlock()
+	}
 	return list
 }
 
@@ -487,7 +554,8 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if !s.canActOn(r.Context(), srv, me.ID, uid) {
+	// a guest holds no roles, so anyone with the permission may act on one
+	if !st.Guest && !s.canActOn(r.Context(), srv, me.ID, uid) {
 		WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You cannot moderate this member."))
 		return
 	}
@@ -562,12 +630,15 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		s.Bcast.EmitUsers(s.voiceAudience(r.Context(), cur), "voice_state", statePayload(updated))
 	}
 	if disconnect {
-		if left, ok := s.Voice.Leave(uid); ok {
+		if g, err := s.Store.GuestByID(r.Context(), uid); st.Guest && err == nil {
+			// a guest disconnected would only join again: they are let go
+			s.endGuest(r.Context(), g, "removed")
+		} else if left, ok := s.Voice.Leave(uid); ok {
 			s.broadcastVoiceLeave(r.Context(), left)
 		}
 	} else if dest != nil && dest.ID != cur.ID {
 		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {
-			old := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak)}, true)
+			old := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Name: latest.Name, AvatarID: latest.AvatarID}, true)
 			if old != nil {
 				// what they pulled in the old channel stops; their client makes a new session
 				s.closeSFUSession(old.SFUSession)
@@ -615,6 +686,12 @@ func (s *Server) voiceChannelDeleted(ctx context.Context, ch *store.Channel) {
 	if len(cleared) > 0 && s.isDM(ch) {
 		s.Bcast.EmitUsers(audience, "call_end", map[string]any{"channel_id": ch.ID, "reason": "ended"})
 	}
+	// the channel's guests went with it; their sockets are told and closed
+	for _, st := range cleared {
+		if st.Guest {
+			s.dropGuest(ctx, st.UserID, "ended")
+		}
+	}
 }
 
 // voiceServerDeleted kicks everyone out of the voice channels of a deleted
@@ -630,6 +707,9 @@ func (s *Server) voiceServerDeleted(chans []*store.Channel, members []ids.ID) {
 		for _, st := range s.Voice.ClearChannel(ch.ID) {
 			s.closeSFUSession(st.SFUSession)
 			s.Bcast.EmitUsers(members, "voice_state", leavePayload(st))
+			if st.Guest {
+				s.dropGuest(context.Background(), st.UserID, "ended")
+			}
 		}
 	}
 }

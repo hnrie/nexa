@@ -24,11 +24,12 @@ import (
 const maxSDPBytes = 256 << 10
 
 func (s *Server) sfuRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /api/v1/voice/sfu/session", s.authed(s.handleSFUSession))
-	mux.Handle("POST /api/v1/voice/sfu/publish", s.authed(s.handleSFUPublish))
-	mux.Handle("POST /api/v1/voice/sfu/subscribe", s.authed(s.handleSFUSubscribe))
-	mux.Handle("PUT /api/v1/voice/sfu/renegotiate", s.authed(s.handleSFURenegotiate))
-	mux.Handle("PUT /api/v1/voice/sfu/close", s.authed(s.handleSFUClose))
+	// guests in a call run it through these too
+	mux.Handle("POST /api/v1/voice/sfu/session", s.callAuthed(s.handleSFUSession))
+	mux.Handle("POST /api/v1/voice/sfu/publish", s.callAuthed(s.handleSFUPublish))
+	mux.Handle("POST /api/v1/voice/sfu/subscribe", s.callAuthed(s.handleSFUSubscribe))
+	mux.Handle("PUT /api/v1/voice/sfu/renegotiate", s.callAuthed(s.handleSFURenegotiate))
+	mux.Handle("PUT /api/v1/voice/sfu/close", s.callAuthed(s.handleSFUClose))
 }
 
 // sfuCaller returns the caller and their call on this device, answering the

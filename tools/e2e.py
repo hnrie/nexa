@@ -4,7 +4,7 @@ contexts and drives them through the core flows, taking screenshots along the wa
 
   PLAYWRIGHT_VENV=... python3 tools/e2e.py [--out tools/out] [--keep] [--headed]
 """
-import argparse, os, shutil, signal, socket, struct, subprocess, sys, tempfile, time, zlib
+import argparse, json, os, shutil, signal, socket, struct, subprocess, sys, tempfile, time, zlib
 from pathlib import Path
 
 VENV = os.environ.get("PLAYWRIGHT_VENV")
@@ -39,7 +39,8 @@ class Server:
         # where the instance running for real on this machine serves from.
         web_dist = os.environ.get("E2E_WEB_DIST") or str(ROOT / "web/dist")
         chatd = os.environ.get("E2E_CHATD") or str(ROOT / "bin/chatd")
-        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS="none", MAX_UPLOAD_BYTES=str(1 << 30))
+        # GUEST_LINKS_P2P: calls here go peer to peer, where guest links are off unless asked for
+        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS="none", MAX_UPLOAD_BYTES=str(1 << 30), GUEST_LINKS_P2P="1")
         self.log = open(self.dir / "chatd.log", "w")
         self.proc = subprocess.Popen([chatd], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.dir))
         for _ in range(50):
@@ -445,9 +446,48 @@ def voice_flow(srv, alice, bob, server_id):
     for sess in (alice, bob):
         sess.page.wait_for_selector("[data-peer-state=connected][data-user]", timeout=40000)
     alice.shot("dm-call")
+    guest_call(alice, bob)
     b.click("[data-testid=voice-status-leave]")
     a.click("[data-testid=voice-status-leave]")
     a.wait_for_function("() => !document.querySelector('[data-testid=voice-status]')", timeout=20000)
+
+
+def guest_call(alice, bob):
+    """A guest with no account joins alice and bob's DM call through a link, reaches nothing else, and is removed."""
+    a, b = alice.page, bob.page
+    a.click("[data-testid=invite-guests]")
+    box = a.locator("[data-testid=guest-link]")
+    box.wait_for(timeout=15000)
+    link = ""
+    for _ in range(100):
+        link = box.input_value()
+        if "#k=" in link:
+            break
+        time.sleep(0.1)
+    assert "/call/" in link and "#k=" in link, f"guest link: {link}"
+    a.keyboard.press("Escape")
+    gctx = a.context.browser.new_context(permissions=["microphone", "camera"])
+    g = gctx.new_page()
+    try:
+        g.goto(link, wait_until="networkidle")
+        g.fill("[data-testid=guest-name]", "Visitor")
+        g.click("[data-testid=guest-join]")
+        g.wait_for_selector("[data-testid=guest-call]", timeout=30000)
+        g.wait_for_function("() => document.querySelectorAll('[data-peer-state=connected][data-user]').length === 3", timeout=60000)
+        code = link.split("/call/")[1].split("#")[0]
+        stay = json.loads(g.evaluate(f"() => sessionStorage.getItem('ec.guest.{code}')"))
+        gid = stay["guest"]["id"]
+        for path in ("/users/@me", "/users/@me/channels", "/users/@me/relationships"):
+            st = g.evaluate("async ([p, t]) => (await fetch('/api/v1' + p, { headers: { Authorization: 'Bearer ' + t } })).status", [path, stay["token"]])
+            assert st == 401, f"a guest reached {path}: {st}"
+        b.wait_for_selector(f"[data-tile='{gid}:avatar'] >> text=Guest", timeout=20000)
+        alice.shot("dm-call-guest")
+        a.locator(f"[data-tile='{gid}:avatar']").click(button="right")
+        a.click("text=Remove From Call")
+        g.wait_for_selector("text=You were removed from the call.", timeout=15000)
+        b.wait_for_selector(f"[data-tile='{gid}:avatar']", state="detached", timeout=15000)
+    finally:
+        gctx.close()
 
 
 def polish_flow(srv, alice, bob, server_id):

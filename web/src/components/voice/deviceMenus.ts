@@ -20,7 +20,7 @@ function nameOf(d: MediaDeviceInfo, i: number, kind: string): string {
  * the browser can route it, which speakers it plays through. A choice takes
  * effect at once, in a call too, and is the same one the voice settings show.
  */
-export async function micMenuItems(openModal: OpenModal): Promise<ContextMenuItem[]> {
+export async function micMenuItems(openModal: OpenModal, opts: { settings?: boolean } = {}): Promise<ContextMenuItem[]> {
   const devices = await listDevices().catch(() => ({ inputs: [], outputs: [], cameras: [] }));
   const store = useSettings.getState();
   const v = store.settings.voice;
@@ -39,13 +39,14 @@ export async function micMenuItems(openModal: OpenModal): Promise<ContextMenuIte
       items.push({ id: `output-${d.deviceId}`, label: nameOf(d, i, "Speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => set({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) });
     });
   }
+  if (opts.settings === false) return items;
   items[items.length - 1]!.separatorAfter = true;
   items.push({ id: "voice-settings", label: "Voice Settings", onSelect: () => openModal("settings", { page: "voice" }) });
   return items;
 }
 
 /** The menu under the camera button: which camera to use, switched live when it is on. */
-export async function cameraMenuItems(openModal: OpenModal): Promise<ContextMenuItem[]> {
+export async function cameraMenuItems(openModal: OpenModal, opts: { settings?: boolean } = {}): Promise<ContextMenuItem[]> {
   const devices = await listDevices().catch(() => ({ inputs: [], outputs: [], cameras: [] }));
   const store = useSettings.getState();
   const v = store.settings.voice;
@@ -60,6 +61,7 @@ export async function cameraMenuItems(openModal: OpenModal): Promise<ContextMenu
       items.push({ id: `camera-${d.deviceId}`, label: nameOf(d, i, "Camera"), checked: v.cameraDeviceId === d.deviceId, onSelect: () => set({ cameraDeviceId: d.deviceId, cameraDeviceLabel: d.label || null }) });
     });
   }
+  if (opts.settings === false) return items;
   items[items.length - 1]!.separatorAfter = true;
   items.push({ id: "video-settings", label: "Video Settings", onSelect: () => openModal("settings", { page: "voice" }) });
   return items;

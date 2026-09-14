@@ -34,6 +34,8 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	-- back to how version 6 looked: undo what later migrations add
 	ALTER TABLE uploads DROP COLUMN blob_id;
 	DROP TABLE realtime_usage;
+	DROP TABLE guests;
+	DROP TABLE guest_links;
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)

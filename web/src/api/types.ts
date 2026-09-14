@@ -257,6 +257,44 @@ export interface VoiceState {
    * screen, screen_audio) with a tag that changes when that track is published again.
    */
   media?: Partial<Record<"audio" | "video" | "screen" | "screen_audio", string>>;
+  /** Enough of the participant to show them in the call; all a guest ever learns about anyone. */
+  user?: CallUser;
+  /** Set for someone in through a guest link, with the key epoch their link carried. */
+  guest?: { epoch: number };
+}
+
+/** The flag on a user who is a guest in a call rather than an account. */
+export const GUEST_FLAG = 8;
+
+export interface CallUser {
+  id: Snowflake;
+  display_name: string;
+  avatar_id: Snowflake | null;
+  flags: number;
+}
+
+/** A link that lets people without an account into one call. */
+export interface GuestLink {
+  code: string;
+  channel_id: Snowflake;
+  creator_id: Snowflake;
+  /** The key epoch whose call key the link carries. */
+  epoch: number;
+  created_at: number;
+  expires_at: number;
+  /** How many guests are in through it now. */
+  guests: number;
+}
+
+/** What a guest is told about their own stay. */
+export interface GuestInfo {
+  id: Snowflake;
+  display_name: string;
+  channel_id: Snowflake;
+  epoch: number;
+  expires_at: number;
+  /** Whether calls go through the SFU, and so need the link's key. */
+  sfu: boolean;
 }
 
 export interface IceServer {
@@ -475,6 +513,8 @@ export interface ReadyPayload {
   emojis: Emoji[];
   sticker_packs: StickerPack[];
   voice_states: VoiceState[];
+  /** Only in a guest's ready: which call they are in. */
+  guest?: GuestInfo;
 }
 
 export interface UnfurlResult {

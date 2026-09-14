@@ -2,8 +2,9 @@
  * The voice session: joins and leaves channels, owns local media, drives the
  * mesh transport from gateway events, and applies mute/deafen/PTT/VAD.
  */
+import { users as usersApi } from "@/api/users";
 import { voice as voiceApi } from "@/api/voice";
-import type { VoiceState } from "@/api/types";
+import { GUEST_FLAG, type PublicUser, type VoiceState } from "@/api/types";
 import type { GatewayEvent } from "@/gateway/events";
 import { gateway } from "@/gateway/session";
 import { holdReload } from "@/lib/busy";
@@ -20,7 +21,10 @@ import { shareBitrate } from "./shareQuality";
 import { LevelMeter, audioContext, getCamera, getMic, getScreen, lastInputChoice, resumeAudio, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { convForChannel } from "@/components/composer/send";
 import { useKeys } from "@/stores/keys";
+import { useUsers } from "@/stores/users";
+import { ring } from "@/lib/keyring";
 import { FrameCrypto } from "./e2ee";
+import { hasGuestKeys, openRelayedKeys, sealKeysForGuest } from "./guestKeys";
 import { MeshTransport, type SignalPayload } from "./mesh";
 import { SfuTransport } from "./sfu";
 import type { TransportEvents, VoiceTransport } from "./transport";
@@ -54,7 +58,7 @@ interface Session {
 let session: Session | null = null;
 /** Keeps a new version of the app from reloading the page while in a call. */
 let releaseCall: (() => void) | null = null;
-let iceCache: { servers: RTCIceServer[]; sfu: boolean; at: number } | null = null;
+let iceCache: { servers: RTCIceServer[]; sfu: boolean; guests: boolean; at: number } | null = null;
 /** Bumped by every join and leave, so a join still waiting on the network can tell it was overtaken. */
 let joinSeq = 0;
 /** This connection's gateway session, to tell this device's call from the same account's other devices. */
@@ -116,6 +120,89 @@ function me(): string | undefined {
   return useAuth.getState().me?.id;
 }
 
+/** Whether this page is a guest's, in a call through a guest link, rather than an account's. */
+function asGuest(): boolean {
+  return ((useAuth.getState().me?.flags ?? 0) & GUEST_FLAG) !== 0;
+}
+
+const BLANK_USER: Omit<PublicUser, "id"> = { username: "", display_name: "", avatar_id: null, banner_id: null, about_me: "", pronouns: "", accent_color: null, accent_color_2: null, status_text: "", status_emoji: "", status_expires_at: null, public_key: "", flags: 0, created_at: 0 };
+
+/** Accounts in a call this page is fetching the profile of. */
+const fetchingCallUsers = new Set<string>();
+
+/**
+ * Keeps whoever is in a call known by name. A guest is known no other way,
+ * and a guest's own page knows nobody else, so those take what the call says.
+ * An account's page fetches the real profile of an account it does not know
+ * yet, rather than keep a stand-in that would stop the profile ever loading.
+ */
+function rememberCallUser(vs: VoiceState): void {
+  const u = vs.user;
+  if (!u || !vs.channel_id) return;
+  const users = useUsers.getState();
+  const known = users.byId[u.id];
+  if (!asGuest() && (u.flags & GUEST_FLAG) === 0) {
+    if (known || fetchingCallUsers.has(u.id)) return;
+    fetchingCallUsers.add(u.id);
+    void usersApi
+      .get(u.id)
+      .then((full) => useUsers.getState().upsert(full))
+      .catch(() => {})
+      .finally(() => fetchingCallUsers.delete(u.id));
+    return;
+  }
+  if (known && known.display_name === u.display_name && known.avatar_id === u.avatar_id && known.flags === u.flags) return;
+  users.upsert({ ...BLANK_USER, ...known, id: u.id, display_name: u.display_name, avatar_id: u.avatar_id, flags: u.flags });
+}
+
+/** The keys handed to each guest in the call, by what they were made from, so each change goes out once. */
+const relayedTo = new Map<string, string>();
+/**
+ * How often the call checks for guests who need newer keys than their link
+ * brought. A key change shows up here within this long, and until the guest
+ * has the new key they cannot open what this device seals with it; the check
+ * itself is only a comparison of epoch lists.
+ */
+const GUEST_RELAY_MS = 1000;
+let relayTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Hands the guests in this call the call keys newer than the ones their links
+ * carried, sealed so only a holder of the link can open them. Everyone in the
+ * call does it; a guest keeps the first copy and ignores the rest.
+ */
+function relayGuestKeys(s: Session): void {
+  if (session !== s || asGuest() || !(s.transport instanceof SfuTransport)) return;
+  const myId = me();
+  const conv = convForChannel(s.channelId);
+  const epochs = ring.epochs(conv);
+  for (const p of participantsOf(useVoice.getState().byChannel, s.channelId)) {
+    if (!p.guest || p.user_id === myId) continue;
+    // a guest who joins again (a reload) has lost what it was given
+    const made = `${p.joined_at}:${p.guest.epoch}:${epochs.join(",")}`;
+    if (relayedTo.get(p.user_id) === made) continue;
+    relayedTo.set(p.user_id, made);
+    const to = p.user_id;
+    void sealKeysForGuest(s.channelId, to, p.guest.epoch, epochs, (epoch) => ring.get(conv, epoch))
+      .then((payload) => {
+        if (payload && session === s) gateway()?.send("voice_signal", { to, payload: { guest_keys: payload } });
+      })
+      .catch(() => relayedTo.delete(to));
+  }
+}
+
+function startRelay(s: Session): void {
+  stopRelay();
+  if (asGuest()) return;
+  relayTimer = setInterval(() => relayGuestKeys(s), GUEST_RELAY_MS);
+}
+
+function stopRelay(): void {
+  if (relayTimer) clearInterval(relayTimer);
+  relayTimer = null;
+  relayedTo.clear();
+}
+
 /** `resume` marks a rejoin after a reconnect, so the server does not treat it as a new call. */
 function sendState(channelId: string | null, resume = false): void {
   const local = useVoiceLocal.getState();
@@ -137,7 +224,7 @@ async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boolean } | 
   if (iceCache && Date.now() - iceCache.at < ICE_CACHE_MS) return iceCache;
   try {
     const res = await voiceApi.ice();
-    iceCache = { servers: res.ice_servers as RTCIceServer[], sfu: !!res.sfu, at: Date.now() };
+    iceCache = { servers: res.ice_servers as RTCIceServer[], sfu: !!res.sfu, guests: res.guests !== false, at: Date.now() };
     return iceCache;
   } catch {
     // Not kept, and not guessed: a server that sends calls through the SFU
@@ -239,10 +326,13 @@ export async function joinVoice(channelId: string): Promise<void> {
   if (!ice) return refuse("Could not reach the server to start the call. Check your connection and try again.");
   if (ice.sfu) {
     if (!FrameCrypto.supported()) return refuse("This browser cannot make encrypted calls. Update it to join.");
-    // the call's frames are sealed with the conversation's key, which has to be on this device first
-    const key = await useKeys.getState().ensureConvKey(convForChannel(channelId)).catch(() => null);
-    if (seq !== joinSeq) return;
-    if (!key) return refuse("This conversation's keys have not reached this device yet. Try again in a moment.");
+    // the call's frames are sealed with the conversation's key, which has to be on this device first;
+    // a guest brought the call's key in its link instead
+    if (!hasGuestKeys(channelId)) {
+      const key = await useKeys.getState().ensureConvKey(convForChannel(channelId)).catch(() => null);
+      if (seq !== joinSeq) return;
+      if (!key) return refuse(asGuest() ? "This link is missing the call's key. Ask for the whole link again." : "This conversation's keys have not reached this device yet. Try again in a moment.");
+    }
   }
   // the session the transport's events belong to; set just below, before anything can fire
   let s: Session;
@@ -311,6 +401,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   s.announced = true;
   sendState(channelId);
   startQuality(s);
+  startRelay(s);
   playSound("join");
   const convo = useChannels.getState().byId[channelId];
   const others = participantsOf(useVoice.getState().byChannel, channelId).filter((p) => p.user_id !== me());
@@ -325,6 +416,7 @@ export async function leaveVoice(notify = true): Promise<void> {
   releaseCall?.();
   releaseCall = null;
   stopQuality();
+  stopRelay();
   if (s) {
     stopMeter(s);
     disconnectInput(s);
@@ -633,6 +725,11 @@ export function inVoice(): string | null {
   return session?.channelId ?? null;
 }
 
+/** Whether this server takes guests in calls; null before the call's settings arrived. */
+export function guestLinksOn(): boolean | null {
+  return iceCache ? iceCache.guests : null;
+}
+
 /** Whether this call goes through the SFU rather than peer to peer. */
 export function callThroughSfu(): boolean {
   return session?.transport instanceof SfuTransport;
@@ -668,6 +765,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
     case "voice_state": {
       const vs = e.d;
       const before = vs.channel_id ? null : channelOfUser(vs.user_id);
+      rememberCallUser(vs);
       store.applyState(vs);
       if (vs.user_id === myId) {
         // The server keeps one call per account and tells all its devices.
@@ -701,6 +799,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
           session.transport.setRoster(everyone);
           session.transport.joined(vs);
           applyTransmit();
+          relayGuestKeys(session);
         } else if (!elsewhere && session && (vs.old_channel_id === session.channelId || !vs.old_channel_id)) {
           // disconnected server-side (kick, channel deleted, moderator)
           void leaveVoice(false);
@@ -723,11 +822,20 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       syncPeers();
       // cameras, shares and what people publish change without anyone joining or leaving
       session.transport.setRoster(participantsOf(useVoice.getState().byChannel, session.channelId));
+      relayGuestKeys(session);
       return;
     }
-    case "voice_signal":
+    case "voice_signal": {
+      const payload = e.d.payload as { guest_keys?: unknown } | null;
+      if (payload && typeof payload === "object" && "guest_keys" in payload) {
+        // newer call keys for a guest, from someone in the call; another guest has none to give
+        const from = session && e.d.channel_id === session.channelId ? useVoice.getState().byChannel[e.d.channel_id]?.[e.d.from] : undefined;
+        if (from && !from.guest && asGuest() && myId) void openRelayedKeys(e.d.channel_id, myId, payload.guest_keys);
+        return;
+      }
       if (session && e.d.channel_id === session.channelId) session.transport.handleSignal(e.d.from, e.d.payload as SignalPayload);
       return;
+    }
     case "voice_error":
       if (SIGNAL_ERRORS.has(e.d.code)) {
         console.warn("voice: signal refused:", e.d.code);
@@ -772,6 +880,7 @@ function channelOfUser(userId: string): string | null {
 
 export function onReadyVoice(list: VoiceState[], sessionId?: string): void {
   mySessionId = sessionId ?? null;
+  for (const vs of list) rememberCallUser(vs);
   // a reconnect may follow a restart that changed how calls connect
   iceCache = null;
   useVoice.getState().setAll(list);

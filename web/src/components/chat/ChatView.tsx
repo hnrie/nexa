@@ -243,6 +243,8 @@ export function ChatView({ channel }: { channel: Channel }) {
               if (isServer) items.push({ id: "invite", label: "Invite People", onSelect: () => openModal("invite", { serverId, channelId: channel.id }) });
               else items.push({ id: "add", label: convo.type === "dm" ? "Add Friends to DM" : "Invite to Group", onSelect: () => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id }) });
               if (isServer || convo.type === "group_dm") items.push({ id: "members", label: membersOpen ? "Hide Members" : "Show Members", onSelect: toggleMembers });
+              // a phone's call bar has no room for it, so inviting guests to the call is here too
+              if (!isServer && inThisCall && (convo.type === "dm" || convo.type === "group_dm")) items.push({ id: "guests", label: "Invite Guests to Call", onSelect: () => openModal("guestLink", { channelId: convo.id }) });
               openContextMenu({ x: Math.max(8, r.right - 200), y: r.bottom + 4, items });
             }}
           >

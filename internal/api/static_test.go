@@ -76,3 +76,22 @@ func TestStaticServing(t *testing.T) {
 		t.Errorf("missing dist: %d %s", res2.StatusCode, b)
 	}
 }
+
+func TestGuestCallLinkPreview(t *testing.T) {
+	srv, _ := newTestServer(t)
+	dist := t.TempDir()
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><html><head><title>Evilion Chat</title></head><body></body></html>"), 0o644)
+	srv.Cfg.WebDist = dist
+	ts := newHTTPTestServer(t, srv)
+	res, err := http.Get(ts.URL + "/call/AbCdEf123456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	body := string(b)
+	// an invitation to a call, and nothing about whose
+	if res.StatusCode != 200 || !strings.Contains(body, `<meta property="og:title" content="Join a voice call">`) || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+		t.Errorf("guest link page: %d %q", res.StatusCode, body)
+	}
+}

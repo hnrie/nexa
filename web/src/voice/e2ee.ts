@@ -6,6 +6,7 @@ import { convForChannel } from "@/components/composer/send";
 import { voiceFrameKey } from "@/crypto/conv";
 import { ring } from "@/lib/keyring";
 import type { FrameKind } from "./frameCrypto";
+import { guestVoiceKeys } from "./guestKeys";
 import type { FrameCryptoMessage, FrameCryptoSeen, FrameCryptoStats } from "./frameCrypto.worker";
 
 interface LegacyEncoded {
@@ -22,8 +23,11 @@ export interface VoiceKeys {
 /**
  * The call keys for a channel, one per epoch of its conversation that this
  * device holds; frames are sealed with the newest. Null when there is none.
+ * A guest has no conversation keys, only the call keys its link brought.
  */
 export function voiceKeysFor(channelId: string): VoiceKeys | null {
+  const guest = guestVoiceKeys(channelId);
+  if (guest) return guest;
   const conv = convForChannel(channelId);
   const epochs = ring.epochs(conv);
   const newest = epochs[epochs.length - 1];

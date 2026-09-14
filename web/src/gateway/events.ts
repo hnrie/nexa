@@ -60,6 +60,8 @@ export type GatewayEvent =
   | { t: "invite_delete"; d: { server_id: Snowflake; code: string } }
   | { t: "settings_update"; d: { version: number; session_id: Snowflake } }
   | { t: "session_expired"; d: unknown }
+  /** A guest's time in the call is over: removed, revoked, expired, left, or the call is gone. */
+  | { t: "guest_ended"; d: { reason: string } }
   | { t: "heartbeat_ack"; d?: undefined };
 
 export type GatewayEventType = GatewayEvent["t"];

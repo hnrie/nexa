@@ -291,6 +291,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       void useAuth.getState().logout();
       return;
     case "heartbeat_ack":
+    case "guest_ended":
       return;
     case "voice_state":
     case "voice_signal":

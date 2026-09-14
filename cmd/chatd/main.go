@@ -95,6 +95,7 @@ func main() {
 	defer cancel()
 	go hub.Run(ctx)
 	srv.StartLimiters(ctx)
+	srv.StartGuests(ctx)
 	if srv.Meter != nil {
 		go srv.Meter.Run(ctx, time.Minute, func(err error) { log.Warn("realtime usage", "err", err) })
 	}

@@ -12,6 +12,10 @@ const (
 	FlagAdmin    int64 = 1
 	FlagDisabled int64 = 2
 	FlagDeleted  int64 = 4
+	// FlagGuest marks someone in a call through a guest link. No account row
+	// ever carries it: guests live in their own table, and the flag only
+	// travels with the stand-in user the call code works with.
+	FlagGuest int64 = 8
 )
 
 // User is a full account row. Fields tagged "-" never leave the server.

@@ -104,6 +104,8 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
     });
   }
   if (canI(st, P.CREATE_INSTANT_INVITE, channelId)) items.push({ id: "invite", label: "Invite People", onSelect: () => ctx.openModal("invite", { serverId: ch.server_id, channelId }) });
+  // a voice channel's call takes guests without an account, through a link
+  if (ch.type === "voice" && canI(st, P.CREATE_INSTANT_INVITE | P.CONNECT, channelId)) items.push({ id: "guests", label: "Invite Guests to Call", onSelect: () => ctx.openModal("guestLink", { channelId }) });
   items.push({ id: "link", label: "Copy Link", onSelect: () => copy(`${window.location.origin}/channels/${ch.server_id}/${ch.id}`), separatorAfter: true });
   if (ch.type === "text") items.push({ id: "mute", label: muted ? "Unmute Channel" : "Mute Channel", onSelect: () => toggleMuted(channelId), separatorAfter: true });
   if (canI(st, P.MANAGE_CHANNELS, channelId)) {

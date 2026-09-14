@@ -42,6 +42,8 @@ type Hub struct {
 	SendAccess func(ctx context.Context, uid, channelID ids.ID) (bool, error)
 	// Interested lists extra users who should receive uid's presence (server co-members).
 	Interested func(ctx context.Context, uid ids.ID) ([]ids.ID, error)
+	// GuestReady fills in a guest's ready payload with their call.
+	GuestReady func(ctx context.Context, g *store.Guest, p *ReadyPayload) error
 	// ReadyExtras adds server data to the ready payload.
 	ReadyExtras func(ctx context.Context, u *store.User, p *ReadyPayload) error
 	// ExtraChannels lists server channels whose read states belong in ready.
@@ -129,7 +131,11 @@ func (h *Hub) sweepSessions(ctx context.Context) {
 	for _, c := range all {
 		dead, checked := gone[c.session.ID]
 		if !checked {
-			dead = !h.sessionAlive(ctx, c.session.ID, c.user.ID)
+			if c.guest != nil {
+				dead = !h.auth.GuestAlive(ctx, c.user.ID)
+			} else {
+				dead = !h.sessionAlive(ctx, c.session.ID, c.user.ID)
+			}
 			if ctx.Err() != nil {
 				return
 			}

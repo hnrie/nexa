@@ -79,6 +79,8 @@ const (
 	EvInviteDelete       = "invite_delete"
 	EvSettingsUpdate     = "settings_update"
 	EvSessionExpired     = "session_expired"
+	// EvGuestEnded tells a guest why their time in the call is over, just before the socket closes.
+	EvGuestEnded = "guest_ended"
 )
 
 // Presence is a user's visible status.
@@ -107,7 +109,9 @@ type ReadyPayload struct {
 	Emojis        []*store.Emoji           `json:"emojis"`
 	StickerPacks  []*store.StickerPack     `json:"sticker_packs"`
 	VoiceStates   []any                    `json:"voice_states"`
-	Extra         map[string]any           `json:"-"`
+	// Guest says which call a guest is in; only a guest's ready has it.
+	Guest any            `json:"guest,omitempty"`
+	Extra map[string]any `json:"-"`
 }
 
 // identifyData is the payload of the identify op.

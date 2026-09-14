@@ -53,6 +53,8 @@
 .tile[data-place="strip"] .tileBar { left: 4px; bottom: 4px; padding: 2px 6px; font-size: 11px; max-width: calc(100% - 8px); }
 .live { flex: none; padding: 0 5px; border-radius: 3px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; }
 .tileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* someone in through a guest link */
+.guestTag { flex: none; padding: 0 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }
 .tileIcon { color: #fff; flex: none; }
 .tileIcon[data-server="true"] { color: var(--danger); }
 .tileState { font-size: 11px; color: var(--warning); white-space: nowrap; }
@@ -133,6 +135,7 @@
 .pAvatar { border-radius: 50%; flex: none; box-shadow: 0 0 0 2px transparent; transition: box-shadow 240ms ease-out; }
 .participant[data-speaking="true"] .pAvatar { box-shadow: 0 0 0 2px var(--positive); transition-duration: 80ms; }
 .pName { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pGuest { flex: none; padding: 0 4px; border-radius: 3px; background: var(--bg-active); color: var(--text-muted); font-size: 10px; font-weight: 700; line-height: 15px; text-transform: uppercase; }
 .pIcons { display: flex; gap: 4px; color: var(--text-muted); }
 .pIcons [data-server="true"] { color: var(--danger); }
 .channelCount { margin-left: auto; font-size: 12px; color: var(--text-muted); }

@@ -4,6 +4,7 @@ import {
   EyeOff,
   Headphones,
   HeadphoneOff,
+  Link2,
   Maximize,
   Maximize2,
   Mic,
@@ -20,24 +21,28 @@ import {
   VolumeX,
 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { ApiError } from "@/api/client";
+import { guests as guestsApi } from "@/api/guests";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { cameraMenuItems, micMenuItems } from "./deviceMenus";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
+import { isGuest } from "@/lib/guestLink";
+import { P } from "@/lib/perms";
 import { CALL_PANEL_DEFAULT, CALL_PANEL_KEY, clampCallPanel, readCallPanel } from "@/lib/callPanel";
 import { callFullscreenWay, enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay, unlockOrientation } from "@/lib/fullscreen";
 import { memberName } from "@/lib/names";
 import { storage } from "@/lib/storage";
 import { pinchView, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
-import { memberColor, useServers } from "@/stores/servers";
+import { canI, memberColor, useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
-import { callThroughSfu, currentCameraFacing, flipCamera, joinVoice, leaveVoice, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen } from "@/voice/session";
+import { callThroughSfu, currentCameraFacing, flipCamera, guestLinksOn, joinVoice, leaveVoice, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
@@ -209,8 +214,12 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
   );
 }
 
-/** The voice room: tiles laid out to fit, a focused stream, and the control bar. */
-export function VoiceView({ channel, embedded = false }: { channel: Channel; embedded?: boolean }) {
+/**
+ * The voice room: tiles laid out to fit, a focused stream, and the control
+ * bar. `guest` is a guest's own page, which has nobody's profile to show and
+ * no settings to open.
+ */
+export function VoiceView({ channel, embedded = false, guest = false }: { channel: Channel; embedded?: boolean; guest?: boolean }) {
   const meId = useAuth((a) => a.me?.id);
   const users = useUsers((u) => u.byId);
   const byChannel = useVoice((v) => v.byChannel);
@@ -324,6 +333,12 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   useWakeLock(connected && tiles.some(showsStream));
 
   const nameOf = (uid: string) => memberName(serverState?.members[uid]?.nickname, users[uid], uid === meId ? "You" : "Unknown User");
+  const inDM = channel.type === "dm" || channel.type === "group_dm";
+  // guests are let in by a link: anyone in a DM or group may make one, and in a server whoever may invite people and join the channel
+  const canInviteGuests = !guest && guestLinksOn() !== false && (inDM || (channel.type === "voice" && canI(serverState, P.CREATE_INSTANT_INVITE | P.CONNECT, channel.id)));
+  const canRemoveGuests = !guest && (inDM || canI(serverState, P.MOVE_MEMBERS, channel.id));
+  const removeGuest = (uid: string) =>
+    void guestsApi.remove(channel.id, uid).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : "Could not remove the guest.", "error"));
   const callFull = (!!fsEl && fsEl === rootRef.current) || pageFull;
 
   const toggleCallFull = () => {
@@ -396,13 +411,16 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
   };
 
   const openDeviceMenu = async (kind: "mic" | "camera", anchor: DOMRect) => {
-    const items = kind === "mic" ? await micMenuItems(openModal) : await cameraMenuItems(openModal);
+    const items = kind === "mic" ? await micMenuItems(openModal, { settings: !guest }) : await cameraMenuItems(openModal, { settings: !guest });
     openContextMenu({ x: anchor.left, y: anchor.top - 8, above: true, items });
   };
 
   const tileMenu = (e: MouseEvent, t: Tile) => {
     e.preventDefault();
-    const items: ContextMenuItem[] = [{ id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: t.userId }) }];
+    const guestTile = isGuest(users[t.userId]);
+    const items: ContextMenuItem[] = [];
+    // a guest has no profile, and a guest's page knows nobody's
+    if (!guest && !guestTile) items.push({ id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: t.userId }) });
     if (t.kind === "screen" && t.me) items.push({ id: "stop-share", label: "Stop Sharing", onSelect: () => void toggleScreen() });
     if (isLive(t)) items.push({ id: "watch", label: watching[t.userId] ? "Stop Watching" : "Watch Stream", onSelect: () => setWatching(t.userId, !watching[t.userId]) });
     if (showsStream(t)) {
@@ -412,7 +430,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
     if (!t.me && t.kind === "screen") {
       // a stream's sound has its own level: turning a loud game down leaves the person's voice alone
       const vol = streamVolumes[t.userId] ?? 100;
-      items[items.length - 1]!.separatorAfter = true;
+      if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push(
         { id: "stream-volume", label: "Stream Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setStreamVolume(t.userId, v) } },
         { id: "stream-mute", label: streamMutes[t.userId] ? "Unmute Stream" : "Mute Stream", onSelect: () => setStreamLocalMute(t.userId, !streamMutes[t.userId]) },
@@ -420,13 +438,18 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
       );
     } else if (!t.me) {
       const vol = volumes[t.userId] ?? 100;
-      items[items.length - 1]!.separatorAfter = true;
+      if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push(
         { id: "volume", label: "User Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setUserVolume(t.userId, v) } },
         { id: "mute", label: localMutes[t.userId] ? "Unmute" : "Mute", onSelect: () => setUserLocalMute(t.userId, !localMutes[t.userId]) },
         { id: "reset", label: "Reset Volume", disabled: vol === 100, onSelect: () => setUserVolume(t.userId, 100) },
       );
     }
+    if (guestTile && canRemoveGuests && t.kind !== "screen") {
+      if (items.length) items[items.length - 1]!.separatorAfter = true;
+      items.push({ id: "remove-guest", label: "Remove From Call", danger: true, onSelect: () => removeGuest(t.userId) });
+    }
+    if (items.length === 0) return;
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
@@ -538,6 +561,7 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
           <span className={s.tileName} style={color ? { color } : undefined}>
             {t.kind === "screen" ? (t.me ? "Your screen" : `${nameOf(t.userId)}'s screen`) : nameOf(t.userId)}
           </span>
+          {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>Guest</span> : null}
           {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
           {t.kind !== "screen" && (vs?.self_deaf || vs?.server_deaf) ? <HeadphoneOff size={14} className={s.tileIcon} data-server={!!vs?.server_deaf} /> : null}
           {(t.kind === "screen" ? streamMutes[t.userId] : localMutes[t.userId]) ? <VolumeX size={14} className={s.tileIcon} /> : null}
@@ -644,6 +668,11 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
           <ControlButton label="Disconnect" danger onClick={() => void leaveVoice()} testId="voice-leave"><PhoneOff size={22} /></ControlButton>
         </div>
         <div className={[s.controlsSide, s.controlsEnd].join(" ")}>
+          {canInviteGuests ? (
+            <Tooltip text="Invite Guests" side="top">
+              <button className={s.sideBtn} aria-label="Invite guests" onClick={() => openModal("guestLink", { channelId: channel.id })} data-testid="invite-guests"><Link2 size={20} /></button>
+            </Tooltip>
+          ) : null}
           <Tooltip text={callFull ? "Exit full screen" : "Full screen"} side="top">
             <button className={s.sideBtn} aria-label={callFull ? "Exit full screen" : "Full screen"} onClick={toggleCallFull} data-testid="call-fullscreen">{callFull ? <Minimize size={20} /> : <Maximize size={20} />}</button>
           </Tooltip>

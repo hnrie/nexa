@@ -3,11 +3,13 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
+	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -16,6 +18,7 @@ type ctxKey int
 const (
 	ctxUser ctxKey = iota
 	ctxSession
+	ctxGuest
 )
 
 // touchInterval bounds how often last_seen_at is written.
@@ -53,15 +56,73 @@ func (a *Authenticator) Resolve(ctx context.Context, token string) (*store.User,
 	return u, se
 }
 
+// ResolveGuest returns the stand-in user and session for a guest's bearer
+// token, and the guest, or nils when the token is not a guest's or the guest's
+// time is up. Resolve never finds a guest: guests have no account, so every
+// route that asks for one turns them away unless it asks for guests by name.
+func (a *Authenticator) ResolveGuest(ctx context.Context, token string) (*store.User, *store.Session, *store.Guest) {
+	if token == "" || len(token) > 256 {
+		return nil, nil, nil
+	}
+	g, err := a.Store.GuestByTokenHash(ctx, HashToken(token))
+	if err != nil || g.ExpiresAt <= time.Now().UnixMilli() {
+		return nil, nil, nil
+	}
+	return g.User(), g.Session(), g
+}
+
+// GuestAlive reports whether a guest is still let in. A failed lookup other
+// than not-found counts as alive, as sessions do.
+func (a *Authenticator) GuestAlive(ctx context.Context, id ids.ID) bool {
+	g, err := a.Store.GuestByID(ctx, id)
+	if errors.Is(err, store.ErrNotFound) {
+		return false
+	}
+	return err != nil || g.ExpiresAt > time.Now().UnixMilli()
+}
+
+// CallMiddleware lets in accounts and guests alike, for the routes a call
+// runs on and nothing else.
+func (a *Authenticator) CallMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := BearerToken(r)
+		if u, se := a.Resolve(r.Context(), token); u != nil {
+			next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), u, se)))
+			return
+		}
+		if u, se, g := a.ResolveGuest(r.Context(), token); u != nil {
+			next.ServeHTTP(w, r.WithContext(WithGuest(r.Context(), u, se, g)))
+			return
+		}
+		unauthorized(w)
+	})
+}
+
+// GuestMiddleware lets in guests only.
+func (a *Authenticator) GuestMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, se, g := a.ResolveGuest(r.Context(), BearerToken(r))
+		if u == nil {
+			unauthorized(w)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(WithGuest(r.Context(), u, se, g)))
+	})
+}
+
+func unauthorized(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": "unauthorized", "message": "You need to log in."}})
+}
+
 // Middleware rejects requests without a valid bearer token.
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := BearerToken(r)
 		u, se := a.Resolve(r.Context(), token)
 		if u == nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": "unauthorized", "message": "You need to log in."}})
+			unauthorized(w)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), u, se)))
@@ -81,6 +142,17 @@ func BearerToken(r *http.Request) string {
 func WithUser(ctx context.Context, u *store.User, se *store.Session) context.Context {
 	ctx = context.WithValue(ctx, ctxUser, u)
 	return context.WithValue(ctx, ctxSession, se)
+}
+
+// WithGuest attaches a guest, with its stand-in user and session, to ctx.
+func WithGuest(ctx context.Context, u *store.User, se *store.Session, g *store.Guest) context.Context {
+	return context.WithValue(WithUser(ctx, u, se), ctxGuest, g)
+}
+
+// GuestFrom returns the guest making the request, or nil for an account.
+func GuestFrom(ctx context.Context) *store.Guest {
+	g, _ := ctx.Value(ctxGuest).(*store.Guest)
+	return g
 }
 
 // UserFrom returns the authenticated user, or nil.

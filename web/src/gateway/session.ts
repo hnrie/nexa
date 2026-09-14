@@ -1,4 +1,5 @@
 import { GatewayClient } from "./client";
+import type { GatewayEvent } from "./events";
 import { applyEvent, resetAll } from "./dispatch";
 import { logoutHooks, useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
@@ -54,6 +55,34 @@ export async function startSession(): Promise<void> {
   window.addEventListener("online", wakeGateway);
   window.addEventListener("pageshow", wakeGateway);
   document.addEventListener("visibilitychange", wakeGatewayIfShown);
+}
+
+/**
+ * Connects the gateway for a guest in a call: no account, keys or settings,
+ * only the events of that one call, handed to `onEvent` as they come.
+ */
+export function startGuestSession(token: string, onEvent: (e: GatewayEvent) => void): void {
+  stopGuestSession();
+  client = new GatewayClient({
+    url: gatewayUrl,
+    token: () => token,
+    onEvent,
+    onStatus: (s) => useUI.getState().setConnection(s),
+    setTimeoutImpl: workerSetTimeout,
+    clearTimeoutImpl: workerClearTimeout,
+  });
+  client.connect();
+  window.addEventListener("online", wakeGateway);
+  window.addEventListener("pageshow", wakeGateway);
+  document.addEventListener("visibilitychange", wakeGatewayIfShown);
+}
+
+export function stopGuestSession(): void {
+  window.removeEventListener("online", wakeGateway);
+  window.removeEventListener("pageshow", wakeGateway);
+  document.removeEventListener("visibilitychange", wakeGatewayIfShown);
+  client?.close();
+  client = null;
 }
 
 /** Coming back online or to the app is when a connection is most likely to have died. */

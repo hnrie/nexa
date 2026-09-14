@@ -39,6 +39,14 @@ type State struct {
 	SFUSession string `json:"-"`
 	Tracks     Tracks `json:"-"`
 	ScreenBps  int64  `json:"-"`
+	// Name and AvatarID are how the participant looked on joining, for the
+	// guests in the call, who are told nothing else about anyone.
+	Name     string  `json:"-"`
+	AvatarID *ids.ID `json:"-"`
+	// Guest is set for someone in through a guest link, with GuestEpoch the
+	// key epoch that link carried.
+	Guest      bool `json:"-"`
+	GuestEpoch int  `json:"-"`
 }
 
 // Tracks names what a call device publishes through the SFU, by kind. Only
@@ -150,6 +158,19 @@ func (r *Registry) Count(ch ids.ID) int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	return len(r.byChannel[ch])
+}
+
+// MemberCount is Count without the guests: whether anyone with an account is in the call.
+func (r *Registry) MemberCount(ch ids.ID) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	n := 0
+	for _, st := range r.byChannel[ch] {
+		if !st.Guest {
+			n++
+		}
+	}
+	return n
 }
 
 // RecentlyActive reports whether a channel has participants or lost its last

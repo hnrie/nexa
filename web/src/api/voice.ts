@@ -17,7 +17,8 @@ export interface SfuPulled {
 
 export const voice = {
   /** sfu says calls go through Cloudflare Realtime on this server. */
-  ice(): Promise<{ ice_servers: IceServer[]; sfu?: boolean }> {
+  /** guests says whether this server takes guests in calls through links. */
+  ice(): Promise<{ ice_servers: IceServer[]; sfu?: boolean; guests?: boolean }> {
     return api.request("GET", "/voice/ice");
   },
   sfuSession(signal?: AbortSignal): Promise<{ session_id: string }> {

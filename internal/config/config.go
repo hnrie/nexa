@@ -56,8 +56,13 @@ type Config struct {
 	// RealtimeMonthlyGB is the SFU's free allowance per month. Video pauses
 	// near it and calls stop just short of it, so nothing is ever billed.
 	RealtimeMonthlyGB int64
-	LogLevel          string
-	SessionTTL        time.Duration
+	// GuestLinksP2P lets guest links work on a server whose calls go peer to
+	// peer. There a link's code alone admits someone who can hear the call,
+	// with no key in it to protect, and guests learn members' addresses, so
+	// it is off unless asked for (development and tests).
+	GuestLinksP2P bool
+	LogLevel      string
+	SessionTTL    time.Duration
 }
 
 // Load builds a Config from getenv, applying defaults and validating values.
@@ -102,6 +107,7 @@ func Load(getenv func(string) string) (Config, error) {
 	str("REALTIME_APP_ID", &c.RealtimeAppID)
 	str("REALTIME_APP_SECRET", &c.RealtimeAppSecret)
 	str("LOG_LEVEL", &c.LogLevel)
+	c.GuestLinksP2P = strings.TrimSpace(getenv("GUEST_LINKS_P2P")) == "1"
 	// Usernames are stored lowercase, so a name written with capitals would
 	// otherwise never match the account it means.
 	c.AdminUsername = strings.ToLower(c.AdminUsername)

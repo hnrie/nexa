@@ -68,6 +68,7 @@ type Server struct {
 	limUpload  *ratelimit.Limiter
 	limUnfurl  *ratelimit.Limiter
 	limVoice   *ratelimit.Limiter
+	limGuest   *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -77,6 +78,10 @@ type Server struct {
 	activityHub *gateway.Hub
 	// Voice tracks who is in which voice channel (set by WireVoice).
 	Voice *voice.Registry
+	// hub is the gateway, for whether a guest is still connected (set by WireVoice).
+	hub *gateway.Hub
+	// guestAway notes when each guest was first seen with no connection.
+	guestAway guestAwayTimes
 	// Realtime sends calls through Cloudflare Realtime SFU when configured, and
 	// Meter keeps them inside its free allowance (both nil otherwise).
 	Realtime *realtime.Client
@@ -114,6 +119,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limUnfurl:  ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
 		// a call renegotiates for every camera, share and person joining
 		limVoice: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
+		// joining a call as a guest, per address: a household or a meeting room, not a crowd of bots
+		limGuest: ratelimit.New(ratelimit.Every(30, time.Hour), 10, 2*time.Hour),
 	}
 }
 
@@ -121,7 +128,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 // Without them every IP and every username ever tried stays in memory for the
 // life of the process.
 func (s *Server) StartLimiters(ctx context.Context) {
-	for _, l := range []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limVoice} {
+	for _, l := range []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limVoice, s.limGuest} {
 		l.Start(ctx)
 	}
 }
@@ -156,6 +163,23 @@ func (s *Server) authed(h http.HandlerFunc) http.Handler {
 			return "u:" + u.ID.String()
 		}
 		return "ip:" + auth.ClientIP(r)
+	})(h))
+}
+
+// callAuthed is authed for the routes a call runs on, which guests use too.
+func (s *Server) callAuthed(h http.HandlerFunc) http.Handler {
+	return s.Auth.CallMiddleware(RateLimit(s.limGeneric, func(r *http.Request) string {
+		if u := auth.UserFrom(r.Context()); u != nil {
+			return "u:" + u.ID.String()
+		}
+		return "ip:" + auth.ClientIP(r)
+	})(h))
+}
+
+// guestAuthed lets in guests only.
+func (s *Server) guestAuthed(h http.HandlerFunc) http.Handler {
+	return s.Auth.GuestMiddleware(RateLimit(s.limGeneric, func(r *http.Request) string {
+		return "u:" + auth.UserFrom(r.Context()).ID.String()
 	})(h))
 }
 
