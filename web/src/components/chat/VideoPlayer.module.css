@@ -1,7 +1,8 @@
-.player { position: relative; width: 550px; max-width: 100%; border-radius: var(--radius-sm); overflow: hidden; background: #000; outline: none; margin-top: 4px; }
+/* container-type lets the controls fit the player's own width: a portrait video, or any video on a phone, is narrow */
+.player { position: relative; width: 550px; max-width: 100%; border-radius: var(--radius-sm); overflow: hidden; background: #000; outline: none; margin-top: 4px; container-type: inline-size; }
 .player:focus-visible { box-shadow: 0 0 0 2px var(--brand); }
 .player[data-full="true"] { max-width: none; width: 100vw; height: 100vh; border-radius: 0; display: flex; align-items: center; justify-content: center; }
-.video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; cursor: pointer; }
+.video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; cursor: pointer; -webkit-touch-callout: none; }
 /* with no recorded size there is no frame, so the video sets the height itself */
 .player[data-sized="false"] .video { max-height: 350px; }
 .player[data-full="true"] .video { max-height: none; }
@@ -14,6 +15,7 @@
 .bigPlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); color: #fff; backdrop-filter: blur(2px); }
 .bigPlay:hover { background: var(--brand); }
 .bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.player[data-full="true"] .bar { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
 .player[data-ui="true"] .bar { opacity: 1; pointer-events: auto; }
 @media (hover: hover) {
   .player:hover .bar, .player:focus-within .bar { opacity: 1; pointer-events: auto; }
@@ -25,18 +27,34 @@
 .progress { position: absolute; left: 0; height: 4px; border-radius: 2px; background: var(--brand); }
 .knob { position: absolute; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity 120ms ease; }
 .track:hover .knob, .player:focus-within .knob { opacity: 1; }
-.controls { display: flex; align-items: center; gap: 4px; margin-top: 2px; color: #fff; }
+/* nothing in the row shrinks: what does not fit moves into the menu instead of being squashed */
+.controls { display: flex; align-items: center; gap: 4px; margin-top: 2px; color: #fff; min-width: 0; }
+.controls > * { flex: none; }
+.controls > .spacer { flex: 1 1 0; min-width: 0; }
 .ctl { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: var(--radius-xs); color: #fff; }
 .ctl:hover { background: rgba(255, 255, 255, 0.16); }
-.time { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.85); padding: 0 4px; }
-.spacer { flex: 1; }
+.time { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.85); padding: 0 4px; white-space: nowrap; }
 .volumeWrap { display: flex; align-items: center; }
 .volume { width: 0; opacity: 0; accent-color: var(--brand); transition: width 140ms ease, opacity 140ms ease; }
 .volumeWrap:hover .volume, .volume:focus { width: 72px; opacity: 1; margin-right: 4px; }
 .speed { height: 30px; padding: 0 8px; border-radius: var(--radius-xs); color: #fff; font-size: 12px; font-weight: 600; }
 .speed:hover { background: rgba(255, 255, 255, 0.16); }
-@media (max-width: 767px) {
-  .player { max-width: 100%; }
-  .volume { width: 56px; opacity: 1; }
-  .ctl { width: 34px; height: 34px; }
+.narrowOnly { display: none; }
+@container (max-width: 419px) {
+  .wideOnly { display: none; }
+  .narrowOnly { display: flex; }
+  .volume { display: none; }
+}
+@container (max-width: 259px) {
+  .total { display: none; }
+}
+/* finger-sized controls; a phone's volume is its own buttons (iOS ignores a video's volume anyway) */
+@media (pointer: coarse) {
+  .bar { padding: 14px 6px 4px; }
+  .track { height: 28px; }
+  .knob { opacity: 1; width: 14px; height: 14px; margin-left: -7px; }
+  .controls { gap: 2px; margin-top: 0; }
+  .ctl { width: 40px; height: 40px; }
+  .speed { height: 40px; }
+  .volume { display: none; }
 }

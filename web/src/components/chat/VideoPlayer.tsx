@@ -1,6 +1,8 @@
-import { Download, Maximize2, Minimize2, Pause, PictureInPicture2, Play, Volume2, VolumeX } from "lucide-react";
+import { Download, Maximize2, Minimize2, MoreVertical, Pause, PictureInPicture2, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
+import { enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay } from "@/lib/fullscreen";
+import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { fitVideo } from "./fitMedia";
 import s from "./VideoPlayer.module.css";
 
@@ -18,15 +20,41 @@ const SPEEDS = [0.5, 1, 1.5, 2];
 /** How long the controls stay up after a tap, while the video is playing. */
 const CONTROLS_LINGER = 2800;
 
-type WebkitVideo = HTMLVideoElement & { webkitEnterFullscreen?: () => void };
-
 /**
  * Whether anything can go full screen here. iPhone Safari has no full screen
  * for elements, only its own player for a video element.
  */
 function canFullscreen(): boolean {
+  return typeof document !== "undefined" && streamFullscreenWay() !== "page";
+}
+
+/** Whether a video can float in picture in picture here, the standard way or Safari's. */
+function canPip(): boolean {
   if (typeof document === "undefined") return false;
-  return !!document.documentElement.requestFullscreen || (typeof HTMLVideoElement !== "undefined" && "webkitEnterFullscreen" in HTMLVideoElement.prototype);
+  return !!(document as Document & { pictureInPictureEnabled?: boolean }).pictureInPictureEnabled || (typeof HTMLVideoElement !== "undefined" && "webkitSetPresentationMode" in HTMLVideoElement.prototype);
+}
+
+/**
+ * Opens the system player (iPhone). iOS refuses it for a video that has not
+ * loaded, and loads nothing before playing, so such a video is started inside
+ * the tap, which also lets the player open as soon as the video can show.
+ */
+function openSystemPlayer(el: HTMLVideoElement, onFail: (err: unknown) => void): void {
+  if (typeof (el as HTMLVideoElement & { webkitEnterFullscreen?: unknown }).webkitEnterFullscreen !== "function") return;
+  if (enterVideoFullscreen(el)) return;
+  // paused again before it could open: the viewer changed their mind
+  const open = () => {
+    if (!el.paused) enterVideoFullscreen(el);
+  };
+  if (el.readyState >= HTMLMediaElement.HAVE_METADATA) {
+    void el.play().then(open, onFail);
+    return;
+  }
+  el.addEventListener("loadedmetadata", open, { once: true });
+  void el.play().catch((err: unknown) => {
+    el.removeEventListener("loadedmetadata", open);
+    onFail(err);
+  });
 }
 
 /** A play() cut short by pause() rejects too, and says nothing about whether the file plays. */
@@ -65,6 +93,8 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
   const [failed, setFailed] = useState(false);
   const [revealed, setRevealed] = useState(!spoiler);
   const [fullOk] = useState(canFullscreen);
+  const [pipOk] = useState(canPip);
+  const openContextMenu = useUI((u) => u.openContextMenu);
   // On a touch screen the controls would otherwise sit over the picture the
   // whole time, so they appear on a tap and fade out again while it plays.
   const [ui, setUi] = useState(true);
@@ -142,11 +172,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
     };
   }, [src, armHide]);
 
-  useEffect(() => {
-    const on = () => setFull(document.fullscreenElement === wrap.current);
-    document.addEventListener("fullscreenchange", on);
-    return () => document.removeEventListener("fullscreenchange", on);
-  }, []);
+  useEffect(() => onFullscreenChange(() => setFull(!!wrap.current && fullscreenElement() === wrap.current)), []);
 
   const seek = (t: number) => {
     const el = video.current;
@@ -178,27 +204,55 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
         break;
       case "f":
         e.preventDefault();
-        void toggleFull();
+        toggleFull();
         break;
       default:
         break;
     }
   };
 
-  const toggleFull = async () => {
-    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-    else if (wrap.current?.requestFullscreen) await wrap.current.requestFullscreen().catch(() => {});
-    else (video.current as WebkitVideo | null)?.webkitEnterFullscreen?.();
-  };
-  const pip = async () => {
+  const toggleFull = () => {
     const el = video.current;
-    if (!el) return;
-    try {
-      if (document.pictureInPictureElement) await document.exitPictureInPicture();
-      else await el.requestPictureInPicture();
-    } catch {
-      /* not supported here */
+    if (fullscreenElement()) {
+      void exitElementFullscreen().catch(() => {});
+      return;
     }
+    const failed = (err: unknown) => playFailed(err) && setFailed(true);
+    if (streamFullscreenWay() === "element" && wrap.current) {
+      // a phone turns sideways for a wide video, where the browser allows it (not iOS)
+      void enterElementFullscreen(wrap.current)
+        .then(() => (el && el.videoWidth > el.videoHeight ? lockLandscape() : false))
+        .catch(() => el && openSystemPlayer(el, failed));
+      return;
+    }
+    if (el) openSystemPlayer(el, failed);
+  };
+  const pip = () => {
+    const el = video.current as (HTMLVideoElement & { webkitSetPresentationMode?: (mode: string) => void }) | null;
+    if (!el) return;
+    if (document.pictureInPictureElement) {
+      void document.exitPictureInPicture().catch(() => {});
+      return;
+    }
+    // inside the tap: Safari opens nothing from a promise that resolves later
+    if (typeof el.requestPictureInPicture === "function") void el.requestPictureInPicture().catch(() => el.webkitSetPresentationMode?.("picture-in-picture"));
+    else el.webkitSetPresentationMode?.("picture-in-picture");
+  };
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = name;
+    a.click();
+  };
+  /** On a player too narrow for every control, speed, picture in picture and download wait in a menu. */
+  const more = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    const items: ContextMenuItem[] = [{ id: "speed", label: "Playback speed", slider: { value: speed, min: 0.5, max: 2, step: 0.5, unit: "×", onChange: setSpeed }, separatorAfter: true }];
+    if (pipOk) items.push({ id: "pip", label: "Picture in Picture", onSelect: pip });
+    items.push({ id: "download", label: "Download", onSelect: download });
+    openContextMenu({ x: r.right - 200, y: r.top - 8, items });
+    reveal();
   };
 
   useEffect(() => {
@@ -234,7 +288,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
       onPointerMove={(e) => e.pointerType === "mouse" && reveal()}
       data-testid="video-player"
     >
-      <video ref={video} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={() => void toggleFull()} />
+      <video ref={video} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={toggleFull} />
       {!revealed ? (
         <div className={s.spoiler} onClick={() => setRevealed(true)}><span>SPOILER</span></div>
       ) : null}
@@ -273,22 +327,25 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
         </div>
         <div className={s.controls}>
           <button className={s.ctl} aria-label={playing ? "Pause" : "Play"} onClick={toggle}>{playing ? <Pause size={18} /> : <Play size={18} />}</button>
-          <span className={s.time}>{clock(time)} / {clock(duration)}</span>
+          <span className={s.time}>{clock(time)}<span className={s.total}> / {clock(duration)}</span></span>
           <span className={s.spacer} />
           <div className={s.volumeWrap}>
             <button className={s.ctl} aria-label={muted ? "Unmute" : "Mute"} onClick={() => setMuted((v) => !v)}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
             <input className={s.volume} type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} aria-label="Volume" onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} />
           </div>
-          <button className={s.speed} aria-label="Playback speed" onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>{speed}×</button>
-          <Tooltip text="Picture in picture" side="top">
-            <button className={s.ctl} aria-label="Picture in picture" onClick={() => void pip()}><PictureInPicture2 size={18} /></button>
-          </Tooltip>
+          <button className={[s.speed, s.wideOnly].join(" ")} aria-label="Playback speed" onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>{speed}×</button>
+          {pipOk ? (
+            <Tooltip text="Picture in picture" side="top">
+              <button className={[s.ctl, s.wideOnly].join(" ")} aria-label="Picture in picture" onClick={pip}><PictureInPicture2 size={18} /></button>
+            </Tooltip>
+          ) : null}
           <Tooltip text="Download" side="top">
-            <a className={s.ctl} href={src} download={name} aria-label="Download video" onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
+            <a className={[s.ctl, s.wideOnly].join(" ")} href={src} download={name} aria-label="Download video" onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
           </Tooltip>
+          <button className={[s.ctl, s.narrowOnly].join(" ")} aria-label="More" onClick={more} data-testid="video-more"><MoreVertical size={18} /></button>
           {fullOk ? (
             <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
-              <button className={s.ctl} aria-label="Full screen" onClick={() => void toggleFull()}>{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
+              <button className={s.ctl} aria-label={full ? "Exit full screen" : "Full screen"} onClick={toggleFull} data-testid="video-fullscreen">{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
             </Tooltip>
           ) : null}
         </div>
