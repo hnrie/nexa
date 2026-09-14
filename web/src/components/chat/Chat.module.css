@@ -97,7 +97,7 @@
 .system .time { margin-left: 4px; }
 .sysLink { color: var(--link); cursor: pointer; }
 .edit { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
-.editTa { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-composer); color: var(--text); border: 0; outline: none; resize: none; font: inherit; font-size: 16px; line-height: 22px; }
+.editTa { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-composer); color: var(--text); border: 0; outline: none; resize: none; font: inherit; font-family: var(--font-with-emoji); font-size: 16px; line-height: 22px; }
 .editHint { font-size: 12px; color: var(--text-muted); }
 .editHint b { color: var(--link); cursor: pointer; font-weight: 400; }
 .editActions { display: flex; justify-content: flex-end; gap: 8px; }

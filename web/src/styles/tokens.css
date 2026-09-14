@@ -57,6 +57,8 @@
   --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.16);
   --shadow-high: 0 12px 24px rgba(0, 0, 0, 0.24);
   --font: "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* text boxes that should draw emoji as Twemoji, like the messages they become */
+  --font-with-emoji: "Twemoji Text", var(--font);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --rail-w: 72px;
   --sidebar-w: 240px;

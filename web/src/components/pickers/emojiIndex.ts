@@ -1,3 +1,5 @@
+import { hasTwemoji, twemojiIndexSettledPromise } from "@/lib/twemoji";
+
 export interface EmojiEntry {
   unicode: string;
   hexcode: string;
@@ -31,11 +33,17 @@ export const GROUPS: { id: number; name: string }[] = [
 ];
 
 let loaded: Promise<EmojiEntry[]> | null = null;
+let grouped: { id: number; name: string; items: EmojiEntry[] }[] = [];
 let all: EmojiEntry[] = [];
 let byShortcode = new Map<string, EmojiEntry>();
 let byUnicode = new Map<string, EmojiEntry>();
 
-/** Loads the dataset once (separate chunk, ~700 KB before compression). */
+/**
+ * Loads the dataset once (separate chunk, ~700 KB before compression),
+ * keeping only the emoji Twemoji has drawn: emojibase follows Unicode, which
+ * Twemoji trails, and an emoji without its picture would show the system's
+ * glyph instead.
+ */
 export function loadEmoji(): Promise<EmojiEntry[]> {
   if (loaded) return loaded;
   loaded = Promise.all([
@@ -44,6 +52,7 @@ export function loadEmoji(): Promise<EmojiEntry[]> {
     // what it means everywhere else; emojibase's names stay searchable behind it
     import("emojibase-data/en/shortcodes/iamcal.json"),
     import("emojibase-data/en/shortcodes/emojibase.json"),
+    twemojiIndexSettledPromise(),
   ]).then(([data, primary, secondary]) => {
     const list = (data.default as unknown as CompactEmoji[]).filter((e) => e.group !== undefined && e.group !== 2);
     const first = primary.default as unknown as Record<string, string | string[]>;
@@ -56,12 +65,16 @@ export function loadEmoji(): Promise<EmojiEntry[]> {
       codes[hex] = [...have, ...extra.filter((n) => !have.includes(n))];
     }
     list.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    all = list.map((e) => {
-      const shortcodes = codes[e.hexcode] ?? [];
-      const entry: EmojiEntry = { unicode: e.unicode, hexcode: e.hexcode, label: e.label, group: e.group ?? 0, tags: e.tags ?? [], shortcodes };
-      if (e.skins?.length) entry.skins = e.skins.filter((s) => s.tone !== undefined).map((s) => ({ tone: s.tone as number | number[], unicode: s.unicode }));
-      return entry;
-    });
+    all = list
+      .filter((e) => hasTwemoji(e.unicode))
+      .map((e) => {
+        const shortcodes = codes[e.hexcode] ?? [];
+        const entry: EmojiEntry = { unicode: e.unicode, hexcode: e.hexcode, label: e.label, group: e.group ?? 0, tags: e.tags ?? [], shortcodes };
+        const skins = e.skins?.filter((s) => s.tone !== undefined && hasTwemoji(s.unicode)).map((s) => ({ tone: s.tone as number | number[], unicode: s.unicode }));
+        if (skins?.length) entry.skins = skins;
+        return entry;
+      });
+    grouped = GROUPS.map((g) => ({ ...g, items: all.filter((e) => e.group === g.id) })).filter((g) => g.items.length > 0);
     byShortcode = new Map();
     byUnicode = new Map();
     for (const e of all) {
@@ -79,6 +92,23 @@ export function emojiLoaded(): boolean {
 
 export function allEmoji(): EmojiEntry[] {
   return all;
+}
+
+/** The emoji by category, in the picker's order; worked out once as the set loads. */
+export function emojiGroups(): { id: number; name: string; items: EmojiEntry[] }[] {
+  return grouped;
+}
+
+/**
+ * Loads the set in a quiet moment after the app starts, so the first open of
+ * the picker (or a :shortcode: typed) does not wait for it.
+ */
+export function preloadEmoji(): void {
+  if (loaded || typeof window === "undefined") return;
+  const start = () => void loadEmoji();
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+  if (idle) idle(start, { timeout: 5000 });
+  else setTimeout(start, 2000);
 }
 
 export function emojiByShortcode(name: string): EmojiEntry | undefined {

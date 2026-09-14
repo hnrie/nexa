@@ -38,9 +38,10 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
+  // a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows
   const cell = (sticker: Sticker, pack: StickerPack) => (
     <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} onClick={() => onPick({ sticker, pack })}>
-      <img src={packImageUrl(pack, sticker)} alt={sticker.name} loading="lazy" draggable={false} />
+      <img src={packImageUrl(pack, sticker, 100)} alt={sticker.name} loading="lazy" decoding="async" draggable={false} />
     </button>
   );
 
@@ -55,7 +56,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
             const cover = p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
             return (
               <button key={p.id} className={s.cat} title={p.name} onClick={() => jump(p.id)} onContextMenu={packMenu(p)}>
-                {cover ? <img className={s.catImg} src={packImageUrl(p, cover)} alt="" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
+                {cover ? <img className={s.catImg} src={packImageUrl(p, cover, 24)} alt="" decoding="async" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
               </button>
             );
           })}
@@ -75,7 +76,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
               <div key={g.label}>
                 <div className={s.section}>{g.label}</div>
                 {g.packs.map((p) => (
-                  <div key={p.id} data-pack={p.id}>
+                  <div key={p.id} data-pack={p.id} className={s.packSection} style={{ containIntrinsicSize: `auto ${40 + Math.ceil(Math.max(p.stickers.length, 1) / 4) * 108}px` }}>
                     <div className={[s.section, s.sectionRow].join(" ")} onContextMenu={packMenu(p)}>
                       <span className={s.sectionName}>{p.name}</span>
                       {p.owner_user_id === meId ? <button className={s.sectionLink} onClick={() => edit(p)}>Edit</button> : null}

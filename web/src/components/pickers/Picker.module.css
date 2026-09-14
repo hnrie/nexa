@@ -67,3 +67,11 @@
 .inspector .big img { width: 28px; height: 28px; object-fit: contain; display: block; }
 .gifCell[data-dead="true"] { display: flex; align-items: center; justify-content: center; }
 .gifDead { font-size: 12px; color: var(--text-muted); text-align: center; padding: 8px; }
+/* the emoji grid draws only the rows in view, each placed where it would be in the full list */
+.virtual { position: relative; }
+.section.virtualRow, .rows.virtualRow { position: absolute; left: 0; right: 0; box-sizing: border-box; }
+.section.virtualRow { z-index: 0; }
+/* the title of the part scrolled through, pinned over the rows */
+.section.stickyHead { position: sticky; top: 0; z-index: 2; height: 32px; margin-bottom: -32px; box-sizing: border-box; }
+/* a pack out of view is neither laid out nor painted until it scrolls near */
+.packSection { content-visibility: auto; }

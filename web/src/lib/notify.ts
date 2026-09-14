@@ -11,7 +11,7 @@ import { useSettings, type Settings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { desktopBridge } from "./desktopBridge";
-import { installAudioUnlock, playSound } from "./sounds";
+import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 
 let navigateTo: ((path: string) => void) | null = null;
 
@@ -126,6 +126,8 @@ export function installNotifications(): void {
   dispatchHooks.onFriendRequest.push(onFriendRequest);
   // a phone can only play sounds once a tap has let the page make noise
   installAudioUnlock();
+  // the recorded sounds come down once the app has settled, so the first message is not late
+  setTimeout(() => preloadSounds(), 4000);
   // a notification shown by the service worker is clicked there, which sends the chat to open back here
   navigator.serviceWorker?.addEventListener("message", (e: MessageEvent) => {
     const d = e.data as { type?: unknown; path?: unknown } | null;

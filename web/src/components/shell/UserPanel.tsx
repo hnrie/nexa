@@ -10,6 +10,7 @@ import { customStatus, statusOf, usePresence, type StatusKind } from "@/stores/p
 import { useUI } from "@/stores/ui";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
+import { micMenuItems } from "@/components/voice/deviceMenus";
 
 const OPTIONS: { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string; color: string }[] = [
   { value: "online", label: "Online", color: "var(--status-online)" },
@@ -28,6 +29,7 @@ export function UserPanel() {
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
+  const openContextMenu = useUI((u) => u.openContextMenu);
   const toggleDeafen = useVoiceLocal((v) => v.toggleDeafen);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -66,7 +68,18 @@ export function UserPanel() {
       </button>
       <div className={s.btns}>
         <Tooltip text={muted ? "Unmute" : "Mute"}>
-          <button className={s.icon} data-on={!muted} onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}>
+          <button
+            className={s.icon}
+            data-on={!muted}
+            onClick={toggleMute}
+            aria-label={muted ? "Unmute" : "Mute"}
+            onContextMenu={(e) => {
+              // a right click chooses the microphone, as the arrow on the call's mute button does
+              e.preventDefault();
+              const at = { x: e.clientX, y: e.clientY };
+              void micMenuItems(openModal).then((items) => openContextMenu({ ...at, above: true, items }));
+            }}
+          >
             {muted ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
         </Tooltip>

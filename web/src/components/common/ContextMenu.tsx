@@ -48,7 +48,7 @@ export function ContextMenuHost() {
     }
     const r = ref.current.getBoundingClientRect();
     const x = Math.min(menu.x, window.innerWidth - r.width - 8);
-    const y = Math.min(menu.y, window.innerHeight - r.height - 8);
+    const y = Math.min(menu.above ? menu.y - r.height : menu.y, window.innerHeight - r.height - 8);
     setPos({ x: Math.max(8, x), y: Math.max(8, y) });
   }, [menu]);
 
@@ -102,11 +102,14 @@ export function ContextMenuHost() {
       <div ref={ref} className={s.menu} data-context-menu style={{ left: pos?.x ?? menu.x, top: pos?.y ?? menu.y, visibility: pos ? "visible" : "hidden" }} role="menu">
         {menu.items.map((item) => (
           <div key={item.id}>
-            {item.slider ? (
+            {item.heading ? (
+              <div className={s.heading}>{item.label}</div>
+            ) : item.slider ? (
               <SliderItem item={{ ...item, slider: item.slider }} />
             ) : (
               <button
-                role="menuitem"
+                role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+                aria-checked={item.checked}
                 className={[s.item, item.danger ? s.danger : ""].join(" ")}
                 disabled={item.disabled}
                 onClick={() => {
@@ -114,7 +117,8 @@ export function ContextMenuHost() {
                   item.onSelect?.();
                 }}
               >
-                <span>{item.label}</span>
+                <span className={s.itemLabel}>{item.label}</span>
+                {item.checked === undefined ? null : <span className={s.radio} data-on={item.checked} aria-hidden="true" />}
               </button>
             )}
             {item.separatorAfter ? <div className={s.sep} /> : null}

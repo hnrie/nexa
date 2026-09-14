@@ -6,7 +6,7 @@ import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
 import { handleVoiceEvent, installVoice, onReadyVoice } from "./session";
 
-vi.mock("@/lib/sounds", () => ({ playSound: vi.fn(), startRinging: vi.fn(), stopRinging: vi.fn() }));
+vi.mock("@/lib/sounds", () => ({ playSound: vi.fn(), startRinging: vi.fn(), stopRinging: vi.fn(), startCalling: vi.fn(), stopCalling: vi.fn() }));
 vi.mock("@/gateway/session", () => ({ gateway: () => null }));
 
 function state(over: Partial<VoiceState>): VoiceState {

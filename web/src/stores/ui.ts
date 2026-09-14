@@ -16,6 +16,10 @@ export interface ContextMenuItem {
   icon?: string;
   onSelect?: () => void;
   separatorAfter?: boolean;
+  /** Marks the chosen one of a set of choices, such as the microphone in use. */
+  checked?: boolean;
+  /** A small title over the items that follow it; not an item itself. */
+  heading?: boolean;
   /** Makes the item a slider that takes effect as it moves, and leaves the menu open. */
   slider?: { value: number; min: number; max: number; step?: number; unit?: string; onChange: (value: number) => void };
 }
@@ -24,6 +28,8 @@ export interface ContextMenuState {
   x: number;
   y: number;
   items: ContextMenuItem[];
+  /** Opens upwards, its bottom edge at y: for a button along the bottom of the screen. */
+  above?: boolean;
 }
 
 export interface Toast {

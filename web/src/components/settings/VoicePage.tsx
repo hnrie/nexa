@@ -226,8 +226,18 @@ export default function VoicePage() {
         </div>
         <p className={st.hint}>Free for everyone, up to source resolution at 60 fps. Sharing asks each time, starting from these.</p>
         <Field label="Camera">
-          <Select value="" onChange={() => {}} disabled>
-            <option value="">{devices?.cameras.length ? `${devices.cameras.length} camera${devices.cameras.length === 1 ? "" : "s"} available (the browser picks the default)` : "No camera found"}</option>
+          <Select
+            value={settings.cameraDeviceId ?? ""}
+            data-testid="camera-device"
+            disabled={!devices?.cameras.length}
+            onChange={(e) => {
+              const id = e.target.value || null;
+              const chosen = devices?.cameras.find((d) => d.deviceId === id);
+              set({ cameraDeviceId: id, cameraDeviceLabel: chosen?.label || null });
+            }}
+          >
+            <option value="">{devices?.cameras.length ? "Default" : "No camera found"}</option>
+            {devices?.cameras.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Camera")}</option>)}
           </Select>
         </Field>
       </div>

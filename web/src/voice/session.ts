@@ -7,7 +7,7 @@ import type { VoiceState } from "@/api/types";
 import type { GatewayEvent } from "@/gateway/events";
 import { gateway } from "@/gateway/session";
 import { holdReload } from "@/lib/busy";
-import { playSound, startRinging, stopRinging } from "@/lib/sounds";
+import { playSound, startCalling, startRinging, stopCalling, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
@@ -60,6 +60,21 @@ let joinSeq = 0;
 let mySessionId: string | null = null;
 let installed = false;
 let ringTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Stops the outgoing tone once the people called have been rung for as long as they are. */
+let callingTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Calling a DM or group nobody else is in yet: the outgoing tone plays until someone picks up. */
+function startCallingTone(): void {
+  startCalling();
+  if (callingTimer) clearTimeout(callingTimer);
+  callingTimer = setTimeout(stopCallingTone, 60000);
+}
+
+function stopCallingTone(): void {
+  if (callingTimer) clearTimeout(callingTimer);
+  callingTimer = null;
+  stopCalling();
+}
 
 /** Relay credentials expire, so the list is fetched again after this long. */
 const ICE_CACHE_MS = 30 * 60 * 1000;
@@ -271,6 +286,9 @@ export async function joinVoice(channelId: string): Promise<void> {
   s.announced = true;
   sendState(channelId);
   playSound("join");
+  const convo = useChannels.getState().byId[channelId];
+  const others = participantsOf(useVoice.getState().byChannel, channelId).filter((p) => p.user_id !== me());
+  if (convo && (convo.type === "dm" || convo.type === "group_dm") && others.length === 0) startCallingTone();
 }
 
 /** Leave voice; tells the server unless the connection is already gone. */
@@ -289,6 +307,7 @@ export async function leaveVoice(notify = true): Promise<void> {
     s.camera?.getTracks().forEach((t) => t.stop());
     s.screen?.getTracks().forEach((t) => t.stop());
     if (notify && s.announced) sendState(null);
+    stopCallingTone();
     playSound("leave");
   }
   useVoice.getState().resetSession();
@@ -389,6 +408,46 @@ export function currentCameraFacing(): CameraFacing {
   return cameraFacing;
 }
 
+/** The camera chosen in settings. */
+function chosenCamera(): { id: string | null; label: string | null } {
+  const v = useSettings.getState().settings.voice;
+  return { id: v.cameraDeviceId ?? null, label: v.cameraDeviceLabel ?? null };
+}
+
+/**
+ * Opens the camera chosen in settings in place of the one that is on, so the
+ * other side sees the picture change without renegotiating.
+ */
+async function switchCamera(): Promise<void> {
+  const s = session;
+  if (!s?.camera || s.cameraPending) return;
+  // some devices cannot open a second camera while the first is live
+  for (const t of s.camera.getTracks()) {
+    t.onended = null;
+    t.stop();
+  }
+  s.cameraPending = true;
+  const stream = await getCamera(cameraFacing, chosenCamera()).catch(() => null);
+  s.cameraPending = false;
+  if (session !== s) {
+    stream?.getTracks().forEach((t) => t.stop());
+    return;
+  }
+  if (!stream) {
+    s.camera = null;
+    s.transport.setLocalVideo(null);
+    useVoice.getState().setLocalVideo(null);
+    sendState(s.channelId);
+    useUI.getState().toast("Could not switch the camera.", "error");
+    return;
+  }
+  s.camera = stream;
+  const track = stream.getVideoTracks()[0] ?? null;
+  if (track) track.onended = () => void toggleCamera();
+  s.transport.setLocalVideo(track);
+  useVoice.getState().setLocalVideo(stream);
+}
+
 /**
  * Turns the camera round. The new stream replaces the old one in place, so
  * the other side sees the picture change without renegotiating.
@@ -448,7 +507,7 @@ export async function toggleCamera(): Promise<void> {
     s.cameraPending = true;
     let stream: MediaStream;
     try {
-      stream = await getCamera(cameraFacing);
+      stream = await getCamera(cameraFacing, chosenCamera());
     } catch {
       s.cameraPending = false;
       if (session === s) useUI.getState().toast("Camera access was denied.", "error");
@@ -621,6 +680,8 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       if (vs.channel_id === session.channelId) {
         if (!session.transport.peerIds().includes(vs.user_id)) {
           session.transport.addPeer(vs.user_id);
+          // someone picked up
+          stopCallingTone();
           playSound("join");
         }
       } else if (before === session.channelId || vs.old_channel_id === session.channelId) {
@@ -665,6 +726,8 @@ export function handleVoiceEvent(e: GatewayEvent): void {
     }
     case "call_end":
       if (e.d.reason === "ended" || e.d.user_id === myId) clearRing(e.d.channel_id);
+      // the one person called said no
+      if (session?.channelId === e.d.channel_id && e.d.user_id !== myId && useChannels.getState().byId[e.d.channel_id]?.type === "dm") stopCallingTone();
       return;
     default:
       return;
@@ -718,6 +781,7 @@ export function installVoice(): void {
     if (!session) return;
     if (a.inputDeviceId !== b.inputDeviceId || a.noiseSuppression !== b.noiseSuppression || a.echoCancellation !== b.echoCancellation || a.autoGain !== b.autoGain) void refreshMic();
     if (a.outputDeviceId !== b.outputDeviceId) void session.transport.setOutputDevice(a.outputDeviceId);
+    if (a.cameraDeviceId !== b.cameraDeviceId || a.cameraDeviceLabel !== b.cameraDeviceLabel) void switchCamera();
     if (a.outputVolume !== b.outputVolume) session.transport.setMasterVolume(a.outputVolume);
     if (a.inputVolume !== b.inputVolume) applyInputGain();
     if (a.mode !== b.mode) applyTransmit();

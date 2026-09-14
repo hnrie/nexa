@@ -15,6 +15,9 @@ export interface VoiceSettings {
   inputDeviceLabel: string | null;
   outputDeviceId: string | null;
   outputDeviceLabel: string | null;
+  /** The chosen camera, found again by name when its id changes; null lets the browser pick. */
+  cameraDeviceId: string | null;
+  cameraDeviceLabel: string | null;
   inputVolume: number;
   outputVolume: number;
   mode: "vad" | "ptt";
@@ -99,6 +102,8 @@ export const DEFAULT_SETTINGS: Settings = {
     inputDeviceId: null,
     inputDeviceLabel: null,
     outputDeviceId: null,
+    cameraDeviceId: null,
+    cameraDeviceLabel: null,
     outputDeviceLabel: null,
     inputVolume: 100,
     outputVolume: 100,

@@ -61,6 +61,27 @@ export function ensureTwemojiIndex(): void {
     });
 }
 
+/** Resolves once it is known which pictures exist, or that the list could not be had. */
+export function twemojiIndexSettledPromise(): Promise<void> {
+  if (twemojiIndexSettled()) return Promise.resolve();
+  ensureTwemojiIndex();
+  return new Promise((resolve) => {
+    const done = () => {
+      waiting.delete(done);
+      resolve();
+    };
+    waiting.add(done);
+  });
+}
+
+/**
+ * Whether the set has a picture for this emoji. Before the list has arrived,
+ * or when it could not be had, nothing is ruled out.
+ */
+export function hasTwemoji(text: string): boolean {
+  return available === null || twemojiCandidates(text).length > 0;
+}
+
 export function twemojiIndexReady(): boolean {
   return available !== null;
 }

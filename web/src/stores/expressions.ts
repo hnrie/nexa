@@ -161,7 +161,7 @@ export function searchStickers(packs: StickerPack[], q: string, limit = 60): { s
   return out.slice(0, limit).map(({ sticker, pack }) => ({ sticker, pack }));
 }
 
-/** Where a pack's image lives: emoji packs store emoji-kind blobs. */
-export function packImageUrl(pack: StickerPack, sticker: Sticker): string {
-  return pack.kind === "emoji" ? emojiUrl(sticker.blob_id, sticker.animated, 48) : stickerUrl(sticker.blob_id, 160);
+/** Where a pack's image lives: emoji packs store emoji-kind blobs. `css` is how wide a sticker is drawn. */
+export function packImageUrl(pack: StickerPack, sticker: Sticker, css = 160): string {
+  return pack.kind === "emoji" ? emojiUrl(sticker.blob_id, sticker.animated, 48) : stickerUrl(sticker.blob_id, css);
 }

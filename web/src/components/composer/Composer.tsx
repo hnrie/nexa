@@ -20,7 +20,7 @@ import { GifPicker } from "@/components/pickers/GifPicker";
 import { StickerPicker } from "@/components/pickers/StickerPicker";
 import { emojiToken, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
 import { extractUrls } from "@/markdown";
-import { emojiLoaded, loadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
+import { emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
 import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem } from "./Autocomplete";
 import { COMMANDS, applyCommand } from "./commands";
@@ -77,6 +77,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const slow = useSlowmode();
   const [now, setNow] = useState(() => Date.now());
   const remaining = channel.slowmode_seconds > 0 && !bypassSlowmode ? slowmodeRemaining(slow, channel.id, channel.slowmode_seconds, now) : 0;
+  // the emoji set loads in a quiet moment, so the picker and :shortcodes: never wait for it
+  useEffect(() => preloadEmoji(), []);
   useEffect(() => {
     if (remaining <= 0) return;
     const t = setInterval(() => setNow(Date.now()), 250);

@@ -1,7 +1,6 @@
-export type SoundName = "message" | "mention" | "friend" | "ring" | "join" | "leave" | "mute" | "unmute";
+export type SoundName = "message" | "mention" | "friend" | "ring" | "outgoing" | "join" | "leave" | "mute" | "unmute";
 
 let ctx: AudioContext | null = null;
-let ringTimer: ReturnType<typeof setInterval> | null = null;
 
 function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -75,10 +74,72 @@ function tone(ac: AudioContext, freq: number, start: number, dur: number, type: 
   o.stop(ac.currentTime + start + dur + 0.02);
 }
 
-/** All sounds are synthesised so no audio asset is bundled or copied. */
-export function playSound(name: SoundName): void {
+/**
+ * The recorded sounds, served with the app (public/sounds). The rest are
+ * synthesised, and so is any recording that cannot be had, so a sound never
+ * goes missing.
+ */
+const FILES: Partial<Record<SoundName, string>> = {
+  message: "/sounds/message.m4a",
+  mention: "/sounds/mention.m4a",
+  ring: "/sounds/incoming-call.m4a",
+  outgoing: "/sounds/outgoing-call.m4a",
+  leave: "/sounds/leave-call.m4a",
+  mute: "/sounds/mute.m4a",
+  unmute: "/sounds/unmute.m4a",
+};
+
+/** How loud the recordings play; they are mastered near full scale. */
+const FILE_GAIN = 0.7;
+/** A sound still loading after this long is dropped rather than played late. */
+const STALE_MS = 1500;
+
+const buffers = new Map<SoundName, AudioBuffer>();
+const loading = new Map<SoundName, Promise<AudioBuffer | null>>();
+
+function loadBuffer(ac: AudioContext, name: SoundName): Promise<AudioBuffer | null> {
+  const url = FILES[name];
+  if (!url) return Promise.resolve(null);
+  const have = buffers.get(name);
+  if (have) return Promise.resolve(have);
+  let p = loading.get(name);
+  if (!p) {
+    p = fetch(url)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((data) => ac.decodeAudioData(data))
+      .then((buf) => {
+        buffers.set(name, buf);
+        return buf;
+      })
+      .catch(() => {
+        // not remembered: a later sound tries again
+        loading.delete(name);
+        return null;
+      });
+    loading.set(name, p);
+  }
+  return p;
+}
+
+/** Fetches and decodes the recordings ahead of time, so the first message plays at once. */
+export function preloadSounds(): void {
   const ac = audio();
   if (!ac) return;
+  for (const name of Object.keys(FILES) as SoundName[]) void loadBuffer(ac, name);
+}
+
+function playBuffer(ac: AudioContext, buf: AudioBuffer, loop = false): AudioBufferSourceNode {
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  src.loop = loop;
+  const g = ac.createGain();
+  g.gain.value = FILE_GAIN;
+  src.connect(g).connect(ac.destination);
+  src.start();
+  return src;
+}
+
+function synth(ac: AudioContext, name: SoundName): void {
   switch (name) {
     case "message":
       tone(ac, 880, 0, 0.09);
@@ -112,19 +173,80 @@ export function playSound(name: SoundName): void {
       tone(ac, 440, 0.07, 0.1, "square", 0.08);
       break;
     case "ring":
+    case "outgoing":
       tone(ac, 659.3, 0, 0.25, "sine", 0.15);
       tone(ac, 880, 0.3, 0.25, "sine", 0.15);
       break;
   }
 }
 
+export function playSound(name: SoundName): void {
+  const ac = audio();
+  if (!ac) return;
+  const buf = buffers.get(name);
+  if (buf) {
+    playBuffer(ac, buf);
+    return;
+  }
+  if (!FILES[name]) {
+    synth(ac, name);
+    return;
+  }
+  const asked = Date.now();
+  void loadBuffer(ac, name).then((loaded) => {
+    if (Date.now() - asked > STALE_MS) return;
+    if (loaded) playBuffer(ac, loaded);
+    else synth(ac, name);
+  });
+}
+
+/** Plays a sound over and over until the returned function is called. */
+function loop(name: SoundName): () => void {
+  const ac = audio();
+  if (!ac) return () => {};
+  let stopped = false;
+  let source: AudioBufferSourceNode | null = null;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  void loadBuffer(ac, name).then((buf) => {
+    if (stopped) return;
+    if (buf) source = playBuffer(ac, buf, true);
+    else {
+      synth(ac, name);
+      timer = setInterval(() => synth(ac, name), 1500);
+    }
+  });
+  return () => {
+    stopped = true;
+    if (timer) clearInterval(timer);
+    try {
+      source?.stop();
+    } catch {
+      /* never started */
+    }
+  };
+}
+
+let stopIncoming: (() => void) | null = null;
+let stopOutgoing: (() => void) | null = null;
+
+/** Someone is calling: rings until stopRinging. */
 export function startRinging(): void {
   stopRinging();
-  playSound("ring");
-  ringTimer = setInterval(() => playSound("ring"), 1500);
+  stopIncoming = loop("ring");
 }
 
 export function stopRinging(): void {
-  if (ringTimer) clearInterval(ringTimer);
-  ringTimer = null;
+  stopIncoming?.();
+  stopIncoming = null;
+}
+
+/** Calling someone who has not picked up yet: the outgoing tone, until stopCalling. */
+export function startCalling(): void {
+  stopCalling();
+  stopOutgoing = loop("outgoing");
+}
+
+export function stopCalling(): void {
+  stopOutgoing?.();
+  stopOutgoing = null;
 }

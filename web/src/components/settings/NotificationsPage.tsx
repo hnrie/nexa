@@ -44,7 +44,11 @@ export default function NotificationsPage() {
         <Button size="sm" variant="secondary" onClick={() => playSound("message")}>Message</Button>
         <Button size="sm" variant="secondary" onClick={() => playSound("mention")}>Mention</Button>
         <Button size="sm" variant="secondary" onClick={() => playSound("friend")}>Friend request</Button>
-        <Button size="sm" variant="secondary" onClick={() => playSound("ring")}>Call</Button>
+        <Button size="sm" variant="secondary" onClick={() => playSound("ring")}>Incoming call</Button>
+        <Button size="sm" variant="secondary" onClick={() => playSound("outgoing")}>Outgoing call</Button>
+        <Button size="sm" variant="secondary" onClick={() => playSound("leave")}>Leave call</Button>
+        <Button size="sm" variant="secondary" onClick={() => playSound("mute")}>Mute</Button>
+        <Button size="sm" variant="secondary" onClick={() => playSound("unmute")}>Unmute</Button>
         <Button size="sm" variant="secondary" onClick={() => void testNotification()}>Desktop notification</Button>
       </div>
     </>

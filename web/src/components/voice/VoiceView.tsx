@@ -1,4 +1,5 @@
 import {
+  ChevronUp,
   Eye,
   EyeOff,
   Headphones,
@@ -21,6 +22,7 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
+import { cameraMenuItems, micMenuItems } from "./deviceMenus";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
@@ -99,13 +101,25 @@ function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): 
   return size;
 }
 
-function ControlButton({ label, onClick, children, on, off, danger, testId, className }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string }) {
-  return (
+function ControlButton({ label, onClick, children, on, off, danger, testId, className, menu }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string; menu?: { label: string; open: (anchor: DOMRect) => void; testId?: string } }) {
+  const button = (
     <Tooltip text={label} side="top">
       <button className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")} data-on={on || undefined} data-off={off || undefined} aria-label={label} aria-pressed={on || off ? true : undefined} onClick={onClick} data-testid={testId}>
         {children}
       </button>
     </Tooltip>
+  );
+  if (!menu) return button;
+  // the little arrow on the button's corner opens its choices, as the one beside Discord's does
+  return (
+    <span className={s.ctlGroup}>
+      {button}
+      <Tooltip text={menu.label} side="top" className={s.ctlMenuWrap}>
+        <button className={s.ctlMenu} aria-label={menu.label} aria-haspopup="menu" onClick={(e) => menu.open(e.currentTarget.closest(`.${s.ctlGroup}`)!.getBoundingClientRect())} data-testid={menu.testId}>
+          <ChevronUp size={14} strokeWidth={3} />
+        </button>
+      </Tooltip>
+    </span>
   );
 }
 
@@ -386,6 +400,11 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
       });
   };
 
+  const openDeviceMenu = async (kind: "mic" | "camera", anchor: DOMRect) => {
+    const items = kind === "mic" ? await micMenuItems(openModal) : await cameraMenuItems(openModal);
+    openContextMenu({ x: anchor.left, y: anchor.top - 8, above: true, items });
+  };
+
   const tileMenu = (e: MouseEvent, t: Tile) => {
     e.preventDefault();
     const items: ContextMenuItem[] = [{ id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: t.userId }) }];
@@ -606,9 +625,9 @@ export function VoiceView({ channel, embedded = false }: { channel: Channel; emb
           </span>
         </div>
         <div className={s.controlsMain}>
-          <ControlButton label={muted ? "Unmute" : "Mute"} off={muted} onClick={toggleMute} testId="voice-mute">{muted ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
+          <ControlButton label={muted ? "Unmute" : "Mute"} off={muted} onClick={toggleMute} testId="voice-mute" menu={{ label: "Microphone options", open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
           <ControlButton label={deafened ? "Undeafen" : "Deafen"} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
-          <ControlButton label={localVideo ? "Turn off camera" : "Turn on camera"} on={!!localVideo} onClick={() => void toggleCamera()}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
+          <ControlButton label={localVideo ? "Turn off camera" : "Turn on camera"} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: "Camera options", open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
           {localVideo && canFlip ? (
             <ControlButton label="Switch camera" onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>
           ) : null}

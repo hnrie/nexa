@@ -12,6 +12,7 @@ import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
 import { leaveVoice, toggleCamera, toggleScreen, voiceStats } from "@/voice/session";
 import s from "./Voice.module.css";
+import { cameraMenuItems } from "./deviceMenus";
 
 /** The "Voice Connected" block that sits above the user panel while in a call. */
 export function VoiceStatus() {
@@ -59,7 +60,20 @@ export function VoiceStatus() {
         </Tooltip>
       </div>
       <div className={s.statusBtns}>
-        <button className={s.statusWide} data-on={!!localVideo} onClick={() => void toggleCamera()} disabled={!mine}><Video size={16} /> {localVideo ? "Camera on" : "Camera"}</button>
+        <button
+          className={s.statusWide}
+          data-on={!!localVideo}
+          onClick={() => void toggleCamera()}
+          disabled={!mine}
+          onContextMenu={(e) => {
+            // a right click chooses the camera
+            e.preventDefault();
+            const at = { x: e.clientX, y: e.clientY };
+            void cameraMenuItems(openModal).then((items) => useUI.getState().openContextMenu({ ...at, above: true, items }));
+          }}
+        >
+          <Video size={16} /> {localVideo ? "Camera on" : "Camera"}
+        </button>
         {/* phone browsers cannot share a screen, so the camera gets the row */}
         {canShareScreen ? <button className={s.statusWide} data-on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} disabled={!mine}><MonitorUp size={16} /> {localScreen ? "Sharing" : "Share"}</button> : null}
       </div>

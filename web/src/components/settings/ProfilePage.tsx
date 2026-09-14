@@ -5,6 +5,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { profileTheme } from "@/lib/avatarColor";
 import { Button } from "@/components/common/Button";
+import { CustomColorIcon } from "./CustomColorIcon";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { Markdown } from "@/markdown";
@@ -130,7 +131,8 @@ export default function ProfilePage() {
             <div className={s.swatches}>
               <button className={s.swatch} data-on={accent === null} style={{ background: "var(--bg-active)" }} title="Default" onClick={() => { setAccent(null); setAccent2(null); }} />
               {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent === c} style={{ background: c }} title={c} onClick={() => setAccent(c)} />)}
-              <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} style={{ background: accent && !PRESETS.includes(accent) ? accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }} title="Custom">
+              <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} title="Custom">
+                <CustomColorIcon color={accent && !PRESETS.includes(accent) ? accent : null} />
                 <input type="color" value={accent ?? "#5865f2"} onChange={(e) => setAccent(e.target.value)} />
               </label>
               <HexInput value={accent} fallback="#5865f2" label="Primary colour hex" onChange={setAccent} />
@@ -139,7 +141,8 @@ export default function ProfilePage() {
             <div className={s.swatches}>
               <button className={s.swatch} data-on={accent2 === null} style={{ background: "var(--bg-active)" }} title="None" onClick={() => setAccent2(null)} disabled={!accent} />
               {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent2 === c} style={{ background: c }} title={c} onClick={() => setAccent2(c)} disabled={!accent} />)}
-              <label className={s.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ background: accent2 && !PRESETS.includes(accent2) ? accent2 : "linear-gradient(135deg,#f00,#0f0,#00f)", opacity: accent ? 1 : 0.4 }} title="Custom">
+              <label className={s.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ opacity: accent ? 1 : 0.4 }} title="Custom">
+                <CustomColorIcon color={accent2 && !PRESETS.includes(accent2) ? accent2 : null} />
                 <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} onChange={(e) => setAccent2(e.target.value)} />
               </label>
               <HexInput value={accent2} fallback="#eb459e" label="Second colour hex" disabled={!accent} onChange={setAccent2} />

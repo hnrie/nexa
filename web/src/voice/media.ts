@@ -68,9 +68,33 @@ export async function getMic(v: VoiceSettings): Promise<MediaStream> {
 
 export type CameraFacing = "user" | "environment";
 
-export async function getCamera(facing: CameraFacing = "user"): Promise<MediaStream> {
-  const video: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: { ideal: facing } };
-  return navigator.mediaDevices.getUserMedia({ video, audio: false });
+/**
+ * Opens a camera: the one chosen in settings while it can still be found (by
+ * its id, then by its name, as the microphone is), otherwise the one facing
+ * the way asked.
+ */
+export async function getCamera(facing: CameraFacing = "user", choice?: { id: string | null; label: string | null }): Promise<MediaStream> {
+  const base: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+  const open = (deviceId: string) => navigator.mediaDevices.getUserMedia({ video: { ...base, deviceId: { exact: deviceId } }, audio: false });
+  if (choice?.id) {
+    try {
+      return await open(choice.id);
+    } catch (err) {
+      if (err instanceof DOMException && err.name !== "OverconstrainedError" && err.name !== "NotFoundError") throw err;
+    }
+  }
+  if (choice?.label) {
+    const all = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
+    const match = all.find((d) => d.kind === "videoinput" && d.label === choice.label && d.deviceId);
+    if (match) {
+      try {
+        return await open(match.deviceId);
+      } catch {
+        /* fall back to the one facing the way asked */
+      }
+    }
+  }
+  return navigator.mediaDevices.getUserMedia({ video: { ...base, facingMode: { ideal: facing } }, audio: false });
 }
 
 /** Whether this device has more than one camera to switch between. */
