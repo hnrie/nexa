@@ -1,5 +1,5 @@
 appId: xyz.evilion.chat
-productName: Evilion Chat
+productName: nexa
 copyright: Copyright © 2026 Evilion
 directories:
   output: dist
@@ -18,7 +18,7 @@ extraResources:
       - icon.png
 asar: true
 compression: maximum
-artifactName: "Evilion-Chat-${version}-${os}-${arch}.${ext}"
+artifactName: "nexa-${version}-${os}-${arch}.${ext}"
 publish:
   provider: generic
   url: https://chat.evilion.xyz/desktop/
@@ -35,11 +35,11 @@ mac:
     - target: zip
       arch: [x64, arm64]
   extendInfo:
-    NSMicrophoneUsageDescription: Evilion Chat uses the microphone for voice calls.
-    NSCameraUsageDescription: Evilion Chat uses the camera for video calls.
-    NSAudioCaptureUsageDescription: Evilion Chat shares the sound of what you share on screen.
+    NSMicrophoneUsageDescription: nexa uses the microphone for voice calls.
+    NSCameraUsageDescription: nexa uses the camera for video calls.
+    NSAudioCaptureUsageDescription: nexa shares the sound of what you share on screen.
 dmg:
-  artifactName: "Evilion-Chat-${version}-mac-${arch}.${ext}"
+  artifactName: "nexa-${version}-mac-${arch}.${ext}"
 win:
   icon: resources/icon.png
   # koffi's native module, which finds a shared window's program (src/main/appAudio.ts)
@@ -49,18 +49,18 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: "Evilion-Chat-Setup-${version}-win-${arch}.${ext}"
+  artifactName: "nexa-Setup-${version}-win-${arch}.${ext}"
 nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
-  shortcutName: Evilion Chat
+  shortcutName: nexa
 linux:
   icon: resources/icon.png
   category: Network;Chat;InstantMessaging
-  executableName: evilion-chat
+  executableName: nexa
   maintainer: Evilion <evilionx3@proton.me>
-  synopsis: Evilion Chat for your computer
+  synopsis: nexa for your computer
   target:
     - target: AppImage
       arch: [x64]
@@ -68,4 +68,4 @@ linux:
       arch: [x64]
   desktop:
     entry:
-      StartupWMClass: Evilion Chat
+      StartupWMClass: nexa

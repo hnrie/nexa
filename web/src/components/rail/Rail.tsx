@@ -1,8 +1,9 @@
-import { MessageCircle, Plus, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { iconUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
+import { NexaMark } from "@/components/common/Brand";
 import { Tooltip } from "@/components/common/Tooltip";
 import { initials } from "@/lib/avatarColor";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
@@ -121,7 +122,7 @@ export function Rail() {
         <span className={s.pill} />
         <Tooltip text="Direct Messages" side="right">
           <button className={s.btn} aria-label={homeCount > 0 ? `Direct Messages, ${homeLabel(homeCount - friendRequests, friendRequests)}` : "Direct Messages"} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
-            <MessageCircle size={28} strokeWidth={2.2} />
+            <NexaMark size={30} />
           </button>
         </Tooltip>
         {homeCount > 0 ? <span className={s.badge} aria-hidden="true" data-testid="home-count">{badgeText(homeCount)}</span> : null}

@@ -19,12 +19,12 @@ func TestDesktopReleasesAreServed(t *testing.T) {
 		t.Fatalf("before publishing: %d %v", res.StatusCode, body)
 	}
 
-	manifest := `{"version":"1.2.3","released_at":1800000000000,"files":[{"os":"windows","arch":"x64","kind":"installer","name":"Evilion-Chat-Setup-1.2.3-x64.exe","size":11,"sha256":"ab"},{"os":"mac","arch":"arm64","kind":"installer","name":"Evilion-Chat-1.2.3-arm64.dmg","size":5,"sha256":"cd"}],"junk":"dropped"}`
+	manifest := `{"version":"1.2.3","released_at":1800000000000,"files":[{"os":"windows","arch":"x64","kind":"installer","name":"nexa-Setup-1.2.3-x64.exe","size":11,"sha256":"ab"},{"os":"mac","arch":"arm64","kind":"installer","name":"nexa-1.2.3-arm64.dmg","size":5,"sha256":"cd"}],"junk":"dropped"}`
 	for name, body := range map[string]string{
 		"manifest.json":                    manifest,
 		"latest.yml":                       "version: 1.2.3\n",
-		"Evilion-Chat-Setup-1.2.3-x64.exe": "hello world",
-		"Evilion-Chat-1.2.3-arm64.dmg":     "12345",
+		"nexa-Setup-1.2.3-x64.exe": "hello world",
+		"nexa-1.2.3-arm64.dmg":     "12345",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
 			t.Fatal(err)
@@ -35,7 +35,7 @@ func TestDesktopReleasesAreServed(t *testing.T) {
 	if res.StatusCode != 200 || body["version"] != "1.2.3" || len(body["files"].([]any)) != 2 || body["junk"] != nil {
 		t.Fatalf("latest: %d %v", res.StatusCode, body)
 	}
-	if f := body["files"].([]any)[0].(map[string]any); f["os"] != "windows" || f["name"] != "Evilion-Chat-Setup-1.2.3-x64.exe" || f["size"] != float64(11) {
+	if f := body["files"].([]any)[0].(map[string]any); f["os"] != "windows" || f["name"] != "nexa-Setup-1.2.3-x64.exe" || f["size"] != float64(11) {
 		t.Errorf("file entry: %v", f)
 	}
 
@@ -53,12 +53,12 @@ func TestDesktopReleasesAreServed(t *testing.T) {
 		b, _ := io.ReadAll(r.Body)
 		return r, string(b)
 	}
-	r, b := get("/desktop/Evilion-Chat-Setup-1.2.3-x64.exe", "")
+	r, b := get("/desktop/nexa-Setup-1.2.3-x64.exe", "")
 	if r.StatusCode != 200 || b != "hello world" || !strings.Contains(r.Header.Get("Cache-Control"), "immutable") || !strings.Contains(r.Header.Get("Content-Disposition"), "attachment") {
 		t.Errorf("installer: %d %q %v", r.StatusCode, b, r.Header)
 	}
 	// resumable, as updaters and browsers expect
-	if r, b := get("/desktop/Evilion-Chat-Setup-1.2.3-x64.exe", "bytes=6-"); r.StatusCode != 206 || b != "world" {
+	if r, b := get("/desktop/nexa-Setup-1.2.3-x64.exe", "bytes=6-"); r.StatusCode != 206 || b != "world" {
 		t.Errorf("range: %d %q", r.StatusCode, b)
 	}
 	if r, _ := get("/desktop/latest.yml", ""); r.StatusCode != 200 || r.Header.Get("Cache-Control") != "no-cache" {

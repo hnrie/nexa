@@ -46,7 +46,7 @@ func (s *Server) captchaInfo() map[string]string {
 func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 	mode, key := s.registrationPolicy(r.Context())
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"name":                "Evilion Chat",
+		"name":                "nexa",
 		"version":             s.Version,
 		"registration":        mode,
 		"needs_key":           mode == "invite" && key != "",

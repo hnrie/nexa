@@ -107,7 +107,7 @@ class Session:
         self.recovery = p.locator("[data-testid=recovery-key]").inner_text()
         assert len(self.recovery.replace("-", "")) == 64, self.recovery
         p.check("input[type=checkbox]")
-        p.click("text=Continue to Evilion Chat")
+        p.click("text=Continue to nexa")
         p.wait_for_url("**/channels/@me", timeout=30000)
         p.wait_for_selector("text=Friends", timeout=15000)
 

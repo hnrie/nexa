@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
+import { NexaLockup } from "../components/common/Brand";
 import s from "./Auth.module.css";
 
 export function AuthLayout({ title, subtitle, children, width = 480 }: { title: string; subtitle?: string; children: ReactNode; width?: number }) {
   return (
     <div className={s.page}>
-      <div className={s.brand}>Evilion Chat</div>
+      <div className={s.brand}><NexaLockup size={34} /></div>
       <div className={s.card} style={{ width }}>
         <h1 className={s.title}>{title}</h1>
         {subtitle ? <p className={s.subtitle}>{subtitle}</p> : null}

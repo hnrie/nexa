@@ -68,7 +68,7 @@ export default function RegisterPage() {
 
   if (recovery) {
     const download = () => {
-      const blob = new Blob([`Evilion Chat recovery key for @${uname}\n\n${recovery}\n\nKeep this somewhere safe. It is the only way to recover your messages if you forget your password.\n`], { type: "text/plain" });
+      const blob = new Blob([`nexa recovery key for @${uname}\n\n${recovery}\n\nKeep this somewhere safe. It is the only way to recover your messages if you forget your password.\n`], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -88,7 +88,7 @@ export default function RegisterPage() {
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
           <span>I have saved my recovery key somewhere safe.</span>
         </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true })}>Continue to Evilion Chat</Button>
+        <Button size="lg" block disabled={!saved} onClick={() => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true })}>Continue to nexa</Button>
       </AuthLayout>
     );
   }

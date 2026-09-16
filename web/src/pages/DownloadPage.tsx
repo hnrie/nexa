@@ -36,7 +36,7 @@ export default function DownloadPage() {
   const toast = useUI((u) => u.toast);
 
   useEffect(() => {
-    document.title = "Download Evilion Chat";
+    document.title = "Download nexa";
     void currentPlatform().then(setTarget);
     desktop.latest().then(setRel, () => setFailed(true));
     android.latest().then(setApk, () => setApk(null));
@@ -53,7 +53,7 @@ export default function DownloadPage() {
       <div className={s.card}>
         <div className={s.head}>
           <img className={s.logo} src="/icons/icon-192.png" alt="" />
-          <h1 className={s.title}>{onAndroid ? "Evilion Chat for Android" : "Evilion Chat for your computer"}</h1>
+          <h1 className={s.title}>{onAndroid ? "nexa for Android" : "nexa for your computer"}</h1>
           <p className={s.sub}>{onAndroid ? "Calls, notifications and a real app." : "RPC support and a better experience."}</p>
         </div>
 
@@ -138,7 +138,7 @@ export default function DownloadPage() {
               <h2 className={s.label}>The first time you open it</h2>
               <ul className={s.notes}>
                 <li><b>Windows</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>More info</b>, then <b>Run anyway</b>.</li>
-                <li><b>macOS</b>: open the disk image and drag Evilion Chat into Applications. The first time, right-click the app and choose <b>Open</b>.</li>
+                <li><b>macOS</b>: open the disk image and drag nexa into Applications. The first time, right-click the app and choose <b>Open</b>.</li>
                 <li><b>Linux</b>: make the AppImage executable (<code>chmod +x</code>) and run it; it updates itself. The .deb installs with your package manager and says when a new version is out.</li>
                 {apk ? <li><b>Android</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>Install</b>.</li> : null}
               </ul>
@@ -147,7 +147,7 @@ export default function DownloadPage() {
         )}
 
         <div className={s.foot}>
-          <Link to="/channels/@me">Open Evilion Chat in your browser</Link>
+          <Link to="/channels/@me">Open nexa in your browser</Link>
         </div>
       </div>
     </div>

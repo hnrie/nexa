@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.main
 
+import xyz.evilion.chat.R
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +28,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tag
@@ -38,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -95,7 +97,7 @@ private fun ServerRail(route: Route) {
                     selected = route is Route.Friends || (route is Route.Chat && route.serverId == null),
                     onClick = { Nav.go(Route.Chat(null, (route as? Route.Chat)?.channelId)) },
                 ) {
-                    Icon(Icons.Filled.Home, "Direct messages", tint = colors.text, modifier = Modifier.size(24.dp))
+                    Icon(painterResource(R.drawable.nexa_mark), "Direct messages", tint = colors.text, modifier = Modifier.size(28.dp))
                 }
             }
             item { Box(Modifier.width(32.dp).height(2.dp).clip(CircleShape).background(colors.borderSubtle)) }

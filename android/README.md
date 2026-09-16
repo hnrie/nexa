@@ -1,4 +1,4 @@
-# Evilion Chat for Android
+# nexa for Android
 
 A native app: Kotlin and Jetpack Compose, OkHttp for the API and the gateway,
 libwebrtc for calls. It talks to the same `chatd` the web client does, does the

@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	defaultUserAgent = "EvilionChat-Unfurl/1.0 (+https://chat.evilion.xyz)"
+	defaultUserAgent = "Nexa-Unfurl/1.0 (+https://chat.evilion.xyz)"
 	defaultTimeout   = 6 * time.Second
 	defaultMaxBytes  = 2 << 20
 	mediaHeadBytes   = 64 << 10

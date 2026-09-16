@@ -1,5 +1,5 @@
 /**
- * Puts `window.evilionDesktop` on Evilion Chat's pages, and on nothing else.
+ * Puts `window.evilionDesktop` on nexa's pages, and on nothing else.
  * Only named calls cross over; the page never gets ipcRenderer itself.
  * web/src/lib/desktopBridge.ts describes this object to the page.
  */

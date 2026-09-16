@@ -1,6 +1,6 @@
 /**
  * What the page may use: the microphone, camera, screen, notifications and
- * clipboard, for Evilion Chat's own origin and nothing else. On macOS the
+ * clipboard, for nexa's own origin and nothing else. On macOS the
  * system asks the person the first time the microphone or camera is wanted.
  */
 import { desktopCapturer, session, systemPreferences, type BrowserWindow, type DesktopCapturerSource } from "electron";

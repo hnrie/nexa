@@ -1,7 +1,7 @@
 /**
  * Updates on macOS without an Apple Developer ID. The system updater
  * (Squirrel.Mac) only installs signed updates, so this one downloads the new
- * zip from Evilion Chat, checks it against the manifest's sha512, unpacks it
+ * zip from nexa, checks it against the manifest's sha512, unpacks it
  * in a temporary folder and, on restart, swaps it for the running app and
  * opens the new one. If the app cannot be replaced where it is (read-only, or run from
  * the disk image), it says so and points to the download page instead.
@@ -25,7 +25,7 @@ export interface MacUpdate {
 function fetchText(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const get = url.startsWith("https:") ? https.get : http.get;
-    get(url, { headers: { "User-Agent": `EvilionChat/${app.getVersion()}`, "Cache-Control": "no-cache" } }, (res) => {
+    get(url, { headers: { "User-Agent": `Nexa/${app.getVersion()}`, "Cache-Control": "no-cache" } }, (res) => {
       if (res.statusCode !== 200) {
         res.resume();
         reject(new Error(`manifest answered ${res.statusCode}`));
@@ -46,7 +46,7 @@ function fetchText(url: string): Promise<string> {
 function download(url: string, dest: string, size: number, onProgress: (fraction: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const get = url.startsWith("https:") ? https.get : http.get;
-    get(url, { headers: { "User-Agent": `EvilionChat/${app.getVersion()}` } }, (res) => {
+    get(url, { headers: { "User-Agent": `Nexa/${app.getVersion()}` } }, (res) => {
       if (res.statusCode !== 200) {
         res.resume();
         reject(new Error(`download answered ${res.statusCode}`));
@@ -122,12 +122,19 @@ export function installMacUpdate(update: MacUpdate): void {
   const backup = `${update.staged}.previous`;
   // the update's folder in the temporary directory, which holds the unpacked app
   const work = path.dirname(path.dirname(update.staged));
+  // a release that renames the app (Evilion Chat -> nexa) lands under its new
+  // name; the swap itself still goes through the old path, so a failure puts
+  // the old app back exactly where it was.
+  const renamed = path.join(path.dirname(bundle), path.basename(update.staged));
   const script = `
 pid=${process.pid}
 while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
 if mv "$1" "$3"; then
   if mv "$2" "$1"; then
     xattr -dr com.apple.quarantine "$1" 2>/dev/null
+    if [ "$6" != "$1" ] && [ ! -e "$6" ] && mv "$1" "$6"; then
+      set -- "$6" "$2" "$3" "$4" "$5" "$6"
+    fi
   else
     mv "$3" "$1"
   fi
@@ -137,6 +144,6 @@ if mv "$1" "$3"; then
 fi
 `;
   // a test of the swap leaves the reopening out (EVILION_UPDATE_NO_RELAUNCH)
-  spawn("/bin/sh", ["-c", script, "evilion-update", bundle, update.staged, backup, work, process.env.EVILION_UPDATE_NO_RELAUNCH ? "1" : ""], { detached: true, stdio: "ignore" }).unref();
+  spawn("/bin/sh", ["-c", script, "evilion-update", bundle, update.staged, backup, work, process.env.EVILION_UPDATE_NO_RELAUNCH ? "1" : "", renamed], { detached: true, stdio: "ignore" }).unref();
   app.quit();
 }

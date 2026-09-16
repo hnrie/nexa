@@ -13,7 +13,7 @@ func TestStaticServing(t *testing.T) {
 	srv, ts := newTestServer(t)
 	dist := t.TempDir()
 	os.MkdirAll(filepath.Join(dist, "assets"), 0o755)
-	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><title>Evilion Chat</title>"), 0o644)
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><title>nexa</title>"), 0o644)
 	os.WriteFile(filepath.Join(dist, "assets", "app-abc123.js"), []byte("console.log(1)"), 0o644)
 	os.WriteFile(filepath.Join(dist, "manifest.webmanifest"), []byte("{}"), 0o644)
 	os.WriteFile(filepath.Join(dist, "sw.js"), []byte("self.x=1"), 0o644)
@@ -29,10 +29,10 @@ func TestStaticServing(t *testing.T) {
 		return res, string(b)
 	}
 	res, body := get("/")
-	if res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") || res.Header.Get("Cache-Control") != "no-cache, must-revalidate" || res.Header.Get("CDN-Cache-Control") != "no-store" || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+	if res.StatusCode != 200 || !strings.Contains(body, "nexa") || res.Header.Get("Cache-Control") != "no-cache, must-revalidate" || res.Header.Get("CDN-Cache-Control") != "no-store" || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
 		t.Errorf("index: %d %q %v", res.StatusCode, body, res.Header)
 	}
-	if res, body = get("/channels/@me/123"); res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") {
+	if res, body = get("/channels/@me/123"); res.StatusCode != 200 || !strings.Contains(body, "nexa") {
 		t.Errorf("spa fallback: %d", res.StatusCode)
 	}
 	res, body = get("/assets/app-abc123.js")
@@ -43,7 +43,7 @@ func TestStaticServing(t *testing.T) {
 	// the page: a cache would then keep that page at the script's address
 	for _, missing := range []string{"/assets/gone-deadbeef.js", "/twemoji/9999.svg", "/download-sw.js", "/__download/0123456789abcdef0123456789abcdef"} {
 		res, body = get(missing)
-		if res.StatusCode != 404 || strings.Contains(body, "Evilion Chat") || res.Header.Get("Cache-Control") != "no-store" {
+		if res.StatusCode != 404 || strings.Contains(body, "nexa") || res.Header.Get("Cache-Control") != "no-store" {
 			t.Errorf("missing %s: %d %q %v", missing, res.StatusCode, body, res.Header.Get("Cache-Control"))
 		}
 	}
@@ -53,7 +53,7 @@ func TestStaticServing(t *testing.T) {
 	if res, _ = get("/sw.js"); res.Header.Get("Service-Worker-Allowed") != "/" {
 		t.Error("service worker header")
 	}
-	if res, body = get("/../../etc/passwd"); res.StatusCode != 200 || !strings.Contains(body, "Evilion Chat") {
+	if res, body = get("/../../etc/passwd"); res.StatusCode != 200 || !strings.Contains(body, "nexa") {
 		t.Errorf("traversal must fall back to index: %d", res.StatusCode)
 	}
 	if res, body = get("/api/v1/nope"); res.StatusCode != 404 || !strings.Contains(body, "not_found") {
@@ -80,7 +80,7 @@ func TestStaticServing(t *testing.T) {
 func TestGuestCallLinkPreview(t *testing.T) {
 	srv, _ := newTestServer(t)
 	dist := t.TempDir()
-	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><html><head><title>Evilion Chat</title></head><body></body></html>"), 0o644)
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><html><head><title>nexa</title></head><body></body></html>"), 0o644)
 	srv.Cfg.WebDist = dist
 	ts := newHTTPTestServer(t, srv)
 	res, err := http.Get(ts.URL + "/call/AbCdEf123456")

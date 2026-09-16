@@ -1,4 +1,4 @@
-# Deploying Evilion Chat on this Mac
+# Deploying nexa on this Mac
 
 ```
 make build                     # web app + Go binary (prebuilt Node at /usr/local/lib/nodejs)

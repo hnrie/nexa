@@ -14,8 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# electron-builder.yml names artifacts Evilion-Chat[-Setup]-<version>-<os>-<arch>.<ext>
-PATTERN = re.compile(r"^Evilion-Chat-(?:Setup-)?(?P<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)-(?P<os>win|mac|linux)-(?P<arch>x64|arm64|x86_64|amd64|aarch64)\.(?P<ext>exe|dmg|zip|AppImage|deb)$")
+# electron-builder.yml names artifacts nexa[-Setup]-<version>-<os>-<arch>.<ext>
+PATTERN = re.compile(r"^nexa-(?:Setup-)?(?P<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)-(?P<os>win|mac|linux)-(?P<arch>x64|arm64|x86_64|amd64|aarch64)\.(?P<ext>exe|dmg|zip|AppImage|deb)$")
 KIND = {"exe": "installer", "dmg": "installer", "zip": "zip", "AppImage": "appimage", "deb": "deb"}
 OS = {"win": "windows", "mac": "mac", "linux": "linux"}
 ARCH = {"x64": "x64", "x86_64": "x64", "amd64": "x64", "arm64": "arm64", "aarch64": "arm64"}
@@ -45,7 +45,7 @@ def main() -> int:
         if m and p.is_file():
             found.append((p, m))
     if not found:
-        print(f"no Evilion-Chat artifacts in {dist}", file=sys.stderr)
+        print(f"no nexa artifacts in {dist}", file=sys.stderr)
         return 1
     versions = {m["version"] for _, m in found}
     if len(versions) != 1:

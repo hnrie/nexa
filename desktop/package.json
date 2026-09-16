@@ -1,8 +1,8 @@
 {
-  "name": "evilion-chat-desktop",
-  "productName": "Evilion Chat",
+  "name": "nexa-desktop",
+  "productName": "nexa",
   "version": "1.0.3",
-  "description": "Evilion Chat for your computer, with Rich Presence that works alongside Discord.",
+  "description": "nexa for your computer, with Rich Presence that works alongside Discord.",
   "author": "Evilion <evilionx3@proton.me>",
   "homepage": "https://chat.evilion.xyz",
   "license": "UNLICENSED",

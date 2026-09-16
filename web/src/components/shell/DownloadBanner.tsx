@@ -89,7 +89,7 @@ export function DownloadBanner() {
     <div className={s.banner} role="region" aria-label="Desktop app" data-testid="download-banner">
       <span className={s.icon}><Monitor size={18} /></span>
       <span className={s.text}>
-        <b>Get Evilion Chat for {OS_NAME[file.os]}</b> — RPC support and a better experience.
+        <b>Get nexa for {OS_NAME[file.os]}</b> — RPC support and a better experience.
       </span>
       {sure ? (
         <>

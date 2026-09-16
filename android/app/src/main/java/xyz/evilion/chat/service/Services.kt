@@ -26,7 +26,7 @@ class GatewayService : Service() {
         Notifications.ensureChannels(this)
         val notification = NotificationCompat.Builder(this, Notifications.CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("Evilion Chat")
+            .setContentTitle("nexa")
             .setContentText("Connected")
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)

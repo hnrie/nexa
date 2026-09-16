@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Publishes the Android app so chatd can serve it.
 
-  python3 tools/publish_android.py [android/app/build/outputs/apk/release/app-release.apk] [--to data/android]
+  python3 tools/publish_android.py [android/app/build/outputs/apk/release] [--to data/android] [--notes "what changed"]
 
-Copies the APK into chatd's ANDROID_DIR under a name that carries its version,
-then writes manifest.json, which /api/v1/android/latest serves to the download
-page and the banner. The APK's own details (version, minimum Android, the
-processors it carries code for, the certificate it is signed with) are read
-from the file itself with the SDK's tools, so the page cannot claim something
-the build does not say. Older builds are left in place, so a download already
-running can finish.
+Copies every APK the release build produced — the one that runs on any phone,
+and the smaller ones carrying code for a single processor — into chatd's
+ANDROID_DIR under names that carry their version, then writes manifest.json,
+which /api/v1/android/latest serves to the download page, the banner and the
+app's own updater. Each APK's details (version, minimum Android, processors,
+signing certificate) are read from the file itself with the SDK's tools, so
+nothing here can claim something a build does not say. Older builds are left
+in place, so a download already running can finish.
 """
 import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
@@ -68,43 +69,80 @@ def signing_cert(apk: Path) -> str:
     return ":".join(raw[i : i + 2] for i in range(0, len(raw), 2))
 
 
+def apk_kind(apk: Path, info: dict) -> str:
+    """Which processor a build is for, or "universal" when it carries them all."""
+    abis = info.get("abis") or []
+    if len(abis) == 1:
+        return abis[0]
+    for abi in ("arm64-v8a", "armeabi-v7a", "x86_64", "x86"):
+        if abi in apk.name:
+            return abi
+    return "universal"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("apk", nargs="?", default=str(ROOT / "android/app/build/outputs/apk/release/app-release.apk"))
+    ap.add_argument("apk", nargs="?", default=str(ROOT / "android/app/build/outputs/apk/release"))
     ap.add_argument("--to", default=os.environ.get("ANDROID_DIR") or str(ROOT / "data/android"))
     ap.add_argument("--version", help="only needed when the SDK's aapt2 is not here")
+    ap.add_argument("--notes", default="", help="what changed, shown by the app when it offers the update")
     args = ap.parse_args()
 
-    apk, dest = Path(args.apk), Path(args.to)
-    if not apk.is_file():
-        print(f"no APK at {apk}", file=sys.stderr)
+    src, dest = Path(args.apk), Path(args.to)
+    apks = sorted(src.glob("*.apk")) if src.is_dir() else [src]
+    apks = [p for p in apks if p.is_file()]
+    if not apks:
+        print(f"no APK at {src}", file=sys.stderr)
         return 1
 
-    info = badging(apk)
-    version = args.version or info.get("version")
-    if not version:
-        print("could not read the version: pass --version, or install the SDK build-tools", file=sys.stderr)
-        return 1
+    builds = []
+    for apk in apks:
+        info = badging(apk)
+        version = args.version or info.get("version")
+        if not version:
+            print("could not read the version: pass --version, or install the SDK build-tools", file=sys.stderr)
+            return 1
+        builds.append((apk, info, version, apk_kind(apk, info)))
 
+    versions = {b[2] for b in builds}
+    if len(versions) != 1:
+        print(f"more than one version in {src}: {sorted(versions)}", file=sys.stderr)
+        return 1
+    version = versions.pop()
+
+    universal = next((b for b in builds if b[3] == "universal"), builds[0])
     dest.mkdir(parents=True, exist_ok=True)
-    name = f"evilion-chat-{version}.apk"
-    target = dest / name
-    if target.resolve() != apk.resolve():
-        shutil.copy2(apk, target)
 
+    files = []
+    for apk, info, _, kind in builds:
+        name = f"evilion-chat-{version}.apk" if kind == "universal" else f"evilion-chat-{version}-{kind}.apk"
+        target = dest / name
+        if target.resolve() != apk.resolve():
+            shutil.copy2(apk, target)
+        entry = {"abi": kind, "name": name, "size": target.stat().st_size, "sha256": sha256(target)}
+        files.append(entry)
+        if apk == universal[0]:
+            universal_entry = entry
+        print(f"  {kind:12} {name}  {entry['size'] / (1 << 20):.1f} MB")
+
+    files.sort(key=lambda f: (f["abi"] != "universal", f["abi"]))
+    info = universal[1]
     manifest = {
         "version": version,
         "version_code": info.get("version_code", 0),
         "released_at": int(time.time() * 1000),
-        "name": name,
-        "size": target.stat().st_size,
-        "sha256": sha256(target),
+        "name": universal_entry["name"],
+        "size": universal_entry["size"],
+        "sha256": universal_entry["sha256"],
         "min_sdk": info.get("min_sdk", 0),
+        "files": files,
         "abis": info.get("abis", []),
-        "signing_sha256": signing_cert(target),
+        "signing_sha256": signing_cert(dest / universal_entry["name"]),
     }
+    if args.notes:
+        manifest["notes"] = args.notes
     (dest / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    print(f"published {name} ({manifest['size'] / (1 << 20):.1f} MB) to {dest}")
+    print(f"published {version} ({len(files)} build{'s' if len(files) != 1 else ''}) to {dest}")
     if not manifest["signing_sha256"]:
         print("note: no signing certificate read, so app links will stay off until apksigner is available")
     return 0

@@ -266,7 +266,7 @@ export default function GuestCallPage() {
             </p>
           </>
         )}
-        {signedIn && phase !== "checking" && phase !== "joining" ? <a className={s.back} href="/channels/@me">Back to Evilion Chat</a> : null}
+        {signedIn && phase !== "checking" && phase !== "joining" ? <a className={s.back} href="/channels/@me">Back to nexa</a> : null}
       </div>
     </div>
   );

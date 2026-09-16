@@ -55,6 +55,17 @@ android {
         }
     }
 
+    // One build per processor keeps the download and every update to about a
+    // third; the universal one is what the website hands anyone it cannot place.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -113,6 +124,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-process:2.11.0")
     implementation("androidx.lifecycle:lifecycle-service:2.11.0")
     implementation("androidx.navigation:navigation-compose:2.10.1")
+    // the phone's own browser, for a captcha its web view is too old to run
+    implementation("androidx.browser:browser:1.10.0")
+    implementation("androidx.webkit:webkit:1.17.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")

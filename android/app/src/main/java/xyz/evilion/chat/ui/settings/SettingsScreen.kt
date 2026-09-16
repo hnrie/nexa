@@ -675,7 +675,7 @@ private fun AboutPage() {
     val scope = rememberCoroutineScope()
     var usage by remember { mutableStateOf(AttachmentStore.usage()) }
     val instance by AppState.instance.collectAsState()
-    Section("Evilion Chat for Android") {
+    Section("nexa for Android") {
         StatRow("App version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         StatRow("Server", xyz.evilion.chat.net.Api.baseUrl.removePrefix("https://"))
         StatRow("Server version", instance?.version ?: "—")

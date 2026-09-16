@@ -161,7 +161,7 @@ export default function SecurityPage() {
 
   const downloadCodes = () => {
     if (!codes) return;
-    const body = `Evilion Chat backup codes for @${me.username}\nEach code works once.\n\n${codes.join("\n")}\n`;
+    const body = `nexa backup codes for @${me.username}\nEach code works once.\n\n${codes.join("\n")}\n`;
     const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
     const a = document.createElement("a");
     a.href = url;

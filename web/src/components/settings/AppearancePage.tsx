@@ -9,9 +9,9 @@ const THEMES: { id: Theme; name: string; colors: string[] }[] = [
   { id: "light", name: "Light", colors: ["#f3f3f4", "#ffffff", "#ebeced"] },
   { id: "ash", name: "Ash", colors: ["#1a1a1e", "#232428", "#27272c"] },
   { id: "onyx", name: "Onyx", colors: ["#000000", "#000000", "#131416"] },
-  { id: "system", name: "Sync with system", colors: ["#2c2d32", "#f3f3f4", "#5865f2"] },
+  { id: "system", name: "Sync with system", colors: ["#2c2d32", "#f3f3f4", "#8000ff"] },
 ];
-const ACCENTS = ["#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#9b59b6", "#3498db", "#e91e63"];
+const ACCENTS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#3498db", "#e91e63"];
 
 export default function AppearancePage() {
   const me = useAuth((a) => a.me);
@@ -41,10 +41,10 @@ export default function AppearancePage() {
       </div>
       <h3 className={s.h5}>Accent colour</h3>
       <div className={s.swatches}>
-        <button className={s.swatch} data-on={st.accent === null} style={{ background: "#5865f2" }} title="Default" onClick={() => patch({ accent: null })} />
+        <button className={s.swatch} data-on={st.accent === null} style={{ background: "#8000ff" }} title="Default" onClick={() => patch({ accent: null })} />
         {ACCENTS.map((c) => <button key={c} className={s.swatch} data-on={st.accent === c} style={{ background: c }} title={c} onClick={() => patch({ accent: c })} />)}
         <label className={s.swatch} data-on={!!st.accent && !ACCENTS.includes(st.accent)} title="Custom" style={{ background: st.accent && !ACCENTS.includes(st.accent) ? st.accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
-          <input type="color" value={st.accent ?? "#5865f2"} onChange={(e) => patch({ accent: e.target.value })} />
+          <input type="color" value={st.accent ?? "#8000ff"} onChange={(e) => patch({ accent: e.target.value })} />
         </label>
       </div>
       <h3 className={s.h5}>Message display</h3>

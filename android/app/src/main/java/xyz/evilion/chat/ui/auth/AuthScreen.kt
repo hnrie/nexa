@@ -142,7 +142,7 @@ fun AuthScreen(locked: Boolean = false) {
             Spacer(Modifier.height(4.dp))
             Text(
                 when (mode) {
-                    Mode.SIGN_IN -> instance?.name?.ifEmpty { null } ?: "Evilion Chat"
+                    Mode.SIGN_IN -> instance?.name?.ifEmpty { null } ?: "nexa"
                     Mode.REGISTER -> "Your password never leaves this device."
                     Mode.RECOVER -> "Your recovery key unwraps your account's keys."
                     Mode.MFA -> "Enter the code from your authenticator app."

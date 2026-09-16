@@ -33,7 +33,7 @@ export default function NotificationsPage() {
       toast("Turn on desktop notifications first.", "error");
       return;
     }
-    if (!(await showNotification("Evilion Chat", { body: "Notifications are working." }))) toast("This browser would not show the notification.", "error");
+    if (!(await showNotification("nexa", { body: "Notifications are working." }))) toast("This browser would not show the notification.", "error");
   };
   return (
     <>

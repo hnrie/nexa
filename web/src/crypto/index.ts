@@ -1,5 +1,5 @@
 /**
- * Client-side cryptography for Evilion Chat.
+ * Client-side cryptography for nexa.
  *
  * Nothing in here ever hands a plaintext, a password or an unwrapped key to the
  * network layer. The server stores ciphertext, wrapped keys and an

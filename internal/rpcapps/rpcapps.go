@@ -1,7 +1,7 @@
 // Package rpcapps looks up the public face of a Discord Rich Presence
 // application: the name and icon its activity shows under, and the art assets
 // its images name. chatd asks Discord once per application and keeps the
-// answer, so nobody using Evilion Chat contacts Discord for it themselves.
+// answer, so nobody using nexa contacts Discord for it themselves.
 package rpcapps
 
 import (
@@ -88,7 +88,7 @@ func New() *Cache {
 		Base:      "https://discord.com/api/v10",
 		CDN:       "https://cdn.discordapp.com",
 		Client:    &http.Client{Timeout: 5 * time.Second},
-		UserAgent: "EvilionChat (https://chat.evilion.xyz, rich presence)",
+		UserAgent: "Nexa (https://chat.evilion.xyz, rich presence)",
 		TTL:       24 * time.Hour,
 		FailTTL:   10 * time.Minute,
 		Max:       5000,

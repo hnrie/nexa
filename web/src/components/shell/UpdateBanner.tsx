@@ -41,7 +41,7 @@ export function UpdateBanner() {
       <span className={s.icon}><Sparkles size={18} /></span>
       <span className={s.text}>
         <b>A new version is here</b>
-        {update.version ? <span style={{ opacity: 0.8 }}> — Evilion Chat {update.version}</span> : null}
+        {update.version ? <span style={{ opacity: 0.8 }}> — nexa {update.version}</span> : null}
       </span>
       <button className={s.download} onClick={download} disabled={waiting} data-testid="update-banner-download">
         <Download size={14} /> {waiting ? `Downloading… ${percent}%` : "Download"}

@@ -21,20 +21,35 @@ import (
 
 var androidFileName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,120}\.apk$`)
 
-// androidRelease is manifest.json as the download page gets it.
+// androidRelease is manifest.json as the download page and the app's own
+// updater get it. The flat Name, Size and SHA256 are the build that runs
+// anywhere; Files carries the smaller per-processor ones, which the app picks
+// from for itself and a browser picks from when it knows what it is running on.
 type androidRelease struct {
-	Version     string `json:"version"`
-	VersionCode int    `json:"version_code"`
-	ReleasedAt  int64  `json:"released_at"`
-	Name        string `json:"name"`
-	Size        int64  `json:"size"`
-	SHA256      string `json:"sha256"`
-	MinSDK      int    `json:"min_sdk"`
+	Version     string        `json:"version"`
+	VersionCode int           `json:"version_code"`
+	ReleasedAt  int64         `json:"released_at"`
+	Name        string        `json:"name"`
+	Size        int64         `json:"size"`
+	SHA256      string        `json:"sha256"`
+	MinSDK      int           `json:"min_sdk"`
+	Files       []androidFile `json:"files,omitempty"`
 	// Abis says which processors the build carries code for.
 	Abis []string `json:"abis,omitempty"`
 	// SigningSHA256 is the certificate the APK is signed with, as Android
 	// checks it for app links and as a person can check with apksigner.
 	SigningSHA256 string `json:"signing_sha256,omitempty"`
+	// Notes is what changed, shown by the app when it offers the update.
+	Notes string `json:"notes,omitempty"`
+}
+
+// androidFile is one build: "universal" runs on any phone, the others carry
+// code for one processor and are a third of the size.
+type androidFile struct {
+	Abi    string `json:"abi"`
+	Name   string `json:"name"`
+	Size   int64  `json:"size"`
+	SHA256 string `json:"sha256"`
 }
 
 func (s *Server) androidRoutes(mux *http.ServeMux) {
@@ -128,6 +143,11 @@ const androidPackage = "xyz.evilion.chat"
 // Turnstile, which checks the hostname a challenge was solved on, so it has to
 // come from this instance. The token goes back to the app through the bridge
 // it installed, and nothing else on this page is ours.
+// captchaReturn is the only place the captcha page may send a token: this
+// instance's own app, by its scheme. Anything else would be an open redirect
+// with a live token attached.
+const captchaReturn = "evilionchat://captcha"
+
 var captchaPage = template.Must(template.New("captcha").Parse(`<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -143,14 +163,29 @@ var captchaPage = template.Must(template.New("captcha").Parse(`<!doctype html>
 </head><body><main>
 <p>One quick check that you are a person.</p>
 <div id="slot"></div>
+<p id="back" hidden>Done. <a id="link" href="#">Go back to nexa</a></p>
 <button type="button" onclick="cancel()">Cancel</button>
 </main>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onerror="cancel()"></script>
 <script>
   var action = {{.Action}};
   var sitekey = {{.SiteKey}};
-  function done(token) { if (window.AndroidCaptcha) window.AndroidCaptcha.onToken(token); }
-  function cancel() { if (window.AndroidCaptcha) window.AndroidCaptcha.onCancel(); }
+  // In the app's own sheet the token goes straight back through the bridge. In
+  // a browser — where a phone with an old web view solves it instead — it goes
+  // back through a link into the app, with a button in case the phone does not
+  // follow it by itself.
+  var back = {{.Return}};
+  function leave(hash) {
+    if (window.AndroidCaptcha) return window.AndroidCaptcha[hash.indexOf("token=") === 1 ? "onToken" : "onCancel"](
+      hash.indexOf("token=") === 1 ? decodeURIComponent(hash.slice(7)) : "");
+    if (!back) return;
+    var url = back + hash;
+    document.getElementById("link").href = url;
+    document.getElementById("back").hidden = false;
+    location.href = url;
+  }
+  function done(token) { leave("#token=" + encodeURIComponent(token)); }
+  function cancel() { leave("#cancelled=1"); }
   window.onloadTurnstileCallback = function () {
     turnstile.render("#slot", {
       sitekey: sitekey, action: action, theme: "dark",
@@ -175,9 +210,15 @@ func (s *Server) handleNativeCaptcha(w http.ResponseWriter, r *http.Request) {
 	if !reCaptchaAction.MatchString(action) {
 		action = "login"
 	}
+	// A page opened in the phone's own browser says where to send the token;
+	// only this instance's app may be named, and only by its own scheme.
+	back := ""
+	if r.URL.Query().Get("redirect") == captchaReturn {
+		back = captchaReturn
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = captchaPage.Execute(w, map[string]string{"Action": action, "SiteKey": s.Cfg.TurnstileSiteKey})
+	_ = captchaPage.Execute(w, map[string]string{"Action": action, "SiteKey": s.Cfg.TurnstileSiteKey, "Return": back})
 }
 
 var reCaptchaAction = regexp.MustCompile(`^[a-z_]{1,32}$`)

@@ -46,7 +46,7 @@ import xyz.evilion.chat.ui.Route
 import xyz.evilion.chat.ui.auth.AuthScreen
 import xyz.evilion.chat.ui.common.LoadingBox
 import xyz.evilion.chat.ui.main.MainScreen
-import xyz.evilion.chat.ui.theme.EvilionTheme
+import xyz.evilion.chat.ui.theme.NexaTheme
 import xyz.evilion.chat.ui.theme.chatColors
 import xyz.evilion.chat.voice.VoiceSession
 
@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(Unit) { Session.bootstrap() }
 
-            EvilionTheme(dark = dark) {
+            NexaTheme(dark = dark) {
                 Box(Modifier.fillMaxSize().background(chatColors.bgBase)) {
                     when (status) {
                         AuthStatus.LOADING -> LoadingBox()

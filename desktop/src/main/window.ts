@@ -22,11 +22,11 @@ export function openExternal(url: string): void {
 
 const offlinePage = (): string =>
   "data:text/html;charset=utf-8," +
-  encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5;url=${START_URL}"><title>Evilion Chat</title>
+  encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5;url=${START_URL}"><title>nexa</title>
 <style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#2c2d32;color:#f3f3f4;font:16px system-ui,-apple-system,"Segoe UI",sans-serif}
 main{text-align:center;max-width:360px;padding:24px}h1{font-size:20px;margin:0 0 8px}p{color:#abacb2;margin:0 0 20px;line-height:1.4}
 a{display:inline-block;padding:10px 20px;border-radius:4px;background:#5865f2;color:#fff;text-decoration:none;font-weight:600}</style></head>
-<body><main><h1>Can't reach Evilion Chat</h1><p>Check your connection. Trying again in a few seconds.</p><a href="${START_URL}">Try now</a></main></body></html>`);
+<body><main><h1>Can't reach nexa</h1><p>Check your connection. Trying again in a few seconds.</p><a href="${START_URL}">Try now</a></main></body></html>`);
 
 export function createMainWindow(settings: SettingsStore, opts: { preload: string; hidden: boolean; icon?: string }): BrowserWindow {
   const saved = settings.get("bounds");
@@ -42,7 +42,7 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
     minHeight: 520,
     show: false,
     backgroundColor: "#2c2d32",
-    title: "Evilion Chat",
+    title: "nexa",
     autoHideMenuBar: true,
     ...(opts.icon ? { icon: opts.icon } : {}),
     webPreferences: {
@@ -133,7 +133,7 @@ export function applicationMenu(win: () => BrowserWindow | null, checkUpdates: (
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: "Evilion Chat",
+        label: "nexa",
         submenu: [
           { role: "about" },
           { label: "Check for Updates…", click: checkUpdates },

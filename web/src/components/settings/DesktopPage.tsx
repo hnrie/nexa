@@ -67,11 +67,11 @@ export default function DesktopPage() {
   const status = !rpc?.enabled
     ? { tone: "muted", icon: <Info size={18} />, text: "Rich Presence is off. Programs talk only to Discord, if it is running." }
     : !rpc.relay
-      ? { tone: "muted", icon: <Info size={18} />, text: "Activity shows here only; Discord does not get it from Evilion Chat." }
+      ? { tone: "muted", icon: <Info size={18} />, text: "Activity shows here only; Discord does not get it from nexa." }
       : discord === "connected"
         ? { tone: "good", icon: <CheckCircle2 size={18} />, text: "Discord is running: activity shows here and on Discord." }
         : discord === "first"
-          ? { tone: "warn", icon: <TriangleAlert size={18} />, text: "Discord started before Evilion Chat, so programs talk only to Discord. Restart Discord and they will reach both." }
+          ? { tone: "warn", icon: <TriangleAlert size={18} />, text: "Discord started before nexa, so programs talk only to Discord. Restart Discord and they will reach both." }
           : { tone: "good", icon: <CheckCircle2 size={18} />, text: "Discord isn't running: activity shows here, and will reach Discord too once it opens." };
 
   const restartDiscord = async () => {
@@ -92,7 +92,7 @@ export default function DesktopPage() {
           checked={!!rpc?.enabled}
           onChange={(on) => void bridge.rpc.setEnabled(on)}
           label="Show what I'm playing, watching and listening to"
-          description="Games, music players and other programs that show Rich Presence on Discord tell Evilion Chat too, with or without Discord running."
+          description="Games, music players and other programs that show Rich Presence on Discord tell nexa too, with or without Discord running."
         />
         <Toggle
           checked={share !== false}
@@ -101,7 +101,7 @@ export default function DesktopPage() {
           label="Share my activity with others"
           description="People who can see your status see it on your profile. Off keeps it to this app."
         />
-        <Toggle checked={!!rpc?.relay} onChange={(on) => void bridge.rpc.setRelay(on)} disabled={!rpc?.enabled} label="Also show it on Discord" description="When Discord is running, programs reach it through Evilion Chat, so your activity shows there as well." />
+        <Toggle checked={!!rpc?.relay} onChange={(on) => void bridge.rpc.setRelay(on)} disabled={!rpc?.enabled} label="Also show it on Discord" description="When Discord is running, programs reach it through nexa, so your activity shows there as well." />
         <div className={d.status} data-tone={status.tone} data-testid="rpc-status">
           {status.icon}
           <div className={d.statusText}>
@@ -128,7 +128,7 @@ export default function DesktopPage() {
         <h5 className={st.h5}>Startup and window</h5>
         {app ? (
           <>
-            <Toggle checked={app.launchAtLogin} onChange={(v) => setApp_({ launchAtLogin: v })} label="Open Evilion Chat when I sign in" description="Starting before Discord lets programs reach both of them." />
+            <Toggle checked={app.launchAtLogin} onChange={(v) => setApp_({ launchAtLogin: v })} label="Open nexa when I sign in" description="Starting before Discord lets programs reach both of them." />
             <Toggle checked={app.startMinimized} onChange={(v) => setApp_({ startMinimized: v })} disabled={!app.launchAtLogin} label="Start in the background" description="When opened at sign-in, stay in the tray until you open it." />
             <Toggle checked={app.closeToTray} onChange={(v) => setApp_({ closeToTray: v })} label="Keep running when the window is closed" description="Calls, notifications and Rich Presence carry on from the tray." />
             <Toggle checked={app.hardwareAcceleration} onChange={(v) => setApp_({ hardwareAcceleration: v })} label="Hardware acceleration" description="Uses the graphics card for smoother video. Turn off if the window flickers; applies after restarting the app." />
@@ -154,7 +154,7 @@ function UpdateRow({ version, update: u }: { version: string; update: UpdateStat
     <div>
       <div className={d.version}>
         <div className={d.versionText}>
-          Evilion Chat {version}
+          nexa {version}
           <small>{line}{u?.lastCheck ? ` Last checked ${formatRelative(u.lastCheck)}.` : ""}</small>
         </div>
         {u?.status === "ready" ? (

@@ -1,5 +1,5 @@
 /**
- * Which Evilion Chat the app opens: the public one, or another given in
+ * Which nexa the app opens: the public one, or another given in
  * EVILION_URL (a local server while testing). Everything the page may do
  * through the app is allowed for this origin only.
  */

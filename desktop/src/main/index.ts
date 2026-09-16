@@ -1,5 +1,5 @@
 /**
- * Evilion Chat for the desktop: one window on the live site, a tray icon, the
+ * nexa for the desktop: one window on the live site, a tray icon, the
  * Rich Presence server, and updates.
  */
 import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
@@ -220,7 +220,7 @@ function applyLoginItem(on: boolean): void {
 /** Linux desktops start what is in ~/.config/autostart when someone signs in. */
 function linuxAutostart(on: boolean): void {
   const dir = path.join(process.env.XDG_CONFIG_HOME || path.join(app.getPath("home"), ".config"), "autostart");
-  const file = path.join(dir, "evilion-chat.desktop");
+  const file = path.join(dir, "nexa.desktop");
   try {
     if (!on) {
       fs.rmSync(file, { force: true });
@@ -229,7 +229,7 @@ function linuxAutostart(on: boolean): void {
     // an AppImage is started through its own file, not the mount it unpacks to
     const exec = (process.env.APPIMAGE || process.execPath).replace(/(["\\`$])/g, "\\$1");
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=Evilion Chat\nExec="${exec}" --hidden\nX-GNOME-Autostart-enabled=true\nTerminal=false\n`);
+    fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=nexa\nExec="${exec}" --hidden\nX-GNOME-Autostart-enabled=true\nTerminal=false\n`);
   } catch (err) {
     log("autostart", { err: String(err) });
   }

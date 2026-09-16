@@ -11,7 +11,7 @@ import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
-const PRESETS = ["#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#9b59b6", "#607d8b"];
+const PRESETS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#607d8b"];
 
 /** A colour column may be missing entirely on an older server, so treat anything but a number as unset. */
 function hexOf(v: number | null | undefined): string | null {
@@ -130,9 +130,9 @@ export default function ProfilePage() {
               {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent === c} style={{ background: c }} title={c} onClick={() => setAccent(c)} />)}
               <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} title="Custom">
                 <CustomColorIcon color={accent && !PRESETS.includes(accent) ? accent : null} />
-                <input type="color" value={accent ?? "#5865f2"} onChange={(e) => setAccent(e.target.value)} />
+                <input type="color" value={accent ?? "#8000ff"} onChange={(e) => setAccent(e.target.value)} />
               </label>
-              <HexInput value={accent} fallback="#5865f2" label="Primary colour hex" onChange={setAccent} />
+              <HexInput value={accent} fallback="#8000ff" label="Primary colour hex" onChange={setAccent} />
             </div>
             <p className={s.hint} style={{ margin: "12px 0 6px" }}>Bottom colour — pick one too and your whole profile becomes a gradient from top to bottom</p>
             <div className={s.swatches}>
