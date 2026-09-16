@@ -22,7 +22,7 @@ export const channels = {
   get(id: Snowflake): Promise<Channel> {
     return api.request<Channel>("GET", `/channels/${id}`);
   },
-  patch(id: Snowflake, body: { name?: string; owner_id?: Snowflake }): Promise<Channel> {
+  patch(id: Snowflake, body: { name?: string; owner_id?: Snowflake; password_key?: string; password_salt?: string; password_params?: unknown; password_remove?: boolean }): Promise<Channel> {
     return api.request<Channel>("PATCH", `/channels/${id}`, body);
   },
   uploadIcon(id: Snowflake, file: Blob, onProgress?: Progress): Promise<Channel> {
@@ -47,8 +47,8 @@ export const channels = {
   subchats(id: Snowflake): Promise<Channel[]> {
     return api.request<Channel[]>("GET", `/channels/${id}/subchats`);
   },
-  createSubchat(id: Snowflake, name: string): Promise<Channel> {
-    return api.request<Channel>("POST", `/channels/${id}/subchats`, { name });
+  createSubchat(id: Snowflake, name: string, lock?: Record<string, unknown>): Promise<Channel> {
+    return api.request<Channel>("POST", `/channels/${id}/subchats`, { name, ...(lock ?? {}) });
   },
   close(id: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${id}`);

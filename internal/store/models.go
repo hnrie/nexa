@@ -164,6 +164,9 @@ type Channel struct {
 	KeyConvID ids.ID `json:"key_conv_id"`
 	// Overwrites is filled for server channels.
 	Overwrites []Overwrite `json:"overwrites,omitempty"`
+	// Locked marks a subchat that asks for a password before it opens. The
+	// password material itself is never part of a channel as sent.
+	Locked bool `json:"locked,omitempty"`
 }
 
 // Server is a community with channels, roles and members.

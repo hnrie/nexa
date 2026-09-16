@@ -73,6 +73,8 @@ export interface Channel {
   key_conv_id: Snowflake;
   /** Permission overwrites; only present on server channels. */
   overwrites?: Overwrite[];
+  /** A subchat that asks for its password before it opens. */
+  locked?: boolean;
 }
 
 /** Permission bits travel as decimal strings; `lib/perms` turns them into BigInt. */

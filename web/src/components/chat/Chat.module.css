@@ -262,3 +262,11 @@
   .subPanel { right: 8px; left: 8px; width: auto; }
 }
 @media (pointer: coarse) { .subClose { padding: 10px; margin-top: -10px; margin-bottom: -10px; margin-right: -10px; } }
+
+/* A subchat waiting for its password. */
+.lockedWrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.lockedCard { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; padding: 24px; border-radius: var(--radius-md); background: var(--bg-raised); text-align: center; }
+.lockedIcon { align-self: center; display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: var(--bg-surface); color: var(--text-muted); }
+.lockedTitle { margin: 0; font-size: 20px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+.lockedText { margin: 0; font-size: 14px; color: var(--text-muted); }
+.lockedCard label { text-align: left; }

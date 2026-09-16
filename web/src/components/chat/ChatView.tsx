@@ -31,6 +31,8 @@ import { MessageList } from "./MessageList";
 import { SubchatPanel } from "./SubchatPanel";
 import { PinsPanel } from "./PinsPanel";
 import { ProfileCard } from "@/components/profile/ProfileCard";
+import { LockedChannel } from "./LockedChannel";
+import { lockState } from "@/lib/subchatLock";
 import { storage } from "@/lib/storage";
 import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
@@ -128,6 +130,20 @@ export function ChatView({ channel }: { channel: Channel }) {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
   const priv = isServer && isPrivateChannel(serverId, channel.overwrites);
+  // A subchat with a password stays shut until this sign-in has typed it.
+  const [unlocked, setUnlocked] = useState(!channel.locked);
+  useEffect(() => {
+    if (!channel.locked) return setUnlocked(true);
+    let alive = true;
+    setUnlocked(false);
+    lockState(channel.id)
+      .then((st) => alive && setUnlocked(!st.locked || st.unlocked))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [channel.id, channel.locked]);
+  const locked = !!channel.locked && !unlocked;
   const other = convo.type === "dm" ? convo.recipient_ids.find((id) => id !== me?.id) : undefined;
   const otherStatus = other ? statusOf(presence[other]) : "offline";
   const cs = other ? customStatus(presence[other]) : null;
@@ -264,13 +280,19 @@ export function ChatView({ channel }: { channel: Channel }) {
         <div className={s.main}>
           {!isServer ? <CallBanner channelId={convo.id} /> : null}
           {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
-          <MessageList key={channel.id} channel={channel} />
-          {/* the composer stays mounted underneath, so a draft and its attachments survive picking */}
-          <div className={s.composerSlot} hidden={selecting}>
-            <TypingBar channelId={channel.id} />
-            <Composer channel={channel} />
-          </div>
-          {selecting ? <SelectionBar channelId={channel.id} /> : null}
+          {locked ? (
+            <LockedChannel channel={channel} onUnlocked={() => setUnlocked(true)} />
+          ) : (
+            <>
+              <MessageList key={channel.id} channel={channel} />
+              {/* the composer stays mounted underneath, so a draft and its attachments survive picking */}
+              <div className={s.composerSlot} hidden={selecting}>
+                <TypingBar channelId={channel.id} />
+                <Composer channel={channel} />
+              </div>
+              {selecting ? <SelectionBar channelId={channel.id} /> : null}
+            </>
+          )}
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}

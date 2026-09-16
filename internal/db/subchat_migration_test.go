@@ -36,6 +36,10 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	DROP TABLE realtime_usage;
 	DROP TABLE guests;
 	DROP TABLE guest_links;
+	ALTER TABLE channels DROP COLUMN lock_salt;
+	ALTER TABLE channels DROP COLUMN lock_params;
+	ALTER TABLE channels DROP COLUMN lock_hash;
+	DROP TABLE channel_unlocks;
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)

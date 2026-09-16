@@ -27,6 +27,7 @@ const ProfileModal = lazyPage(() => import("@/components/profile/ProfileModal"))
 const ServerSettingsModal = lazyPage(() => import("@/components/server/ServerSettingsModal"));
 const ChannelSettingsModal = lazyPage(() => import("@/components/server/ChannelSettingsModal"));
 const MemberActionModal = lazyPage(() => import("@/components/server/MemberActionModal"));
+const SubchatModal = lazyPage(() => import("./SubchatModal"));
 
 /** Renders every modal on the ui store's stack; later ones overlay earlier ones. */
 export function ModalHost() {
@@ -85,6 +86,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       <Suspense fallback={null}>
         {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} /> : null}
         {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} /> : null}
+        {modal?.kind === "subchat" ? <SubchatModal onClose={close} channel={modal.props?.["channel"] as never} parentId={modal.props?.["parentId"] as string | undefined} /> : null}
         {modal?.kind === "serverSettings" ? <ServerSettingsModal onClose={close} serverId={String(modal.props?.["serverId"])} page={modal.props?.["page"] as string | undefined} /> : null}
         {modal?.kind === "channelSettings" ? <ChannelSettingsModal onClose={close} channelId={String(modal.props?.["channelId"])} page={modal.props?.["page"] as string | undefined} /> : null}
         {modal?.kind === "memberAction" ? <MemberActionModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={String(modal.props?.["userId"])} action={modal.props?.["action"] as "kick" | "ban" | "timeout" | "roles"} /> : null}

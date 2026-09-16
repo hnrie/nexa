@@ -11,6 +11,9 @@ import (
 
 const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at`
 
+// channelReadCols adds what is read but never written back through insertChannel.
+const channelReadCols = channelCols + `, lock_hash <> '' AS locked`
+
 // MaxSubchats caps how many side conversations one DM can carry.
 const MaxSubchats = 50
 
@@ -23,7 +26,8 @@ func scanChannel(r rowScanner) (*Channel, error) {
 	var server, parent, owner, icon, last sql.NullInt64
 	var nsfw int64
 	var updated int64
-	if err := r.Scan(&c.ID, &server, &c.Type, &c.Name, &c.Topic, &c.Position, &parent, &nsfw, &c.SlowmodeSeconds, &c.UserLimit, &owner, &icon, &last, &c.CreatedAt, &updated); err != nil {
+	var locked int64
+	if err := r.Scan(&c.ID, &server, &c.Type, &c.Name, &c.Topic, &c.Position, &parent, &nsfw, &c.SlowmodeSeconds, &c.UserLimit, &owner, &icon, &last, &c.CreatedAt, &updated, &locked); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -31,6 +35,7 @@ func scanChannel(r rowScanner) (*Channel, error) {
 	}
 	c.ServerID, c.ParentID, c.OwnerID, c.IconID, c.LastMessageID = idPtr(server), idPtr(parent), idPtr(owner), idPtr(icon), idPtr(last)
 	c.NSFW = nsfw == 1
+	c.Locked = locked == 1
 	// the default key conversation; callers that know about private-channel epochs refine it
 	if c.ServerID != nil {
 		c.KeyConvID = *c.ServerID
@@ -115,7 +120,7 @@ func (s *Store) CreateGroupDM(ctx context.Context, owner ids.ID, recipients []id
 
 // ChannelByID loads a channel (with recipients for DMs).
 func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
-	c, err := scanChannel(s.db.R.QueryRowContext(ctx, `SELECT `+channelCols+` FROM channels WHERE id = ?`, int64(id)))
+	c, err := scanChannel(s.db.R.QueryRowContext(ctx, `SELECT `+channelReadCols+` FROM channels WHERE id = ?`, int64(id)))
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +166,7 @@ func (s *Store) GroupDMsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, erro
 
 // DMChannelsForUser lists the DMs and group DMs the user is in.
 func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels c WHERE c.type IN ('dm','group_dm','subchat') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ? AND p.hidden = 0) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelReadCols+` FROM channels c WHERE c.type IN ('dm','group_dm','subchat') AND EXISTS (SELECT 1 FROM dm_participants p WHERE p.channel_id = c.id AND p.user_id = ? AND p.hidden = 0) ORDER BY coalesce(c.last_message_id, c.id) DESC`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +255,7 @@ func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID
 
 // SubchatsFor lists the side conversations of one DM, newest activity first.
 func (s *Store) SubchatsFor(ctx context.Context, parentID ids.ID) ([]*Channel, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels WHERE parent_id = ? AND type = 'subchat' ORDER BY coalesce(last_message_id, id) DESC`, int64(parentID))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelReadCols+` FROM channels WHERE parent_id = ? AND type = 'subchat' ORDER BY coalesce(last_message_id, id) DESC`, int64(parentID))
 	if err != nil {
 		return nil, err
 	}

@@ -187,3 +187,14 @@ func (s *Server) guestAuthed(h http.HandlerFunc) http.Handler {
 func ipLimited(l *ratelimit.Limiter, h http.HandlerFunc) http.Handler {
 	return RateLimit(l, func(r *http.Request) string { return auth.ClientIP(r) })(h)
 }
+
+// userLimited counts against the signed-in account, for routes where guessing
+// is the risk rather than volume: typing a subchat's password, say.
+func (s *Server) userLimited(l *ratelimit.Limiter, h http.HandlerFunc) http.Handler {
+	return s.authed(RateLimit(l, func(r *http.Request) string {
+		if u := auth.UserFrom(r.Context()); u != nil {
+			return u.ID.String()
+		}
+		return auth.ClientIP(r)
+	})(h).ServeHTTP)
+}

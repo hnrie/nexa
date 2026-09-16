@@ -1,4 +1,4 @@
-import { MessageCircle, Plus, X } from "lucide-react";
+import { Lock, MessageCircle, Plus, Settings2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -10,18 +10,10 @@ import { selectSubchats, useChannels } from "@/stores/channels";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import s from "./Chat.module.css";
-import { promptText } from "@/components/modals/PromptModal";
 
-/** Menu for one subchat row: rename, or delete for everyone. */
+/** Menu for one subchat row: edit its name and password, or delete for everyone. */
 export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: Record<string, unknown>) => void; nav: (p: string) => void }): ContextMenuItem[] {
   const toast = useUI.getState().toast;
-  const rename = async (name: string) => {
-    try {
-      await channelsApi.patch(ch.id, { name });
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not rename that subchat.", "error");
-    }
-  };
   const remove = async () => {
     try {
       await channelsApi.close(ch.id);
@@ -33,13 +25,9 @@ export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: 
   };
   return [
     {
-      id: "rename",
-      label: "Rename Subchat",
-      onSelect: () =>
-        void promptText("Rename Subchat", { label: "Subchat name", initial: ch.name, maxLength: 100 }, "Rename").then((value) => {
-          const next = value?.trim();
-          if (next && next !== ch.name) void rename(next);
-        }),
+      id: "edit",
+      label: "Edit Subchat",
+      onSelect: () => ctx.openModal("subchat", { channel: ch }),
     },
     {
       id: "delete",
@@ -161,7 +149,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
                 openContextMenu({ x: e.clientX, y: e.clientY, items: subchatMenuItems(ch, { openModal, nav }) });
               }}
             >
-              <MessageCircle size={16} className={s.subIcon} />
+              {ch.locked ? <Lock size={16} className={s.subIcon} /> : <MessageCircle size={16} className={s.subIcon} />}
               <span className={s.subName}>{ch.name}</span>
               {(rs?.mentions ?? 0) > 0 ? <span className={s.subBadge}>{rs?.mentions}</span> : null}
             </button>
@@ -184,6 +172,18 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
           data-testid="subchat-name"
           onChange={(e) => setName(e.target.value)}
         />
+        <button
+          type="button"
+          aria-label="New subchat with a password"
+          title="With a password"
+          onClick={() => {
+            onClose();
+            openModal("subchat", { parentId: parent.id });
+          }}
+          data-testid="subchat-with-password"
+        >
+          <Settings2 size={16} />
+        </button>
         <button type="submit" aria-label="Create subchat" disabled={!name.trim() || busy} data-testid="subchat-create"><Plus size={16} /></button>
       </form>
     </div>

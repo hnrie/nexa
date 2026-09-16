@@ -628,7 +628,7 @@ func (s *Store) CreateServerChannel(ctx context.Context, serverID ids.ID, typ, n
 
 // ServerChannels lists a server's channels ordered by parent then position.
 func (s *Store) ServerChannels(ctx context.Context, serverID ids.ID) ([]*Channel, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelCols+` FROM channels WHERE server_id = ? ORDER BY coalesce(parent_id, 0), position, id`, int64(serverID))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+channelReadCols+` FROM channels WHERE server_id = ? ORDER BY coalesce(parent_id, 0), position, id`, int64(serverID))
 	if err != nil {
 		return nil, err
 	}

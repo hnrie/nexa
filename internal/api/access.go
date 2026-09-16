@@ -49,7 +49,50 @@ func (s *Server) channel(w http.ResponseWriter, r *http.Request, need string) (*
 		WriteError(w, ErrNotFound) // hide existence
 		return nil, nil
 	}
+	if !s.unlocked(r, ch) {
+		WriteError(w, E(http.StatusForbidden, "locked", "This subchat asks for its password first."))
+		return nil, nil
+	}
 	return ch, u
+}
+
+// channelIgnoringLock is `channel` for the two routes about the lock itself:
+// asking how the password is stretched, and typing it. Everything else goes
+// through `channel`, which refuses until the password has been typed.
+func (s *Server) channelIgnoringLock(w http.ResponseWriter, r *http.Request) (*store.Channel, *store.User) {
+	u := auth.UserFrom(r.Context())
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return nil, nil
+	}
+	ch, err := s.Store.ChannelByID(r.Context(), id)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return nil, nil
+	}
+	ok, err := s.canAccess(r, u, ch, NeedView)
+	if err != nil || !ok {
+		WriteError(w, ErrNotFound)
+		return nil, nil
+	}
+	return ch, u
+}
+
+// unlocked reports whether this request may open the channel: either it has no
+// password, or this session has already typed it. A password keeps a subchat
+// shut on the screen; the messages in it are encrypted for the same people
+// either way, which is what the client is told.
+func (s *Server) unlocked(r *http.Request, ch *store.Channel) bool {
+	if !ch.Locked {
+		return true
+	}
+	sess := auth.SessionFrom(r.Context())
+	if sess == nil {
+		return false
+	}
+	ok, err := s.Store.IsUnlocked(r.Context(), ch.ID, sess.ID)
+	return err == nil && ok
 }
 
 // canAccess resolves access for any channel type.
