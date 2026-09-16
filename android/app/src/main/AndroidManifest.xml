@@ -86,7 +86,7 @@
         <service
             android:name=".service.CallService"
             android:exported="false"
-            android:foregroundServiceType="microphone|camera|mediaProjection" />
+            android:foregroundServiceType="microphone|camera|mediaProjection|dataSync" />
 
         <receiver android:name=".notify.NotificationActions" android:exported="false" />
 

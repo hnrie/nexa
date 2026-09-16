@@ -5,9 +5,12 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import xyz.evilion.chat.MainActivity
 import xyz.evilion.chat.R
@@ -37,7 +40,14 @@ class GatewayService : Service() {
                 ),
             )
             .build()
-        startForegroundCompat(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        if (!startForegroundCompat(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)) {
+            // The socket does not need this service; it only keeps it open while
+            // the app is away. Failing to put the notification up is not worth
+            // taking the app down for.
+            Session.gateway.connect()
+            stopSelf()
+            return START_NOT_STICKY
+        }
         Session.gateway.connect()
         return START_STICKY
     }
@@ -78,9 +88,19 @@ class CallService : Service() {
                 ),
             )
             .build()
-        val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+        // Android 14 refuses a microphone service to an app that has not been
+        // given the microphone, and the refusal is an exception that would take
+        // the whole app down. Someone who said no to the microphone can still
+        // be in the call and listen, so the service runs as a plain one.
+        val mic = ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        val type = (if (mic) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) or
             (if (sharing) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION else 0)
-        startForegroundCompat(2, notification, type)
+        if (!startForegroundCompat(2, notification, type)) {
+            // the call itself carries on; only the notification that would keep
+            // it alive in the background could not be put up
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
@@ -102,10 +122,19 @@ class CallService : Service() {
     }
 }
 
-private fun Service.startForegroundCompat(id: Int, notification: Notification, type: Int) {
-    if (Build.VERSION.SDK_INT >= 29) {
-        startForeground(id, notification, type)
-    } else {
-        startForeground(id, notification)
+/**
+ * Puts the service in the foreground, and says whether that worked.
+ *
+ * Every way this can fail throws, and none of them is worth a crash: the
+ * system refuses a service of a type whose permission is missing, refuses one
+ * started while the app is away, and refuses one whose notification it will
+ * not show. What is lost is the service, not the call or the socket.
+ */
+private fun Service.startForegroundCompat(id: Int, notification: Notification, type: Int): Boolean =
+    try {
+        if (Build.VERSION.SDK_INT >= 29) startForeground(id, notification, type) else startForeground(id, notification)
+        true
+    } catch (e: Throwable) {
+        Log.w("Services", "could not go to the foreground", e)
+        false
     }
-}

@@ -57,6 +57,13 @@ export default function DownloadPage() {
           <p className={s.sub}>{onAndroid ? "Calls, notifications and a real app." : "RPC support and a better experience."}</p>
         </div>
 
+        {/* Nothing published for Android right now: say so rather than leave a page with no download on it. */}
+        {onAndroid && apk === null ? (
+          <div className={s.empty} data-testid="android-paused">
+            The Android app is being worked on and is not available to download at the moment. It will be back here when it is ready; until then, nexa runs in this browser.
+          </div>
+        ) : null}
+
         {apk && onAndroid ? (
           <div className={s.primary}>
             <a className={s.bigButton} href={android.fileUrl(apk.name)} data-testid="download-android">

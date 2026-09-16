@@ -8,7 +8,9 @@ import android.net.NetworkRequest
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import kotlinx.coroutines.launch
 import xyz.evilion.chat.data.AppState
+import xyz.evilion.chat.data.CrashReport
 import xyz.evilion.chat.data.SecureStore
 import xyz.evilion.chat.data.Session
 import xyz.evilion.chat.data.SettingsStore
@@ -29,6 +31,8 @@ class App : Application() {
         super.onCreate()
         instance = this
 
+        // First, so anything below that goes wrong is still recorded.
+        CrashReport.install(this)
         SecureStore.init(this)
         SettingsStore.init(this)
         AttachmentStore.init(this)
@@ -40,6 +44,8 @@ class App : Application() {
         Api.baseUrl = SecureStore.serverUrl() ?: BuildConfig.DEFAULT_SERVER
         Api.token = SecureStore.token()
         Session.start()
+        // What took the app down last time, now that there is a connection for it.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { CrashReport.sendPending() }
 
         // Messages that arrive while the app is not on screen become notifications.
         Session.messageHooks += { raw, decrypted, mine ->
