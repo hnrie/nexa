@@ -113,3 +113,49 @@ func TestCopiesEveryRow(t *testing.T) {
 		t.Errorf("a NULL came across as %v", *avatar)
 	}
 }
+
+// The bytes that matter are held until a batch is sent, and a []byte scanned
+// into an `any` points at memory the driver reuses. Without a copy the second
+// row of a batch would carry the first row's key.
+func TestKeysSurviveBatching(t *testing.T) {
+	if testing.Short() {
+		t.Skip("needs a Postgres")
+	}
+	url := testPostgres(t)
+	src := schemaDB(t)
+	ctx := context.Background()
+	for i := 1; i <= 6; i++ {
+		// each user's key material is different, and long enough to notice
+		key := make([]byte, 32)
+		for j := range key {
+			key[j] = byte(i)
+		}
+		if _, err := src.W.ExecContext(ctx, `INSERT INTO users (id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, created_at, updated_at)
+			VALUES (?,?,?,?,?,'{}',?,?,?,?)`, i, string(rune('a'+i-1)), "U", "h", key, key, key, i, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// a batch smaller than the number of rows, so the buffer is reused
+	if err := run(srcPath(t, src), url, true, 2); err != nil {
+		t.Fatal(err)
+	}
+	dst, err := db.OpenPostgres(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dst.Close()
+	for i := 1; i <= 6; i++ {
+		var got []byte
+		if err := dst.R.QueryRowContext(ctx, `SELECT enc_private_key FROM users WHERE id = ?`, i).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		for _, b := range got {
+			if b != byte(i) {
+				t.Fatalf("user %d's key came across as %x", i, got)
+			}
+		}
+		if len(got) != 32 {
+			t.Fatalf("user %d's key is %d bytes", i, len(got))
+		}
+	}
+}
