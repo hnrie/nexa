@@ -18,6 +18,13 @@ type Config struct {
 	PublicURL string
 	DataDir   string
 	WebDist   string
+	// DatabaseURL points at a Postgres database (postgres://…). Empty keeps
+	// the SQLite file in DataDir, which is what one machine wants.
+	DatabaseURL string
+	// RedisURL points at a Redis (redis://…) that carries presence, rate
+	// limits and gateway events between chatd processes. Empty keeps all three
+	// inside this process, which is right until there is more than one.
+	RedisURL string
 	// DesktopDir holds published desktop app installers and update manifests,
 	// served at /desktop/. It defaults to "desktop" inside DataDir.
 	DesktopDir      string
@@ -92,6 +99,8 @@ func Load(getenv func(string) string) (Config, error) {
 	str("LISTEN", &c.Listen)
 	str("PUBLIC_URL", &c.PublicURL)
 	str("DATA_DIR", &c.DataDir)
+	str("DATABASE_URL", &c.DatabaseURL)
+	str("REDIS_URL", &c.RedisURL)
 	str("WEB_DIST", &c.WebDist)
 	str("ANDROID_DIR", &c.AndroidDir)
 	if c.AndroidDir == "" {

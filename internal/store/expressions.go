@@ -84,7 +84,7 @@ func (s *Store) CreateEmoji(ctx context.Context, e *Emoji) error {
 	e.ID = ids.New()
 	e.CreatedAt = nowMs()
 	_, err := s.db.W.ExecContext(ctx, `INSERT INTO emojis (`+emojiCols+`) VALUES (?,?,?,?,?,?,?)`, int64(e.ID), int64(e.ServerID), e.Name, int64(e.BlobID), boolInt(e.Animated), int64(e.CreatorID), e.CreatedAt)
-	if err != nil && strings.Contains(err.Error(), "UNIQUE") {
+	if err != nil && db.IsUniqueViolation(err) {
 		return ErrAlreadyExists
 	}
 	return err
@@ -135,7 +135,7 @@ func (s *Store) EmojisForUser(ctx context.Context, uid ids.ID) ([]*Emoji, error)
 func (s *Store) RenameEmoji(ctx context.Context, id ids.ID, name string) error {
 	res, err := s.db.W.ExecContext(ctx, `UPDATE emojis SET name = ? WHERE id = ?`, name, int64(id))
 	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE") {
+		if db.IsUniqueViolation(err) {
 			return ErrAlreadyExists
 		}
 		return err

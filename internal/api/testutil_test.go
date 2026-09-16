@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,7 +30,7 @@ import (
 func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	t.Helper()
 	dir := t.TempDir()
-	d, err := db.Open(filepath.Join(dir, "chat.db"))
+	d, err := openTestDB(t, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,4 +218,37 @@ func newHTTPTestServer(t *testing.T, srv *Server) *httptest.Server {
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return ts
+}
+
+var apiSchemaSeq atomic.Int64
+
+// openTestDB is SQLite in a temporary directory, or — with CHAT_TEST_POSTGRES
+// set — a schema of its own on that Postgres, so the whole API suite can be run
+// against either database.
+func openTestDB(t *testing.T, dir string) (*db.DB, error) {
+	t.Helper()
+	url := os.Getenv("CHAT_TEST_POSTGRES")
+	if url == "" {
+		return db.Open(filepath.Join(dir, "chat.db"))
+	}
+	name := fmt.Sprintf("a%d", apiSchemaSeq.Add(1))
+	admin, err := db.OpenPostgres(url)
+	if err != nil {
+		return nil, err
+	}
+	ctx := context.Background()
+	if _, err := admin.W.ExecContext(ctx, `DROP SCHEMA IF EXISTS `+name+` CASCADE`); err != nil {
+		admin.Close()
+		return nil, err
+	}
+	if _, err := admin.W.ExecContext(ctx, `CREATE SCHEMA `+name); err != nil {
+		admin.Close()
+		return nil, err
+	}
+	admin.Close()
+	sep := "?"
+	if strings.Contains(url, "?") {
+		sep = "&"
+	}
+	return db.OpenPostgres(url + sep + "search_path=" + name)
 }

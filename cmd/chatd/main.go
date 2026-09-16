@@ -59,7 +59,11 @@ func main() {
 		log.Error("data dir", "err", err)
 		os.Exit(1)
 	}
-	database, err := db.Open(filepath.Join(cfg.DataDir, "chat.db"))
+	dbAddr := cfg.DatabaseURL
+	if dbAddr == "" {
+		dbAddr = filepath.Join(cfg.DataDir, "chat.db")
+	}
+	database, err := db.OpenURL(dbAddr)
 	if err != nil {
 		log.Error("open database", "err", err)
 		os.Exit(1)
@@ -109,7 +113,7 @@ func main() {
 	httpSrv := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("listening", "addr", cfg.Listen, "public_url", cfg.PublicURL, "version", version, "web_dist", cfg.WebDist, "captcha", cfg.TurnstileSecretKey != "", "sfu", srv.Realtime != nil)
+		log.Info("listening", "addr", cfg.Listen, "public_url", cfg.PublicURL, "version", version, "web_dist", cfg.WebDist, "captcha", cfg.TurnstileSecretKey != "", "sfu", srv.Realtime != nil, "database", string(database.Dialect), "redis", cfg.RedisURL != "")
 		errc <- httpSrv.ListenAndServe()
 	}()
 
