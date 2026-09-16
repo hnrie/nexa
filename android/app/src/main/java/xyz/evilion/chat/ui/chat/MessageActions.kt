@@ -41,6 +41,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import xyz.evilion.chat.ui.common.TwemojiImage
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.MessageService
 import xyz.evilion.chat.data.P
@@ -95,7 +96,7 @@ fun MessageActions(
                 ) {
                     val recents = SettingsStore.recentEmoji.filter { !it.startsWith("<") }.take(4)
                     for (emoji in (recents + QUICK).distinct().take(6)) {
-                        Text(emoji, fontSize = 26.sp, modifier = Modifier.clickable { react(emoji) }.padding(4.dp))
+                        TwemojiImage(emoji, 28.dp, modifier = Modifier.clickable { react(emoji) }.padding(4.dp), fallbackSize = 26.sp)
                     }
                     Icon(
                         Icons.Filled.EmojiEmotions, "More",

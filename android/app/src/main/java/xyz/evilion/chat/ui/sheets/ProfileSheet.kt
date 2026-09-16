@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
+import xyz.evilion.chat.ui.common.TwemojiImage
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.Session
 import xyz.evilion.chat.media.Media
@@ -112,7 +113,10 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                 }
                 if (!presence?.statusText.isNullOrEmpty()) {
                     Spacer(Modifier.height(6.dp))
-                    Text("${presence?.statusEmoji.orEmpty()} ${presence?.statusText}", color = colors.textSubtle, fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        presence?.statusEmoji?.takeIf { it.isNotEmpty() }?.let { TwemojiImage(it, 16.dp, fallbackSize = 14.sp) }
+                        Text(presence?.statusText.orEmpty(), color = colors.textSubtle, fontSize = 14.sp)
+                    }
                 }
                 if (!user?.aboutMe.isNullOrEmpty()) {
                     Spacer(Modifier.height(12.dp))

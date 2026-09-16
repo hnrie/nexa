@@ -85,7 +85,7 @@ object Api {
     private val OCTET = "application/octet-stream".toMediaType()
 
     /** Paths the server serves outside the versioned API. */
-    private val VERBATIM = listOf("/media/", "/api/", "/native/", "/android/", "/desktop/", "/.well-known/")
+    private val VERBATIM = listOf("/media/", "/api/", "/native/", "/android/", "/desktop/", "/twemoji/", "/.well-known/")
 
     /** Absolute URL for a path; site paths are used verbatim, the rest is versioned. */
     fun url(path: String, query: Map<String, String?> = emptyMap()): HttpUrl {

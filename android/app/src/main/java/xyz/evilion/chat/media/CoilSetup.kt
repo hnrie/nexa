@@ -16,6 +16,7 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.Options
 import coil3.request.crossfade
+import coil3.svg.SvgDecoder
 import okio.FileSystem
 import okio.Path.Companion.toOkioPath
 import xyz.evilion.chat.crypto.AttachmentMeta
@@ -42,6 +43,8 @@ object Images {
                 add(AttachmentFetcher.Factory())
                 add(Keyer<AttachmentMeta> { data, _ -> "attachment:${data.blobId}" })
                 add(AnimatedImageDecoder.Factory())
+                // Twemoji is drawn from SVG, so it stays sharp at any size
+                add(SvgDecoder.Factory())
             }
             .memoryCache {
                 MemoryCache.Builder().maxSizePercent(platform, 0.20).build()

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import coil3.compose.AsyncImage
 import xyz.evilion.chat.media.Media
+import xyz.evilion.chat.media.Twemoji
 import xyz.evilion.chat.ui.theme.ChatColors
 import xyz.evilion.chat.ui.theme.Radius
 import xyz.evilion.chat.ui.theme.chatColors
@@ -157,6 +159,8 @@ fun InlineMarkdown(
     val colors = chatColors
     var revealed by remember(nodes) { mutableStateOf(setOf<Int>()) }
     val emoji = remember(nodes) { customEmojiIn(nodes) }
+    val plain = remember(nodes) { unicodeEmojiIn(nodes).distinctBy { it.text } }
+    LaunchedEffect(Unit) { Twemoji.ensureIndex() }
 
     val text = remember(nodes, revealed, colors, style) {
         buildAnnotatedString {
@@ -164,15 +168,34 @@ fun InlineMarkdown(
         }
     }
 
-    val inline = remember(emoji, emojiSize) {
-        emoji.associate { node ->
-            "emoji:${node.id}" to InlineTextContent(
-                Placeholder((emojiSize + 4).sp, (emojiSize + 4).sp, PlaceholderVerticalAlign.TextCenter),
-            ) {
-                AsyncImage(
-                    model = Media.emoji(node.id, if (emojiSize > 32) 128 else 64),
-                    contentDescription = ":${node.name}:",
-                    modifier = Modifier.size(emojiSize.dp),
+    val inline = remember(emoji, plain, emojiSize) {
+        buildMap<String, InlineTextContent> {
+            for (node in emoji) {
+                put(
+                    "emoji:${node.id}",
+                    InlineTextContent(Placeholder((emojiSize + 4).sp, (emojiSize + 4).sp, PlaceholderVerticalAlign.TextCenter)) {
+                        AsyncImage(
+                            model = Media.emoji(node.id, if (emojiSize > 32) 128 else 64),
+                            contentDescription = ":${node.name}:",
+                            modifier = Modifier.size(emojiSize.dp),
+                        )
+                    },
+                )
+            }
+            for (node in plain) {
+                val url = Twemoji.url(node.text) ?: continue
+                // A shade narrower than it is tall, and centred on the text, so a
+                // line of emoji sits on the same baseline as the words around it
+                // instead of pushing the line apart.
+                put(
+                    "uemoji:${node.text}",
+                    InlineTextContent(Placeholder((emojiSize + 2).sp, (emojiSize + 2).sp, PlaceholderVerticalAlign.Center)) {
+                        AsyncImage(
+                            model = url,
+                            contentDescription = node.text,
+                            modifier = Modifier.size(emojiSize.dp),
+                        )
+                    },
                 )
             }
         }
@@ -272,7 +295,13 @@ private fun AnnotatedString.Builder.appendNodes(
             }
 
             is Node.CustomEmoji -> appendInlineContent("emoji:${node.id}", ":${node.name}:")
-            is Node.UnicodeEmoji -> withStyle(span.copy(fontSize = render.style.fontSize * 1.15f)) { append(node.text) }
+            // The picture stands in for the glyph, so every phone draws what
+            // the browser draws. The glyph itself is the alternative text, so
+            // a copy of the message still carries the emoji, and it is what
+            // shows if the picture never arrives.
+            is Node.UnicodeEmoji ->
+                if (Twemoji.code(node.text) != null) appendInlineContent("uemoji:${node.text}", node.text)
+                else withStyle(span.copy(fontSize = render.style.fontSize * 1.15f)) { append(node.text) }
             is Node.Timestamp -> withStyle(span.copy(background = colors.bgActive)) {
                 append(formatTimestamp(node.unix, node.style))
             }
@@ -286,6 +315,22 @@ private fun customEmojiIn(nodes: List<Node>): List<Node.CustomEmoji> = buildList
     fun walk(list: List<Node>) {
         for (node in list) when (node) {
             is Node.CustomEmoji -> add(node)
+            is Node.Styled -> walk(node.children)
+            is Node.Link -> walk(node.children)
+            is Node.Heading -> walk(node.children)
+            is Node.Subtext -> walk(node.children)
+            is Node.ListBlock -> node.items.forEach { walk(it) }
+            else -> Unit
+        }
+    }
+    walk(nodes)
+}
+
+/** Every plain emoji in a tree, so the same artwork the browser draws can be put in its place. */
+private fun unicodeEmojiIn(nodes: List<Node>): List<Node.UnicodeEmoji> = buildList {
+    fun walk(list: List<Node>) {
+        for (node in list) when (node) {
+            is Node.UnicodeEmoji -> add(node)
             is Node.Styled -> walk(node.children)
             is Node.Link -> walk(node.children)
             is Node.Heading -> walk(node.children)

@@ -142,6 +142,8 @@ dependencies {
 
     implementation("io.coil-kt.coil3:coil-compose:3.6.2")
     implementation("io.coil-kt.coil3:coil-gif:3.6.2")
+    // Twemoji ships as SVG, and the app draws the same artwork the browser does
+    implementation("io.coil-kt.coil3:coil-svg:3.6.2")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.2")
     implementation("io.coil-kt.coil3:coil-video:3.6.2")
 

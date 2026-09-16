@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import xyz.evilion.chat.ui.common.TwemojiImage
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.MessageService
 import xyz.evilion.chat.data.Session
@@ -303,7 +304,7 @@ private fun Reactions(message: UiMessage) {
                         modifier = Modifier.size(16.dp),
                     )
                 } else {
-                    Text(reaction.emoji, fontSize = 14.sp)
+                    TwemojiImage(reaction.emoji, 16.dp, fallbackSize = 14.sp)
                 }
                 Spacer(Modifier.width(4.dp))
                 Text(

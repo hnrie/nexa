@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import xyz.evilion.chat.ui.common.TwemojiImage
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.SettingsStore
 import xyz.evilion.chat.media.Media
@@ -163,10 +164,22 @@ private fun androidx.compose.foundation.lazy.grid.LazyGridScope.header(title: St
     }
 }
 
+private val CUSTOM_TOKEN = Regex("^<(a)?:([^:]+):(\\d+)>$")
+
+/** One cell: a plain emoji drawn with Twemoji, or a custom one by its picture. */
 @Composable
 private fun EmojiCell(text: String, onClick: () -> Unit) {
+    val custom = remember(text) { CUSTOM_TOKEN.find(text) }
     Box(Modifier.size(46.dp).clickable(onClick = onClick), Alignment.Center) {
-        Text(text, fontSize = 26.sp)
+        if (custom != null) {
+            AsyncImage(
+                model = Media.emoji(custom.groupValues[3], 64),
+                contentDescription = custom.groupValues[2],
+                modifier = Modifier.size(30.dp),
+            )
+        } else {
+            TwemojiImage(text, 30.dp, fallbackSize = 26.sp)
+        }
     }
 }
 
