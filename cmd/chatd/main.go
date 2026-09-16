@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -84,6 +85,10 @@ func main() {
 	srv.Secret = secret
 	srv.Media = mediaStore
 	srv.Unfurl = unfurl.NewService()
+	// Twitch's player refuses to open unless it is told which page holds it.
+	if u, err := url.Parse(cfg.PublicURL); err == nil {
+		srv.Unfurl.Fetcher.ParentHost = u.Hostname()
+	}
 	hub := gateway.New(st, srv.Auth, log, cfg.PublicURL)
 	srv.Bcast = hub
 	srv.WireServers(hub)

@@ -83,40 +83,105 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
   );
 }
 
-function YouTubeEmbed({ e }: { e: UnfurlResult }) {
-  const [play, setPlay] = useState(false);
-  const id = e.video_id ?? "";
+/**
+ * The sites whose players a card may open in a frame. The server builds the
+ * address (internal/unfurl/players.go); this list is the second lock, so a
+ * preview that ever came from somewhere else still cannot run a page here.
+ */
+const PLAYER_HOSTS = new Set(["www.youtube-nocookie.com", "player.vimeo.com", "player.twitch.tv", "clips.twitch.tv", "www.dailymotion.com", "streamable.com", "www.loom.com"]);
+
+function playerSrc(e: UnfurlResult): string | null {
+  const raw = e.player ?? (e.video_id ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(e.video_id)}?autoplay=1&rel=0` : null);
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && PLAYER_HOSTS.has(u.host) ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "3 Feb 2026", for the line under a card's title. */
+function publishedOn(ms: number | undefined): string | null {
+  if (!ms) return null;
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** The line above the title: the site's icon, its name, the author, the date. */
+function CardHead({ e }: { e: UnfurlResult }) {
+  const when = publishedOn(e.published_at);
+  const author = e.author_url ? (
+    <a href={e.author_url} target="_blank" rel="noopener noreferrer">{e.author || e.author_url.replace(/^https?:\/\//, "")}</a>
+  ) : e.author ? (
+    <span>{e.author}</span>
+  ) : null;
+  if (!e.site_name && !author && !when && !e.icon) return null;
   return (
-    <div className={s.card}>
-      {e.site_name ? <div className={s.site}>{e.site_name}</div> : <div className={s.site}>YouTube</div>}
-      {e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null}
-      {e.description ? <div className={s.desc}>{e.description}</div> : null}
-      <div className={s.video}>
-        {play ? (
-          <iframe src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1`} title={e.title ?? "YouTube video"} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin" />
-        ) : (
-          <button className={s.poster} onClick={() => setPlay(true)} aria-label="Play video" style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
-            <span className={s.playBtn}><Play size={26} fill="currentColor" /></span>
-          </button>
-        )}
-      </div>
+    <div className={s.site}>
+      {e.icon ? <img className={s.favicon} src={e.icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(ev) => (ev.currentTarget.style.display = "none")} /> : null}
+      {e.site_name ? <span>{e.site_name}</span> : null}
+      {author ? <><span className={s.dot} aria-hidden="true">·</span>{author}</> : null}
+      {when ? <><span className={s.dot} aria-hidden="true">·</span><time dateTime={new Date(e.published_at!).toISOString()}>{when}</time></> : null}
     </div>
   );
 }
 
+/**
+ * One link's card. Everything on it is drawn from fields the server filled in
+ * — no markup from the page itself ever reaches the document. The single
+ * exception is a video, which needs its site's own player; that frame only
+ * opens for the handful of sites both ends agree on, and only when asked.
+ */
 function LinkEmbed({ e }: { e: UnfurlResult }) {
+  const [play, setPlay] = useState(false);
+  const src = playerSrc(e);
   const big = e.image && (e.image_w ?? 0) >= 400;
+  const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null;
+  if (src) {
+    return (
+      <div className={s.card} style={e.color ? { borderLeftColor: e.color } : undefined}>
+        <CardHead e={e} />
+        {title}
+        {e.description ? <div className={s.desc}>{e.description}</div> : null}
+        <div className={s.video}>
+          {play ? (
+            <iframe
+              src={src}
+              title={e.title ?? "Video"}
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            <button className={s.poster} onClick={() => setPlay(true)} aria-label="Play video" style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
+              <span className={s.playBtn}><Play size={26} fill="currentColor" /></span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={s.card} style={e.color ? { borderLeftColor: e.color } : undefined}>
       <div className={s.cardRow}>
         <div className={s.cardText}>
-          {e.site_name ? <div className={s.site}>{e.site_name}</div> : null}
-          {e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null}
+          <CardHead e={e} />
+          {title}
           {e.description ? <div className={s.desc}>{e.description}</div> : null}
         </div>
-        {e.image && !big ? <img className={s.thumb} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} /> : null}
+        {e.image && !big && !e.media ? <img className={s.thumb} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} /> : null}
       </div>
-      {e.image && big ? <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} /> : null}
+      {/* a file this browser plays on its own; the page it came from runs nothing */}
+      {e.media && e.media_kind === "video" ? (
+        <VideoPlayer src={e.media} name={fileNameOf(e.url, "Video")} width={e.media_w} height={e.media_h} />
+      ) : e.media && e.media_kind === "audio" ? (
+        <audio className={s.audio} src={e.media} controls preload="none" />
+      ) : e.image && big ? (
+        <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} />
+      ) : null}
     </div>
   );
 }
@@ -130,9 +195,9 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
         if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
         // played through this server's proxy, so the host of the file never sees who is watching
         if (e.type === "video") return imagePreviews ? <VideoPlayer key={i} src={e.image ?? e.url} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
-        if (e.type === "youtube") return <YouTubeEmbed key={i} e={e} />;
+        if (e.type === "youtube") return <LinkEmbed key={i} e={e} />;
         if (e.type === "invite") return <InviteEmbed key={i} e={e} />;
-        if (e.title || e.description) return <LinkEmbed key={i} e={e} />;
+        if (e.title || e.description || e.player || e.media) return <LinkEmbed key={i} e={e} />;
         return null;
       })}
     </div>

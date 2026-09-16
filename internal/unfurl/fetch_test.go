@@ -166,8 +166,12 @@ func TestFetchTitleOnly(t *testing.T) {
 	if res.Title != "Hello World" {
 		t.Errorf("Title = %q, want collapsed", res.Title)
 	}
-	if res.Description != "" || res.Image != "" || res.SiteName != "" {
+	if res.Description != "" || res.Image != "" {
 		t.Errorf("unexpected extras: %+v", res)
+	}
+	// with no og:site_name the card still names where the link goes
+	if res.SiteName != "example.test" {
+		t.Errorf("SiteName = %q, want the host", res.SiteName)
 	}
 	if res.Type != "link" {
 		t.Errorf("Type = %q, want link", res.Type)

@@ -529,6 +529,21 @@ export interface UnfurlResult {
   video_id?: string;
   mime?: string;
   color?: string;
+  author?: string;
+  author_url?: string;
+  /** When the page says it was published, in Unix milliseconds. */
+  published_at?: number;
+  /** The site's own small icon. */
+  icon?: string;
+  /** A file the browser plays by itself: no frame, nobody else's code. */
+  media?: string;
+  media_kind?: "video" | "audio";
+  media_mime?: string;
+  media_w?: number;
+  media_h?: number;
+  /** A video player's frame, built by the server from a fixed list of sites. */
+  player?: string;
+  player_site?: string;
   /** Set when the link invites you somewhere on this instance. */
   invite_code?: string;
   member_count?: number;

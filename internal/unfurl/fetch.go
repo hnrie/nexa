@@ -57,6 +57,24 @@ type Result struct {
 	VideoID     string `json:"video_id,omitempty"`
 	Mime        string `json:"mime,omitempty"`
 	Color       string `json:"color,omitempty"`
+	// Author and its link, where the page names one.
+	Author    string `json:"author,omitempty"`
+	AuthorURL string `json:"author_url,omitempty"`
+	// PublishedAt is when the page says it was published, in Unix millis.
+	PublishedAt int64 `json:"published_at,omitempty"`
+	// Icon is the site's own small icon, for the line above the title.
+	Icon string `json:"icon,omitempty"`
+	// Media is a file the client can play itself: no frame, no other site's
+	// code. Kind is "video" or "audio", and MediaMime its type where known.
+	Media     string `json:"media,omitempty"`
+	MediaKind string `json:"media_kind,omitempty"`
+	MediaMime string `json:"media_mime,omitempty"`
+	MediaW    int    `json:"media_w,omitempty"`
+	MediaH    int    `json:"media_h,omitempty"`
+	// Player is a frame for a video, and only for a video: the one place a
+	// preview runs another site's code, pinned to an address built here.
+	Player     string `json:"player,omitempty"`
+	PlayerSite string `json:"player_site,omitempty"`
 	// InviteCode is set when the link is an invite to this instance, so the
 	// client can offer to join instead of opening a page.
 	InviteCode  string `json:"invite_code,omitempty"`
@@ -71,6 +89,9 @@ type Fetcher struct {
 	UserAgent string
 	Resolver  Resolver
 	Transport http.RoundTripper
+	// ParentHost is the host this app is served from. Twitch's player refuses
+	// to open without it; nothing else uses it.
+	ParentHost string
 }
 
 func (f *Fetcher) timeout() time.Duration {
@@ -291,6 +312,47 @@ func (f *Fetcher) htmlResult(body io.Reader, final *url.URL) (*Result, error) {
 		}
 	}
 	r.Color = themeColor(meta.first("theme-color"))
+	if r.SiteName == "" {
+		r.SiteName = final.Hostname()
+	}
+	r.Author = clip(meta.first("article:author", "og:article:author", "author", "twitter:creator", "twitter:site"), maxTitleRunes)
+	// An author given as a link belongs in author_url, not on the card as text.
+	if strings.HasPrefix(r.Author, "http://") || strings.HasPrefix(r.Author, "https://") {
+		r.AuthorURL, r.Author = r.Author, ""
+	}
+	if u := meta.first("article:author:url", "og:article:author:url"); u != "" {
+		r.AuthorURL = resolveImage(final, u)
+	}
+	r.PublishedAt = parseTime(meta.first("article:published_time", "og:article:published_time", "article:modified_time", "date", "pubdate"))
+	if icon := meta.first("link:icon"); icon != "" {
+		r.Icon = resolveImage(final, icon)
+	}
+	// A file the client can play by itself: no frame, nobody else's code.
+	if v := meta.first("og:video:secure_url", "og:video:url", "og:video"); v != "" {
+		if mime := strings.ToLower(meta.first("og:video:type")); playableVideo[mime] {
+			if abs := resolveImage(final, v); abs != "" {
+				r.Media, r.MediaKind, r.MediaMime = abs, "video", mime
+				r.MediaW, _ = strconv.Atoi(meta.first("og:video:width"))
+				r.MediaH, _ = strconv.Atoi(meta.first("og:video:height"))
+			}
+		}
+	}
+	if r.Media == "" {
+		if a := meta.first("og:audio:secure_url", "og:audio:url", "og:audio"); a != "" {
+			if mime := strings.ToLower(meta.first("og:audio:type")); playableAudio[mime] {
+				if abs := resolveImage(final, a); abs != "" {
+					r.Media, r.MediaKind, r.MediaMime = abs, "audio", mime
+				}
+			}
+		}
+	}
+	// The one place a preview runs another site's code, and only for a video.
+	if p := PlayerFor(final, f.ParentHost); p != nil {
+		r.Player, r.PlayerSite = p.URL, p.Site
+		if r.SiteName == "" || r.SiteName == final.Hostname() {
+			r.SiteName = p.Site
+		}
+	}
 	if id := YouTubeID(final); id != "" {
 		r.Type = "youtube"
 		r.VideoID = id
@@ -298,10 +360,35 @@ func (f *Fetcher) htmlResult(body io.Reader, final *url.URL) (*Result, error) {
 			r.Image = "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg"
 		}
 	}
-	if r.Title == "" && r.Description == "" && r.Image == "" {
+	if r.Title == "" && r.Description == "" && r.Image == "" && r.Player == "" {
 		return nil, ErrUnsupported
 	}
 	return r, nil
+}
+
+// Files a browser plays without help; anything else would need a plugin or a
+// frame, and a preview gets neither.
+var playableVideo = map[string]bool{"video/mp4": true, "video/webm": true, "video/ogg": true}
+var playableAudio = map[string]bool{"audio/mpeg": true, "audio/mp4": true, "audio/ogg": true, "audio/wav": true, "audio/webm": true, "audio/aac": true, "audio/flac": true}
+
+var timeLayouts = []string{time.RFC3339, "2006-01-02T15:04:05Z0700", "2006-01-02T15:04:05", "2006-01-02 15:04:05", "2006-01-02"}
+
+// parseTime reads the date forms pages put in their metadata, in Unix millis.
+func parseTime(raw string) int64 {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	for _, layout := range timeLayouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			// a year far from now is a typo or a placeholder, not a date
+			if y := t.Year(); y < 1990 || y > 2100 {
+				return 0
+			}
+			return t.UnixMilli()
+		}
+	}
+	return 0
 }
 
 type metaSet map[string]string
@@ -356,6 +443,30 @@ func parseMeta(buf []byte) metaSet {
 				if key != "" && content != "" {
 					if _, seen := out[key]; !seen {
 						out[key] = collapse(content)
+					}
+				}
+			case "link":
+				var rel, href string
+				for hasAttr {
+					var k, v []byte
+					k, v, hasAttr = z.TagAttr()
+					switch strings.ToLower(string(k)) {
+					case "rel":
+						rel = strings.ToLower(string(v))
+					case "href":
+						href = string(v)
+					}
+				}
+				if href == "" {
+					break
+				}
+				// the sharpest icon named wins; apple's is a good large one
+				switch {
+				case strings.Contains(rel, "apple-touch-icon"):
+					out["link:icon"] = href
+				case rel == "icon" || rel == "shortcut icon":
+					if _, seen := out["link:icon"]; !seen {
+						out["link:icon"] = href
 					}
 				}
 			case "body":
