@@ -22,7 +22,8 @@ sealed interface Layer {
     data class ChannelSettings(val channelId: String) : Layer
     data class InviteSheet(val channelId: String) : Layer
     data class ImageViewer(val url: String, val name: String) : Layer
-    data class Call(val channelId: String) : Layer
+    /** `video` starts the call with the camera already on, as the web's video button does. */
+    data class Call(val channelId: String, val video: Boolean = false) : Layer
     data object CreateServer : Layer
     data object NewMessage : Layer
 }

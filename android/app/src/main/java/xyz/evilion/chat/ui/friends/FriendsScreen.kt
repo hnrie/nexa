@@ -161,20 +161,20 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
                         }
                         when (relationship.type) {
                             "incoming" -> {
-                                ActionIcon(Lucide.Check, colors.positive) {
+                                ActionIcon(Lucide.Check, colors.positive, "Accept friend request") {
                                     scope.launch { runCatching { RelationshipsApi.accept(user.id) } }
                                 }
-                                ActionIcon(Lucide.X, colors.danger) {
+                                ActionIcon(Lucide.X, colors.danger, "Decline friend request") {
                                     scope.launch { runCatching { RelationshipsApi.remove(user.id) } }
                                 }
                             }
-                            "outgoing" -> ActionIcon(Lucide.X, colors.textMuted) {
+                            "outgoing" -> ActionIcon(Lucide.X, colors.textMuted, "Cancel friend request") {
                                 scope.launch { runCatching { RelationshipsApi.remove(user.id) } }
                             }
-                            "blocked" -> ActionIcon(Lucide.Ban, colors.textMuted) {
+                            "blocked" -> ActionIcon(Lucide.Ban, colors.textMuted, "Unblock") {
                                 scope.launch { runCatching { RelationshipsApi.unblock(user.id) } }
                             }
-                            else -> ActionIcon(Lucide.MessageCircle, colors.icon) {
+                            else -> ActionIcon(Lucide.MessageCircle, colors.icon, "Message") {
                                 scope.launch {
                                     runCatching {
                                         val channel = ChannelsApi.createDm(listOf(user.id))
@@ -192,12 +192,18 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
 }
 
 @Composable
-private fun ActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, onClick: () -> Unit) {
+private fun ActionIcon(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    /** What the button does, so a screen reader and a finger both know. */
+    label: String,
+    onClick: () -> Unit,
+) {
     Box(
         Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(chatColors.bgSurface)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
+        Icon(icon, label, tint = tint, modifier = Modifier.size(18.dp))
     }
 }

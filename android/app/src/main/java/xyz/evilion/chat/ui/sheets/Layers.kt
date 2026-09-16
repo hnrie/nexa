@@ -17,7 +17,7 @@ fun AppLayers(layers: List<Layer>) {
             is Layer.ChannelSettings -> ChannelSettingsSheet(layer.channelId) { Nav.popTo(layer) }
             is Layer.InviteSheet -> InviteSheet(layer.channelId) { Nav.popTo(layer) }
             is Layer.ImageViewer -> ImageViewerLayer(layer.url, layer.name) { Nav.popTo(layer) }
-            is Layer.Call -> CallScreen(layer.channelId) { Nav.popTo(layer) }
+            is Layer.Call -> CallScreen(layer.channelId, layer.video) { Nav.popTo(layer) }
             is Layer.CreateServer -> CreateServerSheet { Nav.popTo(layer) }
             is Layer.NewMessage -> NewMessageSheet { Nav.popTo(layer) }
         }

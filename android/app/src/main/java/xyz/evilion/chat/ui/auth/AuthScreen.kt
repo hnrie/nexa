@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.auth
 
+import xyz.evilion.chat.R
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -118,11 +120,17 @@ fun AuthScreen(locked: Boolean = false) {
             Modifier.widthIn(max = 460.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // the app's own mark, not the initials of whatever the instance is called
             Box(
                 Modifier.size(64.dp).clip(RoundedCornerShape(18.dp)).background(colors.brand),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("EC", color = colors.onBrand, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                Icon(
+                    painterResource(R.drawable.nexa_mark),
+                    null,
+                    tint = colors.onBrand,
+                    modifier = Modifier.size(38.dp),
+                )
             }
             Spacer(Modifier.height(16.dp))
             Text(

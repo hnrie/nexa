@@ -85,6 +85,7 @@ fun MessageRow(
     Column(Modifier.fillMaxWidth()) {
     if (dayBreak || previous == null) DayDivider(message.raw.createdAt)
 
+    SwipeToReply(enabled = message.raw.type == "default" || message.raw.type == "reply", onReply = onReply) {
     Column(
         Modifier.fillMaxWidth()
             .background(if (mentionsMe) colors.mentionBg.copy(alpha = 0.18f) else Color.Transparent)
@@ -174,6 +175,7 @@ fun MessageRow(
                 }
             }
         }
+    }
     }
     }
 }

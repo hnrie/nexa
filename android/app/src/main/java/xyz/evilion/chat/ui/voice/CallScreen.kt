@@ -73,7 +73,7 @@ import xyz.evilion.chat.voice.VoiceSession
  * sealed and opened.
  */
 @Composable
-fun CallScreen(channelId: String, onClose: () -> Unit) {
+fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -> Unit) {
     val colors = chatColors
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -98,11 +98,15 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
     // Without the microphone a call still works, one way: you hear everyone and
     // nobody hears you, which is what the web client does when it is refused.
     var asked by remember(channelId) { mutableStateOf(false) }
+    // The video button opens the call with the camera already on; the camera is
+    // asked for after the microphone, so the two prompts do not collide.
+    var wantsCamera by remember(channelId) { mutableStateOf(false) }
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         asked = true
         if (!granted) VoiceSession.noteNoMicrophone()
         if (call.channelId != channelId) VoiceSession.join(channelId)
         CallService.start(context, channelId, sharing = false)
+        if (startWithVideo) wantsCamera = true
     }
 
     LaunchedEffect(channelId) {
@@ -114,8 +118,22 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
             asked = true
             if (call.channelId != channelId) VoiceSession.join(channelId)
             CallService.start(context, channelId, sharing = false)
+            if (startWithVideo) wantsCamera = true
         } else {
             micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    LaunchedEffect(wantsCamera, call.video) {
+        if (!wantsCamera) return@LaunchedEffect
+        wantsCamera = false
+        if (call.video) return@LaunchedEffect
+        if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            VoiceSession.toggleCamera()
+        } else {
+            cameraPermission.launch(android.Manifest.permission.CAMERA)
         }
     }
 

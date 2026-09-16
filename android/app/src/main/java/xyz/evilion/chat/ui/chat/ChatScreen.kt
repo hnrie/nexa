@@ -240,6 +240,9 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
                 IconButton(onClick = { Nav.push(Layer.Call(channelId)) }) {
                     Icon(Lucide.Phone, "Start a call", tint = colors.icon)
                 }
+                IconButton(onClick = { Nav.push(Layer.Call(channelId, video = true)) }) {
+                    Icon(Lucide.Video, "Start a video call", tint = colors.icon)
+                }
             }
             IconButton(onClick = { Nav.push(Layer.Pins(channelId)) }) {
                 Icon(Lucide.Pin, "Pinned messages", tint = colors.icon)
