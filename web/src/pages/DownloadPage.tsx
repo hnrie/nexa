@@ -1,10 +1,11 @@
-import { Download, Laptop, Monitor, Terminal } from "lucide-react";
+import { Download, Laptop, Monitor, Smartphone, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { android, androidVersionName, type AndroidRelease } from "@/api/android";
 import { desktop, type DesktopFile, type DesktopRelease } from "@/api/desktop";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { currentPlatform, pickDownload, type DesktopTarget } from "@/lib/platform";
+import { currentPlatform, isAndroid, pickDownload, type DesktopTarget } from "@/lib/platform";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./DownloadPage.module.css";
@@ -28,14 +29,17 @@ function icon(os: DesktopFile["os"]) {
 /** Every desktop download, with the visitor's own first. Needs no account. */
 export default function DownloadPage() {
   const [rel, setRel] = useState<DesktopRelease | null | undefined>(undefined);
+  const [apk, setApk] = useState<AndroidRelease | null | undefined>(undefined);
   const [target, setTarget] = useState<DesktopTarget>({ os: null, arch: null });
   const [failed, setFailed] = useState(false);
+  const onAndroid = isAndroid();
   const toast = useUI((u) => u.toast);
 
   useEffect(() => {
     document.title = "Download Evilion Chat";
     void currentPlatform().then(setTarget);
     desktop.latest().then(setRel, () => setFailed(true));
+    android.latest().then(setApk, () => setApk(null));
   }, []);
 
   const mine = rel ? pickDownload(rel, target) : null;
@@ -49,9 +53,20 @@ export default function DownloadPage() {
       <div className={s.card}>
         <div className={s.head}>
           <img className={s.logo} src="/icons/icon-192.png" alt="" />
-          <h1 className={s.title}>Evilion Chat for your computer</h1>
-          <p className={s.sub}>RPC support and a better experience.</p>
+          <h1 className={s.title}>{onAndroid ? "Evilion Chat for Android" : "Evilion Chat for your computer"}</h1>
+          <p className={s.sub}>{onAndroid ? "Calls, notifications and a real app." : "RPC support and a better experience."}</p>
         </div>
+
+        {apk && onAndroid ? (
+          <div className={s.primary}>
+            <a className={s.bigButton} href={android.fileUrl(apk.name)} data-testid="download-android">
+              <Download size={20} /> Download for Android
+            </a>
+            <span className={s.meta}>
+              Version {apk.version} · {formatBytes(apk.size)} · Android {androidVersionName(apk.min_sdk)} and later
+            </span>
+          </div>
+        ) : null}
 
         {rel === undefined && !failed ? (
           <div className={s.primary}><Spinner size={28} /></div>
@@ -99,12 +114,33 @@ export default function DownloadPage() {
               </div>
             </div>
 
+            {apk ? (
+              <div className={s.section}>
+                <h2 className={s.label}>Android</h2>
+                <div className={s.files}>
+                  <div className={s.file} data-mine={onAndroid} data-testid="download-file">
+                    <span className={s.fileIcon}><Smartphone size={22} /></span>
+                    <span className={s.fileText}>
+                      <span className={s.fileName}>Android · {apk.abis?.includes("arm64-v8a") ? "every phone" : (apk.abis ?? []).join(", ")}</span>
+                      <span className={s.fileSub}>
+                        {formatBytes(apk.size)} · Android {androidVersionName(apk.min_sdk)}+ · <span className={s.hash} title="Copy SHA-256" onClick={() => void navigator.clipboard?.writeText(apk.sha256).then(() => toast("SHA-256 copied.", "success"))}>SHA-256 {apk.sha256.slice(0, 16)}…</span>
+                      </span>
+                    </span>
+                    <Button size="sm" variant={onAndroid ? "primary" : "secondary"} onClick={() => { location.href = android.fileUrl(apk.name); }}>
+                      <Download size={16} /> Download
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className={s.section}>
               <h2 className={s.label}>The first time you open it</h2>
               <ul className={s.notes}>
                 <li><b>Windows</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>More info</b>, then <b>Run anyway</b>.</li>
                 <li><b>macOS</b>: open the disk image and drag Evilion Chat into Applications. The first time, right-click the app and choose <b>Open</b>.</li>
                 <li><b>Linux</b>: make the AppImage executable (<code>chmod +x</code>) and run it; it updates itself. The .deb installs with your package manager and says when a new version is out.</li>
+                {apk ? <li><b>Android</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>Install</b>.</li> : null}
               </ul>
             </div>
           </>

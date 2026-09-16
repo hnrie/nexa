@@ -50,6 +50,24 @@ the instance admin page (stats, runtime registration policy, enable/disable and 
 accounts), a zip data export, friend nicknames that flow through DM names, private
 per-user notes, quick switcher over servers and channels, and the mobile pass.
 
+## Android ✅
+
+A native app in `android/`: Kotlin and Jetpack Compose, OkHttp for the API and the
+gateway, libwebrtc for calls, and no web view except Cloudflare's captcha (which the
+server checks against its own hostname, so it has to load from the site). It carries
+the same encryption — argon2id, x25519 sealed boxes, AES-256-GCM messages, settings
+and chunked files — and its unit tests check that against ciphertext the web client
+produced. Call frames are sealed in the same format as the browser's insertable
+streams; WebRTC on Android only offers that hook to native code, so
+`app/src/main/cpp` implements `FrameEncryptorInterface` and `FrameDecryptorInterface`
+over a self-contained AES-256-GCM. Identity and conversation keys sit in a file
+encrypted with a key from the phone's keystore. Messages arrive while the app is
+closed through a foreground service holding the socket, because this server has no
+push service to hand anything to. The APK is published by
+`tools/publish_android.py`, served from `/android/…`, offered by the download page and
+a banner to phones that visit the site, and `/.well-known/assetlinks.json` lets Android
+open this instance's invite links in the app.
+
 ## Not built (deliberately)
 
 From the spec's P2/P3 lists: server folders, rules gates and announcement channels,

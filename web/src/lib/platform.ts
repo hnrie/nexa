@@ -22,6 +22,19 @@ export interface PlatformHints {
   astc?: boolean | undefined;
   /** navigator.maxTouchPoints */
   touchPoints?: number | undefined;
+  /** navigator.userAgentData.platform, e.g. "Android" */
+  platform?: string | undefined;
+}
+
+/**
+ * An Android phone or tablet, which is offered the app rather than an
+ * installer. A Chromebook says CrOS and runs the web app, and anything
+ * claiming Android while pretending to be a desktop browser is left alone.
+ */
+export function detectAndroid(h: PlatformHints): boolean {
+  if (/CrOS/i.test(h.ua)) return false;
+  if (h.platform && /android/i.test(h.platform)) return true;
+  return /Android/i.test(h.ua) && !/Windows|Macintosh|X11; Linux x86/i.test(h.ua);
 }
 
 export function detectDesktop(h: PlatformHints): DesktopTarget {
@@ -51,6 +64,12 @@ export function pickDownload(rel: DesktopRelease, target: DesktopTarget): Deskto
   const arch = target.arch ?? (target.os === "mac" ? "arm64" : "x64");
   const byKind = (list: DesktopFile[]) => [...list].sort((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind))[0] ?? null;
   return byKind(mine.filter((f) => f.arch === arch)) ?? byKind(mine);
+}
+
+/** Whether this browser is an Android one, for the app banner. */
+export function isAndroid(): boolean {
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  return detectAndroid({ ua: navigator.userAgent, platform: nav.userAgentData?.platform });
 }
 
 /** Reads the hints from this browser, including the slower ones Chromium offers. */

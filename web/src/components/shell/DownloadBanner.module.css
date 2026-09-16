@@ -10,4 +10,10 @@
 .other:hover { opacity: 1; text-decoration: underline; }
 .close { flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--on-brand); }
 .close:hover { background: rgba(255, 255, 255, 0.16); }
-@media (max-width: 900px) { .other { display: none; } }
+/* a phone's row is tight: the tagline goes, the offer itself stays */
+.tagline { display: inline; }
+@media (max-width: 560px) { .tagline { display: none; } }
+
+/* "No thanks" is a button in the Android banner, where the row is tight */
+button.other { background: none; border: 0; cursor: pointer; font-family: inherit; }
+@media (max-width: 900px) { a.other { display: none; } }

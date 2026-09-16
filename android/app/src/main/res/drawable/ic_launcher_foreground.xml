@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The speech bubble from the web app's icon, sized to the adaptive safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="0.1875" android:scaleY="0.1875" android:translateX="6" android:translateY="9.2">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M256,112c-88,0 -160,58 -160,130 0,40 22,76 58,100l-14,58 70,-34c15,4 30,6 46,6 88,0 160,-58 160,-130S344,112 256,112z" />
+        <path android:fillColor="#5865F2" android:pathData="M178,242a18,18 0 1,0 36,0a18,18 0 1,0 -36,0z" />
+        <path android:fillColor="#5865F2" android:pathData="M238,242a18,18 0 1,0 36,0a18,18 0 1,0 -36,0z" />
+        <path android:fillColor="#5865F2" android:pathData="M298,242a18,18 0 1,0 36,0a18,18 0 1,0 -36,0z" />
+    </group>
+</vector>

@@ -21,6 +21,9 @@ type Config struct {
 	// DesktopDir holds published desktop app installers and update manifests,
 	// served at /desktop/. It defaults to "desktop" inside DataDir.
 	DesktopDir      string
+	// AndroidDir holds the published Android app (the APK and manifest.json),
+	// written by tools/publish_android.py and served from /android.
+	AndroidDir string
 	MaxUploadBytes  int64
 	MaxAvatarBytes  int64
 	MaxEmojiBytes   int64
@@ -90,6 +93,10 @@ func Load(getenv func(string) string) (Config, error) {
 	str("PUBLIC_URL", &c.PublicURL)
 	str("DATA_DIR", &c.DataDir)
 	str("WEB_DIST", &c.WebDist)
+	str("ANDROID_DIR", &c.AndroidDir)
+	if c.AndroidDir == "" {
+		c.AndroidDir = filepath.Join(c.DataDir, "android")
+	}
 	str("DESKTOP_DIR", &c.DesktopDir)
 	if c.DesktopDir == "" {
 		c.DesktopDir = filepath.Join(c.DataDir, "desktop")

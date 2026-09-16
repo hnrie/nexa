@@ -7,6 +7,15 @@
 # web
 /web/node_modules/
 /web/dist/
+# android
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/.cxx/
+/android/local.properties
+/android/release.jks
+/android/keystore.properties
+
 # tooling
 /.tools/
 *.log

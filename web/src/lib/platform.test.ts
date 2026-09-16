@@ -1,4 +1,4 @@
-import { detectDesktop, pickDownload } from "./platform";
+import { detectAndroid, detectDesktop, pickDownload } from "./platform";
 import type { DesktopRelease } from "@/api/desktop";
 
 const WIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
@@ -60,5 +60,29 @@ describe("pickDownload", () => {
     expect(pickDownload(rel, { os: "mac", arch: null })?.name).toBe("arm.dmg");
     expect(pickDownload(rel, { os: null, arch: null })).toBeNull();
     expect(pickDownload({ ...rel, files: [] }, { os: "windows", arch: "x64" })).toBeNull();
+  });
+});
+
+describe("detectAndroid", () => {
+  const PIXEL = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36";
+  const TABLET = "Mozilla/5.0 (Linux; Android 13; SM-X900) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+  const CHROMEBOOK = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+  const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+  const WINDOWS = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
+
+  it("knows a phone and a tablet", () => {
+    expect(detectAndroid({ ua: PIXEL })).toBe(true);
+    expect(detectAndroid({ ua: TABLET })).toBe(true);
+    expect(detectAndroid({ ua: WINDOWS, platform: "Android" })).toBe(true);
+  });
+
+  it("leaves everything else alone", () => {
+    expect(detectAndroid({ ua: CHROMEBOOK })).toBe(false);
+    expect(detectAndroid({ ua: IPHONE })).toBe(false);
+    expect(detectAndroid({ ua: WINDOWS })).toBe(false);
+  });
+
+  it("offers a phone no desktop installer", () => {
+    expect(detectDesktop({ ua: PIXEL })).toEqual({ os: null, arch: null });
   });
 });

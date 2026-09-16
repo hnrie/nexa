@@ -11,6 +11,7 @@ chat/
 ├── cmd/chatd/        the Go server: REST API, WebSocket gateway, media, and the built web app
 ├── internal/         config, ids, db (SQLite + migrations), store, auth, api, gateway, media, unfurl
 ├── web/              the React/TypeScript app (Vite); web/dist is what chatd serves
+├── android/          the Android app (Kotlin, Jetpack Compose, WebRTC; see android/README.md)
 ├── deploy/           launchd template, installer, DNS helper
 ├── tools/            screenshot.py and e2e.py (Playwright)
 ├── docs/             design spec, implementation plans, STATUS.md, Discord UI reference captures
@@ -52,6 +53,8 @@ and for restart/stop/update/backup commands.
   screen share up to source resolution at 60 fps, push-to-talk or voice activity,
   per-user volume to 200 %, server mute/deafen/move, and a link-quality readout.
 - **Instance admin**: stats, registration policy, and enabling or disabling accounts.
+- **Apps**: a desktop app (Electron) and a native Android app, both offered to whoever
+  the download page recognises; the web app runs everywhere else.
 - **Your data**: a one-click zip export of everything this device can decrypt.
 
 ## How it works
@@ -73,6 +76,26 @@ and for restart/stop/update/backup commands.
   from dropping idle sockets.
 - **Calls** are peer-to-peer WebRTC (encrypted by construction); the tunnel only carries
   HTTP, so there is no media server on this box.
+
+## The Android app
+
+`android/` is a native Kotlin app, not a wrapper around the web one: Jetpack
+Compose for the interface, OkHttp for the API and the gateway, and libwebrtc
+for calls. It does the same end-to-end encryption — argon2id, x25519 sealed
+boxes, AES-256-GCM messages and files — and its tests check that against
+ciphertext the web client produced. Call frames are sealed in the same format
+the browser uses, by a small C++ library in `android/app/src/main/cpp`, because
+the hook WebRTC gives Android for that takes native code.
+
+```
+make android          # the signed APK (needs android/keystore.properties)
+make publish-android  # copies it where chatd serves it, with its checksum
+make test-android     # the crypto, markdown, invite link and mention tests
+```
+
+The download page and the banner offer the app to phones that visit the site,
+and `/.well-known/assetlinks.json` lets Android open this instance's invite
+links in the app once it is installed.
 
 ## Development
 
