@@ -77,6 +77,11 @@ interface MessagesState {
   channels: Record<string, ChannelMessages>;
   ensure: (channelId: string) => ChannelMessages;
   insert: (channelId: string, msgs: DecryptedMessage[]) => void;
+  /**
+   * Puts a message in and takes its unsent copy out together. Two steps would
+   * leave one frame showing both, or neither, which reads as a flicker.
+   */
+  settle: (channelId: string, msgs: DecryptedMessage[], drop: { tmpId?: string; nonce?: string }) => void;
   update: (channelId: string, msg: DecryptedMessage) => void;
   remove: (channelId: string, id: string) => void;
   removeMany: (channelId: string, ids: string[]) => void;
@@ -119,6 +124,17 @@ function put(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages {
   return { ...c, byId, ids: mergeIds(c.ids, fresh) };
 }
 
+/**
+ * Adds messages that have just arrived. A list that stops short of the present
+ * cannot take messages past its end, because the ones in between are missing;
+ * they come with the newer pages instead.
+ */
+function arrived(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages {
+  const newest = c.ids[c.ids.length - 1];
+  if (!c.hasNewer || !newest) return put(c, msgs);
+  return put(c, msgs.filter((m) => compareIds(m.id, newest) <= 0));
+}
+
 /** The server's copy of a loaded message, reusing the decryption, and the object itself when nothing changed. */
 async function refreshed(prev: DecryptedMessage, m: Message): Promise<DecryptedMessage> {
   if (prev.edited_at !== m.edited_at || JSON.stringify(prev.ciphertext) !== JSON.stringify(m.ciphertext)) return decryptForStore(m);
@@ -153,17 +169,19 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   insert: (channelId, msgs) => {
     if (msgs.length === 0) return;
     resolveAuthors(msgs);
+    set((s) => withChannel(s, channelId, (c) => arrived(c, msgs)));
+  },
+  settle: (channelId, msgs, drop) => {
+    resolveAuthors(msgs);
     set((s) =>
       withChannel(s, channelId, (c) => {
-        // A list that stops short of the present cannot take messages past its
-        // end, because the ones in between are missing. They come with the
-        // newer pages instead.
-        const newest = c.ids[c.ids.length - 1];
-        if (!c.hasNewer || !newest) return put(c, msgs);
-        return put(c, msgs.filter((m) => compareIds(m.id, newest) <= 0));
+        const kept = c.pending.filter((p) => (drop.tmpId ? p.tmpId !== drop.tmpId : true) && (drop.nonce ? p.nonce !== drop.nonce : true));
+        const next = arrived(c, msgs);
+        return kept.length === c.pending.length ? next : { ...next, pending: kept };
       }),
     );
   },
+
   update: (channelId, msg) =>
     set((s) =>
       withChannel(s, channelId, (c) => {

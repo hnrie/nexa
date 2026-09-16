@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { PinOff, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { channels as channelsApi } from "@/api/channels";
 import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
@@ -7,10 +7,12 @@ import { Markdown } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
+import { canPin } from "./messageMenu";
 import s from "./Chat.module.css";
 
 export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: () => void }) {
   const [pins, setPins] = useState<DecryptedMessage[] | null>(null);
+  const [unpinning, setUnpinning] = useState<string | null>(null);
   const users = useUsers((u) => u.byId);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const ctx = useRenderCtx();
@@ -56,6 +58,25 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
               <span className={s.time}>{formatTimestamp(m.created_at)}</span>
             </div>
             <div className={s.pinText}>{m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.att?.length ? "[attachment]" : "[encrypted]"}</div>
+            {canPin(m) ? (
+              <button
+                className={s.pinRemove}
+                aria-label="Unpin this message"
+                title="Unpin"
+                disabled={unpinning === m.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setUnpinning(m.id);
+                  channelsApi
+                    .unpin(channelId, m.id)
+                    .then(() => setPins((cur) => (cur ?? []).filter((x) => x.id !== m.id)))
+                    .catch((err) => useUI.getState().toast(err instanceof Error ? err.message : "That message could not be unpinned.", "error"))
+                    .finally(() => setUnpinning(null));
+                }}
+              >
+                <PinOff size={15} />
+              </button>
+            ) : null}
           </div>
         ))}
       </div>

@@ -146,7 +146,12 @@ export function ChatView({ channel }: { channel: Channel }) {
         ) : (
           <>
             <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? (priv ? <span className={s.lockHash}><Hash size={22} /><Lock size={11} className={s.lock} /></span> : <Hash size={22} />) : <Users size={22} />}</span>
-            <span className={s.hName}>{name}</span>
+            {channel.type === "dm" && other ? (
+              // the other person's name is the way to their profile, as their avatar is
+              <button className={[s.hName, s.hNameBtn].join(" ")} onClick={() => openModal("profile", { userId: other })} data-testid="dm-header-name">{name}</button>
+            ) : (
+              <span className={s.hName}>{name}</span>
+            )}
           </>
         )}
         {isSub ? (

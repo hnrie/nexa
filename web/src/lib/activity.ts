@@ -11,10 +11,19 @@ export function activityVerb(a: Pick<Activity, "type">): string {
   return VERB[a.type] ?? "Playing";
 }
 
+/**
+ * "Listening to" and "Rick Astley" apart, so a list can weight the name on its
+ * own. The name is whichever field the program asked to be shown.
+ */
+export function activityParts(a: Activity): { verb: string; name: string } {
+  const text = a.status_display_type === 1 ? a.state : a.status_display_type === 2 ? a.details : undefined;
+  return { verb: activityVerb(a), name: text || a.name };
+}
+
 /** "Listening to Rick Astley": the summary shown under a name in lists. */
 export function activityLine(a: Activity): string {
-  const text = a.status_display_type === 1 ? a.state : a.status_display_type === 2 ? a.details : undefined;
-  return `${activityVerb(a)} ${text || a.name}`;
+  const { verb, name } = activityParts(a);
+  return `${verb} ${name}`;
 }
 
 /** The card's heading: "Listening to Music Player", or "Playing a game". */

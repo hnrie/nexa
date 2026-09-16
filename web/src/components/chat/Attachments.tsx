@@ -1,4 +1,4 @@
-import { Download, FileIcon, Play, X } from "lucide-react";
+import { Download, FileIcon, Play, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { DecryptError } from "@/crypto/keys";
@@ -8,6 +8,7 @@ import { INLINE_MAX, acquire, attachmentObjectURL, cachedURL, release } from "@/
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
+import { ZoomPan, type ZoomPanHandle } from "@/components/common/ZoomPan";
 import { AudioPlayer } from "./AudioPlayer";
 import { imageMenuItems } from "./messageMenu";
 import { VideoPlayer } from "./VideoPlayer";
@@ -102,30 +103,43 @@ function useInView(ref: React.RefObject<HTMLElement | null>, onView: () => void,
 
 export function Lightbox({ src, name, type, onClose }: { src: string; name: string; type?: string | undefined; onClose: () => void }) {
   const openContextMenu = useUI((u) => u.openContextMenu);
+  const [scale, setScale] = useState(1);
+  const zoom = useRef<ZoomPanHandle>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "+" || e.key === "=") return zoom.current?.zoomBy(1.4);
+      if (e.key === "-") return zoom.current?.zoomBy(1 / 1.4);
       if (e.key !== "Escape") return;
       // the lightbox takes this Escape; it does not also stop picking messages under it
       e.stopPropagation();
-      onClose();
+      // zoomed in, Escape steps back to the whole picture before it closes
+      if (zoomedIn.current) zoom.current?.reset();
+      else onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+  const zoomedIn = useRef(false);
+  zoomedIn.current = scale > 1;
   return createPortal(
-    <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name}>
+    <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name} data-zoomed={scale > 1 || undefined}>
       <button className={s.lbClose} aria-label="Close" onClick={onClose}><X size={22} /></button>
-      <img
-        src={src}
-        alt={name}
-        onClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src, name }) });
-        }}
-      />
+      <ZoomPan className={s.lbStage} handle={zoom} onZoom={setScale} onIdleClick={onClose}>
+        <img
+          src={src}
+          alt={name}
+          draggable={false}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src, name }) });
+          }}
+        />
+      </ZoomPan>
       <div className={s.lbBar} onClick={(e) => e.stopPropagation()}>
+        <button aria-label="Zoom out" onClick={() => zoom.current?.zoomBy(1 / 1.4)}><ZoomOut size={16} /></button>
+        <button onClick={() => zoom.current?.reset()} disabled={scale === 1} data-testid="lightbox-zoom">{Math.round(scale * 100)}%</button>
+        <button aria-label="Zoom in" onClick={() => zoom.current?.zoomBy(1.4)}><ZoomIn size={16} /></button>
         {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
         {type?.toLowerCase().startsWith("image/svg") ? null : <a href={src} target="_blank" rel="noopener noreferrer">Open original</a>}
         <a href={src} download={name}>Download</a>

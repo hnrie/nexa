@@ -2,6 +2,8 @@
 .header { flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border-subtle); }
 .hIcon { color: var(--text-muted); display: flex; flex: none; }
 .hName { font-size: 16px; font-weight: 600; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hNameBtn { min-width: 0; }
+.hNameBtn:hover { text-decoration: underline; }
 .hSub { font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: 8px; }
 .hSub[data-status="online"] { color: var(--status-online); }
 .hSub[data-status="idle"] { color: var(--status-idle); }
@@ -147,14 +149,25 @@
 .popClose { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-xs); color: var(--icon); }
 .popClose:hover { background: var(--bg-hover); color: var(--text); }
 .pinsList { overflow-y: auto; overscroll-behavior: contain; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-.pinItem { padding: 8px 12px; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; }
+.pinItem { position: relative; padding: 8px 12px; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; }
 .pinItem:hover { background: var(--bg-active); }
 .pinHead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; }
 .pinAuthor { font-weight: 600; color: var(--text-strong); }
 .pinText { font-size: 14px; color: var(--text); max-height: 66px; overflow: hidden; }
+.pinRemove { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); opacity: 0; transition: opacity var(--transition), background var(--transition), color var(--transition); }
+.pinItem:hover .pinRemove, .pinRemove:focus-visible { opacity: 1; }
+.pinRemove:hover { background: var(--danger); color: #fff; }
+.pinRemove:disabled { opacity: 0.5; }
+/* A touch screen has no hover, so the button is simply always there. */
+@media (hover: none) { .pinRemove { opacity: 1; } }
 .pinEmpty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .lightbox { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; }
-.lightbox img { max-width: 92vw; max-height: 86vh; object-fit: contain; box-shadow: var(--shadow-high); }
+.lbStage { display: flex; align-items: center; justify-content: center; width: 92vw; height: 86vh; overflow: hidden; touch-action: none; }
+.lbStage img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--shadow-high); -webkit-user-select: none; user-select: none; }
+.lbStage[data-zoomed="true"] { cursor: grab; }
+.lbStage[data-zoomed="true"]:active { cursor: grabbing; }
+.lbBar button:disabled { opacity: 0.55; cursor: default; text-decoration: none; }
+.lbBar button { display: inline-flex; align-items: center; gap: 4px; min-width: 44px; justify-content: center; }
 .lbBar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
 .lbClose { position: absolute; top: 12px; right: 12px; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 0, 0, 0.5); color: #fff; }
 .lbClose:hover { background: rgba(255, 255, 255, 0.15); }
@@ -234,7 +247,7 @@
 .subRow[data-unread="true"] .subIcon { color: var(--text-strong); }
 .subIcon { flex: none; color: var(--text-muted); }
 .subName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subBadge { flex: none; min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 16px; text-align: center; }
+.subBadge { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .subNew { display: flex; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid var(--border-subtle); }
 .subNew input { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); font-size: 14px; border: 1px solid transparent; }
 .subNew input:focus { border-color: var(--brand); outline: none; }

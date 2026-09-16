@@ -13,7 +13,6 @@ import {
   Minimize2,
   MonitorUp,
   MonitorX,
-  PhoneOff,
   PictureInPicture2,
   SwitchCamera,
   Video,
@@ -26,6 +25,7 @@ import { guests as guestsApi } from "@/api/guests";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { cameraMenuItems, micMenuItems } from "./deviceMenus";
+import { HangUp } from "./HangUp";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
@@ -132,10 +132,12 @@ const middle = (list: { x: number; y: number }[]) => ({ x: list.reduce((a, p) =>
 const spread = (list: { x: number; y: number }[]) => (list.length < 2 ? 0 : Math.hypot(list[0]!.x - list[1]!.x, list[0]!.y - list[1]!.y));
 
 /**
- * Holds a stream's picture. When `zoomable` (a focused screen share) two
- * fingers pinch into it and one drags it around once zoomed in: a desktop
- * share is unreadable on a phone otherwise. The view is written straight onto
- * the video rather than through React, so it keeps up with the fingers.
+ * Holds a stream's picture. When `zoomable` (whatever is focused, a share or a
+ * camera) two fingers pinch into it and one drags it around once zoomed in; a
+ * mouse zooms with the wheel and drags to pan. A desktop share is unreadable
+ * on a phone otherwise, and a camera is worth a closer look too. The view is
+ * written straight onto the video rather than through React, so it keeps up
+ * with the fingers.
  */
 function StreamSurface({ zoomable, children }: { zoomable: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -170,10 +172,26 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
     if (!zoomable) reset();
   }, [zoomable, reset]);
 
-  const at = (e: ReactPointerEvent) => {
+  const at = (e: { clientX: number; clientY: number }) => {
     const r = ref.current!.getBoundingClientRect();
     return { x: e.clientX - r.left - r.width / 2, y: e.clientY - r.top - r.height / 2 };
   };
+
+  // The wheel has to be taken here: React listens passively, and zooming has
+  // to stop the page (or the message list under a call) scrolling with it.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !zoomable) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const pt = at(e);
+      const factor = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.03 : 0.0015));
+      view.current = pinchView(view.current, pt, pt, factor, { width: el.clientWidth, height: el.clientHeight });
+      apply();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [zoomable, apply]);
   const restart = () => {
     const list = [...points.current.values()];
     gesture.current = list.length ? { start: { ...view.current }, from: middle(list), spread: spread(list) } : null;
@@ -190,7 +208,9 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
       data-zoomable={zoomable || undefined}
       data-no-swipe={zoomable || undefined}
       onPointerDown={(e) => {
-        if (!zoomable || e.pointerType !== "touch") return;
+        if (!zoomable) return;
+        // a mouse only takes part once there is something to drag around
+        if (e.pointerType !== "touch" && view.current.scale <= 1) return;
         points.current.set(e.pointerId, at(e));
         if (points.current.size > 1 || view.current.scale > 1) e.currentTarget.setPointerCapture?.(e.pointerId);
         restart();
@@ -260,6 +280,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const tileRefs = useRef(new Map<string, HTMLDivElement>());
   const lastTap = useRef<{ key: string; at: number } | null>(null);
   const lastPointer = useRef("mouse");
+  /** A click on the focused tile waits out the double-click window before it sends the tile back. */
+  const unfocusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connected = mine?.channel_id === channel.id;
   const participants = useMemo(() => participantsOf(byChannel, channel.id), [byChannel, channel.id]);
 
@@ -469,6 +491,10 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     const double = !!last && (lastPointer.current === "mouse" ? e.detail >= 2 : now - last.at < DOUBLE_TAP_MS);
     if (double) {
       lastTap.current = null;
+      if (unfocusTimer.current) {
+        clearTimeout(unfocusTimer.current);
+        unfocusTimer.current = null;
+      }
       const first = tiles.find((x) => x.key === last.key);
       if (!first || !showsStream(first)) return;
       const zoomed = tileRefs.current.get(first.key)?.querySelector<HTMLElement>("[data-zoomed='true']");
@@ -476,13 +502,32 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       else fullscreenTile(first);
       return;
     }
-    if (!t || !showsStream(t)) {
+    if (!t) {
       lastTap.current = null;
       return;
     }
     lastTap.current = { key: t.key, at: now };
-    if (el?.dataset.place !== "focus") setFocused(t.key);
+    if (el?.dataset.place !== "focus") {
+      setFocused(t.key);
+      return;
+    }
+    // Clicking what is already focused sends it back to the grid — but a
+    // double click means full screen, so this waits out that window first.
+    // A stream zoomed in is being panned, not dismissed.
+    if (tileIsFull(t) || el.querySelector("[data-zoomed='true']")) return;
+    if (unfocusTimer.current) clearTimeout(unfocusTimer.current);
+    unfocusTimer.current = setTimeout(() => {
+      unfocusTimer.current = null;
+      setFocused(null);
+    }, DOUBLE_TAP_MS);
   };
+
+  useEffect(
+    () => () => {
+      if (unfocusTimer.current) clearTimeout(unfocusTimer.current);
+    },
+    [],
+  );
 
   const renderTile = (t: Tile, place: "grid" | "focus" | "strip") => {
     const vs = byChannel[channel.id]?.[t.userId];
@@ -515,7 +560,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         onContextMenu={(e) => tileMenu(e, t)}
       >
         {playing && t.stream ? (
-          <StreamSurface zoomable={place === "focus" && t.kind === "screen"}>
+          <StreamSurface zoomable={place === "focus"}>
             <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video" && currentCameraFacing() === "user"} className={s.video} onAspect={(r) => noteAspect(t.key, r)} />
           </StreamSurface>
         ) : live ? (
@@ -665,7 +710,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           ) : null}
           {/* phones have no side column for it, so full screen joins the row there */}
           <ControlButton label={callFull ? "Exit full screen" : "Full screen"} on={callFull} onClick={toggleCallFull} className={s.narrowOnly} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
-          <ControlButton label="Disconnect" danger onClick={() => void leaveVoice()} testId="voice-leave"><PhoneOff size={22} /></ControlButton>
+          <ControlButton label="Disconnect" danger onClick={() => void leaveVoice()} testId="voice-leave"><HangUp size={22} /></ControlButton>
         </div>
         <div className={[s.controlsSide, s.controlsEnd].join(" ")}>
           {canInviteGuests ? (

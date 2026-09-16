@@ -1,22 +1,38 @@
 import { useEffect } from "react";
 import { loadLock } from "@/lib/appLock";
+import { desktopBridge } from "@/lib/desktopBridge";
 import { useAuth } from "@/stores/auth";
 
 const ACTIVITY = ["pointerdown", "keydown", "wheel", "touchstart", "mousemove"] as const;
 /** Re-arming on every mouse move would be wasteful; once a second is plenty. */
 const ACTIVITY_THROTTLE = 1000;
 /**
- * The shortest wait after the window loses focus while the page stays visible.
- * Short blurs happen while the app is still in use (a permission prompt, a
- * system sheet), and locking tears the whole UI down.
+ * How long to wait after a blur before deciding focus really left. Short blurs
+ * happen while the app is still in use (a permission prompt, a system sheet),
+ * and locking tears the whole UI down.
  */
-const BLUR_GRACE = 2000;
-/** How soon after a blur to check where focus went. */
-const FOCUS_POLL = 500;
+const BLUR_SETTLE = 700;
+
+/**
+ * Whether the blur that just happened moved focus into the page itself — a
+ * video embed, a captcha frame — rather than out of the window. The browser
+ * reports that as the iframe becoming the active element while the document
+ * keeps focus.
+ */
+function focusWentIntoThePage(): boolean {
+  const el = document.activeElement;
+  return el instanceof HTMLIFrameElement && document.hasFocus();
+}
 
 /**
  * Locks the app on its own: after a stretch of inactivity, and when the window
  * goes to the background, for whoever asked for that in Security settings.
+ *
+ * Where the window is comes from three sources, because no one of them answers
+ * everywhere. The desktop app's own window manager is authoritative when it is
+ * there (a page inside Electron reports focus it does not have). A browser tab
+ * that goes to the background raises visibilitychange. Moving to another app,
+ * which leaves the tab visible, raises only blur.
  */
 export function AppLockEffect() {
   const status = useAuth((a) => a.status);
@@ -33,7 +49,7 @@ export function AppLockEffect() {
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
     let awayTimer: ReturnType<typeof setTimeout> | null = null;
     let awayAt = 0;
-    let focusPoll: ReturnType<typeof setInterval> | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
     let lastSeen = 0;
     // A file chooser takes focus, and on Android hides the page, while the
     // user is still attaching something. Locking then would unmount the input
@@ -51,41 +67,43 @@ export function AppLockEffect() {
       lastSeen = now;
       armIdle();
     };
+    const clearSettle = () => {
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = null;
+    };
+    /** Starts the countdown to locking, unless a shorter one is already running. */
     const leave = (delay: number) => {
       if (!cfg.lockOnBlur || picking) return;
-      // A hidden page follows a blur that already waits out the grace; it must
-      // not wait that long, because a phone suspends the page soon after.
-      if (awayTimer && Date.now() + delay >= awayAt) return;
+      clearSettle();
+      if (awayTimer && awayAt <= Date.now() + delay) return;
       if (awayTimer) clearTimeout(awayTimer);
       awayAt = Date.now() + delay;
-      awayTimer = setTimeout(lock, delay);
+      awayTimer = setTimeout(() => {
+        awayTimer = null;
+        lock();
+      }, delay);
     };
-    const stopFocusPoll = () => {
-      if (focusPoll) clearInterval(focusPoll);
-      focusPoll = null;
-    };
-    const onBlur = () => {
-      if (!cfg.lockOnBlur || focusPoll) return;
-      // Clicking into a video embed blurs the window without leaving the app:
-      // the document still has focus then. Keep checking, and start the wait
-      // only once focus has really gone to another window.
-      focusPoll = setInterval(() => {
-        if (document.hasFocus()) return;
-        stopFocusPoll();
-        leave(Math.max(cfg.blurDelayMs, BLUR_GRACE));
-      }, FOCUS_POLL);
+    /** A blur may still be the page's own; give it a moment to say so. */
+    const maybeLeave = (delay: number) => {
+      if (!cfg.lockOnBlur || picking || awayTimer || settleTimer) return;
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
+        if (focusWentIntoThePage()) return;
+        leave(delay);
+      }, BLUR_SETTLE);
     };
     const back = () => {
       if (awayTimer) clearTimeout(awayTimer);
       awayTimer = null;
       picking = false;
-      stopFocusPoll();
+      clearSettle();
       armIdle();
     };
+    const onBlur = () => maybeLeave(cfg.blurDelayMs);
     const onVisibility = () => {
-      if (document.visibilityState !== "hidden") return back();
-      stopFocusPoll();
-      leave(cfg.blurDelayMs);
+      // A phone suspends a hidden page soon after, so this one does not settle.
+      if (document.visibilityState === "hidden") leave(cfg.blurDelayMs);
+      else back();
     };
     const donePicking = () => {
       picking = false;
@@ -108,10 +126,13 @@ export function AppLockEffect() {
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("blur", onBlur);
     window.addEventListener("focus", back);
+    // The desktop app knows where its own window is; nothing in the page does.
+    const bridge = desktopBridge();
+    const offWindow = bridge?.onWindowState?.((w) => (w.focused && w.visible && !w.minimized ? back() : leave(cfg.blurDelayMs)));
     return () => {
       if (idleTimer) clearTimeout(idleTimer);
       if (awayTimer) clearTimeout(awayTimer);
-      stopFocusPoll();
+      clearSettle();
       for (const ev of ACTIVITY) window.removeEventListener(ev, onActivity);
       window.removeEventListener("pointerdown", donePicking, true);
       window.removeEventListener("keydown", donePicking, true);
@@ -119,6 +140,7 @@ export function AppLockEffect() {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", back);
+      offWindow?.();
     };
   }, [status, userId, lockVersion]);
 

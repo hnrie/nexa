@@ -21,7 +21,7 @@ type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
   | { kind: "msg"; key: string; msg: DecryptedMessage; groupStart: boolean }
-  | { kind: "pending"; key: string; p: PendingMessage };
+  | { kind: "pending"; key: string; p: PendingMessage; groupStart: boolean };
 
 const GROUP_MS = 7 * 60 * 1000;
 
@@ -116,7 +116,13 @@ export function MessageList({ channel }: { channel: Channel }) {
       out.push({ kind: "msg", key: m.id, msg: m, groupStart: !shouldGroup(prev, m) });
       prev = m;
     }
-    for (const p of pending) out.push({ kind: "pending", key: p.tmpId, p });
+    // Unsent messages group with what is above them exactly as sent ones do,
+    // or each would flash its own avatar and name until the server answered.
+    for (const p of pending) {
+      const asMessage = pendingToMessage(p);
+      out.push({ kind: "pending", key: p.tmpId, p, groupStart: !shouldGroup(prev, asMessage) });
+      prev = asMessage;
+    }
     return out;
     // loaded is listed so the rows are built again once the unread point is captured
   }, [ids, byId, pending, me?.id, loaded]);
@@ -361,7 +367,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           {rows.map((row, i) => {
             if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
             if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>New</span></div>;
-            if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={true} pending={row.p.status} />;
+            if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} />;
             return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
           })}
           {hasNewer && loaded ? <div className={s.loader}><Spinner size={24} /></div> : null}

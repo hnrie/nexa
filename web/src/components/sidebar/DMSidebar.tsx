@@ -7,7 +7,7 @@ import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectSubchats, useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
-import { activityLine } from "@/lib/activity";
+import { StatusLine } from "@/components/activity/StatusLine";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
@@ -70,17 +70,17 @@ export function DMSidebar() {
           const unread = isUnread(rs, ch.last_message_id);
           // how many messages wait here; the open conversation is being read
           const count = active === ch.id ? 0 : conversationCount(ch, rs, settings);
-          let sub = "";
+          let sub: React.ReactNode = null;
           let avatar: React.ReactNode;
           if (ch.type === "dm") {
             const other = ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0] ?? "";
             const u = users[other];
             const st = customStatus(presence[other]);
             const act = activitiesOf(presence[other])[0];
-            sub = st ? `${st.emoji ? st.emoji + " " : ""}${st.text}` : act ? activityLine(act) : "";
+            sub = <StatusLine className={s.sub} status={st} activity={act} />;
             avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
           } else {
-            sub = `${ch.recipient_ids.length} Members`;
+            sub = <span className={s.sub}>{`${ch.recipient_ids.length} Members`}</span>;
             const url = iconUrl(ch.icon_id, 32);
             avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} kind="icon" /> : <span className={s.groupIcon}><Users size={18} /></span>;
           }
@@ -102,7 +102,7 @@ export function DMSidebar() {
               {avatar}
               <span className={s.text}>
                 <span className={s.name}>{name}</span>
-                {sub ? <span className={s.sub}>{sub}</span> : null}
+                {sub}
               </span>
               {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-label={`${count > 99 ? "more than 99" : count} unread`}>{badgeText(count)}</span> : null}
               <span

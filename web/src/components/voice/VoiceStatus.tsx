@@ -1,4 +1,4 @@
-import { MonitorUp, PhoneOff, Signal, Video } from "lucide-react";
+import { MonitorUp, Signal, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip } from "@/components/common/Tooltip";
 import { channelDisplayName } from "@/lib/names";
@@ -10,6 +10,7 @@ import { useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
 import { leaveVoice, toggleCamera, toggleScreen } from "@/voice/session";
+import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
 import { cameraMenuItems } from "./deviceMenus";
 
@@ -47,7 +48,7 @@ export function VoiceStatus() {
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>
         <Tooltip text="Disconnect" side="top">
-          <button className={s.statusBtn} aria-label="Disconnect" onClick={() => void leaveVoice()} data-testid="voice-status-leave"><PhoneOff size={18} /></button>
+          <button className={s.statusBtn} aria-label="Disconnect" onClick={() => void leaveVoice()} data-testid="voice-status-leave"><HangUp size={18} /></button>
         </Tooltip>
       </div>
       <div className={s.statusBtns}>

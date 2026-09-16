@@ -33,6 +33,7 @@
   --bg-surface: rgba(0, 0, 0, 0.3); --bg-raised: rgba(0, 0, 0, 0.34); --bg-input: rgba(0, 0, 0, 0.26); --bg-hover: rgba(255, 255, 255, 0.1); --bg-active: rgba(255, 255, 255, 0.18);
   --border: rgba(255, 255, 255, 0.24); --border-subtle: rgba(255, 255, 255, 0.14); --text-brand: #ffffff; --link: #d5e6ff;
   --profile-chip: rgba(0, 0, 0, 0.28); --profile-chip-hover: rgba(0, 0, 0, 0.4); --bubble-bg: rgba(0, 0, 0, 0.42);
+  --profile-scrim: rgba(0, 0, 0, 0.34);
   --profile-accent: color-mix(in srgb, var(--profile-top), #fff 18%);
 }
 .card[data-themed="dark"] {
@@ -40,6 +41,7 @@
   --bg-surface: rgba(255, 255, 255, 0.5); --bg-raised: rgba(255, 255, 255, 0.46); --bg-input: rgba(255, 255, 255, 0.52); --bg-hover: rgba(0, 0, 0, 0.06); --bg-active: rgba(0, 0, 0, 0.12);
   --border: rgba(0, 0, 0, 0.18); --border-subtle: rgba(0, 0, 0, 0.12); --text-brand: #1d1e22; --link: #0b4ea2;
   --profile-chip: rgba(255, 255, 255, 0.55); --profile-chip-hover: rgba(255, 255, 255, 0.78); --bubble-bg: rgba(255, 255, 255, 0.8);
+  --profile-scrim: rgba(255, 255, 255, 0.4);
   --profile-accent: color-mix(in srgb, var(--profile-top), #000 45%);
 }
 /* the main button is the theme's own colour made deep enough for white text, as Discord's is */
@@ -90,10 +92,33 @@
 .bubbleEmoji { display: inline-block; width: 18px; height: 18px; margin-right: 6px; vertical-align: -4px; object-fit: contain; }
 
 .info { position: relative; display: flex; flex-direction: column; gap: 12px; padding: calc(var(--av) * 0.4 + 12px) 16px 16px; }
+/*
+ * A profile gradient can land anywhere, and a mid-tone one leaves the names
+ * and the bio hard to read whichever way the text turns. On a themed card the
+ * details sit on a panel dimmed towards the text's own side, so the gradient
+ * still shows through while the words keep their contrast.
+ */
+.card[data-themed] .info::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--av) * 0.4 + 2px) 8px 8px;
+  border-radius: var(--radius-md);
+  background: var(--profile-scrim);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+.card[data-themed] .info > * { position: relative; }
 .card[data-variant="modal"] .info { gap: 16px; padding: calc(var(--av) * 0.4 + 16px) 24px 24px; }
 .ident { min-width: 0; }
 .nameRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .display { margin: 0; min-width: 0; font-size: 20px; line-height: 26px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+.displayBtn { font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; }
+.displayBtn:hover { text-decoration: underline; }
+/* in the column beside a DM the picture is the way to the whole profile */
+.avatarBtn { display: block; line-height: 0; border-radius: 50%; }
+.avatarBtn:hover { filter: brightness(1.08); }
+.avatarBtn:focus-visible { outline: 2px solid var(--profile-accent); outline-offset: 3px; }
 .card[data-variant="modal"] .display { font-size: 24px; line-height: 30px; }
 .noteBtn { display: inline-flex; padding: 2px; border-radius: 4px; color: var(--text-muted); flex: none; }
 .noteBtn:hover { color: var(--text-strong); }

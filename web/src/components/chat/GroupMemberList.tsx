@@ -3,8 +3,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { Twemoji } from "@/components/common/Twemoji";
-import { activityLine } from "@/lib/activity";
+import { StatusLine } from "@/components/activity/StatusLine";
 import { friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { activitiesOf, statusOf, usePresence } from "@/stores/presence";
@@ -65,13 +64,11 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
                 {row.name}
                 {channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label="Group Owner" /> : null}
               </span>
-              {p?.status_text ? (
-                <span className={s.sub}>
-                  {p.status_emoji ? <Twemoji text={p.status_emoji} className={s.statusEmoji} /> : null} {p.status_text}
-                </span>
-              ) : activity ? (
-                <span className={s.sub}>{activityLine(activity)}</span>
-              ) : null}
+              <StatusLine
+                className={s.sub}
+                status={p?.status_text || p?.status_emoji ? { text: p.status_text, emoji: p.status_emoji } : null}
+                activity={activity}
+              />
             </span>
           </button>
         );

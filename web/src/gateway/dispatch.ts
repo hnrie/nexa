@@ -132,8 +132,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const m = e.d;
       const decrypted = await decryptForStore(m);
       const messages = useMessages.getState();
-      if (m.nonce && meId === m.author_id) messages.resolvePendingByNonce(m.channel_id, m.nonce);
-      messages.insert(m.channel_id, [decrypted]);
+      if (m.nonce && meId === m.author_id) messages.settle(m.channel_id, [decrypted], { nonce: m.nonce });
+      else messages.insert(m.channel_id, [decrypted]);
       useChannels.getState().setLastMessage(m.channel_id, m.id);
       useTyping.getState().remove(m.channel_id, m.author_id);
       if (decrypted.decryptError === "no_key" && m.key_conv_id) useKeys.getState().markWaiting(m.key_conv_id);

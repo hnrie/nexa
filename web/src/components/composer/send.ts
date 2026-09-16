@@ -66,9 +66,8 @@ export async function sendMessage(channelId: string, rawText: string, opts: Send
     const sent = await messagesApi.send(channelId, body);
     const decrypted = await decryptForStore(sent);
     if (!decrypted.payload) decrypted.payload = payload;
-    useMessages.getState().insert(channelId, [decrypted]);
+    useMessages.getState().settle(channelId, [decrypted], { tmpId: tmp, nonce });
     useChannels.getState().setLastMessage(channelId, sent.id);
-    useMessages.getState().removePending(channelId, tmp);
     useSlowmode.getState().markSent(channelId);
   } catch (err) {
     useMessages.getState().failPending(channelId, tmp);

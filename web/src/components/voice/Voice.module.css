@@ -37,6 +37,9 @@
 .surface { position: absolute; inset: 0; overflow: hidden; }
 .surface[data-zoomable="true"] { touch-action: none; }
 .surface[data-zoomed="true"] .video { will-change: transform; }
+/* zoomed in, the picture is dragged around rather than clicked through */
+.surface[data-zoomed="true"] { cursor: grab; }
+.surface[data-zoomed="true"]:active { cursor: grabbing; }
 .tile[data-kind="screen"] .video, .tile[data-place="focus"] .video { object-fit: contain; }
 .video[data-mirror="true"] { transform: scaleX(-1); }
 .avatarWrap { display: flex; align-items: center; justify-content: center; }
@@ -82,6 +85,8 @@
 .ctl[data-off="true"]:hover, .ctl[data-on="true"]:hover { background: #e3e3e6; }
 .narrowOnly { display: none; }
 .leave { background: var(--danger); color: #fff; }
+/* the handset points down, and the icon stays centred in the button */
+.hangUp { transform: rotate(135deg); }
 .leave:hover { background: var(--danger-hover); }
 .sideBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); }
 .sideBtn:hover { color: #fff; background: var(--bg-surface); }

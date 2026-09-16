@@ -20,3 +20,10 @@ a.title:hover, a.line:hover { text-decoration: underline; }
 .button:hover { background: var(--bg-active); text-decoration: none; }
 .list { display: flex; flex-direction: column; gap: 16px; }
 @media (pointer: coarse) { .button { min-height: 40px; } }
+
+/* The status line under a name: the words, then an icon for what kind of thing they are doing. */
+.statusLine { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; }
+.statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activityName { font-weight: 600; color: var(--text-subtle); }
+.kindIcon { flex: none; opacity: 0.8; }
+.statusEmoji { width: 1.1em; height: 1.1em; margin-right: 3px; vertical-align: -0.2em; object-fit: contain; }

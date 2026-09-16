@@ -232,7 +232,13 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
           ) : null}
         </div>
         <div className={s.avatar}>
-          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={avatarSize} status={st} dotSize={panel ? 18 : 26} />
+          {panel ? (
+            <button className={s.avatarBtn} aria-label={`View ${shownName}'s full profile`} onClick={viewFull} data-testid="profile-avatar">
+              <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={avatarSize} status={st} dotSize={18} />
+            </button>
+          ) : (
+            <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={avatarSize} status={st} dotSize={26} />
+          )}
         </div>
         {cs ? (
           <div className={s.bubble} data-testid="profile-status">
@@ -250,7 +256,9 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
       <div className={s.info}>
         <div className={s.ident}>
         <div className={s.nameRow}>
-          <h2 className={s.display}>{shownName}</h2>
+          <h2 className={s.display}>
+            {panel ? <button className={s.displayBtn} onClick={viewFull} data-testid="profile-name">{shownName}</button> : shownName}
+          </h2>
           {interactive && !isMe ? (
             <Tooltip text={note ? "Edit Note" : "Add Note"} side="top">
               <button className={s.noteBtn} aria-label={note ? "Edit note" : "Add note"} onClick={() => setNoteOpen((v) => !v)} data-testid="profile-note-toggle">
