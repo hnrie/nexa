@@ -26,4 +26,7 @@ a.title:hover, a.line:hover { text-decoration: underline; }
 .statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .activityName { font-weight: 600; color: var(--text-subtle); }
 .kindIcon { flex: none; opacity: 0.8; }
+/* two or more things at once: the icon of the first, and how many follow */
+.kindStack { display: inline-flex; align-items: center; gap: 1px; flex: none; }
+.kindMore { font-size: 10px; font-weight: 700; line-height: 1; color: var(--text-muted); }
 .statusEmoji { width: 1.1em; height: 1.1em; margin-right: 3px; vertical-align: -0.2em; object-fit: contain; }

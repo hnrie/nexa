@@ -13,9 +13,18 @@ import s from "./Activity.module.css";
 const ICON: Record<number, typeof Music> = { 0: Gamepad2, 2: Music, 3: Tv, 5: Trophy };
 const LABEL: Record<number, string> = { 0: "Playing a game", 2: "Listening to music", 3: "Watching", 5: "Competing" };
 
-export function ActivityIcon({ type, size = 12 }: { type: number; size?: number }) {
+export function ActivityIcon({ type, size = 12, more = 0 }: { type: number; size?: number; more?: number }) {
   const Icon = ICON[type] ?? Gamepad2;
-  return <Icon size={size} className={s.kindIcon} aria-label={LABEL[type] ?? "Activity"} />;
+  const label = LABEL[type] ?? "Activity";
+  if (more > 0) {
+    return (
+      <span className={s.kindStack} title={`${label}, and ${more} more`}>
+        <Icon size={size} className={s.kindIcon} aria-hidden="true" />
+        <span className={s.kindMore} aria-label={`and ${more} more`}>+{more}</span>
+      </span>
+    );
+  }
+  return <Icon size={size} className={s.kindIcon} aria-label={label} />;
 }
 
 export function StatusLine({
@@ -23,11 +32,14 @@ export function StatusLine({
   activity,
   className,
   testId,
+  more = 0,
 }: {
   status?: { text: string; emoji: string } | null;
   activity?: Activity;
   className?: string;
   testId?: string;
+  /** How many other activities they have besides this one. */
+  more?: number;
 }) {
   if (!status?.text && !status?.emoji && !activity) return null;
   const parts = activity ? activityParts(activity) : null;
@@ -43,7 +55,7 @@ export function StatusLine({
             </>
           ) : null}
       </span>
-      {activity ? <ActivityIcon type={activity.type} /> : null}
+      {activity ? <ActivityIcon type={activity.type} more={more} /> : null}
     </span>
   );
 }

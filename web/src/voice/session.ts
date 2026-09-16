@@ -692,7 +692,13 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
       const soundFailed = audio && err instanceof DOMException && (err.name === "NotReadableError" || err.name === "AbortError");
       const again = soundFailed ? await desktopBridge()?.shareAudioFailed?.().catch(() => false) : false;
       if (again && session === s) stream = await getScreen(res, fps, audio).catch(() => null);
-      if (!stream && soundFailed && session === s) useUI.getState().toast("Your screen share could not start with its sound. Try again, or turn Share audio off.", "error");
+      if (!stream && session === s) {
+        // A share that will not start is usually the computer refusing to let
+        // the app record at all; blaming the sound sends people the wrong way.
+        const access = await desktopBridge()?.screenAccess?.().catch(() => null);
+        if (access && !access.usable) useUI.getState().openModal("screenPermission", { stale: access.stale });
+        else if (soundFailed) useUI.getState().toast("Your screen share could not start with its sound. Try again, or turn Share audio off.", "error");
+      }
     }
     s.screenPending = false;
     if (!stream) return;

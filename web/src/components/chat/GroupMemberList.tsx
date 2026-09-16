@@ -68,6 +68,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
                 className={s.sub}
                 status={p?.status_text || p?.status_emoji ? { text: p.status_text, emoji: p.status_emoji } : null}
                 activity={activity}
+                more={Math.max(0, activitiesOf(p).length - 1)}
               />
             </span>
           </button>

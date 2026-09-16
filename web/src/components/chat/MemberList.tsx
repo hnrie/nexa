@@ -177,6 +177,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
                   testId="member-activity"
                   status={p?.status_text || p?.status_emoji ? { text: p.status_text, emoji: p.status_emoji } : null}
                   activity={activitiesOf(p)[0]}
+                  more={Math.max(0, activitiesOf(p).length - 1)}
                 />
               ) : null}
             </span>

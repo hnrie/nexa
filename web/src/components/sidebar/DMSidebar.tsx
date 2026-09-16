@@ -77,7 +77,7 @@ export function DMSidebar() {
             const u = users[other];
             const st = customStatus(presence[other]);
             const act = activitiesOf(presence[other])[0];
-            sub = <StatusLine className={s.sub} status={st} activity={act} />;
+            sub = <StatusLine className={s.sub} status={st} activity={act} more={Math.max(0, activitiesOf(presence[other]).length - 1)} />;
             avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
           } else {
             sub = <span className={s.sub}>{`${ch.recipient_ids.length} Members`}</span>;

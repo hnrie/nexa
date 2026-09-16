@@ -18,6 +18,7 @@ import { ServerProfileModal } from "./ServerProfileModal";
 import { ChannelTopicModal } from "./ChannelTopicModal";
 import { IncomingCallHost } from "@/components/voice/IncomingCall";
 import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
+import { ScreenPermission } from "@/components/desktop/DisplayPicker";
 import { GuestLinkModal } from "@/components/voice/GuestLinkModal";
 import type { StickerInfo } from "@/api/types";
 import { StickerPackModal } from "./StickerPackModal";
@@ -86,6 +87,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       <Suspense fallback={null}>
         {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} /> : null}
         {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} /> : null}
+        {modal?.kind === "screenPermission" ? <ScreenPermission stale={Boolean(modal.props?.["stale"])} onClose={close} /> : null}
         {modal?.kind === "subchat" ? <SubchatModal onClose={close} channel={modal.props?.["channel"] as never} parentId={modal.props?.["parentId"] as string | undefined} /> : null}
         {modal?.kind === "serverSettings" ? <ServerSettingsModal onClose={close} serverId={String(modal.props?.["serverId"])} page={modal.props?.["page"] as string | undefined} /> : null}
         {modal?.kind === "channelSettings" ? <ChannelSettingsModal onClose={close} channelId={String(modal.props?.["channelId"])} page={modal.props?.["page"] as string | undefined} /> : null}

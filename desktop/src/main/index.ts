@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { IPC, type DesktopSettings, type Identity, type WindowState } from "../shared/bridge";
 import { BASE, ORIGIN, isAppUrl } from "./config";
-import { chooseDisplaySource, handleDisplayMedia, lockPermissions, shareAudioFailed } from "./permissions";
+import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, restartApp, screenAccess, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
 import { SettingsStore } from "./settings";
 import { createTray } from "./tray";
@@ -171,6 +171,9 @@ function registerIpc(): void {
   on(IPC.requestAttention, () => requestAttention());
   handle(IPC.windowGetState, () => windowState());
   handle(IPC.shareAudioFailed, () => shareAudioFailed(log));
+  handle(IPC.screenAccess, () => screenAccess());
+  handle(IPC.openScreenSettings, () => openScreenSettings());
+  handle(IPC.restartApp, () => restartApp());
   on(IPC.displayChoose, (requestId: string, sourceId: string | null, withAudio: boolean) => chooseDisplaySource(String(requestId), sourceId === null ? null : String(sourceId), !!withAudio));
 }
 

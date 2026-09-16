@@ -57,6 +57,9 @@ if (origin && location.origin === origin) {
     requestAttention: (): void => ipcRenderer.send(IPC.requestAttention),
     getWindowState: (): Promise<WindowState> => ipcRenderer.invoke(IPC.windowGetState),
     shareAudioFailed: (): Promise<boolean> => ipcRenderer.invoke(IPC.shareAudioFailed),
+    screenAccess: (): Promise<{ status: string; usable: boolean; stale: boolean }> => ipcRenderer.invoke(IPC.screenAccess),
+    openScreenSettings: (): Promise<void> => ipcRenderer.invoke(IPC.openScreenSettings),
+    restartApp: (): Promise<void> => ipcRenderer.invoke(IPC.restartApp),
     onWindowState: listen<WindowState>(IPC.windowState),
   });
 }

@@ -1,8 +1,9 @@
-import { Monitor, MonitorUp } from "lucide-react";
+import { ExternalLink, Monitor, MonitorUp, RotateCw, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import type { DisplaySourceRequest } from "@/lib/desktopBridge";
+import { desktopBridge } from "@/lib/desktopBridge";
 import { shareAudioRequested } from "@/voice/media";
 import s from "./Desktop.module.css";
 
@@ -13,6 +14,59 @@ import s from "./Desktop.module.css";
  * dialog, so the picker only asks what to share.
  */
 export function DisplayPicker({ request, onChoose }: { request: DisplaySourceRequest; onChoose: (sourceId: string | null, withAudio: boolean) => void }) {
+  if (request.permission) return <ScreenPermission stale={request.permission.stale} onClose={() => onChoose(null, false)} />;
+  return <SourceGrid request={request} onChoose={onChoose} />;
+}
+
+/**
+ * What to do when the computer will not let the app record the screen. macOS
+ * keeps that decision itself, and an update can leave one that reads as
+ * granted while the recording it allows is an older copy of the app — the
+ * settings look right and nothing is captured. A restart picks up a fresh
+ * decision; where it does not, taking the app out of the list and putting it
+ * back writes a new one.
+ */
+export function ScreenPermission({ stale, onClose }: { stale: boolean; onClose: () => void }) {
+  const bridge = desktopBridge();
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="This computer is not sharing the screen"
+      width={520}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+          {bridge?.openScreenSettings ? (
+            <Button variant="secondary" onClick={() => void bridge.openScreenSettings?.()} data-testid="open-screen-settings"><ExternalLink size={16} /> Open Settings</Button>
+          ) : null}
+          {bridge?.restartApp ? (
+            <Button onClick={() => void bridge.restartApp?.()} data-testid="restart-for-screen"><RotateCw size={16} /> Restart nexa</Button>
+          ) : null}
+        </>
+      }
+    >
+      <div className={s.permission}>
+        <span className={s.permissionIcon}><ShieldAlert size={22} /></span>
+        <div>
+          {stale ? (
+            <>
+              <p><b>Screen Recording is switched on for nexa, and the system is still refusing.</b> That happens after an update: the permission points at the copy of the app that asked for it.</p>
+              <p>Restarting usually settles it. If it does not, open Privacy &amp; Security → Screen Recording, take nexa out of the list with the minus button, add it again, and restart.</p>
+            </>
+          ) : (
+            <>
+              <p><b>nexa needs permission to record the screen.</b> Open Privacy &amp; Security → Screen Recording and switch nexa on.</p>
+              <p>macOS only hands the permission over to a fresh start, so restart the app afterwards.</p>
+            </>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onChoose: (sourceId: string | null, withAudio: boolean) => void }) {
   const screens = request.sources.filter((x) => x.kind === "screen");
   const windows = request.sources.filter((x) => x.kind === "window");
   const [tab, setTab] = useState<"screen" | "window">(screens.length ? "screen" : "window");

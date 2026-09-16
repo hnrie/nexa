@@ -63,6 +63,8 @@ export interface DisplaySourceRequest {
   requestId: string;
   sources: DisplaySource[];
   audio: boolean;
+  /** Set instead of sources when this computer will not let the app record the screen. */
+  permission?: { status: string; stale: boolean };
 }
 
 /** Where the app's window is, as its own window system says: a page's own idea of focus is not reliable here. */
@@ -104,5 +106,8 @@ export const IPC = {
   requestAttention: "app:request-attention",
   windowGetState: "app:get-window-state",
   shareAudioFailed: "display:share-audio-failed",
+  screenAccess: "display:screen-access",
+  openScreenSettings: "display:open-screen-settings",
+  restartApp: "app:restart",
   windowState: "app:window-state",
 } as const;

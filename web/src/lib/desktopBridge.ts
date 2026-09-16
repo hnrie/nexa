@@ -84,6 +84,8 @@ export interface DisplaySourceRequest {
   sources: DisplaySource[];
   /** The system can capture sound along with the picture (Windows). */
   audio: boolean;
+  /** Set instead of sources when this computer will not let the app record the screen. */
+  permission?: { status: string; stale: boolean };
 }
 
 /** Where the app's window is, as the window system says (app 1.0.3 and later). */
@@ -148,6 +150,10 @@ export interface EvilionDesktop {
    * straight away, without the picker (app 1.0.3 and later).
    */
   shareAudioFailed?(): Promise<boolean>;
+  /** Whether this computer will really let the app record the screen (macOS keeps a decision that can go stale). */
+  screenAccess?(): Promise<{ status: string; usable: boolean; stale: boolean }>;
+  openScreenSettings?(): Promise<void>;
+  restartApp?(): Promise<void>;
   onWindowState?(cb: (state: WindowState) => void): () => void;
 }
 

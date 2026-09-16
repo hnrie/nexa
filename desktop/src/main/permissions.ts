@@ -3,7 +3,7 @@
  * clipboard, for nexa's own origin and nothing else. On macOS the
  * system asks the person the first time the microphone or camera is wanted.
  */
-import { desktopCapturer, session, systemPreferences, type BrowserWindow, type DesktopCapturerSource } from "electron";
+import { app, desktopCapturer, session, shell, systemPreferences, type BrowserWindow, type DesktopCapturerSource } from "electron";
 import { randomUUID } from "node:crypto";
 import os from "node:os";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
@@ -77,6 +77,56 @@ export function shareAudioFailed(log: Log): boolean {
   return true;
 }
 
+/**
+ * Whether this computer will actually let the app record the screen.
+ *
+ * macOS keeps that decision in its own database, keyed by the app. A system
+ * update, or a new build in the same place, can leave an entry that reads as
+ * granted in System Settings while the recording it allows is the old one:
+ * the app is asked again, granting changes nothing, and only removing the
+ * entry and adding it back (or restarting after granting) puts it right.
+ *
+ * Asking the system for its answer is not enough on its own, because the
+ * stale case answers "granted". A capture with nothing in it is the tell: the
+ * sources come back with empty pictures when the decision is not really ours.
+ */
+export interface ScreenAccess {
+  /** What the system says, where it says anything: "granted", "denied", "not-determined", "restricted" or "unknown". */
+  status: string;
+  /** Whether a share would actually carry a picture. */
+  usable: boolean;
+  /** True when the system says yes but nothing can be captured — the stale case. */
+  stale: boolean;
+}
+
+export async function screenAccess(): Promise<ScreenAccess> {
+  if (process.platform !== "darwin") return { status: "granted", usable: true, stale: false };
+  const status = systemPreferences.getMediaAccessStatus("screen");
+  let captured = false;
+  try {
+    const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: 32, height: 18 } });
+    captured = sources.some((src) => !src.thumbnail.isEmpty());
+  } catch {
+    captured = false;
+  }
+  return { status, usable: captured, stale: status === "granted" && !captured };
+}
+
+/** Opens the Screen Recording list in System Settings. */
+export function openScreenSettings(): void {
+  if (process.platform === "darwin") {
+    void shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+  } else if (process.platform === "win32") {
+    void shell.openExternal("ms-settings:privacy-general");
+  }
+}
+
+/** Quits and opens the app again, which is what a new recording decision needs. */
+export function restartApp(): void {
+  app.relaunch();
+  app.exit(0);
+}
+
 /** The audio device a share asks Chromium for: one program, everything but this app, or everything. */
 interface ShareSound {
   device: string;
@@ -124,7 +174,25 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null, log: L
           }
           const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: true });
           const win = getWindow();
-          if (!win || sources.length === 0) {
+          if (!win) {
+            callback({});
+            return;
+          }
+          // Nothing to offer means the system is not letting this app record,
+          // whatever its settings say. The page is told so it can explain it
+          // rather than showing an empty picker or blaming the sound.
+          const access = sources.length === 0 || sources.every((src) => src.thumbnail.isEmpty()) ? await screenAccess() : null;
+          if (access && !access.usable) {
+            const requestId = randomUUID();
+            win.webContents.send(IPC.displaySources, { requestId, audio: false, sources: [], permission: { status: access.status, stale: access.stale } } satisfies DisplaySourceRequest);
+            pending.set(requestId, { resolve: () => callback({}) });
+            if (!win.isVisible()) win.show();
+            setTimeout(() => {
+              if (pending.delete(requestId)) callback({});
+            }, 120_000);
+            return;
+          }
+          if (sources.length === 0) {
             callback({});
             return;
           }
