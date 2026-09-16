@@ -86,11 +86,14 @@ export interface SearchCtx {
   channelNames: Record<string, string>;
   /** Optional member nicknames by user id (lowercase). */
   nicknames?: Record<string, string>;
+  /** Who is signed in, so `from:me` and `mentions:me` mean them. */
+  meId?: string;
 }
 
 const URL_RE = /https?:\/\/\S+/i;
 
 function userMatches(uid: string, wanted: string, ctx: SearchCtx): boolean {
+  if (wanted === "me" && ctx.meId) return uid === ctx.meId;
   const u = ctx.users[uid];
   if (!u) return uid === wanted;
   return u.username.toLowerCase() === wanted || u.display_name.toLowerCase() === wanted || (ctx.nicknames?.[uid] ?? "") === wanted || uid === wanted;

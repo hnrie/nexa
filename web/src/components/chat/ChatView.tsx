@@ -1,4 +1,4 @@
-import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video } from "lucide-react";
+import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
@@ -220,8 +220,19 @@ export function ChatView({ channel }: { channel: Channel }) {
               data-testid="search-input"
               onFocus={() => setSearchOpen(true)}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); e.currentTarget.blur(); } }}
+              onKeyDown={(e) => { if (e.key === "Escape") { if (searchQuery) { setSearchQuery(""); } else { setSearchOpen(false); e.currentTarget.blur(); } } }}
             />
+            {searchQuery ? (
+              <button
+                type="button"
+                className={sc.clear}
+                aria-label="Clear search"
+                data-testid="search-clear"
+                onClick={(e) => { e.preventDefault(); setSearchQuery(""); setSearchOpen(false); }}
+              >
+                <X size={14} />
+              </button>
+            ) : null}
           </label>
         )}
         {!mobile ? (
@@ -296,7 +307,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}
-        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={mobile ? setSearchQuery : undefined} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} inline={mobile} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
         {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}

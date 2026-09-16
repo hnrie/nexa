@@ -7,11 +7,13 @@ import { Button } from "@/components/common/Button";
 import { memberName } from "@/lib/names";
 import { highlight, isEmptyQuery, parseQuery, search } from "@/lib/search";
 import { formatFull, formatTimestamp } from "@/lib/time";
+import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { SearchSuggestions } from "./SearchSuggestions";
 import s from "./Search.module.css";
 
 /**
@@ -19,9 +21,10 @@ import s from "./Search.module.css";
  * encrypted, so the server cannot do this for us; "Load older" pulls more
  * history into the index.
  */
-export function SearchPanel({ channel, query, onClose, onQuery, onJump }: { channel: Channel; query: string; onClose: () => void; onQuery?: ((v: string) => void) | undefined; onJump?: (() => void) | undefined }) {
+export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }: { channel: Channel; query: string; onClose: () => void; onQuery: (v: string) => void; onJump?: (() => void) | undefined; inline?: boolean }) {
   const nav = useNavigate();
   const users = useUsers((u) => u.byId);
+  const meId = useAuth((a) => a.me?.id);
   const channels = useChannels((c) => c.byId);
   const store = useMessages((m) => m.channels);
   const loadOlder = useMessages((m) => m.loadOlder);
@@ -38,8 +41,8 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump }: { chan
   const results = useMemo(() => {
     if (isEmptyQuery(q)) return [];
     const all = scope.flatMap((c) => Object.values(store[c.id]?.byId ?? {}));
-    return search(all, q, { users, channelNames, nicknames });
-  }, [q, scope, store, users, channelNames, nicknames]);
+    return search(all, q, { users, channelNames, nicknames, ...(meId ? { meId } : {}) });
+  }, [q, scope, store, users, channelNames, nicknames, meId]);
 
   // Channels whose history could not be loaded (one you may view but not read
   // the history of answers 403). They are skipped so the rest still load.
@@ -97,17 +100,19 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump }: { chan
         <span className={s.headText}><Search size={16} /> {isEmptyQuery(q) ? "Search" : `${results.length} result${results.length === 1 ? "" : "s"}`}</span>
         <button className={s.close} aria-label="Close search" onClick={onClose}><X size={18} /></button>
       </div>
-      {onQuery ? (
+      {inline ? (
         <div className={s.inlineSearch}>
           <Search size={16} />
           <input value={query} placeholder="Search" aria-label="Search messages" autoFocus data-testid="search-input-mobile" onChange={(e) => onQuery(e.target.value)} />
+          {query ? <button className={s.clear} aria-label="Clear search" onClick={() => onQuery("")} data-testid="search-clear-mobile"><X size={14} /></button> : null}
         </div>
       ) : null}
+      <SearchSuggestions query={query} users={users} channels={scope} nicknames={nicknames} onPick={onQuery} />
       {isEmptyQuery(q) ? (
         <div className={s.help}>
           <p>Search the messages this device has decrypted{channel.server_id ? " in this server" : " in this conversation"}. Nothing leaves your device: the server only holds ciphertext.</p>
           <dl>
-            <dt>from:</dt><dd>@user</dd>
+            <dt>from:</dt><dd>@user, or <b>me</b></dd>
             <dt>in:</dt><dd>#channel</dd>
             <dt>has:</dt><dd>link, image, file, sticker, embed</dd>
             <dt>before: / after:</dt><dd>2026-01-31</dd>

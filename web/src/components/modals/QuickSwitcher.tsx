@@ -4,9 +4,13 @@ import { channels as channelsApi } from "@/api/channels";
 import { ApiError } from "@/api/client";
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
+import { SearchSuggestions } from "@/components/search/SearchSuggestions";
 import { channelDisplayName } from "@/lib/names";
+import { highlight, isEmptyQuery, parseQuery, search } from "@/lib/search";
+import { formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectServerChannels, useChannels } from "@/stores/channels";
+import { useMessages } from "@/stores/messages";
 import { useServers } from "@/stores/servers";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
@@ -43,14 +47,18 @@ export function QuickSwitcher() {
   const users = useUsers((u) => u.byId);
   const rels = useRelationships((r) => r.byUser);
   const servers = useServers((st) => st.byId);
+  const messageStore = useMessages((m) => m.channels);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
+  /** Jumping somewhere, or looking through what has been said. */
+  const [mode, setMode] = useState<"go" | "messages">("go");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setQ("");
       setSel(0);
+      setMode("go");
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
@@ -98,38 +106,98 @@ export function QuickSwitcher() {
       .map((x) => x.it);
   }, [channels, users, rels, servers, meId, q, nav, upsert]);
 
+  // Everything this device has decrypted, wherever it came from. The server
+  // holds only ciphertext, so this is the whole index there can be.
+  const parsed = useMemo(() => parseQuery(q), [q]);
+  const channelNames = useMemo(() => Object.fromEntries(Object.values(channels).map((c) => [c.id, c.name.toLowerCase()])), [channels]);
+  const hits = useMemo(() => {
+    if (mode !== "messages" || isEmptyQuery(parsed)) return [];
+    const all = Object.values(messageStore).flatMap((c) => Object.values(c.byId));
+    return search(all, parsed, { users, channelNames, ...(meId ? { meId } : {}) }, 40);
+  }, [mode, parsed, messageStore, users, channelNames, meId]);
+  const searchable = useMemo(() => Object.values(channels).filter((c) => c.type === "text" || c.type === "dm" || c.type === "group_dm" || c.type === "subchat"), [channels]);
+
   if (!open) return null;
   const choose = (it: Item | undefined) => {
     if (!it) return;
     setOpen(false);
     it.go();
   };
+  const openMessage = (channelId: string, messageId: string) => {
+    const ch = channels[channelId];
+    if (!ch) return;
+    setOpen(false);
+    nav(ch.server_id ? `/channels/${ch.server_id}/${ch.id}/${messageId}` : `/channels/@me/${ch.id}/${messageId}`);
+    useUI.getState().setJumpTo({ channelId, messageId });
+  };
+  const count = mode === "messages" ? hits.length : items.length;
   return (
     <Modal open onClose={() => setOpen(false)} width={560} bare className={s.top}>
       <div className={s.box}>
-        <input
-          ref={inputRef}
-          className={s.input}
-          value={q}
-          placeholder="Where would you like to go?"
-          onChange={(e) => { setQ(e.target.value); setSel(0); }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown") { e.preventDefault(); setSel((v) => Math.min(items.length - 1, v + 1)); }
-            else if (e.key === "ArrowUp") { e.preventDefault(); setSel((v) => Math.max(0, v - 1)); }
-            else if (e.key === "Enter") { e.preventDefault(); choose(items[sel]); }
-          }}
-        />
-        <div className={s.list}>
-          {items.length === 0 ? <div className={s.empty}>No matches.</div> : null}
-          {items.map((it, i) => (
-            <button key={it.id} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
-              {it.kind === "channel" ? <span className={s.hash}>#</span> : <Avatar id={it.userId} avatarId={it.avatarId} name={it.label.replace(/^#/, "")} size={24} />}
-              <span className={s.label}>{it.kind === "channel" ? it.label.slice(1) : it.label}</span>
-              <span className={s.sub}>{it.sub}</span>
-            </button>
-          ))}
+        <div className={s.tabs} role="tablist">
+          <button role="tab" aria-selected={mode === "go"} data-on={mode === "go"} onClick={() => { setMode("go"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-go">Jump to</button>
+          <button role="tab" aria-selected={mode === "messages"} data-on={mode === "messages"} onClick={() => { setMode("messages"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-messages">Messages</button>
         </div>
-        <div className={s.foot}><b>↑↓</b> navigate <b>↵</b> select <b>esc</b> dismiss</div>
+        <div className={s.inputRow}>
+          <input
+            ref={inputRef}
+            className={s.input}
+            value={q}
+            placeholder={mode === "messages" ? "Search everything you can read — try from:me" : "Where would you like to go?"}
+            data-testid="switcher-input"
+            onChange={(e) => { setQ(e.target.value); setSel(0); }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") { e.preventDefault(); setSel((v) => Math.min(count - 1, v + 1)); }
+              else if (e.key === "ArrowUp") { e.preventDefault(); setSel((v) => Math.max(0, v - 1)); }
+              else if (e.key === "Tab") { e.preventDefault(); setMode((m) => (m === "go" ? "messages" : "go")); setSel(0); }
+              else if (e.key === "Enter") {
+                e.preventDefault();
+                if (mode === "messages") { const m = hits[sel]; if (m) openMessage(m.channel_id, m.id); }
+                else choose(items[sel]);
+              }
+            }}
+          />
+          {q ? <button className={s.clear} aria-label="Clear" onClick={() => { setQ(""); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-clear">×</button> : null}
+        </div>
+        {mode === "messages" ? <SearchSuggestions query={q} users={users} channels={searchable} onPick={(next) => { setQ(next); setSel(0); inputRef.current?.focus(); }} /> : null}
+        <div className={s.list}>
+          {mode === "go" ? (
+            <>
+              {items.length === 0 ? <div className={s.empty}>No matches.</div> : null}
+              {items.map((it, i) => (
+                <button key={it.id} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
+                  {it.kind === "channel" ? <span className={s.hash}>#</span> : <Avatar id={it.userId} avatarId={it.avatarId} name={it.label.replace(/^#/, "")} size={24} />}
+                  <span className={s.label}>{it.kind === "channel" ? it.label.slice(1) : it.label}</span>
+                  <span className={s.sub}>{it.sub}</span>
+                </button>
+              ))}
+            </>
+          ) : (
+            <>
+              {isEmptyQuery(parsed) ? <div className={s.empty}>Type to search everything this device has decrypted. <b>from:me</b> finds what you sent.</div> : null}
+              {!isEmptyQuery(parsed) && hits.length === 0 ? <div className={s.empty}>Nothing matched. Open a conversation and load older messages to widen the index.</div> : null}
+              {hits.map((m, i) => {
+                const ch = channels[m.channel_id];
+                const author = users[m.author_id];
+                return (
+                  <button key={m.id} className={s.hit} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => openMessage(m.channel_id, m.id)} data-testid="switcher-hit">
+                    <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={author?.display_name ?? "?"} size={24} />
+                    <span className={s.hitBody}>
+                      <span className={s.hitHead}>
+                        <b>{author?.display_name ?? "Unknown"}</b>
+                        <span className={s.sub}>{ch ? (ch.server_id ? `#${ch.name}` : channelDisplayName(ch, users, meId)) : ""} · {formatTimestamp(m.created_at)}</span>
+                      </span>
+                      <span className={s.hitText}>
+                        {m.payload?.t ? highlight(m.payload.t, parsed).map((r, k) => (r.hit ? <mark key={k}>{r.text}</mark> : <span key={k}>{r.text}</span>)) : m.payload?.sticker ? "[sticker]" : m.payload?.att?.length ? `[${m.payload.att.length} file${m.payload.att.length === 1 ? "" : "s"}]` : ""}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+        </div>
+        <div className={s.foot}><b>↑↓</b> navigate <b>↵</b> select <b>tab</b> switch mode <b>esc</b> dismiss</div>
       </div>
     </Modal>
   );

@@ -93,3 +93,41 @@ func TestSubchatPasswordGatesReading(t *testing.T) {
 		t.Errorf("with no password there is nothing to type: %d %v", res.StatusCode, body)
 	}
 }
+
+// Every list a client builds its sidebar from has to say which subchats are
+// locked, or the lock never shows until something is clicked.
+func TestLockedFlagTravelsInEveryList(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	_, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB}})
+	dm := body["id"].(string)
+	key := make([]byte, 32)
+	salt := make([]byte, 16)
+	_, body = do(t, ts, "POST", "/api/v1/channels/"+dm+"/subchats", tokA, map[string]any{
+		"name": "quiet", "password_key": b64(key), "password_salt": b64(salt), "password_params": json.RawMessage(`{"m":65536,"t":3,"p":1,"v":1}`),
+	})
+	sub := body["id"].(string)
+
+	lockedIn := func(what string, list []any) {
+		t.Helper()
+		for _, raw := range list {
+			m, _ := raw.(map[string]any)
+			if m["id"] == sub {
+				if m["locked"] != true {
+					t.Errorf("%s does not mark the subchat locked: %v", what, m)
+				}
+				return
+			}
+		}
+		t.Errorf("%s does not list the subchat at all", what)
+	}
+	_, body = do(t, ts, "GET", "/api/v1/channels/"+dm+"/subchats", tokB, nil)
+	lockedIn("the subchat list", body["_list"].([]any))
+	_, body = do(t, ts, "GET", "/api/v1/users/@me/channels", tokB, nil)
+	lockedIn("the conversation list", body["_list"].([]any))
+	_, body = do(t, ts, "GET", "/api/v1/channels/"+sub, tokA, nil)
+	if body["locked"] != true {
+		t.Errorf("the channel itself does not say it is locked: %v", body)
+	}
+}

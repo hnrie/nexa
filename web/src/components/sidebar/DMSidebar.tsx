@@ -1,4 +1,4 @@
-import { MessageCircle, Plus, Users, X } from "lucide-react";
+import { Lock, MessageCircle, Plus, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { UserPanel } from "@/components/shell/UserPanel";
@@ -134,7 +134,7 @@ export function DMSidebar() {
                     openContextMenu({ x: e.clientX, y: e.clientY, items: subchatMenuItems(sub, { openModal, nav }) });
                   }}
                 >
-                  <MessageCircle size={15} />
+                  {sub.locked ? <Lock size={15} /> : <MessageCircle size={15} />}
                   <span className={s.name}>{sub.name}</span>
                   {(srs?.mentions ?? 0) > 0 ? <span className={s.mention}>{srs?.mentions}</span> : null}
                 </button>
