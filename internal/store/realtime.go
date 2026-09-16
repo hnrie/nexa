@@ -10,7 +10,7 @@ import (
 func (s *Store) AddRealtimeUsage(ctx context.Context, month string, bytes int64) (int64, error) {
 	var total int64
 	err := s.db.W.QueryRowContext(ctx, `INSERT INTO realtime_usage (month, bytes, updated_at) VALUES (?, ?, ?)
-		ON CONFLICT(month) DO UPDATE SET bytes = bytes + excluded.bytes, updated_at = excluded.updated_at
+		ON CONFLICT(month) DO UPDATE SET bytes = realtime_usage.bytes + excluded.bytes, updated_at = excluded.updated_at
 		RETURNING bytes`, month, bytes, nowMs()).Scan(&total)
 	return total, err
 }

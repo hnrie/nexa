@@ -9,8 +9,9 @@ import (
 // Ack records that uid has read up to msgID in chID. Without force the marker
 // never moves backwards; force is used by "mark as unread".
 func (s *Store) Ack(ctx context.Context, uid, chID, msgID ids.ID, force bool) error {
+	d := s.db.Dialect
 	q := `INSERT INTO read_states (user_id, channel_id, last_read_message_id, last_ack_at) VALUES (?,?,?,?)
-		ON CONFLICT(user_id, channel_id) DO UPDATE SET last_read_message_id = max(coalesce(last_read_message_id, 0), excluded.last_read_message_id), last_ack_at = excluded.last_ack_at`
+		ON CONFLICT(user_id, channel_id) DO UPDATE SET last_read_message_id = ` + d.Greatest("coalesce(read_states.last_read_message_id, 0)", "excluded.last_read_message_id") + `, last_ack_at = excluded.last_ack_at`
 	if force {
 		q = `INSERT INTO read_states (user_id, channel_id, last_read_message_id, last_ack_at) VALUES (?,?,?,?)
 		ON CONFLICT(user_id, channel_id) DO UPDATE SET last_read_message_id = excluded.last_read_message_id, last_ack_at = excluded.last_ack_at`
@@ -64,15 +65,20 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	// count walk the messages_channel index from the floor instead of scanning
 	// the whole channel. Conversations also count their unread messages, which
 	// stop at MaxUnreadCount so a long-ignored one costs no more than a short one.
+	mentioned := s.db.Dialect.JSONArrayHas("m.mentions")
+	floor := s.db.Dialect.Greatest(
+		"coalesce(r.last_read_message_id, 0)",
+		"coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0)",
+	)
 	args := []any{int64(uid), uid.String(), int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
 	args = append(args, idArgs(channels)...)
 	mrows, err := s.db.R.QueryContext(ctx, `SELECT f.id,
 			(SELECT count(*) FROM messages m
 				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor
-				AND (m.mention_everyone = 1 OR EXISTS (SELECT 1 FROM json_each(m.mentions) WHERE value = ?))),
+				AND (m.mention_everyone = 1 OR `+mentioned+`)),
 			CASE WHEN f.type IN ('dm', 'group_dm') THEN (SELECT count(*) FROM (SELECT 1 FROM messages m
-				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor LIMIT ?)) ELSE 0 END
-		FROM (SELECT c.id, c.type, max(coalesce(r.last_read_message_id, 0), coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0)) AS floor
+				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor LIMIT ?) AS capped) ELSE 0 END
+		FROM (SELECT c.id, c.type, `+floor+` AS floor
 			FROM channels c
 			LEFT JOIN read_states r ON r.channel_id = c.id AND r.user_id = ?
 			LEFT JOIN server_members sm ON sm.server_id = c.server_id AND sm.user_id = ?
@@ -99,6 +105,6 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 // CountMentionsAfter counts unread mentions of uid in a channel after afterID.
 func (s *Store) CountMentionsAfter(ctx context.Context, chID, uid, afterID ids.ID) (int, error) {
 	var n int
-	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM messages m WHERE m.channel_id = ? AND m.author_id != ? AND m.id > ? AND (m.mention_everyone = 1 OR EXISTS (SELECT 1 FROM json_each(m.mentions) WHERE value = ?))`, int64(chID), int64(uid), int64(afterID), uid.String()).Scan(&n)
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM messages m WHERE m.channel_id = ? AND m.author_id != ? AND m.id > ? AND (m.mention_everyone = 1 OR `+s.db.Dialect.JSONArrayHas("m.mentions")+`)`, int64(chID), int64(uid), int64(afterID), uid.String()).Scan(&n)
 	return n, err
 }

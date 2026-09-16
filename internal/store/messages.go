@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sort"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -111,7 +112,7 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 	if m.KeyEpoch != nil {
 		epoch = int64(*m.KeyEpoch)
 	}
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,
 			int64(m.ID), int64(m.ChannelID), int64(m.AuthorID), m.Type, ct, nullID(m.KeyConvID), epoch, nullID(m.ReplyToID), idsJSON(m.Mentions), idsJSON(m.MentionRoles), boolInt(m.MentionEveryone), boolInt(len(m.Attachments) > 0), m.Flags, nonce, nullInt64(m.EditedAt), m.CreatedAt)
 		if err != nil {
@@ -133,7 +134,7 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 				return err
 			}
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE channels SET last_message_id = max(coalesce(last_message_id, 0), ?) WHERE id = ?`, int64(m.ID), int64(m.ChannelID))
+		_, err = tx.ExecContext(ctx, `UPDATE channels SET last_message_id = `+tx.Dialect().Greatest("coalesce(last_message_id, 0)", "?")+` WHERE id = ?`, int64(m.ID), int64(m.ChannelID))
 		return err
 	})
 }
@@ -250,7 +251,9 @@ func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) er
 		return err
 	}
 	args := append([]any{int64(forUser)}, idArgs(list)...)
-	rrows, err := s.db.R.QueryContext(ctx, `SELECT message_id, emoji, count(*), max(user_id = ?) FROM reactions WHERE message_id IN (`+ph+`) GROUP BY message_id, emoji ORDER BY min(created_at), min(rowid)`, args...)
+	rrows, err := s.db.R.QueryContext(ctx, `SELECT message_id, emoji, count(*), max(CASE WHEN user_id = ? THEN 1 ELSE 0 END)
+		FROM reactions WHERE message_id IN (`+ph+`)
+		GROUP BY message_id, emoji ORDER BY min(created_at), min(user_id)`, args...)
 	if err != nil {
 		return err
 	}
@@ -297,7 +300,7 @@ func (s *Store) SetMessageFlags(ctx context.Context, id ids.ID, flags int64) err
 // DeleteMessage removes a message, releasing attachment blobs and fixing the
 // channel's last_message_id.
 func (s *Store) DeleteMessage(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		var chID int64
 		if err := tx.QueryRowContext(ctx, `SELECT channel_id FROM messages WHERE id = ?`, int64(id)).Scan(&chID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -344,7 +347,7 @@ func (s *Store) MessageAuthors(ctx context.Context, chID ids.ID, list []ids.ID) 
 // skipped; the ones actually deleted are returned.
 func (s *Store) DeleteMessages(ctx context.Context, chID ids.ID, list []ids.ID) ([]ids.ID, error) {
 	deleted := make([]ids.ID, 0, len(list))
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		deleted = deleted[:0]
 		for _, id := range list {
 			var n int
@@ -372,8 +375,8 @@ func (s *Store) DeleteMessages(ctx context.Context, chID ids.ID, list []ids.ID) 
 
 // deleteMessageTx drops one message row, releasing one blob reference per
 // attachment row, however many rows share a blob.
-func deleteMessageTx(ctx context.Context, tx *sql.Tx, id ids.ID) error {
-	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.message_id = ? AND a.blob_id = blobs.id)) WHERE id IN (SELECT blob_id FROM attachments WHERE message_id = ?)`, int64(id), int64(id)); err != nil {
+func deleteMessageTx(ctx context.Context, tx *db.Tx, id ids.ID) error {
+	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM attachments a WHERE a.message_id = ? AND a.blob_id = blobs.id)")+` WHERE id IN (SELECT blob_id FROM attachments WHERE message_id = ?)`, int64(id), int64(id)); err != nil {
 		return err
 	}
 	_, err := tx.ExecContext(ctx, `DELETE FROM messages WHERE id = ?`, int64(id))
@@ -381,22 +384,22 @@ func deleteMessageTx(ctx context.Context, tx *sql.Tx, id ids.ID) error {
 }
 
 // fixLastMessageTx points the channel's last_message_id at its newest remaining message.
-func fixLastMessageTx(ctx context.Context, tx *sql.Tx, chID ids.ID) error {
+func fixLastMessageTx(ctx context.Context, tx *db.Tx, chID ids.ID) error {
 	_, err := tx.ExecContext(ctx, `UPDATE channels SET last_message_id = (SELECT max(id) FROM messages WHERE channel_id = ?) WHERE id = ?`, int64(chID), int64(chID))
 	return err
 }
 
 // AddReaction records a reaction; added is false when it already existed.
 func (s *Store) AddReaction(ctx context.Context, msgID, uid ids.ID, emoji string) (added bool, err error) {
-	err = s.Tx(ctx, func(tx *sql.Tx) error {
+	err = s.Tx(ctx, func(tx *db.Tx) error {
 		var distinct, present int
-		if err := tx.QueryRowContext(ctx, `SELECT count(DISTINCT emoji), coalesce(sum(emoji = ?), 0) FROM reactions WHERE message_id = ?`, emoji, int64(msgID)).Scan(&distinct, &present); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT count(DISTINCT emoji), coalesce(sum(CASE WHEN emoji = ? THEN 1 ELSE 0 END), 0) FROM reactions WHERE message_id = ?`, emoji, int64(msgID)).Scan(&distinct, &present); err != nil {
 			return err
 		}
 		if present == 0 && distinct >= MaxReactionEmoji {
 			return ErrLimit
 		}
-		res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO reactions (message_id, user_id, emoji, created_at) VALUES (?,?,?,?)`, int64(msgID), int64(uid), emoji, nowMs())
+		res, err := tx.ExecContext(ctx, `INSERT INTO reactions (message_id, user_id, emoji, created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(msgID), int64(uid), emoji, nowMs())
 		if err != nil {
 			return err
 		}
@@ -422,7 +425,7 @@ func (s *Store) Reactors(ctx context.Context, msgID ids.ID, emoji string, limit 
 	if limit <= 0 || limit > 100 {
 		limit = 100
 	}
-	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM reactions WHERE message_id = ? AND emoji = ? ORDER BY created_at, rowid LIMIT ?`, int64(msgID), emoji, limit)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM reactions WHERE message_id = ? AND emoji = ? ORDER BY created_at, user_id LIMIT ?`, int64(msgID), emoji, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -440,8 +443,8 @@ func (s *Store) Reactors(ctx context.Context, msgID ids.ID, emoji string, limit 
 
 // PinMessage pins a message in its channel.
 func (s *Store) PinMessage(ctx context.Context, chID, msgID, by ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO pins (channel_id, message_id, pinned_by, pinned_at) VALUES (?,?,?,?)`, int64(chID), int64(msgID), int64(by), nowMs())
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		res, err := tx.ExecContext(ctx, `INSERT INTO pins (channel_id, message_id, pinned_by, pinned_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(chID), int64(msgID), int64(by), nowMs())
 		if err != nil {
 			return err
 		}
@@ -455,7 +458,7 @@ func (s *Store) PinMessage(ctx context.Context, chID, msgID, by ids.ID) error {
 
 // UnpinMessage removes a pin.
 func (s *Store) UnpinMessage(ctx context.Context, chID, msgID ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM pins WHERE channel_id = ? AND message_id = ?`, int64(chID), int64(msgID))
 		if err != nil {
 			return err
@@ -463,7 +466,7 @@ func (s *Store) UnpinMessage(ctx context.Context, chID, msgID ids.ID) error {
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE messages SET flags = flags & ~? WHERE id = ?`, MsgFlagPinned, int64(msgID))
+		_, err = tx.ExecContext(ctx, `UPDATE messages SET flags = flags & ? WHERE id = ?`, ^int64(MsgFlagPinned), int64(msgID))
 		return err
 	})
 }

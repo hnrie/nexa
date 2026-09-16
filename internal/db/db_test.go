@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"path/filepath"
 	"testing"
@@ -60,7 +59,7 @@ func TestTxRollbackAndForeignKeys(t *testing.T) {
 	if err := d.Migrate(ctx); err != nil {
 		t.Fatal(err)
 	}
-	err = d.Tx(ctx, func(tx *sql.Tx) error {
+	err = d.Tx(ctx, func(tx *Tx) error {
 		if _, err := tx.Exec("INSERT INTO blobs(id,sha256,size,mime,kind,encrypted,ref_count,created_at) VALUES(1,'a',1,'x','avatar',0,1,0)"); err != nil {
 			return err
 		}

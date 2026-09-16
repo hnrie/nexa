@@ -38,7 +38,7 @@ func New(d *db.DB) *Store { return &Store{db: d} }
 func (s *Store) DB() *db.DB { return s.db }
 
 // Tx runs fn inside a write transaction.
-func (s *Store) Tx(ctx context.Context, fn func(tx *sql.Tx) error) error { return s.db.Tx(ctx, fn) }
+func (s *Store) Tx(ctx context.Context, fn func(tx *db.Tx) error) error { return s.db.Tx(ctx, fn) }
 
 func nowMs() int64 { return time.Now().UnixMilli() }
 
@@ -46,6 +46,16 @@ func nowMs() int64 { return time.Now().UnixMilli() }
 func nullID(id *ids.ID) any {
 	if id == nil {
 		return nil
+	}
+	return int64(*id)
+}
+
+// idOrZero is an optional id as a plain number, with nothing meaning zero.
+// Passing a typed value rather than NULL keeps Postgres from having to guess
+// what a parameter is when it sits beside a literal.
+func idOrZero(id *ids.ID) int64 {
+	if id == nil {
+		return 0
 	}
 	return int64(*id)
 }

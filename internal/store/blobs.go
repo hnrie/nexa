@@ -6,8 +6,13 @@ import (
 	"errors"
 	"fmt"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
+
+// refFloor keeps a reference count from going below zero. SQLite spells the
+// larger of two values max(); Postgres keeps max() for the aggregate.
+func refFloor(d db.Dialect, expr string) string { return d.Greatest("0", expr) }
 
 const blobCols = `id, sha256, size, mime, kind, encrypted, ref_count, owner_id, width, height, animated, created_at`
 
@@ -51,7 +56,7 @@ func (s *Store) BlobByID(ctx context.Context, id ids.ID) (*Blob, error) {
 
 // AddBlobRef changes the reference count by delta (never below zero).
 func (s *Store) AddBlobRef(ctx context.Context, id ids.ID, delta int) error {
-	_, err := s.db.W.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count + ?) WHERE id = ?`, delta, int64(id))
+	_, err := s.db.W.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count + ?")+` WHERE id = ?`, delta, int64(id))
 	return err
 }
 
@@ -101,7 +106,7 @@ func (s *Store) SwapImage(ctx context.Context, table, col string, rowID ids.ID, 
 	if !imageColumns[table+"."+col] {
 		return fmt.Errorf("swap image: %s.%s is not an image column", table, col)
 	}
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		var old sql.NullInt64
 		if err := tx.QueryRowContext(ctx, `SELECT `+col+` FROM `+table+` WHERE id = ?`, int64(rowID)).Scan(&old); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -116,7 +121,7 @@ func (s *Store) SwapImage(ctx context.Context, table, col string, rowID ids.ID, 
 			return nil
 		}
 		// even when old is newID: the new reference was taken for this row, which already had one
-		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - 1) WHERE id = ?`, old.Int64)
+		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count - 1")+` WHERE id = ?`, old.Int64)
 		return err
 	})
 }

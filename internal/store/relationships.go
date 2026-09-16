@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -49,7 +50,7 @@ func (s *Store) SetRelationship(ctx context.Context, uid, target ids.ID, typ str
 // SetRelationshipPair writes both directions atomically.
 func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typeB string) error {
 	now := nowMs()
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		for _, p := range []struct {
 			u, t ids.ID
 			typ  string

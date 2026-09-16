@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -37,7 +38,7 @@ func (s *Store) LockOf(ctx context.Context, channelID ids.ID) (ChannelLock, erro
 // SetLock puts a password on a channel, or takes it off with an empty hash.
 // Every session that had typed the old one has to type the new one.
 func (s *Store) SetLock(ctx context.Context, channelID ids.ID, l ChannelLock) error {
-	return s.db.Tx(ctx, func(tx *sql.Tx) error {
+	return s.db.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE channels SET lock_salt = ?, lock_params = ?, lock_hash = ?, updated_at = ? WHERE id = ?`,
 			nullBytes(l.Salt), l.Params, l.Hash, nowMs(), int64(channelID)); err != nil {
 			return err

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -69,7 +70,7 @@ func (s *Store) SpendTOTPStep(ctx context.Context, id ids.ID, step int64) (bool,
 
 // DisableMFA removes the second factor and every backup code.
 func (s *Store) DisableMFA(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM user_mfa WHERE user_id = ?`, int64(id)); err != nil {
 			return err
 		}
@@ -80,7 +81,7 @@ func (s *Store) DisableMFA(ctx context.Context, id ids.ID) error {
 
 // ReplaceBackupCodes swaps the whole set of codes for a new one.
 func (s *Store) ReplaceBackupCodes(ctx context.Context, id ids.ID, hashes []string) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM mfa_backup_codes WHERE user_id = ?`, int64(id)); err != nil {
 			return err
 		}

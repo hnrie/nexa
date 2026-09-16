@@ -6,13 +6,16 @@ import (
 	"errors"
 	"strings"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
 const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at`
 
 // channelReadCols adds what is read but never written back through insertChannel.
-const channelReadCols = channelCols + `, lock_hash <> '' AS locked`
+// The comparison is spelled as a CASE so it comes back as 0/1 on both
+// databases; Postgres would otherwise hand over a boolean.
+const channelReadCols = channelCols + `, CASE WHEN lock_hash <> '' THEN 1 ELSE 0 END AS locked`
 
 // MaxSubchats caps how many side conversations one DM can carry.
 const MaxSubchats = 50
@@ -65,7 +68,7 @@ func (s *Store) CreateDM(ctx context.Context, a, b ids.ID) (*Channel, bool, erro
 	// The lookup runs inside the write transaction: writes go through one
 	// connection, so two people tapping Message at once cannot both miss the
 	// pair and open two conversations.
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		err := tx.QueryRowContext(ctx, `SELECT c.id FROM channels c
 			JOIN dm_participants p1 ON p1.channel_id = c.id AND p1.user_id = ?
 			JOIN dm_participants p2 ON p2.channel_id = c.id AND p2.user_id = ?
@@ -77,7 +80,7 @@ func (s *Store) CreateDM(ctx context.Context, a, b ids.ID) (*Channel, bool, erro
 			return err
 		}
 		for _, uid := range []ids.ID{a, b} {
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?)`, int64(c.ID), int64(uid), int64(a), now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(c.ID), int64(uid), int64(a), now); err != nil {
 				return err
 			}
 		}
@@ -101,12 +104,12 @@ func (s *Store) CreateGroupDM(ctx context.Context, owner ids.ID, recipients []id
 	c.OwnerID = &o
 	members := append([]ids.ID{owner}, recipients...)
 	now := nowMs()
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		if err := s.insertChannel(ctx, tx, c); err != nil {
 			return err
 		}
 		for _, uid := range members {
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?)`, int64(c.ID), int64(uid), int64(owner), now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(c.ID), int64(uid), int64(owner), now); err != nil {
 				return err
 			}
 		}
@@ -216,7 +219,7 @@ func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, 
 func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID, name string) (*Channel, error) {
 	ch := &Channel{Type: "subchat", Name: name, ParentID: &parent.ID, OwnerID: &owner}
 	var members []ids.ID
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		var n int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM channels WHERE parent_id = ? AND type = 'subchat'`, int64(parent.ID)).Scan(&n); err != nil {
 			return err
@@ -238,7 +241,7 @@ func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID
 		}
 		now := nowMs()
 		for _, uid := range members {
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dm_participants (channel_id, user_id, added_by, added_at, hidden) VALUES (?,?,?,?,0)`,
+			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at, hidden) VALUES (?,?,?,?,0) ON CONFLICT DO NOTHING`,
 				int64(ch.ID), int64(uid), int64(owner), now); err != nil {
 				return err
 			}
@@ -305,9 +308,9 @@ func (s *Store) Participants(ctx context.Context, chID ids.ID) ([]ids.ID, error)
 // joined, or ErrAlreadyExists when uid is already in the group.
 func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) ([]ids.ID, error) {
 	var subs []ids.ID
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		now := nowMs()
-		res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?)`, int64(chID), int64(uid), int64(addedBy), now)
+		res, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(chID), int64(uid), int64(addedBy), now)
 		if err != nil {
 			return err
 		}
@@ -319,7 +322,7 @@ func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) (
 			return err
 		}
 		for _, id := range subs {
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dm_participants (channel_id, user_id, added_by, added_at, hidden) VALUES (?,?,?,?,0)`, int64(id), int64(uid), int64(addedBy), now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at, hidden) VALUES (?,?,?,?,0) ON CONFLICT DO NOTHING`, int64(id), int64(uid), int64(addedBy), now); err != nil {
 				return err
 			}
 		}
@@ -332,7 +335,7 @@ func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) (
 // it, returning the subchats uid was taken out of.
 func (s *Store) RemoveParticipant(ctx context.Context, chID, uid ids.ID) ([]ids.ID, error) {
 	var subs []ids.ID
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM dm_participants WHERE channel_id = ? AND user_id = ?`, int64(chID), int64(uid))
 		if err != nil {
 			return err
@@ -355,7 +358,7 @@ func (s *Store) RemoveParticipant(ctx context.Context, chID, uid ids.ID) ([]ids.
 }
 
 // idsTx runs a query returning one id column inside a transaction.
-func idsTx(ctx context.Context, tx *sql.Tx, query string, args ...any) ([]ids.ID, error) {
+func idsTx(ctx context.Context, tx *db.Tx, query string, args ...any) ([]ids.ID, error) {
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -430,7 +433,7 @@ func (s *Store) UpdateChannel(ctx context.Context, id ids.ID, p ChannelPatch) er
 // leaves its children in place without a parent; deleting a conversation
 // deletes its subchats with it, since nothing could reach them afterwards.
 func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		subs, err := idsTx(ctx, tx, `SELECT id FROM channels WHERE parent_id = ? AND type = 'subchat'`, int64(id))
 		if err != nil {
 			return err
@@ -447,9 +450,9 @@ func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 	})
 }
 
-func deleteChannelTx(ctx context.Context, tx *sql.Tx, id ids.ID) error {
+func deleteChannelTx(ctx context.Context, tx *db.Tx, id ids.ID) error {
 	// release attachment blobs, one reference per attachment row, and a group's icon
-	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.channel_id = ? AND a.blob_id = blobs.id)) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id = ?)`, int64(id), int64(id)); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM attachments a WHERE a.channel_id = ? AND a.blob_id = blobs.id)")+` WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id = ?)`, int64(id), int64(id)); err != nil {
 		return err
 	}
 	if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM channels WHERE id = ?`, int64(id)); err != nil {

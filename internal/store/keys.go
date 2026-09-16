@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -27,7 +28,7 @@ func (s *Store) createEpoch(ctx context.Context, e *KeyEpoch, pending bool) erro
 	if e.CreatedAt == 0 {
 		e.CreatedAt = nowMs()
 	}
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		if pending {
 			var n int
 			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM key_flags WHERE conv_id = ? AND needs_rotation = 1`, int64(e.ConvID)).Scan(&n); err != nil {
@@ -92,9 +93,9 @@ func (s *Store) Epochs(ctx context.Context, conv ids.ID) ([]*KeyEpoch, error) {
 func (s *Store) PutGrants(ctx context.Context, grants []KeyGrant) (int, error) {
 	inserted := 0
 	now := nowMs()
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		for _, g := range grants {
-			res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO key_grants (conv_id, epoch, user_id, wrapped_key, wrapped_by, created_at) VALUES (?,?,?,?,?,?)`, int64(g.ConvID), g.Epoch, int64(g.UserID), g.WrappedKey, int64(g.WrappedBy), now)
+			res, err := tx.ExecContext(ctx, `INSERT INTO key_grants (conv_id, epoch, user_id, wrapped_key, wrapped_by, created_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING`, int64(g.ConvID), g.Epoch, int64(g.UserID), g.WrappedKey, int64(g.WrappedBy), now)
 			if err != nil {
 				if isFKError(err) {
 					return ErrNotFound
@@ -111,7 +112,12 @@ func (s *Store) PutGrants(ctx context.Context, grants []KeyGrant) (int, error) {
 }
 
 func isFKError(err error) bool {
-	return err != nil && (contains(err.Error(), "FOREIGN KEY constraint failed"))
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	// SQLite says so in words; Postgres uses SQLSTATE 23503.
+	return contains(msg, "FOREIGN KEY constraint failed") || contains(msg, "SQLSTATE 23503")
 }
 
 func contains(s, sub string) bool {

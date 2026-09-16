@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
 )
@@ -34,7 +35,7 @@ func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string) (*S
 	voiceCat := &Channel{ServerID: &srv.ID, Type: "category", Name: "Voice Channels", Position: 1}
 	general := &Channel{ServerID: &srv.ID, Type: "text", Name: "general", Position: 0}
 	voice := &Channel{ServerID: &srv.ID, Type: "voice", Name: "General", Position: 0}
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO servers (`+serverCols+`, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, int64(srv.ID), srv.Name, nil, nil, int64(owner), "", nil, 0, 0, now, now); err != nil {
 			return err
 		}
@@ -140,17 +141,18 @@ func (s *Store) UpdateServer(ctx context.Context, id ids.ID, p ServerPatch) erro
 
 // DeleteServer removes a server and its key material.
 func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		// one reference per attachment row, however many rows share a blob
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - (SELECT count(*) FROM attachments a WHERE a.blob_id = blobs.id AND a.channel_id IN (SELECT id FROM channels WHERE server_id = ?))) WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id), int64(id)); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM attachments a WHERE a.blob_id = blobs.id AND a.channel_id IN (SELECT id FROM channels WHERE server_id = ?))")+` WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id), int64(id)); err != nil {
 			return err
 		}
 		// the icon, banner, emoji and server sticker packs go with the server
 		// (by cascade), so their images must be let go of here
-		if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM servers WHERE id = ?1
-			UNION ALL SELECT banner_id FROM servers WHERE id = ?1
-			UNION ALL SELECT blob_id FROM emojis WHERE server_id = ?1
-			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?1`, int64(id)); err != nil {
+		if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM servers WHERE id = ?
+			UNION ALL SELECT banner_id FROM servers WHERE id = ?
+			UNION ALL SELECT blob_id FROM emojis WHERE server_id = ?
+			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?`,
+			int64(id), int64(id), int64(id), int64(id)); err != nil {
 			return err
 		}
 		for _, q := range []string{
@@ -175,7 +177,7 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 
 // releaseBlobRefs takes one reference off every blob id the query returns,
 // counting repeats, so an image used twice loses both of its references.
-func releaseBlobRefs(ctx context.Context, tx *sql.Tx, query string, args ...any) error {
+func releaseBlobRefs(ctx context.Context, tx *db.Tx, query string, args ...any) error {
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return err
@@ -197,7 +199,7 @@ func releaseBlobRefs(ctx context.Context, tx *sql.Tx, query string, args ...any)
 		return err
 	}
 	for id, n := range counts {
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(0, ref_count - ?) WHERE id = ?`, n, id); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - ?")+` WHERE id = ?`, n, id); err != nil {
 			return err
 		}
 	}
@@ -230,7 +232,7 @@ var ErrBanned = errors.New("banned")
 // ErrBanned when banned.
 func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, error) {
 	var m *Member
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		var err error
 		m, err = addMember(ctx, tx, serverID, uid)
 		return err
@@ -244,7 +246,7 @@ func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, e
 // spends nothing.
 func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code string) (*Member, error) {
 	var m *Member
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		var err error
 		if m, err = addMember(ctx, tx, serverID, uid); err != nil {
 			return err
@@ -266,9 +268,11 @@ func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code str
 
 // addMember inserts the membership unless the user is banned, checking the ban
 // in the same statement so a ban written a moment earlier always holds.
-func addMember(ctx context.Context, tx *sql.Tx, serverID, uid ids.ID) (*Member, error) {
+func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID) (*Member, error) {
 	now := nowMs()
-	res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO server_members (server_id, user_id, nickname, joined_at, flags) SELECT ?1, ?2, '', ?3, 0 WHERE NOT EXISTS (SELECT 1 FROM bans WHERE server_id = ?1 AND user_id = ?2)`, int64(serverID), int64(uid), now)
+	res, err := tx.ExecContext(ctx, `INSERT INTO server_members (server_id, user_id, nickname, joined_at, flags)
+		SELECT ?, ?, '', ?, 0 WHERE NOT EXISTS (SELECT 1 FROM bans WHERE server_id = ? AND user_id = ?) ON CONFLICT DO NOTHING`,
+		int64(serverID), int64(uid), now, int64(serverID), int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +338,7 @@ func (s *Store) Members(ctx context.Context, serverID ids.ID, after ids.ID, limi
 	args := []any{int64(serverID), int64(after)}
 	if q = strings.ToLower(strings.TrimSpace(q)); q != "" {
 		like := escapeLike(q) + "%"
-		query += ` AND (u.username LIKE ? ESCAPE '\' OR ulower(u.display_name) LIKE ? ESCAPE '\' OR ulower(m.nickname) LIKE ? ESCAPE '\')`
+		query += ` AND (u.username LIKE ? ESCAPE '\' OR ` + s.db.Dialect.Lower("u.display_name") + ` LIKE ? ESCAPE '\' OR ` + s.db.Dialect.Lower("m.nickname") + ` LIKE ? ESCAPE '\')`
 		args = append(args, like, like, like)
 	}
 	query += ` ORDER BY m.user_id LIMIT ?`
@@ -437,7 +441,7 @@ func (s *Store) UpdateMember(ctx context.Context, serverID, uid ids.ID, p Member
 
 // AddMemberRole assigns a role; idempotent.
 func (s *Store) AddMemberRole(ctx context.Context, serverID, uid, roleID ids.ID) error {
-	_, err := s.db.W.ExecContext(ctx, `INSERT OR IGNORE INTO member_roles (server_id, user_id, role_id) VALUES (?,?,?)`, int64(serverID), int64(uid), int64(roleID))
+	_, err := s.db.W.ExecContext(ctx, `INSERT INTO member_roles (server_id, user_id, role_id) VALUES (?,?,?) ON CONFLICT DO NOTHING`, int64(serverID), int64(uid), int64(roleID))
 	return err
 }
 
@@ -449,12 +453,12 @@ func (s *Store) RemoveMemberRole(ctx context.Context, serverID, uid, roleID ids.
 
 // SetMemberRoles replaces a member's roles.
 func (s *Store) SetMemberRoles(ctx context.Context, serverID, uid ids.ID, roleIDs []ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM member_roles WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)); err != nil {
 			return err
 		}
 		for _, r := range roleIDs {
-			if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO member_roles (server_id, user_id, role_id) VALUES (?,?,?)`, int64(serverID), int64(uid), int64(r)); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO member_roles (server_id, user_id, role_id) VALUES (?,?,?) ON CONFLICT DO NOTHING`, int64(serverID), int64(uid), int64(r)); err != nil {
 				return err
 			}
 		}
@@ -485,7 +489,7 @@ func scanRole(r rowScanner) (*Role, error) {
 // CreateRole adds a role at the top of the hierarchy (below nothing but the owner).
 func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, permsBits perms.Perm, color int) (*Role, error) {
 	ro := &Role{ID: ids.New(), ServerID: serverID, Name: name, Color: color, Permissions: permsBits, CreatedAt: nowMs()}
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		// new roles start at the bottom of the hierarchy (just above @everyone),
 		// so the creator always outranks them
 		if _, err := tx.ExecContext(ctx, `UPDATE roles SET position = position + 1 WHERE server_id = ? AND position >= 1`, int64(serverID)); err != nil {
@@ -563,7 +567,7 @@ func (s *Store) UpdateRole(ctx context.Context, id ids.ID, p RolePatch) error {
 
 // DeleteRole removes a role, its assignments and its overwrites. @everyone cannot be deleted.
 func (s *Store) DeleteRole(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		var serverID int64
 		if err := tx.QueryRowContext(ctx, `SELECT server_id FROM roles WHERE id = ?`, int64(id)).Scan(&serverID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -584,7 +588,7 @@ func (s *Store) DeleteRole(ctx context.Context, id ids.ID) error {
 
 // SetRolePositions rewrites positions (@everyone stays at 0).
 func (s *Store) SetRolePositions(ctx context.Context, serverID ids.ID, positions map[ids.ID]int) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		for id, pos := range positions {
 			if id == serverID {
 				continue
@@ -605,13 +609,13 @@ func (s *Store) SetRolePositions(ctx context.Context, serverID ids.ID, positions
 // CreateServerChannel adds a channel at the end of its parent.
 func (s *Store) CreateServerChannel(ctx context.Context, serverID ids.ID, typ, name string, parent *ids.ID) (*Channel, error) {
 	c := &Channel{ServerID: &serverID, Type: typ, Name: name, ParentID: parent}
-	err := s.Tx(ctx, func(tx *sql.Tx) error {
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		var max sql.NullInt64
-		if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND type = ? AND coalesce(parent_id, 0) = coalesce(?, 0)`, int64(serverID), map[bool]string{true: "category", false: "x"}[typ == "category"], nullID(parent)).Scan(&max); err != nil {
+		if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND type = ? AND coalesce(parent_id, 0) = ?`, int64(serverID), map[bool]string{true: "category", false: "x"}[typ == "category"], idOrZero(parent)).Scan(&max); err != nil {
 			return err
 		}
 		if typ != "category" {
-			if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND type != 'category' AND coalesce(parent_id, 0) = coalesce(?, 0)`, int64(serverID), nullID(parent)).Scan(&max); err != nil {
+			if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND type != 'category' AND coalesce(parent_id, 0) = ?`, int64(serverID), idOrZero(parent)).Scan(&max); err != nil {
 				return err
 			}
 		}
@@ -684,7 +688,7 @@ func (s *Store) ServerChannels(ctx context.Context, serverID ids.ID) ([]*Channel
 
 // SetChannelPositions applies a bulk reorder.
 func (s *Store) SetChannelPositions(ctx context.Context, serverID ids.ID, list []ChannelPosition) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		for _, p := range list {
 			if p.ParentSet {
 				if _, err := tx.ExecContext(ctx, `UPDATE channels SET position = ?, parent_id = ?, updated_at = ? WHERE id = ? AND server_id = ?`, p.Position, nullID(p.ParentID), nowMs(), int64(p.ID), int64(serverID)); err != nil {

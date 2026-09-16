@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -147,7 +148,7 @@ func (s *Store) RenameEmoji(ctx context.Context, id ids.ID, name string) error {
 
 // DeleteEmoji removes an emoji and drops its blob reference.
 func (s *Store) DeleteEmoji(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		var blob int64
 		if err := tx.QueryRowContext(ctx, `SELECT blob_id FROM emojis WHERE id = ?`, int64(id)).Scan(&blob); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -158,7 +159,7 @@ func (s *Store) DeleteEmoji(ctx context.Context, id ids.ID) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM emojis WHERE id = ?`, int64(id)); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(ref_count - 1, 0) WHERE id = ?`, blob)
+		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count - 1")+` WHERE id = ?`, blob)
 		return err
 	})
 }
@@ -241,9 +242,9 @@ func (s *Store) UpdatePack(ctx context.Context, id ids.ID, patch StickerPackPatc
 
 // DeletePack removes a pack, its stickers and their blob references.
 func (s *Store) DeletePack(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		// one reference per sticker: the same picture added twice holds two
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(ref_count - (SELECT count(*) FROM stickers st WHERE st.pack_id = ? AND st.blob_id = blobs.id), 0) WHERE id IN (SELECT blob_id FROM stickers WHERE pack_id = ?)`, int64(id), int64(id)); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM stickers st WHERE st.pack_id = ? AND st.blob_id = blobs.id)")+` WHERE id IN (SELECT blob_id FROM stickers WHERE pack_id = ?)`, int64(id), int64(id)); err != nil {
 			return err
 		}
 		res, err := tx.ExecContext(ctx, `DELETE FROM sticker_packs WHERE id = ?`, int64(id))
@@ -344,7 +345,7 @@ func (s *Store) installedSet(ctx context.Context, uid ids.ID) (map[ids.ID]bool, 
 
 // InstallPack adds a public pack to the user's collection.
 func (s *Store) InstallPack(ctx context.Context, uid, packID ids.ID) error {
-	_, err := s.db.W.ExecContext(ctx, `INSERT OR IGNORE INTO sticker_installs (user_id, pack_id, installed_at) VALUES (?,?,?)`, int64(uid), int64(packID), nowMs())
+	_, err := s.db.W.ExecContext(ctx, `INSERT INTO sticker_installs (user_id, pack_id, installed_at) VALUES (?,?,?) ON CONFLICT DO NOTHING`, int64(uid), int64(packID), nowMs())
 	return err
 }
 
@@ -402,7 +403,7 @@ func scanSticker(r rowScanner) (*Sticker, error) {
 func (s *Store) AddSticker(ctx context.Context, st *Sticker) error {
 	st.ID = ids.New()
 	st.CreatedAt = nowMs()
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		var max sql.NullInt64
 		if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM stickers WHERE pack_id = ?`, int64(st.PackID)).Scan(&max); err != nil {
 			return err
@@ -470,7 +471,7 @@ func (s *Store) UpdateSticker(ctx context.Context, id ids.ID, name, tags *string
 
 // DeleteSticker removes a sticker and drops its blob reference.
 func (s *Store) DeleteSticker(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		var blob, pack int64
 		if err := tx.QueryRowContext(ctx, `SELECT blob_id, pack_id FROM stickers WHERE id = ?`, int64(id)).Scan(&blob, &pack); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
@@ -481,7 +482,7 @@ func (s *Store) DeleteSticker(ctx context.Context, id ids.ID) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM stickers WHERE id = ?`, int64(id)); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = max(ref_count - 1, 0) WHERE id = ?`, blob); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count - 1")+` WHERE id = ?`, blob); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE sticker_packs SET cover_sticker_id = NULL WHERE id = ? AND cover_sticker_id = ?`, pack, int64(id)); err != nil {
@@ -494,7 +495,7 @@ func (s *Store) DeleteSticker(ctx context.Context, id ids.ID) error {
 
 // SetStickerPositions rewrites the order of a pack's stickers.
 func (s *Store) SetStickerPositions(ctx context.Context, packID ids.ID, positions map[ids.ID]int) error {
-	return s.Tx(ctx, func(tx *sql.Tx) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
 		for id, pos := range positions {
 			if _, err := tx.ExecContext(ctx, `UPDATE stickers SET position = ? WHERE id = ? AND pack_id = ?`, pos, int64(id), int64(packID)); err != nil {
 				return err
