@@ -10,6 +10,7 @@ import { useUsers, displayName } from "@/stores/users";
 import { canPin } from "./messageMenu";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: () => void }) {
   const [pins, setPins] = useState<DecryptedMessage[] | null>(null);
   const [unpinning, setUnpinning] = useState<string | null>(null);
@@ -46,11 +47,11 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
   return (
     <div className={s.pinsPop} ref={ref}>
       <div className={s.pinsHead}>
-        <span>Pinned Messages</span>
-        <button className={s.popClose} aria-label="Close pinned messages" onClick={onClose}><X size={18} /></button>
+        <span>{t("chat.chat.pinnedMessages")}</span>
+        <button className={s.popClose} aria-label={t("chat.pins.closePinnedMessages")} onClick={onClose}><X size={18} /></button>
       </div>
       <div className={s.pinsList}>
-        {pins === null ? <div className={s.pinEmpty}>Loading…</div> : pins.length === 0 ? <div className={s.pinEmpty}>This channel doesn't have any pinned messages… yet.</div> : null}
+        {pins === null ? <div className={s.pinEmpty}>{t("chat.pins.loading")}</div> : pins.length === 0 ? <div className={s.pinEmpty}>{t("chat.pins.thisChannelDoesnTHaveAny")}</div> : null}
         {pins?.map((m) => (
           <div key={m.id} className={s.pinItem} onClick={() => { setJumpTo({ channelId, messageId: m.id }); onClose(); }}>
             <div className={s.pinHead}>
@@ -61,8 +62,8 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
             {canPin(m) ? (
               <button
                 className={s.pinRemove}
-                aria-label="Unpin this message"
-                title="Unpin"
+                aria-label={t("chat.pins.unpinThisMessage")}
+                title={t("chat.pins.unpin")}
                 disabled={unpinning === m.id}
                 onClick={(e) => {
                   e.stopPropagation();

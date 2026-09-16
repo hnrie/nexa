@@ -9,6 +9,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const endEdit = useUI((u) => u.endEdit);
@@ -73,8 +74,8 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       />
       {touch ? (
         <div className={s.editActions}>
-          <Button variant="secondary" className={s.editBtn} onClick={cancel}>Cancel</Button>
-          <Button className={s.editBtn} loading={busy} onClick={() => void save()}>Save</Button>
+          <Button variant="secondary" className={s.editBtn} onClick={cancel}>{t("chat.editMessage.cancel")}</Button>
+          <Button className={s.editBtn} loading={busy} onClick={() => void save()}>{t("chat.editMessage.save")}</Button>
         </div>
       ) : (
         <div className={s.editHint}>

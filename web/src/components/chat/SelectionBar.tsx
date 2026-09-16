@@ -8,6 +8,7 @@ import { useUI } from "@/stores/ui";
 import { canPick, deleteMessagesNow } from "./messageMenu";
 import s from "./Chat.module.css";
 
+import { t as tr_ } from "@/i18n";
 /** Takes the composer's place while picking messages to delete. */
 export function SelectionBar({ channelId }: { channelId: string }) {
   const picked = useSelection((x) => x.picked);
@@ -54,7 +55,7 @@ export function SelectionBar({ channelId }: { channelId: string }) {
   return (
     <div className={cs.wrap}>
       <div className={s.selectBar} data-testid="selection-bar">
-        <button type="button" className={s.selectCancel} aria-label="Stop selecting" title="Stop selecting (Esc)" onClick={clear}>
+        <button type="button" className={s.selectCancel} aria-label={tr_("chat.selectionBar.stopSelecting")} title={tr_("chat.selectionBar.stopSelectingEsc")} onClick={clear}>
           <X size={20} />
         </button>
         <span className={s.selectCount} aria-live="polite">

@@ -8,6 +8,7 @@ import { desktopBridge } from "@/lib/desktopBridge";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import s from "./Settings.module.css";
 
+import { t } from "@/i18n";
 const AccountPage = lazyPage(() => import("./AccountPage"));
 const ProfilePage = lazyPage(() => import("./ProfilePage"));
 const PrivacyPage = lazyPage(() => import("./PrivacyPage"));
@@ -48,7 +49,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   const body =
     page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage /> : <AccountPage onClose={onClose} />;
   return createPortal(
-    <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label="User Settings" data-modal-layer="">
+    <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label={t("settings.settings.userSettings")} data-modal-layer="">
       <div className={s.navWrap}>
         <nav className={s.nav}>
           {nav.map((g) => (
@@ -61,9 +62,9 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
           ))}
           <div className={s.navSep} />
           {!inApp && !mobile ? (
-            <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">Get the Desktop App</button>
+            <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">{t("settings.settings.getTheDesktopApp")}</button>
           ) : null}
-          <button className={[s.navItem, s.danger].join(" ")} onClick={() => void logout()}>Log Out</button>
+          <button className={[s.navItem, s.danger].join(" ")} onClick={() => void logout()}>{t("settings.settings.logOut")}</button>
         </nav>
       </div>
       <div className={s.contentWrap}>
@@ -71,7 +72,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
           <Suspense fallback={null}>{body}</Suspense>
         </div>
         <div className={s.closeCol}>
-          <button className={s.close} aria-label="Close settings" onClick={onClose}><X size={20} /></button>
+          <button className={s.close} aria-label={t("server.settingsLayer.closeSettings")} onClick={onClose}><X size={20} /></button>
           <span className={s.esc}>ESC</span>
         </div>
       </div>

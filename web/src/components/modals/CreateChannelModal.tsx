@@ -14,6 +14,7 @@ import { useKeys } from "@/stores/keys";
 import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 function slug(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, "-");
 }
@@ -70,31 +71,31 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
   };
 
   return (
-    <Modal open onClose={onClose} title="Create Channel" width={460} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>Create Channel</Button></>}>
+    <Modal open onClose={onClose} title={t("modals.createChannel.createChannel")} width={460} footer={<><Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>{t("modals.createChannel.createChannel")}</Button></>}>
       <div className={s.form}>
         {parent ? <p className={s.hint}>in {parent.name}</p> : null}
-        <Field label="Channel type">
+        <Field label={t("modals.createChannel.channelType")}>
           <div className={s.types}>
             <label className={s.type} data-on={type === "text"}>
               <span className={s.typeIcon}><Hash size={22} /></span>
-              <span className={s.typeText}><span className={s.typeLabel}>Text</span><span className={s.typeDesc}>Send messages, images, GIFs, emoji, opinions and puns</span></span>
+              <span className={s.typeText}><span className={s.typeLabel}>{t("modals.createChannel.text")}</span><span className={s.typeDesc}>{t("modals.createChannel.sendMessagesImagesGifsEmojiOpinions")}</span></span>
               <input type="radio" name="type" checked={type === "text"} onChange={() => setType("text")} />
             </label>
             <label className={s.type} data-on={type === "voice"}>
               <span className={s.typeIcon}><Volume2 size={22} /></span>
-              <span className={s.typeText}><span className={s.typeLabel}>Voice</span><span className={s.typeDesc}>Hang out together with voice, video, and screen share</span></span>
+              <span className={s.typeText}><span className={s.typeLabel}>{t("modals.createChannel.voice")}</span><span className={s.typeDesc}>{t("modals.createChannel.hangOutTogetherWithVoiceVideo")}</span></span>
               <input type="radio" name="type" checked={type === "voice"} onChange={() => setType("voice")} />
             </label>
           </div>
         </Field>
-        <Field label="Channel name" required>
+        <Field label={t("modals.createChannel.channelName")} required>
           <div className={s.hashInput}>
             {type === "text" ? <Hash size={16} /> : <Volume2 size={16} />}
             <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="new-channel" maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
           </div>
         </Field>
-        <Toggle checked={priv} onChange={setPriv} label="Private Channel" description="Only selected members and roles will be able to view this channel. It gets its own encryption key." />
-        {priv ? <p className={s.fine}><Lock size={12} /> Add roles or members from the channel's permission settings after creating it.</p> : null}
+        <Toggle checked={priv} onChange={setPriv} label={t("modals.createChannel.privateChannel")} description={t("modals.createChannel.onlySelectedMembersAndRolesWill")} />
+        {priv ? <p className={s.fine}><Lock size={12} /> {t("modals.createChannel.addRolesOrMembersFromThe")}</p> : null}
       </div>
     </Modal>
   );

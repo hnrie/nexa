@@ -9,6 +9,7 @@ import { SHARE_FRAME_RATES, SHARE_RESOLUTIONS, shareBitrate } from "@/voice/shar
 import { startScreen } from "@/voice/session";
 import s from "./Voice.module.css";
 
+import { t } from "@/i18n";
 const RESOLUTION_NOTES: Record<ShareResolution, string> = { "720p": "HD", "1080p": "Full HD", "1440p": "QHD", source: "Native" };
 const FPS_NOTES: Record<ShareFps, string> = { 15: "Text, slides", 30: "Smooth", 60: "Games, video" };
 
@@ -81,24 +82,24 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
     <Modal
       open
       onClose={onClose}
-      title="Share Your Screen"
+      title={t("voice.shareScreen.shareYourScreen")}
       width={460}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={goLive} data-testid="go-live"><MonitorUp size={16} /> Go Live</Button>
+          <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
+          <Button onClick={goLive} data-testid="go-live"><MonitorUp size={16} /> {t("voice.shareScreen.goLive")}</Button>
         </>
       }
     >
       <div className={s.shareForm}>
-        <Choices label="Resolution" id="share-res" options={SHARE_RESOLUTIONS.map((r) => ({ value: r.value, title: r.label, note: RESOLUTION_NOTES[r.value] }))} value={resolution} onChange={setResolution} />
-        <Choices label="Frame rate" id="share-fps" options={SHARE_FRAME_RATES.map((f) => ({ value: f, title: `${f} fps`, note: FPS_NOTES[f] }))} value={fps} onChange={setFps} />
+        <Choices label={t("voice.shareScreen.resolution")} id="share-res" options={SHARE_RESOLUTIONS.map((r) => ({ value: r.value, title: r.label, note: RESOLUTION_NOTES[r.value] }))} value={resolution} onChange={setResolution} />
+        <Choices label={t("voice.shareScreen.frameRate")} id="share-fps" options={SHARE_FRAME_RATES.map((f) => ({ value: f, title: `${f} fps`, note: FPS_NOTES[f] }))} value={fps} onChange={setFps} />
         <div className={s.shareAudio} data-testid="share-audio">
           <Toggle
             checked={audio}
             disabled={!audioSupported}
             onChange={setAudio}
-            label="Share audio"
+            label={t("voice.shareScreen.shareAudio")}
             description={
               !audioSupported
                 ? "This computer can't share its sound."

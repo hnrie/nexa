@@ -3,6 +3,7 @@ import { reportCrash } from "@/lib/crashReport";
 import { storage } from "@/lib/storage";
 import s from "./ErrorBoundary.module.css";
 
+import { t } from "@/i18n";
 interface Props {
   children: ReactNode;
 }
@@ -84,10 +85,10 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <pre className={s.detail}>{error.message}{info ? `\n${info}` : ""}</pre>
           <div className={s.actions}>
-            <button className={s.primary} onClick={this.reload}>Reload</button>
-            <button className={s.secondary} onClick={() => void this.reset()}>Clear cache and reload</button>
+            <button className={s.primary} onClick={this.reload}>{t("shell.errorBoundary.reload")}</button>
+            <button className={s.secondary} onClick={() => void this.reset()}>{t("shell.errorBoundary.clearCacheAndReload")}</button>
           </div>
-          <p className={s.note}>If it keeps happening, tell whoever runs this instance what you were doing.</p>
+          <p className={s.note}>{t("shell.errorBoundary.ifItKeepsHappeningTellWhoever")}</p>
         </div>
       </div>
     );

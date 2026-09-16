@@ -22,6 +22,7 @@ import { audioContext } from "@/voice/media";
 import { handleVoiceEvent, installVoice, joinVoice, leaveVoice, onReadyVoice } from "@/voice/session";
 import s from "./GuestCallPage.module.css";
 
+import { t } from "@/i18n";
 type Phase = "checking" | "invalid" | "form" | "joining" | "call" | "ended";
 
 /** Why a guest's time in the call ended, as the server says it; and whether the link may take them again. */
@@ -210,12 +211,12 @@ export default function GuestCallPage() {
       <div className={s.call} data-testid="guest-call">
         <header className={s.bar}>
           <PhoneCall size={18} className={s.barIcon} />
-          <span className={s.barTitle}>Voice call</span>
+          <span className={s.barTitle}>{t("guestCall.voiceCall")}</span>
           <span className={s.barWho}>
-            <span className={s.tag}>Guest</span>
+            <span className={s.tag}>{t("voice.voiceParticipants.guest")}</span>
             <span className={s.barName}>{name}</span>
           </span>
-          <Button size="sm" variant="danger" onClick={() => void leave()} data-testid="guest-leave">Leave</Button>
+          <Button size="sm" variant="danger" onClick={() => void leave()} data-testid="guest-leave">{t("guestCall.leave")}</Button>
         </header>
         <div className={s.stage}>
           <VoiceView channel={channel} guest />
@@ -238,7 +239,7 @@ export default function GuestCallPage() {
           </>
         ) : phase === "invalid" ? (
           <>
-            <h1 className={s.title}>Can't join this call</h1>
+            <h1 className={s.title}>{t("guestCall.canTJoinThisCall")}</h1>
             <p className={s.sub}>{error}</p>
           </>
         ) : phase === "ended" ? (
@@ -252,21 +253,21 @@ export default function GuestCallPage() {
           </>
         ) : (
           <>
-            <h1 className={s.title}>You're invited to a voice call</h1>
-            <p className={s.sub}>No account needed. Pick the name people in the call will see.</p>
+            <h1 className={s.title}>{t("guestCall.youReInvitedToAVoice")}</h1>
+            <p className={s.sub}>{t("guestCall.noAccountNeededPickTheName")}</p>
             <form className={s.form} onSubmit={(e) => void join(e)}>
-              <Field label="Your name">
-                <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={32} autoFocus autoComplete="nickname" placeholder="What should we call you?" data-testid="guest-name" />
+              <Field label={t("guestCall.yourName")}>
+                <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={32} autoFocus autoComplete="nickname" placeholder={t("guestCall.whatShouldWeCallYou")} data-testid="guest-name" />
               </Field>
               {error ? <p className={s.error}>{error}</p> : null}
-              <Button type="submit" block disabled={!name.trim()} data-testid="guest-join">Join Call</Button>
+              <Button type="submit" block disabled={!name.trim()} data-testid="guest-join">{t("guestCall.joinCall")}</Button>
             </form>
             <p className={s.fine}>
               <ShieldCheck size={14} /> As a guest you can only be in this call. The call stays end-to-end encrypted.
             </p>
           </>
         )}
-        {signedIn && phase !== "checking" && phase !== "joining" ? <a className={s.back} href="/channels/@me">Back to nexa</a> : null}
+        {signedIn && phase !== "checking" && phase !== "joining" ? <a className={s.back} href="/channels/@me">{t("guestCall.backToNexa")}</a> : null}
       </div>
     </div>
   );

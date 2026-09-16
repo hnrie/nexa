@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ImageCropModal } from "./ImageCropModal";
 import s from "./IconPicker.module.css";
 
+import { t } from "@/i18n";
 interface Props {
   /** The icon there is now, if any. */
   currentUrl: string | null;
@@ -63,7 +64,7 @@ export function IconPicker({ currentUrl, picked, onPick, onRemove, initials, lab
         ) : null}
       </button>
       {shown && onRemove && !disabled ? (
-        <button type="button" className={s.remove} aria-label="Remove icon" onClick={onRemove}><X size={14} /></button>
+        <button type="button" className={s.remove} aria-label={t("common.iconPicker.removeIcon")} onClick={onRemove}><X size={14} /></button>
       ) : null}
       {crop ? (
         <ImageCropModal
@@ -71,7 +72,7 @@ export function IconPicker({ currentUrl, picked, onPick, onRemove, initials, lab
           aspect={1}
           round={!square}
           maxSize={1024}
-          title="Crop the icon"
+          title={t("common.iconPicker.cropTheIcon")}
           onClose={() => setCrop(null)}
           onDone={({ blob }) => {
             setCrop(null);

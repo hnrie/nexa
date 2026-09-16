@@ -13,6 +13,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 export default function InvitesPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
   const channels = useChannels((c) => c.byId);
@@ -53,18 +54,18 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <h2 className={st.title}>Invites</h2>
-      <p className={st.hint}>Active invite links for this server. Revoking a link does not remove anyone who already joined.</p>
+      <h2 className={st.title}>{t("server.invites.invites")}</h2>
+      <p className={st.hint}>{t("server.invites.activeInviteLinksForThisServer")}</p>
       <div style={{ margin: "16px 0" }}>
-        <Button size="sm" onClick={() => openModal("invite", { serverId })}>Create Invite</Button>
+        <Button size="sm" onClick={() => openModal("invite", { serverId })}>{t("server.invites.createInvite")}</Button>
       </div>
       {invites === null ? <Spinner /> : null}
-      {invites && invites.length === 0 ? <p className={st.hint}>There are no active invites.</p> : null}
+      {invites && invites.length === 0 ? <p className={st.hint}>{t("server.invites.thereAreNoActiveInvites")}</p> : null}
       {invites && invites.length > 0 ? (
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>
-              <tr><th>Inviter</th><th>Code</th><th>Channel</th><th>Uses</th><th>Expires</th><th /></tr>
+              <tr><th>{t("server.invites.inviter")}</th><th>{t("server.invites.code")}</th><th>{t("server.invites.channel")}</th><th>{t("server.invites.uses")}</th><th>{t("server.invites.expires")}</th><th /></tr>
             </thead>
             <tbody>
               {invites.map((i) => (
@@ -74,7 +75,7 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
                   <td>{i.channel_id && channels[i.channel_id] ? `#${channels[i.channel_id]!.name}` : "—"}</td>
                   <td>{i.uses}{i.max_uses ? ` / ${i.max_uses}` : ""}</td>
                   <td>{i.expires_at ? formatFull(i.expires_at) : "Never"}</td>
-                  <td><Button size="sm" variant="ghost" loading={busy === i.code} onClick={() => void revoke(i.code)}>Revoke</Button></td>
+                  <td><Button size="sm" variant="ghost" loading={busy === i.code} onClick={() => void revoke(i.code)}>{t("server.invites.revoke")}</Button></td>
                 </tr>
               ))}
             </tbody>

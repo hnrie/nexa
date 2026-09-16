@@ -6,6 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
 
+import { t } from "@/i18n";
 /** The passcode screen: shown whenever this device's app lock is on. */
 export default function PasscodePage() {
   const me = useAuth((a) => a.me);
@@ -57,7 +58,7 @@ export default function PasscodePage() {
     >
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
-        <Field label="Passcode" required>
+        <Field label={t("settings.security.passcode")} required>
           <TextInput
             ref={input}
             type="password"
@@ -69,9 +70,9 @@ export default function PasscodePage() {
             required
           />
         </Field>
-        {left <= 3 ? <div className={s.warn}>{left} {left === 1 ? "try" : "tries"} left before this device forgets your keys. You would then sign in with your password.</div> : null}
+        {left <= 3 ? <div className={s.warn}>{t("passcode.triesLeft", { count: left })} You would then sign in with your password.</div> : null}
         <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">{adopting ? "Set up this device" : "Unlock"}</Button>
-        <Button type="button" variant="link" onClick={() => void logout()}>Log out instead</Button>
+        <Button type="button" variant="link" onClick={() => void logout()}>{t("lock.logOutInstead")}</Button>
       </form>
     </AuthLayout>
   );

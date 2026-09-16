@@ -38,6 +38,7 @@ import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
 import s from "./Chat.module.css";
 
+import { t as tr_ } from "@/i18n";
 const PROFILE_PANEL_KEY = "ec:dmProfilePanel";
 
 export function ChatView({ channel }: { channel: Channel }) {
@@ -155,7 +156,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         <PageHeaderButtons />
         {channel.type === "group_dm" ? (
           // a group's icon and name open its settings, as Discord's header does
-          <button className={s.hGroup} onClick={() => openModal("editGroup", { channelId: channel.id })} aria-label="Edit group" data-testid="edit-group">
+          <button className={s.hGroup} onClick={() => openModal("editGroup", { channelId: channel.id })} aria-label={tr_("chat.chat.editGroup")} data-testid="edit-group">
             <span className={s.hIcon}>{channel.icon_id ? <Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={24} kind="icon" /> : <Users size={22} />}</span>
             <span className={s.hName}>{name}</span>
           </button>
@@ -193,30 +194,30 @@ export function ChatView({ channel }: { channel: Channel }) {
         <span className={s.hSpacer} />
         {!isServer && !mobile ? (
           <Tooltip text="Subchats" side="bottom">
-            <button className={s.hBtn} data-on={subchats} aria-label="Subchats" onClick={() => setSubchats((v) => !v)} data-testid="subchats-button" data-pop-toggle="subchats"><MessageCircle size={22} /></button>
+            <button className={s.hBtn} data-on={subchats} aria-label={tr_("chat.chat.subchats")} onClick={() => setSubchats((v) => !v)} data-testid="subchats-button" data-pop-toggle="subchats"><MessageCircle size={22} /></button>
           </Tooltip>
         ) : null}
         {!isServer ? (
           <>
             <Tooltip text="Start Voice Call" side="bottom">
-              <button className={s.hBtn} aria-label="Start Voice Call" onClick={() => void startCall(false)} data-testid="start-call"><Phone size={22} /></button>
+              <button className={s.hBtn} aria-label={tr_("chat.chat.startVoiceCall")} onClick={() => void startCall(false)} data-testid="start-call"><Phone size={22} /></button>
             </Tooltip>
             <Tooltip text="Start Video Call" side="bottom">
-              <button className={s.hBtn} aria-label="Start Video Call" onClick={() => void startCall(true)}><Video size={22} /></button>
+              <button className={s.hBtn} aria-label={tr_("chat.chat.startVideoCall")} onClick={() => void startCall(true)}><Video size={22} /></button>
             </Tooltip>
           </>
         ) : null}
         {mobile ? (
           <Tooltip text="Search" side="bottom">
-            <button className={s.hBtn} data-on={searchOpen} aria-label="Search messages" onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
+            <button className={s.hBtn} data-on={searchOpen} aria-label={tr_("chat.chat.searchMessages")} onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
           </Tooltip>
         ) : (
-          <label className={sc.searchBox} title="Search this device's decrypted messages">
+          <label className={sc.searchBox} title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")}>
             <Search size={16} />
             <input
               value={searchQuery}
-              placeholder="Search"
-              aria-label="Search messages"
+              placeholder={tr_("chat.chat.search")}
+              aria-label={tr_("chat.chat.searchMessages")}
               data-testid="search-input"
               onFocus={() => setSearchOpen(true)}
               onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
@@ -226,7 +227,7 @@ export function ChatView({ channel }: { channel: Channel }) {
               <button
                 type="button"
                 className={sc.clear}
-                aria-label="Clear search"
+                aria-label={tr_("chat.chat.clearSearch")}
                 data-testid="search-clear"
                 onClick={(e) => { e.preventDefault(); setSearchQuery(""); setSearchOpen(false); }}
               >
@@ -237,17 +238,17 @@ export function ChatView({ channel }: { channel: Channel }) {
         )}
         {!mobile ? (
           <Tooltip text="Pinned Messages" side="bottom">
-            <button className={s.hBtn} data-on={pins} aria-label="Pinned Messages" onClick={() => setPins((v) => !v)} data-pop-toggle="pins"><Pin size={22} /></button>
+            <button className={s.hBtn} data-on={pins} aria-label={tr_("chat.chat.pinnedMessages")} onClick={() => setPins((v) => !v)} data-pop-toggle="pins"><Pin size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && isServer ? (
           <Tooltip text="Invite People" side="bottom">
-            <button className={s.hBtn} aria-label="Invite People" onClick={() => openModal("invite", { serverId, channelId: channel.id })}><UserPlus size={22} /></button>
+            <button className={s.hBtn} aria-label={tr_("chat.chat.invitePeople")} onClick={() => openModal("invite", { serverId, channelId: channel.id })}><UserPlus size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && !isServer ? (
           <Tooltip text={convo.type === "dm" ? "Add Friends to DM" : "Invite to Group"} side="bottom">
-            <button className={s.hBtn} aria-label="Add friends" onClick={() => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id })}><UserPlus size={22} /></button>
+            <button className={s.hBtn} aria-label={tr_("chat.chat.addFriends")} onClick={() => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id })}><UserPlus size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && channel.type === "dm" && other ? (
@@ -257,13 +258,13 @@ export function ChatView({ channel }: { channel: Channel }) {
         ) : null}
         {!mobile && (convo.type === "group_dm" || isServer) ? (
           <Tooltip text="Member List" side="bottom">
-            <button className={s.hBtn} data-on={membersOpen} aria-label="Member List" onClick={toggleMembers}><Users size={22} /></button>
+            <button className={s.hBtn} data-on={membersOpen} aria-label={tr_("chat.chat.memberList")} onClick={toggleMembers}><Users size={22} /></button>
           </Tooltip>
         ) : null}
         {mobile ? (
           <button
             className={s.hBtn}
-            aria-label="More"
+            aria-label={tr_("chat.chat.more")}
             data-testid="chat-more"
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
@@ -312,7 +313,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
         {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}
         {!mobile && channel.type === "dm" && other && profileOpen && !searchOpen ? (
-          <aside className={s.profilePanel} aria-label="User profile" data-testid="dm-profile-panel">
+          <aside className={s.profilePanel} aria-label={tr_("chat.chat.userProfile")} data-testid="dm-profile-panel">
             <ProfileCard key={other} userId={other} variant="panel" />
           </aside>
         ) : null}

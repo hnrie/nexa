@@ -8,6 +8,7 @@ import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 export function CreateCategoryModal({ onClose, serverId }: { onClose: () => void; serverId: string }) {
   const upsert = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
@@ -26,10 +27,10 @@ export function CreateCategoryModal({ onClose, serverId }: { onClose: () => void
     }
   };
   return (
-    <Modal open onClose={onClose} title="Create Category" width={440} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>Create Category</Button></>}>
+    <Modal open onClose={onClose} title={t("modals.createCategory.createCategory")} width={440} footer={<><Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>{t("modals.createCategory.createCategory")}</Button></>}>
       <div className={s.form}>
-        <Field label="Category name" required>
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="New Category" maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} />
+        <Field label={t("modals.createCategory.categoryName")} required>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createCategory.newCategory")} maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} />
         </Field>
       </div>
     </Modal>

@@ -11,6 +11,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./Sticker.module.css";
 
+import { t } from "@/i18n";
 type MessageSticker = NonNullable<MessagePayload["sticker"]>;
 
 const GAP = 8;
@@ -111,7 +112,7 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
         {sticker.blob ? <img className={s.preview} src={stickerUrl(sticker.blob, 64)} alt="" draggable={false} /> : null}
         <div className={s.text}>
           <div className={s.name}>{name}</div>
-          {info ? <div className={s.sub}>From {info.pack.name}</div> : null}
+          {info ? <div className={s.sub}>{t("chat.stickerPopout.fromPack", { name: info.pack.name })}</div> : null}
         </div>
       </div>
       {info === undefined ? (

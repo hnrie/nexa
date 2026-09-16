@@ -11,6 +11,7 @@ import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 /** Menu for one subchat row: edit its name and password, or delete for everyone. */
 export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: Record<string, unknown>) => void; nav: (p: string) => void }): ContextMenuItem[] {
   const toast = useUI.getState().toast;
@@ -120,16 +121,16 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
   };
 
   return (
-    <div className={s.subPanel} ref={box} role="dialog" aria-label="Subchats" data-testid="subchat-panel">
+    <div className={s.subPanel} ref={box} role="dialog" aria-label={t("chat.chat.subchats")} data-testid="subchat-panel">
       <div className={s.subHead}>
         <MessageCircle size={16} />
-        <span>Subchats</span>
-        <button className={s.subClose} aria-label="Close subchats" onClick={onClose}><X size={16} /></button>
+        <span>{t("chat.chat.subchats")}</span>
+        <button className={s.subClose} aria-label={t("chat.subchat.closeSubchats")} onClick={onClose}><X size={16} /></button>
       </div>
-      <p className={s.subHint}>Side conversations inside this chat. Everyone here can see them, and each one is encrypted under its own key.</p>
+      <p className={s.subHint}>{t("chat.subchat.sideConversationsInsideThisChatEveryone")}</p>
       <div className={s.subList}>
         {loading && list.length === 0 ? <div className={s.subEmpty}><Spinner size={18} /></div> : null}
-        {!loading && list.length === 0 ? <div className={s.subEmpty}>No subchats yet.</div> : null}
+        {!loading && list.length === 0 ? <div className={s.subEmpty}>{t("chat.subchat.noSubchatsYet")}</div> : null}
         {list.map((ch) => {
           const rs = reads[ch.id];
           const unread = isUnread(rs, ch.last_message_id) && ch.id !== activeId;
@@ -167,15 +168,15 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
           ref={input}
           value={name}
           maxLength={48}
-          placeholder="New subchat name"
-          aria-label="New subchat name"
+          placeholder={t("chat.subchat.newSubchatName")}
+          aria-label={t("chat.subchat.newSubchatName")}
           data-testid="subchat-name"
           onChange={(e) => setName(e.target.value)}
         />
         <button
           type="button"
-          aria-label="New subchat with a password"
-          title="With a password"
+          aria-label={t("chat.subchat.newSubchatWithAPassword")}
+          title={t("chat.subchat.withAPassword")}
           onClick={() => {
             onClose();
             openModal("subchat", { parentId: parent.id });
@@ -184,7 +185,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
         >
           <Settings2 size={16} />
         </button>
-        <button type="submit" aria-label="Create subchat" disabled={!name.trim() || busy} data-testid="subchat-create"><Plus size={16} /></button>
+        <button type="submit" aria-label={t("chat.subchat.createSubchat")} disabled={!name.trim() || busy} data-testid="subchat-create"><Plus size={16} /></button>
       </form>
     </div>
   );

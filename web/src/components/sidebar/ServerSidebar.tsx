@@ -20,6 +20,7 @@ import { useUI } from "@/stores/ui";
 import { categoryMenuItems, channelMenuItems, serverMenuItems } from "./serverMenu";
 import s from "./ServerSidebar.module.css";
 
+import { t } from "@/i18n";
 type Drag = { id: string; kind: "channel" | "category" };
 type Drop = { id: string; where: "before" | "after" | "into" };
 
@@ -196,12 +197,12 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         <span className={s.actions}>
           {canI(st, P.CREATE_INSTANT_INVITE, ch.id) ? (
             <Tooltip text="Create Invite" side="top">
-              <button className={s.action} aria-label="Create Invite" onClick={() => openModal("invite", { serverId, channelId: ch.id })}><UserPlus size={16} /></button>
+              <button className={s.action} aria-label={t("server.invites.createInvite")} onClick={() => openModal("invite", { serverId, channelId: ch.id })}><UserPlus size={16} /></button>
             </Tooltip>
           ) : null}
           {canI(st, P.MANAGE_CHANNELS, ch.id) ? (
             <Tooltip text="Edit Channel" side="top">
-              <button className={s.action} aria-label="Edit Channel" onClick={() => openModal("channelSettings", { channelId: ch.id })}><Settings size={16} /></button>
+              <button className={s.action} aria-label={t("sidebar.serverSidebar.editChannel")} onClick={() => openModal("channelSettings", { channelId: ch.id })}><Settings size={16} /></button>
             </Tooltip>
           ) : null}
         </span>
@@ -241,7 +242,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
                 </button>
                 {canManage ? (
                   <Tooltip text="Create Channel" side="top">
-                    <button className={s.catAdd} aria-label="Create Channel" onClick={() => openModal("createChannel", { serverId, parentId: category.id })}><Plus size={16} /></button>
+                    <button className={s.catAdd} aria-label={t("modals.createChannel.createChannel")} onClick={() => openModal("createChannel", { serverId, parentId: category.id })}><Plus size={16} /></button>
                   </Tooltip>
                 ) : null}
               </div>
@@ -249,7 +250,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
             </div>
           );
         })}
-        {tree.loose.length === 0 && tree.categories.length === 0 ? <div className={s.empty}>No channels you can see yet.</div> : null}
+        {tree.loose.length === 0 && tree.categories.length === 0 ? <div className={s.empty}>{t("sidebar.serverSidebar.noChannelsYouCanSeeYet")}</div> : null}
       </div>
       <VoiceStatus />
       <UserPanel />

@@ -16,6 +16,7 @@ import { outranks } from "../memberMenu";
 import s from "../ServerSettings.module.css";
 import r from "../RoleChips.module.css";
 
+import { t } from "@/i18n";
 const PAGE = 50;
 
 export default function MembersPage({ serverId }: { serverId: string }) {
@@ -64,9 +65,9 @@ export default function MembersPage({ serverId }: { serverId: string }) {
   const canRoles = canI(server, P.MANAGE_ROLES);
   return (
     <>
-      <h2 className={st.title}>Members — {server.memberCount}</h2>
+      <h2 className={st.title}>{t("server.members.membersCount", { count: server.memberCount })}</h2>
       <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder="Search members" />
+        <TextInput value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder={t("server.channelSettings.searchMembers")} />
       </div>
       {rows.slice(0, shown).map(({ m, name, username }) => {
         const above = m.user_id !== meId && outranks(serverId, m.user_id);
@@ -77,8 +78,8 @@ export default function MembersPage({ serverId }: { serverId: string }) {
             <div className={s.memberText}>
               <span className={s.memberName}>
                 {name}
-                {server.server.owner_id === m.user_id ? <Crown size={14} style={{ color: "var(--warning)" }} aria-label="Owner" /> : null}
-                {timedOut ? <Clock size={14} style={{ color: "var(--danger)" }} aria-label="Timed out" /> : null}
+                {server.server.owner_id === m.user_id ? <Crown size={14} style={{ color: "var(--warning)" }} aria-label={t("server.members.owner")} /> : null}
+                {timedOut ? <Clock size={14} style={{ color: "var(--danger)" }} aria-label={t("server.members.timedOut")} /> : null}
               </span>
               <span className={s.memberSub}>@{username} · joined {formatFull(m.joined_at)}</span>
               <span className={r.chips}>
@@ -96,15 +97,15 @@ export default function MembersPage({ serverId }: { serverId: string }) {
               </span>
             </div>
             <div className={s.memberActions}>
-              {canRoles && (above || m.user_id === meId) ? <button title="Roles" aria-label="Edit roles" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}><Shield size={18} /></button> : null}
-              {canTimeout && above ? <button title={timedOut ? "Remove timeout" : "Timeout"} aria-label="Timeout" data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "timeout" })}><Clock size={18} /></button> : null}
-              {canKick && above ? <button title="Kick" aria-label="Kick" data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "kick" })}><UserMinus size={18} /></button> : null}
-              {canBan && above ? <button title="Ban" aria-label="Ban" data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "ban" })}><Ban size={18} /></button> : null}
+              {canRoles && (above || m.user_id === meId) ? <button title={t("server.members.roles")} aria-label={t("server.members.editRoles")} onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}><Shield size={18} /></button> : null}
+              {canTimeout && above ? <button title={timedOut ? "Remove timeout" : "Timeout"} aria-label={t("server.members.timeout")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "timeout" })}><Clock size={18} /></button> : null}
+              {canKick && above ? <button title={t("server.members.kick")} aria-label={t("server.members.kick")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "kick" })}><UserMinus size={18} /></button> : null}
+              {canBan && above ? <button title={t("server.members.ban")} aria-label={t("server.members.ban")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "ban" })}><Ban size={18} /></button> : null}
             </div>
           </div>
         );
       })}
-      {rows.length > shown ? <div className={s.loadMore}><Button variant="secondary" size="sm" onClick={() => setShown((v) => v + PAGE)}>Show more ({rows.length - shown} left)</Button></div> : null}
+      {rows.length > shown ? <div className={s.loadMore}><Button variant="secondary" size="sm" onClick={() => setShown((v) => v + PAGE)}>{t("server.members.showMoreLeft", { count: rows.length - shown })}</Button></div> : null}
     </>
   );
 }

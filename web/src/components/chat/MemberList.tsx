@@ -15,6 +15,7 @@ import { useUsers } from "@/stores/users";
 import { P, compute, has, toPermMember } from "@/lib/perms";
 import s from "./MemberList.module.css";
 
+import { t } from "@/i18n";
 // one collator for every sort: localeCompare with options builds one per call
 const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
 
@@ -168,7 +169,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             <span className={s.text}>
               <span className={s.name} style={row.color ? { color: row.color } : undefined}>
                 {name}
-                {st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label="Server Owner" /> : null}
+                {st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
               </span>
               {p?.status_text || p?.status_emoji || activitiesOf(p)[0] ? (
                 // a custom status wins the words; what they are doing still marks the line with its own icon

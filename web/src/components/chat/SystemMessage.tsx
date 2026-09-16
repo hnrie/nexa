@@ -5,6 +5,7 @@ import { useUsers, displayName } from "@/stores/users";
 import { formatTimestamp } from "@/lib/time";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const openModal = useUI((u) => u.openModal);
@@ -27,7 +28,7 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
       icon = <Pin size={18} />;
       body = (
         <>
-          {A} pinned <span className={s.sysLink} onClick={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })}>a message</span> to this channel.
+          {A} pinned <span className={s.sysLink} onClick={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })}>{t("chat.systemMessage.aMessage")}</span> to this channel.
         </>
       );
       break;

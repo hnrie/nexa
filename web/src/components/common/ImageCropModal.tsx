@@ -5,6 +5,7 @@ import { Modal } from "@/components/common/Modal";
 import { animatedByType, isAnimatedImage } from "./animatedImage";
 import s from "./ImageCrop.module.css";
 
+import { t } from "@/i18n";
 export interface CropResult {
   blob: Blob;
   /** True when the original bytes are used unchanged (an animation kept whole). */
@@ -129,8 +130,8 @@ export function ImageCropModal({ file, aspect, round = false, title = "Edit imag
       width={400}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button loading={busy} disabled={!img} onClick={() => void apply()} data-testid="crop-apply">Apply</Button>
+          <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
+          <Button loading={busy} disabled={!img} onClick={() => void apply()} data-testid="crop-apply">{t("common.imageCrop.apply")}</Button>
         </>
       }
     >
@@ -158,16 +159,16 @@ export function ImageCropModal({ file, aspect, round = false, title = "Edit imag
         </div>
         <div className={s.controls}>
           <ZoomIn size={16} />
-          <input className={s.range} type="range" min={1} max={5} step={0.01} value={zoom} disabled={keepOriginal} onChange={(e) => setZoom(Number(e.target.value))} aria-label="Zoom" />
-          <button className={s.reset} aria-label="Reset" title="Reset" onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}><RotateCcw size={16} /></button>
+          <input className={s.range} type="range" min={1} max={5} step={0.01} value={zoom} disabled={keepOriginal} onChange={(e) => setZoom(Number(e.target.value))} aria-label={t("common.imageCrop.zoom")} />
+          <button className={s.reset} aria-label={t("common.imageCrop.reset")} title={t("common.imageCrop.reset")} onClick={() => { setZoom(1); setOffset({ x: 0, y: 0 }); }}><RotateCcw size={16} /></button>
         </div>
         {animated ? (
           <label className={s.keep}>
             <input type="checkbox" checked={keepOriginal} onChange={(e) => setKeepOriginal(e.target.checked)} />
-            <span>Upload the original so it keeps animating (cropping would flatten it)</span>
+            <span>{t("common.imageCrop.uploadTheOriginalSoItKeeps")}</span>
           </label>
         ) : null}
-        <p className={s.hint}>Drag to move, scroll or use the slider to zoom.</p>
+        <p className={s.hint}>{t("common.imageCrop.dragToMoveScrollOrUse")}</p>
       </div>
     </Modal>
   );

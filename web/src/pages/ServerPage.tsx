@@ -13,6 +13,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./ServerPage.module.css";
 
+import { t as tr_ } from "@/i18n";
 export default function ServerPage() {
   const { serverId = "", channelId, messageId } = useParams();
   const nav = useNavigate();
@@ -103,8 +104,8 @@ function NoChannels() {
     <div className={s.empty}>
       <header className={s.header}><PageHeaderButtons /></header>
       <div className={s.emptyBody}>
-        <h2>No text channels</h2>
-        <p>You find yourself in a strange place. You do not have access to any text channels, or there are none in this server.</p>
+        <h2>{tr_("server.noTextChannels")}</h2>
+        <p>{tr_("server.youFindYourselfInAStrange")}</p>
       </div>
     </div>
   );

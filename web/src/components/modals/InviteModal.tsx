@@ -16,6 +16,7 @@ import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 const AGES: { v: number; label: string }[] = [
   { v: 1800, label: "30 minutes" },
   { v: 3600, label: "1 hour" },
@@ -75,30 +76,30 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
   return (
     <Modal open onClose={onClose} title={`Invite friends to ${st?.server.name ?? "the server"}`} width={480}>
       <div className={s.form}>
-        <Field label="Invite to channel">
+        <Field label={t("modals.invite.inviteToChannel")}>
           <Select value={channel} onChange={(e) => { setChannel(e.target.value); void generate(e.target.value); }}>
             {candidates.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
           </Select>
         </Field>
-        <Field label="Send a server invite link to a friend" hint={invite ? `Your invite link expires ${invite.expires_at ? `on ${new Date(invite.expires_at).toLocaleString()}` : "never"}${invite.max_uses ? ` and can be used ${invite.max_uses} times` : ""}.` : undefined}>
+        <Field label={t("modals.invite.sendAServerInviteLinkTo")} hint={invite ? `Your invite link expires ${invite.expires_at ? `on ${new Date(invite.expires_at).toLocaleString()}` : "never"}${invite.max_uses ? ` and can be used ${invite.max_uses} times` : ""}.` : undefined}>
           <div className={s.linkRow}>
             <TextInput readOnly value={link} placeholder={busy ? "Generating…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="invite-link" />
-            <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy</>}</Button>
+            <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>
         <div className={s.keyNote} data-warn={!key}>
           <KeyRound size={16} />
           <span>{key ? "This link carries the server's current encryption key, so whoever opens it can read the channels right away. Anyone with the link can read the history it unlocks; keys rotate when someone is removed." : "You don't hold this server's encryption key yet, so the link can't carry it. New members will receive a key from a member who is online."}</span>
         </div>
-        <Toggle checked={withKey && !!key} disabled={!key} onChange={setWithKey} label="Include the encryption key in the link" />
+        <Toggle checked={withKey && !!key} disabled={!key} onChange={setWithKey} label={t("modals.invite.includeTheEncryptionKeyInThe")} />
         <div className={s.sep} />
         <div className={s.row2}>
-          <Field label="Expire after">
+          <Field label={t("modals.groupInvite.expireAfter")}>
             <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(channel, v, uses); }}>
               {AGES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
-          <Field label="Max number of uses">
+          <Field label={t("modals.groupInvite.maxNumberOfUses")}>
             <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); void generate(channel, age, v); }}>
               {USES.map((u) => <option key={u} value={u}>{u === 0 ? "No limit" : `${u} use${u === 1 ? "" : "s"}`}</option>)}
             </Select>

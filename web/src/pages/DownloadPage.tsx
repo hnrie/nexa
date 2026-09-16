@@ -10,6 +10,7 @@ import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./DownloadPage.module.css";
 
+import { t } from "@/i18n";
 const LABEL: Record<string, string> = {
   "windows:installer": "Windows",
   "mac:installer": "macOS",
@@ -80,10 +81,10 @@ export default function DownloadPage() {
         ) : failed ? (
           <div className={s.empty}>
             Downloads could not be loaded.
-            <div style={{ marginTop: 8 }}><Button size="sm" variant="secondary" onClick={() => { setFailed(false); desktop.latest().then(setRel, () => setFailed(true)); }}>Try again</Button></div>
+            <div style={{ marginTop: 8 }}><Button size="sm" variant="secondary" onClick={() => { setFailed(false); desktop.latest().then(setRel, () => setFailed(true)); }}>{t("chat.messageList.tryAgain")}</Button></div>
           </div>
         ) : !rel ? (
-          <div className={s.empty}>The desktop app has not been published yet.</div>
+          <div className={s.empty}>{t("download.theDesktopAppHasNotBeen")}</div>
         ) : (
           <>
             {mine ? (
@@ -95,14 +96,14 @@ export default function DownloadPage() {
                 {otherMac ? (
                   <span className={s.meta}>
                     {otherMac.arch === "x64" ? "On a Mac with an Intel processor? " : "On a Mac with Apple Silicon? "}
-                    <a href={desktop.fileUrl(otherMac.name)} data-testid="download-other-mac">Download that version</a>
+                    <a href={desktop.fileUrl(otherMac.name)} data-testid="download-other-mac">{t("download.downloadThatVersion")}</a>
                   </span>
                 ) : null}
               </div>
             ) : null}
 
             <div className={s.section}>
-              <h2 className={s.label}>All downloads</h2>
+              <h2 className={s.label}>{t("download.allDownloads")}</h2>
               <div className={s.files}>
                 {shown.map((f) => (
                   <div key={f.name} className={s.file} data-mine={mine?.name === f.name} data-testid="download-file">
@@ -110,7 +111,7 @@ export default function DownloadPage() {
                     <span className={s.fileText}>
                       <span className={s.fileName}>{LABEL[`${f.os}:${f.kind}`] ?? f.name} · {ARCH[f.arch][f.os]}</span>
                       <span className={s.fileSub}>
-                        {formatBytes(f.size)} · <span className={s.hash} title="Copy SHA-256" onClick={() => copyHash(f)}>SHA-256 {f.sha256.slice(0, 16)}…</span>
+                        {formatBytes(f.size)} · <span className={s.hash} title={t("download.copySha256")} onClick={() => copyHash(f)}>SHA-256 {f.sha256.slice(0, 16)}…</span>
                       </span>
                     </span>
                     <Button size="sm" variant={mine?.name === f.name ? "primary" : "secondary"} onClick={() => { location.href = desktop.fileUrl(f.name); }}>
@@ -123,14 +124,14 @@ export default function DownloadPage() {
 
             {apk ? (
               <div className={s.section}>
-                <h2 className={s.label}>Android</h2>
+                <h2 className={s.label}>{t("download.android")}</h2>
                 <div className={s.files}>
                   <div className={s.file} data-mine={onAndroid} data-testid="download-file">
                     <span className={s.fileIcon}><Smartphone size={22} /></span>
                     <span className={s.fileText}>
                       <span className={s.fileName}>Android · {apk.abis?.includes("arm64-v8a") ? "every phone" : (apk.abis ?? []).join(", ")}</span>
                       <span className={s.fileSub}>
-                        {formatBytes(apk.size)} · Android {androidVersionName(apk.min_sdk)}+ · <span className={s.hash} title="Copy SHA-256" onClick={() => void navigator.clipboard?.writeText(apk.sha256).then(() => toast("SHA-256 copied.", "success"))}>SHA-256 {apk.sha256.slice(0, 16)}…</span>
+                        {formatBytes(apk.size)} · Android {androidVersionName(apk.min_sdk)}+ · <span className={s.hash} title={t("download.copySha256")} onClick={() => void navigator.clipboard?.writeText(apk.sha256).then(() => toast("SHA-256 copied.", "success"))}>SHA-256 {apk.sha256.slice(0, 16)}…</span>
                       </span>
                     </span>
                     <Button size="sm" variant={onAndroid ? "primary" : "secondary"} onClick={() => { location.href = android.fileUrl(apk.name); }}>
@@ -142,19 +143,19 @@ export default function DownloadPage() {
             ) : null}
 
             <div className={s.section}>
-              <h2 className={s.label}>The first time you open it</h2>
+              <h2 className={s.label}>{t("download.theFirstTimeYouOpenIt")}</h2>
               <ul className={s.notes}>
-                <li><b>Windows</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>More info</b>, then <b>Run anyway</b>.</li>
-                <li><b>macOS</b>: open the disk image and drag nexa into Applications. The first time, right-click the app and choose <b>Open</b>.</li>
-                <li><b>Linux</b>: make the AppImage executable (<code>chmod +x</code>) and run it; it updates itself. The .deb installs with your package manager and says when a new version is out.</li>
-                {apk ? <li><b>Android</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>Install</b>.</li> : null}
+                <li><b>{t("download.windows")}</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>{t("download.moreInfo")}</b>, then <b>{t("download.runAnyway")}</b>.</li>
+                <li><b>macOS</b>: open the disk image and drag nexa into Applications. The first time, right-click the app and choose <b>{t("chat.lockedChannel.open")}</b>.</li>
+                <li><b>{t("download.linux")}</b>: make the AppImage executable (<code>{t("download.chmodX")}</code>{t("download.andRunItItUpdatesItself")}</li>
+                {apk ? <li><b>{t("download.android")}</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>{t("settings.stickers.install")}</b>.</li> : null}
               </ul>
             </div>
           </>
         )}
 
         <div className={s.foot}>
-          <Link to="/channels/@me">Open nexa in your browser</Link>
+          <Link to="/channels/@me">{t("download.openNexaInYourBrowser")}</Link>
         </div>
       </div>
     </div>

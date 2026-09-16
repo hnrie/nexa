@@ -21,6 +21,7 @@ import { useUsers } from "@/stores/users";
 import s from "@/components/friends/Friends.module.css";
 import { guarded } from "@/lib/captcha";
 
+import { t as tr_ } from "@/i18n";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
 
 export default function FriendsPage() {
@@ -59,11 +60,11 @@ export default function FriendsPage() {
     <div className={s.page}>
       <header className={s.header}>
         <PageHeaderButtons />
-        <div className={s.title}><Users size={22} /> Friends</div>
+        <div className={s.title}><Users size={22} /> {tr_("sidebar.dMSidebar.friends")}</div>
         {tabs.map((t) => (
           <button key={t.id} className={s.tab} data-selected={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
         ))}
-        <button className={s.addTab} data-selected={tab === "add"} onClick={() => setTab("add")}>Add Friend</button>
+        <button className={s.addTab} data-selected={tab === "add"} onClick={() => setTab("add")}>{tr_("profile.profileCard.addFriend")}</button>
       </header>
       <div className={s.body}>
         {tab === "add" ? (
@@ -71,7 +72,7 @@ export default function FriendsPage() {
         ) : (
           <>
             <div className={s.search}>
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search" aria-label="Search friends" />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("chat.chat.search")} aria-label={tr_("friends.searchFriends")} />
               <Search size={20} />
             </div>
             <h3 className={s.section}>{tabs.find((t) => t.id === tab)?.label.replace(/ \(\d+\)$/, "")} — {list.length}</h3>
@@ -189,19 +190,19 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       <div className={s.actions}>
         {rel.type === "friend" ? (
           <>
-            <Tooltip text="Message"><button className={s.act} aria-label="Message" onClick={() => void message()}><MessageSquare size={20} /></button></Tooltip>
-            <Tooltip text="Start Voice Call"><button className={s.act} aria-label="Start Voice Call" onClick={() => void call()} data-testid="friend-call"><Phone size={20} /></button></Tooltip>
-            <Tooltip text="More"><button className={s.act} aria-label="More" onClick={more}><MoreVertical size={20} /></button></Tooltip>
+            <Tooltip text="Message"><button className={s.act} aria-label={tr_("profile.profileCard.message")} onClick={() => void message()}><MessageSquare size={20} /></button></Tooltip>
+            <Tooltip text="Start Voice Call"><button className={s.act} aria-label={tr_("chat.chat.startVoiceCall")} onClick={() => void call()} data-testid="friend-call"><Phone size={20} /></button></Tooltip>
+            <Tooltip text="More"><button className={s.act} aria-label={tr_("chat.chat.more")} onClick={more}><MoreVertical size={20} /></button></Tooltip>
           </>
         ) : rel.type === "incoming" ? (
           <>
-            <Tooltip text="Accept"><button className={[s.act, s.ok].join(" ")} aria-label="Accept" onClick={() => void accept()}><Check size={20} /></button></Tooltip>
-            <Tooltip text="Ignore"><button className={[s.act, s.no].join(" ")} aria-label="Ignore" onClick={() => void remove("Request ignored.")}><X size={20} /></button></Tooltip>
+            <Tooltip text="Accept"><button className={[s.act, s.ok].join(" ")} aria-label={tr_("voice.incomingCall.accept")} onClick={() => void accept()}><Check size={20} /></button></Tooltip>
+            <Tooltip text="Ignore"><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.ignore")} onClick={() => void remove("Request ignored.")}><X size={20} /></button></Tooltip>
           </>
         ) : rel.type === "outgoing" ? (
-          <Tooltip text="Cancel"><button className={[s.act, s.no].join(" ")} aria-label="Cancel" onClick={() => void remove("Request cancelled.")}><X size={20} /></button></Tooltip>
+          <Tooltip text="Cancel"><button className={[s.act, s.no].join(" ")} aria-label={tr_("chat.editMessage.cancel")} onClick={() => void remove("Request cancelled.")}><X size={20} /></button></Tooltip>
         ) : (
-          <Tooltip text="Unblock"><button className={[s.act, s.no].join(" ")} aria-label="Unblock" onClick={() => void remove("Unblocked.")}><X size={20} /></button></Tooltip>
+          <Tooltip text="Unblock"><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove("Unblocked.")}><X size={20} /></button></Tooltip>
         )}
       </div>
       {meId ? null : null}
@@ -240,12 +241,12 @@ function AddFriend() {
   };
   return (
     <div className={s.addBox}>
-      <h3 className={s.addTitle}>Add Friend</h3>
-      <p className={s.addSub}>You can add friends with their username.</p>
+      <h3 className={s.addTitle}>{tr_("profile.profileCard.addFriend")}</h3>
+      <p className={s.addSub}>{tr_("friends.youCanAddFriendsWithTheir")}</p>
       <form className={s.addForm} onSubmit={(e) => void submit(e)}>
         <UserPlus size={20} style={{ color: "var(--text-muted)" }} />
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="You can add friends with their username." aria-label="Username" autoCapitalize="none" spellCheck={false} />
-        <Button type="submit" size="sm" loading={busy} disabled={!value.trim()}>Send Friend Request</Button>
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr_("friends.youCanAddFriendsWithTheir")} aria-label={tr_("settings.account.username")} autoCapitalize="none" spellCheck={false} />
+        <Button type="submit" size="sm" loading={busy} disabled={!value.trim()}>{tr_("friends.sendFriendRequest")}</Button>
       </form>
       {msg ? <div className={[s.addMsg, msg.ok ? s.ok : s.err].join(" ")}>{msg.text}</div> : null}
     </div>

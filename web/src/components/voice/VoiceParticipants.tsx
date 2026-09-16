@@ -13,6 +13,7 @@ import { participantsOf, useVoice } from "@/stores/voice";
 import { setUserLocalMute, setUserVolume } from "@/voice/session";
 import s from "./Voice.module.css";
 
+import { t } from "@/i18n";
 /** Who is in a voice channel, listed under it in the sidebar. */
 export function VoiceParticipants({ channelId, serverId }: { channelId: string; serverId: string | null }) {
   const byChannel = useVoice((v) => v.byChannel);
@@ -63,7 +64,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
           >
             <Avatar id={p.user_id} avatarId={users[p.user_id]?.avatar_id ?? null} name={name} size={24} className={s.pAvatar} />
             <span className={s.pName}>{name}</span>
-            {guest ? <span className={s.pGuest}>Guest</span> : null}
+            {guest ? <span className={s.pGuest}>{t("voice.voiceParticipants.guest")}</span> : null}
             <span className={s.pIcons}>
               {p.video ? <Video size={14} /> : null}
               {p.streaming ? <MonitorUp size={14} /> : null}

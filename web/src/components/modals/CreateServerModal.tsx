@@ -14,6 +14,7 @@ import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 import { guarded } from "@/lib/captcha";
 
+import { t } from "@/i18n";
 export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const nav = useNavigate();
   const me = useAuth((a) => a.me);
@@ -62,10 +63,10 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
 
   if (mode === "join") {
     return (
-      <Modal open onClose={onClose} title="Join a Server" width={440} footer={<><Button variant="ghost" onClick={() => setMode("create")}>Back</Button><Button onClick={join} disabled={!code.trim()}>Join Server</Button></>}>
+      <Modal open onClose={onClose} title={t("modals.createServer.joinAServer")} width={440} footer={<><Button variant="ghost" onClick={() => setMode("create")}>{t("modals.createServer.back")}</Button><Button onClick={join} disabled={!code.trim()}>{t("modals.createServer.joinServer")}</Button></>}>
         <div className={s.form}>
-          <p className={s.hint}>Enter an invite below to join an existing server.</p>
-          <Field label="Invite link" required>
+          <p className={s.hint}>{t("modals.createServer.enterAnInviteBelowToJoin")}</p>
+          <Field label={t("modals.createServer.inviteLink")} required>
             <TextInput value={code} onChange={(e) => setCode(e.target.value)} placeholder={`${window.location.origin}/invite/hTKzmak`} autoFocus onKeyDown={(e) => e.key === "Enter" && join()} />
           </Field>
           <p className={s.fine}>Invites look like {window.location.origin}/invite/hTKzmak or just the code.</p>
@@ -74,16 +75,16 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
     );
   }
   return (
-    <Modal open onClose={onClose} title="Create Your Server" width={440} footer={<><Button variant="ghost" onClick={() => setMode("join")}>Have an invite already?</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>Create</Button></>}>
+    <Modal open onClose={onClose} title={t("modals.createServer.createYourServer")} width={440} footer={<><Button variant="ghost" onClick={() => setMode("join")}>{t("modals.createServer.haveAnInviteAlready")}</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>{t("modals.createServer.create")}</Button></>}>
       <div className={s.form}>
-        <p className={s.hint}>Your server is where you and your friends hang out. Make yours and start talking. Everything in it is end-to-end encrypted.</p>
+        <p className={s.hint}>{t("modals.createServer.yourServerIsWhereYouAnd")}</p>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <IconPicker currentUrl={null} picked={icon} onPick={setIcon} onRemove={() => setIcon(null)} initials={initials(name || "S")} label="Server icon" testId="server-icon" />
+          <IconPicker currentUrl={null} picked={icon} onPick={setIcon} onRemove={() => setIcon(null)} initials={initials(name || "S")} label={t("modals.createServer.serverIcon")} testId="server-icon" />
         </div>
-        <Field label="Server name" required>
+        <Field label={t("modals.createServer.serverName")} required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="server-name" />
         </Field>
-        <p className={s.fine}>By creating a server, you agree to keep it a decent place.</p>
+        <p className={s.fine}>{t("modals.createServer.byCreatingAServerYouAgree")}</p>
       </div>
     </Modal>
   );

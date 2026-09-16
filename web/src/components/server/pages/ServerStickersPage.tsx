@@ -9,6 +9,7 @@ import st from "@/components/settings/Settings.module.css";
 import { PackEditor } from "../PackEditor";
 import { promptText } from "@/components/modals/PromptModal";
 
+import { t } from "@/i18n";
 /** Server settings → Stickers: packs owned by this server, managed with Manage Expressions. */
 export default function ServerStickersPage({ serverId }: { serverId: string }) {
   const server = useServers((x) => x.byId[serverId]);
@@ -33,8 +34,8 @@ export default function ServerStickersPage({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <h2 className={st.title}>Stickers</h2>
-      <p className={st.hint}>Sticker packs that belong to this server. Every member can use them here; make a pack public to let anyone install it. There is no limit on packs or stickers.</p>
+      <h2 className={st.title}>{t("pickers.expressionPicker.stickers")}</h2>
+      <p className={st.hint}>{t("server.serverStickers.stickerPacksThatBelongToThis")}</p>
       <PackEditor packs={list} selectedId={selected} onSelect={setSelected} canManage={() => manage} onCreate={manage ? () => void create() : undefined} createLabel="Create Server Pack" emptyText={manage ? "This server has no sticker packs yet." : "This server has no sticker packs yet. Members with Manage Expressions can add some."} />
     </>
   );

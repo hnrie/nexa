@@ -11,6 +11,7 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { unlockSubchat } from "@/lib/subchatLock";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 export function LockedChannel({ channel, onUnlocked }: { channel: Channel; onUnlocked: () => void }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,11 +41,11 @@ export function LockedChannel({ channel, onUnlocked }: { channel: Channel; onUnl
       >
         <span className={s.lockedIcon}><Lock size={28} /></span>
         <h2 className={s.lockedTitle}>{channel.name}</h2>
-        <p className={s.lockedText}>This subchat asks for its password. Type it once and it stays open until you sign out.</p>
-        <Field label="Password" error={error ?? undefined}>
+        <p className={s.lockedText}>{t("chat.lockedChannel.thisSubchatAsksForItsPassword")}</p>
+        <Field label={t("chat.lockedChannel.password")} error={error ?? undefined}>
           <TextInput type="password" value={password} autoFocus autoComplete="current-password" onChange={(e) => setPassword(e.target.value)} data-testid="subchat-password" />
         </Field>
-        <Button type="submit" block loading={busy} disabled={!password} data-testid="subchat-unlock">Open</Button>
+        <Button type="submit" block loading={busy} disabled={!password} data-testid="subchat-unlock">{t("chat.lockedChannel.open")}</Button>
       </form>
     </div>
   );

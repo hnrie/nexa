@@ -12,6 +12,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 const VERBS: Record<string, string> = {
   server_update: "updated the server",
   server_transfer: "transferred ownership to",
@@ -108,11 +109,11 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <h2 className={st.title}>Audit Log</h2>
-      <p className={st.hint}>Every moderation and configuration change in this server, newest first.</p>
+      <h2 className={st.title}>{t("server.auditLog.auditLog")}</h2>
+      <p className={st.hint}>{t("server.auditLog.everyModerationAndConfigurationChangeIn")}</p>
       <div style={{ height: 16 }} />
       {entries === null ? <Spinner /> : null}
-      {entries && entries.length === 0 ? <p className={st.hint}>Nothing has happened yet.</p> : null}
+      {entries && entries.length === 0 ? <p className={st.hint}>{t("server.auditLog.nothingHasHappenedYet")}</p> : null}
       {entries?.map((e) => (
         <div key={e.id} className={s.auditRow}>
           <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
@@ -125,7 +126,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       ))}
       {entries && entries.length > 0 && !done ? (
         <div className={s.loadMore}>
-          <Button variant="secondary" size="sm" loading={busy} onClick={() => void load(entries[entries.length - 1]?.id)}>Load more</Button>
+          <Button variant="secondary" size="sm" loading={busy} onClick={() => void load(entries[entries.length - 1]?.id)}>{t("server.auditLog.loadMore")}</Button>
         </div>
       ) : null}
     </>

@@ -10,6 +10,7 @@ import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
+import { t } from "@/i18n";
 type Dialog = null | "username" | "displayName" | "password" | "recovery" | "delete";
 
 export default function AccountPage({ onClose }: { onClose: () => void }) {
@@ -64,7 +65,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <h2 className={s.title}>My Account</h2>
+      <h2 className={s.title}>{t("settings.account.myAccount")}</h2>
       <div className={s.card}>
         <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : me.accent_color !== null ? { background: `#${me.accent_color.toString(16).padStart(6, "0")}` } : undefined} />
         <div className={s.cardHead}>
@@ -73,38 +74,38 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
             <div className={s.cardName}>{me.display_name}</div>
             <div className={s.cardUser}>{me.username}</div>
           </div>
-          <Button size="sm" onClick={() => { onClose(); openModal("settings", { page: "profiles" }); }}>Edit User Profile</Button>
+          <Button size="sm" onClick={() => { onClose(); openModal("settings", { page: "profiles" }); }}>{t("settings.account.editUserProfile")}</Button>
         </div>
         <div className={s.rows}>
           <div className={s.row}>
-            <div><div className={s.rowLabel}>Display Name</div><div className={s.rowValue}>{me.display_name}</div></div>
-            <Button size="sm" variant="secondary" onClick={() => open("displayName", me.display_name)}>Edit</Button>
+            <div><div className={s.rowLabel}>{t("settings.account.displayName")}</div><div className={s.rowValue}>{me.display_name}</div></div>
+            <Button size="sm" variant="secondary" onClick={() => open("displayName", me.display_name)}>{t("pickers.stickerPicker.edit")}</Button>
           </div>
           <div className={s.row}>
-            <div><div className={s.rowLabel}>Username</div><div className={s.rowValue}>{me.username}</div></div>
-            <Button size="sm" variant="secondary" onClick={() => open("username", me.username)}>Edit</Button>
+            <div><div className={s.rowLabel}>{t("settings.account.username")}</div><div className={s.rowValue}>{me.username}</div></div>
+            <Button size="sm" variant="secondary" onClick={() => open("username", me.username)}>{t("pickers.stickerPicker.edit")}</Button>
           </div>
         </div>
       </div>
 
       <div className={s.sep} />
-      <h3 className={s.h5}>Password and Authentication</h3>
-      <p className={s.hint}>Your password protects your account and the keys that decrypt your messages. Changing it re-wraps your keys; nothing is lost.</p>
+      <h3 className={s.h5}>{t("settings.account.passwordAndAuthentication")}</h3>
+      <p className={s.hint}>{t("settings.account.yourPasswordProtectsYourAccountAnd")}</p>
       <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button onClick={() => open("password")}>Change Password</Button>
+        <Button onClick={() => open("password")}>{t("settings.account.changePassword")}</Button>
         <Button variant="secondary" onClick={() => open("recovery")}>{me.has_recovery ? "Generate a new recovery key" : "Set up a recovery key"}</Button>
       </div>
       <p className={s.hint}>{me.has_recovery ? "A recovery key is set. Generating a new one replaces it." : "Without a recovery key, a forgotten password means your message history cannot be recovered."}</p>
 
       <div className={s.sep} />
-      <h3 className={s.h5}>Account Removal</h3>
+      <h3 className={s.h5}>{t("settings.account.accountRemoval")}</h3>
       <div className={s.dangerBox}>
-        <span className={s.hint} style={{ margin: 0 }}>Deleting your account is permanent. Your messages stay in conversations but your profile and keys are erased.</span>
-        <Button variant="danger" onClick={() => open("delete")}>Delete Account</Button>
+        <span className={s.hint} style={{ margin: 0 }}>{t("settings.account.deletingYourAccountIsPermanentYour")}</span>
+        <Button variant="danger" onClick={() => open("delete")}>{t("settings.account.deleteAccount")}</Button>
       </div>
 
       {dialog === "displayName" || dialog === "username" ? (
-        <Modal open onClose={close} title={dialog === "username" ? "Change your username" : "Change your display name"} footer={<><Button variant="ghost" onClick={close}>Cancel</Button><Button loading={busy} onClick={() => void saveName(dialog === "username" ? "username" : "display_name")}>Done</Button></>}>
+        <Modal open onClose={close} title={dialog === "username" ? "Change your username" : "Change your display name"} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} onClick={() => void saveName(dialog === "username" ? "username" : "display_name")}>{t("modals.serverNotifications.done")}</Button></>}>
           <Field label={dialog === "username" ? "Username" : "Display name"} error={error}>
             <TextInput value={value} onChange={(e) => setValue(e.target.value)} autoFocus maxLength={32} autoCapitalize={dialog === "username" ? "none" : undefined} />
           </Field>
@@ -112,47 +113,47 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       ) : null}
 
       {dialog === "password" ? (
-        <Modal open onClose={close} title="Update your password" footer={<><Button variant="ghost" onClick={close}>Cancel</Button><Button loading={busy} disabled={value.length < 1 || pw.length < 8 || pw !== pw2} onClick={() => void run(async () => { await changePassword(value, pw); toast("Password changed. Other devices were logged out.", "success"); close(); })}>Done</Button></>}>
+        <Modal open onClose={close} title={t("settings.account.updateYourPassword")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={value.length < 1 || pw.length < 8 || pw !== pw2} onClick={() => void run(async () => { await changePassword(value, pw); toast("Password changed. Other devices were logged out.", "success"); close(); })}>{t("modals.serverNotifications.done")}</Button></>}>
           <div className={s.form}>
             {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
-            <Field label="Current password" required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
-            <Field label="New password" required hint="At least 8 characters."><TextInput type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
-            <Field label="Confirm new password" required error={pw2 && pw2 !== pw ? "Passwords do not match." : null}><TextInput type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
+            <Field label={t("settings.account.currentPassword")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+            <Field label={t("settings.account.newPassword")} required hint={t("settings.account.atLeast8Characters")}><TextInput type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
+            <Field label={t("settings.account.confirmNewPassword")} required error={pw2 && pw2 !== pw ? "Passwords do not match." : null}><TextInput type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
           </div>
         </Modal>
       ) : null}
 
       {dialog === "recovery" ? (
-        <Modal open onClose={close} closeOnOverlay={!recovery} title="Recovery key" footer={recovery ? <Button onClick={close}>Done</Button> : <><Button variant="ghost" onClick={close}>Cancel</Button><Button loading={busy} disabled={!value} onClick={() => void run(async () => setRecovery(await newRecoveryKey(value)))}>Generate</Button></>}>
+        <Modal open onClose={close} closeOnOverlay={!recovery} title={t("settings.account.recoveryKey")} footer={recovery ? <Button onClick={close}>{t("modals.serverNotifications.done")}</Button> : <><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={!value} onClick={() => void run(async () => setRecovery(await newRecoveryKey(value)))}>{t("settings.account.generate")}</Button></>}>
           {recovery ? (
             <div className={s.form}>
-              <p className={s.hint}>Save this key now. It will not be shown again, and it replaces any previous key.</p>
+              <p className={s.hint}>{t("settings.account.saveThisKeyNowItWill")}</p>
               <div className={s.recovery}>{recovery}</div>
-              <Button variant="secondary" onClick={() => void navigator.clipboard?.writeText(recovery)}>Copy</Button>
+              <Button variant="secondary" onClick={() => void navigator.clipboard?.writeText(recovery)}>{t("modals.groupInvite.copy")}</Button>
             </div>
           ) : (
             <div className={s.form}>
               {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
-              <p className={s.hint}>Confirm your password to generate a new recovery key.</p>
-              <Field label="Password" required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+              <p className={s.hint}>{t("settings.account.confirmYourPasswordToGenerateA")}</p>
+              <Field label={t("chat.lockedChannel.password")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
             </div>
           )}
         </Modal>
       ) : null}
 
       {dialog === "delete" ? (
-        <Modal open onClose={close} title="Delete Account" footer={<><Button variant="ghost" onClick={close}>Cancel</Button><Button variant="danger" loading={busy} disabled={!value} onClick={() => void run(async () => {
+        <Modal open onClose={close} title={t("settings.account.deleteAccount")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button variant="danger" loading={busy} disabled={!value} onClick={() => void run(async () => {
           const { deriveAuthKey, deriveMaster } = await import("@/crypto/kdf");
           const { b64 } = await import("@/crypto/bytes");
           const bundle = await usersApi.myKeys();
           const master = await deriveMaster(value, b64.dec(bundle.kdf_salt), { m: bundle.kdf_params.m, t: bundle.kdf_params.t, p: bundle.kdf_params.p, v: 1 });
           await usersApi.deleteMe(b64.enc(deriveAuthKey(master)));
           await logout();
-        })}>Delete Account</Button></>}>
+        })}>{t("settings.account.deleteAccount")}</Button></>}>
           <div className={s.form}>
             {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
-            <p className={s.hint}>This cannot be undone. Enter your password to confirm.</p>
-            <Field label="Password" required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+            <p className={s.hint}>{t("settings.account.thisCannotBeUndoneEnterYour")}</p>
+            <Field label={t("chat.lockedChannel.password")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
           </div>
         </Modal>
       ) : null}

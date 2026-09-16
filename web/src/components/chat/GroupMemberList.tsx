@@ -13,6 +13,7 @@ import { displayName, useUsers } from "@/stores/users";
 import { groupMemberMenuItems } from "./groupMemberMenu";
 import s from "./MemberList.module.css";
 
+import { t } from "@/i18n";
 const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
 
 /**
@@ -42,7 +43,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
 
   return (
     <aside className={s.list} data-testid="group-member-list" data-open={drawer ? open : undefined} aria-hidden={drawer && !open}>
-      <div className={s.head}>Members — {rows.length}</div>
+      <div className={s.head}>{t("chat.groupMemberList.membersCount", { count: rows.length })}</div>
       {rows.map((row) => {
         const p = presence[row.id];
         const activity = activitiesOf(p)[0];
@@ -62,7 +63,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             <span className={s.text}>
               <span className={s.name}>
                 {row.name}
-                {channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label="Group Owner" /> : null}
+                {channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
               </span>
               <StatusLine
                 className={s.sub}

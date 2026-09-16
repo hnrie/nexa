@@ -10,6 +10,7 @@ import { GifGrid, type GifTileData } from "./GifGrid";
 import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
+import { t as tr_ } from "@/i18n";
 type Pick = (gif: { url: string; w?: number; h?: number }) => void;
 
 interface ResultTile extends GifTileData {
@@ -116,10 +117,10 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     <div className={s.body} style={{ flexDirection: "column" }}>
       <div className={s.searchRow} style={{ flexDirection: "column", alignItems: "stretch" }}>
         {enabled ? (
-          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder="Search Klipy" aria-label="Search GIFs" autoFocus={focusSearchOnOpen()} />
+          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder={tr_("pickers.gifPicker.searchKlipy")} aria-label={tr_("pickers.gifPicker.searchGifs")} autoFocus={focusSearchOnOpen()} />
         ) : null}
         <div className={s.gifTabs}>
-          <button className={s.gifTab} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>Favorites</button>
+          <button className={s.gifTab} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>{tr_("pickers.gifPicker.favorites")}</button>
           {enabled ? <button className={s.gifTab} data-on={tab === "search"} onClick={() => setTab("search")}>{q.trim() ? "Results" : "Trending"}</button> : null}
         </div>
       </div>
@@ -138,12 +139,12 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
                 { id: "unfavorite", label: "Remove from Favorites", danger: true, onSelect: () => removeFavoriteGifs(new Set([t.key])) },
               ])
             }
-            overlay={(t) => <button className={s.gifRemove} aria-label="Remove favorite" onClick={() => removeFavoriteGifs(new Set([t.key]))}><X size={14} /></button>}
+            overlay={(t) => <button className={s.gifRemove} aria-label={tr_("pickers.gifPicker.removeFavorite")} onClick={() => removeFavoriteGifs(new Set([t.key]))}><X size={14} /></button>}
             footer={
               dead.size > 0 ? (
                 <div className={s.gifNote}>
                   {dead.size} favourite{dead.size === 1 ? "" : "s"} no longer load.{" "}
-                  <button className={s.gifTab} onClick={() => removeFavoriteGifs(dead)}>Remove them</button>
+                  <button className={s.gifTab} onClick={() => removeFavoriteGifs(dead)}>{tr_("pickers.gifPicker.removeThem")}</button>
                 </div>
               ) : null
             }
@@ -172,20 +173,20 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           }}
           footer={
             <>
-              {loading ? <div className={s.gifNote}>Loading…</div> : null}
+              {loading ? <div className={s.gifNote}>{tr_("chat.pins.loading")}</div> : null}
               {!loading && results.length === 0 && shownFor !== null ? <div className={s.empty}>{shownFor.trim() ? "No GIFs match." : "Nothing trending right now."}</div> : null}
               {failed ? (
                 <div className={s.gifNote}>
                   More GIFs could not be loaded.{" "}
-                  <button className={s.gifTab} onClick={() => { setFailed(false); if (shownFor !== null && next) void load(shownFor, next); }}>Try again</button>
+                  <button className={s.gifTab} onClick={() => { setFailed(false); if (shownFor !== null && next) void load(shownFor, next); }}>{tr_("chat.messageList.tryAgain")}</button>
                 </div>
               ) : null}
-              {results.length > 0 ? <div className={s.gifNote}>Search powered by Klipy. This server fetches every GIF for you, so nobody on the other end learns who is looking.</div> : null}
+              {results.length > 0 ? <div className={s.gifNote}>{tr_("pickers.gifPicker.searchPoweredByKlipyThisServer")}</div> : null}
             </>
           }
         />
       )}
-      {!enabled && enabled !== null ? <div className={s.gifNote}>GIF search is off on this server: set KLIPY_API_KEY to enable it.</div> : null}
+      {!enabled && enabled !== null ? <div className={s.gifNote}>{tr_("pickers.gifPicker.gifSearchIsOffOnThis")}</div> : null}
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { useUsers } from "@/stores/users";
 import s from "@/components/modals/ServerModals.module.css";
 import r from "./RoleChips.module.css";
 
+import { t } from "@/i18n";
 const DURATIONS: { v: number; label: string }[] = [
   { v: 60, label: "60 seconds" },
   { v: 300, label: "5 minutes" },
@@ -82,10 +83,10 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       }
     };
     return (
-      <Modal open onClose={onClose} title="Edit Roles" width={440} footer={<Button onClick={onClose}>Done</Button>}>
+      <Modal open onClose={onClose} title={t("server.memberAction.editRoles")} width={440} footer={<Button onClick={onClose}>{t("modals.serverNotifications.done")}</Button>}>
         <div className={s.form}>
           {head}
-          {roles.length === 0 ? <p className={s.hint}>This server has no roles yet. Create some in Server Settings.</p> : null}
+          {roles.length === 0 ? <p className={s.hint}>{t("server.memberAction.thisServerHasNoRolesYet")}</p> : null}
           <div className={r.list}>
             {roles.map((ro) => {
               const on = optimistic[ro.id] ?? member?.role_ids.includes(ro.id) ?? false;
@@ -113,7 +114,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
         width={440}
         footer={
           <>
-            <Button variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
             <Button
               variant="danger"
               loading={busy}
@@ -134,8 +135,8 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
             <p className={s.hint}>They are timed out until {new Date(member!.timeout_until!).toLocaleString()}. Removing it lets them talk again right away.</p>
           ) : (
             <>
-              <p className={s.hint}>Timed out members cannot send messages, react, or speak in voice channels. They can still read.</p>
-              <Field label="Duration">
+              <p className={s.hint}>{t("server.memberAction.timedOutMembersCannotSendMessages")}</p>
+              <Field label={t("server.memberAction.duration")}>
                 <Select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
                   {DURATIONS.map((d) => <option key={d.v} value={d.v}>{d.label}</option>)}
                 </Select>
@@ -156,7 +157,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       width={440}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
           <Button
             variant="danger"
             loading={busy}
@@ -176,16 +177,16 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       <div className={s.form}>
         {head}
         <p className={s.hint}>{ban ? `Are you sure you want to ban ${name}? They won't be able to rejoin unless they are unbanned.` : `Are you sure you want to kick ${name}? They will be able to rejoin with a new invite.`}</p>
-        <p className={s.fine}>The server's encryption keys rotate after they are removed, so they cannot read anything sent afterwards.</p>
-        <Field label="Reason (optional)">
+        <p className={s.fine}>{t("server.memberAction.theServerSEncryptionKeysRotate")}</p>
+        <Field label={t("server.memberAction.reasonOptional")}>
           <TextInput value={reason} onChange={(e) => setReason(e.target.value)} maxLength={512} autoFocus />
         </Field>
         {ban ? (
-          <Field label="Delete message history">
+          <Field label={t("server.memberAction.deleteMessageHistory")}>
             <Select value={days} onChange={(e) => setDays(Number(e.target.value))}>
-              <option value={0}>Don't delete any</option>
-              <option value={1}>Previous 24 hours</option>
-              <option value={7}>Previous 7 days</option>
+              <option value={0}>{t("server.memberAction.donTDeleteAny")}</option>
+              <option value={1}>{t("server.memberAction.previous24Hours")}</option>
+              <option value={7}>{t("server.memberAction.previous7Days")}</option>
             </Select>
           </Field>
         ) : null}

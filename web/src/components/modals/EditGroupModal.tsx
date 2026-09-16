@@ -15,6 +15,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 /** A group's name and icon. Anyone in it can rename it; its owner sets the icon. */
 export function EditGroupModal({ channelId, onClose }: { channelId: string; onClose: () => void }) {
   const ch = useChannels((c) => c.byId[channelId]);
@@ -54,12 +55,12 @@ export function EditGroupModal({ channelId, onClose }: { channelId: string; onCl
     <Modal
       open
       onClose={onClose}
-      title="Edit Group"
+      title={t("modals.editGroup.editGroup")}
       width={440}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => void save()} loading={busy} disabled={!dirty} data-testid="save-group">Save</Button>
+          <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
+          <Button onClick={() => void save()} loading={busy} disabled={!dirty} data-testid="save-group">{t("chat.editMessage.save")}</Button>
         </>
       }
     >
@@ -77,13 +78,13 @@ export function EditGroupModal({ channelId, onClose }: { channelId: string; onCl
               setRemoveIcon(true);
             }}
             initials={initials(shownName)}
-            label="Group icon"
+            label={t("modals.editGroup.groupIcon")}
             disabled={!owner}
             testId="group-icon"
           />
           <p className={s.hint}>{owner ? "Pick a picture for the group. It is cropped round, the way a profile picture is." : "Only the group's owner can change its icon."}</p>
         </div>
-        <Field label="Group name">
+        <Field label={t("modals.editGroup.groupName")}>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder={channelDisplayName({ ...ch, name: "" }, users, meId)} data-testid="group-name" onKeyDown={(e) => e.key === "Enter" && dirty && void save()} />
         </Field>
       </div>

@@ -4,6 +4,7 @@ import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
 
+import { t } from "@/i18n";
 /** The first retry waits this long, and each one after waits twice as long as the last. */
 const FIRST_RETRY_MS = 2000;
 const MAX_RETRY_MS = 30_000;
@@ -54,9 +55,9 @@ export default function OfflinePage() {
   }, [bootstrap]);
 
   return (
-    <AuthLayout title="Can't connect" subtitle={error ?? "Could not reach the server."} width={420}>
-      <p className={s.progress}>You are still logged in. Check your connection, or wait a moment if the server is restarting; this page keeps trying.</p>
-      <Button size="lg" block loading={busy} onClick={() => retryNow.current()} data-testid="offline-retry">Retry</Button>
+    <AuthLayout title={t("offline.canTConnect")} subtitle={error ?? "Could not reach the server."} width={420}>
+      <p className={s.progress}>{t("offline.youAreStillLoggedInCheck")}</p>
+      <Button size="lg" block loading={busy} onClick={() => retryNow.current()} data-testid="offline-retry">{t("chat.messageItem.retry")}</Button>
     </AuthLayout>
   );
 }

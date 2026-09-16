@@ -6,6 +6,7 @@ import { participantsOf, useVoice } from "@/stores/voice";
 import { joinVoice } from "@/voice/session";
 import s from "./Voice.module.css";
 
+import { t } from "@/i18n";
 /** Shown at the top of a DM while a call is running that you are not in. */
 export function CallBanner({ channelId }: { channelId: string }) {
   const byChannel = useVoice((v) => v.byChannel);
@@ -23,7 +24,7 @@ export function CallBanner({ channelId }: { channelId: string }) {
         ))}
       </div>
       <div className={s.bannerText}>
-        <span className={s.bannerHead}>Call in progress</span>
+        <span className={s.bannerHead}>{t("voice.callBanner.callInProgress")}</span>
         <span className={s.bannerSub}>{participants.map((p) => displayName(users[p.user_id])).join(", ")}</span>
       </div>
       <button className={s.bannerJoin} onClick={() => void joinVoice(channelId)} disabled={joining === channelId}>

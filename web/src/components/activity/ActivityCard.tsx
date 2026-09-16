@@ -4,6 +4,7 @@ import { useNow } from "@/hooks/useNow";
 import { activityHeading, activityProgress, formatClock } from "@/lib/activity";
 import s from "./Activity.module.css";
 
+import { t } from "@/i18n";
 /** Text that opens its link in a new tab when the activity gives one. */
 function Linked({ href, className, title, children }: { href?: string | undefined; className?: string | undefined; title?: string | undefined; children: React.ReactNode }) {
   return href ? (
@@ -70,7 +71,7 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
       {clock?.kind === "progress" ? (
         <div className={s.progress} data-testid="activity-progress">
           <span>{formatClock(clock.elapsed)}</span>
-          <div className={s.bar} role="progressbar" aria-valuemin={0} aria-valuemax={Math.round(clock.total / 1000)} aria-valuenow={Math.round(clock.elapsed / 1000)} aria-label="Playback">
+          <div className={s.bar} role="progressbar" aria-valuemin={0} aria-valuemax={Math.round(clock.total / 1000)} aria-valuenow={Math.round(clock.elapsed / 1000)} aria-label={t("activity.activityCard.playback")}>
             <i style={{ width: `${clock.fraction * 100}%` }} />
           </div>
           <span>{formatClock(clock.total)}</span>

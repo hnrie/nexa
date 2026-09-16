@@ -32,6 +32,7 @@ import { discardPending, retryPending } from "@/components/composer/send";
 import { buildMessageMenu, canDelete, canEdit, canPick, canPin, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 interface Props {
   msg: DecryptedMessage;
   groupStart: boolean;
@@ -48,7 +49,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const openModal = useUI((u) => u.openModal);
   const ctx = useRenderCtx();
   if (!msg.reply_to_id) return null;
-  if (!target) return <div className={s.replyLine}><span className={s.replyText}>Original message was deleted or is not loaded.</span></div>;
+  if (!target) return <div className={s.replyLine}><span className={s.replyText}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</span></div>;
   const author = users[target.author_id];
   const mediaOnly = !!target.payload?.t && isOnlyMediaLinks(target.payload.t, (target.payload.embeds ?? []) as UnfurlResult[]);
   const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true }), ctx) : target.payload?.att?.length || mediaOnly ? "Click to see attachment" : target.decryptError ? "Encrypted message" : "";
@@ -198,13 +199,13 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       ) : (
         <div className={[s.content, jumbo ? s.jumbo : ""].join(" ")} style={jumboSize ? ({ "--jumbo-size": `${jumboSize}px` } as React.CSSProperties) : undefined}>
           {msg.decryptError === "no_key" ? (
-            <span className={s.waiting}><Lock size={14} /> Waiting for the encryption key…</span>
+            <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
           ) : msg.decryptError === "bad" ? (
-            <span className={s.waiting}><Lock size={14} /> This message could not be decrypted.</span>
+            <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.thisMessageCouldNotBeDecrypted")}</span>
           ) : (
             <>
               {text ? <Markdown source={text} ctx={ctx} jumbo={jumbo} /> : null}
-              {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>(edited)</span> : null}
+              {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>{t("chat.messageItem.edited")}</span> : null}
             </>
           )}
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
@@ -212,9 +213,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           {embeds ? <Embeds list={embeds} /> : null}
           {pending === "failed" ? (
             <div className={s.failedRow}>
-              <span>Message failed to send.</span>
-              <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> Retry</button>
-              <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>Delete</button>
+              <span>{t("chat.messageItem.messageFailedToSend")}</span>
+              <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> {t("chat.messageItem.retry")}</button>
+              <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>{t("chat.messageItem.delete")}</button>
             </div>
           ) : null}
         </div>
@@ -222,19 +223,19 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {!pending && !editing && !selecting ? (
         <div className={s.toolbar} role="toolbar" data-shift={shift}>
-          <ToolButton label="Add Reaction" onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
+          <ToolButton label={t("chat.messageItem.addReaction")} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
           {canEdit(msg) ? (
-            <ToolButton label="Edit Message" onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
+            <ToolButton label={t("chat.messageItem.editMessage")} onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
           ) : null}
-          <ToolButton label="Reply" onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
+          <ToolButton label={t("chat.messageItem.reply")} onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
           {shift ? (
             <>
               {canPin(msg) ? <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
-              <ToolButton label="Mark Unread" onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
-              <ToolButton label="Copy Message Link" onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
-              {dev ? <ToolButton label="Copy Message ID" onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
+              <ToolButton label={t("chat.messageItem.markUnread")} onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
+              <ToolButton label={t("chat.messageItem.copyMessageLink")} onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
+              {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
               {canDelete(msg) ? (
-                <ToolButton label="Delete Message (Shift skips the prompt)" danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
+                <ToolButton label={t("chat.messageItem.deleteMessageShiftSkipsThePrompt")} danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
               ) : null}
             </>
           ) : null}
@@ -250,7 +251,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const close = useCallback(() => setAnchor(null), []);
-  if (!sticker.blob) return <span className={s.edited}>[sticker]</span>;
+  if (!sticker.blob) return <span className={s.edited}>{t("chat.messageItem.sticker")}</span>;
   const w = sticker.w && sticker.h ? Math.round((160 * sticker.w) / sticker.h) : 160;
   const toggle = (el: HTMLElement) => setAnchor((cur) => (cur ? null : el));
   return (

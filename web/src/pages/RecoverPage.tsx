@@ -9,6 +9,7 @@ import { AuthLayout } from "./AuthLayout";
 import OfflinePage from "./OfflinePage";
 import s from "./Auth.module.css";
 
+import { t } from "@/i18n";
 export default function RecoverPage() {
   const nav = useNavigate();
   const recover = useAuth((a) => a.recover);
@@ -64,37 +65,37 @@ export default function RecoverPage() {
 
   if (fresh) {
     return (
-      <AuthLayout title="Password reset" subtitle="Here is your new recovery key. The old one no longer works.">
+      <AuthLayout title={t("recover.passwordReset")} subtitle={t("recover.hereIsYourNewRecoveryKey")}>
         <div className={s.recovery}>{fresh}</div>
-        <Button variant="secondary" block onClick={() => void navigator.clipboard?.writeText(fresh)}>Copy</Button>
+        <Button variant="secondary" block onClick={() => void navigator.clipboard?.writeText(fresh)}>{t("modals.groupInvite.copy")}</Button>
         <label className={s.check}>
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-          <span>I have saved my new recovery key.</span>
+          <span>{t("recover.iHaveSavedMyNewRecovery")}</span>
         </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav("/channels/@me", { replace: true })}>Continue</Button>
+        <Button size="lg" block disabled={!saved} onClick={() => nav("/channels/@me", { replace: true })}>{t("settings.security.continue")}</Button>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="Recover your account" subtitle="Use the recovery key you saved when you registered.">
+    <AuthLayout title={t("recover.recoverYourAccount")} subtitle={t("recover.useTheRecoveryKeyYouSaved")}>
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
-        <Field label="Username" required>
+        <Field label={t("settings.account.username")} required>
           <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" required />
         </Field>
-        <Field label="Recovery key" required hint="Eight groups of eight characters, dashes optional.">
+        <Field label={t("settings.account.recoveryKey")} required hint={t("recover.eightGroupsOfEightCharactersDashes")}>
           <TextInput value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} required />
         </Field>
-        <Field label="New password" required>
+        <Field label={t("settings.account.newPassword")} required>
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>
-        <Field label="Confirm new password" required error={confirm && confirm !== password ? "Passwords do not match." : null}>
+        <Field label={t("settings.account.confirmNewPassword")} required error={confirm && confirm !== password ? "Passwords do not match." : null}>
           <TextInput type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
-        <Button type="submit" size="lg" block loading={busy}>Reset password</Button>
+        <Button type="submit" size="lg" block loading={busy}>{t("recover.resetPassword")}</Button>
         <div className={s.foot}>
-          <Link to="/login">Back to log in</Link>
+          <Link to="/login">{t("recover.backToLogIn")}</Link>
         </div>
       </form>
     </AuthLayout>

@@ -23,6 +23,7 @@ import { useUsers } from "@/stores/users";
 import s from "./InvitePage.module.css";
 import { guarded } from "@/lib/captcha";
 
+import { t } from "@/i18n";
 /**
  * Where a link's key waits while its visitor logs in or registers. The key
  * cannot ride along in `?next=`: a query string reaches the server, in the
@@ -138,9 +139,9 @@ export default function InvitePage() {
         {error ? (
           <>
             <div className={s.iconBox} data-invalid="true">!</div>
-            <h1 className={s.title}>Invite Invalid</h1>
+            <h1 className={s.title}>{t("invite.inviteInvalid")}</h1>
             <p className={s.sub}>{error}</p>
-            <Link to="/channels/@me" className={s.link}>Continue to the app</Link>
+            <Link to="/channels/@me" className={s.link}>{t("invite.continueToTheApp")}</Link>
           </>
         ) : null}
         {preview && target ? (
@@ -150,12 +151,12 @@ export default function InvitePage() {
             <h1 className={s.title}>{target.name}</h1>
             {preview.server?.description ? <p className={s.sub}>{preview.server.description}</p> : null}
             <div className={s.counts}>
-              {preview.server ? <span><i className={s.online} /> {preview.server.online_count} Online</span> : null}
+              {preview.server ? <span><i className={s.online} /> {t("invite.onlineCount", { count: preview.server.online_count })}</span> : null}
               <span><i className={s.offline} /> {target.member_count} {isGroup ? "in this group" : "Members"}</span>
             </div>
             {status === "ready" ? (
               member ? (
-                <Button block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>You're already in — Open</Button>
+                <Button block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>{t("invite.youReAlreadyInOpen")}</Button>
               ) : (
                 <>
                   <Button block loading={busy} onClick={() => void accept()}>{isGroup ? "Join Group" : "Accept Invite"}</Button>
@@ -164,14 +165,14 @@ export default function InvitePage() {
               )
             ) : status === "anonymous" ? (
               <div className={s.authRow}>
-                <Button block onClick={() => nav(`/login?next=${next}`)}>Log in to accept</Button>
-                <Link to={`/register?next=${next}&invite=${encodeURIComponent(code)}`} className={s.link}>Need an account? Register</Link>
+                <Button block onClick={() => nav(`/login?next=${next}`)}>{t("invite.logInToAccept")}</Button>
+                <Link to={`/register?next=${next}&invite=${encodeURIComponent(code)}`} className={s.link}>{t("invite.needAnAccountRegister")}</Link>
               </div>
             ) : (
               <Spinner />
             )}
-            {fragment.includes("k=") ? <p className={s.note}>This link carries the encryption key, so you can read the history as soon as you join.</p> : null}
-            {isGroup ? <p className={s.note}>Group chats are end-to-end encrypted. Someone already inside has to be online to hand you the key.</p> : null}
+            {fragment.includes("k=") ? <p className={s.note}>{t("invite.thisLinkCarriesTheEncryptionKey")}</p> : null}
+            {isGroup ? <p className={s.note}>{t("invite.groupChatsAreEndToEnd")}</p> : null}
           </>
         ) : null}
       </div>

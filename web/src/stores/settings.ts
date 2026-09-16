@@ -57,6 +57,8 @@ export interface Settings {
   messageDisplay: "cozy" | "compact";
   reducedMotion: boolean;
   underlineLinks: boolean;
+  /** BCP 47 tag, or null to follow the browser. Travels with the account. */
+  locale: string | null;
   /** Underline misspelled words while typing, with suggestions on a right click. */
   spellcheck: boolean;
   linkPreviews: boolean;
@@ -89,6 +91,7 @@ export const DEFAULT_SETTINGS: Settings = {
   messageDisplay: "cozy",
   reducedMotion: false,
   underlineLinks: false,
+  locale: null,
   spellcheck: true,
   linkPreviews: true,
   imagePreviews: true,

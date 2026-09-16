@@ -1,5 +1,6 @@
 import { Modal } from "@/components/common/Modal";
 
+import { t } from "@/i18n";
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const mod = isMac ? "⌘" : "Ctrl";
 
@@ -18,7 +19,7 @@ const ROWS: [string, string][] = [
 
 export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
   return (
-    <Modal open onClose={onClose} title="Keyboard shortcuts" width={520}>
+    <Modal open onClose={onClose} title={t("modals.shortcutsHelp.keyboardShortcuts")} width={520}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
         <tbody>
           {ROWS.map(([k, v]) => (

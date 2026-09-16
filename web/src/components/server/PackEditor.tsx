@@ -15,6 +15,7 @@ import { SaveBar } from "./SettingsLayer";
 import s from "./PackEditor.module.css";
 import { promptFields } from "@/components/modals/PromptModal";
 
+import { t } from "@/i18n";
 const ACCEPT = "image/png,image/gif,image/webp,image/apng";
 const MAX_STICKER = 5 * 1024 * 1024;
 
@@ -65,7 +66,7 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, 
                 </span>
               </button>
               {removable ? (
-                <button className={s.packRemove} aria-label={`Remove ${p.name}`} title="Remove pack" onClick={() => confirmRemovePack(p, () => { if (selected?.id === p.id) onSelect(null); })}>
+                <button className={s.packRemove} aria-label={`Remove ${p.name}`} title={t("server.packEditor.removePack")} onClick={() => confirmRemovePack(p, () => { if (selected?.id === p.id) onSelect(null); })}>
                   <X size={16} />
                 </button>
               ) : null}
@@ -262,19 +263,19 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       </div>
       {manage ? (
         <>
-          <Field label="Pack name" required>
+          <Field label={t("server.packEditor.packName")} required>
             <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="pack-name" />
           </Field>
           <div style={{ height: 12 }} />
-          <Field label="Description" hint="Shown when people find the pack.">
+          <Field label={t("server.packEditor.description")} hint={t("server.packEditor.shownWhenPeopleFindThePack")}>
             <TextArea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 500))} maxLength={500} />
           </Field>
           <div style={{ height: 12 }} />
-          <Toggle checked={pack.public} onChange={(v) => void setPublic(v)} label="Public pack" description="Anyone with the link can install a public pack, and it shows up in Discover." />
+          <Toggle checked={pack.public} onChange={(v) => void setPublic(v)} label={t("server.packEditor.publicPack")} description={t("server.packEditor.anyoneWithTheLinkCanInstall")} />
           {pack.public ? (
             <div className={s.linkRow}>
               <TextInput readOnly value={packUrl(pack.id)} onFocus={(e) => e.currentTarget.select()} />
-              <Button size="sm" variant={copied ? "positive" : "secondary"} onClick={copyLink}>{copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy link</>}</Button>
+              <Button size="sm" variant={copied ? "positive" : "secondary"} onClick={copyLink}>{copied ? <><Check size={14} /> {t("modals.groupInvite.copied")}</> : <><Copy size={14} /> {t("server.packEditor.copyLink")}</>}</Button>
             </div>
           ) : null}
           <div
@@ -291,9 +292,9 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
           {pending.map((p) => (
             <div key={p.preview} className={s.pending}>
               <img src={p.preview} alt="" />
-              <TextInput value={p.name} maxLength={30} placeholder="Name" onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, name: e.target.value } : x)))} data-testid="sticker-name" />
-              {isEmoji ? null : <TextInput value={p.tags} maxLength={200} placeholder="Tags (space separated)" onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, tags: e.target.value } : x)))} />}
-              <Button size="sm" variant="ghost" onClick={() => unstage(p.preview)}>Remove</Button>
+              <TextInput value={p.name} maxLength={30} placeholder={t("modals.subchat.name")} onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, name: e.target.value } : x)))} data-testid="sticker-name" />
+              {isEmoji ? null : <TextInput value={p.tags} maxLength={200} placeholder={t("server.packEditor.tagsSpaceSeparated")} onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, tags: e.target.value } : x)))} />}
+              <Button size="sm" variant="ghost" onClick={() => unstage(p.preview)}>{t("composer.composer.remove")}</Button>
             </div>
           ))}
           {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">Upload {pending.length} {isEmoji ? "emoji" : `sticker${pending.length === 1 ? "" : "s"}`}</Button></div> : null}
@@ -313,15 +314,15 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDrop={(e) => void onDrop(e)}
             onDragEnd={() => { setDrag(null); setDrop(null); }}
           >
-            {pack.cover_sticker_id === st.id ? <span className={s.coverBadge}>Cover</span> : null}
+            {pack.cover_sticker_id === st.id ? <span className={s.coverBadge}>{t("server.packEditor.cover")}</span> : null}
             <img className={s.cellImg} src={packImageUrl(pack, st)} alt={st.name} loading="lazy" draggable={false} />
             <span className={s.cellName} title={st.name}>{st.name}</span>
             <span className={s.cellTags} title={st.tags}>{st.tags}</span>
             {manage ? (
               <span className={s.cellBtns}>
-                <button className={s.cellBtn} title="Set as cover" aria-label="Set as cover" onClick={() => void setCover(st)}><Star size={14} /></button>
-                <button className={s.cellBtn} title="Rename" aria-label="Rename" onClick={() => rename(st)}><Pencil size={14} /></button>
-                <button className={s.cellBtn} title="Delete" aria-label="Delete sticker" data-danger="true" onClick={() => remove(st)}><Trash2 size={14} /></button>
+                <button className={s.cellBtn} title={t("server.packEditor.setAsCover")} aria-label={t("server.packEditor.setAsCover")} onClick={() => void setCover(st)}><Star size={14} /></button>
+                <button className={s.cellBtn} title={t("server.packEditor.rename")} aria-label={t("server.packEditor.rename")} onClick={() => rename(st)}><Pencil size={14} /></button>
+                <button className={s.cellBtn} title={t("chat.messageItem.delete")} aria-label={t("server.packEditor.deleteSticker")} data-danger="true" onClick={() => remove(st)}><Trash2 size={14} /></button>
               </span>
             ) : null}
           </div>

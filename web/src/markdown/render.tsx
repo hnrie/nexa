@@ -5,6 +5,7 @@ import { ensureShortcodes, onShortcodesReady, shortcodeVersion, shortcodesReady 
 import type { Node, RenderCtx } from "./ast";
 import { parse } from "./parse";
 
+import { t } from "@/i18n";
 // ---------------------------------------------------------------------------
 // React renderer for the markdown AST.
 //
@@ -142,9 +143,9 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
     case "mention":
       switch (node.kind) {
         case "everyone":
-          return <span className="md-mention">@everyone</span>;
+          return <span className="md-mention">{t("render.everyone")}</span>;
         case "here":
-          return <span className="md-mention">@here</span>;
+          return <span className="md-mention">{t("render.here")}</span>;
         case "user":
           return <UserMention id={node.id} ctx={ctx} />;
         case "channel":

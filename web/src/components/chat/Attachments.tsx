@@ -15,6 +15,7 @@ import { VideoPlayer } from "./VideoPlayer";
 import { fitMedia, fitVideo } from "./fitMedia";
 import s from "./Chat.module.css";
 
+import { t as tr_ } from "@/i18n";
 export { fitMedia };
 
 /** Small pictures are fetched straight away, before they are even on screen. */
@@ -123,7 +124,7 @@ export function Lightbox({ src, name, type, onClose }: { src: string; name: stri
   zoomedIn.current = scale > 1;
   return createPortal(
     <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name} data-zoomed={scale > 1 || undefined}>
-      <button className={s.lbClose} aria-label="Close" onClick={onClose}><X size={22} /></button>
+      <button className={s.lbClose} aria-label={tr_("chat.attachments.close")} onClick={onClose}><X size={22} /></button>
       <ZoomPan className={s.lbStage} handle={zoom} onZoom={setScale} onIdleClick={onClose}>
         <img
           src={src}
@@ -137,12 +138,12 @@ export function Lightbox({ src, name, type, onClose }: { src: string; name: stri
         />
       </ZoomPan>
       <div className={s.lbBar} onClick={(e) => e.stopPropagation()}>
-        <button aria-label="Zoom out" onClick={() => zoom.current?.zoomBy(1 / 1.4)}><ZoomOut size={16} /></button>
+        <button aria-label={tr_("chat.attachments.zoomOut")} onClick={() => zoom.current?.zoomBy(1 / 1.4)}><ZoomOut size={16} /></button>
         <button onClick={() => zoom.current?.reset()} disabled={scale === 1} data-testid="lightbox-zoom">{Math.round(scale * 100)}%</button>
-        <button aria-label="Zoom in" onClick={() => zoom.current?.zoomBy(1.4)}><ZoomIn size={16} /></button>
+        <button aria-label={tr_("chat.attachments.zoomIn")} onClick={() => zoom.current?.zoomBy(1.4)}><ZoomIn size={16} /></button>
         {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
-        {type?.toLowerCase().startsWith("image/svg") ? null : <a href={src} target="_blank" rel="noopener noreferrer">Open original</a>}
-        <a href={src} download={name}>Download</a>
+        {type?.toLowerCase().startsWith("image/svg") ? null : <a href={src} target="_blank" rel="noopener noreferrer">{tr_("chat.attachments.openOriginal")}</a>}
+        <a href={src} download={name}>{tr_("chat.attachments.download")}</a>
       </div>
     </div>,
     document.body,
@@ -202,7 +203,7 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
       {error ? (
         <LoadFailed error={error} what="video" onRetry={retry} />
       ) : wanted || auto ? (
-        <span className={s.videoLoading}><Spinner size={20} /> Decrypting {att.name} ({formatBytes(att.size)})…</span>
+        <span className={s.videoLoading}><Spinner size={20} /> {tr_("chat.attachments.decryptingNamed", { name: att.name, size: formatBytes(att.size) })}</span>
       ) : (
         <button className={s.videoLoad} onClick={load}>
           <Play size={20} /> Load video ({formatBytes(att.size)})
@@ -222,7 +223,7 @@ function AudioAttachment({ att }: { att: AttachmentMeta }) {
       ) : error ? (
         <span className={s.fileSize}><LoadFailed error={error} what="audio" onRetry={retry} /></span>
       ) : wanted || auto ? (
-        <span className={s.fileSize}>Decrypting {att.name}…</span>
+        <span className={s.fileSize}>{tr_("chat.attachments.decrypting", { name: att.name })}</span>
       ) : (
         <button className={s.videoLoad} onClick={load}>
           <Play size={16} /> Load {att.name} ({formatBytes(att.size)})
@@ -256,7 +257,7 @@ function FileAttachment({ att }: { att: AttachmentMeta }) {
         <span className={s.fileName} onClick={() => void download()}>{att.name}</span>
         <span className={s.fileSize}>{busy ? `Downloading… ${percent}% of ${formatBytes(att.size)}` : formatBytes(att.size)}</span>
       </div>
-      <button className={s.dl} aria-label="Download" onClick={() => void download()} disabled={busy}>{busy ? <Spinner size={20} /> : <Download size={20} />}</button>
+      <button className={s.dl} aria-label={tr_("chat.attachments.download")} onClick={() => void download()} disabled={busy}>{busy ? <Spinner size={20} /> : <Download size={20} />}</button>
     </div>
   );
 }

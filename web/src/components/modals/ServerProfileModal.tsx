@@ -9,6 +9,7 @@ import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 /** Edit your nickname in one server (or someone else's, with Manage Nicknames). */
 export function ServerProfileModal({ onClose, serverId, userId }: { onClose: () => void; serverId: string; userId?: string | undefined }) {
   const me = useAuth((a) => a.me);
@@ -30,9 +31,9 @@ export function ServerProfileModal({ onClose, serverId, userId }: { onClose: () 
     }
   };
   return (
-    <Modal open onClose={onClose} title={target === me?.id ? "Change Nickname" : "Change Their Nickname"} width={440} footer={<><Button variant="ghost" onClick={() => void save("")} disabled={busy}>Reset Nickname</Button><Button onClick={() => void save(nick)} loading={busy}>Save</Button></>}>
+    <Modal open onClose={onClose} title={target === me?.id ? "Change Nickname" : "Change Their Nickname"} width={440} footer={<><Button variant="ghost" onClick={() => void save("")} disabled={busy}>{t("modals.serverProfile.resetNickname")}</Button><Button onClick={() => void save(nick)} loading={busy}>{t("chat.editMessage.save")}</Button></>}>
       <div className={s.form}>
-        <Field label="Nickname" hint={`How you appear in ${st?.server.name ?? "this server"}. Leave it empty to use your display name.`}>
+        <Field label={t("modals.serverProfile.nickname")} hint={`How you appear in ${st?.server.name ?? "this server"}. Leave it empty to use your display name.`}>
           <TextInput value={nick} onChange={(e) => setNick(e.target.value)} maxLength={32} placeholder={me?.display_name} autoFocus onKeyDown={(e) => e.key === "Enter" && void save(nick)} />
         </Field>
       </div>

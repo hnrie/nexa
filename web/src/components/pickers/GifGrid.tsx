@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { gifHeight, masonry, tilesWithin } from "@/lib/masonry";
 import s from "./Picker.module.css";
 
+import { t as tr_ } from "@/i18n";
 export interface GifTileData {
   key: string;
   src: string;
@@ -124,7 +125,7 @@ export function GifGrid<T extends GifTileData>({ tiles, onPick, onMenu, onDead, 
               }
             >
               {tile.dead ? (
-                <span className={s.gifDead}>This one is gone</span>
+                <span className={s.gifDead}>{tr_("pickers.gifGrid.thisOneIsGone")}</span>
               ) : (
                 <button type="button" className={s.gifPick} aria-label={tile.label} onClick={() => onPick(tile)}>
                   <img

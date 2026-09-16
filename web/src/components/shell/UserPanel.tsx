@@ -13,6 +13,7 @@ import { useVoiceLocal } from "@/stores/voiceLocal";
 import s from "./UserPanel.module.css";
 import { micMenuItems } from "@/components/voice/deviceMenus";
 
+import { t } from "@/i18n";
 const OPTIONS: { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string }[] = [
   { value: "online", label: "Online" },
   { value: "idle", label: "Idle" },
@@ -93,13 +94,13 @@ export function UserPanel() {
         </Tooltip>
         {update?.status === "ready" ? (
           <Tooltip text={`Restart to update to ${update.version ?? "the new version"}`}>
-            <button className={[s.icon, s.update].join(" ")} onClick={() => void desktopBridge()?.updates.restart()} aria-label="Restart to update" data-testid="update-ready">
+            <button className={[s.icon, s.update].join(" ")} onClick={() => void desktopBridge()?.updates.restart()} aria-label={t("settings.desktop.restartToUpdate")} data-testid="update-ready">
               <Download size={20} />
             </button>
           </Tooltip>
         ) : null}
         <Tooltip text="User Settings">
-          <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label="User Settings">
+          <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label={t("settings.settings.userSettings")}>
             <Settings size={20} />
           </button>
         </Tooltip>
@@ -131,7 +132,7 @@ export function UserPanel() {
           <div className={s.sep} />
           <button className={[s.opt, s.danger].join(" ")} onClick={() => void logout()}>
             <LogOut size={16} />
-            <span>Log Out</span>
+            <span>{t("settings.settings.logOut")}</span>
           </button>
         </div>
       ) : null}

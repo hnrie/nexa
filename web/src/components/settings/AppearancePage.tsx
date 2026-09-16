@@ -2,8 +2,10 @@ import { Avatar } from "@/components/common/Avatar";
 import { Toggle } from "@/components/common/Toggle";
 import { useAuth } from "@/stores/auth";
 import { useSettings, type Theme } from "@/stores/settings";
+import { LANGUAGES } from "@/i18n";
 import s from "./Settings.module.css";
 
+import { t as tr_ } from "@/i18n";
 const THEMES: { id: Theme; name: string; colors: string[] }[] = [
   { id: "dark", name: "Dark", colors: ["#2c2d32", "#323339", "#393a41"] },
   { id: "light", name: "Light", colors: ["#f3f3f4", "#ffffff", "#ebeced"] },
@@ -20,17 +22,38 @@ export default function AppearancePage() {
   const px = Math.round(st.fontScale * 16);
   return (
     <>
-      <h2 className={s.title}>Appearance</h2>
+      <h2 className={s.title}>{tr_("settings.appearance.appearance")}</h2>
       <div className={s.previewMsg} style={{ fontSize: `${px}px` }}>
         <Avatar id={me?.id ?? "0"} avatarId={me?.avatar_id ?? null} name={me?.display_name ?? "You"} size={40} />
         <div>
           <span className={s.previewName}>{me?.display_name ?? "You"}</span>
-          <span className={s.previewTime}>Today at 4:20 PM</span>
-          <div className={s.previewText}>Look at me I'm a beautiful butterfly. Fluttering in the moonlight 🌝</div>
-          <div className={s.previewText}>Waiting for the day when</div>
+          <span className={s.previewTime}>{tr_("settings.appearance.todayAt420Pm")}</span>
+          <div className={s.previewText}>{tr_("settings.appearance.lookAtMeIMA")}</div>
+          <div className={s.previewText}>{tr_("settings.appearance.waitingForTheDayWhen")}</div>
         </div>
       </div>
-      <h3 className={s.h5}>Theme</h3>
+      <h3 className={s.h5}>{tr_("settings.appearance.language")}</h3>
+      <p className={s.hint}>{tr_("settings.appearance.languageHint")}</p>
+      <div className={s.languages}>
+        <button className={s.language} data-on={st.locale === null} onClick={() => patch({ locale: null })} data-testid="language-auto">
+          {tr_("settings.appearance.matchMyBrowser")}
+        </button>
+        {LANGUAGES.map((l) => (
+          <button
+            key={l.tag}
+            className={s.language}
+            data-on={st.locale === l.tag}
+            lang={l.tag}
+            dir={l.rtl ? "rtl" : "ltr"}
+            onClick={() => patch({ locale: l.tag })}
+            data-testid={`language-${l.tag}`}
+          >
+            <span className={s.languageName}>{l.endonym}</span>
+            <span className={s.languageEnglish}>{l.english}</span>
+          </button>
+        ))}
+      </div>
+      <h3 className={s.h5}>{tr_("settings.appearance.theme")}</h3>
       <div className={s.themes}>
         {THEMES.map((t) => (
           <button key={t.id} className={s.themeCard} data-on={st.theme === t.id} onClick={() => patch({ theme: t.id })}>
@@ -39,15 +62,15 @@ export default function AppearancePage() {
           </button>
         ))}
       </div>
-      <h3 className={s.h5}>Accent colour</h3>
+      <h3 className={s.h5}>{tr_("settings.appearance.accentColour")}</h3>
       <div className={s.swatches}>
-        <button className={s.swatch} data-on={st.accent === null} style={{ background: "#8000ff" }} title="Default" onClick={() => patch({ accent: null })} />
+        <button className={s.swatch} data-on={st.accent === null} style={{ background: "#8000ff" }} title={tr_("server.roles.default")} onClick={() => patch({ accent: null })} />
         {ACCENTS.map((c) => <button key={c} className={s.swatch} data-on={st.accent === c} style={{ background: c }} title={c} onClick={() => patch({ accent: c })} />)}
-        <label className={s.swatch} data-on={!!st.accent && !ACCENTS.includes(st.accent)} title="Custom" style={{ background: st.accent && !ACCENTS.includes(st.accent) ? st.accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
+        <label className={s.swatch} data-on={!!st.accent && !ACCENTS.includes(st.accent)} title={tr_("settings.appearance.custom")} style={{ background: st.accent && !ACCENTS.includes(st.accent) ? st.accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
           <input type="color" value={st.accent ?? "#8000ff"} onChange={(e) => patch({ accent: e.target.value })} />
         </label>
       </div>
-      <h3 className={s.h5}>Message display</h3>
+      <h3 className={s.h5}>{tr_("settings.appearance.messageDisplay")}</h3>
       {(["cozy", "compact"] as const).map((m) => (
         <label key={m} className={s.radio} data-on={st.messageDisplay === m}>
           <input type="radio" name="display" checked={st.messageDisplay === m} onChange={() => patch({ messageDisplay: m })} />
@@ -57,13 +80,13 @@ export default function AppearancePage() {
           </span>
         </label>
       ))}
-      <h3 className={s.h5}>Chat font scaling — {px}px</h3>
-      <input className={s.slider} type="range" min={12} max={20} step={1} value={px} onChange={(e) => patch({ fontScale: Number(e.target.value) / 16 })} aria-label="Font size" />
-      <h3 className={s.h5}>Accessibility</h3>
-      <Toggle checked={st.reducedMotion} onChange={(v) => patch({ reducedMotion: v })} label="Reduced motion" description="Disables animations and transitions." />
-      <Toggle checked={st.underlineLinks} onChange={(v) => patch({ underlineLinks: v })} label="Always underline links" description="Makes links easier to spot in messages." />
-      <h3 className={s.h5}>Typing</h3>
-      <Toggle checked={st.spellcheck !== false} onChange={(v) => patch({ spellcheck: v })} label="Spell check" description="Underlines misspelled words in the message box and while editing. Right-click one for suggestions, or to add it to your dictionary." />
+      <h3 className={s.h5}>{tr_("settings.appearance.chatFontScaling", { px })}</h3>
+      <input className={s.slider} type="range" min={12} max={20} step={1} value={px} onChange={(e) => patch({ fontScale: Number(e.target.value) / 16 })} aria-label={tr_("settings.appearance.fontSize")} />
+      <h3 className={s.h5}>{tr_("settings.appearance.accessibility")}</h3>
+      <Toggle checked={st.reducedMotion} onChange={(v) => patch({ reducedMotion: v })} label={tr_("settings.appearance.reducedMotion")} description={tr_("settings.appearance.disablesAnimationsAndTransitions")} />
+      <Toggle checked={st.underlineLinks} onChange={(v) => patch({ underlineLinks: v })} label={tr_("settings.appearance.alwaysUnderlineLinks")} description={tr_("settings.appearance.makesLinksEasierToSpotIn")} />
+      <h3 className={s.h5}>{tr_("settings.appearance.typing")}</h3>
+      <Toggle checked={st.spellcheck !== false} onChange={(v) => patch({ spellcheck: v })} label={tr_("settings.appearance.spellCheck")} description={tr_("settings.appearance.underlinesMisspelledWordsInTheMessage")} />
     </>
   );
 }

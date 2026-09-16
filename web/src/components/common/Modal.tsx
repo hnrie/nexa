@@ -4,6 +4,7 @@ import { X } from "lucide-react";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
 import s from "./Modal.module.css";
 
+import { t } from "@/i18n";
 /** Only the most recently opened dialog reacts to Escape; portals mount in order, so the last in the DOM is on top. */
 export function isTopLayer(el: HTMLElement | null): boolean {
   if (!el) return false;
@@ -56,7 +57,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
         {!bare && title !== undefined ? (
           <div className={s.header}>
             <h2 className={s.title}>{title}</h2>
-            <button className={s.close} onClick={onClose} aria-label="Close">
+            <button className={s.close} onClick={onClose} aria-label={t("chat.attachments.close")}>
               <X size={20} />
             </button>
           </div>

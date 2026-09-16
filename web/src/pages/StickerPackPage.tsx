@@ -15,6 +15,7 @@ import { useUI } from "@/stores/ui";
 import s from "./InvitePage.module.css";
 import p from "@/components/server/PackEditor.module.css";
 
+import { t } from "@/i18n";
 /** The shareable page for a sticker pack: preview it, install it, or open it for editing. */
 export default function StickerPackPage() {
   const { packId = "" } = useParams();
@@ -74,9 +75,9 @@ export default function StickerPackPage() {
         {error ? (
           <>
             <div className={s.iconBox} data-invalid="true">!</div>
-            <h1 className={s.title}>Pack unavailable</h1>
+            <h1 className={s.title}>{t("stickerPack.packUnavailable")}</h1>
             <p className={s.sub}>{error}</p>
-            <Link to="/channels/@me" className={s.link}>Back to the app</Link>
+            <Link to="/channels/@me" className={s.link}>{t("stickerPack.backToTheApp")}</Link>
           </>
         ) : null}
         {pack ? (
@@ -95,8 +96,8 @@ export default function StickerPackPage() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", justifyContent: "center" }}>
-              {mine ? <Button onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>Edit pack</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? "Remove from my stickers" : "Install pack"}</Button>}
-              <Link to="/channels/@me" className={s.link} style={{ alignSelf: "center" }}>Back to the app</Link>
+              {mine ? <Button onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>{t("stickerPack.editPack")}</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? "Remove from my stickers" : "Install pack"}</Button>}
+              <Link to="/channels/@me" className={s.link} style={{ alignSelf: "center" }}>{t("stickerPack.backToTheApp")}</Link>
             </div>
           </>
         ) : null}

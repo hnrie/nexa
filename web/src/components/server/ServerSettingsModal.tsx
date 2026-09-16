@@ -6,6 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
 import { SettingsLayer, type NavGroup } from "./SettingsLayer";
 
+import { t } from "@/i18n";
 const OverviewPage = lazyPage(() => import("./pages/ServerOverviewPage"));
 const RolesPage = lazyPage(() => import("./pages/RolesPage"));
 const MembersPage = lazyPage(() => import("./pages/MembersPage"));
@@ -57,7 +58,7 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     page === "delete" ? <DeleteServerPage serverId={serverId} onDone={() => { onClose(); nav("/channels/@me"); }} /> :
     <EncryptionPage serverId={serverId} />;
   return (
-    <SettingsLayer label="Server Settings" groups={groups} page={page} setPage={setPage} onClose={onClose}>
+    <SettingsLayer label={t("server.serverSettings.serverSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose}>
       <Suspense fallback={null}>{body}</Suspense>
     </SettingsLayer>
   );

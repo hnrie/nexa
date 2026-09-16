@@ -14,6 +14,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 export default function BansPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
   const upsertUsers = useUsers((u) => u.upsert);
@@ -62,10 +63,10 @@ export default function BansPage({ serverId }: { serverId: string }) {
     <>
       <h2 className={st.title}>Bans{bans ? ` — ${bans.length}` : ""}</h2>
       <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search bans" />
+        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("server.bans.searchBans")} />
       </div>
       {bans === null ? <Spinner /> : null}
-      {bans && bans.length === 0 ? <p className={st.hint}>No one is banned. Keep it that way.</p> : null}
+      {bans && bans.length === 0 ? <p className={st.hint}>{t("server.bans.noOneIsBannedKeepIt")}</p> : null}
       {shown.map((b) => (
         <div key={b.user_id} className={s.memberRow}>
           <Avatar id={b.user_id} avatarId={users[b.user_id]?.avatar_id ?? null} name={displayName(users[b.user_id])} size={40} />
@@ -73,7 +74,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
             <span className={s.memberName}>{displayName(users[b.user_id])}</span>
             <span className={s.memberSub}>@{users[b.user_id]?.username ?? b.user_id} · banned {formatFull(b.created_at)} by {displayName(users[b.banned_by])}{b.reason ? ` · ${b.reason}` : ""}</span>
           </div>
-          <Button size="sm" variant="secondary" loading={busy === b.user_id} onClick={() => void revoke(b.user_id)}>Revoke Ban</Button>
+          <Button size="sm" variant="secondary" loading={busy === b.user_id} onClick={() => void revoke(b.user_id)}>{t("server.bans.revokeBan")}</Button>
         </div>
       ))}
     </>

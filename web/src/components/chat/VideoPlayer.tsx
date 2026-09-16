@@ -6,6 +6,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { fitVideo } from "./fitMedia";
 import s from "./VideoPlayer.module.css";
 
+import { t as tr_ } from "@/i18n";
 function clock(t: number): string {
   if (!Number.isFinite(t) || t < 0) t = 0;
   const total = Math.floor(t);
@@ -294,19 +295,19 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
       ) : null}
       {failed ? (
         <div className={s.failed}>
-          <span>This browser cannot play this video.</span>
-          <a className={s.failedDownload} href={src} download={name}>Download it</a>
+          <span>{tr_("chat.videoPlayer.thisBrowserCannotPlayThisVideo")}</span>
+          <a className={s.failedDownload} href={src} download={name}>{tr_("chat.videoPlayer.downloadIt")}</a>
         </div>
       ) : null}
       {!playing && revealed && !failed ? (
-        <button className={s.bigPlay} aria-label="Play" onClick={toggle}><Play size={28} fill="currentColor" /></button>
+        <button className={s.bigPlay} aria-label={tr_("chat.videoPlayer.play")} onClick={toggle}><Play size={28} fill="currentColor" /></button>
       ) : null}
       {/* data-no-swipe: dragging the seek bar or volume must not pull a drawer open on a phone */}
       <div className={s.bar} data-no-swipe onClick={(e) => e.stopPropagation()} onPointerDown={reveal}>
         <div
           className={s.track}
           role="slider"
-          aria-label="Seek"
+          aria-label={tr_("chat.audioPlayer.seek")}
           aria-valuemin={0}
           aria-valuemax={Math.round(duration) || 0}
           aria-valuenow={Math.round(time)}
@@ -331,18 +332,18 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
           <span className={s.spacer} />
           <div className={s.volumeWrap}>
             <button className={s.ctl} aria-label={muted ? "Unmute" : "Mute"} onClick={() => setMuted((v) => !v)}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
-            <input className={s.volume} type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} aria-label="Volume" onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} />
+            <input className={s.volume} type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} aria-label={tr_("chat.audioPlayer.volume")} onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} />
           </div>
-          <button className={[s.speed, s.wideOnly].join(" ")} aria-label="Playback speed" onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>{speed}×</button>
+          <button className={[s.speed, s.wideOnly].join(" ")} aria-label={tr_("chat.audioPlayer.playbackSpeed")} onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>{speed}×</button>
           {pipOk ? (
             <Tooltip text="Picture in picture" side="top">
-              <button className={[s.ctl, s.wideOnly].join(" ")} aria-label="Picture in picture" onClick={pip}><PictureInPicture2 size={18} /></button>
+              <button className={[s.ctl, s.wideOnly].join(" ")} aria-label={tr_("chat.videoPlayer.pictureInPicture")} onClick={pip}><PictureInPicture2 size={18} /></button>
             </Tooltip>
           ) : null}
           <Tooltip text="Download" side="top">
-            <a className={[s.ctl, s.wideOnly].join(" ")} href={src} download={name} aria-label="Download video" onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
+            <a className={[s.ctl, s.wideOnly].join(" ")} href={src} download={name} aria-label={tr_("chat.videoPlayer.downloadVideo")} onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
           </Tooltip>
-          <button className={[s.ctl, s.narrowOnly].join(" ")} aria-label="More" onClick={more} data-testid="video-more"><MoreVertical size={18} /></button>
+          <button className={[s.ctl, s.narrowOnly].join(" ")} aria-label={tr_("chat.chat.more")} onClick={more} data-testid="video-more"><MoreVertical size={18} /></button>
           {fullOk ? (
             <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
               <button className={s.ctl} aria-label={full ? "Exit full screen" : "Full screen"} onClick={toggleFull} data-testid="video-fullscreen">{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>

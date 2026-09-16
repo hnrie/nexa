@@ -16,6 +16,7 @@ import { promptText } from "@/components/modals/PromptModal";
 import st from "./Settings.module.css";
 import s from "@/components/server/PackEditor.module.css";
 
+import { t as tr_ } from "@/i18n";
 /** User settings → Sticker Packs: your own packs, installed packs, and a Discover tab for public ones. */
 export default function StickersPage({ initialPackId }: { initialPackId?: string | undefined }) {
   const meId = useAuth((a) => a.me?.id);
@@ -78,12 +79,12 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
 
   return (
     <>
-      <h2 className={st.title}>Expression Packs</h2>
-      <p className={st.hint}>Build your own emoji and sticker packs, share them with a link, and install other people's. Everything here is free and unlimited: your emoji work in every server and DM.</p>
+      <h2 className={st.title}>{tr_("settings.stickers.expressionPacks")}</h2>
+      <p className={st.hint}>{tr_("settings.stickers.buildYourOwnEmojiAndSticker")}</p>
       <div className={s.tabs} style={{ marginTop: 16 }}>
-        <button className={s.tab} data-on={tab === "stickers"} onClick={() => { setTab("stickers"); setSelected(null); }} data-nav="packs-stickers">Stickers</button>
-        <button className={s.tab} data-on={tab === "emoji"} onClick={() => { setTab("emoji"); setSelected(null); }} data-nav="packs-emoji">Emoji</button>
-        <button className={s.tab} data-on={tab === "discover"} onClick={() => setTab("discover")}>Discover</button>
+        <button className={s.tab} data-on={tab === "stickers"} onClick={() => { setTab("stickers"); setSelected(null); }} data-nav="packs-stickers">{tr_("pickers.expressionPicker.stickers")}</button>
+        <button className={s.tab} data-on={tab === "emoji"} onClick={() => { setTab("emoji"); setSelected(null); }} data-nav="packs-emoji">{tr_("modals.customStatus.emoji")}</button>
+        <button className={s.tab} data-on={tab === "discover"} onClick={() => setTab("discover")}>{tr_("settings.stickers.discover")}</button>
       </div>
       {tab !== "discover" ? (
         <PackEditor
@@ -98,7 +99,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
         />
       ) : (
         <>
-          <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search public packs" autoFocus />
+          <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr_("settings.stickers.searchPublicPacks")} autoFocus />
           {found === null ? <div style={{ marginTop: 16 }}><Spinner /></div> : null}
           {found && found.length === 0 ? <div className={s.empty}>{q ? "No public packs match." : "No public packs yet. Make one of yours public to be the first."}</div> : null}
           <div className={s.browseGrid}>
@@ -115,9 +116,9 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
                   </div>
                   {p.description ? <span className={s.packSub}>{p.description}</span> : null}
                   <div className={s.browseStickers}>{p.stickers.slice(0, 4).map((x) => <img key={x.id} src={packImageUrl(p, x)} alt={x.name} title={x.name} loading="lazy" />)}</div>
-                  {p.owner_user_id === meId ? <Button size="sm" variant="secondary" onClick={() => { setSelected(p.id); setTab((p.kind ?? "sticker") === "emoji" ? "emoji" : "stickers"); }}>Edit</Button> : p.installed ? (
-                    canRemovePack(p, meId) ? <Button size="sm" variant="secondary" onClick={() => confirmRemovePack(p, () => setFound((cur) => cur?.map((x) => (x.id === p.id ? { ...x, installed: false } : x)) ?? null))}>Remove</Button> : <Button size="sm" variant="secondary" disabled>Installed</Button>
-                  ) : <Button size="sm" loading={busy === p.id} onClick={() => void install(p)}>Install</Button>}
+                  {p.owner_user_id === meId ? <Button size="sm" variant="secondary" onClick={() => { setSelected(p.id); setTab((p.kind ?? "sticker") === "emoji" ? "emoji" : "stickers"); }}>{tr_("pickers.stickerPicker.edit")}</Button> : p.installed ? (
+                    canRemovePack(p, meId) ? <Button size="sm" variant="secondary" onClick={() => confirmRemovePack(p, () => setFound((cur) => cur?.map((x) => (x.id === p.id ? { ...x, installed: false } : x)) ?? null))}>{tr_("composer.composer.remove")}</Button> : <Button size="sm" variant="secondary" disabled>{tr_("settings.stickers.installed")}</Button>
+                  ) : <Button size="sm" loading={busy === p.id} onClick={() => void install(p)}>{tr_("settings.stickers.install")}</Button>}
                 </div>
               );
             })}

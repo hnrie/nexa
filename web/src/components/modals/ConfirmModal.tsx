@@ -4,6 +4,7 @@ import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { useUI } from "@/stores/ui";
 
+import { t } from "@/i18n";
 interface Props {
   onClose: () => void;
   title: string;
@@ -28,7 +29,7 @@ export function ConfirmModal({ onClose, title, body, confirmLabel = "Confirm", d
     }
   };
   return (
-    <Modal open onClose={onClose} title={title} width={440} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant={danger ? "danger" : "primary"} loading={busy} onClick={() => void go()}>{confirmLabel}</Button></>}>
+    <Modal open onClose={onClose} title={title} width={440} footer={<><Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button><Button variant={danger ? "danger" : "primary"} loading={busy} onClick={() => void go()}>{confirmLabel}</Button></>}>
       <div style={{ color: "var(--text)", fontSize: 16 }}>{body}</div>
     </Modal>
   );

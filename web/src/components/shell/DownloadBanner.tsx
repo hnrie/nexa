@@ -10,6 +10,7 @@ import { storage } from "@/lib/storage";
 import { formatBytes } from "@/lib/time";
 import s from "./DownloadBanner.module.css";
 
+import { t } from "@/i18n";
 const DISMISSED = "ec:desktopBanner";
 const DISMISSED_ANDROID = "ec:androidBanner";
 const OS_NAME: Record<DesktopFile["os"], string> = { windows: "Windows", mac: "macOS", linux: "Linux" };
@@ -69,16 +70,16 @@ export function DownloadBanner() {
   if (androidBrowser) {
     if (!apk) return null;
     return (
-      <div className={s.banner} role="region" aria-label="Android app" data-testid="android-banner">
+      <div className={s.banner} role="region" aria-label={t("shell.downloadBanner.androidApp")} data-testid="android-banner">
         <span className={s.icon}><Smartphone size={18} /></span>
         <span className={s.text}>
-          <b>Get the Android app</b><span className={s.tagline}> — calls, notifications and a real app.</span>
+          <b>{t("shell.downloadBanner.getTheAndroidApp")}</b><span className={s.tagline}> {t("shell.downloadBanner.callsNotificationsAndARealApp")}</span>
         </span>
         <a className={s.download} href={android.fileUrl(apk.name)} data-testid="android-banner-button">
           <Download size={14} /> Download <span style={{ opacity: 0.7 }}>{formatBytes(apk.size)}</span>
         </a>
-        <button className={s.other} onClick={close} data-testid="android-banner-dismiss">No thanks</button>
-        <button className={s.close} aria-label="Close" title="Close" onClick={close}><X size={16} /></button>
+        <button className={s.other} onClick={close} data-testid="android-banner-dismiss">{t("shell.downloadBanner.noThanks")}</button>
+        <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={close}><X size={16} /></button>
       </div>
     );
   }
@@ -86,17 +87,17 @@ export function DownloadBanner() {
   if (mobile || !pick) return null;
   const { file, sure } = pick;
   return (
-    <div className={s.banner} role="region" aria-label="Desktop app" data-testid="download-banner">
+    <div className={s.banner} role="region" aria-label={t("shell.downloadBanner.desktopApp")} data-testid="download-banner">
       <span className={s.icon}><Monitor size={18} /></span>
       <span className={s.text}>
-        <b>Get nexa for {OS_NAME[file.os]}</b> — RPC support and a better experience.
+        <b>{t("shell.downloadBanner.getNexaFor", { os: OS_NAME[file.os] })}</b> — RPC support and a better experience.
       </span>
       {sure ? (
         <>
           <a className={s.download} href={desktop.fileUrl(file.name)} data-testid="download-banner-button">
             <Download size={14} /> Download <span style={{ opacity: 0.7 }}>{formatBytes(file.size)}</span>
           </a>
-          <Link className={s.other} to="/download">Other platforms</Link>
+          <Link className={s.other} to="/download">{t("shell.downloadBanner.otherPlatforms")}</Link>
         </>
       ) : (
         // a Mac that does not say which chip it has chooses between the two on the download page
@@ -104,7 +105,7 @@ export function DownloadBanner() {
           <Download size={14} /> Download
         </Link>
       )}
-      <button className={s.close} aria-label="Close" title="Close" onClick={close} data-testid="download-banner-close"><X size={16} /></button>
+      <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={close} data-testid="download-banner-close"><X size={16} /></button>
     </div>
   );
 }

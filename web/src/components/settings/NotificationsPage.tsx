@@ -8,6 +8,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
+import { t } from "@/i18n";
 export default function NotificationsPage() {
   const st = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
@@ -37,24 +38,24 @@ export default function NotificationsPage() {
   };
   return (
     <>
-      <h2 className={s.title}>Notifications</h2>
+      <h2 className={s.title}>{t("settings.notifications.notifications")}</h2>
       {inApp ? (
-        <Toggle checked={st.notifications.app !== false} onChange={(v) => void enable(v)} label="Enable desktop notifications" description="Get a notification for new messages and friend requests when you aren't looking at them, even with the window closed to the tray, unless you are in Do Not Disturb." />
+        <Toggle checked={st.notifications.app !== false} onChange={(v) => void enable(v)} label={t("settings.notifications.enableDesktopNotifications")} description={t("settings.notifications.getANotificationForNewMessages")} />
       ) : (
-        <Toggle checked={st.notifications.desktop && perm === "granted"} disabled={perm === "unsupported" || perm === "denied"} onChange={(v) => void enable(v)} label="Enable desktop notifications" description={perm === "denied" ? "Notifications are blocked for this site in your browser settings." : perm === "unsupported" ? "This browser does not support notifications." : "Get a notification for new messages while this tab is open, unless you are in Do Not Disturb."} />
+        <Toggle checked={st.notifications.desktop && perm === "granted"} disabled={perm === "unsupported" || perm === "denied"} onChange={(v) => void enable(v)} label={t("settings.notifications.enableDesktopNotifications")} description={perm === "denied" ? "Notifications are blocked for this site in your browser settings." : perm === "unsupported" ? "This browser does not support notifications." : "Get a notification for new messages while this tab is open, unless you are in Do Not Disturb."} />
       )}
-      <Toggle checked={st.notifications.sounds} onChange={(v) => patch({ notifications: { ...st.notifications, sounds: v } })} label="Sounds" description="Play a sound for new messages, mentions, friend requests and calls." />
-      <h3 className={s.h5}>Test</h3>
+      <Toggle checked={st.notifications.sounds} onChange={(v) => patch({ notifications: { ...st.notifications, sounds: v } })} label={t("settings.notifications.sounds")} description={t("settings.notifications.playASoundForNewMessages")} />
+      <h3 className={s.h5}>{t("settings.notifications.test")}</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("message")}>Message</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("mention")}>Mention</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("friend")}>Friend request</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("ring")}>Incoming call</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("outgoing")}>Outgoing call</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("leave")}>Leave call</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("mute")}>Mute</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testSound("unmute")}>Unmute</Button>
-        <Button size="sm" variant="secondary" onClick={() => void testNotification()}>Desktop notification</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("message")}>{t("profile.profileCard.message")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("mention")}>{t("settings.notifications.mention")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("friend")}>{t("settings.notifications.friendRequest")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("ring")}>{t("settings.notifications.incomingCall")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("outgoing")}>{t("settings.notifications.outgoingCall")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("leave")}>{t("settings.notifications.leaveCall")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("mute")}>{t("settings.notifications.mute")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testSound("unmute")}>{t("settings.notifications.unmute")}</Button>
+        <Button size="sm" variant="secondary" onClick={() => void testNotification()}>{t("settings.notifications.desktopNotification")}</Button>
       </div>
       {soundHint ? (
         <p className={s.hint} style={{ marginTop: 12 }} role="status" data-testid="sound-trouble">

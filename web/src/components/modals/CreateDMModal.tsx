@@ -11,6 +11,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import s from "./CreateDMModal.module.css";
 
+import { t } from "@/i18n";
 // only the create call is batched; a group grows without limit after that
 const MAX = 49;
 
@@ -58,10 +59,10 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   };
 
   return (
-    <Modal open onClose={onClose} title="Select Friends" width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={picked.length === 0}>{group ? "Add to Group" : picked.length > 1 ? "Create Group DM" : "Create DM"}</Button>}>
+    <Modal open onClose={onClose} title={t("modals.createDM.selectFriends")} width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={picked.length === 0}>{group ? "Add to Group" : picked.length > 1 ? "Create Group DM" : "Create DM"}</Button>}>
       <p className={s.hint}>{group ? "Add anyone you are friends with; groups have no size limit." : picked.length >= MAX ? "Add the rest with an invite link once the group exists." : `Pick friends to start a group, or one person for a DM.`}</p>
-      <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type the username of a friend" autoFocus />
-      {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name (optional)" maxLength={100} /> : null}
+      <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("modals.createDM.typeTheUsernameOfAFriend")} autoFocus />
+      {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
       <div className={s.list}>
         {shown.length === 0 ? <div className={s.empty}>{friends.length === 0 ? "Add some friends first." : "No friends match."}</div> : null}
         {shown.map((r) => (

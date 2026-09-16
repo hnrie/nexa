@@ -7,6 +7,7 @@ import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
 
+import { t } from "@/i18n";
 export default function LoginPage() {
   const nav = useNavigate();
   const loc = useLocation();
@@ -98,7 +99,7 @@ export default function LoginPage() {
   if (step === "code") {
     return (
       <AuthLayout
-        title="One more step"
+        title={t("login.oneMoreStep")}
         subtitle={useBackup ? "Enter one of the backup codes you saved." : "Enter the six-digit code from your authenticator app."}
         width={420}
       >
@@ -118,30 +119,30 @@ export default function LoginPage() {
               required
             />
           </Field>
-          <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">Sign in</Button>
+          <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">{t("login.signIn")}</Button>
           <Button type="button" variant="link" onClick={() => { setUseBackup((v) => !v); setCode(""); setError(null); }}>
             {useBackup ? "Use your authenticator instead" : `Use a backup code${codesLeft ? ` (${codesLeft} left)` : ""}`}
           </Button>
-          <Button type="button" variant="link" onClick={backToPassword}>Back</Button>
+          <Button type="button" variant="link" onClick={backToPassword}>{t("modals.createServer.back")}</Button>
         </form>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="Welcome back!" subtitle="We're so excited to see you again!">
+    <AuthLayout title={t("login.welcomeBack")} subtitle={t("login.weReSoExcitedToSee")}>
       <form className={s.form} onSubmit={(e) => void onPassword(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
-        <Field label="Username" required>
+        <Field label={t("settings.account.username")} required>
           <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus required />
         </Field>
-        <Field label="Password" required>
+        <Field label={t("chat.lockedChannel.password")} required>
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-          <Link to="/recover" className={s.foot}>Forgot your password?</Link>
+          <Link to="/recover" className={s.foot}>{t("login.forgotYourPassword")}</Link>
         </Field>
-        <Button type="submit" size="lg" block loading={busy}>Log In</Button>
+        <Button type="submit" size="lg" block loading={busy}>{t("login.logIn")}</Button>
         <div className={s.foot}>
-          Need an account? <Link to="/register">Register</Link>
+          Need an account? <Link to="/register">{t("login.register")}</Link>
         </div>
       </form>
     </AuthLayout>

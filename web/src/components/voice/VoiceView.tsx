@@ -46,6 +46,7 @@ import { callThroughSfu, currentCameraFacing, flipCamera, guestLinksOn, joinVoic
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
+import { t as tr_ } from "@/i18n";
 /** A video element bound to a MediaStream, that keeps playing through whatever pauses it on iOS. */
 export function StreamVideo({ stream, muted = true, mirror = false, className, onAspect }: { stream: MediaStream; muted?: boolean; mirror?: boolean; className?: string; onAspect?: (ratio: number) => void }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -568,7 +569,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
             {watching[t.userId] ? (
               <>
-                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>Connecting to {nameOf(t.userId)}'s screen…</div> : null}
+                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{tr_("voice.voice.connectingToScreen", { name: nameOf(t.userId) })}</div> : null}
                 <button
                   className={s.watchBtn}
                   data-testid="stop-watching"
@@ -582,7 +583,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
               </>
             ) : (
               <>
-                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{nameOf(t.userId)} is sharing their screen</div> : null}
+                {place !== "strip" && tileH >= 190 ? <div className={s.offerText}>{tr_("voice.voice.isSharingTheirScreen", { name: nameOf(t.userId) })}</div> : null}
                 <button
                   className={s.watchBtn}
                   data-testid="watch-stream"
@@ -606,7 +607,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           <span className={s.tileName} style={color ? { color } : undefined}>
             {t.kind === "screen" ? (t.me ? "Your screen" : `${nameOf(t.userId)}'s screen`) : nameOf(t.userId)}
           </span>
-          {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>Guest</span> : null}
+          {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>{tr_("voice.voiceParticipants.guest")}</span> : null}
           {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
           {t.kind !== "screen" && (vs?.self_deaf || vs?.server_deaf) ? <HeadphoneOff size={14} className={s.tileIcon} data-server={!!vs?.server_deaf} /> : null}
           {(t.kind === "screen" ? streamMutes[t.userId] : localMutes[t.userId]) ? <VolumeX size={14} className={s.tileIcon} /> : null}
@@ -616,12 +617,12 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           <div className={s.tileBtns} onClick={(e) => e.stopPropagation()}>
             {t.me && t.kind === "screen" ? (
               <Tooltip text="Stop Sharing" side="bottom">
-                <button className={s.tileBtn} aria-label="Stop sharing" onClick={() => void toggleScreen()}><MonitorX size={18} /></button>
+                <button className={s.tileBtn} aria-label={tr_("voice.voice.stopSharing")} onClick={() => void toggleScreen()}><MonitorX size={18} /></button>
               </Tooltip>
             ) : null}
             {live && watching[t.userId] ? (
               <Tooltip text="Stop Watching" side="bottom">
-                <button className={s.tileBtn} aria-label="Stop watching" data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={18} /></button>
+                <button className={s.tileBtn} aria-label={tr_("voice.voice.stopWatching")} data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={18} /></button>
               </Tooltip>
             ) : null}
             {playing && !full ? (
@@ -633,7 +634,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
             ) : null}
             {playing && (canPip || webkitPip) && t.stream ? (
               <Tooltip text="Picture in Picture" side="bottom">
-                <button className={s.tileBtn} aria-label="Picture in picture" onClick={() => pip(t)}><PictureInPicture2 size={18} /></button>
+                <button className={s.tileBtn} aria-label={tr_("chat.videoPlayer.pictureInPicture")} onClick={() => pip(t)}><PictureInPicture2 size={18} /></button>
               </Tooltip>
             ) : null}
             {playing ? (
@@ -679,7 +680,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         }}
         onClick={onStageClick}
       >
-        {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>Large rooms strain peer-to-peer calls.</div> : null}
+        {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>{tr_("voice.voice.largeRoomsStrainPeerToPeer")}</div> : null}
         {focusedTile ? (
           <>
             <div className={s.focus} ref={focusRef}>{renderTile(focusedTile, "focus")}</div>
@@ -703,19 +704,19 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           <ControlButton label={deafened ? "Undeafen" : "Deafen"} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
           <ControlButton label={localVideo ? "Turn off camera" : "Turn on camera"} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: "Camera options", open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
           {localVideo && canFlip ? (
-            <ControlButton label="Switch camera" onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>
+            <ControlButton label={tr_("voice.voice.switchCamera")} onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>
           ) : null}
           {canShareScreen ? (
             <ControlButton label={localScreen ? "Stop sharing" : "Share your screen"} on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
           ) : null}
           {/* phones have no side column for it, so full screen joins the row there */}
           <ControlButton label={callFull ? "Exit full screen" : "Full screen"} on={callFull} onClick={toggleCallFull} className={s.narrowOnly} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
-          <ControlButton label="Disconnect" danger onClick={() => void leaveVoice()} testId="voice-leave"><HangUp size={22} /></ControlButton>
+          <ControlButton label={tr_("voice.voiceStatus.disconnect")} danger onClick={() => void leaveVoice()} testId="voice-leave"><HangUp size={22} /></ControlButton>
         </div>
         <div className={[s.controlsSide, s.controlsEnd].join(" ")}>
           {canInviteGuests ? (
             <Tooltip text="Invite Guests" side="top">
-              <button className={s.sideBtn} aria-label="Invite guests" onClick={() => openModal("guestLink", { channelId: channel.id })} data-testid="invite-guests"><Link2 size={20} /></button>
+              <button className={s.sideBtn} aria-label={tr_("voice.voice.inviteGuests")} onClick={() => openModal("guestLink", { channelId: channel.id })} data-testid="invite-guests"><Link2 size={20} /></button>
             </Tooltip>
           ) : null}
           <Tooltip text={callFull ? "Exit full screen" : "Full screen"} side="top">
@@ -799,11 +800,11 @@ function CallResizer({ root }: { root: React.RefObject<HTMLDivElement | null> })
       className={s.resizer}
       role="separator"
       aria-orientation="horizontal"
-      aria-label="Resize call"
+      aria-label={tr_("voice.voice.resizeCall")}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(share * 100)}
-      title="Drag to resize, double-click to reset"
+      title={tr_("voice.voice.dragToResizeDoubleClickTo")}
       tabIndex={0}
       data-dragging={dragging || undefined}
       data-native-press=""

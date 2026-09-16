@@ -21,6 +21,7 @@ import { serverMenuItems } from "@/components/sidebar/serverMenu";
 import { lastChannelOf } from "@/stores/serverNav";
 import s from "./Rail.module.css";
 
+import { t } from "@/i18n";
 /** Servers in the user's chosen order (settings), then join order. */
 export function orderedServerIds(order: string[], positions: string[]): string[] {
   const known = new Set(order);
@@ -117,7 +118,7 @@ export function Rail() {
   };
 
   return (
-    <nav className={s.rail} aria-label="Servers" ref={railRef} onDragEnd={() => { setDragId(null); setOver(null); }}>
+    <nav className={s.rail} aria-label={t("rail.rail.servers")} ref={railRef} onDragEnd={() => { setDragId(null); setOver(null); }}>
       <div className={s.item} data-selected={home} data-unread={(unread || friendRequests > 0) && !home} data-testid="home">
         <span className={s.pill} />
         <Tooltip text="Direct Messages" side="right">
@@ -197,7 +198,7 @@ export function Rail() {
       <div className={[s.item, s.add].join(" ")}>
         <span className={s.pill} />
         <Tooltip text="Add a Server" side="right">
-          <button className={s.btn} aria-label="Add a Server" onClick={() => openModal("createServer")}>
+          <button className={s.btn} aria-label={t("rail.rail.addAServer")} onClick={() => openModal("createServer")}>
             <Plus size={24} />
           </button>
         </Tooltip>

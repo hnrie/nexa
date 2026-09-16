@@ -20,6 +20,7 @@ import { useSettings } from "@/stores/settings";
 import { closeDM, dmMenuItems } from "./dmMenu";
 import s from "./Sidebar.module.css";
 
+import { t } from "@/i18n";
 export function DMSidebar() {
   const nav = useNavigate();
   const loc = useLocation();
@@ -50,20 +51,20 @@ export function DMSidebar() {
   return (
     <div className={s.sidebar}>
       <div className={s.search}>
-        <button className={s.searchBtn} onClick={() => setQuickSwitcher(true)}>Find or start a conversation</button>
+        <button className={s.searchBtn} onClick={() => setQuickSwitcher(true)}>{t("sidebar.dMSidebar.findOrStartAConversation")}</button>
       </div>
       <div className={s.scroll}>
         <button className={s.nav} data-selected={loc.pathname === "/channels/@me"} onClick={() => go("/channels/@me")}>
           <span className={s.navIcon}><Users size={22} /></span>
-          <span>Friends</span>
+          <span>{t("sidebar.dMSidebar.friends")}</span>
         </button>
         <div className={s.header}>
-          <span>Direct Messages</span>
-          <button className={s.headerBtn} aria-label="Create DM" title="Create DM" onClick={() => openModal("createDM")}>
+          <span>{t("sidebar.dMSidebar.directMessages")}</span>
+          <button className={s.headerBtn} aria-label={t("sidebar.dMSidebar.createDm")} title={t("sidebar.dMSidebar.createDm")} onClick={() => openModal("createDM")}>
             <Plus size={16} />
           </button>
         </div>
-        {dms.length === 0 ? <div className={s.empty}>No conversations yet. Add a friend to start one.</div> : null}
+        {dms.length === 0 ? <div className={s.empty}>{t("sidebar.dMSidebar.noConversationsYetAddAFriend")}</div> : null}
         {dms.map((ch) => {
           const name = channelDisplayName(ch, users, meId, nicknames);
           const rs = reads[ch.id];
@@ -108,7 +109,7 @@ export function DMSidebar() {
               <span
                 className={s.close}
                 role="button"
-                aria-label="Close DM"
+                aria-label={t("sidebar.dMSidebar.closeDm")}
                 title={ch.type === "group_dm" ? "Leave group" : "Close DM"}
                 onClick={(e) => {
                   e.stopPropagation();

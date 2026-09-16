@@ -7,6 +7,7 @@ import { desktopBridge } from "@/lib/desktopBridge";
 import { shareAudioRequested } from "@/voice/media";
 import s from "./Desktop.module.css";
 
+import { t } from "@/i18n";
 /**
  * The desktop app's screen and window picker, asked for by getDisplayMedia
  * after the Share Your Screen dialog. Browsers have their own; the app shows
@@ -32,16 +33,16 @@ export function ScreenPermission({ stale, onClose }: { stale: boolean; onClose: 
     <Modal
       open
       onClose={onClose}
-      title="This computer is not sharing the screen"
+      title={t("desktop.displayPicker.thisComputerIsNotSharingThe")}
       width={520}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
+          <Button variant="ghost" onClick={onClose}>{t("chat.attachments.close")}</Button>
           {bridge?.openScreenSettings ? (
-            <Button variant="secondary" onClick={() => void bridge.openScreenSettings?.()} data-testid="open-screen-settings"><ExternalLink size={16} /> Open Settings</Button>
+            <Button variant="secondary" onClick={() => void bridge.openScreenSettings?.()} data-testid="open-screen-settings"><ExternalLink size={16} /> {t("desktop.displayPicker.openSettings")}</Button>
           ) : null}
           {bridge?.restartApp ? (
-            <Button onClick={() => void bridge.restartApp?.()} data-testid="restart-for-screen"><RotateCw size={16} /> Restart nexa</Button>
+            <Button onClick={() => void bridge.restartApp?.()} data-testid="restart-for-screen"><RotateCw size={16} /> {t("desktop.displayPicker.restartNexa")}</Button>
           ) : null}
         </>
       }
@@ -51,13 +52,13 @@ export function ScreenPermission({ stale, onClose }: { stale: boolean; onClose: 
         <div>
           {stale ? (
             <>
-              <p><b>Screen Recording is switched on for nexa, and the system is still refusing.</b> That happens after an update: the permission points at the copy of the app that asked for it.</p>
-              <p>Restarting usually settles it. If it does not, open Privacy &amp; Security → Screen Recording, take nexa out of the list with the minus button, add it again, and restart.</p>
+              <p><b>{t("desktop.displayPicker.screenRecordingIsSwitchedOnFor")}</b> {t("desktop.displayPicker.thatHappensAfterAnUpdateThe")}</p>
+              <p>{t("desktop.displayPicker.restartingUsuallySettlesItIfIt")}</p>
             </>
           ) : (
             <>
-              <p><b>nexa needs permission to record the screen.</b> Open Privacy &amp; Security → Screen Recording and switch nexa on.</p>
-              <p>macOS only hands the permission over to a fresh start, so restart the app afterwards.</p>
+              <p><b>{t("desktop.displayPicker.nexaNeedsPermissionToRecordThe")}</b> {t("desktop.displayPicker.openPrivacyAmpSecurityScreenRecording")}</p>
+              <p>{t("desktop.displayPicker.macosOnlyHandsThePermissionOver")}</p>
             </>
           )}
         </div>
@@ -79,21 +80,21 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
     <Modal
       open
       onClose={() => onChoose(null, false)}
-      title="Choose what to share"
+      title={t("desktop.displayPicker.chooseWhatToShare")}
       width={640}
       footer={
         <>
-          <Button variant="ghost" onClick={() => onChoose(null, false)}>Cancel</Button>
-          <Button disabled={!picked} onClick={() => onChoose(picked, audio)} data-testid="display-share"><MonitorUp size={16} /> Share</Button>
+          <Button variant="ghost" onClick={() => onChoose(null, false)}>{t("chat.editMessage.cancel")}</Button>
+          <Button disabled={!picked} onClick={() => onChoose(picked, audio)} data-testid="display-share"><MonitorUp size={16} /> {t("desktop.displayPicker.share")}</Button>
         </>
       }
     >
       <div className={s.tabs} role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "screen"} className={s.tab} data-on={tab === "screen"} onClick={() => setTab("screen")}>Screens ({screens.length})</button>
-        <button type="button" role="tab" aria-selected={tab === "window"} className={s.tab} data-on={tab === "window"} onClick={() => setTab("window")}>Windows ({windows.length})</button>
+        <button type="button" role="tab" aria-selected={tab === "screen"} className={s.tab} data-on={tab === "screen"} onClick={() => setTab("screen")}>{t("desktop.displayPicker.screensCount", { count: screens.length })}</button>
+        <button type="button" role="tab" aria-selected={tab === "window"} className={s.tab} data-on={tab === "window"} onClick={() => setTab("window")}>{t("desktop.displayPicker.windowsCount", { count: windows.length })}</button>
       </div>
       {shown.length === 0 ? (
-        <div className={s.empty}>Nothing to share here.</div>
+        <div className={s.empty}>{t("desktop.displayPicker.nothingToShareHere")}</div>
       ) : (
         <div className={s.grid}>
           {shown.map((src) => (

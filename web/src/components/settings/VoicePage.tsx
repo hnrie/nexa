@@ -10,6 +10,7 @@ import { inVoice } from "@/voice/session";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
 
+import { t as tr_ } from "@/i18n";
 /** User settings → Voice & Video. */
 export default function VoicePage() {
   const settings = useSettings((s) => s.settings.voice);
@@ -119,10 +120,10 @@ export default function VoicePage() {
   const label = (d: MediaDeviceInfo, i: number, kind: string) => d.label || `${kind} ${i + 1}`;
   return (
     <>
-      <h2 className={st.title}>Voice & Video</h2>
+      <h2 className={st.title}>{tr_("settings.voice.voiceVideo")}</h2>
       <div className={st.form}>
         <div className={`${st.twoCol} ${st.twoEqual}`}>
-          <Field label="Input device">
+          <Field label={tr_("settings.voice.inputDevice")}>
             <Select
               value={settings.inputDeviceId ?? ""}
               data-testid="input-device"
@@ -136,7 +137,7 @@ export default function VoicePage() {
               {realDevices(devices?.inputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Microphone")}</option>)}
             </Select>
           </Field>
-          <Field label="Output device">
+          <Field label={tr_("settings.voice.outputDevice")}>
             <Select
               value={settings.outputDeviceId ?? ""}
               onChange={(e) => {
@@ -158,19 +159,19 @@ export default function VoicePage() {
             <input type="range" className={st.slider} min={0} max={200} value={settings.outputVolume} onChange={(e) => set({ outputVolume: Number(e.target.value) })} />
           </Field>
         </div>
-        <Field label="Mic test" hint="Speak and watch both meters. The top one is your microphone; the bottom one is what a call would actually send. The yellow mark is your voice-activity threshold.">
+        <Field label={tr_("settings.voice.micTest")} hint={tr_("settings.voice.speakAndWatchBothMetersThe")}>
           <div>
             <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? "Stop test" : "Let's check"}</Button>
-            <div className={v.meter} aria-label="Input level" data-testid="mic-level">
+            <div className={v.meter} aria-label={tr_("settings.voice.inputLevel")} data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
               {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}
             </div>
             {testing ? (
               <>
-                <div className={v.meter} aria-label="Level others would hear" data-testid="sent-level" style={{ marginTop: 6 }}>
+                <div className={v.meter} aria-label={tr_("settings.voice.levelOthersWouldHear")} data-testid="sent-level" style={{ marginTop: 6 }}>
                   <div className={v.meterFill} data-sent="true" style={{ width: `${Math.round(sentLevel * 100)}%` }} />
                 </div>
-                <p className={st.hint} style={{ marginTop: 6 }}>Top: your microphone. Bottom: what the call sends.</p>
+                <p className={st.hint} style={{ marginTop: 6 }}>{tr_("settings.voice.topYourMicrophoneBottomWhatThe")}</p>
               </>
             ) : null}
             {wrongDevice ? (
@@ -181,17 +182,17 @@ export default function VoicePage() {
             {diag ? <pre className={v.diag} data-testid="mic-diagnostics">{diag}</pre> : null}
           </div>
         </Field>
-        <h5 className={st.h5}>Input mode</h5>
+        <h5 className={st.h5}>{tr_("settings.voice.inputMode")}</h5>
         <label className={st.radio} data-on={settings.mode === "vad"}>
           <input type="radio" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
-          <span className={st.radioText}><span className={st.radioLabel}>Voice Activity</span><span className={st.radioDesc}>Transmit whenever you talk.</span></span>
+          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.voiceActivity")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitWheneverYouTalk")}</span></span>
         </label>
         <label className={st.radio} data-on={settings.mode === "ptt"}>
           <input type="radio" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
-          <span className={st.radioText}><span className={st.radioLabel}>Push to Talk</span><span className={st.radioDesc}>Transmit only while you hold a key.</span></span>
+          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
         </label>
         {settings.mode === "ptt" ? (
-          <Field label="Push-to-talk key" hint="Click the box, then press the key you want. Works while this tab is focused.">
+          <Field label={tr_("settings.voice.pushToTalkKey")} hint={tr_("settings.voice.clickTheBoxThenPressThe")}>
             <button type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing(true)}>
               <span>{capturing ? "Press a key…" : settings.pttKey}</span>
               <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? "Esc to cancel" : "Change"}</span>
@@ -199,7 +200,7 @@ export default function VoicePage() {
           </Field>
         ) : (
           <>
-            <Toggle checked={settings.autoSensitivity} onChange={(on) => set({ autoSensitivity: on })} label="Automatically determine input sensitivity" description="Learns your background noise and only counts speech above it." />
+            <Toggle checked={settings.autoSensitivity} onChange={(on) => set({ autoSensitivity: on })} label={tr_("settings.voice.automaticallyDetermineInputSensitivity")} description={tr_("settings.voice.learnsYourBackgroundNoiseAndOnly")} />
             {!settings.autoSensitivity ? (
               <Field label={`Input sensitivity — ${settings.sensitivity} dB`}>
                 <input type="range" className={st.slider} min={-100} max={0} value={settings.sensitivity} onChange={(e) => set({ sensitivity: Number(e.target.value) })} />
@@ -207,11 +208,11 @@ export default function VoicePage() {
             ) : null}
           </>
         )}
-        <h5 className={st.h5}>Voice processing</h5>
-        <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label="Noise suppression" description="Filters keyboard clatter and fans with the browser's built-in suppressor." />
-        <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label="Echo cancellation" />
-        <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label="Automatic gain control" />
-        <Field label="Camera">
+        <h5 className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h5>
+        <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label={tr_("settings.voice.noiseSuppression")} description={tr_("settings.voice.filtersKeyboardClatterAndFansWith")} />
+        <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label={tr_("settings.voice.echoCancellation")} />
+        <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label={tr_("settings.voice.automaticGainControl")} />
+        <Field label={tr_("settings.voice.camera")}>
           <Select
             value={settings.cameraDeviceId ?? ""}
             data-testid="camera-device"

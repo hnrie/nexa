@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { EmojiPicker, focusSearchOnOpen, type EmojiPick } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
+import { t } from "@/i18n";
 export type PickerTab = "emoji" | "gif" | "sticker";
 
 interface Props {
@@ -82,12 +83,12 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
     };
   }, [onClose]);
   const body = (
-    <div className={s.pop} ref={ref} role="dialog" aria-label="Expression picker" style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor}>
+    <div className={s.pop} ref={ref} role="dialog" aria-label={t("pickers.expressionPicker.expressionPicker")} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor}>
       <div className={s.tabs}>
-        <button className={s.tab} data-selected={active === "gif"} disabled={!gifs} onClick={() => setActive("gif")}>GIFs</button>
-        <button className={s.tab} data-selected={active === "sticker"} disabled={!stickers} onClick={() => setActive("sticker")}>Stickers</button>
-        <button className={s.tab} data-selected={active === "emoji"} onClick={() => setActive("emoji")}>Emoji</button>
-        <button className={s.close} aria-label="Close picker" onClick={onClose}><X size={18} /></button>
+        <button className={s.tab} data-selected={active === "gif"} disabled={!gifs} onClick={() => setActive("gif")}>{t("pickers.expressionPicker.gifs")}</button>
+        <button className={s.tab} data-selected={active === "sticker"} disabled={!stickers} onClick={() => setActive("sticker")}>{t("pickers.expressionPicker.stickers")}</button>
+        <button className={s.tab} data-selected={active === "emoji"} onClick={() => setActive("emoji")}>{t("modals.customStatus.emoji")}</button>
+        <button className={s.close} aria-label={t("pickers.expressionPicker.closePicker")} onClick={onClose}><X size={18} /></button>
       </div>
       {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} /> : active === "gif" ? gifs : stickers}
     </div>

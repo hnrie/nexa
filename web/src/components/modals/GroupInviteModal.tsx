@@ -16,6 +16,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 const AGES: { v: number; label: string }[] = [
   { v: 1800, label: "30 minutes" },
   { v: 86400, label: "1 day" },
@@ -69,11 +70,11 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
   return (
     <Modal open onClose={onClose} title={`Invite people to ${name}`} width={480}>
       <div className={s.form}>
-        <p className={s.hint}>Anyone with this link joins the group, friend or not. Group chats have no size limit here.</p>
-        <Field label="Invite link" hint={invite?.expires_at ? `Expires ${new Date(invite.expires_at).toLocaleString()}.` : "This link never expires."}>
+        <p className={s.hint}>{t("modals.groupInvite.anyoneWithThisLinkJoinsThe")}</p>
+        <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? `Expires ${new Date(invite.expires_at).toLocaleString()}.` : "This link never expires."}>
           <div className={s.linkRow}>
             <TextInput readOnly value={link} placeholder={busy ? "Generating…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="group-invite-link" />
-            <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy</>}</Button>
+            <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>
         <div className={s.keyNote} data-warn={!key}>
@@ -81,12 +82,12 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
           <span>{key ? "The link carries this chat's encryption key, so whoever joins can read what is already here." : "You do not hold this chat's key yet, so the link cannot carry it. Someone who has it needs to be online when the new member joins."}</span>
         </div>
         <div className={s.row2}>
-          <Field label="Expire after">
+          <Field label={t("modals.groupInvite.expireAfter")}>
             <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(v, uses); }}>
               {AGES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
-          <Field label="Max number of uses">
+          <Field label={t("modals.groupInvite.maxNumberOfUses")}>
             <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); void generate(age, v); }}>
               {USES.map((u) => <option key={u} value={u}>{u === 0 ? "No limit" : `${u} use${u === 1 ? "" : "s"}`}</option>)}
             </Select>

@@ -12,6 +12,7 @@ import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 import { imageNameFromUrl } from "@/lib/imageActions";
 
+import { t } from "@/i18n";
 /** A readable name for a linked file: the last part of its address. */
 function fileNameOf(url: string, fallback: string): string {
   try {
@@ -156,7 +157,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
               referrerPolicy="strict-origin-when-cross-origin"
             />
           ) : (
-            <button className={s.poster} onClick={() => setPlay(true)} aria-label="Play video" style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
+            <button className={s.poster} onClick={() => setPlay(true)} aria-label={t("chat.embeds.playVideo")} style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
               <span className={s.playBtn}><Play size={26} fill="currentColor" /></span>
             </button>
           )}
@@ -221,7 +222,7 @@ function InviteEmbed({ e }: { e: UnfurlResult }) {
   const online = typeof e.online_count === "number" && e.online_count > 0 ? `${e.online_count} online` : "";
   return (
     <div className={s.invite} data-testid="invite-embed">
-      <div className={s.inviteHead}>You have been invited to join</div>
+      <div className={s.inviteHead}>{t("chat.embeds.youHaveBeenInvitedToJoin")}</div>
       <div className={s.inviteBody}>
         {e.image ? (
           <img className={s.inviteIcon} src={e.image} alt="" loading="lazy" />
@@ -232,7 +233,7 @@ function InviteEmbed({ e }: { e: UnfurlResult }) {
           <span className={s.inviteName}>{e.title}</span>
           <span className={s.inviteSub}>{[online, members].filter(Boolean).join(" · ") || e.description}</span>
         </div>
-        <Button size="sm" variant="positive" onClick={open} data-testid="invite-join">Join</Button>
+        <Button size="sm" variant="positive" onClick={open} data-testid="invite-join">{t("chat.embeds.join")}</Button>
       </div>
     </div>
   );

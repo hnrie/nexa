@@ -7,6 +7,7 @@ import { useAuth } from "@/stores/auth";
 import { AuthLayout, passwordStrength, usernameProblem } from "./AuthLayout";
 import s from "./Auth.module.css";
 
+import { t } from "@/i18n";
 export default function RegisterPage() {
   const nav = useNavigate();
   const register = useAuth((a) => a.register);
@@ -77,33 +78,33 @@ export default function RegisterPage() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
     return (
-      <AuthLayout title="Save your recovery key" subtitle="Your messages are end-to-end encrypted. If you forget your password, this key is the only way back in.">
+      <AuthLayout title={t("register.saveYourRecoveryKey")} subtitle={t("register.yourMessagesAreEndToEnd")}>
         <div className={s.recovery} data-testid="recovery-key">{recovery}</div>
         <div className={s.row}>
-          <Button variant="secondary" block onClick={() => void navigator.clipboard?.writeText(recovery)}>Copy</Button>
-          <Button variant="secondary" block onClick={download}>Download .txt</Button>
+          <Button variant="secondary" block onClick={() => void navigator.clipboard?.writeText(recovery)}>{t("modals.groupInvite.copy")}</Button>
+          <Button variant="secondary" block onClick={download}>{t("register.downloadTxt")}</Button>
         </div>
-        <div className={s.warn}>We cannot show this key again. Anyone who has it can read your messages, so store it like a password.</div>
+        <div className={s.warn}>{t("register.weCannotShowThisKeyAgain")}</div>
         <label className={s.check}>
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-          <span>I have saved my recovery key somewhere safe.</span>
+          <span>{t("register.iHaveSavedMyRecoveryKey")}</span>
         </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true })}>Continue to nexa</Button>
+        <Button size="lg" block disabled={!saved} onClick={() => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true })}>{t("register.continueToNexa")}</Button>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="Create an account">
+    <AuthLayout title={t("register.createAnAccount")}>
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
-        <Field label="Username" required error={uname && uProblem ? uProblem : null} hint="Lowercase letters, numbers, underscores and dots. This is your unique @handle.">
+        <Field label={t("settings.account.username")} required error={uname && uProblem ? uProblem : null} hint={t("register.lowercaseLettersNumbersUnderscoresAndDots")}>
           <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={32} required />
         </Field>
-        <Field label="Display name" required hint="How your name appears to others. You can change it any time.">
+        <Field label={t("register.displayName")} required hint={t("register.howYourNameAppearsToOthers")}>
           <TextInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" maxLength={32} required />
         </Field>
-        <Field label="Password" required hint={password && password.length < 8 ? "At least 8 characters." : undefined}>
+        <Field label={t("chat.lockedChannel.password")} required hint={password && password.length < 8 ? "At least 8 characters." : undefined}>
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
           {password ? (
             <div className={s.strength} data-score={strength.score}>
@@ -112,19 +113,19 @@ export default function RegisterPage() {
             </div>
           ) : null}
         </Field>
-        <Field label="Confirm password" required error={confirm && confirm !== password ? "Passwords do not match." : null}>
+        <Field label={t("register.confirmPassword")} required error={confirm && confirm !== password ? "Passwords do not match." : null}>
           <TextInput type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
         <details>
-          <summary className={s.foot}>Have an invite or registration key?</summary>
-          <Field label="Invite / registration key">
+          <summary className={s.foot}>{t("register.haveAnInviteOrRegistrationKey")}</summary>
+          <Field label={t("register.inviteRegistrationKey")}>
             <TextInput value={inviteKey} onChange={(e) => setInviteKey(e.target.value)} />
           </Field>
         </details>
         {progress ? <div className={s.progress}>{progress}</div> : null}
-        <Button type="submit" size="lg" block loading={busy} disabled={!canSubmit}>Continue</Button>
+        <Button type="submit" size="lg" block loading={busy} disabled={!canSubmit}>{t("settings.security.continue")}</Button>
         <div className={s.foot}>
-          <Link to="/login">Already have an account?</Link>
+          <Link to="/login">{t("register.alreadyHaveAnAccount")}</Link>
         </div>
       </form>
     </AuthLayout>

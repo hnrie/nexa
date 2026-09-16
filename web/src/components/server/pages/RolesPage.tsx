@@ -19,6 +19,7 @@ import { SaveBar } from "../SettingsLayer";
 import { rolePositionsAfterDrop } from "./rolePositions";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 const SWATCHES = [0x1abc9c, 0x2ecc71, 0x3498db, 0x9b59b6, 0xe91e63, 0xf1c40f, 0xe67e22, 0xe74c3c, 0x95a5a6, 0x607d8b, 0x11806a, 0x1f8b4c, 0x206694, 0x71368a, 0xad1457, 0xc27c0e, 0xa84300, 0x992d22, 0x979c9f, 0x546e7a];
 
 function hex(c: number): string {
@@ -83,11 +84,11 @@ export default function RolesPage({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <h2 className={st.title}>Roles</h2>
-      <p className={st.hint}>Use roles to group your members and assign permissions. Drag roles to reorder them: members can only manage roles below their own highest role.</p>
+      <h2 className={st.title}>{t("server.members.roles")}</h2>
+      <p className={st.hint}>{t("server.roles.useRolesToGroupYourMembers")}</p>
       <div className={s.rolesLayout}>
         <div className={s.roleList}>
-          <Button size="sm" variant="secondary" onClick={() => void create()} loading={busy} style={{ marginBottom: 8 }} data-testid="create-role"><Plus size={14} /> Create Role</Button>
+          <Button size="sm" variant="secondary" onClick={() => void create()} loading={busy} style={{ marginBottom: 8 }} data-testid="create-role"><Plus size={14} /> {t("server.roles.createRole")}</Button>
           {roles.map((r) => {
             const canDrag = r.id !== serverId && canManageRole(mine.highest, mine.isOwner, r.position);
             return (
@@ -114,9 +115,9 @@ export default function RolesPage({ serverId }: { serverId: string }) {
         </div>
         <div>
           <div className={s.tabs}>
-            <button className={s.tab} data-on={view === "display"} onClick={() => setTab("display")}>Display</button>
-            <button className={s.tab} data-on={view === "permissions"} onClick={() => setTab("permissions")}>Permissions</button>
-            {role.id !== serverId ? <button className={s.tab} data-on={tab === "members"} onClick={() => setTab("members")}>Manage Members</button> : null}
+            <button className={s.tab} data-on={view === "display"} onClick={() => setTab("display")}>{t("server.roles.display")}</button>
+            <button className={s.tab} data-on={view === "permissions"} onClick={() => setTab("permissions")}>{t("server.channelSettings.permissions")}</button>
+            {role.id !== serverId ? <button className={s.tab} data-on={tab === "members"} onClick={() => setTab("members")}>{t("server.roles.manageMembers")}</button> : null}
           </div>
           {view === "display" ? <DisplayTab key={role.id} role={role} editable={editable} everyone={role.id === serverId} onSaved={upsertRole} onDeleted={() => { removeRole(serverId, role.id); setSelected(serverId); }} /> : null}
           {view === "permissions" ? <PermissionsTab key={role.id} role={role} editable={editable} actorPerms={server.myPermissions} onSaved={upsertRole} /> : null}
@@ -161,27 +162,27 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
   return (
     <div className={st.form}>
       {!everyone ? (
-        <Field label="Role name" required>
+        <Field label={t("server.roles.roleName")} required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} disabled={!editable} data-testid="role-name" />
         </Field>
       ) : (
-        <p className={st.hint}>@everyone is the base role every member has. You can change its colour and permissions but not its name.</p>
+        <p className={st.hint}>{t("server.roles.everyoneIsTheBaseRoleEvery")}</p>
       )}
-      <Field as="div" label="Role colour" hint="Members use the colour of their highest role that has one.">
-        <div className={s.swatches} role="radiogroup" aria-label="Role colour">
+      <Field as="div" label={t("server.roles.roleColour")} hint={t("server.roles.membersUseTheColourOfTheir")}>
+        <div className={s.swatches} role="radiogroup" aria-label={t("server.roles.roleColour")}>
           <span className={s.preview}><span className={s.dot} style={{ background: color ? hex(color) : "var(--text-muted)" }} />{name || "@everyone"}</span>
-          <label className={s.swatch} data-on={color === 0} style={{ background: "var(--bg-active)" }} title="Default"><input type="radio" checked={color === 0} disabled={!editable} onChange={() => setColor(0)} /></label>
+          <label className={s.swatch} data-on={color === 0} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")}><input type="radio" checked={color === 0} disabled={!editable} onChange={() => setColor(0)} /></label>
           {SWATCHES.map((c) => (
             <label key={c} className={s.swatch} data-on={color === c} style={{ background: hex(c) }} title={hex(c)}><input type="radio" checked={color === c} disabled={!editable} onChange={() => setColor(c)} /></label>
           ))}
-          <label className={s.swatch} style={{ background: color && !SWATCHES.includes(color) ? hex(color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title="Custom colour"><input type="color" value={hex(color || 0x99aab5)} disabled={!editable} onChange={(e) => setColor(parseInt(e.target.value.slice(1), 16))} /></label>
+          <label className={s.swatch} style={{ background: color && !SWATCHES.includes(color) ? hex(color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title={t("server.roles.customColour")}><input type="color" value={hex(color || 0x99aab5)} disabled={!editable} onChange={(e) => setColor(parseInt(e.target.value.slice(1), 16))} /></label>
         </div>
       </Field>
-      {!everyone ? <Toggle checked={hoist} disabled={!editable} onChange={setHoist} label="Display role members separately from online members" /> : null}
-      <Toggle checked={mentionable} disabled={!editable} onChange={setMentionable} label="Allow anyone to @mention this role" description="Members with Mention @everyone can always mention roles." />
+      {!everyone ? <Toggle checked={hoist} disabled={!editable} onChange={setHoist} label={t("server.roles.displayRoleMembersSeparatelyFromOnline")} /> : null}
+      <Toggle checked={mentionable} disabled={!editable} onChange={setMentionable} label={t("server.roles.allowAnyoneToMentionThisRole")} description={t("server.roles.membersWithMentionEveryoneCanAlways")} />
       {!everyone && editable ? (
         <div>
-          <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: `Delete '${role.name}'`, body: "Members lose this role and any permissions it granted. This cannot be undone.", confirmLabel: "Delete Role", danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> Delete Role</Button>
+          <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: `Delete '${role.name}'`, body: "Members lose this role and any permissions it granted. This cannot be undone.", confirmLabel: "Delete Role", danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> {t("server.roles.deleteRole")}</Button>
         </div>
       ) : null}
       <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(role.name); setColor(role.color); setHoist(role.hoist); setMentionable(role.mentionable); }} onSave={() => void save()} />
@@ -210,8 +211,8 @@ function PermissionsTab({ role, editable, actorPerms, onSaved }: { role: Role; e
   return (
     <div>
       <div className={s.searchRow}>
-        <TextInput value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search permissions" />
-        <Button variant="ghost" size="sm" onClick={() => setValue(0n)} disabled={!editable}>Clear</Button>
+        <TextInput value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("server.roles.searchPermissions")} />
+        <Button variant="ghost" size="sm" onClick={() => setValue(0n)} disabled={!editable}>{t("modals.quickSwitcher.clear")}</Button>
       </div>
       <p className={st.hint} style={{ marginBottom: 8 }}>You can only grant permissions you hold yourself{(actorPerms & (1n << 3n)) !== 0n ? " (you have all of them)" : ""}.</p>
       <RoleGrid value={value} onChange={setValue} editable={editable} filter={filter} />
@@ -247,7 +248,7 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
   return (
     <div>
       <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search members" />
+        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("server.channelSettings.searchMembers")} />
       </div>
       {members.map(({ m, name, username, has }) => (
         <div key={m.user_id} className={s.memberRow}>

@@ -30,6 +30,7 @@ import { useAutosize } from "./useAutosize";
 import type { RefObject } from "react";
 import s from "./Composer.module.css";
 
+import { t as tr_ } from "@/i18n";
 const MAX_LEN = 4000;
 const TYPING_INTERVAL = 8000;
 /** How long Send waits for link previews that are still on their way. */
@@ -449,14 +450,14 @@ export function Composer({ channel }: { channel: Channel }) {
   if (!canSend) {
     return (
       <div className={s.wrap}>
-        <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">You do not have permission to send messages in this channel.</div>
+        <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">{tr_("composer.composer.youDoNotHavePermissionTo")}</div>
       </div>
     );
   }
 
   return (
     <div className={s.wrap} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={onDrop}>
-      {drag ? <div className={s.drop}>Drop to upload to {name}</div> : null}
+      {drag ? <div className={s.drop}>{tr_("composer.composer.dropToUploadTo", { name })}</div> : null}
       {ac ? <Autocomplete items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
       {picker ? (
         <ExpressionPicker
@@ -477,7 +478,7 @@ export function Composer({ channel }: { channel: Channel }) {
             {replyTarget.author_id !== me?.id ? (
               <button className={s.pingBtn} data-on={replyTo?.ping} onClick={() => replyTo && setReplyTo({ ...replyTo, ping: !replyTo.ping })}>@ {replyTo?.ping ? "ON" : "OFF"}</button>
             ) : null}
-            <button className={s.closeBtn} aria-label="Cancel reply" onClick={() => setReplyTo(null)}><X size={16} /></button>
+            <button className={s.closeBtn} aria-label={tr_("composer.composer.cancelReply")} onClick={() => setReplyTo(null)}><X size={16} /></button>
           </span>
         </div>
       ) : null}
@@ -493,8 +494,8 @@ export function Composer({ channel }: { channel: Channel }) {
               {f.progress > 0 && f.progress < 1 ? <div className={s.bar}><i style={{ width: `${Math.round(f.progress * 100)}%` }} /></div> : null}
               {f.error ? <div className={s.err}>{f.error}</div> : null}
               <div className={s.cardBtns}>
-                <button className={s.cardBtn} data-on={f.spoiler} title="Spoiler" onClick={() => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, spoiler: !x.spoiler } : x)))}>{f.spoiler ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                <button className={[s.cardBtn, s.del].join(" ")} title="Remove" onClick={() => { removedFiles.current.add(f.id); setFiles((cur) => cur.filter((x) => x.id !== f.id)); }}><Trash2 size={16} /></button>
+                <button className={s.cardBtn} data-on={f.spoiler} title={tr_("composer.composer.spoiler")} onClick={() => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, spoiler: !x.spoiler } : x)))}>{f.spoiler ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                <button className={[s.cardBtn, s.del].join(" ")} title={tr_("composer.composer.remove")} onClick={() => { removedFiles.current.add(f.id); setFiles((cur) => cur.filter((x) => x.id !== f.id)); }}><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
@@ -502,7 +503,7 @@ export function Composer({ channel }: { channel: Channel }) {
       ) : null}
       <div className={s.box}>
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
-        {canAttach ? <button className={s.attach} aria-label="Upload a file" onClick={() => fileRef.current?.click()} disabled={sending}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
+        {canAttach ? <button className={s.attach} aria-label={tr_("composer.composer.uploadAFile")} onClick={() => fileRef.current?.click()} disabled={sending}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
         <textarea
           ref={taRef}
           className={s.ta}
@@ -524,13 +525,13 @@ export function Composer({ channel }: { channel: Channel }) {
           aria-label={placeholder}
         />
         <div className={s.btns}>
-          <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label="Select emoji" onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
-          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label="Send message" onClick={() => void send()} disabled={sending || remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
+          <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
+          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={sending || remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
         </div>
       </div>
       {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
-        <span className={s.slowmode} data-active={remaining > 0} title="Slow mode is enabled">
+        <span className={s.slowmode} data-active={remaining > 0} title={tr_("composer.composer.slowModeIsEnabled")}>
           <Timer size={14} /> {remaining > 0 ? `${remaining}s` : "Slowmode is enabled"}
         </span>
       ) : null}

@@ -7,6 +7,7 @@ import { useUsers } from "@/stores/users";
 import { ProfileCard } from "./ProfileCard";
 import s from "./Profile.module.css";
 
+import { t } from "@/i18n";
 export default function ProfileModal({ onClose, userId }: { onClose: () => void; userId: string }) {
   const me = useAuth((a) => a.me);
   const stored = useUsers((u) => u.byId[userId]);
@@ -30,13 +31,13 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
 
   if (!known && loadError) {
     return (
-      <Modal open onClose={onClose} title="Profile">
-        <p className={s.small}>Could not load this profile.</p>
-        <Button size="sm" onClick={() => { setLoadError(false); setRetry((r) => r + 1); }}>Retry</Button>
+      <Modal open onClose={onClose} title={t("profile.profile.profile")}>
+        <p className={s.small}>{t("profile.profile.couldNotLoadThisProfile")}</p>
+        <Button size="sm" onClick={() => { setLoadError(false); setRetry((r) => r + 1); }}>{t("chat.messageItem.retry")}</Button>
       </Modal>
     );
   }
-  if (!known) return <Modal open onClose={onClose} title="Profile"><p className={s.small}>Loading…</p></Modal>;
+  if (!known) return <Modal open onClose={onClose} title={t("profile.profile.profile")}><p className={s.small}>{t("chat.pins.loading")}</p></Modal>;
   return (
     <Modal open onClose={onClose} width={600} bare>
       <ProfileCard userId={userId} variant="modal" onClose={onClose} />

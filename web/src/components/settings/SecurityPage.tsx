@@ -18,6 +18,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
+import { t } from "@/i18n";
 /** Turns the account password into the proof the server expects. */
 async function authKeyFor(password: string): Promise<string> {
   const bundle = await usersApi.myKeys();
@@ -175,9 +176,9 @@ export default function SecurityPage() {
 
   return (
     <>
-      <h2 className={s.title}>Security</h2>
+      <h2 className={s.title}>{t("settings.security.security")}</h2>
 
-      <h3 className={s.h}><ShieldCheck size={16} /> Two-factor authentication</h3>
+      <h3 className={s.h}><ShieldCheck size={16} /> {t("settings.security.twoFactorAuthentication")}</h3>
       <p className={s.hint}>
         An authenticator app adds a six-digit code to every sign-in, so your password alone is not enough. Your messages stay end-to-end encrypted either way; this protects the account itself.
       </p>
@@ -190,16 +191,16 @@ export default function SecurityPage() {
         </div>
         {on ? (
           <div style={{ display: "flex", gap: 8 }}>
-            <Button size="sm" variant="secondary" onClick={() => setDialog("codes")}>Backup codes</Button>
-            <Button size="sm" variant="danger" onClick={() => setDialog("disable")} data-testid="mfa-disable">Turn off</Button>
+            <Button size="sm" variant="secondary" onClick={() => setDialog("codes")}>{t("settings.security.backupCodes")}</Button>
+            <Button size="sm" variant="danger" onClick={() => setDialog("disable")} data-testid="mfa-disable">{t("settings.security.turnOff")}</Button>
           </div>
         ) : (
-          <Button size="sm" onClick={() => setDialog("enable")} data-testid="mfa-enable">Set up</Button>
+          <Button size="sm" onClick={() => setDialog("enable")} data-testid="mfa-enable">{t("settings.security.setUp")}</Button>
         )}
       </div>
-      {on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>You have no backup codes left. Without one, losing your authenticator means falling back to your recovery key.</div> : null}
+      {on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>{t("settings.security.youHaveNoBackupCodesLeft")}</div> : null}
 
-      <h3 className={s.h} style={{ marginTop: 28 }}><Lock size={16} /> App lock</h3>
+      <h3 className={s.h} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
       <p className={s.hint}>
         A passcode for this device. While it is on, your keys are stored wrapped by the passcode, so closing the tab or locking the app really does put your messages out of reach until you type it again. Ten wrong tries wipe the wrapped copy, and your account password gets you back in.
       </p>
@@ -209,11 +210,11 @@ export default function SecurityPage() {
           <div className={s.deviceSub}>{policy ? "Every device you sign in on asks for it, on each reload and whenever the app locks." : "The app opens straight into your messages."}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {policy ? <Button size="sm" variant="secondary" onClick={() => setDialog("passcode")}>Change</Button> : null}
+          {policy ? <Button size="sm" variant="secondary" onClick={() => setDialog("passcode")}>{t("settings.security.change")}</Button> : null}
           {policy ? (
-            <Button size="sm" variant="danger" onClick={() => setDialog("removePasscode")} data-testid="lock-remove">Remove</Button>
+            <Button size="sm" variant="danger" onClick={() => setDialog("removePasscode")} data-testid="lock-remove">{t("composer.composer.remove")}</Button>
           ) : (
-            <Button size="sm" onClick={() => setDialog("passcode")} data-testid="lock-set">Set a passcode</Button>
+            <Button size="sm" onClick={() => setDialog("passcode")} data-testid="lock-set">{t("settings.security.setAPasscode")}</Button>
           )}
         </div>
       </div>
@@ -223,32 +224,32 @@ export default function SecurityPage() {
           <div className={s.row}>
             <div className={s.rowLabel}>
               Lock after inactivity
-              <div className={s.deviceSub}>Nothing typed, clicked or scrolled for this long.</div>
+              <div className={s.deviceSub}>{t("settings.security.nothingTypedClickedOrScrolledFor")}</div>
             </div>
             <div className={s.rowValue}>
-              <Select value={String(lock.autoLockMs)} onChange={(e) => patch({ autoLockMs: Number(e.target.value) })} aria-label="Lock after inactivity" data-testid="lock-idle">
+              <Select value={String(lock.autoLockMs)} onChange={(e) => patch({ autoLockMs: Number(e.target.value) })} aria-label={t("settings.security.lockAfterInactivity")} data-testid="lock-idle">
                 {AUTO_LOCK_CHOICES.map((c) => <option key={c.ms} value={c.ms}>{c.label}</option>)}
               </Select>
             </div>
           </div>
           <div className={s.row}>
             <div className={s.rowLabel} style={{ flex: 1 }}>
-              <Toggle checked={lock.lockOnBlur} onChange={(v) => patch({ lockOnBlur: v })} label="Lock when the app loses focus" description="Switching to another window or tab locks it." />
+              <Toggle checked={lock.lockOnBlur} onChange={(v) => patch({ lockOnBlur: v })} label={t("settings.security.lockWhenTheAppLosesFocus")} description={t("settings.security.switchingToAnotherWindowOrTab")} />
             </div>
           </div>
           {lock.lockOnBlur ? (
             <div className={s.row}>
-              <div className={s.rowLabel}>Lock once it is in the background</div>
+              <div className={s.rowLabel}>{t("settings.security.lockOnceItIsInThe")}</div>
               <div className={s.rowValue}>
-                <Select value={String(lock.blurDelayMs)} onChange={(e) => patch({ blurDelayMs: Number(e.target.value) })} aria-label="Lock once in the background">
+                <Select value={String(lock.blurDelayMs)} onChange={(e) => patch({ blurDelayMs: Number(e.target.value) })} aria-label={t("settings.security.lockOnceInTheBackground")}>
                   {BLUR_DELAY_CHOICES.map((c) => <option key={c.ms} value={c.ms}>{c.label}</option>)}
                 </Select>
               </div>
             </div>
           ) : null}
           <div className={s.row}>
-            <div className={s.rowLabel}>Lock right now</div>
-            <div className={s.rowValue}><Button size="sm" variant="secondary" onClick={lockApp} data-testid="lock-now">Lock</Button></div>
+            <div className={s.rowLabel}>{t("settings.security.lockRightNow")}</div>
+            <div className={s.rowValue}><Button size="sm" variant="secondary" onClick={lockApp} data-testid="lock-now">{t("settings.security.lock")}</Button></div>
           </div>
         </div>
       ) : null}
@@ -261,22 +262,22 @@ export default function SecurityPage() {
               <BackupCodes codes={codes} copied={copied} onCopy={() => void copyCodes()} onDownload={downloadCodes} onDone={close} />
             ) : !setup ? (
               <>
-                <p className={s.hint}>Confirm your password to start.</p>
-                <Field label="Password" required>
+                <p className={s.hint}>{t("settings.security.confirmYourPasswordToStart")}</p>
+                <Field label={t("chat.lockedChannel.password")} required>
                   <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
-                <Button block loading={busy} disabled={!password} onClick={() => void beginSetup()}>Continue</Button>
+                <Button block loading={busy} disabled={!password} onClick={() => void beginSetup()}>{t("settings.security.continue")}</Button>
               </>
             ) : (
               <>
                 <div style={{ display: "flex", justifyContent: "center" }}>
-                  <QrCode text={setup.uri} size={188} label="Authenticator setup code" />
+                  <QrCode text={setup.uri} size={188} label={t("settings.security.authenticatorSetupCode")} />
                 </div>
                 <button type="button" className={s.hint} style={{ textAlign: "center", textDecoration: "underline" }} onClick={() => setShowSecret((v) => !v)}>
                   {showSecret ? "Hide the key" : "Can't scan it?"}
                 </button>
                 {showSecret ? <div className={s.recovery} data-testid="totp-secret">{setup.formatted}</div> : null}
-                <Field label="Enter the six-digit code it shows" required>
+                <Field label={t("settings.security.enterTheSixDigitCodeIt")} required>
                   <TextInput
                     value={code}
                     onChange={(e) => setCode(e.target.value.replace(/[^\d\s]/g, "").slice(0, 7))}
@@ -287,7 +288,7 @@ export default function SecurityPage() {
                     data-testid="totp-code"
                   />
                 </Field>
-                <Button block loading={busy} disabled={code.replace(/\s/g, "").length !== 6} onClick={() => void finishSetup()} data-testid="totp-confirm">Turn on</Button>
+                <Button block loading={busy} disabled={code.replace(/\s/g, "").length !== 6} onClick={() => void finishSetup()} data-testid="totp-confirm">{t("settings.security.turnOn")}</Button>
               </>
             )}
           </div>
@@ -295,16 +296,16 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "codes" ? (
-        <Modal title="Backup codes" open onClose={close} closeOnOverlay={!codes} width={460}>
+        <Modal title={t("settings.security.backupCodes")} open onClose={close} closeOnOverlay={!codes} width={460}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             {!codes ? (
               <>
                 <p className={s.hint}>Each code signs you in once when you cannot reach your authenticator. Making a new set cancels the old one. You have {left} left.</p>
-                <Field label="Password" required>
+                <Field label={t("chat.lockedChannel.password")} required>
                   <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
-                <Button block loading={busy} disabled={!password} onClick={() => void regenerate()}>Generate new codes</Button>
+                <Button block loading={busy} disabled={!password} onClick={() => void regenerate()}>{t("settings.security.generateNewCodes")}</Button>
               </>
             ) : (
               <BackupCodes codes={codes} copied={copied} onCopy={() => void copyCodes()} onDownload={downloadCodes} onDone={close} />
@@ -314,14 +315,14 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "disable" ? (
-        <Modal title="Turn off two-factor authentication" open onClose={close} width={440}>
+        <Modal title={t("settings.security.turnOffTwoFactorAuthentication")} open onClose={close} width={440}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
-            <p className={s.hint}>Your password alone will get into this account again. Your backup codes are destroyed.</p>
-            <Field label="Password" required>
+            <p className={s.hint}>{t("settings.security.yourPasswordAloneWillGetInto")}</p>
+            <Field label={t("chat.lockedChannel.password")} required>
               <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
             </Field>
-            <Button block variant="danger" loading={busy} disabled={!password} onClick={() => void disable()}>Turn it off</Button>
+            <Button block variant="danger" loading={busy} disabled={!password} onClick={() => void disable()}>{t("settings.security.turnItOff")}</Button>
           </div>
         </Modal>
       ) : null}
@@ -330,11 +331,11 @@ export default function SecurityPage() {
         <Modal title={lock ? "Change your passcode" : "Set a passcode"} open onClose={close} width={440}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
-            <p className={s.hint}>Digits or a phrase, at least 4 characters. It never leaves this device, so nobody, including this server, can reset it for you. Forgetting it costs you nothing permanent: sign in again with your password.</p>
-            <Field label="Passcode" required>
+            <p className={s.hint}>{t("settings.security.digitsOrAPhraseAtLeast")}</p>
+            <Field label={t("settings.security.passcode")} required>
               <TextInput type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="new-password" autoFocus data-testid="passcode-new" />
             </Field>
-            <Field label="Passcode again" required>
+            <Field label={t("settings.security.passcodeAgain")} required>
               <TextInput type="password" value={pin2} onChange={(e) => setPin2(e.target.value)} autoComplete="new-password" data-testid="passcode-confirm" />
             </Field>
             <Button block loading={busy} disabled={!pin || !pin2} onClick={() => void savePasscode()} data-testid="passcode-save">{lock ? "Change it" : "Turn it on"}</Button>
@@ -343,11 +344,11 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "removePasscode" ? (
-        <Modal title="Remove the passcode" open onClose={close} width={440}>
+        <Modal title={t("settings.security.removeThePasscode")} open onClose={close} width={440}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
-            <p className={s.hint}>This device goes back to keeping your keys ready, and the app opens straight into your messages.</p>
-            <Button block variant="danger" loading={busy} onClick={() => void dropPasscode()}>Remove it</Button>
+            <p className={s.hint}>{t("settings.security.thisDeviceGoesBackToKeeping")}</p>
+            <Button block variant="danger" loading={busy} onClick={() => void dropPasscode()}>{t("settings.security.removeIt")}</Button>
           </div>
         </Modal>
       ) : null}
@@ -360,15 +361,15 @@ function BackupCodes({ codes, copied, onCopy, onDownload, onDone }: { codes: str
     <>
       <div className={s.dangerBox} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
         <Smartphone size={16} style={{ flexShrink: 0, marginTop: 2 }} />
-        <span>Save these now. They are shown once, and each one signs you in a single time if you lose your authenticator.</span>
+        <span>{t("settings.security.saveTheseNowTheyAreShown")}</span>
       </div>
       <div className={s.recovery} data-testid="backup-codes">
         {codes.map((c) => <div key={c}>{c}</div>)}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <Button variant="secondary" onClick={onCopy}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Copied" : "Copy"}</Button>
-        <Button variant="secondary" onClick={onDownload}><Download size={15} /> Download</Button>
-        <Button onClick={onDone} style={{ marginLeft: "auto" }}>Done</Button>
+        <Button variant="secondary" onClick={onDownload}><Download size={15} /> {t("chat.attachments.download")}</Button>
+        <Button onClick={onDone} style={{ marginLeft: "auto" }}>{t("modals.serverNotifications.done")}</Button>
       </div>
     </>
   );

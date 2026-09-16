@@ -17,6 +17,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./QuickSwitcher.module.css";
 
+import { t } from "@/i18n";
 interface Item {
   id: string;
   kind: "dm" | "friend" | "channel" | "server";
@@ -135,8 +136,8 @@ export function QuickSwitcher() {
     <Modal open onClose={() => setOpen(false)} width={560} bare className={s.top}>
       <div className={s.box}>
         <div className={s.tabs} role="tablist">
-          <button role="tab" aria-selected={mode === "go"} data-on={mode === "go"} onClick={() => { setMode("go"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-go">Jump to</button>
-          <button role="tab" aria-selected={mode === "messages"} data-on={mode === "messages"} onClick={() => { setMode("messages"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-messages">Messages</button>
+          <button role="tab" aria-selected={mode === "go"} data-on={mode === "go"} onClick={() => { setMode("go"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-go">{t("modals.quickSwitcher.jumpTo")}</button>
+          <button role="tab" aria-selected={mode === "messages"} data-on={mode === "messages"} onClick={() => { setMode("messages"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-messages">{t("modals.quickSwitcher.messages")}</button>
         </div>
         <div className={s.inputRow}>
           <input
@@ -157,13 +158,13 @@ export function QuickSwitcher() {
               }
             }}
           />
-          {q ? <button className={s.clear} aria-label="Clear" onClick={() => { setQ(""); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-clear">×</button> : null}
+          {q ? <button className={s.clear} aria-label={t("modals.quickSwitcher.clear")} onClick={() => { setQ(""); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-clear">×</button> : null}
         </div>
         {mode === "messages" ? <SearchSuggestions query={q} users={users} channels={searchable} onPick={(next) => { setQ(next); setSel(0); inputRef.current?.focus(); }} /> : null}
         <div className={s.list}>
           {mode === "go" ? (
             <>
-              {items.length === 0 ? <div className={s.empty}>No matches.</div> : null}
+              {items.length === 0 ? <div className={s.empty}>{t("modals.quickSwitcher.noMatches")}</div> : null}
               {items.map((it, i) => (
                 <button key={it.id} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
                   {it.kind === "channel" ? <span className={s.hash}>#</span> : <Avatar id={it.userId} avatarId={it.avatarId} name={it.label.replace(/^#/, "")} size={24} />}
@@ -174,8 +175,8 @@ export function QuickSwitcher() {
             </>
           ) : (
             <>
-              {isEmptyQuery(parsed) ? <div className={s.empty}>Type to search everything this device has decrypted. <b>from:me</b> finds what you sent.</div> : null}
-              {!isEmptyQuery(parsed) && hits.length === 0 ? <div className={s.empty}>Nothing matched. Open a conversation and load older messages to widen the index.</div> : null}
+              {isEmptyQuery(parsed) ? <div className={s.empty}>Type to search everything this device has decrypted. <b>from:me</b> {t("modals.quickSwitcher.findsWhatYouSent")}</div> : null}
+              {!isEmptyQuery(parsed) && hits.length === 0 ? <div className={s.empty}>{t("modals.quickSwitcher.nothingMatchedOpenAConversationAnd")}</div> : null}
               {hits.map((m, i) => {
                 const ch = channels[m.channel_id];
                 const author = users[m.author_id];

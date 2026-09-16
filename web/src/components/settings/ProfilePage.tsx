@@ -11,6 +11,7 @@ import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
+import { t } from "@/i18n";
 const PRESETS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#607d8b"];
 
 /** A colour column may be missing entirely on an older server, so treat anything but a number as unset. */
@@ -100,57 +101,57 @@ export default function ProfilePage() {
 
   return (
     <>
-      <h2 className={s.title}>Profiles</h2>
+      <h2 className={s.title}>{t("settings.profile.profiles")}</h2>
       <div className={s.twoCol}>
         <div className={s.form}>
-          <Field label="Display Name"><TextInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={32} /></Field>
-          <Field label="Pronouns"><TextInput value={pronouns} onChange={(e) => setPronouns(e.target.value)} maxLength={40} placeholder="Add your pronouns" /></Field>
+          <Field label={t("settings.account.displayName")}><TextInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={32} /></Field>
+          <Field label={t("settings.profile.pronouns")}><TextInput value={pronouns} onChange={(e) => setPronouns(e.target.value)} maxLength={40} placeholder={t("settings.profile.addYourPronouns")} /></Field>
           <div>
-            <div className={s.h5} style={{ marginTop: 0 }}>Avatar</div>
+            <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.avatar")}</div>
             <div className={s.uploadRow}>
               <input ref={avatarRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "avatar" }); e.target.value = ""; }} />
-              <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()}>Change Avatar</Button>
-              {me.avatar_id ? <Button size="sm" variant="ghost" onClick={() => void remove("avatar")}>Remove Avatar</Button> : null}
+              <Button size="sm" loading={uploading === "avatar"} onClick={() => avatarRef.current?.click()}>{t("settings.profile.changeAvatar")}</Button>
+              {me.avatar_id ? <Button size="sm" variant="ghost" onClick={() => void remove("avatar")}>{t("settings.profile.removeAvatar")}</Button> : null}
             </div>
-            <p className={s.hint}>PNG, JPEG, GIF or WebP up to 10 MB. Animated avatars play everywhere, for everyone.</p>
+            <p className={s.hint}>{t("settings.profile.pngJpegGifOrWebpUp")}</p>
           </div>
           <div>
-            <div className={s.h5} style={{ marginTop: 0 }}>Profile Banner</div>
+            <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileBanner")}</div>
             <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "banner" }); e.target.value = ""; }} />
             <div className={s.bannerPick} style={banner ? { backgroundImage: `url(${banner})` } : { background: themeCss }}>
-              <Button size="sm" variant="secondary" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()}>Change Banner</Button>
-              {me.banner_id ? <Button size="sm" variant="ghost" onClick={() => void remove("banner")}>Remove</Button> : null}
+              <Button size="sm" variant="secondary" loading={uploading === "banner"} onClick={() => bannerRef.current?.click()}>{t("settings.profile.changeBanner")}</Button>
+              {me.banner_id ? <Button size="sm" variant="ghost" onClick={() => void remove("banner")}>{t("composer.composer.remove")}</Button> : null}
             </div>
           </div>
           <div>
-            <div className={s.h5} style={{ marginTop: 0 }}>Profile Theme</div>
-            <p className={s.hint} style={{ margin: "0 0 6px" }}>Top colour — on its own it colours your banner</p>
+            <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileTheme")}</div>
+            <p className={s.hint} style={{ margin: "0 0 6px" }}>{t("settings.profile.topColourOnItsOwnIt")}</p>
             <div className={s.swatches}>
-              <button className={s.swatch} data-on={accent === null} style={{ background: "var(--bg-active)" }} title="Default" onClick={() => { setAccent(null); setAccent2(null); }} />
+              <button className={s.swatch} data-on={accent === null} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")} onClick={() => { setAccent(null); setAccent2(null); }} />
               {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent === c} style={{ background: c }} title={c} onClick={() => setAccent(c)} />)}
-              <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} title="Custom">
+              <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} title={t("settings.appearance.custom")}>
                 <CustomColorIcon color={accent && !PRESETS.includes(accent) ? accent : null} />
                 <input type="color" value={accent ?? "#8000ff"} onChange={(e) => setAccent(e.target.value)} />
               </label>
-              <HexInput value={accent} fallback="#8000ff" label="Primary colour hex" onChange={setAccent} />
+              <HexInput value={accent} fallback="#8000ff" label={t("settings.profile.primaryColourHex")} onChange={setAccent} />
             </div>
-            <p className={s.hint} style={{ margin: "12px 0 6px" }}>Bottom colour — pick one too and your whole profile becomes a gradient from top to bottom</p>
+            <p className={s.hint} style={{ margin: "12px 0 6px" }}>{t("settings.profile.bottomColourPickOneTooAnd")}</p>
             <div className={s.swatches}>
-              <button className={s.swatch} data-on={accent2 === null} style={{ background: "var(--bg-active)" }} title="None" onClick={() => setAccent2(null)} disabled={!accent} />
+              <button className={s.swatch} data-on={accent2 === null} style={{ background: "var(--bg-active)" }} title={t("settings.profile.none")} onClick={() => setAccent2(null)} disabled={!accent} />
               {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent2 === c} style={{ background: c }} title={c} onClick={() => setAccent2(c)} disabled={!accent} />)}
-              <label className={s.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ opacity: accent ? 1 : 0.4 }} title="Custom">
+              <label className={s.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ opacity: accent ? 1 : 0.4 }} title={t("settings.appearance.custom")}>
                 <CustomColorIcon color={accent2 && !PRESETS.includes(accent2) ? accent2 : null} />
                 <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} onChange={(e) => setAccent2(e.target.value)} />
               </label>
-              <HexInput value={accent2} fallback="#eb459e" label="Second colour hex" disabled={!accent} onChange={setAccent2} />
+              <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} disabled={!accent} onChange={setAccent2} />
             </div>
           </div>
-          <Field label="About Me" hint="Markdown works here. There is no length limit.">
-            <TextArea value={about} onChange={(e) => setAbout(e.target.value)} rows={6} placeholder="Tell people about yourself" />
+          <Field label={t("settings.profile.aboutMe")} hint={t("settings.profile.markdownWorksHereThereIsNo")}>
+            <TextArea value={about} onChange={(e) => setAbout(e.target.value)} rows={6} placeholder={t("settings.profile.tellPeopleAboutYourself")} />
           </Field>
         </div>
         <div className={s.preview}>
-          <div className={s.h5} style={{ marginTop: 0 }}>Preview</div>
+          <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.preview")}</div>
           {/* the profile exactly as others will see it, theme and all, with the changes not yet saved */}
           <div className={s.previewCard} data-testid="profile-preview">
             <ProfileCard userId={me.id} variant="panel" preview={{ display_name: displayName || me.display_name, pronouns, about_me: about, accent_color: hex(accent), accent_color_2: hex(accent2) }} />
@@ -174,10 +175,10 @@ export default function ProfilePage() {
       ) : null}
       {dirty ? (
         <div className={s.saveBar}>
-          <span>Careful — you have unsaved changes!</span>
+          <span>{t("server.settingsLayer.carefulYouHaveUnsavedChanges")}</span>
           <span className={s.saveBtns}>
-            <Button variant="ghost" onClick={reset}>Reset</Button>
-            <Button variant="positive" loading={saving} onClick={() => void save()}>Save Changes</Button>
+            <Button variant="ghost" onClick={reset}>{t("common.imageCrop.reset")}</Button>
+            <Button variant="positive" loading={saving} onClick={() => void save()}>{t("settings.profile.saveChanges")}</Button>
           </span>
         </div>
       ) : null}

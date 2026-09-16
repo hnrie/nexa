@@ -5,6 +5,7 @@ import { useDesktop } from "@/stores/desktop";
 import { useUI } from "@/stores/ui";
 import s from "./DownloadBanner.module.css";
 
+import { t } from "@/i18n";
 /**
  * Discord holds the pipe that programs try first, so one that was already
  * running when nexa started keeps every game and music player to itself.
@@ -31,16 +32,16 @@ export function RpcBanner() {
   };
 
   return (
-    <div className={s.banner} role="region" aria-label="Rich Presence" data-testid="rpc-banner">
+    <div className={s.banner} role="region" aria-label={t("settings.desktop.richPresence")} data-testid="rpc-banner">
       <span className={s.icon}><TriangleAlert size={18} /></span>
       <span className={s.text}>
-        <b>Discord was already running when nexa started</b>
-        <span style={{ opacity: 0.8 }}> — programs are reaching only Discord. Restart Discord and they reach both.</span>
+        <b>{t("shell.rpcBanner.discordWasAlreadyRunningWhenNexa")}</b>
+        <span style={{ opacity: 0.8 }}> {t("shell.rpcBanner.programsAreReachingOnlyDiscordRestart")}</span>
       </span>
       <button className={s.download} onClick={() => void restart()} disabled={busy} data-testid="rpc-banner-restart">
         <RotateCw size={14} /> {busy ? "Restarting…" : "Restart Discord"}
       </button>
-      <button className={s.close} aria-label="Close" title="Close" onClick={() => setClosed(true)} data-testid="rpc-banner-close"><X size={16} /></button>
+      <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={() => setClosed(true)} data-testid="rpc-banner-close"><X size={16} /></button>
     </div>
   );
 }

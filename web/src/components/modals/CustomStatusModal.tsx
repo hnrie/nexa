@@ -10,6 +10,7 @@ import { useAuth } from "@/stores/auth";
 import { usePresence } from "@/stores/presence";
 import s from "./CustomStatusModal.module.css";
 
+import { t as tr_ } from "@/i18n";
 const CLEAR: { label: string; ms: number | null }[] = [
   { label: "Don't clear", ms: null },
   { label: "30 minutes", ms: 30 * 60_000 },
@@ -47,10 +48,10 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal open onClose={onClose} title="Set a custom status" width={440} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={save}>Save</Button></>}>
+    <Modal open onClose={onClose} title={tr_("modals.customStatus.setACustomStatus")} width={440} footer={<><Button variant="ghost" onClick={onClose}>{tr_("chat.editMessage.cancel")}</Button><Button onClick={save}>{tr_("chat.editMessage.save")}</Button></>}>
       <div className={s.form}>
         <div className={s.row}>
-          <Field label="Emoji" className={s.emoji}>
+          <Field label={tr_("modals.customStatus.emoji")} className={s.emoji}>
             <div className={s.emojiPick}>
               <button
                 type="button"
@@ -68,12 +69,12 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
                 {emoji ? <Twemoji text={emoji} className={s.emojiImg} title="" /> : <SmilePlus size={20} />}
               </button>
               {emoji ? (
-                <button type="button" className={s.emojiClear} aria-label="Remove the emoji" onClick={() => setEmoji("")}><X size={12} /></button>
+                <button type="button" className={s.emojiClear} aria-label={tr_("modals.customStatus.removeTheEmoji")} onClick={() => setEmoji("")}><X size={12} /></button>
               ) : null}
             </div>
           </Field>
           <Field label={`What's cookin', ${me?.display_name ?? ""}?`} className={s.textField}>
-            <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder="Support has arrived!" maxLength={128} autoFocus />
+            <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder={tr_("modals.customStatus.supportHasArrived")} maxLength={128} autoFocus />
           </Field>
         </div>
         {picker ? (
@@ -87,13 +88,13 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
             }}
           />
         ) : null}
-        <Field label="Clear after">
+        <Field label={tr_("modals.customStatus.clearAfter")}>
           <select className={s.select} value={clear} onChange={(e) => setClear(Number(e.target.value))}>
             {CLEAR.map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
           </select>
         </Field>
         {presence?.status_text || presence?.status_emoji ? (
-          <Button variant="link" onClick={() => { setText(""); setEmoji(""); }}>Clear status</Button>
+          <Button variant="link" onClick={() => { setText(""); setEmoji(""); }}>{tr_("modals.customStatus.clearStatus")}</Button>
         ) : null}
       </div>
     </Modal>

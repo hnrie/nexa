@@ -12,6 +12,7 @@ import { useUI } from "@/stores/ui";
 import st from "./Settings.module.css";
 import s from "@/components/server/ServerSettings.module.css";
 
+import { t as tr_ } from "@/i18n";
 /** User settings → Instance Admin (admins only): stats, registration policy, users. */
 export default function AdminPage() {
   const meId = useAuth((a) => a.me?.id);
@@ -95,19 +96,19 @@ export default function AdminPage() {
 
   return (
     <>
-      <h2 className={st.title}>Instance Admin</h2>
-      <p className={st.hint}>You run this instance. These settings apply to everyone on it.</p>
-      <h5 className={st.h5}>Overview</h5>
+      <h2 className={st.title}>{tr_("settings.admin.instanceAdmin")}</h2>
+      <p className={st.hint}>{tr_("settings.admin.youRunThisInstanceTheseSettings")}</p>
+      <h5 className={st.h5}>{tr_("server.channelSettings.overview")}</h5>
       {stats ? (
         <div className={st.rows} style={{ margin: 0 }}>
-          <div className={st.row}><span className={st.rowLabel}>Users</span><span className={st.rowValue}>{stats.users} ({stats.online} online)</span></div>
-          <div className={st.row}><span className={st.rowLabel}>Servers</span><span className={st.rowValue}>{stats.servers}</span></div>
-          <div className={st.row}><span className={st.rowLabel}>Messages</span><span className={st.rowValue}>{stats.messages}</span></div>
-          <div className={st.row}><span className={st.rowLabel}>Stored files</span><span className={st.rowValue}>{stats.blobs} · {formatBytes(stats.blob_bytes)}</span></div>
-          <div className={st.row}><span className={st.rowLabel}>Version</span><span className={st.rowValue}>{stats.version}</span></div>
+          <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.users")}</span><span className={st.rowValue}>{tr_("settings.admin.usersOnline", { users: stats.users, online: stats.online })}</span></div>
+          <div className={st.row}><span className={st.rowLabel}>{tr_("rail.rail.servers")}</span><span className={st.rowValue}>{stats.servers}</span></div>
+          <div className={st.row}><span className={st.rowLabel}>{tr_("modals.quickSwitcher.messages")}</span><span className={st.rowValue}>{stats.messages}</span></div>
+          <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.storedFiles")}</span><span className={st.rowValue}>{stats.blobs} · {formatBytes(stats.blob_bytes)}</span></div>
+          <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.version")}</span><span className={st.rowValue}>{stats.version}</span></div>
         </div>
       ) : <Spinner />}
-      <h5 className={st.h5}>Registration</h5>
+      <h5 className={st.h5}>{tr_("settings.admin.registration")}</h5>
       {settings ? (
         <>
           {(["open", "invite", "closed"] as const).map((m) => (
@@ -120,19 +121,19 @@ export default function AdminPage() {
             </label>
           ))}
           <p className={st.hint}>The config file says "{settings.config_registration}"; what you pick here overrides it until you clear it.</p>
-          <Field label={`Registration key ${settings.registration_key_set ? "(set)" : "(not set)"}`} hint="Share this with people you want to let in while registration is invite-only.">
+          <Field label={`Registration key ${settings.registration_key_set ? "(set)" : "(not set)"}`} hint={tr_("settings.admin.shareThisWithPeopleYouWant")}>
             <div style={{ display: "flex", gap: 8 }}>
-              <TextInput value={key} onChange={(e) => setKey(e.target.value)} placeholder="New key" maxLength={128} />
-              <Button size="sm" onClick={() => void saveKey()}>Save</Button>
-              {settings.registration_key_set ? <Button size="sm" variant="ghost" onClick={() => void clearKey()}>Clear</Button> : null}
+              <TextInput value={key} onChange={(e) => setKey(e.target.value)} placeholder={tr_("settings.admin.newKey")} maxLength={128} />
+              <Button size="sm" onClick={() => void saveKey()}>{tr_("chat.editMessage.save")}</Button>
+              {settings.registration_key_set ? <Button size="sm" variant="ghost" onClick={() => void clearKey()}>{tr_("modals.quickSwitcher.clear")}</Button> : null}
             </div>
           </Field>
           <p className={st.hint} style={{ marginTop: 12 }}>Limits from the config: uploads {formatBytes(settings.max_upload_bytes)}, avatars {formatBytes(settings.max_avatar_bytes)}, emoji {formatBytes(settings.max_emoji_bytes)}, stickers {formatBytes(settings.max_sticker_bytes)}. GIF search {settings.gif_search ? "on" : "off"}, TURN {settings.turn ? "configured" : "not configured"}. Change these in chatd.env and restart.</p>
         </>
       ) : <Spinner />}
-      <h5 className={st.h5}>Users</h5>
+      <h5 className={st.h5}>{tr_("settings.admin.users")}</h5>
       <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by username or display name" />
+        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr_("settings.admin.searchByUsernameOrDisplayName")} />
       </div>
       {users === null ? <Spinner /> : null}
       {users?.map((u) => (
@@ -193,16 +194,16 @@ function CrashLog() {
   };
   return (
     <>
-      <h5 className={st.h5}>Crashes</h5>
+      <h5 className={st.h5}>{tr_("settings.admin.crashes")}</h5>
       <p className={st.hint}>
         What the app reported from people's browsers: the error, where in the code it happened and which build it was. Nothing from a conversation is sent. The newest {list?.length ?? 0} are kept.
       </p>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <Button size="sm" variant="secondary" onClick={() => void load()}>Refresh</Button>
-        {list?.length ? <Button size="sm" variant="danger" onClick={() => void clear()}>Clear</Button> : null}
+        <Button size="sm" variant="secondary" onClick={() => void load()}>{tr_("settings.admin.refresh")}</Button>
+        {list?.length ? <Button size="sm" variant="danger" onClick={() => void clear()}>{tr_("modals.quickSwitcher.clear")}</Button> : null}
       </div>
       {list === null ? <Spinner /> : null}
-      {list?.length === 0 ? <p className={st.hint}>Nothing has crashed. Good.</p> : null}
+      {list?.length === 0 ? <p className={st.hint}>{tr_("settings.admin.nothingHasCrashedGood")}</p> : null}
       {list?.map((e) => (
         <div key={e.id} className={s.memberRow} style={{ alignItems: "flex-start", cursor: "pointer" }} onClick={() => setOpen(open === e.id ? null : e.id)}>
           <div className={s.memberText}>

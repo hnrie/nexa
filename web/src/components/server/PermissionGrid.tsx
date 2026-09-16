@@ -3,6 +3,7 @@ import { Toggle } from "@/components/common/Toggle";
 import { P, PERM_GROUPS, has, type PermName } from "@/lib/perms";
 import s from "./PermissionGrid.module.css";
 
+import { t } from "@/i18n";
 /** Which permissions a channel of this type exposes; categories show everything channel-scoped. */
 export function permsForChannel(type: "text" | "voice" | "category" | undefined): PermName[] {
   const out: PermName[] = [];
@@ -89,9 +90,9 @@ export function OverwriteGrid({
                     <span className={s.desc}>{it.description}</span>
                   </div>
                   <div className={s.tri} role="radiogroup" aria-label={it.label}>
-                    <button type="button" className={s.triBtn} data-kind="deny" data-on={cur === "deny"} disabled={!editable} aria-label="Deny" aria-pressed={cur === "deny"} onClick={() => set(bit, "deny")}><X size={16} /></button>
-                    <button type="button" className={s.triBtn} data-kind="neutral" data-on={cur === "neutral"} disabled={!editable} aria-label="Inherit" aria-pressed={cur === "neutral"} onClick={() => set(bit, "neutral")}><Minus size={16} /></button>
-                    <button type="button" className={s.triBtn} data-kind="allow" data-on={cur === "allow"} disabled={!editable} aria-label="Allow" aria-pressed={cur === "allow"} onClick={() => set(bit, "allow")}><Check size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="deny" data-on={cur === "deny"} disabled={!editable} aria-label={t("server.permissionGrid.deny")} aria-pressed={cur === "deny"} onClick={() => set(bit, "deny")}><X size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="neutral" data-on={cur === "neutral"} disabled={!editable} aria-label={t("server.permissionGrid.inherit")} aria-pressed={cur === "neutral"} onClick={() => set(bit, "neutral")}><Minus size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="allow" data-on={cur === "allow"} disabled={!editable} aria-label={t("server.permissionGrid.allow")} aria-pressed={cur === "allow"} onClick={() => set(bit, "allow")}><Check size={16} /></button>
                   </div>
                 </div>
               );

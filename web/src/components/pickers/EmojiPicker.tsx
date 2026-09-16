@@ -11,6 +11,7 @@ import { Twemoji } from "@/components/common/Twemoji";
 import { TONE_NAMES, emojiGroups, emojiLoaded, loadEmoji, searchEmoji, spriteStyle, withTone, type EmojiEntry } from "./emojiIndex";
 import s from "./Picker.module.css";
 
+import { t } from "@/i18n";
 /**
  * Whether opening the picker should put the cursor in its search box. On a
  * touch screen that raises the keyboard, which covers the picker's sheet.
@@ -115,7 +116,7 @@ const CellButton = memo(function CellButton({ cell, tone, hover, onPick }: { cel
 /** The strip under the grid naming whatever the pointer is on. */
 function Inspector({ hover, tone }: { hover: HoverStore; tone: number }) {
   const cell = useSyncExternalStore(hover.subscribe, hover.get, hover.get);
-  if (!cell) return <div className={s.inspector}><span style={{ color: "var(--text-muted)" }}>Pick an emoji</span></div>;
+  if (!cell) return <div className={s.inspector}><span style={{ color: "var(--text-muted)" }}>{t("pickers.emojiPicker.pickAnEmoji")}</span></div>;
   if (cell.kind === "unicode") {
     const text = withTone(cell.e, tone);
     const src = unicodeSrc(text);
@@ -181,11 +182,11 @@ function ToneSelector({ tone, onChange }: { tone: number; onChange: (tone: numbe
 
   return (
     <div className={s.toneWrap} ref={wrap}>
-      <button className={s.tone} aria-label="Skin tone" title="Skin tone" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="skin-tone">
+      <button className={s.tone} aria-label={t("pickers.emojiPicker.skinTone")} title={t("pickers.emojiPicker.skinTone")} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="skin-tone">
         <Twemoji text={HANDS[tone] ?? HANDS[0]!} className={s.toneHand} />
       </button>
       {open ? (
-        <div className={s.toneMenu} role="menu" aria-label="Skin tone" ref={menu} onKeyDown={move}>
+        <div className={s.toneMenu} role="menu" aria-label={t("pickers.emojiPicker.skinTone")} ref={menu} onKeyDown={move}>
           {HANDS.map((hand, i) => (
             <button
               key={hand}
@@ -361,12 +362,12 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
   return (
     <>
       <div className={s.searchRow}>
-        <input ref={inputRef} className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find the perfect emoji" aria-label="Search emoji" />
+        <input ref={inputRef} className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("pickers.emojiPicker.findThePerfectEmoji")} aria-label={t("pickers.emojiPicker.searchEmoji")} />
         <ToneSelector tone={tone} onChange={(i) => patch({ skinTone: i })} />
       </div>
       <div className={s.body}>
         <div className={s.cats}>
-          {sections.some((x) => x.key === "g:-1") ? <button className={s.cat} title="Frequently used" onClick={() => jump("g:-1")}>{ICONS[-1]}</button> : null}
+          {sections.some((x) => x.key === "g:-1") ? <button className={s.cat} title={t("pickers.emojiPicker.frequentlyUsed")} onClick={() => jump("g:-1")}>{ICONS[-1]}</button> : null}
           {emojiPacks.map(({ pack, items }) => (
             <button key={pack.id} className={s.cat} title={pack.name} onClick={() => jump(`c:${pack.id}`)}>
               {items[0] ? <img className={s.catImg} src={packImageUrl(pack, items[0])} alt="" /> : <span className={s.catInitial}>{initials(pack.name)}</span>}
@@ -384,8 +385,8 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
             : null}
         </div>
         <div className={s.grid} ref={gridRef} onScroll={onScroll} onMouseLeave={() => hover.set(null)} data-testid="emoji-grid">
-          {!ready && !q.trim() ? <div className={s.empty}>Loading emoji…</div> : null}
-          {noResults ? <div className={s.empty}>No emoji match.</div> : null}
+          {!ready && !q.trim() ? <div className={s.empty}>{t("pickers.emojiPicker.loadingEmoji")}</div> : null}
+          {noResults ? <div className={s.empty}>{t("pickers.emojiPicker.noEmojiMatch")}</div> : null}
           {current ? <div className={[s.section, s.stickyHead].join(" ")} aria-hidden="true">{current}</div> : null}
           <div className={s.virtual} style={{ height }}>
             {rows.slice(first, last).map((r) =>

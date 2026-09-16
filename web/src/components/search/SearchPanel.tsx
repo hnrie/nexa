@@ -16,6 +16,7 @@ import { useUsers } from "@/stores/users";
 import { SearchSuggestions } from "./SearchSuggestions";
 import s from "./Search.module.css";
 
+import { t } from "@/i18n";
 /**
  * Searches the messages this device has decrypted. Messages are end-to-end
  * encrypted, so the server cannot do this for us; "Load older" pulls more
@@ -98,13 +99,13 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
     <aside className={s.panel} data-testid="search-panel">
       <div className={s.head}>
         <span className={s.headText}><Search size={16} /> {isEmptyQuery(q) ? "Search" : `${results.length} result${results.length === 1 ? "" : "s"}`}</span>
-        <button className={s.close} aria-label="Close search" onClick={onClose}><X size={18} /></button>
+        <button className={s.close} aria-label={t("search.search.closeSearch")} onClick={onClose}><X size={18} /></button>
       </div>
       {inline ? (
         <div className={s.inlineSearch}>
           <Search size={16} />
-          <input value={query} placeholder="Search" aria-label="Search messages" autoFocus data-testid="search-input-mobile" onChange={(e) => onQuery(e.target.value)} />
-          {query ? <button className={s.clear} aria-label="Clear search" onClick={() => onQuery("")} data-testid="search-clear-mobile"><X size={14} /></button> : null}
+          <input value={query} placeholder={t("chat.chat.search")} aria-label={t("chat.chat.searchMessages")} autoFocus data-testid="search-input-mobile" onChange={(e) => onQuery(e.target.value)} />
+          {query ? <button className={s.clear} aria-label={t("chat.chat.clearSearch")} onClick={() => onQuery("")} data-testid="search-clear-mobile"><X size={14} /></button> : null}
         </div>
       ) : null}
       <SearchSuggestions query={query} users={users} channels={scope} nicknames={nicknames} onPick={onQuery} />
@@ -113,10 +114,10 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
           <p>Search the messages this device has decrypted{channel.server_id ? " in this server" : " in this conversation"}. Nothing leaves your device: the server only holds ciphertext.</p>
           <dl>
             <dt>from:</dt><dd>@user, or <b>me</b></dd>
-            <dt>in:</dt><dd>#channel</dd>
-            <dt>has:</dt><dd>link, image, file, sticker, embed</dd>
-            <dt>before: / after:</dt><dd>2026-01-31</dd>
-            <dt>"quotes"</dt><dd>exact phrase</dd>
+            <dt>in:</dt><dd>{t("search.search.channel")}</dd>
+            <dt>has:</dt><dd>{t("search.search.linkImageFileStickerEmbed")}</dd>
+            <dt>{t("search.search.beforeAfter")}</dt><dd>2026-01-31</dd>
+            <dt>{t("search.search.quotes")}</dt><dd>{t("search.search.exactPhrase")}</dd>
             <dt>-word</dt><dd>exclude</dd>
           </dl>
         </div>
@@ -140,10 +141,10 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
             </button>
           );
         })}
-        {!isEmptyQuery(q) && results.length === 0 ? <div className={s.empty}>No results in the {indexed} messages loaded so far.</div> : null}
+        {!isEmptyQuery(q) && results.length === 0 ? <div className={s.empty}>{t("search.search.noResultsInLoaded", { count: indexed })}</div> : null}
       </div>
       <div className={s.foot}>
-        <span>{indexed} messages indexed</span>
+        <span>{t("search.search.messagesIndexed", { count: indexed })}</span>
         <Button size="sm" variant="secondary" loading={loading} disabled={exhausted} onClick={() => void loadMore()} data-testid="search-older">{exhausted ? "All history loaded" : "Load older"}</Button>
       </div>
     </aside>

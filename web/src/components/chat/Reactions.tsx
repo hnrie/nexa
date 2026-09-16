@@ -12,6 +12,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 /**
  * The reaction key for a pick. Pack emoji arrive as a bare <a?:name:id> token
  * without `custom`, and the key must not keep the angle brackets.
@@ -78,7 +79,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
         );
       })}
       {msg.reactions.length > 0 ? (
-        <button className={s.addReact} aria-label="Add reaction" onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={16} /></button>
+        <button className={s.addReact} aria-label={t("chat.reactions.addReaction")} onClick={(e) => onOpenPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={16} /></button>
       ) : null}
       {pickerAnchor ? <ExpressionPicker anchor={pickerAnchor} onClose={closePicker} onEmoji={(e) => { closePicker(); void toggleReaction(msg, reactionKeyOf(e)); }} /> : null}
     </div>

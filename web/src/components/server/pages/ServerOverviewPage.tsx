@@ -14,6 +14,7 @@ import st from "@/components/settings/Settings.module.css";
 import { SaveBar } from "../SettingsLayer";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 export default function ServerOverviewPage({ serverId }: { serverId: string }) {
   const server = useServers((x) => x.byId[serverId]?.server);
   const updateServer = useServers((x) => x.updateServer);
@@ -79,35 +80,35 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
   const icon = iconUrl(server.icon_id, 128);
   return (
     <>
-      <h2 className={st.title}>Server Overview</h2>
+      <h2 className={st.title}>{t("server.serverOverview.serverOverview")}</h2>
       <div className={st.form}>
         <div className={s.iconWrap}>
           <div className={s.serverIcon}>{icon ? <img src={icon} alt="" /> : initials(server.name)}</div>
           <div className={st.form} style={{ gap: 8 }}>
-            <p className={st.hint} style={{ margin: 0 }}>We recommend an image of at least 512×512. Animated GIFs stay animated.</p>
+            <p className={st.hint} style={{ margin: 0 }}>{t("server.serverOverview.weRecommendAnImageOfAt")}</p>
             <div style={{ display: "flex", gap: 8 }}>
-              <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>Upload Image</Button>
-              {server.icon_id ? <Button variant="ghost" size="sm" onClick={() => void removeIcon()} disabled={busy}>Remove</Button> : null}
+              <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>{t("server.serverOverview.uploadImage")}</Button>
+              {server.icon_id ? <Button variant="ghost" size="sm" onClick={() => void removeIcon()} disabled={busy}>{t("composer.composer.remove")}</Button> : null}
             </div>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop(f); e.target.value = ""; }} />
           </div>
         </div>
-        <Field label="Server name" required>
+        <Field label={t("modals.createServer.serverName")} required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="server-settings-name" />
         </Field>
-        <Field label="Server description" hint="Shown on invite pages so people know what they're joining.">
-          <TextArea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 1000))} maxLength={1000} placeholder="What is this server about?" />
+        <Field label={t("server.serverOverview.serverDescription")} hint={t("server.serverOverview.shownOnInvitePagesSoPeople")}>
+          <TextArea value={description} onChange={(e) => setDescription(e.target.value.slice(0, 1000))} maxLength={1000} placeholder={t("server.serverOverview.whatIsThisServerAbout")} />
         </Field>
-        <Field label="System messages channel" hint="Join messages are posted here.">
+        <Field label={t("server.serverOverview.systemMessagesChannel")} hint={t("server.serverOverview.joinMessagesArePostedHere")}>
           <Select value={system} onChange={(e) => setSystem(e.target.value)}>
-            <option value="">No system messages</option>
+            <option value="">{t("server.serverOverview.noSystemMessages")}</option>
             {texts.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
           </Select>
         </Field>
-        <Field as="div" label="Default notification settings" hint="What new members get until they change it themselves.">
-          <div className={st.form} style={{ gap: 8 }} role="radiogroup" aria-label="Default notification settings">
-            <label className={st.radio} data-on={notif === 0}><input type="radio" checked={notif === 0} onChange={() => setNotif(0)} /><span className={st.radioText}><span className={st.radioLabel}>All Messages</span></span></label>
-            <label className={st.radio} data-on={notif === 1}><input type="radio" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>Only @mentions</span></span></label>
+        <Field as="div" label={t("server.serverOverview.defaultNotificationSettings")} hint={t("server.serverOverview.whatNewMembersGetUntilThey")}>
+          <div className={st.form} style={{ gap: 8 }} role="radiogroup" aria-label={t("server.serverOverview.defaultNotificationSettings")}>
+            <label className={st.radio} data-on={notif === 0}><input type="radio" checked={notif === 0} onChange={() => setNotif(0)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.allMessages")}</span></span></label>
+            <label className={st.radio} data-on={notif === 1}><input type="radio" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.onlyMentions")}</span></span></label>
           </div>
         </Field>
       </div>
@@ -116,7 +117,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
           file={crop}
           aspect={1}
           round
-          title="Crop the server icon"
+          title={t("server.serverOverview.cropTheServerIcon")}
           onClose={() => setCrop(null)}
           onDone={({ blob }) => {
             setCrop(null);

@@ -14,6 +14,7 @@ import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import s from "@/components/modals/ServerModals.module.css";
 
+import { t } from "@/i18n";
 const AGES: { v: number; label: string }[] = [
   { v: 3600, label: "1 hour" },
   { v: 21600, label: "6 hours" },
@@ -85,29 +86,29 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
 
   const expires = state ? new Date(state.link.expires_at) : null;
   return (
-    <Modal open onClose={onClose} title="Invite guests to this call" width={480}>
+    <Modal open onClose={onClose} title={t("voice.guestLink.inviteGuestsToThisCall")} width={480}>
       <div className={s.form}>
-        <p className={s.hint}>Anyone with this link can join the call without an account. They pick a name and pass a quick check, and all they get is the call: no messages, members or anything else here.</p>
-        <Field label="Guest link" hint={expires ? `New guests can use it until ${expires.toLocaleString()}. A guest can stay for up to 12 hours.` : undefined}>
+        <p className={s.hint}>{t("voice.guestLink.anyoneWithThisLinkCanJoin")}</p>
+        <Field label={t("voice.guestLink.guestLink")} hint={expires ? `New guests can use it until ${expires.toLocaleString()}. A guest can stay for up to 12 hours.` : undefined}>
           <div className={s.linkRow}>
             <TextInput readOnly value={state?.url ?? ""} placeholder={busy ? "Making a link…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="guest-link" />
-            <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!state} data-testid="guest-link-copy">{copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy</>}</Button>
+            <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!state} data-testid="guest-link-copy">{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>
         {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
         <div className={s.keyNote}>
           <ShieldCheck size={16} />
-          <span>The call stays end-to-end encrypted: the link carries the call's key in the part after #, which never reaches the server. Anyone you give the link to can listen in, so share it with care.</span>
+          <span>{t("voice.guestLink.theCallStaysEndToEnd")}</span>
         </div>
         <div className={s.sep} />
         <div className={s.row2}>
-          <Field label="New link expires after">
+          <Field label={t("voice.guestLink.newLinkExpiresAfter")}>
             <Select value={age} onChange={(e) => setAge(Number(e.target.value))}>
               {AGES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-            <Button variant="secondary" onClick={() => void load({ fresh: true, maxAge: age })} disabled={busy} data-testid="guest-link-new">New Link</Button>
+            <Button variant="secondary" onClick={() => void load({ fresh: true, maxAge: age })} disabled={busy} data-testid="guest-link-new">{t("voice.guestLink.newLink")}</Button>
           </div>
         </div>
         <Button variant="danger" onClick={() => void revoke()} disabled={busy} data-testid="guest-link-revoke">{managesAll ? "Revoke All Guest Links" : "Revoke My Guest Links"}</Button>

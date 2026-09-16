@@ -14,6 +14,7 @@ import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
 import { cameraMenuItems } from "./deviceMenus";
 
+import { t } from "@/i18n";
 /** The "Voice Connected" block that sits above the user panel while in a call. */
 export function VoiceStatus() {
   const nav = useNavigate();
@@ -48,7 +49,7 @@ export function VoiceStatus() {
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>
         <Tooltip text="Disconnect" side="top">
-          <button className={s.statusBtn} aria-label="Disconnect" onClick={() => void leaveVoice()} data-testid="voice-status-leave"><HangUp size={18} /></button>
+          <button className={s.statusBtn} aria-label={t("voice.voiceStatus.disconnect")} onClick={() => void leaveVoice()} data-testid="voice-status-leave"><HangUp size={18} /></button>
         </Tooltip>
       </div>
       <div className={s.statusBtns}>

@@ -13,6 +13,7 @@ import { displayName, useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 export default function EncryptionPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
   const toast = useUI((u) => u.toast);
@@ -56,8 +57,8 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
   const needsRotation = info?.some((c) => c.flags?.needs_rotation) ?? false;
   return (
     <>
-      <h2 className={st.title}>Encryption</h2>
-      <p className={st.hint}>Every message here is end-to-end encrypted. The server root key encrypts ordinary channels; private channels have keys of their own. Keys are only ever wrapped to members' devices; the server stores ciphertext and can't read any of it.</p>
+      <h2 className={st.title}>{t("server.encryption.encryption")}</h2>
+      <p className={st.hint}>{t("server.encryption.everyMessageHereIsEndTo")}</p>
       <div style={{ height: 16 }} />
       {needsRotation ? (
         <div className={s.warn}>
@@ -91,10 +92,10 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
       <div className={s.keyCard}>
         <ShieldCheck size={22} style={{ color: "var(--positive)" }} />
         <div className={s.keyText}>
-          <span className={s.keyName}>Share missing keys</span>
-          <span className={s.keySub}>Members who joined while nobody with the key was online receive it as soon as a holder connects. Run a check now.</span>
+          <span className={s.keyName}>{t("server.encryption.shareMissingKeys")}</span>
+          <span className={s.keySub}>{t("server.encryption.membersWhoJoinedWhileNobodyWith")}</span>
         </div>
-        <Button size="sm" variant="secondary" loading={busy === "reconcile"} onClick={() => void doReconcile()}>Check now</Button>
+        <Button size="sm" variant="secondary" loading={busy === "reconcile"} onClick={() => void doReconcile()}>{t("server.encryption.checkNow")}</Button>
       </div>
     </>
   );

@@ -13,6 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import st from "./Settings.module.css";
 
+import { t as tr_ } from "@/i18n";
 /** User settings → Desktop App: Rich Presence, how the app starts, and updates. Only inside the app. */
 export default function DesktopPage() {
   const bridge = desktopBridge();
@@ -85,38 +86,38 @@ export default function DesktopPage() {
 
   return (
     <>
-      <h2 className={st.title}>Desktop App</h2>
+      <h2 className={st.title}>{tr_("settings.desktop.desktopApp")}</h2>
       <div className={st.form}>
-        <h5 className={st.h5}>Rich Presence</h5>
+        <h5 className={st.h5}>{tr_("settings.desktop.richPresence")}</h5>
         <Toggle
           checked={!!rpc?.enabled}
           onChange={(on) => void bridge.rpc.setEnabled(on)}
-          label="Show what I'm playing, watching and listening to"
-          description="Games, music players and other programs that show Rich Presence on Discord tell nexa too, with or without Discord running."
+          label={tr_("settings.desktop.showWhatIMPlayingWatching")}
+          description={tr_("settings.desktop.gamesMusicPlayersAndOtherPrograms")}
         />
         <Toggle
           checked={share !== false}
           onChange={(on) => patch({ shareActivity: on })}
           disabled={!rpc?.enabled}
-          label="Share my activity with others"
-          description="People who can see your status see it on your profile. Off keeps it to this app."
+          label={tr_("settings.desktop.shareMyActivityWithOthers")}
+          description={tr_("settings.desktop.peopleWhoCanSeeYourStatus")}
         />
-        <Toggle checked={!!rpc?.relay} onChange={(on) => void bridge.rpc.setRelay(on)} disabled={!rpc?.enabled} label="Also show it on Discord" description="When Discord is running, programs reach it through nexa, so your activity shows there as well." />
+        <Toggle checked={!!rpc?.relay} onChange={(on) => void bridge.rpc.setRelay(on)} disabled={!rpc?.enabled} label={tr_("settings.desktop.alsoShowItOnDiscord")} description={tr_("settings.desktop.whenDiscordIsRunningProgramsReach")} />
         <div className={d.status} data-tone={status.tone} data-testid="rpc-status">
           {status.icon}
           <div className={d.statusText}>
             <span>{status.text}</span>
             {discord === "first" && rpc?.enabled && bridge.platform === "win32" ? (
               <div>
-                <Button size="sm" variant="secondary" loading={restarting} onClick={() => void restartDiscord()}>Restart Discord</Button>
+                <Button size="sm" variant="secondary" loading={restarting} onClick={() => void restartDiscord()}>{tr_("settings.desktop.restartDiscord")}</Button>
               </div>
             ) : null}
           </div>
         </div>
 
-        <h5 className={st.h5}>Programs</h5>
+        <h5 className={st.h5}>{tr_("settings.desktop.programs")}</h5>
         {!rpc || rpc.apps.length === 0 ? (
-          <p className={st.hint}>Nothing is using Rich Presence right now. Open a game or music player that shows your activity on Discord.</p>
+          <p className={st.hint}>{tr_("settings.desktop.nothingIsUsingRichPresenceRight")}</p>
         ) : (
           <div className={d.apps}>
             {rpc.apps.map((a) => (
@@ -125,17 +126,17 @@ export default function DesktopPage() {
           </div>
         )}
 
-        <h5 className={st.h5}>Startup and window</h5>
+        <h5 className={st.h5}>{tr_("settings.desktop.startupAndWindow")}</h5>
         {app ? (
           <>
-            <Toggle checked={app.launchAtLogin} onChange={(v) => setApp_({ launchAtLogin: v })} label="Open nexa when I sign in" description="Starting before Discord lets programs reach both of them." />
-            <Toggle checked={app.startMinimized} onChange={(v) => setApp_({ startMinimized: v })} disabled={!app.launchAtLogin} label="Start in the background" description="When opened at sign-in, stay in the tray until you open it." />
-            <Toggle checked={app.closeToTray} onChange={(v) => setApp_({ closeToTray: v })} label="Keep running when the window is closed" description="Calls, notifications and Rich Presence carry on from the tray." />
-            <Toggle checked={app.hardwareAcceleration} onChange={(v) => setApp_({ hardwareAcceleration: v })} label="Hardware acceleration" description="Uses the graphics card for smoother video. Turn off if the window flickers; applies after restarting the app." />
+            <Toggle checked={app.launchAtLogin} onChange={(v) => setApp_({ launchAtLogin: v })} label={tr_("settings.desktop.openNexaWhenISignIn")} description={tr_("settings.desktop.startingBeforeDiscordLetsProgramsReach")} />
+            <Toggle checked={app.startMinimized} onChange={(v) => setApp_({ startMinimized: v })} disabled={!app.launchAtLogin} label={tr_("settings.desktop.startInTheBackground")} description={tr_("settings.desktop.whenOpenedAtSignInStay")} />
+            <Toggle checked={app.closeToTray} onChange={(v) => setApp_({ closeToTray: v })} label={tr_("settings.desktop.keepRunningWhenTheWindowIs")} description={tr_("settings.desktop.callsNotificationsAndRichPresenceCarry")} />
+            <Toggle checked={app.hardwareAcceleration} onChange={(v) => setApp_({ hardwareAcceleration: v })} label={tr_("settings.desktop.hardwareAcceleration")} description={tr_("settings.desktop.usesTheGraphicsCardForSmoother")} />
           </>
         ) : null}
 
-        <h5 className={st.h5}>Updates</h5>
+        <h5 className={st.h5}>{tr_("settings.desktop.updates")}</h5>
         <UpdateRow version={bridge.version} update={update} />
       </div>
     </>
@@ -158,11 +159,11 @@ function UpdateRow({ version, update: u }: { version: string; update: UpdateStat
           <small>{line}{u?.lastCheck ? ` Last checked ${formatRelative(u.lastCheck)}.` : ""}</small>
         </div>
         {u?.status === "ready" ? (
-          <Button onClick={() => void desktopBridge()?.updates.restart()} data-testid="update-restart">Restart to update</Button>
+          <Button onClick={() => void desktopBridge()?.updates.restart()} data-testid="update-restart">{tr_("settings.desktop.restartToUpdate")}</Button>
         ) : u?.status === "manual" && u.downloadUrl ? (
-          <Button onClick={() => window.open(u.downloadUrl, "_blank")}>Download</Button>
+          <Button onClick={() => window.open(u.downloadUrl, "_blank")}>{tr_("chat.attachments.download")}</Button>
         ) : (
-          <Button variant="secondary" loading={u?.status === "checking"} disabled={u?.status === "downloading"} onClick={() => void desktopBridge()?.updates.check()} data-testid="update-check">Check for updates</Button>
+          <Button variant="secondary" loading={u?.status === "checking"} disabled={u?.status === "downloading"} onClick={() => void desktopBridge()?.updates.check()} data-testid="update-check">{tr_("settings.desktop.checkForUpdates")}</Button>
         )}
       </div>
       {u?.status === "downloading" ? <div className={d.progress}><i style={{ width: `${Math.round((u.progress ?? 0) * 100)}%` }} /></div> : null}

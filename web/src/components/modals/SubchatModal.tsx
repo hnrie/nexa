@@ -15,6 +15,7 @@ import { newLock, passwordProblem } from "@/lib/subchatLock";
 import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
 
+import { t } from "@/i18n";
 const MAX_NAME = 48;
 
 export default function SubchatModal({ onClose, channel, parentId }: { onClose: () => void; channel?: Channel; parentId?: string }) {
@@ -62,7 +63,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
   return (
     <Modal title={editing ? "Edit Subchat" : "New Subchat"} open onClose={onClose} width={440}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <Field label="Name" required>
+        <Field label={t("modals.subchat.name")} required>
           <TextInput value={name} maxLength={MAX_NAME} autoFocus onChange={(e) => setName(e.target.value)} data-testid="subchat-modal-name" />
         </Field>
         <Toggle
@@ -72,8 +73,8 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
             setPassword("");
             setConfirm("");
           }}
-          label="Ask for a password"
-          description="Everyone in the subchat types it once per sign-in before it opens. The messages are encrypted for the same people either way."
+          label={t("modals.subchat.askForAPassword")}
+          description={t("modals.subchat.everyoneInTheSubchatTypesIt")}
         />
         {wantsPassword ? (
           <>
@@ -88,7 +89,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
               />
             </Field>
             {password ? (
-              <Field label="Type it again">
+              <Field label={t("modals.subchat.typeItAgain")}>
                 <TextInput type="password" value={confirm} autoComplete="new-password" onChange={(e) => setConfirm(e.target.value)} />
               </Field>
             ) : null}

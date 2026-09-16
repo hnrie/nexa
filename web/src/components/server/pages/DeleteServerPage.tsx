@@ -9,6 +9,7 @@ import { useUI } from "@/stores/ui";
 import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
+import { t } from "@/i18n";
 /** Irons out what phone keyboards change on their own: stray spaces and curly quotes. */
 function norm(x: string): string {
   return x.trim().replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
@@ -34,14 +35,14 @@ export default function DeleteServerPage({ serverId, onDone }: { serverId: strin
   };
   return (
     <>
-      <h2 className={st.title}>Delete Server</h2>
+      <h2 className={st.title}>{t("server.deleteServer.deleteServer")}</h2>
       <div className={s.danger}>
-        <p className={st.hint} style={{ margin: 0 }}>Are you sure you want to delete <b>{server.name}</b>? Every channel, message and role in it is gone for everyone, permanently. There is no undo.</p>
+        <p className={st.hint} style={{ margin: 0 }}>Are you sure you want to delete <b>{server.name}</b>{t("server.deleteServer.everyChannelMessageAndRoleIn")}</p>
         <Field label={`Type "${server.name}" to confirm`}>
           <TextInput value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={server.name} autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} data-testid="delete-server-confirm" />
         </Field>
         <div>
-          <Button variant="danger" disabled={norm(typed) !== norm(server.name)} loading={busy} onClick={() => void go()} data-testid="delete-server"><Trash2 size={16} /> Delete Server</Button>
+          <Button variant="danger" disabled={norm(typed) !== norm(server.name)} loading={busy} onClick={() => void go()} data-testid="delete-server"><Trash2 size={16} /> {t("server.deleteServer.deleteServer")}</Button>
         </div>
       </div>
     </>

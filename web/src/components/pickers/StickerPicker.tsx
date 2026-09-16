@@ -8,6 +8,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
+import { t } from "@/i18n";
 export interface StickerPick {
   sticker: Sticker;
   pack: StickerPack;
@@ -48,7 +49,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   return (
     <>
       <div className={s.searchRow}>
-        <input className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search stickers" aria-label="Search stickers" autoFocus={focusSearchOnOpen()} />
+        <input className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("pickers.stickerPicker.searchStickers")} aria-label={t("pickers.stickerPicker.searchStickers")} autoFocus={focusSearchOnOpen()} />
       </div>
       <div className={s.body}>
         <div className={s.cats}>
@@ -66,11 +67,11 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
             <div className={s.empty}>
               No sticker packs yet.
               <br />
-              <button className={s.sectionLink} onClick={() => openModal("settings", { page: "stickers" })}>Create or install a pack</button>
+              <button className={s.sectionLink} onClick={() => openModal("settings", { page: "stickers" })}>{t("pickers.stickerPicker.createOrInstallAPack")}</button>
             </div>
           ) : null}
           {results ? (
-            results.length === 0 ? <div className={s.empty}>No stickers match.</div> : <div className={s.stickerGrid}>{results.map((r) => cell(r.sticker, r.pack))}</div>
+            results.length === 0 ? <div className={s.empty}>{t("pickers.stickerPicker.noStickersMatch")}</div> : <div className={s.stickerGrid}>{results.map((r) => cell(r.sticker, r.pack))}</div>
           ) : (
             groups.map((g) => (
               <div key={g.label}>
@@ -79,10 +80,10 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
                   <div key={p.id} data-pack={p.id} className={s.packSection} style={{ containIntrinsicSize: `auto ${40 + Math.ceil(Math.max(p.stickers.length, 1) / 4) * 108}px` }}>
                     <div className={[s.section, s.sectionRow].join(" ")} onContextMenu={packMenu(p)}>
                       <span className={s.sectionName}>{p.name}</span>
-                      {p.owner_user_id === meId ? <button className={s.sectionLink} onClick={() => edit(p)}>Edit</button> : null}
-                      {canRemovePack(p, meId) ? <button className={s.sectionLink} data-danger="true" onClick={() => confirmRemovePack(p)} aria-label={`Remove ${p.name}`}>Remove</button> : null}
+                      {p.owner_user_id === meId ? <button className={s.sectionLink} onClick={() => edit(p)}>{t("pickers.stickerPicker.edit")}</button> : null}
+                      {canRemovePack(p, meId) ? <button className={s.sectionLink} data-danger="true" onClick={() => confirmRemovePack(p)} aria-label={`Remove ${p.name}`}>{t("composer.composer.remove")}</button> : null}
                     </div>
-                    {p.stickers.length === 0 ? <div className={s.gifNote}>This pack is empty.</div> : <div className={s.stickerGrid}>{p.stickers.map((st) => cell(st, p))}</div>}
+                    {p.stickers.length === 0 ? <div className={s.gifNote}>{t("pickers.stickerPicker.thisPackIsEmpty")}</div> : <div className={s.stickerGrid}>{p.stickers.map((st) => cell(st, p))}</div>}
                   </div>
                 ))}
               </div>

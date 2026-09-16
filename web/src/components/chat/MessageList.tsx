@@ -17,6 +17,7 @@ import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import s from "./Chat.module.css";
 
+import { t } from "@/i18n";
 type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
@@ -296,7 +297,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           <div className={s.emptyAvatar}><Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={80} /></div>
           <h2 className={s.emptyName}>{name}</h2>
           <div className={s.emptyUser}>{u?.username ?? ""}</div>
-          <p className={s.emptyText}>This is the beginning of your direct message history with <b>{name}</b>. Messages here are end-to-end encrypted.</p>
+          <p className={s.emptyText}>This is the beginning of your direct message history with <b>{name}</b>{t("chat.messageList.messagesHereAreEndToEnd")}</p>
         </div>
       );
     }
@@ -306,7 +307,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       return (
         <div className={s.empty}>
           <h2 className={s.emptyName}>{name}</h2>
-          <p className={s.emptyText}>A subchat inside <b>{where}</b>, for everyone already in it. It has its own key, so what is said here is encrypted separately.</p>
+          <p className={s.emptyText}>A subchat inside <b>{where}</b>{t("chat.messageList.forEveryoneAlreadyInItIt")}</p>
         </div>
       );
     }
@@ -314,7 +315,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       <div className={s.empty}>
         {channel.type === "group_dm" && channel.icon_id ? <div className={s.emptyAvatar}><Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={80} kind="icon" /></div> : null}
         <h2 className={s.emptyName}>{channel.server_id ? `Welcome to #${name}!` : name}</h2>
-        <p className={s.emptyText}>{channel.server_id ? <>This is the start of the <b>#{name}</b> channel.{channel.topic ? ` ${channel.topic}` : ""}</> : <>Welcome to the beginning of the <b>{name}</b> group.</>} Messages here are end-to-end encrypted.</p>
+        <p className={s.emptyText}>{channel.server_id ? <>This is the start of the <b>#{name}</b> channel.{channel.topic ? ` ${channel.topic}` : ""}</> : <>Welcome to the beginning of the <b>{name}</b> {t("chat.messageList.group")}</>} Messages here are end-to-end encrypted.</p>
       </div>
     );
   }, [channel, users, me?.id, byIdChannels]);
@@ -349,15 +350,15 @@ export function MessageList({ channel }: { channel: Channel }) {
 
   return (
     <div className={[s.listWrap, compact ? s.compact : ""].join(" ")} data-selecting={selecting || undefined}>
-      {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>New messages</span><span>Jump to present</span></div> : null}
+      {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>{t("chat.messageList.newMessages")}</span><span>{t("chat.messageList.jumpToPresent")}</span></div> : null}
       <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="">
         <div className={s.inner}>
           {!hasOlder ? (
             intro
           ) : !loaded && !loading && failed > 0 ? (
             <div className={s.loadError}>
-              <span>Messages could not be loaded.</span>
-              <button className={s.loadRetry} onClick={() => void loadInitial(channel.id)}>Try again</button>
+              <span>{t("chat.messageList.messagesCouldNotBeLoaded")}</span>
+              <button className={s.loadRetry} onClick={() => void loadInitial(channel.id)}>{t("chat.messageList.tryAgain")}</button>
             </div>
           ) : (loading && !newerBusy) || !loaded ? (
             <div className={s.loader}><Spinner size={24} /></div>
@@ -366,7 +367,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           )}
           {rows.map((row, i) => {
             if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
-            if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>New</span></div>;
+            if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
             if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} />;
             return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
           })}
@@ -374,7 +375,7 @@ export function MessageList({ channel }: { channel: Channel }) {
         </div>
       </div>
       {showJump && ids.length > 0 && !newBelow ? (
-        <button className={s.jumpBtn} aria-label="Jump to present" onClick={jumpToPresent}><ArrowDown size={18} /></button>
+        <button className={s.jumpBtn} aria-label={t("chat.messageList.jumpToPresent")} onClick={jumpToPresent}><ArrowDown size={18} /></button>
       ) : null}
     </div>
   );

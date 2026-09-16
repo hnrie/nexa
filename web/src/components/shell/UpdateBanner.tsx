@@ -4,6 +4,7 @@ import { desktopBridge } from "@/lib/desktopBridge";
 import { useDesktop } from "@/stores/desktop";
 import s from "./DownloadBanner.module.css";
 
+import { t } from "@/i18n";
 /**
  * Tells someone in the desktop app that a new version is out, across the top
  * of the app, as soon as the app's minute-by-minute check finds it. Download
@@ -37,16 +38,16 @@ export function UpdateBanner() {
   const percent = Math.round((update.progress ?? 0) * 100);
 
   return (
-    <div className={s.banner} role="region" aria-label="Update" data-testid="update-banner">
+    <div className={s.banner} role="region" aria-label={t("shell.updateBanner.update")} data-testid="update-banner">
       <span className={s.icon}><Sparkles size={18} /></span>
       <span className={s.text}>
-        <b>A new version is here</b>
+        <b>{t("shell.updateBanner.aNewVersionIsHere")}</b>
         {update.version ? <span style={{ opacity: 0.8 }}> — nexa {update.version}</span> : null}
       </span>
       <button className={s.download} onClick={download} disabled={waiting} data-testid="update-banner-download">
         <Download size={14} /> {waiting ? `Downloading… ${percent}%` : "Download"}
       </button>
-      <button className={s.close} aria-label="Close" title="Close" onClick={() => setClosed(update.version ?? "")} data-testid="update-banner-close"><X size={16} /></button>
+      <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={() => setClosed(update.version ?? "")} data-testid="update-banner-close"><X size={16} /></button>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import s from "../ServerSettings.module.css";
 import p from "../PackEditor.module.css";
 import { promptText } from "@/components/modals/PromptModal";
 
+import { t } from "@/i18n";
 const ACCEPT = "image/png,image/gif,image/webp,image/jpeg";
 const NO_EMOJI: Emoji[] = [];
 
@@ -97,7 +98,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>
-              <tr><th style={{ width: 56 }}>Image</th><th>Name</th><th>Uploaded by</th>{manage ? <th /> : null}</tr>
+              <tr><th style={{ width: 56 }}>{t("server.emoji.image")}</th><th>{t("modals.subchat.name")}</th><th>{t("server.emoji.uploadedBy")}</th>{manage ? <th /> : null}</tr>
             </thead>
             <tbody>
               {list.map((e) => (
@@ -107,8 +108,8 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
                   <td>{displayName(users[e.creator_id])}</td>
                   {manage ? (
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                      <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title="Rename" aria-label="Rename" onClick={() => void rename(e)}><Pencil size={16} /></button>
-                      <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title="Delete" aria-label="Delete emoji" onClick={() => remove(e)}><Trash2 size={16} /></button>
+                      <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title={t("server.packEditor.rename")} aria-label={t("server.packEditor.rename")} onClick={() => void rename(e)}><Pencil size={16} /></button>
+                      <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title={t("chat.messageItem.delete")} aria-label={t("server.emoji.deleteEmoji")} onClick={() => remove(e)}><Trash2 size={16} /></button>
                     </td>
                   ) : null}
                 </tr>
@@ -121,8 +122,8 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <h2 className={st.title}>Emoji</h2>
-      <p className={st.hint}>Add up to as many emoji as you want, static or animated. Everyone can use them in every channel and DM, no subscription required. Names must be 2–32 letters, numbers or underscores.</p>
+      <h2 className={st.title}>{t("modals.customStatus.emoji")}</h2>
+      <p className={st.hint}>{t("server.emoji.addUpToAsManyEmoji")}</p>
       {manage ? (
         <div
           className={p.dropzone}
@@ -136,10 +137,10 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
           <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void upload(e.target.files); e.target.value = ""; }} data-testid="emoji-file" />
         </div>
       ) : null}
-      {emojis.length === 0 ? <p className={st.hint} style={{ marginTop: 16 }}>No custom emoji yet.</p> : null}
+      {emojis.length === 0 ? <p className={st.hint} style={{ marginTop: 16 }}>{t("server.emoji.noCustomEmojiYet")}</p> : null}
       {section("Emoji", still)}
       {section("Animated emoji", animated)}
-      {manage ? <div style={{ marginTop: 16 }}><Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} loading={busy}>Upload Emoji</Button></div> : null}
+      {manage ? <div style={{ marginTop: 16 }}><Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} loading={busy}>{t("server.emoji.uploadEmoji")}</Button></div> : null}
     </>
   );
 }

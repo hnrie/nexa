@@ -6,6 +6,7 @@ import { Button } from "@/components/common/Button";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
+import { t } from "@/i18n";
 function describe(ua: string): string {
   if (!ua) return "Unknown device";
   const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "Browser";
@@ -34,21 +35,21 @@ export default function DevicesPage() {
   };
   return (
     <>
-      <h2 className={s.title}>Devices</h2>
-      <p className={s.hint}>Every device that is logged into your account. Logging one out removes its session immediately; it will need your password again.</p>
+      <h2 className={s.title}>{t("settings.devices.devices")}</h2>
+      <p className={s.hint}>{t("settings.devices.everyDeviceThatIsLoggedInto")}</p>
       <div style={{ marginTop: 16 }}>
-        {list === null ? <p className={s.hint}>Loading…</p> : null}
+        {list === null ? <p className={s.hint}>{t("chat.pins.loading")}</p> : null}
         {list?.map((se) => (
           <div key={se.id} className={s.device}>
             <div>
               <div className={s.deviceName}>{describe(se.user_agent)}{se.current ? " · This device" : ""}</div>
               <div className={s.deviceSub}>{se.ip} · last active {new Date(se.last_seen_at).toLocaleString()}</div>
             </div>
-            {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>Log out</Button> : null}
+            {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>{t("settings.devices.logOut")}</Button> : null}
           </div>
         ))}
       </div>
-      {list && list.some((se) => !se.current) ? <Button variant="danger" onClick={() => void dropOthers()}>Log out all other devices</Button> : null}
+      {list && list.some((se) => !se.current) ? <Button variant="danger" onClick={() => void dropOthers()}>{t("settings.devices.logOutAllOtherDevices")}</Button> : null}
     </>
   );
 }

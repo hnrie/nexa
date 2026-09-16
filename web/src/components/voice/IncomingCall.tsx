@@ -11,6 +11,7 @@ import { declineCall, joinVoice } from "@/voice/session";
 import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
 
+import { t } from "@/i18n";
 /** Rings for incoming DM calls; accept joins the DM's voice, decline tells the caller. */
 export function IncomingCallHost() {
   const ringing = useVoice((v) => v.ringing);
@@ -36,8 +37,8 @@ export function IncomingCallHost() {
         <div className={s.ringName}>{displayName(caller)}</div>
         <div className={s.ringSub}>{channel && channel.type === "group_dm" ? `Incoming call in ${channelDisplayName(channel, users, meId)}` : "Incoming call…"}</div>
         <div className={s.ringBtns}>
-          <button className={[s.ringBtn, s.ringDecline].join(" ")} aria-label="Decline" onClick={() => void declineCall(channelId)}><HangUp size={24} /></button>
-          <button className={[s.ringBtn, s.ringAccept].join(" ")} aria-label="Accept" onClick={() => void accept()} data-testid="accept-call"><Phone size={24} /></button>
+          <button className={[s.ringBtn, s.ringDecline].join(" ")} aria-label={t("voice.incomingCall.decline")} onClick={() => void declineCall(channelId)}><HangUp size={24} /></button>
+          <button className={[s.ringBtn, s.ringAccept].join(" ")} aria-label={t("voice.incomingCall.accept")} onClick={() => void accept()} data-testid="accept-call"><Phone size={24} /></button>
         </div>
       </div>
     </Modal>

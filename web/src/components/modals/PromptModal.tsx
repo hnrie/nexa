@@ -5,6 +5,7 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
+import { t } from "@/i18n";
 export interface PromptField {
   key: string;
   label: string;
@@ -62,7 +63,7 @@ export function PromptModal({ onClose, title, fields, confirmLabel = "Save", all
       width={440}
       footer={
         <>
-          <Button variant="ghost" onClick={cancel}>Cancel</Button>
+          <Button variant="ghost" onClick={cancel}>{t("chat.editMessage.cancel")}</Button>
           <Button onClick={() => submit()} disabled={!ready} data-testid="prompt-confirm">{confirmLabel}</Button>
         </>
       }

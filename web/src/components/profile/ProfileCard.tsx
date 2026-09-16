@@ -25,6 +25,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import s from "./Profile.module.css";
 
+import { t } from "@/i18n";
 const dateOf = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
@@ -201,15 +202,15 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
 
   // the full profile leads with one clear action; the preview keeps its buttons on the banner
   const primary = !buttons ? null : isMe ? (
-    <button className={s.primary} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /> Edit Profile</button>
+    <button className={s.primary} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /> {t("profile.profileCard.editProfile")}</button>
   ) : friend ? (
-    <button className={s.primary} onClick={() => void message()}><MessageCircle size={16} /> Message</button>
+    <button className={s.primary} onClick={() => void message()}><MessageCircle size={16} /> {t("profile.profileCard.message")}</button>
   ) : rel?.type === "incoming" ? (
-    <button className={s.primary} onClick={() => void accept()}><Check size={16} /> Accept Request</button>
+    <button className={s.primary} onClick={() => void accept()}><Check size={16} /> {t("profile.profileCard.acceptRequest")}</button>
   ) : rel?.type === "outgoing" ? (
-    <button className={s.primary} disabled><Clock size={16} /> Request Sent</button>
+    <button className={s.primary} disabled><Clock size={16} /> {t("profile.profileCard.requestSent")}</button>
   ) : rel?.type === "blocked" ? null : (
-    <button className={s.primary} onClick={() => void addFriend()}><UserPlus size={16} /> Add Friend</button>
+    <button className={s.primary} onClick={() => void addFriend()}><UserPlus size={16} /> {t("profile.profileCard.addFriend")}</button>
   );
 
   return (
@@ -219,16 +220,16 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
         <div className={s.bannerBtns}>
           {!interactive ? null : panel ? (
             isMe ? (
-              <BannerButton label="Edit Profile" onClick={() => openModal("settings", { page: "profiles" })}><Pencil size={16} /></BannerButton>
+              <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => openModal("settings", { page: "profiles" })}><Pencil size={16} /></BannerButton>
             ) : (
               <>
-                {rel?.type === "incoming" ? <BannerButton label="Accept Friend Request" onClick={() => void accept()}><Check size={18} /></BannerButton> : null}
-                {!rel ? <BannerButton label="Add Friend" onClick={() => void addFriend()}><UserPlus size={18} /></BannerButton> : null}
-                <BannerButton label="More" onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton>
+                {rel?.type === "incoming" ? <BannerButton label={t("profile.profileCard.acceptFriendRequest")} onClick={() => void accept()}><Check size={18} /></BannerButton> : null}
+                {!rel ? <BannerButton label={t("profile.profileCard.addFriend")} onClick={() => void addFriend()}><UserPlus size={18} /></BannerButton> : null}
+                <BannerButton label={t("chat.chat.more")} onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton>
               </>
             )
           ) : onClose ? (
-            <BannerButton label="Close" onClick={onClose}><X size={18} /></BannerButton>
+            <BannerButton label={t("chat.attachments.close")} onClick={onClose}><X size={18} /></BannerButton>
           ) : null}
         </div>
         <div className={s.avatar}>
@@ -277,7 +278,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
               </Tooltip>
             </>
           ) : null}
-          {user.flags & 1 ? <span className={s.chip}>Admin</span> : null}
+          {user.flags & 1 ? <span className={s.chip}>{t("profile.profileCard.admin")}</span> : null}
         </div>
         </div>
 
@@ -286,12 +287,12 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
             {primary}
             {!isMe && !friend ? (
               <Tooltip text="Message" side="top">
-                <button className={s.square} aria-label="Message" onClick={() => void message()}><MessageCircle size={18} /></button>
+                <button className={s.square} aria-label={t("profile.profileCard.message")} onClick={() => void message()}><MessageCircle size={18} /></button>
               </Tooltip>
             ) : null}
             {!isMe ? (
               <Tooltip text="More" side="top">
-                <button className={s.square} aria-label="More" onClick={more} data-testid="profile-more"><MoreHorizontal size={18} /></button>
+                <button className={s.square} aria-label={t("chat.chat.more")} onClick={more} data-testid="profile-more"><MoreHorizontal size={18} /></button>
               </Tooltip>
             ) : null}
           </div>
@@ -312,15 +313,15 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
 
         {interactive && !isMe && (noteOpen || note) ? (
           <div className={s.section}>
-            <h3>Note</h3>
+            <h3>{t("profile.profileCard.note")}</h3>
             <textarea
               ref={noteRef}
               className={s.note}
               value={note}
               maxLength={256}
               rows={2}
-              placeholder="Click to add a note"
-              aria-label="Note"
+              placeholder={t("profile.profileCard.clickToAddANote")}
+              aria-label={t("profile.profileCard.note")}
               onChange={(e) => setNote(e.target.value)}
               onBlur={() => setNoteOpen(false)}
             />
@@ -335,19 +336,19 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
               <Markdown source={user.about_me} ctx={ctx} />
             </div>
             {panel && bioClamped && interactive ? (
-              <button className={s.moreLink} onClick={viewFull} data-testid="view-full-bio">View Full Bio</button>
+              <button className={s.moreLink} onClick={viewFull} data-testid="view-full-bio">{t("profile.profileCard.viewFullBio")}</button>
             ) : null}
           </div>
         ) : null}
 
         <div className={s.sinceRow}>
           <div className={s.section}>
-            <h3>Member Since</h3>
+            <h3>{t("profile.profileCard.memberSince")}</h3>
             <p>{dateOf(user.created_at)}</p>
           </div>
           {friend && !isMe && rel.created_at ? (
             <div className={s.section} data-testid="friends-since">
-              <h3>Friends Since</h3>
+              <h3>{t("profile.profileCard.friendsSince")}</h3>
               <p>{dateOf(rel.created_at)}</p>
             </div>
           ) : null}
@@ -355,7 +356,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
 
         {!panel && showMutual && mutualServers.length > 0 ? (
           <div className={s.section}>
-            <h3>Mutual Servers — {mutualServers.length}</h3>
+            <h3>{t("profile.profileCard.mutualServersCount", { count: mutualServers.length })}</h3>
             {mutualServers.map((id) => {
               const server = servers[id]!.server;
               const icon = iconUrl(server.icon_id, 32);
@@ -370,7 +371,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
         ) : null}
         {!panel && showMutual && mutual.friends.length > 0 ? (
           <div className={s.section}>
-            <h3>Mutual Friends — {mutual.friends.length}</h3>
+            <h3>{t("profile.profileCard.mutualFriendsCount", { count: mutual.friends.length })}</h3>
             {mutual.friends.map((id) => (
               <button key={id} className={s.listItem} onClick={() => openModal("profile", { userId: id })}>
                 <Avatar id={id} avatarId={users[id]?.avatar_id ?? null} name={displayName(users[id])} size={32} />
@@ -381,7 +382,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
         ) : null}
 
         {interactive && panel ? (
-          <button className={s.fullBtn} onClick={viewFull} data-testid="view-full-profile">View Full Profile</button>
+          <button className={s.fullBtn} onClick={viewFull} data-testid="view-full-profile">{t("profile.profileCard.viewFullProfile")}</button>
         ) : null}
       </div>
     </div>

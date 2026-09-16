@@ -5,6 +5,7 @@ import { Button } from "@/components/common/Button";
 import { isTopLayer } from "@/components/common/Modal";
 import s from "@/components/settings/Settings.module.css";
 
+import { t } from "@/i18n";
 export interface NavGroup {
   head: string;
   items: { id: string; label: string; danger?: boolean }[];
@@ -43,7 +44,7 @@ export function SettingsLayer({ label, groups, page, setPage, onClose, children,
       <div className={s.contentWrap}>
         <div className={s.content}>{children}</div>
         <div className={s.closeCol}>
-          <button className={s.close} aria-label="Close settings" onClick={onClose}><X size={20} /></button>
+          <button className={s.close} aria-label={t("server.settingsLayer.closeSettings")} onClick={onClose}><X size={20} /></button>
           <span className={s.esc}>ESC</span>
         </div>
       </div>
@@ -57,9 +58,9 @@ export function SaveBar({ dirty, busy, onReset, onSave, label = "Save Changes" }
   if (!dirty) return null;
   return (
     <div className={s.saveBar} data-testid="save-bar">
-      <span>Careful — you have unsaved changes!</span>
+      <span>{t("server.settingsLayer.carefulYouHaveUnsavedChanges")}</span>
       <span className={s.saveBtns}>
-        <Button variant="ghost" onClick={onReset} disabled={busy}>Reset</Button>
+        <Button variant="ghost" onClick={onReset} disabled={busy}>{t("common.imageCrop.reset")}</Button>
         <Button variant="positive" onClick={onSave} loading={busy} data-testid="save">{label}</Button>
       </span>
     </div>

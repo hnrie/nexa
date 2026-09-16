@@ -21,6 +21,7 @@ import { OverwriteGrid } from "./PermissionGrid";
 import { SaveBar, SettingsLayer, type NavGroup } from "./SettingsLayer";
 import s from "./ServerSettings.module.css";
 
+import { t as tr_ } from "@/i18n";
 const SLOWMODE = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600];
 
 function slowLabel(v: number): string {
@@ -44,7 +45,7 @@ export default function ChannelSettingsModal({ onClose, channelId, page: initial
     { head: "", items: [{ id: "delete", label: isCat ? "Delete Category" : "Delete Channel", danger: true }] },
   ];
   return (
-    <SettingsLayer label="Channel Settings" groups={groups} page={page} setPage={setPage} onClose={onClose}>
+    <SettingsLayer label={tr_("server.channelSettings.channelSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose}>
       {page === "permissions" ? <PermissionsPage channel={channel} serverId={channel.server_id} /> : page === "delete" ? <DeletePage channel={channel} onDone={() => { onClose(); nav(`/channels/${channel.server_id}`); }} /> : <OverviewPage channel={channel} />}
     </SettingsLayer>
   );
@@ -94,7 +95,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
   const isText = channel.type === "text";
   return (
     <>
-      <h2 className={st.title}>Overview</h2>
+      <h2 className={st.title}>{tr_("server.channelSettings.overview")}</h2>
       <div className={st.form}>
         <Field label={channel.type === "category" ? "Category name" : "Channel name"} required>
           <div className={s.iconInput}>
@@ -103,20 +104,20 @@ function OverviewPage({ channel }: { channel: Channel }) {
           </div>
         </Field>
         {isText ? (
-          <Field label="Channel topic" hint={`${1024 - topic.length} characters left`}>
-            <TextArea value={topic} onChange={(e) => setTopic(e.target.value.slice(0, 1024))} placeholder="Let everyone know how to use this channel!" maxLength={1024} />
+          <Field label={tr_("server.channelSettings.channelTopic")} hint={`${1024 - topic.length} characters left`}>
+            <TextArea value={topic} onChange={(e) => setTopic(e.target.value.slice(0, 1024))} placeholder={tr_("server.channelSettings.letEveryoneKnowHowToUse")} maxLength={1024} />
           </Field>
         ) : null}
         {isText ? (
-          <Field label="Slowmode" hint="Members will be restricted to sending one message per this interval, unless they have Manage Channel or Manage Messages permissions.">
+          <Field label={tr_("server.channelSettings.slowmode")} hint={tr_("server.channelSettings.membersWillBeRestrictedToSending")}>
             <Select value={slow} onChange={(e) => setSlow(Number(e.target.value))}>
               {SLOWMODE.map((v) => <option key={v} value={v}>{slowLabel(v)}</option>)}
             </Select>
           </Field>
         ) : null}
-        {isText ? <Toggle checked={nsfw} onChange={setNsfw} label="Age-Restricted Channel" description="Users will need to confirm they are of legal age to view the content in this channel." /> : null}
+        {isText ? <Toggle checked={nsfw} onChange={setNsfw} label={tr_("server.channelSettings.ageRestrictedChannel")} description={tr_("server.channelSettings.usersWillNeedToConfirmThey")} /> : null}
         {channel.type === "voice" ? (
-          <Field label={`User limit — ${limit === 0 ? "No limit" : `${limit} users`}`} hint="Limit how many people can join this voice channel. Members with Move Members can still join when it is full.">
+          <Field label={`User limit — ${limit === 0 ? "No limit" : `${limit} users`}`} hint={tr_("server.channelSettings.limitHowManyPeopleCanJoin")}>
             <input type="range" className={st.slider} min={0} max={99} value={limit} onChange={(e) => setLimit(Number(e.target.value))} />
           </Field>
         ) : null}
@@ -221,22 +222,22 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
 
   return (
     <>
-      <h2 className={st.title}>Permissions</h2>
+      <h2 className={st.title}>{tr_("server.channelSettings.permissions")}</h2>
       <p className={st.hint}>Use permissions to customise who can do what in this {channel.type === "category" ? "category" : "channel"}. {isPrivate ? "This channel is private: only the roles and members listed here can see it, and it has its own encryption key." : ""}</p>
       <div className={s.permLayout}>
         <div className={s.permList}>
           <div className={s.permListHead}>
-            <span>Roles / Members</span>
+            <span>{tr_("server.channelSettings.rolesMembers")}</span>
             {editable ? (
               <span className={s.permAdd}>
-                <button className={s.smallBtn} onClick={() => setAdding(adding === "role" ? null : "role")} title="Add role"><Plus size={14} /> Role</button>
-                <button className={s.smallBtn} onClick={() => setAdding(adding === "member" ? null : "member")} title="Add member"><Plus size={14} /> Member</button>
+                <button className={s.smallBtn} onClick={() => setAdding(adding === "role" ? null : "role")} title={tr_("server.channelSettings.addRole")}><Plus size={14} /> {tr_("server.channelSettings.role")}</button>
+                <button className={s.smallBtn} onClick={() => setAdding(adding === "member" ? null : "member")} title={tr_("server.channelSettings.addMember")}><Plus size={14} /> {tr_("server.channelSettings.member")}</button>
               </span>
             ) : null}
           </div>
           {adding === "role" ? (
             <div className={s.picker}>
-              {candidateRoles.length === 0 ? <div className={s.pickerEmpty}>Every role already has an overwrite.</div> : null}
+              {candidateRoles.length === 0 ? <div className={s.pickerEmpty}>{tr_("server.channelSettings.everyRoleAlreadyHasAnOverwrite")}</div> : null}
               {candidateRoles.map((r) => (
                 <button key={r.id} className={s.pickerRow} onClick={() => void add(r.id, "role")}>
                   <span className={s.dot} style={{ background: r.color ? `#${r.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
@@ -247,7 +248,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
           ) : null}
           {adding === "member" ? (
             <div className={s.picker}>
-              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search members" autoFocus />
+              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("server.channelSettings.searchMembers")} autoFocus />
               {candidateMembers.map((m) => (
                 <button key={m.id} className={s.pickerRow} onClick={() => void add(m.id, "member")}>
                   <Avatar id={m.id} avatarId={users[m.id]?.avatar_id ?? null} name={m.name} size={20} />
@@ -264,7 +265,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
                 <span className={s.permTargetName}>{t.name}</span>
               </button>
               {editable && t.id !== serverId ? (
-                <button className={s.permRemove} aria-label="Remove overwrite" onClick={() => void remove(t.id)} disabled={busy}><X size={14} /></button>
+                <button className={s.permRemove} aria-label={tr_("server.channelSettings.removeOverwrite")} onClick={() => void remove(t.id)} disabled={busy}><X size={14} /></button>
               ) : null}
             </div>
           ))}
@@ -279,10 +280,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
                   if (on) setDeny(deny | P.VIEW_CHANNEL), setAllow(allow & ~P.VIEW_CHANNEL);
                   else setDeny(deny & ~P.VIEW_CHANNEL);
                 }}
-                label="Private Channel"
-                description="Only selected members and roles can view this channel. Private channels get their own encryption key, rotated whenever someone loses access."
+                label={tr_("modals.createChannel.privateChannel")}
+                description={tr_("server.channelSettings.onlySelectedMembersAndRolesCan")}
               />
-              {wantPrivate ? <span className={s.lockNote}><Lock size={14} /> Add roles or members on the left to let them in.</span> : null}
+              {wantPrivate ? <span className={s.lockNote}><Lock size={14} /> {tr_("server.channelSettings.addRolesOrMembersOnThe")}</span> : null}
             </div>
           ) : null}
           <OverwriteGrid allow={allow} deny={deny} editable={editable} channelType={channel.type as "text" | "voice" | "category"} onChange={(a, d) => { setAllow(a); setDeny(d); }} />
