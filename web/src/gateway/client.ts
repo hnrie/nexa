@@ -17,7 +17,12 @@ export interface GatewayOptions {
 }
 
 const MAX_QUEUE = 64;
-const MAX_BACKOFF_MS = 30_000;
+/**
+ * The longest wait between reconnects. It stays under the server's grace for a
+ * call that outlives its socket (internal/api/voice_glue.go), so a blip never
+ * ends a call whose sound is still going through.
+ */
+const MAX_BACKOFF_MS = 12_000;
 /**
  * How long a heartbeat may go unanswered. A phone that changes network or
  * wakes from sleep can keep a socket "open" for minutes after its connection

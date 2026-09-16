@@ -318,3 +318,36 @@ func TestOriginRejected(t *testing.T) {
 		t.Error("foreign origin must be rejected")
 	}
 }
+
+// A status flipped twice in a row must leave everyone on the last one, not on
+// whichever change happened to arrive before the rate limit closed.
+func TestPresenceChangesCoalesce(t *testing.T) {
+	e := newEnv(t)
+	a, tokA := e.user(t, "pa")
+	b, tokB := e.user(t, "pb")
+	ctx := context.Background()
+	_, _, _ = e.st.CreateDM(ctx, a.ID, b.ID)
+	_ = e.st.SetRelationshipPair(ctx, a.ID, b.ID, "friend", "friend")
+	ca := e.dial(t)
+	if ca.identify(tokA) == nil {
+		t.Fatal("ready a")
+	}
+	cb := e.dial(t)
+	if cb.identify(tokB) == nil {
+		t.Fatal("ready b")
+	}
+	// more changes than the burst allows, sent back to back
+	for _, st := range []string{"idle", "online", "idle", "online", "idle", "online", "idle", "dnd"} {
+		ca.send("presence", map[string]any{"status": st})
+	}
+	if d := cb.presence(a.ID, "dnd", 5*time.Second); d == nil {
+		t.Fatal("b never saw the last status a set")
+	}
+	u, err := e.st.UserByID(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.PresencePref != "dnd" {
+		t.Errorf("stored preference is %q, want dnd", u.PresencePref)
+	}
+}

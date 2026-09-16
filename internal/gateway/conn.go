@@ -21,6 +21,15 @@ import (
 const (
 	readLimit    = 1 << 16
 	writeTimeout = 10 * time.Second
+	// The socket is pinged at the protocol level, which the browser answers
+	// whatever the page is doing. A tab in the background has its timers
+	// throttled, so its own heartbeat can be a minute late while the pong
+	// still comes back on time. A peer that has really gone — a closed
+	// laptop, a network that dropped — answers nothing, and its presence
+	// turns offline within pingEvery + pingTimeout rather than after the
+	// heartbeat's whole minute of silence.
+	pingEvery   = 12 * time.Second
+	pingTimeout = 8 * time.Second
 	// typingCooldown sits well below the composer's 8 s resend interval, so a
 	// refresh that arrives a little early on a jittery link is not dropped.
 	typingCooldown = 5 * time.Second
@@ -95,8 +104,13 @@ type conn struct {
 	typing map[ids.ID]time.Time
 	typMu  sync.Mutex
 
-	ops         *rate.Limiter
-	presence    *rate.Limiter
+	ops      *rate.Limiter
+	presence *rate.Limiter
+	// A presence change that comes too soon waits here rather than being
+	// dropped; the latest one wins when its turn arrives.
+	presMu      sync.Mutex
+	presPending json.RawMessage
+	presTimer   *time.Timer
 	signalBytes *rate.Limiter
 
 	// Activities this connection reported, resolved and cleaned. Payloads that
@@ -251,6 +265,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go c.writeLoop()
+	go c.pingLoop()
 	c.readLoop(ctx)
 
 	last := h.unregister(c)
@@ -270,6 +285,34 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if h.OnDisconnect != nil {
 			h.OnDisconnect(bg, user.ID)
 		}
+	}
+}
+
+// pingLoop asks the peer to answer, and ends the connection when it stops.
+func (c *conn) pingLoop() {
+	t := time.NewTicker(pingEvery)
+	defer t.Stop()
+	for {
+		select {
+		case <-c.closed:
+			return
+		case <-t.C:
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
+		err := c.ws.Ping(ctx)
+		cancel()
+		select {
+		case <-c.closed:
+			return
+		default:
+		}
+		if err != nil {
+			c.close(websocket.StatusPolicyViolation, "no answer")
+			return
+		}
+		// An answered ping is proof enough of life; the heartbeat timeout is
+		// left for a socket that answers pings while its page has gone.
+		c.beat.Store(time.Now().UnixMilli())
 	}
 }
 
@@ -324,6 +367,105 @@ func (c *conn) readLoop(ctx context.Context) {
 	}
 }
 
+// queuePresence applies a presence change, at most one every presenceEvery.
+// One that arrives too soon is held rather than dropped — flipping status
+// twice, or setting a status right after, would otherwise leave everyone else
+// looking at the older one — and the latest wins when its turn comes.
+func (c *conn) queuePresence(ctx context.Context, raw json.RawMessage) {
+	c.presMu.Lock()
+	c.presPending = raw
+	if c.presTimer != nil {
+		c.presMu.Unlock()
+		return
+	}
+	r := c.presence.Reserve()
+	if !r.OK() {
+		c.presPending = nil
+		c.presMu.Unlock()
+		return
+	}
+	if delay := r.Delay(); delay > 0 {
+		c.presTimer = time.AfterFunc(delay, c.flushPresence)
+		c.presMu.Unlock()
+		return
+	}
+	c.presPending = nil
+	c.presMu.Unlock()
+	c.applyPresence(ctx, raw)
+}
+
+func (c *conn) flushPresence() {
+	c.presMu.Lock()
+	c.presTimer = nil
+	raw := c.presPending
+	c.presPending = nil
+	c.presMu.Unlock()
+	if raw == nil {
+		return
+	}
+	select {
+	case <-c.closed:
+		return
+	default:
+	}
+	c.applyPresence(context.Background(), raw)
+}
+
+func (c *conn) applyPresence(ctx context.Context, raw json.RawMessage) {
+	h := c.hub
+	var d presenceData
+	if err := json.Unmarshal(raw, &d); err != nil {
+		return
+	}
+	if d.StatusExpiresAt != nil && *d.StatusExpiresAt < 0 {
+		return
+	}
+	var p store.ProfilePatch
+	if d.Status != nil {
+		switch *d.Status {
+		case "online", "idle", "dnd", "invisible":
+			p.PresencePref = d.Status
+		}
+	}
+	if d.ClearStatus {
+		empty := ""
+		var nilExp *int64
+		p.StatusText, p.StatusEmoji, p.StatusExpiresAt = &empty, &empty, &nilExp
+	} else {
+		// The same rules as PATCH /users/@me. Overlong text is cut by
+		// characters rather than refused, as there is no reply to show.
+		if d.StatusText != nil {
+			t, ok := textutil.CleanText(strings.ReplaceAll(*d.StatusText, "\n", " "), maxStatusText)
+			if !ok && t != "" {
+				t, ok = strings.TrimSpace(string([]rune(t)[:maxStatusText])), true
+			}
+			if ok {
+				p.StatusText = &t
+			}
+		}
+		if d.StatusEmoji != nil {
+			if e, ok := textutil.CleanText(*d.StatusEmoji, maxStatusEmoji); ok && !strings.ContainsAny(e, " \n") {
+				p.StatusEmoji = &e
+			}
+		}
+		// A new status always sets its expiry: JSON null decodes like a
+		// missing field, and must not leave an earlier status's timer behind.
+		if d.StatusExpiresAt != nil || d.StatusText != nil || d.StatusEmoji != nil {
+			exp := d.StatusExpiresAt
+			p.StatusExpiresAt = &exp
+		}
+	}
+	if err := h.st.UpdateProfile(ctx, c.user.ID, p); err != nil {
+		return
+	}
+	u, err := h.st.UserByID(ctx, c.user.ID)
+	if err != nil {
+		return
+	}
+	c.user = u
+	h.broadcastPresence(ctx, u)
+}
+
 func (c *conn) handle(ctx context.Context, f ClientFrame) {
 	h := c.hub
 	if c.guest != nil {
@@ -339,60 +481,7 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		c.enqueue(ServerFrame{T: EvHeartbeatAck})
 	case OpPresence:
 		c.beat.Store(time.Now().UnixMilli())
-		if !c.presence.Allow() {
-			return
-		}
-		var d presenceData
-		if err := json.Unmarshal(f.D, &d); err != nil {
-			return
-		}
-		if d.StatusExpiresAt != nil && *d.StatusExpiresAt < 0 {
-			return
-		}
-		var p store.ProfilePatch
-		if d.Status != nil {
-			switch *d.Status {
-			case "online", "idle", "dnd", "invisible":
-				p.PresencePref = d.Status
-			}
-		}
-		if d.ClearStatus {
-			empty := ""
-			var nilExp *int64
-			p.StatusText, p.StatusEmoji, p.StatusExpiresAt = &empty, &empty, &nilExp
-		} else {
-			// The same rules as PATCH /users/@me. Overlong text is cut by
-			// characters rather than refused, as there is no reply to show.
-			if d.StatusText != nil {
-				t, ok := textutil.CleanText(strings.ReplaceAll(*d.StatusText, "\n", " "), maxStatusText)
-				if !ok && t != "" {
-					t, ok = strings.TrimSpace(string([]rune(t)[:maxStatusText])), true
-				}
-				if ok {
-					p.StatusText = &t
-				}
-			}
-			if d.StatusEmoji != nil {
-				if e, ok := textutil.CleanText(*d.StatusEmoji, maxStatusEmoji); ok && !strings.ContainsAny(e, " \n") {
-					p.StatusEmoji = &e
-				}
-			}
-			// A new status always sets its expiry: JSON null decodes like a
-			// missing field, and must not leave an earlier status's timer behind.
-			if d.StatusExpiresAt != nil || d.StatusText != nil || d.StatusEmoji != nil {
-				exp := d.StatusExpiresAt
-				p.StatusExpiresAt = &exp
-			}
-		}
-		if err := h.st.UpdateProfile(ctx, c.user.ID, p); err != nil {
-			return
-		}
-		u, err := h.st.UserByID(ctx, c.user.ID)
-		if err != nil {
-			return
-		}
-		c.user = u
-		h.broadcastPresence(ctx, u)
+		c.queuePresence(ctx, f.D)
 	case OpActivities:
 		c.beat.Store(time.Now().UnixMilli())
 		var d activitiesData

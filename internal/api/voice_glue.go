@@ -24,8 +24,10 @@ const maxSignalBytes = 64 << 10
 // voiceGrace is how long a call through the SFU outlives the gateway
 // connection that held it. Media does not go through the gateway, so a phone
 // changing networks or a socket that stalled keeps talking meanwhile, and its
-// device picks the call up on the new connection with a resume.
-var voiceGrace = 20 * time.Second
+// device picks the call up on the new connection with a resume. It sits well
+// past the client's longest wait between reconnects (web/src/gateway/client.ts),
+// or a call would end while its sound was still going through.
+var voiceGrace = 45 * time.Second
 
 // voiceStatePayload is what clients receive; channel_id is null when a user leaves.
 type voiceStatePayload struct {

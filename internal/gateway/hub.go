@@ -78,11 +78,11 @@ func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, publicURL
 }
 
 // sessionCheckEvery is how many sweeps pass between session re-checks.
-const sessionCheckEvery = 4
+const sessionCheckEvery = 12
 
 // Run sweeps dead connections until ctx ends.
 func (h *Hub) Run(ctx context.Context) {
-	t := time.NewTicker(15 * time.Second)
+	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
 	for n := 1; ; n++ {
 		select {
