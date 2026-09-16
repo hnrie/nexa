@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.sheets
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,11 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Message
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -178,24 +174,24 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                             enabled = !busy,
                             colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Message, null, Modifier.size(16.dp))
+                            Icon(Lucide.MessageCircle, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Message")
                         }
                         when (relationship?.type) {
-                            "friend" -> OutlineAction("Remove friend", Icons.Filled.PersonRemove, colors.danger) {
+                            "friend" -> OutlineAction("Remove friend", Lucide.UserMinus, colors.danger) {
                                 scope.launch { runCatching { RelationshipsApi.remove(userId) } }
                             }
-                            "incoming" -> OutlineAction("Accept", Icons.Filled.PersonAdd, colors.positive) {
+                            "incoming" -> OutlineAction("Accept", Lucide.UserPlus, colors.positive) {
                                 scope.launch { runCatching { RelationshipsApi.accept(userId) } }
                             }
-                            "outgoing" -> OutlineAction("Cancel request", Icons.Filled.PersonRemove, colors.textMuted) {
+                            "outgoing" -> OutlineAction("Cancel request", Lucide.UserMinus, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.remove(userId) } }
                             }
-                            "blocked" -> OutlineAction("Unblock", Icons.Filled.Block, colors.textMuted) {
+                            "blocked" -> OutlineAction("Unblock", Lucide.Ban, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.unblock(userId) } }
                             }
-                            else -> OutlineAction("Add friend", Icons.Filled.PersonAdd, colors.positive) {
+                            else -> OutlineAction("Add friend", Lucide.UserPlus, colors.positive) {
                                 scope.launch {
                                     runCatching {
                                         Session.guarded("friend_request") { captcha ->

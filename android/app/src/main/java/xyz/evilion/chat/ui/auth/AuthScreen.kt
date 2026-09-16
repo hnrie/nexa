@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.auth
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,10 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -186,7 +183,7 @@ fun AuthScreen(locked: Boolean = false) {
                         trailing = {
                             IconButton(onClick = { showPassword = !showPassword }) {
                                 Icon(
-                                    if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    if (showPassword) Lucide.EyeOff else Lucide.Eye,
                                     "Show password", tint = colors.icon,
                                 )
                             }
@@ -220,7 +217,7 @@ fun AuthScreen(locked: Boolean = false) {
                     Field(password, { password = it }, "Password", password = !showPassword, trailing = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
-                                if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                if (showPassword) Lucide.EyeOff else Lucide.Eye,
                                 "Show password", tint = colors.icon,
                             )
                         }
@@ -261,7 +258,7 @@ fun AuthScreen(locked: Boolean = false) {
                     Field(password, { password = it }, "Password", password = !showPassword, imeAction = ImeAction.Done, trailing = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
-                                if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                if (showPassword) Lucide.EyeOff else Lucide.Eye,
                                 "Show password", tint = colors.icon,
                             )
                         }

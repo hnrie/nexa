@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.sheets
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,11 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -163,7 +159,7 @@ fun PinsSheet(channelId: String, onDismiss: () -> Unit) {
             )
             when {
                 pins == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = colors.brand) }
-                pins!!.isEmpty() -> EmptyState(Icons.Filled.PushPin, "Nothing pinned yet", "Long press a message to pin it.")
+                pins!!.isEmpty() -> EmptyState(Lucide.Pin, "Nothing pinned yet", "Long press a message to pin it.")
                 else -> LazyColumn(Modifier.weight(1f)) {
                     items(pins!!.size, key = { pins!![it].raw.id }) { index ->
                         val message = pins!![index]
@@ -226,7 +222,7 @@ fun SearchSheet(channelId: String, onDismiss: () -> Unit) {
             )
             if (results.isEmpty()) {
                 EmptyState(
-                    Icons.Filled.Search,
+                    Lucide.Search,
                     if (query.length < 2) "Type to search" else "Nothing found",
                     "Only messages this device has decrypted are searched.",
                 )
@@ -335,7 +331,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
                         .padding(vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.PersonAdd, null, tint = colors.icon, modifier = Modifier.size(20.dp))
+                    Icon(Lucide.UserPlus, null, tint = colors.icon, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
                     Text("Invite people", color = colors.text, fontSize = 15.sp)
                 }
@@ -384,7 +380,7 @@ fun InviteSheet(channelId: String, onDismiss: () -> Unit) {
                     ) {
                         Text(shown, color = colors.text, fontSize = 14.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Icon(
-                            Icons.Filled.ContentCopy, "Copy", tint = colors.icon,
+                            Lucide.Copy, "Copy", tint = colors.icon,
                             modifier = Modifier.size(20.dp).clickable { clipboard.setText(AnnotatedString(shown)) },
                         )
                     }

@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.server
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,10 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -86,7 +83,7 @@ fun ServerSettingsScreen(serverId: String, startPage: String) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = colors.icon,
+                Lucide.ArrowLeft, "Back", tint = colors.icon,
                 modifier = Modifier.size(24.dp).clickable {
                     if (page == "overview") Nav.openChannel(serverId, AppState.channelsOf(serverId).firstOrNull { it.isText }?.id)
                     else page = "overview"
@@ -345,7 +342,7 @@ private fun RolesPage(serverId: String) {
             )
             Spacer(Modifier.width(8.dp))
             Icon(
-                Icons.Filled.Add, "Create role", tint = colors.brand,
+                Lucide.Plus, "Create role", tint = colors.brand,
                 modifier = Modifier.size(28.dp).clickable(enabled = newName.isNotBlank()) {
                     scope.launch {
                         runCatching {
@@ -374,7 +371,7 @@ private fun RolesPage(serverId: String) {
                 )
                 if (r.id != serverId) {
                     Icon(
-                        Icons.Filled.Delete, "Delete role", tint = colors.danger,
+                        Lucide.Trash2, "Delete role", tint = colors.danger,
                         modifier = Modifier.size(18.dp).clickable {
                             scope.launch {
                                 runCatching {

@@ -3,6 +3,7 @@ package xyz.evilion.chat.ui.chat
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,12 +21,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Gif
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -201,7 +196,7 @@ fun Composer(
                     color = colors.textMuted, fontSize = 12.sp, modifier = Modifier.weight(1f),
                 )
                 Icon(
-                    Icons.Filled.Close, "Cancel reply", tint = colors.icon,
+                    Lucide.X, "Cancel reply", tint = colors.icon,
                     modifier = Modifier.size(16.dp).clickable(onClick = onClearReply),
                 )
             }
@@ -213,7 +208,7 @@ fun Composer(
             ) {
                 Text("Editing message", color = colors.warning, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 Icon(
-                    Icons.Filled.Close, "Cancel edit", tint = colors.icon,
+                    Lucide.X, "Cancel edit", tint = colors.icon,
                     modifier = Modifier.size(16.dp).clickable {
                         onClearEdit()
                         value = TextFieldValue("")
@@ -255,7 +250,7 @@ fun Composer(
                             }
                         } else {
                             Icon(
-                                Icons.Filled.Close, "Remove",
+                                Lucide.X, "Remove",
                                 tint = Color.White,
                                 modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(18.dp)
                                     .clip(CircleShape).background(colors.bgOverlay)
@@ -275,7 +270,7 @@ fun Composer(
         ) {
             if (canAttach) {
                 IconButton(onClick = { pickFiles.launch(arrayOf("*/*")) }, enabled = !sending) {
-                    Icon(Icons.Filled.AddCircle, "Attach", tint = colors.icon)
+                    Icon(Lucide.CirclePlus, "Attach", tint = colors.icon)
                 }
             }
             Box(
@@ -314,16 +309,16 @@ fun Composer(
                 )
             }
             IconButton(onClick = { picker = "emoji" }) {
-                Icon(Icons.Filled.EmojiEmotions, "Emoji", tint = colors.icon)
+                Icon(Lucide.Smile, "Emoji", tint = colors.icon)
             }
             if (value.text.isBlank() && staged.isEmpty()) {
                 IconButton(onClick = { picker = "gif" }) {
-                    Icon(Icons.Filled.Gif, "GIFs and stickers", tint = colors.icon)
+                    Icon(Lucide.Sticker, "GIFs and stickers", tint = colors.icon)
                 }
             } else {
                 IconButton(onClick = { doSend() }, enabled = canSend && !sending) {
                     if (sending) CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
-                    else Icon(Icons.AutoMirrored.Filled.Send, "Send", tint = colors.brand)
+                    else Icon(Lucide.Send, "Send", tint = colors.brand)
                 }
             }
         }

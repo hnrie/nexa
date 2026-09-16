@@ -1,12 +1,11 @@
 package xyz.evilion.chat.ui.main
 
 import androidx.activity.compose.BackHandler
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -86,7 +85,7 @@ fun MainScreen() {
                     val channelId = current.channelId
                     if (channelId == null) {
                         EmptyState(
-                            Icons.Filled.Tag,
+                            Lucide.Hash,
                             "No conversation open",
                             "Pick one from the list, or start a new message.",
                         )

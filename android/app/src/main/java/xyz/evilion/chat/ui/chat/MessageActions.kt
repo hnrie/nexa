@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,15 +12,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.EmojiEmotions
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.MarkChatUnread
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -99,29 +91,29 @@ fun MessageActions(
                         TwemojiImage(emoji, 28.dp, modifier = Modifier.clickable { react(emoji) }.padding(4.dp), fallbackSize = 26.sp)
                     }
                     Icon(
-                        Icons.Filled.EmojiEmotions, "More",
+                        Lucide.Smile, "More",
                         tint = colors.icon,
                         modifier = Modifier.size(26.dp).clickable { pickingEmoji = true },
                     )
                 }
             }
 
-            ActionRow(Icons.AutoMirrored.Filled.Reply, "Reply") { onReply() }
-            if (mine && message.raw.ciphertext != null) ActionRow(Icons.Filled.Edit, "Edit") { onEdit() }
+            ActionRow(Lucide.Reply, "Reply") { onReply() }
+            if (mine && message.raw.ciphertext != null) ActionRow(Lucide.Pencil, "Edit") { onEdit() }
             if (!message.payload?.text.isNullOrEmpty()) {
-                ActionRow(Icons.Filled.ContentCopy, "Copy text") {
+                ActionRow(Lucide.Copy, "Copy text") {
                     clipboard.setText(AnnotatedString(message.payload?.text.orEmpty()))
                     onDismiss()
                 }
             }
-            ActionRow(Icons.Filled.Link, "Copy link") {
+            ActionRow(Lucide.Link2, "Copy link") {
                 val base = Api.baseUrl.trimEnd('/')
                 val path = if (serverId != null) "$base/channels/$serverId/$channelId/${message.raw.id}"
                 else "$base/channels/@me/$channelId/${message.raw.id}"
                 clipboard.setText(AnnotatedString(path))
                 onDismiss()
             }
-            ActionRow(Icons.Filled.MarkChatUnread, "Mark unread") {
+            ActionRow(Lucide.MessageCircleMore, "Mark unread") {
                 scope.launch {
                     val previous = AppState.messages(channelId).value
                         .filter { (it.raw.id.toLongOrNull() ?: 0) < (message.raw.id.toLongOrNull() ?: 0) }
@@ -133,7 +125,7 @@ fun MessageActions(
                 onDismiss()
             }
             if (canManage || mine) {
-                ActionRow(Icons.Filled.PushPin, if (pinned) "Unpin" else "Pin") {
+                ActionRow(Lucide.Pin, if (pinned) "Unpin" else "Pin") {
                     scope.launch {
                         runCatching {
                             if (pinned) ChannelsApi.unpin(channelId, message.raw.id)
@@ -144,7 +136,7 @@ fun MessageActions(
                 }
             }
             if (mine || canManage) {
-                ActionRow(Icons.Filled.Delete, "Delete", colors.danger) {
+                ActionRow(Lucide.Trash2, "Delete", colors.danger) {
                     scope.launch {
                         runCatching { MessageService.delete(channelId, message.raw.id) }
                             .onFailure { Session.toasts.emit(it.message ?: "That message could not be deleted.") }

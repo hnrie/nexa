@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -129,8 +127,8 @@ fun AudioPlayer(meta: AttachmentMeta) {
     }) {
         when {
             loading -> CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
-            playing -> Icon(Icons.Filled.Pause, "Pause", tint = colors.icon)
-            else -> Icon(Icons.Filled.PlayArrow, "Play", tint = colors.icon)
+            playing -> Icon(Lucide.Pause, "Pause", tint = colors.icon)
+            else -> Icon(Lucide.Play, "Play", tint = colors.icon)
         }
     }
     Column(Modifier.weight(1f)) {

@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.voice
 
+import xyz.evilion.chat.ui.common.HangUpIcon
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,9 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -69,7 +68,7 @@ fun IncomingCallScreen(channelId: String, fromUserId: String) {
                     },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.CallEnd, "Decline", tint = Color.White, modifier = Modifier.size(30.dp))
+                    HangUpIcon("Decline", tint = Color.White, size = 30.dp)
                 }
                 Box(
                     Modifier.size(68.dp).clip(CircleShape).background(colors.positive).clickable {
@@ -79,7 +78,7 @@ fun IncomingCallScreen(channelId: String, fromUserId: String) {
                     },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.Call, "Answer", tint = Color.White, modifier = Modifier.size(30.dp))
+                    Icon(Lucide.Phone, "Answer", tint = Color.White, modifier = Modifier.size(30.dp))
                 }
             }
         }

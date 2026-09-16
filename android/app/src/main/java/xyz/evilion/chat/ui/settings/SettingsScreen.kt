@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,18 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.Brush
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -96,7 +85,7 @@ fun SettingsScreen(startPage: String) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = colors.icon,
+                Lucide.ArrowLeft, "Back", tint = colors.icon,
                 modifier = Modifier.size(24.dp).clickable {
                     if (page == "root") Nav.go(Route.Chat(null, null)) else page = "root"
                 },
@@ -133,15 +122,15 @@ fun SettingsScreen(startPage: String) {
                             Text("@${me?.username ?: ""}", color = colors.textMuted, fontSize = 13.sp)
                         }
                     }
-                    SettingsRow(Icons.Filled.Person, "My account") { page = "account" }
-                    SettingsRow(Icons.Filled.Brush, "Appearance") { page = "appearance" }
-                    SettingsRow(Icons.Filled.Notifications, "Notifications") { page = "notifications" }
-                    SettingsRow(Icons.Filled.Mic, "Voice & video") { page = "voice" }
-                    SettingsRow(Icons.Filled.PrivacyTip, "Privacy") { page = "privacy" }
-                    SettingsRow(Icons.Filled.Security, "Security") { page = "security" }
-                    SettingsRow(Icons.Filled.Devices, "Devices") { page = "sessions" }
-                    if (me?.flags?.and(1) == 1) SettingsRow(Icons.Filled.Shield, "Instance") { page = "admin" }
-                    SettingsRow(Icons.Filled.Info, "About") { page = "about" }
+                    SettingsRow(Lucide.User, "My account") { page = "account" }
+                    SettingsRow(Lucide.Brush, "Appearance") { page = "appearance" }
+                    SettingsRow(Lucide.Bell, "Notifications") { page = "notifications" }
+                    SettingsRow(Lucide.Mic, "Voice & video") { page = "voice" }
+                    SettingsRow(Lucide.ShieldAlert, "Privacy") { page = "privacy" }
+                    SettingsRow(Lucide.ShieldCheck, "Security") { page = "security" }
+                    SettingsRow(Lucide.MonitorSmartphone, "Devices") { page = "sessions" }
+                    if (me?.flags?.and(1) == 1) SettingsRow(Lucide.Shield, "Instance") { page = "admin" }
+                    SettingsRow(Lucide.Info, "About") { page = "about" }
                     SignOutRow()
                 }
                 "account" -> AccountPage()
@@ -179,7 +168,7 @@ private fun SignOutRow() {
         Modifier.fillMaxWidth().clickable { scope.launch { Session.logout() } }.padding(horizontal = 20.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.AutoMirrored.Filled.Logout, null, tint = colors.danger, modifier = Modifier.size(20.dp))
+        Icon(Lucide.LogOut, null, tint = colors.danger, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(16.dp))
         Text("Sign out", color = colors.danger, fontSize = 15.sp)
     }

@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.friends
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,13 +17,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Message
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -77,7 +71,7 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
             Modifier.fillMaxWidth().background(colors.bgRaised).statusBarsPadding().height(52.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onOpenDrawer) { Icon(Icons.Filled.Menu, "Channels", tint = colors.icon) }
+            IconButton(onClick = onOpenDrawer) { Icon(Lucide.Menu, "Channels", tint = colors.icon) }
             Text("Friends", color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
         }
         Row(
@@ -139,7 +133,7 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
         }
 
         if (list.isEmpty()) {
-            EmptyState(Icons.Filled.Group, "Nobody here yet", "Add someone by their username to get started.")
+            EmptyState(Lucide.Users, "Nobody here yet", "Add someone by their username to get started.")
         } else {
             LazyColumn(Modifier.weight(1f)) {
                 items(list.size, key = { list[it].user.id }) { index ->
@@ -167,20 +161,20 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
                         }
                         when (relationship.type) {
                             "incoming" -> {
-                                ActionIcon(Icons.Filled.Check, colors.positive) {
+                                ActionIcon(Lucide.Check, colors.positive) {
                                     scope.launch { runCatching { RelationshipsApi.accept(user.id) } }
                                 }
-                                ActionIcon(Icons.Filled.Close, colors.danger) {
+                                ActionIcon(Lucide.X, colors.danger) {
                                     scope.launch { runCatching { RelationshipsApi.remove(user.id) } }
                                 }
                             }
-                            "outgoing" -> ActionIcon(Icons.Filled.Close, colors.textMuted) {
+                            "outgoing" -> ActionIcon(Lucide.X, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.remove(user.id) } }
                             }
-                            "blocked" -> ActionIcon(Icons.Filled.Block, colors.textMuted) {
+                            "blocked" -> ActionIcon(Lucide.Ban, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.unblock(user.id) } }
                             }
-                            else -> ActionIcon(Icons.AutoMirrored.Filled.Message, colors.icon) {
+                            else -> ActionIcon(Lucide.MessageCircle, colors.icon) {
                                 scope.launch {
                                     runCatching {
                                         val channel = ChannelsApi.createDm(listOf(user.id))

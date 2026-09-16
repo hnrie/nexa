@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,15 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -124,12 +116,12 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                channel == null -> EmptyState(Icons.Filled.Tag, "This conversation is not available.")
-                failedLoad != null -> EmptyState(Icons.Filled.Tag, "Could not load messages", failedLoad)
+                channel == null -> EmptyState(Lucide.Hash, "This conversation is not available.")
+                failedLoad != null -> EmptyState(Lucide.Hash, "Could not load messages", failedLoad)
                 messages.isEmpty() && !loaded.containsKey(channelId) ->
                     Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = colors.brand) }
                 messages.isEmpty() -> EmptyState(
-                    Icons.Filled.Tag,
+                    Lucide.Hash,
                     "This is the beginning of #${AppState.channelName(channel, me?.id)}",
                     "Say something to start it off.",
                 )
@@ -167,7 +159,7 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
                         .clickable { scope.launch { listState.animateScrollToItem(0) } },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Filled.KeyboardArrowDown, "Jump to the newest", tint = colors.icon, modifier = Modifier.size(22.dp))
+                    Icon(Lucide.ChevronDown, "Jump to the newest", tint = colors.icon, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -212,7 +204,7 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onOpenDrawer) {
-                Icon(Icons.Filled.Menu, "Channels", tint = colors.icon)
+                Icon(Lucide.Menu, "Channels", tint = colors.icon)
             }
             if (other != null) {
                 val user = AppState.user(other)
@@ -220,7 +212,7 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
                 Spacer(Modifier.width(8.dp))
             } else if (channel.serverId != null) {
                 Icon(
-                    if (channel.isVoice) Icons.AutoMirrored.Filled.VolumeUp else Icons.Filled.Tag,
+                    if (channel.isVoice) Lucide.Volume2 else Lucide.Hash,
                     null, tint = colors.textChannel, modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(4.dp))
@@ -246,18 +238,18 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
             }
             if (channel.isDm || AppState.permissionsIn(channelId).has(P.CONNECT)) {
                 IconButton(onClick = { Nav.push(Layer.Call(channelId)) }) {
-                    Icon(Icons.Filled.Call, "Start a call", tint = colors.icon)
+                    Icon(Lucide.Phone, "Start a call", tint = colors.icon)
                 }
             }
             IconButton(onClick = { Nav.push(Layer.Pins(channelId)) }) {
-                Icon(Icons.Filled.PushPin, "Pinned messages", tint = colors.icon)
+                Icon(Lucide.Pin, "Pinned messages", tint = colors.icon)
             }
             IconButton(onClick = { Nav.push(Layer.Search(channelId)) }) {
-                Icon(Icons.Filled.Search, "Search", tint = colors.icon)
+                Icon(Lucide.Search, "Search", tint = colors.icon)
             }
             if (serverId != null || channel.type == "group_dm") {
                 IconButton(onClick = { Nav.push(Layer.Members(channelId)) }) {
-                    Icon(Icons.Filled.Group, "Members", tint = colors.icon)
+                    Icon(Lucide.Users, "Members", tint = colors.icon)
                 }
             }
         }

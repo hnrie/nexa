@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.auth
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,9 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -52,7 +50,7 @@ fun RecoveryKeyOverlay(key: String, onDone: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(Icons.Filled.Key, null, tint = colors.brand, modifier = Modifier.size(44.dp))
+            Icon(Lucide.Key, null, tint = colors.brand, modifier = Modifier.size(44.dp))
             Spacer(Modifier.height(16.dp))
             Text("Save your recovery key", color = colors.textStrong, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
@@ -73,7 +71,7 @@ fun RecoveryKeyOverlay(key: String, onDone: () -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = { clipboard.setText(AnnotatedString(key)) }) {
-                Icon(Icons.Filled.ContentCopy, null, Modifier.size(16.dp), tint = colors.textBrand)
+                Icon(Lucide.Copy, null, Modifier.size(16.dp), tint = colors.textBrand)
                 Spacer(Modifier.size(6.dp))
                 Text("Copy", color = colors.textBrand)
             }

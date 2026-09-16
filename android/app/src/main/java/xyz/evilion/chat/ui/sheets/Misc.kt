@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.sheets
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -20,9 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -104,7 +102,7 @@ fun ImageViewerLayer(blobId: String, name: String, onDismiss: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    Icons.Filled.Close, "Close", tint = Color.White,
+                    Lucide.X, "Close", tint = Color.White,
                     modifier = Modifier.size(26.dp).clickable(onClick = onDismiss),
                 )
                 Spacer(Modifier.width(12.dp))
@@ -113,7 +111,7 @@ fun ImageViewerLayer(blobId: String, name: String, onDismiss: () -> Unit) {
                 val scope = rememberCoroutineScope()
                 if (meta != null) {
                     Icon(
-                        Icons.Filled.Download, "Open", tint = Color.White,
+                        Lucide.Download, "Open", tint = Color.White,
                         modifier = Modifier.size(24.dp).clickable {
                             scope.launch { xyz.evilion.chat.ui.chat.openAttachment(context, meta) }
                         },
@@ -303,7 +301,7 @@ fun StickerPackScreen(packId: String) {
     Column(Modifier.fillMaxSize().background(colors.bgBase).statusBarsPadding().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Filled.Close, "Back", tint = colors.icon,
+                Lucide.X, "Back", tint = colors.icon,
                 modifier = Modifier.size(24.dp).clickable { Nav.go(xyz.evilion.chat.ui.Route.Chat(null, null)) },
             )
             Spacer(Modifier.width(12.dp))

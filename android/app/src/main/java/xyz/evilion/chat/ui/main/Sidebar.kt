@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.main
 
 import xyz.evilion.chat.R
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,15 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -124,7 +116,7 @@ private fun ServerRail(route: Route) {
             }
             item {
                 RailButton(selected = false, onClick = { Nav.push(Layer.CreateServer) }) {
-                    Icon(Icons.Filled.Add, "Create a server", tint = colors.positive, modifier = Modifier.size(24.dp))
+                    Icon(Lucide.Plus, "Create a server", tint = colors.positive, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -173,7 +165,7 @@ private fun ServerChannels(serverId: String, activeChannel: String?, onPick: () 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Icon(Icons.Filled.Settings, "Server settings", tint = colors.icon, modifier = Modifier.size(18.dp))
+            Icon(Lucide.Settings, "Server settings", tint = colors.icon, modifier = Modifier.size(18.dp))
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(colors.borderSubtle))
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)) {
@@ -191,7 +183,7 @@ private fun ServerChannels(serverId: String, activeChannel: String?, onPick: () 
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            if (isCollapsed) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                            if (isCollapsed) Lucide.ChevronDown else Lucide.ChevronUp,
                             null, tint = colors.textChannel, modifier = Modifier.size(14.dp),
                         )
                         Spacer(Modifier.width(2.dp))
@@ -245,9 +237,9 @@ private fun ChannelRow(channel: Channel, selected: Boolean, serverId: String, on
         ) {
             Icon(
                 when {
-                    channel.isVoice -> Icons.AutoMirrored.Filled.VolumeUp
-                    private -> Icons.Filled.Lock
-                    else -> Icons.Filled.Tag
+                    channel.isVoice -> Lucide.Volume2
+                    private -> Lucide.Lock
+                    else -> Lucide.Hash
                 },
                 null,
                 tint = if (selected || unread) colors.text else colors.textChannel,
@@ -300,7 +292,7 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
         ) {
             Text("Direct messages", color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Icon(
-                Icons.Filled.Add, "New message",
+                Lucide.Plus, "New message",
                 tint = colors.icon,
                 modifier = Modifier.size(20.dp).clickable { Nav.push(Layer.NewMessage) },
             )
@@ -313,7 +305,7 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
                         .clickable { Nav.go(Route.Friends); onPick() }.padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.Group, null, tint = colors.icon, modifier = Modifier.size(20.dp))
+                    Icon(Lucide.Users, null, tint = colors.icon, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Friends", color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     val pending = AppState.relationships.value.values.count { it.type == "incoming" }
@@ -377,7 +369,7 @@ private fun SelfPanel() {
             )
         }
         Icon(
-            Icons.Filled.Settings, "Settings",
+            Lucide.Settings, "Settings",
             tint = colors.icon,
             modifier = Modifier.size(22.dp).clickable { Nav.go(Route.Settings()) },
         )

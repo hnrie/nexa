@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,12 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -125,7 +120,7 @@ fun MessageRow(
                         Text(shortTime(message.raw.createdAt), color = colors.textMuted, fontSize = 11.sp)
                         if (message.raw.flags and 1 != 0) {
                             Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Filled.PushPin, "Pinned", tint = colors.textMuted, modifier = Modifier.size(12.dp))
+                            Icon(Lucide.Pin, "Pinned", tint = colors.textMuted, modifier = Modifier.size(12.dp))
                         }
                     }
                 }
@@ -163,7 +158,7 @@ fun MessageRow(
                     Text("Sending…", color = colors.textMuted, fontSize = 11.sp)
                 } else if (message.failed) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.ErrorOutline, null, tint = colors.danger, modifier = Modifier.size(14.dp))
+                        Icon(Lucide.CircleAlert, null, tint = colors.danger, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
                             "Not sent. Tap to try again.",
@@ -187,7 +182,7 @@ fun MessageRow(
 private fun Locked(text: String) {
     val colors = chatColors
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Filled.Lock, null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
+        Icon(Lucide.Lock, null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(6.dp))
         Text(text, color = colors.textMuted, fontSize = 13.sp, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
     }
@@ -255,7 +250,7 @@ private fun ReplyPreview(messageId: String, channelId: String, serverId: String?
         Modifier.fillMaxWidth().padding(start = 16.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.AutoMirrored.Filled.Reply, null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
+        Icon(Lucide.Reply, null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(4.dp))
         if (target == null) {
             Text("Original message", color = colors.textMuted, fontSize = 12.sp)

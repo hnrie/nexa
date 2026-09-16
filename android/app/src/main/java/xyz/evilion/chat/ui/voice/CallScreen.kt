@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,19 +28,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cameraswitch
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Headset
-import androidx.compose.material.icons.filled.HeadsetOff
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.ScreenShare
-import androidx.compose.material.icons.filled.StopScreenShare
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.VideocamOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -139,7 +128,7 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    Icons.Filled.KeyboardArrowDown, "Back to the conversation", tint = colors.icon,
+                    Lucide.ChevronDown, "Back to the conversation", tint = colors.icon,
                     modifier = Modifier.size(28.dp).clickable(onClick = onClose),
                 )
                 Spacer(Modifier.width(12.dp))
@@ -206,11 +195,11 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
                             )
                             if (state.selfMute || state.serverMute) {
                                 Spacer(Modifier.width(4.dp))
-                                Icon(Icons.Filled.MicOff, null, tint = colors.danger, modifier = Modifier.size(12.dp))
+                                Icon(Lucide.MicOff, null, tint = colors.danger, modifier = Modifier.size(12.dp))
                             }
                             if (state.selfDeaf || state.serverDeaf) {
                                 Spacer(Modifier.width(4.dp))
-                                Icon(Icons.Filled.HeadsetOff, null, tint = colors.danger, modifier = Modifier.size(12.dp))
+                                Icon(Lucide.HeadphoneOff, null, tint = colors.danger, modifier = Modifier.size(12.dp))
                             }
                         }
                     }
@@ -232,17 +221,17 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CallButton(
-                    if (call.muted) Icons.Filled.MicOff else Icons.Filled.Mic,
+                    if (call.muted) Lucide.MicOff else Lucide.Mic,
                     if (call.muted) "Unmute" else "Mute",
                     active = call.muted,
                 ) { VoiceSession.setMuted(!call.muted) }
                 CallButton(
-                    if (call.deafened) Icons.Filled.HeadsetOff else Icons.Filled.Headset,
+                    if (call.deafened) Lucide.HeadphoneOff else Lucide.Headphones,
                     if (call.deafened) "Undeafen" else "Deafen",
                     active = call.deafened,
                 ) { VoiceSession.setDeafened(!call.deafened) }
                 CallButton(
-                    if (call.video) Icons.Filled.Videocam else Icons.Filled.VideocamOff,
+                    if (call.video) Lucide.Video else Lucide.VideoOff,
                     "Camera",
                     active = call.video,
                 ) {
@@ -256,7 +245,7 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
                     }
                 }
                 CallButton(
-                    if (call.screen) Icons.Filled.StopScreenShare else Icons.Filled.ScreenShare,
+                    if (call.screen) Lucide.MonitorX else Lucide.MonitorUp,
                     "Share screen",
                     active = call.screen,
                 ) {
@@ -267,10 +256,10 @@ fun CallScreen(channelId: String, onClose: () -> Unit) {
                         screenCapture.launch(manager.createScreenCaptureIntent())
                     }
                 }
-                CallButton(Icons.Filled.VolumeUp, "Speaker", active = call.speaker) {
+                CallButton(Lucide.Volume2, "Speaker", active = call.speaker) {
                     VoiceSession.setSpeaker(!call.speaker)
                 }
-                CallButton(Icons.Filled.CallEnd, "Leave", danger = true) {
+                CallButton(Lucide.Phone, "Leave", danger = true, hangUp = true) {
                     VoiceSession.leave()
                     CallService.stop(context)
                     onClose()
@@ -286,6 +275,8 @@ private fun CallButton(
     label: String,
     active: Boolean = false,
     danger: Boolean = false,
+    /** A handset turned down, for the button that ends the call. */
+    hangUp: Boolean = false,
     onClick: () -> Unit,
 ) {
     val colors = chatColors
@@ -301,7 +292,12 @@ private fun CallButton(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, label, tint = if (danger || active) Color.White else colors.icon, modifier = Modifier.size(24.dp))
+        Icon(
+            icon,
+            label,
+            tint = if (danger || active) Color.White else colors.icon,
+            modifier = Modifier.size(24.dp).then(if (hangUp) Modifier.rotate(135f) else Modifier),
+        )
     }
 }
 

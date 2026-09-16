@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.chat
 
 import android.content.Context
 import android.content.Intent
+import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,11 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -102,7 +98,7 @@ private fun ImageAttachment(meta: AttachmentMeta) {
                     Modifier.clip(RoundedCornerShape(20.dp)).background(colors.bgOverlay).padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.VisibilityOff, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Lucide.EyeOff, null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Spoiler", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
@@ -151,7 +147,7 @@ private fun VideoAttachment(meta: AttachmentMeta) {
                 contentAlignment = Alignment.Center,
             ) {
                 if (busy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                else Icon(Icons.Filled.PlayArrow, "Play", tint = Color.White, modifier = Modifier.size(30.dp))
+                else Icon(Lucide.Play, "Play", tint = Color.White, modifier = Modifier.size(30.dp))
             }
         }
     }
@@ -188,7 +184,7 @@ private fun FileAttachment(meta: AttachmentMeta) {
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Filled.Description, null, tint = colors.textBrand, modifier = Modifier.size(28.dp))
+        Icon(Lucide.FileText, null, tint = colors.textBrand, modifier = Modifier.size(28.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(meta.name, color = colors.link, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -197,7 +193,7 @@ private fun FileAttachment(meta: AttachmentMeta) {
         if (progress != null) {
             CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
         } else {
-            Icon(Icons.Filled.Download, "Open", tint = colors.icon, modifier = Modifier.size(20.dp))
+            Icon(Lucide.Download, "Open", tint = colors.icon, modifier = Modifier.size(20.dp))
         }
     }
 }
