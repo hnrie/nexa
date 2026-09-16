@@ -62,7 +62,7 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
       <div style={{ height: 16 }} />
       {needsRotation ? (
         <div className={s.warn}>
-          <TriangleAlert size={16} style={{ verticalAlign: -3, marginRight: 6 }} />
+          <TriangleAlert size={16} style={{ verticalAlign: -3, marginInlineEnd: 6 }} />
           Someone left or was removed and the keys they held have not been rotated yet. Rotating happens automatically when a key holder is online; you can also do it now.
         </div>
       ) : null}

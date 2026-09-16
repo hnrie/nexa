@@ -14,7 +14,7 @@
 .failedDownload:hover { text-decoration: none; filter: brightness(1.08); }
 .bigPlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); color: #fff; backdrop-filter: blur(2px); }
 .bigPlay:hover { background: var(--brand); }
-.bar { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.bar { position: absolute; left: 0; right: 0; bottom: 0; direction: ltr; padding: 18px 8px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
 .player[data-full="true"] .bar { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
 .player[data-ui="true"] .bar { opacity: 1; pointer-events: auto; }
 @media (hover: hover) {
@@ -25,7 +25,7 @@
 .track::before { content: ""; position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.25); }
 .buffered { position: absolute; left: 0; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.4); }
 .progress { position: absolute; left: 0; height: 4px; border-radius: 2px; background: var(--brand); }
-.knob { position: absolute; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity 120ms ease; }
+.knob { position: absolute; width: 12px; height: 12px; margin-inline-start: -6px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity 120ms ease; }
 .track:hover .knob, .player:focus-within .knob { opacity: 1; }
 /* nothing in the row shrinks: what does not fit moves into the menu instead of being squashed */
 .controls { display: flex; align-items: center; gap: 4px; margin-top: 2px; color: #fff; min-width: 0; }
@@ -36,7 +36,7 @@
 .time { font-size: 12px; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.85); padding: 0 4px; white-space: nowrap; }
 .volumeWrap { display: flex; align-items: center; }
 .volume { width: 0; opacity: 0; accent-color: var(--brand); transition: width 140ms ease, opacity 140ms ease; }
-.volumeWrap:hover .volume, .volume:focus { width: 72px; opacity: 1; margin-right: 4px; }
+.volumeWrap:hover .volume, .volume:focus { width: 72px; opacity: 1; margin-inline-end: 4px; }
 .speed { height: 30px; padding: 0 8px; border-radius: var(--radius-xs); color: #fff; font-size: 12px; font-weight: 600; }
 .speed:hover { background: rgba(255, 255, 255, 0.16); }
 .narrowOnly { display: none; }
@@ -52,7 +52,7 @@
 @media (pointer: coarse) {
   .bar { padding: 14px 6px 4px; }
   .track { height: 28px; }
-  .knob { opacity: 1; width: 14px; height: 14px; margin-left: -7px; }
+  .knob { opacity: 1; width: 14px; height: 14px; margin-inline-start: -7px; }
   .controls { gap: 2px; margin-top: 0; }
   .ctl { width: 40px; height: 40px; }
   .speed { height: 40px; }

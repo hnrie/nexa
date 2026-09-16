@@ -4,7 +4,7 @@
 .tab:hover { background: var(--bg-active); }
 .tab[data-on="true"] { outline: 2px solid var(--brand); outline-offset: -2px; background: var(--bg-selected); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-height: min(52vh, 420px); overflow-y: auto; padding: 2px; }
-.source { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text); text-align: left; min-width: 0; }
+.source { display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: var(--radius-sm); background: var(--bg-raised); color: var(--text); text-align: start; min-width: 0; }
 .source:hover { background: var(--bg-active); }
 .source[data-on="true"] { outline: 2px solid var(--brand); outline-offset: -2px; background: var(--bg-selected); }
 .thumb { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-xs); background: #000; object-fit: contain; display: block; }

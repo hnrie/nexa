@@ -1,7 +1,7 @@
 .rail { width: var(--rail-w); height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; background: var(--bg-base); }
 .rail::-webkit-scrollbar { display: none; }
 .item { position: relative; width: 100%; display: flex; justify-content: center; }
-.pill { position: absolute; left: 0; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-radius: 0 4px 4px 0; background: var(--text-strong); opacity: 0; transition: height var(--transition), opacity var(--transition), margin-top var(--transition); }
+.pill { position: absolute; inset-inline-start: 0; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--text-strong); opacity: 0; transition: height var(--transition), opacity var(--transition), margin-top var(--transition); }
 .item[data-unread="true"] .pill { opacity: 1; }
 .item:hover .pill { opacity: 1; height: 20px; margin-top: -10px; }
 .item[data-selected="true"] .pill { opacity: 1; height: 40px; margin-top: -20px; }
@@ -11,13 +11,13 @@
 .add:hover .btn { background: var(--positive) !important; color: #fff; }
 .add .btn { color: var(--positive); }
 .sep { width: 32px; height: 2px; border-radius: 1px; background: var(--border); margin: 2px 0; }
-.badge { position: absolute; right: 6px; bottom: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg-base); }
+.badge { position: absolute; inset-inline-end: 6px; bottom: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg-base); }
 .server .btn { font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .server .btn.hasIcon { background: transparent; }
 .initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .server[data-muted="true"] .btn { opacity: 0.6; }
 .server[data-dragging="true"] { opacity: 0.4; }
-.server[data-drop="before"]::before, .server[data-drop="after"]::after { content: ""; position: absolute; left: 12px; right: 12px; height: 2px; background: var(--brand); border-radius: 1px; }
+.server[data-drop="before"]::before, .server[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 12px; height: 2px; background: var(--brand); border-radius: 1px; }
 .server[data-drop="before"]::before { top: -5px; }
 .server[data-drop="after"]::after { bottom: -5px; }
 .waiting .btn { background: transparent; }

@@ -5,9 +5,9 @@
 .icon[data-state="off"] { background: var(--bg-active); color: var(--text-muted); }
 .title { margin: 0; font-size: 22px; font-weight: 700; color: var(--text-strong); }
 .sub { margin: 0; font-size: 15px; color: var(--text-muted); line-height: 1.4; }
-.form { width: 100%; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; text-align: left; }
+.form { width: 100%; display: flex; flex-direction: column; gap: 16px; margin-top: 8px; text-align: start; }
 .error { margin: 0; padding: 10px 12px; border-radius: var(--radius-xs); background: rgba(218, 62, 68, 0.15); border: 1px solid rgba(218, 62, 68, 0.5); color: var(--text); font-size: 14px; }
-.fine { display: flex; align-items: flex-start; gap: 6px; margin: 4px 0 0; font-size: 12px; color: var(--text-muted); text-align: left; line-height: 1.4; }
+.fine { display: flex; align-items: flex-start; gap: 6px; margin: 4px 0 0; font-size: 12px; color: var(--text-muted); text-align: start; line-height: 1.4; }
 .fine svg { flex: none; margin-top: 1px; color: var(--positive); }
 .back { margin-top: 4px; font-size: 14px; color: var(--link); }
 .back:hover { text-decoration: underline; }

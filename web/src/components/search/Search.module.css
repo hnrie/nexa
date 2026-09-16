@@ -1,4 +1,4 @@
-.panel { width: 420px; max-width: 45vw; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--border-subtle); background: var(--bg-raised); min-height: 0; }
+.panel { width: 420px; max-width: 45vw; flex: none; display: flex; flex-direction: column; border-inline-start: 1px solid var(--border-subtle); background: var(--bg-raised); min-height: 0; }
 .head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border-subtle); }
 .headText { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .close { display: flex; padding: 4px; border-radius: var(--radius-xs); color: var(--text-muted); }
@@ -11,14 +11,14 @@
 .help dt { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
 .help dd { margin: 0; }
 .list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-.result { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); text-align: left; color: var(--text); width: 100%; }
+.result { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); text-align: start; color: var(--text); width: 100%; }
 .result:hover { background: var(--bg-hover); }
 /* long names and channels shorten rather than push the card wider than the panel */
 .resultHead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; min-width: 0; }
 .resultName, .resultChan { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resultName { font-weight: 600; color: var(--text-strong); }
 .resultChan { color: var(--text-muted); }
-.resultTime { margin-left: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.resultTime { margin-inline-start: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .resultText { font-size: 14px; line-height: 1.375; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .resultText mark { background: rgba(88, 101, 242, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
 .empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 14px; }
@@ -29,13 +29,13 @@
 .searchBox input::placeholder { color: var(--text-placeholder); }
 /* Tablets and narrow windows have no room for a 420px column beside the chat,
    which would squeeze the messages and composer to nothing: search opens over it. */
-@media (max-width: 1099px) { .panel { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(420px, 100%); max-width: none; box-shadow: var(--shadow-high); } }
+@media (max-width: 1099px) { .panel { position: absolute; top: 0; inset-inline-end: 0; bottom: 0; z-index: 5; width: min(420px, 100%); max-width: none; box-shadow: var(--shadow-high); } }
 @media (max-width: 767px) { .panel { position: absolute; inset: 0; width: 100%; max-width: none; z-index: 5; } .searchBox { width: 120px; } .searchBox:focus-within { width: 180px; } }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }
 
 /* What to type next, under whichever box the query is being typed in. */
 .suggest { position: relative; margin: 0 12px 8px; max-height: 232px; overflow-y: auto; border-radius: var(--radius-xs); background: var(--bg-floating); box-shadow: var(--shadow-medium); }
-.suggestRow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; text-align: left; color: var(--text); font-size: 14px; }
+.suggestRow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; text-align: start; color: var(--text); font-size: 14px; }
 .suggestRow:hover { background: var(--bg-hover); }
 .suggestName { color: var(--text-strong); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggestSub { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

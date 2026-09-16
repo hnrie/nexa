@@ -28,7 +28,7 @@ export function CallBanner({ channelId }: { channelId: string }) {
         <span className={s.bannerSub}>{participants.map((p) => displayName(users[p.user_id])).join(", ")}</span>
       </div>
       <button className={s.bannerJoin} onClick={() => void joinVoice(channelId)} disabled={joining === channelId}>
-        <Phone size={14} style={{ verticalAlign: -2, marginRight: 6 }} />
+        <Phone size={14} style={{ verticalAlign: -2, marginInlineEnd: 6 }} />
         {joining === channelId ? "Joining…" : "Join Call"}
       </button>
     </div>

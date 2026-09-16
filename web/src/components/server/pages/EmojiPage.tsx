@@ -107,7 +107,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
                   <td className={s.code}>:{e.name}:</td>
                   <td>{displayName(users[e.creator_id])}</td>
                   {manage ? (
-                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <td style={{ textAlign: "end", whiteSpace: "nowrap" }}>
                       <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title={t("server.packEditor.rename")} aria-label={t("server.packEditor.rename")} onClick={() => void rename(e)}><Pencil size={16} /></button>
                       <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title={t("chat.messageItem.delete")} aria-label={t("server.emoji.deleteEmoji")} onClick={() => remove(e)}><Trash2 size={16} /></button>
                     </td>

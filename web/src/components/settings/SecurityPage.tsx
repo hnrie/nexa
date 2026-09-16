@@ -369,7 +369,7 @@ function BackupCodes({ codes, copied, onCopy, onDownload, onDone }: { codes: str
       <div style={{ display: "flex", gap: 8 }}>
         <Button variant="secondary" onClick={onCopy}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Copied" : "Copy"}</Button>
         <Button variant="secondary" onClick={onDownload}><Download size={15} /> {t("chat.attachments.download")}</Button>
-        <Button onClick={onDone} style={{ marginLeft: "auto" }}>{t("modals.serverNotifications.done")}</Button>
+        <Button onClick={onDone} style={{ marginInlineStart: "auto" }}>{t("modals.serverNotifications.done")}</Button>
       </div>
     </>
   );

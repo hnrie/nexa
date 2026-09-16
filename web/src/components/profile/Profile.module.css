@@ -61,17 +61,17 @@
   -webkit-mask-image: radial-gradient(circle at calc(var(--av-left) + var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
   mask-image: radial-gradient(circle at calc(var(--av-left) + var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
 }
-.bannerBtns { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 8px; }
+.bannerBtns { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 2; display: flex; gap: 8px; }
 .bannerBtn { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); color: #fff; transition: background var(--transition); }
 .bannerBtn:hover { background: rgba(0, 0, 0, 0.72); }
 /* 60% of the avatar over the banner, 40% below it */
-.avatar { position: absolute; left: var(--av-left); bottom: calc(var(--av) * -0.4); z-index: 1; line-height: 0; }
+.avatar { position: absolute; inset-inline-start: var(--av-left); bottom: calc(var(--av) * -0.4); z-index: 1; line-height: 0; }
 
 /* a custom status is a thought bubble beside the avatar, across the banner's edge */
-.bubble { position: absolute; z-index: 1; left: calc(var(--av-left) + var(--av) + 14px); right: 16px; top: calc(100% - 18px); display: flex; pointer-events: none; }
+.bubble { position: absolute; z-index: 1; inset-inline-start: calc(var(--av-left) + var(--av) + 14px); inset-inline-end: 16px; top: calc(100% - 18px); display: flex; pointer-events: none; }
 .bubble::before, .bubble::after { content: ""; position: absolute; border-radius: 50%; background: var(--bubble-bg); }
-.bubble::before { width: 10px; height: 10px; left: -6px; top: -8px; }
-.bubble::after { width: 5px; height: 5px; left: -13px; top: -14px; }
+.bubble::before { width: 10px; height: 10px; inset-inline-start: -6px; top: -8px; }
+.bubble::after { width: 5px; height: 5px; inset-inline-start: -13px; top: -14px; }
 .bubbleText {
   max-width: 100%;
   padding: 8px 12px;
@@ -89,7 +89,7 @@
   overflow: hidden;
 }
 .card[data-variant="modal"] .bubbleText { -webkit-line-clamp: 3; }
-.bubbleEmoji { display: inline-block; width: 18px; height: 18px; margin-right: 6px; vertical-align: -4px; object-fit: contain; }
+.bubbleEmoji { display: inline-block; width: 18px; height: 18px; margin-inline-end: 6px; vertical-align: -4px; object-fit: contain; }
 
 .info { position: relative; display: flex; flex-direction: column; gap: 12px; padding: calc(var(--av) * 0.4 + 12px) 16px 16px; }
 /*
@@ -113,7 +113,7 @@
 .ident { min-width: 0; }
 .nameRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .display { margin: 0; min-width: 0; font-size: 20px; line-height: 26px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
-.displayBtn { font: inherit; color: inherit; text-align: left; overflow-wrap: anywhere; }
+.displayBtn { font: inherit; color: inherit; text-align: start; overflow-wrap: anywhere; }
 .displayBtn:hover { text-decoration: underline; }
 /* in the column beside a DM the picture is the way to the whole profile */
 .avatarBtn { display: block; line-height: 0; border-radius: 50%; }
@@ -135,10 +135,10 @@
 .square { width: 36px; height: 36px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--profile-chip); color: var(--text-strong); transition: background var(--transition); }
 .square:hover { background: var(--profile-chip-hover); }
 
-.mutualRow { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; max-width: 100%; font-size: 14px; line-height: 20px; color: var(--text); text-align: left; }
+.mutualRow { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; max-width: 100%; font-size: 14px; line-height: 20px; color: var(--text); text-align: start; }
 .mutualRow:hover > span:last-child { text-decoration: underline; }
 .stack { display: flex; flex: none; }
-.stackItem + .stackItem { margin-left: -6px; }
+.stackItem + .stackItem { margin-inline-start: -6px; }
 /* each small avatar gives way to the one overlapping it, the way the big one gives way to its dot */
 .stackItem:not(:last-child) {
   -webkit-mask-image: radial-gradient(circle at calc(100% + 4px) 50%, transparent 12px, #000 12.5px);
@@ -162,7 +162,7 @@
 .note:hover { background: var(--bg-hover); }
 .note:focus { background: var(--bg-input); outline: none; }
 
-.listItem { display: flex; align-items: center; gap: 12px; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 8px; border-radius: 8px; font-size: 15px; font-weight: 500; color: var(--text-strong); text-align: left; }
+.listItem { display: flex; align-items: center; gap: 12px; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 8px; border-radius: 8px; font-size: 15px; font-weight: 500; color: var(--text-strong); text-align: start; }
 .listItem:hover { background: var(--bg-hover); }
 .listIcon { width: 32px; height: 32px; border-radius: 30%; object-fit: cover; flex: none; }
 .listInitial { width: 32px; height: 32px; border-radius: 30%; flex: none; display: flex; align-items: center; justify-content: center; background: var(--profile-chip); font-size: 13px; font-weight: 700; }

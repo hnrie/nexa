@@ -1,5 +1,5 @@
 .panel { flex: none; margin: 0 8px 8px; padding: 0 8px 0 4px; height: var(--panel-h); display: flex; align-items: center; gap: 8px; background: var(--bg-surface); border-radius: var(--radius-sm); position: relative; }
-.me { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; height: 40px; padding: 0 4px; border-radius: var(--radius-xs); text-align: left; }
+.me { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; height: 40px; padding: 0 4px; border-radius: var(--radius-xs); text-align: start; }
 .me:hover { background: var(--bg-hover); }
 /* the speaking ring, drawn as the call's is: on quickly, fading out gently between words */
 .avatar { border-radius: 50%; box-shadow: 0 0 0 2px transparent; transition: box-shadow 240ms ease-out; }
@@ -11,12 +11,12 @@
 .icon { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--icon); }
 .icon:hover { background: var(--bg-hover); color: var(--text); }
 .icon[data-on="false"] { color: var(--danger); }
-.pop { position: absolute; bottom: calc(100% + 8px); left: 0; width: 280px; padding: 8px; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); z-index: 50; }
+.pop { position: absolute; bottom: calc(100% + 8px); inset-inline-start: 0; width: 280px; padding: 8px; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); z-index: 50; }
 .popHead { display: flex; align-items: center; gap: 12px; padding: 8px; }
 .popName { font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .popUser { font-size: 13px; color: var(--text-muted); }
 .sep { height: 1px; background: var(--border); margin: 6px 4px; }
-.opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border-radius: var(--radius-xs); color: var(--text-subtle); font-size: 14px; font-weight: 500; text-align: left; }
+.opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border-radius: var(--radius-xs); color: var(--text-subtle); font-size: 14px; font-weight: 500; text-align: start; }
 .opt:hover { background: var(--brand); color: #fff; }
 .opt:hover .optSub { color: inherit; }
 .optText { display: flex; flex-direction: column; }

@@ -7,7 +7,7 @@
 .md-spoiler[data-revealed="true"] { background: var(--spoiler-revealed); color: inherit; cursor: text; }
 .md-spoiler[data-revealed="false"] * { visibility: hidden; }
 .md-spoiler[data-revealed="false"] img { visibility: hidden; }
-.md-quote { margin: 2px 0; padding: 0 8px 0 12px; border-left: 4px solid var(--border-strong); border-radius: 2px; color: var(--text); }
+.md-quote { margin: 2px 0; padding: 0 8px 0 12px; border-inline-start: 4px solid var(--border-strong); border-radius: 2px; color: var(--text); }
 .md-h1 { font-size: 1.5em; font-weight: 700; margin: 16px 0 8px; line-height: 1.25; }
 .md-h2 { font-size: 1.25em; font-weight: 700; margin: 16px 0 8px; line-height: 1.25; }
 .md-h3 { font-size: 1em; font-weight: 700; margin: 16px 0 4px; line-height: 1.25; }
@@ -23,7 +23,7 @@
 .md-emoji-jumbo, .md-emoji-unicode.md-emoji-jumbo { font-size: var(--jumbo-size, 48px); line-height: 1.15; width: auto; height: auto; vertical-align: middle; }
 img.md-emoji-jumbo { width: var(--jumbo-size, 48px); height: var(--jumbo-size, 48px); }
 .md-timestamp { padding: 0 2px; border-radius: 3px; background: var(--bg-active); }
-.md-list { margin: 4px 0; padding-left: 24px; }
+.md-list { margin: 4px 0; padding-inline-start: 24px; }
 .md-list-item { margin: 2px 0; }
 /* highlight.js theme, kept minimal and tied to the palette */
 .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-name { color: #c678dd; }

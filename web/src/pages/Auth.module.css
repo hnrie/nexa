@@ -16,7 +16,7 @@
 .strength i[data-on="true"] { background: var(--positive); }
 .strength[data-score="1"] i[data-on="true"] { background: var(--danger); }
 .strength[data-score="2"] i[data-on="true"] { background: var(--warning); }
-.strengthLabel { font-size: 12px; color: var(--text-muted); min-width: 60px; text-align: right; }
+.strengthLabel { font-size: 12px; color: var(--text-muted); min-width: 60px; text-align: end; }
 .recovery { font-family: var(--font-mono); font-size: 15px; line-height: 1.7; letter-spacing: 0.04em; padding: 16px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; user-select: all; word-break: break-all; color: var(--text-strong); border: 1px solid var(--border); }
 .warn { padding: 12px; border-radius: var(--radius-xs); background: rgba(253, 184, 51, 0.12); border: 1px solid rgba(253, 184, 51, 0.5); font-size: 14px; color: var(--text); }
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }

@@ -5,7 +5,7 @@
 .art { position: relative; flex: none; width: 72px; height: 72px; }
 .large { width: 72px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg-active); display: block; }
 .fallback { width: 72px; height: 72px; border-radius: var(--radius-sm); background: var(--bg-active); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
-.small { position: absolute; right: -6px; bottom: -6px; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--bg-raised); border: 3px solid var(--bg-raised); box-sizing: content-box; }
+.small { position: absolute; inset-inline-end: -6px; bottom: -6px; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--bg-raised); border: 3px solid var(--bg-raised); box-sizing: content-box; }
 .text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 18px; color: var(--text); }
 .title { font-weight: 600; color: var(--text-strong); }
 .title, .line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -29,4 +29,4 @@ a.title:hover, a.line:hover { text-decoration: underline; }
 /* two or more things at once: the icon of the first, and how many follow */
 .kindStack { display: inline-flex; align-items: center; gap: 1px; flex: none; }
 .kindMore { font-size: 10px; font-weight: 700; line-height: 1; color: var(--text-muted); }
-.statusEmoji { width: 1.1em; height: 1.1em; margin-right: 3px; vertical-align: -0.2em; object-fit: contain; }
+.statusEmoji { width: 1.1em; height: 1.1em; margin-inline-end: 3px; vertical-align: -0.2em; object-fit: contain; }

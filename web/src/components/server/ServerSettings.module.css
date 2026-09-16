@@ -1,6 +1,6 @@
 .iconInput { position: relative; }
-.iconInput svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-.iconInput input { padding-left: 32px; }
+.iconInput svg { position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.iconInput input { padding-inline-start: 32px; }
 .permLayout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 24px; margin-top: 16px; }
 .permList { display: flex; flex-direction: column; gap: 2px; align-self: start; position: sticky; top: 60px; }
 .permListHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
@@ -8,7 +8,7 @@
 .smallBtn { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 6px; border-radius: var(--radius-xs); background: var(--bg-surface); color: var(--text); font-size: 12px; font-weight: 600; }
 .smallBtn:hover { background: var(--bg-hover); }
 .picker { display: flex; flex-direction: column; gap: 2px; padding: 8px; margin-bottom: 8px; border-radius: var(--radius-xs); background: var(--bg-surface); max-height: 280px; overflow-y: auto; }
-.pickerRow { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text); font-size: 14px; text-align: left; width: 100%; }
+.pickerRow { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text); font-size: 14px; text-align: start; width: 100%; }
 .pickerRow:hover { background: var(--bg-hover); }
 .pickerEmpty { padding: 8px; font-size: 13px; color: var(--text-muted); }
 .muted { color: var(--text-muted); font-size: 12px; }
@@ -16,9 +16,9 @@
 .permTarget { display: flex; align-items: center; border-radius: var(--radius-xs); color: var(--text-channel); }
 .permTarget:hover { background: var(--bg-hover); color: var(--text); }
 .permTarget[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
-.permTargetBtn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; color: inherit; font-size: 15px; font-weight: 500; text-align: left; }
+.permTargetBtn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 8px; color: inherit; font-size: 15px; font-weight: 500; text-align: start; }
 .permTargetName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.permRemove { display: flex; padding: 4px; margin-right: 4px; color: var(--text-muted); border-radius: var(--radius-xs); }
+.permRemove { display: flex; padding: 4px; margin-inline-end: 4px; color: var(--text-muted); border-radius: var(--radius-xs); }
 .permRemove:hover { color: var(--danger); }
 .permEditor { min-width: 0; }
 .privateRow { padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; flex-direction: column; gap: 8px; }
@@ -26,15 +26,15 @@
 
 .rolesLayout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; margin-top: 16px; }
 .roleList { display: flex; flex-direction: column; gap: 2px; align-self: start; position: sticky; top: 60px; }
-.roleRow { position: relative; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 15px; font-weight: 500; text-align: left; width: 100%; }
+.roleRow { position: relative; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 15px; font-weight: 500; text-align: start; width: 100%; }
 .roleRow:hover { background: var(--bg-hover); color: var(--text); }
 .roleRow[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
 .roleRow[data-dragging="true"] { opacity: 0.4; }
-.roleRow[data-drop="before"]::before, .roleRow[data-drop="after"]::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--brand); }
+.roleRow[data-drop="before"]::before, .roleRow[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 0; height: 2px; background: var(--brand); }
 .roleRow[data-drop="before"]::before { top: -2px; }
 .roleRow[data-drop="after"]::after { bottom: -2px; }
 .roleName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.roleCount { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.roleCount { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); }
 .tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .tab { padding: 10px 2px; font-size: 15px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tab:hover { color: var(--text); }
@@ -57,7 +57,7 @@
 .loadMore { margin: 12px 0; display: flex; justify-content: center; }
 
 .table { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--text); }
-.table th { text-align: left; padding: 8px 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); border-bottom: 1px solid var(--border); }
+.table th { text-align: start; padding: 8px 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); border-bottom: 1px solid var(--border); }
 .table td { padding: 10px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
 .code { font-family: var(--font-mono); font-size: 13px; }
 .tableWrap { overflow-x: auto; }

@@ -6,7 +6,7 @@
   -webkit-mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
   mask-image: radial-gradient(circle at calc(100% - var(--dot) / 2) calc(100% - var(--dot) / 2), transparent var(--cut), #000 calc(var(--cut) + 0.5px));
 }
-.status { position: absolute; right: 0; bottom: 0; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--status-offline); }
+.status { position: absolute; inset-inline-end: 0; bottom: 0; width: var(--dot); height: var(--dot); border-radius: 50%; background: var(--status-offline); }
 .alone { position: static; display: inline-block; flex: none; }
 .online { background: var(--status-online); }
 /* idle is a crescent moon */

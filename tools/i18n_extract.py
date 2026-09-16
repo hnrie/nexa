@@ -23,6 +23,14 @@ CATALOG = ROOT / "web/src/i18n/locales/en.json"
 ATTRS = ("label", "placeholder", "title", "aria-label", "description", "confirmLabel",
          "hint", "subtitle", "alt", "emptyText", "tooltip")
 
+# Object properties whose value a person reads. Menus, settings navigation and
+# confirm dialogs are built as data, so their text never appears between tags.
+PROPS = ("label", "title", "head", "desc", "description", "text", "hint", "placeholder",
+         "confirmLabel", "body", "note", "subtitle", "emptyText", "tooltip", "initial")
+
+# Calls whose first argument is a sentence: a toast, a prompt's heading.
+CALLS = ("toast", "promptText")
+
 # Files that hold no interface text, or whose strings are not for reading.
 SKIP_DIRS = ("i18n", "test")
 SKIP_FILES = ("vite-env.d.ts",)
@@ -92,7 +100,10 @@ def main() -> int:
         if isinstance(v, str):
             seen_by_text.setdefault(v, k)
 
-    files = sorted(p for p in SRC.rglob("*.tsx") if not p.name.endswith(".test.tsx"))
+    files = sorted(
+        p for p in [*SRC.rglob("*.tsx"), *SRC.rglob("*.ts")]
+        if not p.name.endswith((".test.tsx", ".test.ts", ".d.ts"))
+    )
     changed, added, left = 0, 0, []
     for path in files:
         if any(part in SKIP_DIRS for part in path.relative_to(SRC).parts) or path.name in SKIP_FILES:
@@ -137,6 +148,24 @@ def main() -> int:
             return f'{open_tag}{lead}{{{fn}("{key_for(body)}")}}{trail}{close}'
 
         out = re.sub(r"(>)([^<>{}\n]{2,300}?)(</)", text_sub, out)
+
+        # object properties: label: "Some words"
+        def prop_sub(m):
+            name, value = m.group(1), m.group(2)
+            if not is_text(value):
+                return m.group(0)
+            return f'{name}: {fn}("{key_for(value)}")'
+
+        out = re.sub(r'\b(' + "|".join(PROPS) + r')\s*:\s*"([^"\\\n]+)"', prop_sub, out)
+
+        # a sentence handed to a call: toast("Saved."), promptText("Rename Emoji", …)
+        def call_sub(m):
+            head, value = m.group(1), m.group(2)
+            if not is_text(value):
+                return m.group(0)
+            return f'{head}({fn}("{key_for(value)}")'
+
+        out = re.sub(r'\b(' + "|".join(CALLS) + r')\("([^"\\\n]+)"', call_sub, out)
 
         if out == text:
             continue

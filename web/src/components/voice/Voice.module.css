@@ -6,7 +6,7 @@
 .root:fullscreen { padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left); }
 
 /* the grab bar between a call and the conversation under it */
-.resizer { position: absolute; left: 0; right: 0; bottom: -7px; z-index: 6; height: 14px; display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; outline: none; }
+.resizer { position: absolute; inset-inline: 0; bottom: -7px; z-index: 6; height: 14px; display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; outline: none; }
 .resizer::before { content: ""; width: 40px; height: 4px; border-radius: 2px; background: var(--border-strong); transition: background-color var(--transition), width var(--transition); }
 .resizer:hover::before, .resizer:focus-visible::before, .resizer[data-dragging="true"]::before { width: 64px; background: var(--brand); }
 .lobby { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; background: var(--bg-raised); color: var(--text); }
@@ -52,8 +52,8 @@
 .tile[data-place="strip"] .offer { gap: 4px; padding: 4px 4px 22px; }
 .tile[data-place="strip"] .watchBtn { height: 24px; padding: 0 8px; font-size: 12px; }
 
-.tileBar { position: absolute; left: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius-xs); background: rgba(0, 0, 0, 0.6); font-size: 13px; font-weight: 500; color: #fff; max-width: calc(100% - 16px); }
-.tile[data-place="strip"] .tileBar { left: 4px; bottom: 4px; padding: 2px 6px; font-size: 11px; max-width: calc(100% - 8px); }
+.tileBar { position: absolute; inset-inline-start: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius-xs); background: rgba(0, 0, 0, 0.6); font-size: 13px; font-weight: 500; color: #fff; max-width: calc(100% - 16px); }
+.tile[data-place="strip"] .tileBar { inset-inline-start: 4px; bottom: 4px; padding: 2px 6px; font-size: 11px; max-width: calc(100% - 8px); }
 .live { flex: none; padding: 0 5px; border-radius: 3px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; }
 .tileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* someone in through a guest link */
@@ -61,7 +61,7 @@
 .tileIcon { color: #fff; flex: none; }
 .tileIcon[data-server="true"] { color: var(--danger); }
 .tileState { font-size: 11px; color: var(--warning); white-space: nowrap; }
-.tileBtns { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; }
+.tileBtns { position: absolute; top: 8px; inset-inline-end: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; }
 .tile:hover .tileBtns, .tile:focus-within .tileBtns { opacity: 1; }
 .tileBtn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; }
 .tileBtn:hover { background: var(--brand); }
@@ -78,7 +78,7 @@
 .ctl:hover { background: color-mix(in srgb, var(--bg-surface), #fff 14%); }
 /* a control with choices: the button, and a small arrow on its corner that opens them */
 .ctlGroup { position: relative; display: inline-flex; flex: none; }
-.ctlGroup > .ctlMenuWrap { position: absolute; right: -6px; bottom: -4px; }
+.ctlGroup > .ctlMenuWrap { position: absolute; inset-inline-end: -6px; bottom: -4px; }
 .ctlMenu { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-floating); color: var(--text-strong); border: 2px solid #000; box-shadow: var(--shadow-low); }
 .ctlMenu:hover { background: color-mix(in srgb, var(--bg-floating), #fff 14%); }
 .ctl[data-off="true"], .ctl[data-on="true"] { background: #fff; color: #000; }
@@ -135,7 +135,7 @@
 
 /* participants under a voice channel in the sidebar */
 .participants { display: flex; flex-direction: column; padding: 0 0 4px 22px; }
-.participant { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 14px; width: 100%; text-align: left; }
+.participant { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 14px; width: 100%; text-align: start; }
 .participant:hover { background: var(--bg-hover); color: var(--text); }
 .pAvatar { border-radius: 50%; flex: none; box-shadow: 0 0 0 2px transparent; transition: box-shadow 240ms ease-out; }
 .participant[data-speaking="true"] .pAvatar { box-shadow: 0 0 0 2px var(--positive); transition-duration: 80ms; }
@@ -143,7 +143,7 @@
 .pGuest { flex: none; padding: 0 4px; border-radius: 3px; background: var(--bg-active); color: var(--text-muted); font-size: 10px; font-weight: 700; line-height: 15px; text-transform: uppercase; }
 .pIcons { display: flex; gap: 4px; color: var(--text-muted); }
 .pIcons [data-server="true"] { color: var(--danger); }
-.channelCount { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.channelCount { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); }
 
 /* DM call banner */
 .banner { flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); }
@@ -151,8 +151,8 @@
 .bannerHead { font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .bannerSub { font-size: 12px; color: var(--text-muted); }
 .bannerAvatars { display: flex; }
-.bannerAvatars > * { margin-left: -6px; }
-.bannerAvatars > :first-child { margin-left: 0; }
+.bannerAvatars > * { margin-inline-start: -6px; }
+.bannerAvatars > :first-child { margin-inline-start: 0; }
 .bannerJoin { height: 32px; padding: 0 16px; border-radius: var(--radius-xs); background: var(--positive); color: #fff; font-size: 14px; font-weight: 600; }
 .bannerJoin:hover { background: var(--positive-hover); }
 
