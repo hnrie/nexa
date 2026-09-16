@@ -12,6 +12,7 @@ import type { VoiceState } from "@/api/types";
 import { FrameCrypto, voiceKeysFor } from "./e2ee";
 import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
 import { Playback } from "./playback";
+import { PlayoutDelay } from "./playoutDelay";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 
 type PubKind = "audio" | "video" | "screen" | "screen_audio";
@@ -26,6 +27,8 @@ interface Pulled {
   mid: string;
   /** The received track, once it has arrived. */
   track: MediaStreamTrack | null;
+  /** Its receiver, so its buffer can be kept short while the link is clean. */
+  receiver?: RTCRtpReceiver;
   /** This receiver's name in the frame crypto worker, new for every receiver. */
   cryptoId?: string;
   /** When the track arrived, whether any of its frames reached the worker yet, and whether one opened. */
@@ -213,6 +216,8 @@ export class SfuTransport implements VoiceTransport {
   private keyTimer: ReturnType<typeof setInterval>;
   private bypassTimer: ReturnType<typeof setInterval>;
   private receiverSeq = 0;
+  /** Keeps each voice's buffer as short as its link allows, so a call is a conversation. */
+  private readonly playout = new PlayoutDelay();
   /** How often each person's track of each kind has been pulled again for skipping decryption. */
   private repulls = new Map<string, number>();
   private recoverTimer: ReturnType<typeof setTimeout> | null = null;
@@ -681,6 +686,17 @@ export class SfuTransport implements VoiceTransport {
       };
       const seen = this.lossSeen.get(s.mid) ?? [];
       const last = seen[seen.length - 1];
+      // How this voice arrived over the last second, for its buffer: a clean
+      // link plays sooner, and any trouble hands the decision straight back.
+      if (last && p.receiver && counts.received >= last.received) {
+        const got = counts.received - last.received;
+        const missed = Math.max(0, counts.lost - last.lost);
+        const played = counts.samples - last.samples;
+        this.playout.observe(s.mid, p.receiver, {
+          loss: got + missed > 0 ? missed / (got + missed) : 0,
+          conceal: played > 0 ? Math.max(0, counts.concealed - last.concealed) / played : 0,
+        }, now);
+      }
       // counters that went back are a new stream: what came before says nothing about it
       const kept = last && counts.received >= last.received ? seen : [];
       this.lossSeen.set(s.mid, [...kept, counts].slice(-LOSS_CHECKS_KEPT));
@@ -848,6 +864,7 @@ export class SfuTransport implements VoiceTransport {
     }
     if (!p) return;
     p.track = e.track;
+    p.receiver = e.receiver;
     p.cryptoId = cryptoId;
     p.arrivedAt = Date.now();
     p.seen = false;
