@@ -124,12 +124,26 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 	}
 }
 
+// limiters is every rate limiter this server keeps.
+func (s *Server) limiters() []*ratelimit.Limiter {
+	return []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limVoice, s.limGuest}
+}
+
 // StartLimiters runs the rate limiters' idle-key sweepers until ctx is done.
 // Without them every IP and every username ever tried stays in memory for the
 // life of the process.
 func (s *Server) StartLimiters(ctx context.Context) {
-	for _, l := range []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limVoice, s.limGuest} {
+	for _, l := range s.limiters() {
 		l.Start(ctx)
+	}
+}
+
+// ShareLimiters makes every rate limit count across chatd processes rather
+// than once per process, which is what an instance behind more than one of
+// them needs: otherwise two processes let twice as much through.
+func (s *Server) ShareLimiters(shared ratelimit.Shared) {
+	for _, l := range s.limiters() {
+		l.Share(shared)
 	}
 }
 

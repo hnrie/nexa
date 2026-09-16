@@ -21,6 +21,7 @@ import (
 	"github.com/coder/websocket"
 
 	"evilion.xyz/chat/internal/api"
+	"evilion.xyz/chat/internal/cache"
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/gateway"
@@ -84,8 +85,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	shared, err := cache.Open(cfg.RedisURL)
+	if err != nil {
+		log.Error("open redis", "err", err)
+		os.Exit(1)
+	}
+	defer shared.Close()
+
 	srv := api.NewServer(cfg, st, log, nil)
 	srv.Version = version
+	// With a Redis behind it every process counts against one allowance; with
+	// none, each keeps its own, which is right while there is only one.
+	if cfg.RedisURL != "" {
+		srv.ShareLimiters(shared)
+	}
 	srv.Secret = secret
 	srv.Media = mediaStore
 	srv.Unfurl = unfurl.NewService()

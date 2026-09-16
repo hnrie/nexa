@@ -56,3 +56,25 @@ the Mac build swaps itself in on restart (it is not signed, so macOS's own
 updater cannot); a .deb only says a new version is out. Builds are unsigned:
 Windows shows "Windows protected your PC" (More info → Run anyway) and macOS
 wants a right-click → Open the first time; the download page says so.
+
+## Moving to Postgres
+
+SQLite is the default and stays the right answer for one machine. Move when one
+stops being enough — several chatd processes, a replica, a database somebody
+else keeps alive.
+
+```
+launchctl unload ~/Library/LaunchAgents/xyz.evilion.chat.plist   # stop chatd
+go run ./cmd/chatmigrate --from data/chat.db --to 'postgres://chat@host/chat?sslmode=require'
+```
+
+It copies every table in one transaction and counts the rows on both sides
+before it says it is done; nothing lands if anything fails. Then set
+`DATABASE_URL` to the same URL in `chatd.env` and start chatd again. The SQLite
+file is left alone, so unsetting `DATABASE_URL` puts things back exactly as
+they were.
+
+Running more than one chatd also needs `REDIS_URL`: presence, rate limits and
+gateway events live there instead of in one process's memory, so the processes
+agree about who is online, share one allowance, and pass each other's events on
+to their own sockets.
