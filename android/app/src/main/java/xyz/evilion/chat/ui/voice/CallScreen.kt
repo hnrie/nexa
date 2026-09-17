@@ -14,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -234,10 +236,10 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
                 )
             }
 
-            Row(
+            FlowRow(
                 Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 CallButton(
                     if (call.muted) Lucide.MicOff else Lucide.Mic,
@@ -300,7 +302,7 @@ private fun CallButton(
 ) {
     val colors = chatColors
     Box(
-        Modifier.size(52.dp).clip(CircleShape)
+        Modifier.size(48.dp).clip(CircleShape)
             .background(
                 when {
                     danger -> colors.danger

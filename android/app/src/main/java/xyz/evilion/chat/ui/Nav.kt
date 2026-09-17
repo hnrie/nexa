@@ -40,8 +40,24 @@ object Nav {
         route.value = Route.Chat(serverId, channelId)
     }
 
+    /**
+     * Opens a layer, unless one of the same kind is already open.
+     *
+     * Two call screens are two full-screen dialogs over one call, each with its
+     * own renderers, each joining and each starting the foreground service —
+     * and closing one leaves the other. Tapping the phone icon and then the
+     * video icon was enough, because they differ only in a flag.
+     */
     fun push(layer: Layer) {
-        layers.value = layers.value + layer
+        val open = layers.value
+        if (open.any { it.sameKind(layer) }) return
+        layers.value = open + layer
+    }
+
+    /** Whether two layers are the same thing on screen, ignoring how it was opened. */
+    private fun Layer.sameKind(other: Layer): Boolean = when {
+        this is Layer.Call && other is Layer.Call -> channelId == other.channelId
+        else -> this == other
     }
 
     fun pop() {

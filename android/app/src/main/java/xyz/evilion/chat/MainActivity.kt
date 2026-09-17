@@ -80,18 +80,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val status by Session.status.collectAsState()
             val settings by SettingsStore.doc.collectAsState()
-            val dark = when (SettingsStore.theme) {
-                "light" -> false
-                "system" -> androidx.compose.foundation.isSystemInDarkTheme()
-                else -> true
-            }
+            val palette = xyz.evilion.chat.ui.theme.paletteFor(SettingsStore.theme)
 
             LaunchedEffect(Unit) { Session.bootstrap() }
             // the account's language, which the web client writes to the same
             // settings field, so one choice follows someone between devices
             LaunchedEffect(settings) { Strings.use(SettingsStore.locale) }
 
-            NexaTheme(dark = dark) {
+            NexaTheme(colors = palette) {
                 // Keyed on the language: a screen that built its words once —
                 // a menu, an empty state — is built again rather than holding
                 // the ones it was born with. Navigation lives in Nav, above

@@ -118,6 +118,50 @@ val DarkColors = ChatColors(
     isDark = true,
 )
 
+/**
+ * Ash and Onyx, the same two the web client offers.
+ *
+ * The theme is kept with the account, so picking one on a phone picks it in
+ * the browser too. Both used to fall through to Dark here while the browser
+ * changed, which is a confusing way to find out a setting did nothing.
+ * Transcribed from web/src/styles/tokens.css.
+ */
+val AshColors = DarkColors.copy(
+    bgBase = Color(0xFF1A1A1E),
+    bgRaised = Color(0xFF232428),
+    bgSurface = Color(0xFF27272C),
+    bgFloating = Color(0xFF2B2C30),
+    bgInput = Color(0xFF131416),
+    bgComposer = Color(0xFF27272C),
+    text = Color(0xFFEFEFF1),
+    textMuted = Color(0xFF96979E),
+    textChannel = Color(0xFF81828A),
+    spoilerRevealed = Color(0xFF1A1A1E),
+    codeBg = Color(0xFF131416),
+    embedBg = Color(0xFF27272C),
+)
+
+val OnyxColors = DarkColors.copy(
+    bgBase = Color(0xFF000000),
+    bgRaised = Color(0xFF000000),
+    bgSurface = Color(0xFF131416),
+    bgFloating = Color(0xFF16171A),
+    bgInput = Color(0xFF0D0D0F),
+    bgComposer = Color(0xFF131416),
+    bgHover = Color(0x0FFFFFFF),
+    bgSelected = Color(0x1AFFFFFF),
+    bgActive = Color(0x24FFFFFF),
+    bgMessageHover = Color(0x0AFFFFFF),
+    text = Color(0xFFD4D5D8),
+    textStrong = Color(0xFFFFFFFF),
+    textMuted = Color(0xFF81828A),
+    textChannel = Color(0xFF7A7B83),
+    borderSubtle = Color(0x1AFFFFFF),
+    spoilerRevealed = Color(0xFF131416),
+    codeBg = Color(0xFF0D0D0F),
+    embedBg = Color(0xFF131416),
+)
+
 val LightColors = ChatColors(
     bgBase = Color(0xFFF3F3F4),
     bgRaised = Color(0xFFFFFFFF),
@@ -160,8 +204,10 @@ val LightColors = ChatColors(
     borderStrong = Color(0x8597979F),
     spoiler = Color(0xFF8F9097),
     spoilerRevealed = Color(0xFFEBECED),
-    codeBg = Color(0xFFF3F3F4),
-    embedBg = Color(0xFFF3F3F4),
+    // not bgBase: a code block or an embed drawn the same colour as the page
+    // behind it loses every edge it has
+    codeBg = Color(0xFFFFFFFF),
+    embedBg = Color(0xFFFFFFFF),
     isDark = false,
 )
 
@@ -186,9 +232,19 @@ private val AppTypography = Typography(
     labelSmall = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
 )
 
+/** The palette a saved theme name means; "system" follows the phone. */
 @Composable
-fun NexaTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = if (dark) DarkColors else LightColors
+fun paletteFor(name: String): ChatColors = when (name) {
+    "light" -> LightColors
+    "ash" -> AshColors
+    "onyx" -> OnyxColors
+    "system" -> if (isSystemInDarkTheme()) DarkColors else LightColors
+    else -> DarkColors
+}
+
+@Composable
+fun NexaTheme(colors: ChatColors, content: @Composable () -> Unit) {
+    val dark = colors.isDark
     val scheme = if (dark) {
         darkColorScheme(
             primary = colors.brand,

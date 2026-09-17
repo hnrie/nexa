@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -238,23 +240,45 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
                     )
                 }
             }
-            if (channel.isDm || AppState.permissionsIn(channelId).has(P.CONNECT)) {
+            // Six buttons is 288 dp of enforced touch target, which on a
+            // 360 dp phone left the channel name — the most important label on
+            // the screen — about 40 dp, ellipsised to two characters, and hid
+            // the topic entirely. Calling stays out front; the rest moves into
+            // one menu, the way the web client's header does it.
+            val canCall = channel.isDm || AppState.permissionsIn(channelId).has(P.CONNECT)
+            if (canCall) {
                 IconButton(onClick = { Nav.push(Layer.Call(channelId)) }) {
                     Icon(Lucide.Phone, t("chatScreen.startACall"), tint = colors.icon)
                 }
-                IconButton(onClick = { Nav.push(Layer.Call(channelId, video = true)) }) {
-                    Icon(Lucide.Video, t("chatScreen.startAVideoCall"), tint = colors.icon)
+            }
+            var more by remember(channelId) { mutableStateOf(false) }
+            IconButton(onClick = { more = true }) {
+                Icon(Lucide.EllipsisVertical, t("chat.chat.more"), tint = colors.icon)
+            }
+            DropdownMenu(expanded = more, onDismissRequest = { more = false }, containerColor = colors.bgFloating) {
+                if (canCall) {
+                    DropdownMenuItem(
+                        text = { Text(t("chatScreen.startAVideoCall"), color = colors.text) },
+                        leadingIcon = { Icon(Lucide.Video, null, tint = colors.icon) },
+                        onClick = { more = false; Nav.push(Layer.Call(channelId, video = true)) },
+                    )
                 }
-            }
-            IconButton(onClick = { Nav.push(Layer.Pins(channelId)) }) {
-                Icon(Lucide.Pin, t("chatScreen.pinnedMessages"), tint = colors.icon)
-            }
-            IconButton(onClick = { Nav.push(Layer.Search(channelId)) }) {
-                Icon(Lucide.Search, t("chat.chat.search"), tint = colors.icon)
-            }
-            if (serverId != null || channel.type == "group_dm") {
-                IconButton(onClick = { Nav.push(Layer.Members(channelId)) }) {
-                    Icon(Lucide.Users, t("server.serverSettings.members"), tint = colors.icon)
+                DropdownMenuItem(
+                    text = { Text(t("chatScreen.pinnedMessages"), color = colors.text) },
+                    leadingIcon = { Icon(Lucide.Pin, null, tint = colors.icon) },
+                    onClick = { more = false; Nav.push(Layer.Pins(channelId)) },
+                )
+                DropdownMenuItem(
+                    text = { Text(t("chat.chat.search"), color = colors.text) },
+                    leadingIcon = { Icon(Lucide.Search, null, tint = colors.icon) },
+                    onClick = { more = false; Nav.push(Layer.Search(channelId)) },
+                )
+                if (serverId != null || channel.type == "group_dm") {
+                    DropdownMenuItem(
+                        text = { Text(t("server.serverSettings.members"), color = colors.text) },
+                        leadingIcon = { Icon(Lucide.Users, null, tint = colors.icon) },
+                        onClick = { more = false; Nav.push(Layer.Members(channelId)) },
+                    )
                 }
             }
         }

@@ -145,7 +145,13 @@ object SettingsStore {
             sending!!
         }
         try {
-            val saved = UsersApi.putSettings(encrypt(k, _doc.value), version + 1)
+            // The version sent is the one being replaced, not the one being
+            // written: the server answers with the number it wrote. Sending
+            // version + 1 meant the very first save claimed to replace a
+            // version that did not exist, so it was refused as a conflict —
+            // and so was every save after it. Nothing this app changed had
+            // ever reached the account.
+            val saved = UsersApi.putSettings(encrypt(k, _doc.value), version)
             version = saved.version
             synchronized(pending) { sending = null }
             failures = 0
