@@ -1676,6 +1676,8 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		status = http.StatusCreated
 		s.emitServer(r.Context(), srv.ID, "member_add", map[string]any{"server_id": srv.ID, "member": member, "user": me.Public()})
+		// the people already here have never seen this user's presence
+		s.Bcast.PresenceChanged(me.ID)
 		if srv.SystemChannelID != nil {
 			if ch, err := s.Store.ChannelByID(r.Context(), *srv.SystemChannelID); err == nil {
 				s.systemMessage(r, ch, me.ID, "system_join", []ids.ID{me.ID}, nil)

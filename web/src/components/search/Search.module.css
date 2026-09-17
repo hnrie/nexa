@@ -20,7 +20,7 @@
 .resultChan { color: var(--text-muted); }
 .resultTime { margin-inline-start: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .resultText { font-size: 14px; line-height: 1.375; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.resultText mark { background: rgba(88, 101, 242, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+.resultText mark { background: rgba(128, 0, 255, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
 .empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-muted); }
 .searchBox { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); width: 180px; transition: width 150ms ease; }

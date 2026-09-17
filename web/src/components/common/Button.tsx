@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import s from "./Button.module.css";
 
+import { t } from "@/i18n";
 type Variant = "primary" | "secondary" | "danger" | "positive" | "link" | "ghost";
 type Size = "sm" | "md" | "lg";
 

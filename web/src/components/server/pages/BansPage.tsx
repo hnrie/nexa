@@ -51,7 +51,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
       await serversApi.unban(serverId, userId);
       setBans((cur) => cur?.filter((b) => b.user_id !== userId) ?? null);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not revoke the ban.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.bans.couldNotRevokeTheBan"), "error");
     } finally {
       setBusy(null);
     }
@@ -61,7 +61,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
   const shown = (bans ?? []).filter((b) => !query || displayName(users[b.user_id]).toLowerCase().includes(query) || (users[b.user_id]?.username ?? "").includes(query));
   return (
     <>
-      <h2 className={st.title}>Bans{bans ? ` — ${bans.length}` : ""}</h2>
+      <h2 className={st.title}>{bans ? t("server.bans.bansCount", { count: bans.length }) : t("server.bans.bans")}</h2>
       <div className={s.searchRow}>
         <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("server.bans.searchBans")} />
       </div>
@@ -72,7 +72,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
           <Avatar id={b.user_id} avatarId={users[b.user_id]?.avatar_id ?? null} name={displayName(users[b.user_id])} size={40} />
           <div className={s.memberText}>
             <span className={s.memberName}>{displayName(users[b.user_id])}</span>
-            <span className={s.memberSub}>@{users[b.user_id]?.username ?? b.user_id} · banned {formatFull(b.created_at)} by {displayName(users[b.banned_by])}{b.reason ? ` · ${b.reason}` : ""}</span>
+            <span className={s.memberSub}>@{users[b.user_id]?.username ?? b.user_id} · {t("server.bans.bannedByOn", { when: formatFull(b.created_at), who: displayName(users[b.banned_by]) })}{b.reason ? ` · ${b.reason}` : ""}</span>
           </div>
           <Button size="sm" variant="secondary" loading={busy === b.user_id} onClick={() => void revoke(b.user_id)}>{t("server.bans.revokeBan")}</Button>
         </div>

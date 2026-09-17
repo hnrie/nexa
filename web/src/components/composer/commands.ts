@@ -1,4 +1,5 @@
-const KAOMOJI: Record<string, string> = {
+
+import { t } from "@/i18n";const KAOMOJI: Record<string, string> = {
   // markdown eats one backslash as an escape and would read the arm's _ as emphasis, so both are escaped
   shrug: "¯\\\\\\_(ツ)_/¯",
   tableflip: "(╯°□°)╯︵ ┻━┻",
@@ -6,14 +7,16 @@ const KAOMOJI: Record<string, string> = {
   lenny: "( ͡° ͜ʖ ͡°)",
 };
 
-export const COMMANDS = [
+export function commands() {
+  return [
   { name: "shrug", desc: "Appends ¯\\_(ツ)_/¯ to your message." },
-  { name: "tableflip", desc: "Appends (╯°□°)╯︵ ┻━┻ to your message." },
-  { name: "unflip", desc: "Appends ┬─┬ ノ( ゜-゜ノ) to your message." },
-  { name: "lenny", desc: "Appends ( ͡° ͜ʖ ͡°) to your message." },
-  { name: "me", desc: "Displays text with emphasis." },
-  { name: "spoiler", desc: "Marks your message as a spoiler." },
+  { name: "tableflip", desc: t("composer.commands.appendsToYourMessage") },
+  { name: "unflip", desc: t("composer.commands.appendsToYourMessage2") },
+  { name: "lenny", desc: t("composer.commands.appendsToYourMessage3") },
+  { name: "me", desc: t("composer.commands.displaysTextWithEmphasis") },
+  { name: "spoiler", desc: t("composer.commands.marksYourMessageAsASpoiler") },
 ];
+}
 
 /** Expands a leading slash command; returns null when the text is not a command. */
 export function applyCommand(text: string): string | null {

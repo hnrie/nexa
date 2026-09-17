@@ -5,6 +5,7 @@ import { FullScreenSpinner } from "@/components/common/Spinner";
 import { AppShell } from "@/components/shell/AppShell";
 import { RedirectIfAuthed, RequireAuth } from "@/components/shell/RequireAuth";
 
+const HomePage = lazyPage(() => import("@/pages/HomePage"));
 const LoginPage = lazyPage(() => import("@/pages/LoginPage"));
 const RegisterPage = lazyPage(() => import("@/pages/RegisterPage"));
 const RecoverPage = lazyPage(() => import("@/pages/RecoverPage"));
@@ -20,6 +21,7 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<FullScreenSpinner />}>
       <Routes>
+        <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/recover" element={<RecoverPage />} />

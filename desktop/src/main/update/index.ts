@@ -1,5 +1,5 @@
 /**
- * Keeping the app up to date from nexa's own server.
+ * Keeping the app up to date from Nexa's own server.
  *
  * Windows (NSIS) and the Linux AppImage use electron-updater; the Mac build
  * uses its own updater (see mac.ts); a .deb can only be told there is a new

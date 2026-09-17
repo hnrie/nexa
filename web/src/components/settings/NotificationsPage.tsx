@@ -31,10 +31,10 @@ export default function NotificationsPage() {
   };
   const testNotification = async () => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") {
-      toast("Turn on desktop notifications first.", "error");
+      toast(t("settings.notifications.turnOnDesktopNotificationsFirst"), "error");
       return;
     }
-    if (!(await showNotification("nexa", { body: "Notifications are working." }))) toast("This browser would not show the notification.", "error");
+    if (!(await showNotification("Nexa", { body: t("settings.notifications.notificationsAreWorking") }))) toast(t("settings.notifications.thisBrowserWouldNotShowThe"), "error");
   };
   return (
     <>

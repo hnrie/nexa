@@ -6,6 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { encodeInviteKey } from "./inviteLink";
 
+import { t } from "@/i18n";
 /** Whether a user is a guest in a call rather than an account. */
 export function isGuest(u: { flags: number } | null | undefined): boolean {
   return !!u && (u.flags & GUEST_FLAG) !== 0;
@@ -30,7 +31,7 @@ const REUSE_LEFT_MS = 60 * 60_000;
 export async function guestLinkFor(channelId: string, opts: { fresh?: boolean; maxAge?: number } = {}): Promise<{ url: string; link: GuestLink }> {
   const conv = convForChannel(channelId);
   const latest = await useKeys.getState().ensureConvKey(conv).catch(() => null);
-  if (!latest) throw new Error("This conversation's keys have not reached this device yet. Try again in a moment.");
+  if (!latest) throw new Error(t("guestLink.thisConversationSKeysHaveNot"));
   const callKey = voiceFrameKey(latest.root, channelId);
   const me = useAuth.getState().me?.id;
   if (!opts.fresh) {

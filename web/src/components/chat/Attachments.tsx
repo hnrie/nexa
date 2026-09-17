@@ -244,7 +244,7 @@ function FileAttachment({ att }: { att: AttachmentMeta }) {
     try {
       await saveAttachment(att, (n) => setDone(n));
     } catch (err) {
-      toast(err instanceof Error && err.message ? err.message : "Could not download that file.", "error");
+      toast(err instanceof Error && err.message ? err.message : tr_("chat.attachments.couldNotDownloadThatFile"), "error");
     } finally {
       setBusy(false);
     }
@@ -255,7 +255,7 @@ function FileAttachment({ att }: { att: AttachmentMeta }) {
       <FileIcon size={36} className={s.fileIcon} />
       <div className={s.fileText}>
         <span className={s.fileName} onClick={() => void download()}>{att.name}</span>
-        <span className={s.fileSize}>{busy ? `Downloading… ${percent}% of ${formatBytes(att.size)}` : formatBytes(att.size)}</span>
+        <span className={s.fileSize}>{busy ? tr_("chat.attachments.downloadingPercent", { percent, size: formatBytes(att.size) }) : formatBytes(att.size)}</span>
       </div>
       <button className={s.dl} aria-label={tr_("chat.attachments.download")} onClick={() => void download()} disabled={busy}>{busy ? <Spinner size={20} /> : <Download size={20} />}</button>
     </div>

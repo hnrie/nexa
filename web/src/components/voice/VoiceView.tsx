@@ -361,7 +361,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const canInviteGuests = !guest && guestLinksOn() !== false && (inDM || (channel.type === "voice" && canI(serverState, P.CREATE_INSTANT_INVITE | P.CONNECT, channel.id)));
   const canRemoveGuests = !guest && (inDM || canI(serverState, P.MOVE_MEMBERS, channel.id));
   const removeGuest = (uid: string) =>
-    void guestsApi.remove(channel.id, uid).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : "Could not remove the guest.", "error"));
+    void guestsApi.remove(channel.id, uid).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : tr_("voice.voiceParticipants.couldNotRemoveTheGuest"), "error"));
   const callFull = (!!fsEl && fsEl === rootRef.current) || pageFull;
 
   const toggleCallFull = () => {
@@ -443,34 +443,34 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     const guestTile = isGuest(users[t.userId]);
     const items: ContextMenuItem[] = [];
     // a guest has no profile, and a guest's page knows nobody's
-    if (!guest && !guestTile) items.push({ id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: t.userId }) });
-    if (t.kind === "screen" && t.me) items.push({ id: "stop-share", label: "Stop Sharing", onSelect: () => void toggleScreen() });
-    if (isLive(t)) items.push({ id: "watch", label: watching[t.userId] ? "Stop Watching" : "Watch Stream", onSelect: () => setWatching(t.userId, !watching[t.userId]) });
+    if (!guest && !guestTile) items.push({ id: "profile", label: tr_("profile.profile.profile"), onSelect: () => openModal("profile", { userId: t.userId }) });
+    if (t.kind === "screen" && t.me) items.push({ id: "stop-share", label: tr_("voice.voice.stopSharing"), onSelect: () => void toggleScreen() });
+    if (isLive(t)) items.push({ id: "watch", label: watching[t.userId] ? tr_("voice.voice.stopWatching") : tr_("voice.voice.watchStream"), onSelect: () => setWatching(t.userId, !watching[t.userId]) });
     if (showsStream(t)) {
       items.push({ id: "focus", label: focused === t.key ? "Unfocus" : "Focus", onSelect: () => setFocused(focused === t.key ? null : t.key) });
-      items.push({ id: "fullscreen", label: tileIsFull(t) ? "Exit Full Screen" : "Full Screen", onSelect: () => fullscreenTile(t) });
+      items.push({ id: "fullscreen", label: tileIsFull(t) ? tr_("voice.voice.exitFullScreen") : tr_("voice.voice.fullScreen"), onSelect: () => fullscreenTile(t) });
     }
     if (!t.me && t.kind === "screen") {
       // a stream's sound has its own level: turning a loud game down leaves the person's voice alone
       const vol = streamVolumes[t.userId] ?? 100;
       if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push(
-        { id: "stream-volume", label: "Stream Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setStreamVolume(t.userId, v) } },
-        { id: "stream-mute", label: streamMutes[t.userId] ? "Unmute Stream" : "Mute Stream", onSelect: () => setStreamLocalMute(t.userId, !streamMutes[t.userId]) },
-        { id: "stream-reset", label: "Reset Stream Volume", disabled: vol === 100, onSelect: () => setStreamVolume(t.userId, 100) },
+        { id: "stream-volume", label: tr_("voice.voice.streamVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setStreamVolume(t.userId, v) } },
+        { id: "stream-mute", label: streamMutes[t.userId] ? tr_("voice.voice.unmuteStream") : tr_("voice.voice.muteStream"), onSelect: () => setStreamLocalMute(t.userId, !streamMutes[t.userId]) },
+        { id: "stream-reset", label: tr_("voice.voice.resetStreamVolume"), disabled: vol === 100, onSelect: () => setStreamVolume(t.userId, 100) },
       );
     } else if (!t.me) {
       const vol = volumes[t.userId] ?? 100;
       if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push(
-        { id: "volume", label: "User Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setUserVolume(t.userId, v) } },
+        { id: "volume", label: tr_("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setUserVolume(t.userId, v) } },
         { id: "mute", label: localMutes[t.userId] ? "Unmute" : "Mute", onSelect: () => setUserLocalMute(t.userId, !localMutes[t.userId]) },
-        { id: "reset", label: "Reset Volume", disabled: vol === 100, onSelect: () => setUserVolume(t.userId, 100) },
+        { id: "reset", label: tr_("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(t.userId, 100) },
       );
     }
     if (guestTile && canRemoveGuests && t.kind !== "screen") {
       if (items.length) items[items.length - 1]!.separatorAfter = true;
-      items.push({ id: "remove-guest", label: "Remove From Call", danger: true, onSelect: () => removeGuest(t.userId) });
+      items.push({ id: "remove-guest", label: tr_("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: () => removeGuest(t.userId) });
     }
     if (items.length === 0) return;
     openContextMenu({ x: e.clientX, y: e.clientY, items });
@@ -616,12 +616,12 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         {place !== "strip" && (playing || (t.me && t.kind === "screen")) ? (
           <div className={s.tileBtns} onClick={(e) => e.stopPropagation()}>
             {t.me && t.kind === "screen" ? (
-              <Tooltip text="Stop Sharing" side="bottom">
+              <Tooltip text={tr_("voice.voice.stopSharing")} side="bottom">
                 <button className={s.tileBtn} aria-label={tr_("voice.voice.stopSharing")} onClick={() => void toggleScreen()}><MonitorX size={18} /></button>
               </Tooltip>
             ) : null}
             {live && watching[t.userId] ? (
-              <Tooltip text="Stop Watching" side="bottom">
+              <Tooltip text={tr_("voice.voice.stopWatching")} side="bottom">
                 <button className={s.tileBtn} aria-label={tr_("voice.voice.stopWatching")} data-testid="stop-watching" onClick={() => setWatching(t.userId, false)}><EyeOff size={18} /></button>
               </Tooltip>
             ) : null}
@@ -633,13 +633,13 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
               </Tooltip>
             ) : null}
             {playing && (canPip || webkitPip) && t.stream ? (
-              <Tooltip text="Picture in Picture" side="bottom">
+              <Tooltip text={tr_("chat.videoPlayer.pictureInPicture")} side="bottom">
                 <button className={s.tileBtn} aria-label={tr_("chat.videoPlayer.pictureInPicture")} onClick={() => pip(t)}><PictureInPicture2 size={18} /></button>
               </Tooltip>
             ) : null}
             {playing ? (
-              <Tooltip text={full ? "Exit Full Screen" : "Full Screen"} side="bottom">
-                <button className={s.tileBtn} aria-label={full ? "Exit full screen" : "Full screen"} data-testid="tile-fullscreen" onClick={() => fullscreenTile(t)}>
+              <Tooltip text={full ? tr_("voice.voice.exitFullScreen") : tr_("voice.voice.fullScreen")} side="bottom">
+                <button className={s.tileBtn} aria-label={full ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} data-testid="tile-fullscreen" onClick={() => fullscreenTile(t)}>
                   {full ? <Minimize size={18} /> : <Maximize size={18} />}
                 </button>
               </Tooltip>
@@ -654,8 +654,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     return (
       <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="">
         <div className={s.lobby}>
-          <div className={s.lobbyTitle}>{channel.type === "voice" ? channel.name : "Voice call"}</div>
-          <div className={s.lobbySub}>{participants.length === 0 ? "No one is here yet." : `${participants.length} in voice`}</div>
+          <div className={s.lobbyTitle}>{channel.type === "voice" ? channel.name : tr_("guestCall.voiceCall")}</div>
+          <div className={s.lobbySub}>{participants.length === 0 ? tr_("voice.voice.noOneIsHereYet") : tr_("voice.voice.inVoiceCount", { count: participants.length })}</div>
           <div className={s.lobbyAvatars}>
             {participants.slice(0, 8).map((p) => (
               <Avatar key={p.user_id} id={p.user_id} avatarId={users[p.user_id]?.avatar_id ?? null} name={nameOf(p.user_id)} size={40} />
@@ -700,27 +700,27 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           </span>
         </div>
         <div className={s.controlsMain}>
-          <ControlButton label={muted ? "Unmute" : "Mute"} off={muted} onClick={toggleMute} testId="voice-mute" menu={{ label: "Microphone options", open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
+          <ControlButton label={muted ? "Unmute" : "Mute"} off={muted} onClick={toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
           <ControlButton label={deafened ? "Undeafen" : "Deafen"} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
-          <ControlButton label={localVideo ? "Turn off camera" : "Turn on camera"} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: "Camera options", open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
+          <ControlButton label={localVideo ? tr_("voice.voice.turnOffCamera") : tr_("voice.voice.turnOnCamera")} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: tr_("voice.voice.cameraOptions"), open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
           {localVideo && canFlip ? (
             <ControlButton label={tr_("voice.voice.switchCamera")} onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>
           ) : null}
           {canShareScreen ? (
-            <ControlButton label={localScreen ? "Stop sharing" : "Share your screen"} on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
+            <ControlButton label={localScreen ? tr_("voice.voice.stopSharing") : tr_("voice.voice.shareYourScreen")} on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
           ) : null}
           {/* phones have no side column for it, so full screen joins the row there */}
-          <ControlButton label={callFull ? "Exit full screen" : "Full screen"} on={callFull} onClick={toggleCallFull} className={s.narrowOnly} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
+          <ControlButton label={callFull ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} on={callFull} onClick={toggleCallFull} className={s.narrowOnly} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
           <ControlButton label={tr_("voice.voiceStatus.disconnect")} danger onClick={() => void leaveVoice()} testId="voice-leave"><HangUp size={22} /></ControlButton>
         </div>
         <div className={[s.controlsSide, s.controlsEnd].join(" ")}>
           {canInviteGuests ? (
-            <Tooltip text="Invite Guests" side="top">
+            <Tooltip text={tr_("voice.voice.inviteGuests")} side="top">
               <button className={s.sideBtn} aria-label={tr_("voice.voice.inviteGuests")} onClick={() => openModal("guestLink", { channelId: channel.id })} data-testid="invite-guests"><Link2 size={20} /></button>
             </Tooltip>
           ) : null}
-          <Tooltip text={callFull ? "Exit full screen" : "Full screen"} side="top">
-            <button className={s.sideBtn} aria-label={callFull ? "Exit full screen" : "Full screen"} onClick={toggleCallFull} data-testid="call-fullscreen">{callFull ? <Minimize size={20} /> : <Maximize size={20} />}</button>
+          <Tooltip text={callFull ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} side="top">
+            <button className={s.sideBtn} aria-label={callFull ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} onClick={toggleCallFull} data-testid="call-fullscreen">{callFull ? <Minimize size={20} /> : <Maximize size={20} />}</button>
           </Tooltip>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent, type KeyboardEvent, type SyntheticEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
@@ -10,6 +10,7 @@ import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import { useSelection } from "@/stores/selection";
+import { DropOverlay } from "./DropOverlay";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { canI, useServers } from "@/stores/servers";
@@ -23,7 +24,7 @@ import { extractUrls } from "@/markdown";
 import { emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
 import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem } from "./Autocomplete";
-import { COMMANDS, applyCommand } from "./commands";
+import { commands, applyCommand } from "./commands";
 import { createLinkPreviews } from "./linkPreviews";
 import { sendMessage, type SendOptions } from "./send";
 import { useAutosize } from "./useAutosize";
@@ -90,7 +91,6 @@ export function Composer({ channel }: { channel: Channel }) {
   const [files, setFiles] = useState<Staged[]>([]);
   const [sending, setSending] = useState(false);
   const [picker, setPicker] = useState(false);
-  const [drag, setDrag] = useState(false);
   const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: "user" | "emoji" | "command" } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -212,8 +212,8 @@ export function Composer({ channel }: { channel: Channel }) {
         .filter((u) => !tok.query || u.username.includes(tok.query) || u.display_name.toLowerCase().includes(tok.query) || (serverState?.members[u.id]?.nickname ?? "").toLowerCase().includes(tok.query))
         .slice(0, 8)
         .map((u) => ({ kind: "user", user: u }));
-      if (canEveryone && isServer && "everyone".startsWith(tok.query)) items.unshift({ kind: "command", name: "everyone", desc: "Notify everyone who can see this channel" });
-      if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: "Notify everyone online in this channel" });
+      if (canEveryone && isServer && "everyone".startsWith(tok.query)) items.unshift({ kind: "command", name: "everyone", desc: tr_("composer.composer.notifyEveryoneWhoCanSeeThis") });
+      if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: tr_("composer.composer.notifyEveryoneOnlineInThisChannel") });
     } else if (tok.kind === "emoji") {
       if (!emojiLoaded()) void loadEmoji().then(() => refreshAc(value, caret));
       const ex = useExpressions.getState();
@@ -225,7 +225,7 @@ export function Composer({ channel }: { channel: Channel }) {
       const all = [...custom, ...fromPacks];
       items = [...all, ...searchEmoji(tok.query, Math.max(2, 8 - all.length)).map((e) => ({ kind: "emoji" as const, entry: e }))];
     } else {
-      items = COMMANDS.filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
+      items = commands().filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
     }
     setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind } : null);
   }, [users, rels, channel.recipient_ids]);
@@ -290,7 +290,7 @@ export function Composer({ channel }: { channel: Channel }) {
 
   const addFiles = (list: FileList | File[]) => {
     if (!canAttach) {
-      toast("You do not have permission to upload files in this channel.", "error");
+      toast(tr_("composer.composer.youDoNotHavePermissionTo"), "error");
       return;
     }
     const staged: Staged[] = [];
@@ -372,7 +372,7 @@ export function Composer({ channel }: { channel: Channel }) {
       if (!body && !opts.attachments) return;
       await sendMessage(channelId, body, opts);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Upload failed.";
+      const msg = err instanceof Error ? err.message : tr_("composer.composer.uploadFailed");
       setFiles((cur) => cur.map((x) => (sentIds.has(x.id) ? { ...x, error: x.progress < 1 ? msg : x.error } : x)));
       if (sent.length) toast(msg, "error");
     } finally {
@@ -412,52 +412,27 @@ export function Composer({ channel }: { channel: Channel }) {
     }
   };
 
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    setDrag(false);
-    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
-  };
+  // Files land on the conversation that is open, wherever they are dropped;
+  // DropOverlay owns the window handlers and says where the file is going.
+  const takeFiles = useRef<((list: FileList) => void) | null>(null);
+  takeFiles.current = canSend ? addFiles : null;
 
-  // A file dropped anywhere else in the chat would make the browser open it in
-  // place of the app, so it lands in this tray instead.
-  const dropElsewhere = useRef<((list: FileList) => void) | null>(null);
-  dropElsewhere.current = canSend ? addFiles : null;
-  useEffect(() => {
-    const hasFiles = (e: globalThis.DragEvent) => !!e.dataTransfer?.types.includes("Files");
-    const onWindowDragOver = (e: globalThis.DragEvent) => {
-      if (hasFiles(e)) e.preventDefault();
-    };
-    const onWindowDrop = (e: globalThis.DragEvent) => {
-      // the composer itself, or a drop zone such as the pack editor, already took it
-      if (!hasFiles(e) || e.defaultPrevented) return;
-      e.preventDefault();
-      if (inOwnLayer(e.target instanceof Element ? e.target : null)) return;
-      // while picking messages the composer is out of sight, so a file must not slip into it
-      if (useSelection.getState().channelId) return;
-      if (e.dataTransfer?.files.length) dropElsewhere.current?.(e.dataTransfer.files);
-    };
-    window.addEventListener("dragover", onWindowDragOver);
-    window.addEventListener("drop", onWindowDrop);
-    return () => {
-      window.removeEventListener("dragover", onWindowDragOver);
-      window.removeEventListener("drop", onWindowDrop);
-    };
-  }, []);
-
+  const selecting = useSelection((x) => x.channelId) !== null;
   const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
   const counterOn = text.length > MAX_LEN - 200;
 
   if (!canSend) {
     return (
       <div className={s.wrap}>
+          <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled />
         <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">{tr_("composer.composer.youDoNotHavePermissionTo")}</div>
       </div>
     );
   }
 
   return (
-    <div className={s.wrap} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={onDrop}>
-      {drag ? <div className={s.drop}>{tr_("composer.composer.dropToUploadTo", { name })}</div> : null}
+    <div className={s.wrap}>
+      <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
       {ac ? <Autocomplete items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
       {picker ? (
         <ExpressionPicker
@@ -532,7 +507,7 @@ export function Composer({ channel }: { channel: Channel }) {
       {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
         <span className={s.slowmode} data-active={remaining > 0} title={tr_("composer.composer.slowModeIsEnabled")}>
-          <Timer size={14} /> {remaining > 0 ? `${remaining}s` : "Slowmode is enabled"}
+          <Timer size={14} /> {remaining > 0 ? `${remaining}s` : tr_("composer.composer.slowmodeIsEnabled")}
         </span>
       ) : null}
     </div>

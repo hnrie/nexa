@@ -172,7 +172,7 @@ export class RpcService extends EventEmitter {
       id: me?.id ?? "0",
       username: me?.username ?? "evilion",
       discriminator: "0",
-      global_name: me?.global_name ?? "nexa",
+      global_name: me?.global_name ?? "Nexa",
       avatar: null,
       avatar_decoration_data: null,
       bot: false,

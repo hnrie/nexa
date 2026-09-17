@@ -16,14 +16,16 @@ import s from "@/components/modals/ServerModals.module.css";
 import r from "./RoleChips.module.css";
 
 import { t } from "@/i18n";
-const DURATIONS: { v: number; label: string }[] = [
-  { v: 60, label: "60 seconds" },
-  { v: 300, label: "5 minutes" },
-  { v: 600, label: "10 minutes" },
-  { v: 3600, label: "1 hour" },
-  { v: 86400, label: "1 day" },
-  { v: 604800, label: "1 week" },
+function durations(): { v: number; label: string }[] {
+  return [
+  { v: 60, label: t("server.memberAction.60Seconds") },
+  { v: 300, label: t("server.memberAction.5Minutes") },
+  { v: 600, label: t("server.memberAction.10Minutes") },
+  { v: 3600, label: t("modals.customStatus.1Hour") },
+  { v: 86400, label: t("modals.groupInvite.1Day") },
+  { v: 604800, label: t("server.memberAction.1Week") },
 ];
+}
 
 /** Kick, ban, timeout or edit the roles of one member. */
 export default function MemberActionModal({ onClose, serverId, userId, action }: { onClose: () => void; serverId: string; userId: string; action: "kick" | "ban" | "timeout" | "roles" }) {
@@ -48,7 +50,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       await fn();
       onClose();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "That didn't work.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.memberAction.thatDidnTWork"), "error");
     } finally {
       setBusy(false);
     }
@@ -73,7 +75,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       try {
         upsertMember(on ? await serversApi.addRole(serverId, userId, roleId) : await serversApi.removeRole(serverId, userId, roleId));
       } catch (err) {
-        toast(err instanceof ApiError ? err.message : "Could not change roles.", "error");
+        toast(err instanceof ApiError ? err.message : t("server.memberAction.couldNotChangeRoles"), "error");
       } finally {
         setOptimistic((o) => {
           const next = { ...o };
@@ -124,7 +126,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
                 })
               }
             >
-              {timedOut ? "Remove Timeout" : "Time Out"}
+              {timedOut ? t("server.memberAction.removeTimeout") : t("server.memberAction.timeOut")}
             </Button>
           </>
         }
@@ -132,13 +134,13 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
         <div className={s.form}>
           {head}
           {timedOut ? (
-            <p className={s.hint}>They are timed out until {new Date(member!.timeout_until!).toLocaleString()}. Removing it lets them talk again right away.</p>
+            <p className={s.hint}>{t("server.memberAction.timedOutUntil", { when: new Date(member!.timeout_until!).toLocaleString() })}</p>
           ) : (
             <>
               <p className={s.hint}>{t("server.memberAction.timedOutMembersCannotSendMessages")}</p>
               <Field label={t("server.memberAction.duration")}>
                 <Select value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
-                  {DURATIONS.map((d) => <option key={d.v} value={d.v}>{d.label}</option>)}
+                  {durations().map((d) => <option key={d.v} value={d.v}>{d.label}</option>)}
                 </Select>
               </Field>
             </>
@@ -176,7 +178,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
     >
       <div className={s.form}>
         {head}
-        <p className={s.hint}>{ban ? `Are you sure you want to ban ${name}? They won't be able to rejoin unless they are unbanned.` : `Are you sure you want to kick ${name}? They will be able to rejoin with a new invite.`}</p>
+        <p className={s.hint}>{ban ? t("server.memberAction.confirmBan", { name }) : t("server.memberAction.confirmKick", { name })}</p>
         <p className={s.fine}>{t("server.memberAction.theServerSEncryptionKeysRotate")}</p>
         <Field label={t("server.memberAction.reasonOptional")}>
           <TextInput value={reason} onChange={(e) => setReason(e.target.value)} maxLength={512} autoFocus />

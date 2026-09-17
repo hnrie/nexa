@@ -5,13 +5,13 @@ import { Modal } from "@/components/common/Modal";
 import { Toggle } from "@/components/common/Toggle";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
-import { SHARE_FRAME_RATES, SHARE_RESOLUTIONS, shareBitrate } from "@/voice/shareQuality";
+import { SHARE_FRAME_RATES, shareResolutions, shareBitrate } from "@/voice/shareQuality";
 import { startScreen } from "@/voice/session";
 import s from "./Voice.module.css";
 
 import { t } from "@/i18n";
-const RESOLUTION_NOTES: Record<ShareResolution, string> = { "720p": "HD", "1080p": "Full HD", "1440p": "QHD", source: "Native" };
-const FPS_NOTES: Record<ShareFps, string> = { 15: "Text, slides", 30: "Smooth", 60: "Games, video" };
+const resolutionNotes = (): Record<ShareResolution, string> => ({ "720p": "HD", "1080p": t("voice.shareScreen.fullHd"), "1440p": "QHD", source: t("voice.shareScreen.native") });
+const fpsNotes = (): Record<ShareFps, string> => ({ 15: t("voice.shareScreen.textSlides"), 30: t("voice.shareScreen.smooth"), 60: t("voice.shareScreen.gamesVideo") });
 
 /**
  * A row of choices that behaves as a radio group: one tab stop on the chosen
@@ -92,8 +92,8 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className={s.shareForm}>
-        <Choices label={t("voice.shareScreen.resolution")} id="share-res" options={SHARE_RESOLUTIONS.map((r) => ({ value: r.value, title: r.label, note: RESOLUTION_NOTES[r.value] }))} value={resolution} onChange={setResolution} />
-        <Choices label={t("voice.shareScreen.frameRate")} id="share-fps" options={SHARE_FRAME_RATES.map((f) => ({ value: f, title: `${f} fps`, note: FPS_NOTES[f] }))} value={fps} onChange={setFps} />
+        <Choices label={t("voice.shareScreen.resolution")} id="share-res" options={shareResolutions().map((r) => ({ value: r.value, title: r.label, note: resolutionNotes()[r.value] }))} value={resolution} onChange={setResolution} />
+        <Choices label={t("voice.shareScreen.frameRate")} id="share-fps" options={SHARE_FRAME_RATES.map((f) => ({ value: f, title: `${f} fps`, note: fpsNotes()[f] }))} value={fps} onChange={setFps} />
         <div className={s.shareAudio} data-testid="share-audio">
           <Toggle
             checked={audio}
@@ -102,12 +102,12 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
             label={t("voice.shareScreen.shareAudio")}
             description={
               !audioSupported
-                ? "This computer can't share its sound."
+                ? t("voice.shareScreen.thisComputerCanTShareIts")
                 : audioHasCall
-                  ? "Everyone watching hears what your computer plays. This version of Windows can't leave the call itself out, so people may hear themselves; Windows 10 version 2004 or later can."
+                  ? t("voice.shareScreen.everyoneWatchingHearsWhatYourComputer")
                   : windowAudio
-                    ? "Share a window and everyone watching hears just that app. Share a whole screen and they hear everything your computer plays. The call's own sound is always left out."
-                    : "Everyone watching hears what you're sharing. The call's own sound is left out."
+                    ? t("voice.shareScreen.shareAWindowAndEveryoneWatching")
+                    : t("voice.shareScreen.everyoneWatchingHearsWhatYouRe")
             }
           />
         </div>

@@ -61,9 +61,9 @@ export default function ProfilePage() {
       setAbout(u.about_me);
       setAccent(hexOf(u.accent_color));
       setAccent2(hexOf(u.accent_color_2));
-      toast("Profile saved.", "success");
+      toast(t("settings.profile.profileSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save.", "error");
+      toast(err instanceof ApiError ? err.message : t("settings.privacy.couldNotSave"), "error");
     } finally {
       setSaving(false);
     }
@@ -76,14 +76,14 @@ export default function ProfilePage() {
     setAccent2(currentAccent2);
   };
   const upload = async (kind: "avatar" | "banner", file: File) => {
-    if (file.size > 10 * 1024 * 1024) return toast("Images are limited to 10 MB.", "error");
+    if (file.size > 10 * 1024 * 1024) return toast(t("settings.profile.imagesAreLimitedTo10Mb"), "error");
     setUploading(kind);
     try {
       const res = kind === "avatar" ? await usersApi.uploadAvatar(file) : await usersApi.uploadBanner(file);
       setMe(res.user);
       toast(kind === "avatar" ? "Avatar updated." : "Banner updated.", "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Upload failed.", "error");
+      toast(err instanceof ApiError ? err.message : t("composer.composer.uploadFailed"), "error");
     } finally {
       setUploading(null);
     }
@@ -94,7 +94,7 @@ export default function ProfilePage() {
       else await usersApi.deleteBanner();
       setMe(await usersApi.me());
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not remove.", "error");
+      toast(err instanceof ApiError ? err.message : t("settings.profile.couldNotRemove"), "error");
     }
   };
   const banner = bannerUrl(me.banner_id, 600);

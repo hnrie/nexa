@@ -8,7 +8,7 @@ import s from "./DownloadBanner.module.css";
 import { t } from "@/i18n";
 /**
  * Discord holds the pipe that programs try first, so one that was already
- * running when nexa started keeps every game and music player to itself.
+ * running when Nexa started keeps every game and music player to itself.
  * Nothing here can take it over; Discord has to be started again, after this
  * app. Saying so where it happens beats leaving Rich Presence quietly broken
  * until someone opens settings. Closing it keeps it away for this session.
@@ -23,9 +23,9 @@ export function RpcBanner() {
   const restart = async () => {
     setBusy(true);
     try {
-      if (!(await bridge.rpc.restartDiscord())) useUI.getState().toast("Discord doesn't seem to be running.", "info");
+      if (!(await bridge.rpc.restartDiscord())) useUI.getState().toast(t("settings.desktop.discordDoesnTSeemToBe"), "info");
     } catch {
-      useUI.getState().toast("Discord could not be restarted from here. Close and open it yourself.", "error");
+      useUI.getState().toast(t("shell.rpcBanner.discordCouldNotBeRestartedFrom"), "error");
     } finally {
       setBusy(false);
     }
@@ -39,7 +39,7 @@ export function RpcBanner() {
         <span style={{ opacity: 0.8 }}> {t("shell.rpcBanner.programsAreReachingOnlyDiscordRestart")}</span>
       </span>
       <button className={s.download} onClick={() => void restart()} disabled={busy} data-testid="rpc-banner-restart">
-        <RotateCw size={14} /> {busy ? "Restarting…" : "Restart Discord"}
+        <RotateCw size={14} /> {busy ? "Restarting…" : t("settings.desktop.restartDiscord")}
       </button>
       <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={() => setClosed(true)} data-testid="rpc-banner-close"><X size={16} /></button>
     </div>

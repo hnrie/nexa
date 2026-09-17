@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Emoji, Sticker, StickerPack } from "@/api/types";
 import { emojiUrl, stickerUrl } from "@/api/users";
 
+import { t as tr_ } from "@/i18n";
 interface ExpressionsState {
   /** Custom emoji per server. */
   emojis: Record<string, Emoji[]>;
@@ -117,7 +118,7 @@ export function groupPacks(packs: Record<string, StickerPack>, serverId: string 
   take("This server", (p) => !!serverId && p.server_id === serverId);
   take("My packs", (p) => !!p.owner_user_id && p.owner_user_id === meId);
   take("Installed", (p) => p.installed);
-  take("Other servers", (p) => !!p.server_id);
+  take(tr_("expressions.otherServers"), (p) => !!p.server_id);
   return groups;
 }
 

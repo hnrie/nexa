@@ -37,12 +37,12 @@ export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: num
     <button
       className={s.star}
       data-on={on}
-      title={on ? "Remove from favorites" : "Add to favorites"}
-      aria-label={on ? "Remove from favorites" : "Add to favorites"}
+      title={on ? t("chat.embeds.removeFromFavorites") : t("chat.embeds.addToFavorites")}
+      aria-label={on ? t("chat.embeds.removeFromFavorites") : t("chat.embeds.addToFavorites")}
       onClick={(e) => {
         e.stopPropagation();
         const now = toggleFavoriteGif({ url, ...(w ? { w } : {}), ...(h ? { h } : {}) });
-        toast(now ? "Added to your GIF favorites." : "Removed from favorites.", "success");
+        toast(now ? t("chat.embeds.addedToYourGifFavorites") : t("chat.embeds.removedFromFavorites"), "success");
       }}
     >
       <Star size={16} fill={on ? "currentColor" : "none"} />

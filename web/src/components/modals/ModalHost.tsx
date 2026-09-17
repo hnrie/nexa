@@ -23,6 +23,7 @@ import { GuestLinkModal } from "@/components/voice/GuestLinkModal";
 import type { StickerInfo } from "@/api/types";
 import { StickerPackModal } from "./StickerPackModal";
 
+import { t } from "@/i18n";
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
 const ProfileModal = lazyPage(() => import("@/components/profile/ProfileModal"));
 const ServerSettingsModal = lazyPage(() => import("@/components/server/ServerSettingsModal"));
@@ -53,7 +54,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "confirm" ? (
         <ConfirmModal
           onClose={close}
-          title={String(modal.props?.["title"] ?? "Are you sure?")}
+          title={String(modal.props?.["title"] ?? t("modals.modalHost.areYouSure"))}
           body={modal.props?.["body"] as React.ReactNode}
           confirmLabel={modal.props?.["confirmLabel"] as string | undefined}
           danger={Boolean(modal.props?.["danger"])}

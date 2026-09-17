@@ -21,24 +21,24 @@ export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: 
       useChannels.getState().remove(ch.id);
       if (ch.parent_id) ctx.nav(`/channels/@me/${ch.parent_id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not delete that subchat.", "error");
+      toast(err instanceof ApiError ? err.message : t("chat.subchat.couldNotDeleteThatSubchat"), "error");
     }
   };
   return [
     {
       id: "edit",
-      label: "Edit Subchat",
+      label: t("chat.subchat.editSubchat"),
       onSelect: () => ctx.openModal("subchat", { channel: ch }),
     },
     {
       id: "delete",
-      label: "Delete Subchat",
+      label: t("chat.subchat.deleteSubchat"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
           title: `Delete '${ch.name}'`,
-          body: "The subchat and every message in it are removed for everyone in this conversation. This cannot be undone.",
-          confirmLabel: "Delete Subchat",
+          body: t("chat.subchat.theSubchatAndEveryMessageIn"),
+          confirmLabel: t("chat.subchat.deleteSubchat"),
           danger: true,
           onConfirm: remove,
         }),
@@ -114,7 +114,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
       onClose();
       nav(`/channels/@me/${ch.id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not start that subchat.", "error");
+      toast(err instanceof ApiError ? err.message : t("chat.subchat.couldNotStartThatSubchat"), "error");
     } finally {
       setBusy(false);
     }

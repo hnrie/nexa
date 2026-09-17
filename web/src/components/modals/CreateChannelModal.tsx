@@ -60,11 +60,11 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
         } else {
           onClose();
           nav(`/channels/${serverId}/${ch.id}`);
-          toast("The channel was created but may not be private yet. Check its permissions.", "error");
+          toast(t("modals.createChannel.theChannelWasCreatedButMay"), "error");
           return;
         }
       }
-      toast(err instanceof ApiError ? err.message : "Could not create the channel.", "error");
+      toast(err instanceof ApiError ? err.message : t("modals.createChannel.couldNotCreateTheChannel"), "error");
     } finally {
       setBusy(false);
     }

@@ -8,6 +8,7 @@ import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 
+import { t } from "@/i18n";
 export interface MenuCtx {
   nav: (path: string) => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
@@ -40,12 +41,12 @@ export async function leaveServer(serverId: string, nav: (p: string) => void): P
     useServers.getState().remove(serverId);
     nav("/channels/@me");
   } catch (err) {
-    useUI.getState().toast(err instanceof ApiError ? err.message : "Could not leave the server.", "error");
+    useUI.getState().toast(err instanceof ApiError ? err.message : t("sidebar.serverMenu.couldNotLeaveTheServer"), "error");
   }
 }
 
 function copy(text: string): void {
-  void navigator.clipboard?.writeText(text).then(() => useUI.getState().toast("Copied!", "success"));
+  void navigator.clipboard?.writeText(text).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success"));
 }
 
 export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem[] {
@@ -56,34 +57,34 @@ export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem
   const muted = settings.notifications.muted.includes(serverId);
   const owner = st.server.owner_id === me?.id;
   const items: ContextMenuItem[] = [
-    { id: "read", label: "Mark As Read", onSelect: () => markServerRead(serverId), separatorAfter: true },
-    { id: "invite", label: "Invite People", onSelect: () => ctx.openModal("invite", { serverId }) },
+    { id: "read", label: t("sidebar.dmMenu.markAsRead"), onSelect: () => markServerRead(serverId), separatorAfter: true },
+    { id: "invite", label: t("chat.chat.invitePeople"), onSelect: () => ctx.openModal("invite", { serverId }) },
   ];
-  if (anyOf(st.myPermissions, ANY_MANAGE)) items.push({ id: "settings", label: "Server Settings", onSelect: () => ctx.openModal("serverSettings", { serverId }) });
+  if (anyOf(st.myPermissions, ANY_MANAGE)) items.push({ id: "settings", label: t("server.serverSettings.serverSettings"), onSelect: () => ctx.openModal("serverSettings", { serverId }) });
   if (canI(st, P.MANAGE_CHANNELS)) {
-    items.push({ id: "channel", label: "Create Channel", onSelect: () => ctx.openModal("createChannel", { serverId }) });
-    items.push({ id: "category", label: "Create Category", onSelect: () => ctx.openModal("createCategory", { serverId }) });
+    items.push({ id: "channel", label: t("modals.createChannel.createChannel"), onSelect: () => ctx.openModal("createChannel", { serverId }) });
+    items.push({ id: "category", label: t("modals.createCategory.createCategory"), onSelect: () => ctx.openModal("createCategory", { serverId }) });
   }
   items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "mute", label: muted ? "Unmute Server" : "Mute Server", onSelect: () => toggleMuted(serverId) });
-  items.push({ id: "notif", label: "Notification Settings", onSelect: () => ctx.openModal("serverNotifications", { serverId }), separatorAfter: true });
-  items.push({ id: "profile", label: "Edit Server Profile", onSelect: () => ctx.openModal("serverProfile", { serverId }) });
+  items.push({ id: "mute", label: muted ? t("sidebar.serverMenu.unmuteServer") : t("sidebar.serverMenu.muteServer"), onSelect: () => toggleMuted(serverId) });
+  items.push({ id: "notif", label: t("modals.serverNotifications.notificationSettings"), onSelect: () => ctx.openModal("serverNotifications", { serverId }), separatorAfter: true });
+  items.push({ id: "profile", label: t("sidebar.serverMenu.editServerProfile"), onSelect: () => ctx.openModal("serverProfile", { serverId }) });
   if (!owner) {
     items.push({
       id: "leave",
-      label: "Leave Server",
+      label: t("sidebar.serverMenu.leaveServer"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
           title: `Leave '${st.server.name}'`,
           body: `Are you sure you want to leave ${st.server.name}? You won't be able to rejoin this server unless you are re-invited.`,
-          confirmLabel: "Leave Server",
+          confirmLabel: t("sidebar.serverMenu.leaveServer"),
           danger: true,
           onConfirm: () => leaveServer(serverId, ctx.nav),
         }),
     });
   }
-  if (settings.developerMode) items.push({ id: "copy", label: "Copy Server ID", onSelect: () => copy(serverId) });
+  if (settings.developerMode) items.push({ id: "copy", label: t("sidebar.serverMenu.copyServerId"), onSelect: () => copy(serverId) });
   return items;
 }
 
@@ -97,28 +98,28 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
   if (ch.type === "text") {
     items.push({
       id: "read",
-      label: "Mark As Read",
+      label: t("sidebar.dmMenu.markAsRead"),
       disabled: !ch.last_message_id,
       onSelect: () => ch.last_message_id && void useReadStates.getState().ack(ch.id, ch.last_message_id),
       separatorAfter: true,
     });
   }
-  if (canI(st, P.CREATE_INSTANT_INVITE, channelId)) items.push({ id: "invite", label: "Invite People", onSelect: () => ctx.openModal("invite", { serverId: ch.server_id, channelId }) });
+  if (canI(st, P.CREATE_INSTANT_INVITE, channelId)) items.push({ id: "invite", label: t("chat.chat.invitePeople"), onSelect: () => ctx.openModal("invite", { serverId: ch.server_id, channelId }) });
   // a voice channel's call takes guests without an account, through a link
-  if (ch.type === "voice" && canI(st, P.CREATE_INSTANT_INVITE | P.CONNECT, channelId)) items.push({ id: "guests", label: "Invite Guests to Call", onSelect: () => ctx.openModal("guestLink", { channelId }) });
-  items.push({ id: "link", label: "Copy Link", onSelect: () => copy(`${window.location.origin}/channels/${ch.server_id}/${ch.id}`), separatorAfter: true });
+  if (ch.type === "voice" && canI(st, P.CREATE_INSTANT_INVITE | P.CONNECT, channelId)) items.push({ id: "guests", label: t("chat.chat.inviteGuestsToCall"), onSelect: () => ctx.openModal("guestLink", { channelId }) });
+  items.push({ id: "link", label: t("sidebar.serverMenu.copyLink"), onSelect: () => copy(`${window.location.origin}/channels/${ch.server_id}/${ch.id}`), separatorAfter: true });
   if (ch.type === "text") items.push({ id: "mute", label: muted ? "Unmute Channel" : "Mute Channel", onSelect: () => toggleMuted(channelId), separatorAfter: true });
   if (canI(st, P.MANAGE_CHANNELS, channelId)) {
-    items.push({ id: "edit", label: "Edit Channel", onSelect: () => ctx.openModal("channelSettings", { channelId }) });
+    items.push({ id: "edit", label: t("sidebar.serverSidebar.editChannel"), onSelect: () => ctx.openModal("channelSettings", { channelId }) });
     items.push({
       id: "delete",
-      label: "Delete Channel",
+      label: t("sidebar.serverMenu.deleteChannel"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: "Delete Channel",
+          title: t("sidebar.serverMenu.deleteChannel"),
           body: `Are you sure you want to delete #${ch.name}? This cannot be undone.`,
-          confirmLabel: "Delete Channel",
+          confirmLabel: t("sidebar.serverMenu.deleteChannel"),
           danger: true,
           onConfirm: async () => {
             await serversApi.deleteChannel(ch.id);
@@ -127,7 +128,7 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
         }),
     });
   }
-  if (settings.developerMode) items.push({ id: "copy", label: "Copy Channel ID", onSelect: () => copy(channelId) });
+  if (settings.developerMode) items.push({ id: "copy", label: t("sidebar.dmMenu.copyChannelId"), onSelect: () => copy(channelId) });
   return items;
 }
 
@@ -136,19 +137,19 @@ export function categoryMenuItems(categoryId: string, ctx: MenuCtx & { collapsed
   if (!ch || !ch.server_id) return [];
   const st = useServers.getState().byId[ch.server_id];
   const settings = useSettings.getState().settings;
-  const items: ContextMenuItem[] = [{ id: "collapse", label: ctx.collapsed ? "Expand Category" : "Collapse Category", onSelect: ctx.toggle, separatorAfter: true }];
+  const items: ContextMenuItem[] = [{ id: "collapse", label: ctx.collapsed ? t("sidebar.serverMenu.expandCategory") : t("sidebar.serverMenu.collapseCategory"), onSelect: ctx.toggle, separatorAfter: true }];
   if (canI(st, P.MANAGE_CHANNELS)) {
-    items.push({ id: "create", label: "Create Channel", onSelect: () => ctx.openModal("createChannel", { serverId: ch.server_id, parentId: categoryId }) });
-    items.push({ id: "edit", label: "Edit Category", onSelect: () => ctx.openModal("channelSettings", { channelId: categoryId }) });
+    items.push({ id: "create", label: t("modals.createChannel.createChannel"), onSelect: () => ctx.openModal("createChannel", { serverId: ch.server_id, parentId: categoryId }) });
+    items.push({ id: "edit", label: t("sidebar.serverMenu.editCategory"), onSelect: () => ctx.openModal("channelSettings", { channelId: categoryId }) });
     items.push({
       id: "delete",
-      label: "Delete Category",
+      label: t("sidebar.serverMenu.deleteCategory"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: "Delete Category",
+          title: t("sidebar.serverMenu.deleteCategory"),
           body: `Delete the category '${ch.name}'? Channels inside it are kept and moved to the top of the list.`,
-          confirmLabel: "Delete Category",
+          confirmLabel: t("sidebar.serverMenu.deleteCategory"),
           danger: true,
           onConfirm: async () => {
             await serversApi.deleteChannel(ch.id);
@@ -157,6 +158,6 @@ export function categoryMenuItems(categoryId: string, ctx: MenuCtx & { collapsed
         }),
     });
   }
-  if (settings.developerMode) items.push({ id: "copy", label: "Copy Category ID", onSelect: () => copy(categoryId) });
+  if (settings.developerMode) items.push({ id: "copy", label: t("sidebar.serverMenu.copyCategoryId"), onSelect: () => copy(categoryId) });
   return items;
 }

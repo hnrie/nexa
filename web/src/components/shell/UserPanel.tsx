@@ -6,7 +6,8 @@ import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
 import { gateway } from "@/gateway/session";
 import { useAuth } from "@/stores/auth";
-import { customStatus, statusOf, usePresence, type StatusKind } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence, type StatusKind } from "@/stores/presence";
+import { StatusLine } from "@/components/activity/StatusLine";
 import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
@@ -14,12 +15,14 @@ import s from "./UserPanel.module.css";
 import { micMenuItems } from "@/components/voice/deviceMenus";
 
 import { t } from "@/i18n";
-const OPTIONS: { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string }[] = [
-  { value: "online", label: "Online" },
-  { value: "idle", label: "Idle" },
-  { value: "dnd", label: "Do Not Disturb", sub: "You will not receive any desktop notifications." },
-  { value: "invisible", label: "Invisible", sub: "You will appear offline but keep full access." },
+function statusOptions(): { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string }[] {
+  return [
+  { value: "online", label: t("shell.user.online") },
+  { value: "idle", label: t("shell.user.idle") },
+  { value: "dnd", label: t("shell.user.doNotDisturb"), sub: "You will not receive any desktop notifications." },
+  { value: "invisible", label: t("shell.user.invisible"), sub: t("shell.user.youWillAppearOfflineButKeep") },
 ];
+}
 
 export function UserPanel() {
   const me = useAuth((a) => a.me);
@@ -55,6 +58,8 @@ export function UserPanel() {
   if (!me) return null;
   const status: StatusKind = statusOf(presence);
   const custom = customStatus(presence);
+  const activities = activitiesOf(presence);
+  const activity = activities[0];
   const choose = (value: "online" | "idle" | "dnd" | "invisible") => {
     gateway()?.sendPresence({ status: value });
     setPresence({ user_id: me.id, status: value, status_text: presence?.status_text ?? "", status_emoji: presence?.status_emoji ?? "", status_expires_at: presence?.status_expires_at ?? null });
@@ -67,11 +72,15 @@ export function UserPanel() {
         <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status={status} className={s.avatar} data-speaking={speaking} />
         <span className={s.text}>
           <span className={s.name}>{me.display_name}</span>
-          <span className={s.sub}>{custom ? `${custom.emoji ? custom.emoji + " " : ""}${custom.text}` : statusLabel(status)}</span>
+          {custom || activity ? (
+            <StatusLine className={s.sub} status={custom} activity={activity} more={Math.max(0, activities.length - 1)} />
+          ) : (
+            <span className={s.sub}>{statusLabel(status)}</span>
+          )}
         </span>
       </button>
       <div className={s.btns}>
-        <Tooltip text={muted ? "Unmute" : "Mute"}>
+        <Tooltip text={muted ? t("settings.notifications.unmute") : t("settings.notifications.mute")}>
           <button
             className={s.icon}
             data-on={!muted}
@@ -99,7 +108,7 @@ export function UserPanel() {
             </button>
           </Tooltip>
         ) : null}
-        <Tooltip text="User Settings">
+        <Tooltip text={t("settings.settings.userSettings")}>
           <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label={t("settings.settings.userSettings")}>
             <Settings size={20} />
           </button>
@@ -117,10 +126,10 @@ export function UserPanel() {
           <div className={s.sep} />
           <button className={s.opt} onClick={() => { setOpen(false); openModal("customStatus"); }}>
             <Pencil size={16} />
-            <span className={s.optText}><span>{custom ? "Edit custom status" : "Set a custom status"}</span></span>
+            <span className={s.optText}><span>{custom ? t("shell.user.editCustomStatus") : t("modals.customStatus.setACustomStatus")}</span></span>
           </button>
           <div className={s.sep} />
-          {OPTIONS.map((o) => (
+          {statusOptions().map((o) => (
             <button key={o.value} className={s.opt} onClick={() => choose(o.value)} role="menuitemradio" aria-checked={status === o.value}>
               <StatusDot status={o.value} size={12} />
               <span className={s.optText}>

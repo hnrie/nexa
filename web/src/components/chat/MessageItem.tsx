@@ -52,7 +52,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   if (!target) return <div className={s.replyLine}><span className={s.replyText}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</span></div>;
   const author = users[target.author_id];
   const mediaOnly = !!target.payload?.t && isOnlyMediaLinks(target.payload.t, (target.payload.embeds ?? []) as UnfurlResult[]);
-  const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true }), ctx) : target.payload?.att?.length || mediaOnly ? "Click to see attachment" : target.decryptError ? "Encrypted message" : "";
+  const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true }), ctx) : target.payload?.att?.length || mediaOnly ? t("chat.messageItem.clickToSeeAttachment") : target.decryptError ? t("chat.messageItem.encryptedMessage") : "";
   return (
     <div className={s.replyLine} onClick={() => setJumpTo({ channelId: msg.channel_id, messageId: target.id })}>
       <Avatar id={target.author_id} avatarId={author?.avatar_id ?? null} name={displayName(author)} size={16} />
@@ -176,7 +176,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       }}
     >
       {pickable ? (
-        <button type="button" className={s.pick} role="checkbox" aria-checked={picked} aria-label={picked ? "Unselect message" : "Select message"} data-testid="pick-message">
+        <button type="button" className={s.pick} role="checkbox" aria-checked={picked} aria-label={picked ? t("chat.messageItem.unselectMessage") : t("chat.messageItem.selectMessage")} data-testid="pick-message">
           {picked ? <Check size={14} strokeWidth={3} /> : null}
         </button>
       ) : null}
@@ -230,7 +230,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           <ToolButton label={t("chat.messageItem.reply")} onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
           {shift ? (
             <>
-              {canPin(msg) ? <ToolButton label={pinned ? "Unpin Message" : "Pin Message"} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
+              {canPin(msg) ? <ToolButton label={pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage")} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
               <ToolButton label={t("chat.messageItem.markUnread")} onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
               <ToolButton label={t("chat.messageItem.copyMessageLink")} onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
               {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
@@ -239,7 +239,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
               ) : null}
             </>
           ) : null}
-          <ToolButton label={shift ? "Everything else" : "More (hold Shift for all actions)"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
+          <ToolButton label={shift ? t("chat.messageItem.everythingElse") : "More (hold Shift for all actions)"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
         </div>
       ) : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}

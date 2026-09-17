@@ -37,7 +37,7 @@ export default function RegisterPage() {
     if (!canSubmit) return;
     setBusy(true);
     setError(null);
-    setProgress("Securing your account… this takes a moment.");
+    setProgress(t("register.securingYourAccountThisTakesA"));
     justRegistered.current = true;
     try {
       const res = await register(uname, displayName.trim(), password, inviteKey ? { registration_key: inviteKey, invite_code: inviteKey } : undefined);
@@ -46,15 +46,15 @@ export default function RegisterPage() {
       justRegistered.current = false;
       if (err instanceof ApiError) {
         const map: Record<string, string> = {
-          username_taken: "That username is taken.",
-          invalid_username: "That username is not allowed.",
-          registration_closed: "This server is not accepting new accounts.",
-          invite_required: "You need an invite or registration key to sign up here.",
-          rate_limited: "Too many sign-ups from your network. Try again later.",
+          username_taken: t("register.thatUsernameIsTaken"),
+          invalid_username: t("register.thatUsernameIsNotAllowed"),
+          registration_closed: t("register.thisServerIsNotAcceptingNew"),
+          invite_required: t("register.youNeedAnInviteOrRegistration"),
+          rate_limited: t("register.tooManySignUpsFromYour"),
         };
         setError(map[err.code] ?? err.message);
       } else {
-        setError("Something went wrong. Please try again.");
+        setError(t("register.somethingWentWrongPleaseTryAgain"));
       }
     } finally {
       setBusy(false);
@@ -69,7 +69,7 @@ export default function RegisterPage() {
 
   if (recovery) {
     const download = () => {
-      const blob = new Blob([`nexa recovery key for @${uname}\n\n${recovery}\n\nKeep this somewhere safe. It is the only way to recover your messages if you forget your password.\n`], { type: "text/plain" });
+      const blob = new Blob([`Nexa recovery key for @${uname}\n\n${recovery}\n\nKeep this somewhere safe. It is the only way to recover your messages if you forget your password.\n`], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -104,7 +104,7 @@ export default function RegisterPage() {
         <Field label={t("register.displayName")} required hint={t("register.howYourNameAppearsToOthers")}>
           <TextInput value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="nickname" maxLength={32} required />
         </Field>
-        <Field label={t("chat.lockedChannel.password")} required hint={password && password.length < 8 ? "At least 8 characters." : undefined}>
+        <Field label={t("chat.lockedChannel.password")} required hint={password && password.length < 8 ? t("settings.account.atLeast8Characters") : undefined}>
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
           {password ? (
             <div className={s.strength} data-score={strength.score}>

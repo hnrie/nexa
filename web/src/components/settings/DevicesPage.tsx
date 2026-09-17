@@ -8,7 +8,7 @@ import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
 function describe(ua: string): string {
-  if (!ua) return "Unknown device";
+  if (!ua) return t("settings.devices.unknownDevice");
   const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "Browser";
   const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
   return os ? `${browser} on ${os}` : browser;
@@ -26,7 +26,7 @@ export default function DevicesPage() {
       await authApi.deleteSession(id);
       await load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not log that device out.", "error");
+      toast(err instanceof ApiError ? err.message : t("settings.devices.couldNotLogThatDeviceOut"), "error");
     }
   };
   const dropOthers = async () => {
@@ -42,8 +42,8 @@ export default function DevicesPage() {
         {list?.map((se) => (
           <div key={se.id} className={s.device}>
             <div>
-              <div className={s.deviceName}>{describe(se.user_agent)}{se.current ? " · This device" : ""}</div>
-              <div className={s.deviceSub}>{se.ip} · last active {new Date(se.last_seen_at).toLocaleString()}</div>
+              <div className={s.deviceName}>{describe(se.user_agent)}{se.current ? ` · ${t("settings.devices.thisDevice")}` : ""}</div>
+              <div className={s.deviceSub}>{se.ip} · {t("settings.devices.lastActive", { when: new Date(se.last_seen_at).toLocaleString() })}</div>
             </div>
             {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>{t("settings.devices.logOut")}</Button> : null}
           </div>

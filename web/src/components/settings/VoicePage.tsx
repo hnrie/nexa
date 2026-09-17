@@ -161,7 +161,7 @@ export default function VoicePage() {
         </div>
         <Field label={tr_("settings.voice.micTest")} hint={tr_("settings.voice.speakAndWatchBothMetersThe")}>
           <div>
-            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? "Stop test" : "Let's check"}</Button>
+            <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? tr_("settings.voice.stopTest") : tr_("settings.voice.letSCheck")}</Button>
             <div className={v.meter} aria-label={tr_("settings.voice.inputLevel")} data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
               {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}
@@ -194,8 +194,8 @@ export default function VoicePage() {
         {settings.mode === "ptt" ? (
           <Field label={tr_("settings.voice.pushToTalkKey")} hint={tr_("settings.voice.clickTheBoxThenPressThe")}>
             <button type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing(true)}>
-              <span>{capturing ? "Press a key…" : settings.pttKey}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? "Esc to cancel" : "Change"}</span>
+              <span>{capturing ? tr_("settings.voice.pressAKey") : settings.pttKey}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? tr_("settings.voice.escToCancel") : "Change"}</span>
             </button>
           </Field>
         ) : (

@@ -33,7 +33,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
         const name = memberName(server?.members[p.user_id]?.nickname, users[p.user_id], p.user_id === meId ? "You" : "Unknown User");
         // a guest has no profile to open; whoever may move members may put one out
         const guest = !!p.guest || isGuest(users[p.user_id]);
-        const removeGuest = () => void guestsApi.remove(channelId, p.user_id).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : "Could not remove the guest.", "error"));
+        const removeGuest = () => void guestsApi.remove(channelId, p.user_id).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : t("voice.voiceParticipants.couldNotRemoveTheGuest"), "error"));
         return (
           <button
             key={p.user_id}
@@ -45,7 +45,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
             onContextMenu={(e) => {
               e.preventDefault();
               const vol = volumes[p.user_id] ?? 100;
-              const profile = { id: "profile", label: "Profile", onSelect: () => openModal("profile", { userId: p.user_id }) };
+              const profile = { id: "profile", label: t("profile.profile.profile"), onSelect: () => openModal("profile", { userId: p.user_id }) };
               openContextMenu({
                 x: e.clientX,
                 y: e.clientY,
@@ -54,10 +54,10 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
                     ? [profile]
                     : [
                         ...(guest ? [] : [{ ...profile, separatorAfter: true }]),
-                        { id: "volume", label: "User Volume", slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v: number) => setUserVolume(p.user_id, v) } },
+                        { id: "volume", label: t("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v: number) => setUserVolume(p.user_id, v) } },
                         { id: "mute", label: localMutes[p.user_id] ? "Unmute" : "Mute", onSelect: () => setUserLocalMute(p.user_id, !localMutes[p.user_id]) },
-                        { id: "reset", label: "Reset Volume", disabled: vol === 100, onSelect: () => setUserVolume(p.user_id, 100), separatorAfter: guest && canI(server, P.MOVE_MEMBERS, channelId) },
-                        ...(guest && canI(server, P.MOVE_MEMBERS, channelId) ? [{ id: "remove-guest", label: "Remove From Call", danger: true, onSelect: removeGuest }] : []),
+                        { id: "reset", label: t("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(p.user_id, 100), separatorAfter: guest && canI(server, P.MOVE_MEMBERS, channelId) },
+                        ...(guest && canI(server, P.MOVE_MEMBERS, channelId) ? [{ id: "remove-guest", label: t("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: removeGuest }] : []),
                       ],
               });
             }}

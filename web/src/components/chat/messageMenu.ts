@@ -14,6 +14,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
 
+import { t } from "@/i18n";
 export interface MenuHooks {
   openReactionPicker: () => void;
 }
@@ -49,8 +50,8 @@ export function imageMenuItems(image: ImageTarget): ContextMenuItem[] {
   // a browser's own refusal says nothing useful; the helpers' own errors do
   const failed = (err: unknown, fallback: string) => ui.toast(err instanceof Error && !(err instanceof DOMException) && err.message ? err.message : fallback, "error");
   return [
-    { id: "copy-image", label: "Copy Image", onSelect: () => void copyImage(image.src).then(() => ui.toast("Image copied.", "success"), (err: unknown) => failed(err, "Could not copy the picture.")) },
-    { id: "save-image", label: "Save Image", onSelect: () => void saveImage(image.src, image.name).catch((err: unknown) => failed(err, "Could not save the picture.")) },
+    { id: "copy-image", label: t("chat.messageMenu.copyImage"), onSelect: () => void copyImage(image.src).then(() => ui.toast(t("chat.messageMenu.imageCopied"), "success"), (err: unknown) => failed(err, t("chat.messageMenu.couldNotCopyThePicture"))) },
+    { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void saveImage(image.src, image.name).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) },
   ];
 }
 
@@ -61,43 +62,43 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
   const items: ContextMenuItem[] = image ? imageMenuItems(image) : [];
   if (items.length) items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "react", label: "Add Reaction", onSelect: hooks.openReactionPicker, separatorAfter: true });
-  if (canEdit(msg)) items.push({ id: "edit", label: "Edit Message", onSelect: () => ui.setEditing({ channelId: msg.channel_id, messageId: msg.id }) });
-  items.push({ id: "reply", label: "Reply", onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: true });
+  items.push({ id: "react", label: t("chat.messageItem.addReaction"), onSelect: hooks.openReactionPicker, separatorAfter: true });
+  if (canEdit(msg)) items.push({ id: "edit", label: t("chat.messageItem.editMessage"), onSelect: () => ui.setEditing({ channelId: msg.channel_id, messageId: msg.id }) });
+  items.push({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: true });
   items.push({
     id: "copy",
-    label: "Copy Text",
+    label: t("chat.messageMenu.copyText"),
     disabled: !msg.payload?.t,
     onSelect: () => void navigator.clipboard?.writeText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId)),
   });
   if (canPin(msg)) items.push({
     id: "pin",
-    label: pinned ? "Unpin Message" : "Pin Message",
+    label: pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage"),
     onSelect: () => {
       const p = pinned ? channelsApi.unpin(msg.channel_id, msg.id) : channelsApi.pin(msg.channel_id, msg.id);
-      p.catch((err: unknown) => ui.toast(err instanceof Error ? err.message : "Could not update the pin.", "error"));
+      p.catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotUpdateThePin"), "error"));
     },
   });
-  items.push({ id: "unread", label: "Mark Unread", onSelect: () => markUnread(msg) });
+  items.push({ id: "unread", label: t("chat.messageItem.markUnread"), onSelect: () => markUnread(msg) });
   if (msg.payload?.embeds?.length && useAuth.getState().me?.id === msg.author_id) {
     const suppressed = (msg.flags & 4) !== 0;
-    items.push({ id: "embeds", label: suppressed ? "Show Embeds" : "Remove Embeds", onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast("Could not update embeds.", "error")) });
+    items.push({ id: "embeds", label: suppressed ? t("chat.messageMenu.showEmbeds") : t("chat.messageMenu.removeEmbeds"), onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast(t("chat.messageMenu.couldNotUpdateEmbeds"), "error")) });
   }
-  items.push({ id: "link", label: "Copy Message Link", onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
-  if (dev) items.push({ id: "id", label: "Copy Message ID", onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
+  items.push({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
+  if (dev) items.push({ id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
   if (canDelete(msg)) {
-    items.push({ id: "select", label: "Select Messages", onSelect: () => startSelecting(msg) });
+    items.push({ id: "select", label: t("chat.messageMenu.selectMessages"), onSelect: () => startSelecting(msg) });
     items.push({
       id: "delete",
-      label: "Delete Message",
+      label: t("chat.messageMenu.deleteMessage"),
       danger: true,
       onSelect: () =>
         ui.openModal("confirm", {
-          title: "Delete Message",
-          body: "Are you sure you want to delete this message?",
-          confirmLabel: "Delete",
+          title: t("chat.messageMenu.deleteMessage"),
+          body: t("chat.messageMenu.areYouSureYouWantTo"),
+          confirmLabel: t("chat.messageItem.delete"),
           danger: true,
-          onConfirm: () => messagesApi.remove(msg.channel_id, msg.id).catch((err: unknown) => ui.toast(err instanceof Error ? err.message : "Could not delete.", "error")),
+          onConfirm: () => messagesApi.remove(msg.channel_id, msg.id).catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotDelete"), "error")),
         }),
     });
   }
@@ -129,7 +130,7 @@ export function markUnread(msg: DecryptedMessage): void {
 export function copyMessageLink(msg: DecryptedMessage): void {
   const chan = useChannels.getState().byId[msg.channel_id];
   const base = chan?.server_id ? `/channels/${chan.server_id}` : "/channels/@me";
-  void navigator.clipboard?.writeText(`${location.origin}${base}/${msg.channel_id}/${msg.id}`).then(() => useUI.getState().toast("Link copied.", "success"));
+  void navigator.clipboard?.writeText(`${location.origin}${base}/${msg.channel_id}/${msg.id}`).then(() => useUI.getState().toast(t("chat.messageMenu.linkCopied"), "success"));
 }
 
 /** Deletes without the confirmation dialog (the Shift shortcut). */
@@ -138,7 +139,7 @@ export async function deleteMessageNow(msg: DecryptedMessage): Promise<void> {
     await messagesApi.remove(msg.channel_id, msg.id);
     useMessages.getState().remove(msg.channel_id, msg.id);
   } catch (err) {
-    useUI.getState().toast(err instanceof Error ? err.message : "Could not delete the message.", "error");
+    useUI.getState().toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotDeleteTheMessage"), "error");
   }
 }
 
@@ -176,6 +177,6 @@ export async function togglePin(msg: DecryptedMessage): Promise<void> {
     if (pinned) await channelsApi.unpin(msg.channel_id, msg.id);
     else await channelsApi.pin(msg.channel_id, msg.id);
   } catch (err) {
-    useUI.getState().toast(err instanceof Error ? err.message : "Could not update the pin.", "error");
+    useUI.getState().toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotUpdateThePin"), "error");
   }
 }

@@ -49,7 +49,7 @@ export default function RecoverPage() {
       } else if (err instanceof Error && /invalid recovery key/i.test(err.message)) {
         setError("That does not look like a recovery key (64 hex characters).");
       } else {
-        setError("Recovery failed. Check the key and try again.");
+        setError(t("recover.recoveryFailedCheckTheKeyAnd"));
       }
     } finally {
       setBusy(false);

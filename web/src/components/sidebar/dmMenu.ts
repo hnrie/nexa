@@ -13,6 +13,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { joinVoice } from "@/voice/session";
 
+import { t } from "@/i18n";
 function nameOf(ch: Channel): string {
   return channelDisplayName(ch, useUsers.getState().byId, useAuth.getState().me?.id, friendNicknames(useRelationships.getState().byUser));
 }
@@ -44,7 +45,7 @@ export async function closeDM(channelId: string, nav?: (p: string) => void): Pro
     leave(channelId, nav);
     forget(channelId);
   } catch (err) {
-    useUI.getState().toast(err instanceof ApiError ? err.message : "Could not close that conversation.", "error");
+    useUI.getState().toast(err instanceof ApiError ? err.message : t("sidebar.dmMenu.couldNotCloseThatConversation"), "error");
   }
 }
 
@@ -55,7 +56,7 @@ export async function purgeDM(channelId: string, nav?: (p: string) => void): Pro
     leave(channelId, nav);
     forget(channelId);
   } catch (err) {
-    useUI.getState().toast(err instanceof ApiError ? err.message : "Could not delete that conversation.", "error");
+    useUI.getState().toast(err instanceof ApiError ? err.message : t("sidebar.dmMenu.couldNotDeleteThatConversation"), "error");
   }
 }
 
@@ -85,21 +86,21 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
   const items: ContextMenuItem[] = [
     {
       id: "read",
-      label: "Mark As Read",
+      label: t("sidebar.dmMenu.markAsRead"),
       disabled: !ch.last_message_id || !isUnread(reads.byChannel[channelId], ch.last_message_id),
       onSelect: () => ch.last_message_id && void reads.ack(channelId, ch.last_message_id),
       separatorAfter: true,
     },
   ];
   if (group) {
-    items.push({ id: "edit", label: "Edit Group", onSelect: () => ctx.openModal("editGroup", { channelId }) });
-    items.push({ id: "invite", label: "Invite People", onSelect: () => ctx.openModal("groupInvite", { channelId }) });
-    items.push({ id: "add", label: "Add Friends", onSelect: () => ctx.openModal("createDM", { groupId: channelId }) });
+    items.push({ id: "edit", label: t("modals.editGroup.editGroup"), onSelect: () => ctx.openModal("editGroup", { channelId }) });
+    items.push({ id: "invite", label: t("chat.chat.invitePeople"), onSelect: () => ctx.openModal("groupInvite", { channelId }) });
+    items.push({ id: "add", label: t("sidebar.dmMenu.addFriends"), onSelect: () => ctx.openModal("createDM", { groupId: channelId }) });
   } else {
-    items.push({ id: "profile", label: "Profile", onSelect: () => { const other = ch.recipient_ids.find((id) => id !== me?.id); if (other) ctx.openModal("profile", { userId: other }); } });
+    items.push({ id: "profile", label: t("profile.profile.profile"), onSelect: () => { const other = ch.recipient_ids.find((id) => id !== me?.id); if (other) ctx.openModal("profile", { userId: other }); } });
     items.push({
       id: "call",
-      label: "Start Call",
+      label: t("sidebar.dmMenu.startCall"),
       onSelect: () => {
         ctx.nav(`/channels/@me/${channelId}`);
         void joinVoice(channelId);
@@ -108,7 +109,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
   }
   items.push({
     id: "mute",
-    label: muted ? "Unmute Conversation" : "Mute Conversation",
+    label: muted ? t("sidebar.dmMenu.unmuteConversation") : t("sidebar.dmMenu.muteConversation"),
     onSelect: () => {
       const list = settings.notifications.muted;
       useSettings.getState().patch({ notifications: { ...settings.notifications, muted: muted ? list.filter((x) => x !== channelId) : [...list, channelId] } });
@@ -117,14 +118,14 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
   });
   items.push({
     id: "close",
-    label: group ? "Leave Group" : "Close DM",
+    label: group ? t("chat.groupMemberMenu.leaveGroup") : t("sidebar.dMSidebar.closeDm"),
     danger: group,
     onSelect: () =>
       group
         ? ctx.openModal("confirm", {
             title: `Leave '${name}'`,
-            body: "You stop receiving messages from this group. You need a new invite to come back.",
-            confirmLabel: "Leave Group",
+            body: t("sidebar.dmMenu.youStopReceivingMessagesFromThis"),
+            confirmLabel: t("chat.groupMemberMenu.leaveGroup"),
             danger: true,
             onConfirm: () => closeDM(channelId, ctx.nav),
           })
@@ -133,20 +134,20 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
   if (!group || owner) {
     items.push({
       id: "purge",
-      label: group ? "Delete Group" : "Delete Conversation",
+      label: group ? t("sidebar.dmMenu.deleteGroup") : t("sidebar.dmMenu.deleteConversation"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
           title: group ? `Delete '${name}'` : `Delete your conversation with ${name}`,
           body: group
-            ? "The group and every message in it are removed for everyone. This cannot be undone."
-            : "Every message is removed for both of you, not just hidden from your side. This cannot be undone. To tidy your own list without deleting anything, use Close DM instead.",
-          confirmLabel: group ? "Delete Group" : "Delete For Everyone",
+            ? t("sidebar.dmMenu.theGroupAndEveryMessageIn")
+            : t("sidebar.dmMenu.everyMessageIsRemovedForBoth"),
+          confirmLabel: group ? t("sidebar.dmMenu.deleteGroup") : t("sidebar.dmMenu.deleteForEveryone"),
           danger: true,
           onConfirm: () => purgeDM(channelId, ctx.nav),
         }),
     });
   }
-  if (settings.developerMode) items.push({ id: "copy", label: "Copy Channel ID", onSelect: () => void navigator.clipboard?.writeText(channelId) });
+  if (settings.developerMode) items.push({ id: "copy", label: t("sidebar.dmMenu.copyChannelId"), onSelect: () => void navigator.clipboard?.writeText(channelId) });
   return items;
 }

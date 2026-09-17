@@ -15,12 +15,14 @@ import { useUI } from "@/stores/ui";
 import s from "@/components/modals/ServerModals.module.css";
 
 import { t } from "@/i18n";
-const AGES: { v: number; label: string }[] = [
-  { v: 3600, label: "1 hour" },
-  { v: 21600, label: "6 hours" },
-  { v: 86400, label: "1 day" },
-  { v: 604800, label: "7 days" },
+function ages(): { v: number; label: string }[] {
+  return [
+  { v: 3600, label: t("modals.customStatus.1Hour") },
+  { v: 21600, label: t("modals.invite.6Hours") },
+  { v: 86400, label: t("modals.groupInvite.1Day") },
+  { v: 604800, label: t("modals.groupInvite.7Days") },
 ];
+}
 
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError || err instanceof Error ? err.message : fallback);
 
@@ -75,11 +77,11 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
     setBusy(true);
     try {
       const { revoked } = await guestsApi.revokeAll(channelId);
-      toast(revoked ? "Those guest links no longer work, and their guests have left the call." : "There were no guest links to revoke.", "success");
+      toast(revoked ? t("voice.guestLink.thoseGuestLinksNoLongerWork") : t("voice.guestLink.thereWereNoGuestLinksTo"), "success");
       setState(null);
       await load({ fresh: true, maxAge: age });
     } catch (err) {
-      toast(errorText(err, "Could not revoke the links."), "error");
+      toast(errorText(err, t("voice.guestLink.couldNotRevokeTheLinks")), "error");
       setBusy(false);
     }
   };
@@ -104,14 +106,14 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
         <div className={s.row2}>
           <Field label={t("voice.guestLink.newLinkExpiresAfter")}>
             <Select value={age} onChange={(e) => setAge(Number(e.target.value))}>
-              {AGES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
+              {ages().map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
             <Button variant="secondary" onClick={() => void load({ fresh: true, maxAge: age })} disabled={busy} data-testid="guest-link-new">{t("voice.guestLink.newLink")}</Button>
           </div>
         </div>
-        <Button variant="danger" onClick={() => void revoke()} disabled={busy} data-testid="guest-link-revoke">{managesAll ? "Revoke All Guest Links" : "Revoke My Guest Links"}</Button>
+        <Button variant="danger" onClick={() => void revoke()} disabled={busy} data-testid="guest-link-revoke">{managesAll ? t("voice.guestLink.revokeAllGuestLinks") : t("voice.guestLink.revokeMyGuestLinks")}</Button>
       </div>
     </Modal>
   );

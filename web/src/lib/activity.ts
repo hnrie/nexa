@@ -5,10 +5,12 @@
  */
 import type { Activity } from "@/api/types";
 
-const VERB: Record<number, string> = { 0: "Playing", 2: "Listening to", 3: "Watching", 5: "Competing in" };
+import { t } from "@/i18n";
+/** The verb each activity type reads with, per call so it follows the language. */
+const verbs = (): Record<number, string> => ({ 0: t("activity.playing"), 2: t("activity.listeningTo"), 3: t("activity.watching"), 5: t("activity.competingIn") });
 
 export function activityVerb(a: Pick<Activity, "type">): string {
-  return VERB[a.type] ?? "Playing";
+  return verbs()[a.type] ?? t("activity.playing");
 }
 
 /**

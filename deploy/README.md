@@ -1,4 +1,4 @@
-# Deploying nexa on this Mac
+# Deploying Nexa on this Mac
 
 ```
 make build                     # web app + Go binary (prebuilt Node at /usr/local/lib/nodejs)

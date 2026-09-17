@@ -52,7 +52,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
       onClose();
       nav(`/channels/@me/${ch.id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create the conversation.", "error");
+      toast(err instanceof ApiError ? err.message : t("modals.createDM.couldNotCreateTheConversation"), "error");
     } finally {
       setBusy(false);
     }
@@ -60,7 +60,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
 
   return (
     <Modal open onClose={onClose} title={t("modals.createDM.selectFriends")} width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={picked.length === 0}>{group ? "Add to Group" : picked.length > 1 ? "Create Group DM" : "Create DM"}</Button>}>
-      <p className={s.hint}>{group ? "Add anyone you are friends with; groups have no size limit." : picked.length >= MAX ? "Add the rest with an invite link once the group exists." : `Pick friends to start a group, or one person for a DM.`}</p>
+      <p className={s.hint}>{group ? t("modals.createDM.addAnyoneYouAreFriendsWith") : picked.length >= MAX ? t("modals.createDM.addTheRestWithAnInvite") : `Pick friends to start a group, or one person for a DM.`}</p>
       <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("modals.createDM.typeTheUsernameOfAFriend")} autoFocus />
       {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
       <div className={s.list}>

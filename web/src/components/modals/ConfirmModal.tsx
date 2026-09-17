@@ -23,7 +23,7 @@ export function ConfirmModal({ onClose, title, body, confirmLabel = "Confirm", d
       onClose();
     } catch (err) {
       // most callers let the request's error through; say what went wrong and keep the dialog open to retry
-      useUI.getState().toast(err instanceof ApiError ? err.message : "Something went wrong.", "error");
+      useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.confirm.somethingWentWrong"), "error");
     } finally {
       setBusy(false);
     }

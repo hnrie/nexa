@@ -16,7 +16,7 @@ import { useUsers } from "@/stores/users";
 import { SearchSuggestions } from "./SearchSuggestions";
 import s from "./Search.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /**
  * Searches the messages this device has decrypted. Messages are end-to-end
  * encrypted, so the server cannot do this for us; "Load older" pulls more
@@ -111,9 +111,9 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
       <SearchSuggestions query={query} users={users} channels={scope} nicknames={nicknames} onPick={onQuery} />
       {isEmptyQuery(q) ? (
         <div className={s.help}>
-          <p>Search the messages this device has decrypted{channel.server_id ? " in this server" : " in this conversation"}. Nothing leaves your device: the server only holds ciphertext.</p>
+          <p>{channel.server_id ? t("search.search.helpServer") : t("search.search.helpConversation")}</p>
           <dl>
-            <dt>from:</dt><dd>@user, or <b>me</b></dd>
+            <dt>from:</dt><dd><Tr id="search.search.fromHint" values={{ me: <b>{t("search.search.me")}</b> }} /></dd>
             <dt>in:</dt><dd>{t("search.search.channel")}</dd>
             <dt>has:</dt><dd>{t("search.search.linkImageFileStickerEmbed")}</dd>
             <dt>{t("search.search.beforeAfter")}</dt><dd>2026-01-31</dd>
@@ -145,7 +145,7 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
       </div>
       <div className={s.foot}>
         <span>{t("search.search.messagesIndexed", { count: indexed })}</span>
-        <Button size="sm" variant="secondary" loading={loading} disabled={exhausted} onClick={() => void loadMore()} data-testid="search-older">{exhausted ? "All history loaded" : "Load older"}</Button>
+        <Button size="sm" variant="secondary" loading={loading} disabled={exhausted} onClick={() => void loadMore()} data-testid="search-older">{exhausted ? "All history loaded" : t("search.search.loadOlder")}</Button>
       </div>
     </aside>
   );

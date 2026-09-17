@@ -273,6 +273,7 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 	}
 	s.Bcast.EmitUsers(updated.Recipients, "channel_create", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_add", []ids.ID{me.ID}, nil)
+	s.Bcast.PresenceChanged(me.ID)
 	s.Bcast.KeysMaybeNeeded(updated.ID)
 	s.subchatsJoined(ctx, subs, me.ID)
 	users := []store.PublicUser{}

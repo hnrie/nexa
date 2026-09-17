@@ -3,6 +3,7 @@ import { b64 } from "@/crypto/bytes";
 import { decryptFile, encryptedSize } from "@/crypto/file";
 import type { AttachmentMeta } from "@/crypto/message";
 
+import { t } from "@/i18n";
 interface Entry {
   url: string;
   size: number;
@@ -70,7 +71,7 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
     hit.last = Date.now();
     return Promise.resolve(hit.url);
   }
-  if (att.size > INLINE_MAX) return Promise.reject(new Error("That file is too large to open here. Download it instead."));
+  if (att.size > INLINE_MAX) return Promise.reject(new Error(t("mediaCache.thatFileIsTooLargeTo")));
   const pending = inflight.get(att.blob_id);
   if (pending) return pending;
   const job = (async () => {

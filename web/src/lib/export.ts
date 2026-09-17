@@ -183,7 +183,7 @@ export async function exportMyData(onProgress: (text: string) => void): Promise<
       entries.push({ name: `messages/errors/${ch.id}.txt`, data: new TextEncoder().encode(String(err)) });
     }
   }
-  entries.push({ name: "README.txt", data: new TextEncoder().encode("nexa data export\n\nEverything here was decrypted on your device. Messages you never held a key for are marked decrypted: false.\nAttachments are listed by name; download them from the app while you still have access.\n") });
+  entries.push({ name: "README.txt", data: new TextEncoder().encode("Nexa data export\n\nEverything here was decrypted on your device. Messages you never held a key for are marked decrypted: false.\nAttachments are listed by name; download them from the app while you still have access.\n") });
   return buildZip(entries);
 }
 

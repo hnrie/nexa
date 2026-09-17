@@ -25,7 +25,7 @@ export function ServerProfileModal({ onClose, serverId, userId }: { onClose: () 
       upsertMember(await serversApi.patchMember(serverId, target === me?.id ? "@me" : target, { nick: value.trim() || null }));
       onClose();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not change the nickname.", "error");
+      toast(err instanceof ApiError ? err.message : t("modals.serverProfile.couldNotChangeTheNickname"), "error");
     } finally {
       setBusy(false);
     }

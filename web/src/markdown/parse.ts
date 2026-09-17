@@ -1,6 +1,7 @@
 import { shortcodeToEmoji } from "@/lib/shortcodes";
 import type { Node, RenderCtx } from "./ast";
 
+import { t } from "@/i18n";
 // ---------------------------------------------------------------------------
 // Discord-flavoured markdown parser.
 //

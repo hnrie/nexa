@@ -60,7 +60,7 @@ export default function StickerPackPage() {
         setPack(res);
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not change the pack.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotChangeThePack"), "error");
     } finally {
       setBusy(false);
     }
@@ -96,7 +96,7 @@ export default function StickerPackPage() {
               ))}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", justifyContent: "center" }}>
-              {mine ? <Button onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>{t("stickerPack.editPack")}</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? "Remove from my stickers" : "Install pack"}</Button>}
+              {mine ? <Button onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>{t("stickerPack.editPack")}</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? t("stickerPack.removeFromMyStickers") : t("stickerPack.installPack")}</Button>}
               <Link to="/channels/@me" className={s.link} style={{ alignSelf: "center" }}>{t("stickerPack.backToTheApp")}</Link>
             </div>
           </>

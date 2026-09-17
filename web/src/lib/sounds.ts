@@ -1,5 +1,6 @@
 import { AudioKeeper, isHomeScreenApp } from "./audioKeeper";
 
+import { t as tr_ } from "@/i18n";
 export type SoundName = "message" | "mention" | "friend" | "ring" | "outgoing" | "join" | "leave" | "mute" | "unmute";
 
 /** A sound that cannot start within this long is dropped rather than played late. */
@@ -307,7 +308,7 @@ async function play(name: SoundName): Promise<boolean> {
 
 /** Why the last sound could not play, for the settings page to say. */
 export function soundTrouble(): string {
-  if (!contextClass()) return "This browser can't play sounds.";
+  if (!contextClass()) return tr_("sounds.thisBrowserCanTPlaySounds");
   if (trouble?.state === "running") return "The sound took too long to load. Check the connection and try again.";
   const detail = trouble ? ` (${trouble.problem ?? `audio stayed ${trouble.state}`})` : "";
   if (isHomeScreenApp()) return `The sound couldn't start${detail}. Since iOS 26, sound in apps added to the Home Screen can stop working until the phone restarts. Restarting brings it back, and ${location.host} opened in Safari isn't affected.`;

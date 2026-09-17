@@ -14,6 +14,7 @@ import { useUsers, displayName } from "@/stores/users";
 import { desktopBridge } from "./desktopBridge";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 
+import { t } from "@/i18n";
 let navigateTo: ((path: string) => void) | null = null;
 
 /** The router's navigate function, supplied by the shell. */
@@ -95,11 +96,11 @@ export function messageAlert(onScreen: boolean, viewingChannel: boolean): { soun
 function previewOf(m: Message): string {
   const stored = useMessages.getState().channels[m.channel_id]?.byId[m.id];
   const p = stored?.payload;
-  if (!p) return stored?.decryptError ? "Encrypted message" : "New message";
+  if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
   if (p.t) return plainText(parse(p.t, { inline: true })).slice(0, 140);
   if (p.att?.length) return p.att.length === 1 ? `Sent ${p.att[0]!.name}` : `Sent ${p.att.length} files`;
-  if (p.sticker) return "Sent a sticker";
-  return "New message";
+  if (p.sticker) return t("notify.sentASticker");
+  return t("notify.newMessage");
 }
 
 function onMessage(m: Message, mine: boolean): void {
@@ -136,7 +137,7 @@ function onFriendRequest(r: Relationship): void {
   if (settings.notifications.sounds) playSound("friend");
   if (appOnScreen()) return;
   if (!notificationsEnabled(settings)) return;
-  void showNotification("Friend Request", { body: `${displayName(r.user)} sent you a friend request.`, tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
+  void showNotification(t("notify.friendRequest"), { body: `${displayName(r.user)} sent you a friend request.`, tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
 }
 
 let installed = false;

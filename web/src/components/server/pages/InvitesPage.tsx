@@ -46,7 +46,7 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
       await serversApi.deleteInvite(code);
       setInvites((cur) => cur?.filter((i) => i.code !== code) ?? null);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not revoke the invite.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.invites.couldNotRevokeTheInvite"), "error");
     } finally {
       setBusy(null);
     }

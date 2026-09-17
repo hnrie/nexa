@@ -9,6 +9,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 
+import { t } from "@/i18n";
 export interface GroupMemberMenuCtx {
   nav: (path: string) => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
@@ -21,7 +22,7 @@ async function messageUser(userId: string, nav: (path: string) => void): Promise
     useChannels.getState().upsert(ch);
     nav(`/channels/@me/${ch.id}`);
   } catch (err) {
-    useUI.getState().toast(err instanceof ApiError ? err.message : "Could not open the conversation.", "error");
+    useUI.getState().toast(err instanceof ApiError ? err.message : t("chat.groupMemberMenu.couldNotOpenTheConversation"), "error");
   }
 }
 
@@ -39,28 +40,28 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   const nicknames = friendNicknames(useRelationships.getState().byUser);
   const self = userId === me.id;
   const user = users[userId];
-  const name = nicknames[userId] || displayName(user, self ? me.display_name : "Unknown User");
+  const name = nicknames[userId] || displayName(user, self ? me.display_name : t("chat.groupMemberMenu.unknownUser"));
   const group = channelDisplayName(ch, users, me.id, nicknames);
   const manage = managesGroup(ch);
   const isOwner = ch.owner_id === userId;
   const owner = ch.owner_id ? nicknames[ch.owner_id] || displayName(users[ch.owner_id], "its current owner") : "its current owner";
 
   const items: ContextMenuItem[] = [
-    { id: "profile", label: "Profile", onSelect: () => ctx.openModal("profile", { userId }) },
+    { id: "profile", label: t("profile.profile.profile"), onSelect: () => ctx.openModal("profile", { userId }) },
     {
       id: "mention",
-      label: "Mention",
+      label: t("settings.notifications.mention"),
       disabled: !user?.username,
       onSelect: () => window.dispatchEvent(new CustomEvent("ec:insert-text", { detail: `@${user?.username} ` })),
     },
   ];
-  if (!self) items.push({ id: "message", label: "Message", onSelect: () => void messageUser(userId, ctx.nav) });
+  if (!self) items.push({ id: "message", label: t("profile.profileCard.message"), onSelect: () => void messageUser(userId, ctx.nav) });
   items[items.length - 1]!.separatorAfter = true;
 
   if (manage && !isOwner) {
     items.push({
       id: "owner",
-      label: self ? "Take Ownership" : "Transfer Ownership",
+      label: self ? t("chat.groupMemberMenu.takeOwnership") : t("chat.groupMemberMenu.transferOwnership"),
       onSelect: () =>
         ctx.openModal("confirm", {
           title: self ? `Take ownership of '${group}'` : `Transfer ownership of '${group}'`,
@@ -69,7 +70,7 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
             : ch.owner_id === me.id
               ? `${name} becomes the group's owner, able to remove people and delete the group, and you become a member like everyone else.`
               : `${name} becomes the group's owner in place of ${owner}.`,
-          confirmLabel: self ? "Take Ownership" : "Transfer Ownership",
+          confirmLabel: self ? t("chat.groupMemberMenu.takeOwnership") : t("chat.groupMemberMenu.transferOwnership"),
           onConfirm: () => channelsApi.patch(channelId, { owner_id: userId }),
         }),
     });
@@ -77,13 +78,13 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   if (manage && !self && !isOwner) {
     items.push({
       id: "remove",
-      label: "Remove From Group",
+      label: t("chat.groupMemberMenu.removeFromGroup"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
           title: `Remove ${name}`,
           body: `${name} is removed from '${group}' and stops receiving its messages. They need a new invite to come back.`,
-          confirmLabel: "Remove",
+          confirmLabel: t("composer.composer.remove"),
           danger: true,
           onConfirm: () => channelsApi.removeRecipient(channelId, userId),
         }),
@@ -92,15 +93,15 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   if (self) {
     items.push({
       id: "leave",
-      label: "Leave Group",
+      label: t("chat.groupMemberMenu.leaveGroup"),
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
           title: `Leave '${group}'`,
           body: isOwner
-            ? "You stop receiving messages from this group, and ownership passes to another member. You need a new invite to come back."
-            : "You stop receiving messages from this group. You need a new invite to come back.",
-          confirmLabel: "Leave Group",
+            ? t("chat.groupMemberMenu.youStopReceivingMessagesFromThis")
+            : t("sidebar.dmMenu.youStopReceivingMessagesFromThis"),
+          confirmLabel: t("chat.groupMemberMenu.leaveGroup"),
           danger: true,
           onConfirm: () => closeDM(channelId, ctx.nav),
         }),
@@ -108,7 +109,7 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   }
   if (useSettings.getState().settings.developerMode) {
     items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "copy", label: "Copy User ID", onSelect: () => void navigator.clipboard?.writeText(userId).then(() => useUI.getState().toast("Copied!", "success")) });
+    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(userId).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success")) });
   }
   return items;
 }

@@ -249,9 +249,9 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
   const more = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     const r = e.currentTarget.getBoundingClientRect();
-    const items: ContextMenuItem[] = [{ id: "speed", label: "Playback speed", slider: { value: speed, min: 0.5, max: 2, step: 0.5, unit: "×", onChange: setSpeed }, separatorAfter: true }];
-    if (pipOk) items.push({ id: "pip", label: "Picture in Picture", onSelect: pip });
-    items.push({ id: "download", label: "Download", onSelect: download });
+    const items: ContextMenuItem[] = [{ id: "speed", label: tr_("chat.audioPlayer.playbackSpeed"), slider: { value: speed, min: 0.5, max: 2, step: 0.5, unit: "×", onChange: setSpeed }, separatorAfter: true }];
+    if (pipOk) items.push({ id: "pip", label: tr_("chat.videoPlayer.pictureInPicture"), onSelect: pip });
+    items.push({ id: "download", label: tr_("chat.attachments.download"), onSelect: download });
     openContextMenu({ x: r.right - 200, y: r.top - 8, items });
     reveal();
   };
@@ -336,17 +336,17 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
           </div>
           <button className={[s.speed, s.wideOnly].join(" ")} aria-label={tr_("chat.audioPlayer.playbackSpeed")} onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>{speed}×</button>
           {pipOk ? (
-            <Tooltip text="Picture in picture" side="top">
+            <Tooltip text={tr_("chat.videoPlayer.pictureInPicture")} side="top">
               <button className={[s.ctl, s.wideOnly].join(" ")} aria-label={tr_("chat.videoPlayer.pictureInPicture")} onClick={pip}><PictureInPicture2 size={18} /></button>
             </Tooltip>
           ) : null}
-          <Tooltip text="Download" side="top">
+          <Tooltip text={tr_("chat.attachments.download")} side="top">
             <a className={[s.ctl, s.wideOnly].join(" ")} href={src} download={name} aria-label={tr_("chat.videoPlayer.downloadVideo")} onClick={(e) => e.stopPropagation()}><Download size={18} /></a>
           </Tooltip>
           <button className={[s.ctl, s.narrowOnly].join(" ")} aria-label={tr_("chat.chat.more")} onClick={more} data-testid="video-more"><MoreVertical size={18} /></button>
           {fullOk ? (
-            <Tooltip text={full ? "Exit full screen" : "Full screen"} side="top">
-              <button className={s.ctl} aria-label={full ? "Exit full screen" : "Full screen"} onClick={toggleFull} data-testid="video-fullscreen">{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
+            <Tooltip text={full ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} side="top">
+              <button className={s.ctl} aria-label={full ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} onClick={toggleFull} data-testid="video-fullscreen">{full ? <Minimize2 size={18} /> : <Maximize2 size={18} />}</button>
             </Tooltip>
           ) : null}
         </div>

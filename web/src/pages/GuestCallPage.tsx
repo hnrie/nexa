@@ -26,15 +26,17 @@ import { t } from "@/i18n";
 type Phase = "checking" | "invalid" | "form" | "joining" | "call" | "ended";
 
 /** Why a guest's time in the call ended, as the server says it; and whether the link may take them again. */
-const ENDINGS: Record<string, { text: string; again: boolean }> = {
-  left: { text: "You left the call.", again: true },
-  removed: { text: "You were removed from the call.", again: false },
-  revoked: { text: "The link you joined with was turned off.", again: false },
-  expired: { text: "Your time as a guest is up.", again: true },
-  unavailable: { text: "This call no longer takes guests.", again: false },
-  ended: { text: "This call is gone.", again: false },
-  gone: { text: "You were away from the call for too long.", again: true },
+function endings(): Record<string, { text: string; again: boolean }> {
+  return {
+  left: { text: t("guestCall.youLeftTheCall"), again: true },
+  removed: { text: t("guestCall.youWereRemovedFromTheCall"), again: false },
+  revoked: { text: t("guestCall.theLinkYouJoinedWithWas"), again: false },
+  expired: { text: t("guestCall.yourTimeAsAGuestIs"), again: true },
+  unavailable: { text: t("guestCall.thisCallNoLongerTakesGuests"), again: false },
+  ended: { text: t("guestCall.thisCallIsGone"), again: false },
+  gone: { text: t("guestCall.youWereAwayFromTheCall"), again: true },
 };
+}
 
 /** Where this tab keeps its guest session, so a reload goes straight back in. Never localStorage: it would outlive the tab. */
 const storeName = (code: string) => `ec.guest.${code}`;
@@ -59,7 +61,7 @@ function saveSession(code: string, value: { token: string; guest: GuestInfo } | 
 
 /** The one channel a guest knows: the call, with nothing else about it. */
 function callChannel(id: string): Channel {
-  return { id, server_id: null, type: "voice", name: "Voice call", topic: "", position: 0, parent_id: null, nsfw: false, slowmode_seconds: 0, user_limit: 0, owner_id: null, icon_id: null, last_message_id: null, created_at: 0, recipient_ids: [], key_conv_id: id };
+  return { id, server_id: null, type: "voice", name: t("guestCall.voiceCall"), topic: "", position: 0, parent_id: null, nsfw: false, slowmode_seconds: 0, user_limit: 0, owner_id: null, icon_id: null, last_message_id: null, created_at: 0, recipient_ids: [], key_conv_id: id };
 }
 
 function guestMe(g: GuestInfo): MeUser {
@@ -96,7 +98,7 @@ export default function GuestCallPage() {
     stopGuestSession();
     api.setToken(null);
     clearGuestKeys();
-    setEnding(ENDINGS[reason] ?? { text: "Your time in the call is over.", again: false });
+    setEnding(endings()[reason] ?? { text: t("guestCall.yourTimeInTheCallIs"), again: false });
     setPhase("ended");
   };
 
@@ -155,9 +157,9 @@ export default function GuestCallPage() {
       return;
     }
     installVoice();
-    document.title = "Voice call";
+    document.title = t("guestCall.voiceCall");
     if (!key) {
-      setError("This link is missing its key. Ask for the whole link, including the part after #.");
+      setError(t("guestCall.thisLinkIsMissingItsKey"));
       setPhase("invalid");
       return;
     }
@@ -195,7 +197,7 @@ export default function GuestCallPage() {
       saveSession(code, res);
       begin(res.token, res.guest, true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not join the call.");
+      setError(err instanceof ApiError ? err.message : t("guestCall.couldNotJoinTheCall"));
       setPhase(err instanceof ApiError && err.code === "invalid_guest_link" ? "invalid" : "form");
     }
   };
@@ -244,9 +246,9 @@ export default function GuestCallPage() {
           </>
         ) : phase === "ended" ? (
           <>
-            <h1 className={s.title}>{ending?.text ?? "The call is over."}</h1>
+            <h1 className={s.title}>{ending?.text ?? t("guestCall.theCallIsOver")}</h1>
             {ending?.again ? (
-              <Button onClick={() => { setEnding(null); setPhase("checking"); void guestsApi.check(code).then(() => setPhase("form"), () => { setError("This link is invalid or has expired."); setPhase("invalid"); }); }} data-testid="guest-again">
+              <Button onClick={() => { setEnding(null); setPhase("checking"); void guestsApi.check(code).then(() => setPhase("form"), () => { setError(t("guestCall.thisLinkIsInvalidOrHas")); setPhase("invalid"); }); }} data-testid="guest-again">
                 Join Again
               </Button>
             ) : null}

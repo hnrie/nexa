@@ -163,7 +163,7 @@ var captchaPage = template.Must(template.New("captcha").Parse(`<!doctype html>
 </head><body><main>
 <p>One quick check that you are a person.</p>
 <div id="slot"></div>
-<p id="back" hidden>Done. <a id="link" href="#">Go back to nexa</a></p>
+<p id="back" hidden>Done. <a id="link" href="#">Go back to Nexa</a></p>
 <button type="button" onclick="cancel()">Cancel</button>
 </main>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer onerror="cancel()"></script>

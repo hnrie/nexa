@@ -81,7 +81,7 @@ export function DMSidebar() {
             sub = <StatusLine className={s.sub} status={st} activity={act} more={Math.max(0, activitiesOf(presence[other]).length - 1)} />;
             avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
           } else {
-            sub = <span className={s.sub}>{`${ch.recipient_ids.length} Members`}</span>;
+            sub = <span className={s.sub}>{t("chat.groupMemberList.membersOnly", { count: ch.recipient_ids.length })}</span>;
             const url = iconUrl(ch.icon_id, 32);
             avatar = url ? <Avatar id={ch.id} avatarId={ch.icon_id} name={name} size={32} kind="icon" /> : <span className={s.groupIcon}><Users size={18} /></span>;
           }
@@ -110,7 +110,7 @@ export function DMSidebar() {
                 className={s.close}
                 role="button"
                 aria-label={t("sidebar.dMSidebar.closeDm")}
-                title={ch.type === "group_dm" ? "Leave group" : "Close DM"}
+                title={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (ch.type === "group_dm") openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });

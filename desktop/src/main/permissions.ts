@@ -1,6 +1,6 @@
 /**
  * What the page may use: the microphone, camera, screen, notifications and
- * clipboard, for nexa's own origin and nothing else. On macOS the
+ * clipboard, for Nexa's own origin and nothing else. On macOS the
  * system asks the person the first time the microphone or camera is wanted.
  */
 import { app, desktopCapturer, session, shell, systemPreferences, type BrowserWindow, type DesktopCapturerSource } from "electron";

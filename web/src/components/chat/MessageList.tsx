@@ -17,7 +17,7 @@ import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import s from "./Chat.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
@@ -268,7 +268,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       if (triedAround.current === jumpTo.messageId) {
         triedAround.current = null;
         setJumpTo(null);
-        useUI.getState().toast("That message could not be found.", "error");
+        useUI.getState().toast(t("chat.messageList.thatMessageCouldNotBeFound"), "error");
         return;
       }
       triedAround.current = jumpTo.messageId;
@@ -297,7 +297,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           <div className={s.emptyAvatar}><Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={80} /></div>
           <h2 className={s.emptyName}>{name}</h2>
           <div className={s.emptyUser}>{u?.username ?? ""}</div>
-          <p className={s.emptyText}>This is the beginning of your direct message history with <b>{name}</b>{t("chat.messageList.messagesHereAreEndToEnd")}</p>
+          <p className={s.emptyText}><Tr id="chat.messageList.dmStart" values={{ name: <b>{name}</b> }} /></p>
         </div>
       );
     }
@@ -307,15 +307,20 @@ export function MessageList({ channel }: { channel: Channel }) {
       return (
         <div className={s.empty}>
           <h2 className={s.emptyName}>{name}</h2>
-          <p className={s.emptyText}>A subchat inside <b>{where}</b>{t("chat.messageList.forEveryoneAlreadyInItIt")}</p>
+          <p className={s.emptyText}><Tr id="chat.messageList.subchatStart" values={{ where: <b>{where}</b> }} /></p>
         </div>
       );
     }
     return (
       <div className={s.empty}>
         {channel.type === "group_dm" && channel.icon_id ? <div className={s.emptyAvatar}><Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={80} kind="icon" /></div> : null}
-        <h2 className={s.emptyName}>{channel.server_id ? `Welcome to #${name}!` : name}</h2>
-        <p className={s.emptyText}>{channel.server_id ? <>This is the start of the <b>#{name}</b> channel.{channel.topic ? ` ${channel.topic}` : ""}</> : <>Welcome to the beginning of the <b>{name}</b> {t("chat.messageList.group")}</>} Messages here are end-to-end encrypted.</p>
+        <h2 className={s.emptyName}>{channel.server_id ? t("chat.messageList.welcomeToChannel", { name }) : name}</h2>
+        <p className={s.emptyText}>
+          {channel.server_id
+            ? <Tr id="chat.messageList.channelStart" values={{ name: <b>#{name}</b> }} />
+            : <Tr id="chat.messageList.groupStart" values={{ name: <b>{name}</b> }} />}
+          {channel.server_id && channel.topic ? ` ${channel.topic}` : ""} {t("chat.messageList.endToEnd")}
+        </p>
       </div>
     );
   }, [channel, users, me?.id, byIdChannels]);

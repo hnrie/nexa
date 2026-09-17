@@ -6,7 +6,7 @@
  * ways, so the program gets Discord's genuine replies and events and its
  * presence shows on Discord. When Discord is not running, or quits part way,
  * the session answers the program itself. Either way it reads SET_ACTIVITY on
- * the way past, which is how the activity reaches nexa.
+ * the way past, which is how the activity reaches Nexa.
  */
 import type { RpcActivity } from "../../shared/bridge";
 import { normalizeActivity } from "./activity";
@@ -150,7 +150,7 @@ export class RpcSession {
           cmd: typeof msg.cmd === "string" ? msg.cmd : "UNKNOWN",
           evt: "ERROR",
           nonce,
-          data: { code: 4002, message: "nexa handles Rich Presence; this command needs Discord to be running." },
+          data: { code: 4002, message: "Nexa handles Rich Presence; this command needs Discord to be running." },
         });
     }
   }

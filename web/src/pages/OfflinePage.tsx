@@ -55,7 +55,7 @@ export default function OfflinePage() {
   }, [bootstrap]);
 
   return (
-    <AuthLayout title={t("offline.canTConnect")} subtitle={error ?? "Could not reach the server."} width={420}>
+    <AuthLayout title={t("offline.canTConnect")} subtitle={error ?? t("offline.couldNotReachTheServer")} width={420}>
       <p className={s.progress}>{t("offline.youAreStillLoggedInCheck")}</p>
       <Button size="lg" block loading={busy} onClick={() => retryNow.current()} data-testid="offline-retry">{t("chat.messageItem.retry")}</Button>
     </AuthLayout>

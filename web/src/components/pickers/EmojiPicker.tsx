@@ -278,7 +278,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
       const byUnicode = new Map<string, EmojiEntry>();
       for (const g of emojiGroups()) for (const e of g.items) byUnicode.set(e.unicode, e);
       const cells = recent.map((u) => byUnicode.get(u)).filter((e): e is EmojiEntry => !!e).map((e): Cell => ({ kind: "unicode", e }));
-      if (cells.length) out.push({ key: "g:-1", title: "Frequently used", cells });
+      if (cells.length) out.push({ key: "g:-1", title: t("pickers.emojiPicker.frequentlyUsed"), cells });
     }
     for (const g of customGroups) out.push({ key: `c:${g.id}`, title: g.name, cells: g.items.map((e): Cell => ({ kind: "custom", e })) });
     for (const { pack, items } of emojiPacks) out.push({ key: `c:${pack.id}`, title: pack.name, cells: items.map((st): Cell => ({ kind: "pack", st, pack })) });

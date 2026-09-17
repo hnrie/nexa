@@ -27,6 +27,8 @@ type Broadcaster interface {
 	EmitUsers(userIDs []ids.ID, event string, data any)
 	EmitChannel(channelID ids.ID, event string, data any)
 	KeysMaybeNeeded(convID ids.ID)
+	// PresenceChanged re-sends a user's presence to whoever should now see it.
+	PresenceChanged(uid ids.ID)
 	Typing(ctx context.Context, uid, channelID ids.ID)
 	// CloseSession and CloseUserSessions disconnect the sockets of sessions
 	// that were just deleted; except 0 closes all of a user's.
@@ -41,6 +43,7 @@ func (NoopBroadcaster) UserUpdated(*store.User)                {}
 func (NoopBroadcaster) EmitUsers([]ids.ID, string, any)        {}
 func (NoopBroadcaster) EmitChannel(ids.ID, string, any)        {}
 func (NoopBroadcaster) KeysMaybeNeeded(ids.ID)                 {}
+func (NoopBroadcaster) PresenceChanged(ids.ID)                 {}
 func (NoopBroadcaster) Typing(context.Context, ids.ID, ids.ID) {}
 func (NoopBroadcaster) CloseSession(ids.ID)                    {}
 func (NoopBroadcaster) CloseUserSessions(ids.ID, ids.ID)       {}

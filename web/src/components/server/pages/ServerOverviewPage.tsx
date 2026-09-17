@@ -51,9 +51,9 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       setDescription(srv.description);
       setSystem(srv.system_channel_id ?? "");
       setNotif(srv.default_notifications);
-      toast("Server saved.", "success");
+      toast(t("server.serverOverview.serverSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save the server.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.serverOverview.couldNotSaveTheServer"), "error");
     } finally {
       setBusy(false);
     }
@@ -63,7 +63,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     try {
       updateServer(await serversApi.uploadIcon(serverId, file));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not upload the icon.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.serverOverview.couldNotUploadTheIcon"), "error");
     } finally {
       setBusy(false);
     }

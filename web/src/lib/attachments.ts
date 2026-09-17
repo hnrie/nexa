@@ -6,6 +6,7 @@ import type { AttachmentMeta } from "@/crypto/message";
 import { holdReload } from "./busy";
 import type { PieceReply, PieceRequest } from "./upload.worker";
 
+import { t } from "@/i18n";
 /** Fallback until the server says what it accepts. */
 export const MAX_UPLOAD = 100 * 1024 * 1024;
 
@@ -121,14 +122,14 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
       }
       worker.terminate();
       if (reply.type === "failed") {
-        reject(new ApiError(0, "network", "The upload could not reach the server."));
+        reject(new ApiError(0, "network", t("attachments.theUploadCouldNotReachThe")));
         return;
       }
       if (reply.status >= 200 && reply.status < 300) {
         try {
           resolve(reply.text ? JSON.parse(reply.text) : undefined);
         } catch {
-          reject(new ApiError(reply.status, "bad_response", "The server's answer could not be read."));
+          reject(new ApiError(reply.status, "bad_response", t("attachments.theServerSAnswerCouldNot")));
         }
         return;
       }
@@ -138,7 +139,7 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
     worker.onerror = (e) => {
       worker.terminate();
       if (heard) {
-        reject(new ApiError(0, "worker", "The upload stopped unexpectedly."));
+        reject(new ApiError(0, "worker", t("attachments.theUploadStoppedUnexpectedly")));
         return;
       }
       // It never got going (an older browser, or its script would not load).
@@ -282,7 +283,7 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
           const from = sent;
           const reply = (await send(job, (loaded) => onProgress(from + loaded))) as { received?: number } | undefined;
           const received = reply?.received ?? -1;
-          if (received <= sent || received > end) throw new Error("The server lost track of this upload.");
+          if (received <= sent || received > end) throw new Error(t("attachments.theServerLostTrackOfThis"));
           sent = received;
           movedAt = Date.now();
         } catch (err) {

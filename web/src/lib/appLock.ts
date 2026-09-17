@@ -17,26 +17,31 @@ import type { AppLockPolicy } from "@/stores/settings";
 import { unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
 import { storage } from "./storage";
 
+import { t } from "@/i18n";
 /** Heavier than the login KDF: a four-digit passcode needs the help. */
 export const LOCK_KDF: KdfParams = { m: 65536, t: 6, p: 1, v: 1 };
 export const MAX_FAILURES = 10;
 export const MIN_PASSCODE = 4;
 
 /** Idle time before the app locks itself, in milliseconds. 0 means never. */
-export const AUTO_LOCK_CHOICES: { label: string; ms: number }[] = [
-  { label: "Never", ms: 0 },
-  { label: "1 minute", ms: 60_000 },
-  { label: "5 minutes", ms: 5 * 60_000 },
-  { label: "15 minutes", ms: 15 * 60_000 },
-  { label: "1 hour", ms: 60 * 60_000 },
+export function autoLockChoices(): { label: string; ms: number }[] {
+  return [
+  { label: t("modals.groupInvite.never"), ms: 0 },
+  { label: t("appLock.1Minute"), ms: 60_000 },
+  { label: t("server.memberAction.5Minutes"), ms: 5 * 60_000 },
+  { label: t("appLock.15Minutes"), ms: 15 * 60_000 },
+  { label: t("modals.customStatus.1Hour"), ms: 60 * 60_000 },
 ];
+}
 
 /** How long a background window waits before locking. */
-export const BLUR_DELAY_CHOICES: { label: string; ms: number }[] = [
-  { label: "Immediately", ms: 0 },
-  { label: "After 30 seconds", ms: 30_000 },
-  { label: "After 5 minutes", ms: 5 * 60_000 },
+export function blurDelayChoices(): { label: string; ms: number }[] {
+  return [
+  { label: t("appLock.immediately"), ms: 0 },
+  { label: t("appLock.after30Seconds"), ms: 30_000 },
+  { label: t("appLock.after5Minutes"), ms: 5 * 60_000 },
 ];
+}
 
 export interface LockConfig {
   v: 1;
@@ -144,8 +149,8 @@ export function isNumeric(passcode: string): boolean {
 /** Returns why a passcode is unacceptable, or null when it is fine. */
 export function passcodeProblem(passcode: string): string | null {
   if (passcode.length < MIN_PASSCODE) return `Use at least ${MIN_PASSCODE} characters.`;
-  if (passcode.length > 128) return "That is too long.";
-  if (/^(.)\1*$/.test(passcode)) return "Pick something less guessable than one repeated character.";
+  if (passcode.length > 128) return t("appLock.thatIsTooLong");
+  if (/^(.)\1*$/.test(passcode)) return t("appLock.pickSomethingLessGuessableThanOne");
   return null;
 }
 
@@ -227,7 +232,7 @@ export async function adoptPolicy(userId: string, identity: Identity, passcode: 
  */
 export async function unlockIdentity(userId: string, passcode: string): Promise<Identity> {
   const cfg = loadLock(userId);
-  if (!cfg) throw new Error("This device has no passcode.");
+  if (!cfg) throw new Error(t("appLock.thisDeviceHasNoPasscode"));
   const key = await passcodeKey(passcode, b64.dec(cfg.salt), cfg.params);
   try {
     const privateKey = await unwrapPrivateKey(b64.dec(cfg.wrapped), key);

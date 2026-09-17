@@ -1,5 +1,5 @@
 appId: xyz.evilion.chat
-productName: nexa
+productName: Nexa
 copyright: Copyright © 2026 Evilion
 directories:
   output: dist
@@ -35,9 +35,9 @@ mac:
     - target: zip
       arch: [x64, arm64]
   extendInfo:
-    NSMicrophoneUsageDescription: nexa uses the microphone for voice calls.
-    NSCameraUsageDescription: nexa uses the camera for video calls.
-    NSAudioCaptureUsageDescription: nexa shares the sound of what you share on screen.
+    NSMicrophoneUsageDescription: Nexa uses the microphone for voice calls.
+    NSCameraUsageDescription: Nexa uses the camera for video calls.
+    NSAudioCaptureUsageDescription: Nexa shares the sound of what you share on screen.
 dmg:
   artifactName: "nexa-${version}-mac-${arch}.${ext}"
 win:
@@ -54,13 +54,13 @@ nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
-  shortcutName: nexa
+  shortcutName: Nexa
 linux:
   icon: resources/icon.png
   category: Network;Chat;InstantMessaging
   executableName: nexa
   maintainer: Evilion <evilionx3@proton.me>
-  synopsis: nexa for your computer
+  synopsis: Nexa for your computer
   target:
     - target: AppImage
       arch: [x64]

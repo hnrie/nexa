@@ -42,10 +42,10 @@ export function UpdateBanner() {
       <span className={s.icon}><Sparkles size={18} /></span>
       <span className={s.text}>
         <b>{t("shell.updateBanner.aNewVersionIsHere")}</b>
-        {update.version ? <span style={{ opacity: 0.8 }}> — nexa {update.version}</span> : null}
+        {update.version ? <span style={{ opacity: 0.8 }}> — Nexa {update.version}</span> : null}
       </span>
       <button className={s.download} onClick={download} disabled={waiting} data-testid="update-banner-download">
-        <Download size={14} /> {waiting ? `Downloading… ${percent}%` : "Download"}
+        <Download size={14} /> {waiting ? t("shell.updateBanner.downloadingPercent", { percent }) : t("chat.attachments.download")}
       </button>
       <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={() => setClosed(update.version ?? "")} data-testid="update-banner-close"><X size={16} /></button>
     </div>

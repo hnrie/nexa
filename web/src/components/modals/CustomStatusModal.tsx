@@ -11,13 +11,15 @@ import { usePresence } from "@/stores/presence";
 import s from "./CustomStatusModal.module.css";
 
 import { t as tr_ } from "@/i18n";
-const CLEAR: { label: string; ms: number | null }[] = [
-  { label: "Don't clear", ms: null },
-  { label: "30 minutes", ms: 30 * 60_000 },
-  { label: "1 hour", ms: 60 * 60_000 },
-  { label: "4 hours", ms: 4 * 60 * 60_000 },
-  { label: "Today", ms: -1 },
+function clearChoices(): { label: string; ms: number | null }[] {
+  return [
+  { label: tr_("modals.customStatus.donTClear"), ms: null },
+  { label: tr_("modals.customStatus.30Minutes"), ms: 30 * 60_000 },
+  { label: tr_("modals.customStatus.1Hour"), ms: 60 * 60_000 },
+  { label: tr_("modals.customStatus.4Hours"), ms: 4 * 60 * 60_000 },
+  { label: tr_("modals.customStatus.today"), ms: -1 },
 ];
+}
 
 export function CustomStatusModal({ onClose }: { onClose: () => void }) {
   const me = useAuth((a) => a.me);
@@ -33,7 +35,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
 
   const save = () => {
     if (!me) return;
-    const opt = CLEAR[clear];
+    const opt = clearChoices()[clear];
     let expires: number | null = null;
     if (opt?.ms === -1) {
       const d = new Date();
@@ -56,7 +58,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 className={s.emojiBtn}
-                aria-label={emoji ? "Change the emoji" : "Pick an emoji"}
+                aria-label={emoji ? tr_("modals.customStatus.changeTheEmoji") : tr_("pickers.emojiPicker.pickAnEmoji")}
                 onMouseDown={() => { pickerWasOpen.current = !!picker; }}
                 onClick={(e) => {
                   const wasOpen = pickerWasOpen.current || !!picker;
@@ -90,7 +92,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
         ) : null}
         <Field label={tr_("modals.customStatus.clearAfter")}>
           <select className={s.select} value={clear} onChange={(e) => setClear(Number(e.target.value))}>
-            {CLEAR.map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
+            {clearChoices().map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
           </select>
         </Field>
         {presence?.status_text || presence?.status_emoji ? (

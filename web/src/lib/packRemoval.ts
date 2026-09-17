@@ -5,6 +5,7 @@ import { useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 
+import { t } from "@/i18n";
 /**
  * Packs someone installed can be removed by them. Their own packs are deleted
  * instead, and a pack of a server they are in stays for as long as they do.
@@ -19,7 +20,7 @@ export function removePackQuestion(pack: StickerPack): { title: string; body: st
   const count = pack.stickers.length;
   const what = pack.kind === "emoji" ? "emoji" : count === 1 ? "sticker" : "stickers";
   const leaving = count === 0 ? "It leaves your picker." : `Its ${count} ${what} ${count === 1 ? "leaves" : "leave"} your picker.`;
-  return { title: `Remove '${pack.name}'`, body: `${leaving} You can install it again for as long as it stays public.`, confirmLabel: "Remove Pack" };
+  return { title: `Remove '${pack.name}'`, body: `${leaving} You can install it again for as long as it stays public.`, confirmLabel: t("pickers.stickerPicker.removePack") };
 }
 
 /** Uninstalls the pack and takes it out of the pickers. Says what went wrong if it could not. */
@@ -28,7 +29,7 @@ export async function removePack(pack: StickerPack): Promise<boolean> {
   try {
     await expressionsApi.uninstall(pack.id);
   } catch (err) {
-    toast(err instanceof ApiError ? err.message : "Could not remove the pack.", "error");
+    toast(err instanceof ApiError ? err.message : t("packRemoval.couldNotRemoveThePack"), "error");
     return false;
   }
   const expressions = useExpressions.getState();

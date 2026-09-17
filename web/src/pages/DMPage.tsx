@@ -6,6 +6,7 @@ import { FullScreenSpinner } from "@/components/common/Spinner";
 import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
 
+import { t } from "@/i18n";
 export default function DMPage() {
   const { channelId, messageId } = useParams();
   const nav = useNavigate();
@@ -41,6 +42,6 @@ export default function DMPage() {
     if (missing) nav("/channels/@me", { replace: true });
   }, [missing, nav]);
 
-  if (!channel) return <FullScreenSpinner text="Opening conversation…" />;
+  if (!channel) return <FullScreenSpinner text={t("dM.openingConversation")} />;
   return <ChatView channel={channel} />;
 }

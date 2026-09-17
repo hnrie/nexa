@@ -5,7 +5,7 @@ import { useUsers, displayName } from "@/stores/users";
 import { formatTimestamp } from "@/lib/time";
 import s from "./Chat.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const openModal = useUI((u) => u.openModal);
@@ -18,29 +18,39 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   let body: React.ReactNode;
   switch (msg.type) {
     case "system_member_add":
-      body = <>{A} added {T} to the group.</>;
+      body = <Tr id="chat.systemMessage.addedToGroup" values={{ actor: A, target: T }} />;
       break;
     case "system_member_remove":
       icon = <ArrowLeftFromLine size={18} />;
-      body = msg.mentions[0] === msg.author_id ? <>{A} left the group.</> : <>{A} removed {T} from the group.</>;
+      body = msg.mentions[0] === msg.author_id
+        ? <Tr id="chat.systemMessage.leftGroup" values={{ actor: A }} />
+        : <Tr id="chat.systemMessage.removedFromGroup" values={{ actor: A, target: T }} />;
       break;
     case "system_pin":
       icon = <Pin size={18} />;
       body = (
-        <>
-          {A} pinned <span className={s.sysLink} onClick={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })}>{t("chat.systemMessage.aMessage")}</span> to this channel.
-        </>
+        <Tr
+          id="chat.systemMessage.pinned"
+          values={{
+            actor: A,
+            message: (
+              <span className={s.sysLink} onClick={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })}>
+                {t("chat.systemMessage.aMessage")}
+              </span>
+            ),
+          }}
+        />
       );
       break;
     case "system_join":
-      body = <>{A} joined.</>;
+      body = <Tr id="chat.systemMessage.joined" values={{ actor: A }} />;
       break;
     case "system_call":
       icon = <Phone size={18} />;
-      body = <>{A} started a call.</>;
+      body = <Tr id="chat.systemMessage.startedACall" values={{ actor: A }} />;
       break;
     default:
-      body = <>{A} did something.</>;
+      body = <Tr id="chat.systemMessage.didSomething" values={{ actor: A }} />;
   }
   return (
     <div className={s.system} data-id={msg.id}>

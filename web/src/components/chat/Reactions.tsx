@@ -41,7 +41,7 @@ export async function toggleReaction(msg: DecryptedMessage, emoji: string): Prom
     else await messagesApi.react(msg.channel_id, msg.id, emoji);
   } catch (err) {
     store.setReaction(msg.channel_id, msg.id, emoji, me.id, has, true);
-    useUI.getState().toast(err instanceof Error ? err.message : "Could not react.", "error");
+    useUI.getState().toast(err instanceof Error ? err.message : t("chat.reactions.couldNotReact"), "error");
   }
 }
 

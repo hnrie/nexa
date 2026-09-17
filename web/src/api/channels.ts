@@ -1,6 +1,7 @@
 import { ApiError, api, errorFromResponse } from "./client";
 import type { Channel, Invite, Message, Snowflake } from "./types";
 
+import { t } from "@/i18n";
 type Progress = (loaded: number, total: number) => void;
 
 /** How much of a download is gathered before it is handed to the browser's blob store. */
@@ -96,7 +97,7 @@ export const channels = {
     const res = await api.fetchImpl(attachmentUrl(blobId), init);
     if (!res.ok) throw await errorFromResponse(res);
     if (expected === undefined || !res.body) return res.blob();
-    const wrongSize = (): ApiError => new ApiError(0, "size_mismatch", "That file is not the size its message says.");
+    const wrongSize = (): ApiError => new ApiError(0, "size_mismatch", t("channels.thatFileIsNotTheSize"));
     const declared = res.headers.get("Content-Length");
     if (declared !== null && !res.headers.has("Content-Encoding")) {
       if (Number(declared) !== expected) {

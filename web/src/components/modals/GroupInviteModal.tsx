@@ -17,12 +17,14 @@ import { useUsers } from "@/stores/users";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
-const AGES: { v: number; label: string }[] = [
-  { v: 1800, label: "30 minutes" },
-  { v: 86400, label: "1 day" },
-  { v: 604800, label: "7 days" },
-  { v: 0, label: "Never" },
+function ages(): { v: number; label: string }[] {
+  return [
+  { v: 1800, label: t("modals.customStatus.30Minutes") },
+  { v: 86400, label: t("modals.groupInvite.1Day") },
+  { v: 604800, label: t("modals.groupInvite.7Days") },
+  { v: 0, label: t("modals.groupInvite.never") },
 ];
+}
 const USES = [0, 1, 5, 10, 25];
 
 /** A shareable link that adds whoever opens it to this group chat. */
@@ -71,7 +73,7 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
     <Modal open onClose={onClose} title={`Invite people to ${name}`} width={480}>
       <div className={s.form}>
         <p className={s.hint}>{t("modals.groupInvite.anyoneWithThisLinkJoinsThe")}</p>
-        <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? `Expires ${new Date(invite.expires_at).toLocaleString()}.` : "This link never expires."}>
+        <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? `Expires ${new Date(invite.expires_at).toLocaleString()}.` : t("modals.groupInvite.thisLinkNeverExpires")}>
           <div className={s.linkRow}>
             <TextInput readOnly value={link} placeholder={busy ? "Generating…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="group-invite-link" />
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
@@ -79,12 +81,12 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
         </Field>
         <div className={s.keyNote} data-warn={!key}>
           <KeyRound size={16} />
-          <span>{key ? "The link carries this chat's encryption key, so whoever joins can read what is already here." : "You do not hold this chat's key yet, so the link cannot carry it. Someone who has it needs to be online when the new member joins."}</span>
+          <span>{key ? t("modals.groupInvite.theLinkCarriesThisChatS") : t("modals.groupInvite.youDoNotHoldThisChat")}</span>
         </div>
         <div className={s.row2}>
           <Field label={t("modals.groupInvite.expireAfter")}>
             <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(v, uses); }}>
-              {AGES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
+              {ages().map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
           <Field label={t("modals.groupInvite.maxNumberOfUses")}>

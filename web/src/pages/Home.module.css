@@ -1,0 +1,74 @@
+/* The front page. It scrolls in a column and reveals each block as it arrives;
+   the only motion is a fade and a short rise, which holds up on a slow machine
+   and disappears for anyone who asked for less of it. */
+/* the body does not scroll, so this page is its own scroller */
+.page { height: 100%; overflow-y: auto; overscroll-behavior: contain; background: var(--bg-base); color: var(--text); scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { .page { scroll-behavior: auto; } }
+.page > * { box-sizing: border-box; }
+
+.top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px max(16px, env(safe-area-inset-left)) 14px max(16px, env(safe-area-inset-right)); background: color-mix(in srgb, var(--bg-base) 82%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border-subtle); }
+.logo { color: var(--text-strong); display: flex; }
+.nav { display: flex; align-items: center; gap: 8px; }
+.quiet { padding: 8px 12px; border-radius: 999px; color: var(--text-subtle); font-size: 15px; font-weight: 600; }
+.quiet:hover { color: var(--text-strong); background: var(--bg-hover); text-decoration: none; }
+.cta { padding: 8px 16px; border-radius: 999px; background: var(--brand); color: var(--on-brand, #fff); font-size: 15px; font-weight: 700; }
+.cta:hover { background: var(--brand-hover); text-decoration: none; }
+
+.hero { position: relative; display: flex; flex-direction: column; align-items: center; gap: 36px; padding: 72px 24px 48px; text-align: center; }
+.glow { position: absolute; inset: -20% 0 auto; height: 520px; background: radial-gradient(50% 55% at 50% 0%, rgba(128, 0, 255, 0.28), transparent 70%); pointer-events: none; }
+.h1 { margin: 0 0 14px; font-size: clamp(34px, 6vw, 58px); line-height: 1.05; font-weight: 800; letter-spacing: -0.03em; color: var(--text-strong); max-width: 16ch; margin-inline: auto; }
+.lede { margin: 0 auto 26px; max-width: 54ch; font-size: clamp(16px, 2vw, 19px); line-height: 1.55; color: var(--text-subtle); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }
+.big { padding: 14px 26px; border-radius: 999px; background: var(--brand); color: var(--on-brand, #fff); font-size: 16px; font-weight: 700; box-shadow: 0 8px 24px rgba(128, 0, 255, 0.28); transition: transform var(--transition), box-shadow var(--transition); }
+.big:hover { background: var(--brand-hover); text-decoration: none; transform: translateY(-1px); box-shadow: 0 12px 30px rgba(128, 0, 255, 0.34); }
+.bigQuiet { padding: 14px 26px; border-radius: 999px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-strong); font-size: 16px; font-weight: 700; transition: transform var(--transition), background var(--transition); }
+.bigQuiet:hover { background: var(--bg-hover); text-decoration: none; transform: translateY(-1px); }
+.fine { margin: 18px 0 0; font-size: 13px; color: var(--text-muted); }
+.heroShot { width: min(1040px, 100%); }
+
+.points { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; width: min(1100px, 100%); margin: 0 auto; padding: 48px 24px 24px; }
+.point { height: 100%; padding: 22px; border-radius: var(--radius-md); background: var(--bg-surface); border: 1px solid var(--border-subtle); }
+.pointIcon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-bottom: 14px; border-radius: 12px; background: color-mix(in srgb, var(--brand) 18%, transparent); color: var(--brand); }
+.pointTitle { margin: 0 0 6px; font-size: 17px; font-weight: 700; color: var(--text-strong); }
+.pointBody { margin: 0; font-size: 15px; line-height: 1.55; color: var(--text-subtle); }
+
+.strip { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); align-items: center; gap: 40px; width: min(1100px, 100%); margin: 0 auto; padding: 40px 24px; }
+.strip[data-flip] > :first-child { order: 2; }
+.h2 { margin: 0 0 12px; font-size: clamp(24px, 3.2vw, 34px); line-height: 1.15; font-weight: 800; letter-spacing: -0.02em; color: var(--text-strong); }
+.body { margin: 0; font-size: 16px; line-height: 1.6; color: var(--text-subtle); }
+
+.shot { margin: 0; border-radius: var(--radius-md); overflow: hidden; background: var(--bg-raised); border: 1px solid var(--border); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35); }
+.shot img { display: block; width: 100%; height: auto; }
+.chrome { display: flex; align-items: center; gap: 6px; padding: 9px 12px; background: var(--bg-active); border-bottom: 1px solid var(--border-subtle); }
+.chrome i { width: 9px; height: 9px; border-radius: 50%; background: var(--border-strong); }
+
+.compare { width: min(760px, 100%); margin: 0 auto; padding: 40px 24px; text-align: center; }
+.table { width: 100%; margin-top: 20px; border-collapse: collapse; font-size: 15px; }
+.table th { padding: 10px 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-subtle); }
+.table td { padding: 12px; border-top: 1px solid var(--border-subtle); color: var(--text-subtle); }
+.table td:first-child { text-align: start; color: var(--text); }
+.table td[data-yes] { color: var(--positive); font-weight: 700; font-size: 18px; }
+.table td:not([data-yes]):not(:first-child) { color: var(--danger); font-size: 18px; }
+.table td:not(:first-child) { width: 96px; color: var(--text-muted); }
+
+.end { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 72px 24px; text-align: center; }
+.endMark { color: var(--text-strong); flex: none; }
+
+.foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 20px max(16px, env(safe-area-inset-left)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right)); border-top: 1px solid var(--border-subtle); font-size: 14px; color: var(--text-muted); }
+.footLinks { display: flex; gap: 16px; }
+.footLinks a { color: var(--text-subtle); }
+
+/* shown by default; the hook hides only what it can see is off screen */
+.reveal { opacity: 1; transform: none; transition: opacity 620ms cubic-bezier(0.2, 0.7, 0.3, 1), transform 620ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+.reveal:not([data-seen]) { opacity: 0; transform: translateY(18px); }
+
+@media (max-width: 860px) {
+  .strip { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 40px 20px; text-align: center; }
+  .strip[data-flip] > :first-child { order: 0; }
+  .hero { padding: 48px 20px 32px; }
+  .points { padding: 32px 20px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .big:hover, .bigQuiet:hover { transform: none; }
+}

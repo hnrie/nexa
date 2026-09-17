@@ -12,6 +12,7 @@ import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, saveL
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { storage } from "@/lib/storage";
 
+import { t } from "@/i18n";
 /** "offline": a token is stored, but the server or this device's key store could not be reached. */
 export type AuthStatus = "idle" | "loading" | "offline" | "anonymous" | "locked" | "pinlocked" | "ready";
 
@@ -71,7 +72,7 @@ async function saveSettingsNow(): Promise<boolean> {
   return useSettings.getState().flush();
 }
 
-const SAVE_FAILED = "Could not save that to your account. Check your connection and try again.";
+const saveFailed = () => t("auth.couldNotSaveThatToYour");
 
 /**
  * Run on sign-out before the state is cleared. The gateway session registers
@@ -142,7 +143,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
         set({ status: "anonymous", error: err.message });
         return;
       }
-      set({ status: "offline", error: err instanceof ApiError || err instanceof TypeError ? "Could not reach the server." : "Could not open the keys saved on this device." });
+      set({ status: "offline", error: err instanceof ApiError || err instanceof TypeError ? t("offline.couldNotReachTheServer") : t("auth.couldNotOpenTheKeysSaved") });
     }
   },
 
@@ -186,7 +187,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   completeMfa: async ({ code, backupCode }) => {
     const pending = pendingMfa;
-    if (!pending) throw new Error("Start again from your password.");
+    if (!pending) throw new Error(t("auth.startAgainFromYourPassword"));
     const body = backupCode ? { backup_code: backupCode } : { code: (code ?? "").replace(/\s/g, "") };
     const res = await authApi.loginMfa(pending.ticket, body);
     const privateKey = await unwrapPrivateKey(b64.dec(res.enc_private_key), pending.encKey);
@@ -215,7 +216,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       // This device has not seen the account's passcode yet: check it against
       // the policy, then wrap this device's copy of the key with it.
       const policy = pendingPolicy ?? useSettings.getState().settings.appLock;
-      if (!policy || !current) throw new Error("This device has no passcode.");
+      if (!policy || !current) throw new Error(t("appLock.thisDeviceHasNoPasscode"));
       await adoptPolicy(me.id, current, passcode, policy);
       pendingPolicy = null;
       await keystore.forgetIdentity(me.id);
@@ -245,7 +246,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   setPasscode: async (passcode, opts) => {
     const { me, identity } = get();
-    if (!me || !identity) throw new Error("Unlock your keys first.");
+    if (!me || !identity) throw new Error(t("auth.unlockYourKeysFirst"));
     const previousLock = loadLock(me.id);
     const previousPolicy = useSettings.getState().settings.appLock;
     const cfg = await enableLock(me.id, identity, passcode, opts);
@@ -269,7 +270,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     }
     useSettings.getState().patch({ appLock: previousPolicy });
     get().bumpLock();
-    throw new Error(SAVE_FAILED);
+    throw new Error(saveFailed());
   },
 
   removePasscode: async () => {
@@ -289,7 +290,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     }
     useSettings.getState().patch({ appLock: previousPolicy });
     get().bumpLock();
-    throw new Error(SAVE_FAILED);
+    throw new Error(saveFailed());
   },
 
   bumpLock: () => set((s) => ({ lockVersion: s.lockVersion + 1 })),

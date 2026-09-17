@@ -29,6 +29,7 @@ import { MeshTransport, type SignalPayload } from "./mesh";
 import { SfuTransport } from "./sfu";
 import type { TransportEvents, VoiceTransport } from "./transport";
 
+import { t as tr_ } from "@/i18n";
 interface Session {
   channelId: string;
   transport: VoiceTransport;
@@ -330,15 +331,15 @@ export async function joinVoice(channelId: string): Promise<void> {
     store.setError(message);
     useUI.getState().toast(message, "error");
   };
-  if (!ice) return refuse("Could not reach the server to start the call. Check your connection and try again.");
+  if (!ice) return refuse(tr_("session.couldNotReachTheServerTo"));
   if (ice.sfu) {
-    if (!FrameCrypto.supported()) return refuse("This browser cannot make encrypted calls. Update it to join.");
+    if (!FrameCrypto.supported()) return refuse(tr_("session.thisBrowserCannotMakeEncryptedCalls"));
     // the call's frames are sealed with the conversation's key, which has to be on this device first;
     // a guest brought the call's key in its link instead
     if (!hasGuestKeys(channelId)) {
       const key = await useKeys.getState().ensureConvKey(convForChannel(channelId)).catch(() => null);
       if (seq !== joinSeq) return;
-      if (!key) return refuse(asGuest() ? "This link is missing the call's key. Ask for the whole link again." : "This conversation's keys have not reached this device yet. Try again in a moment.");
+      if (!key) return refuse(asGuest() ? tr_("session.thisLinkIsMissingTheCall") : tr_("guestLink.thisConversationSKeysHaveNot"));
     }
   }
   // the session the transport's events belong to; set just below, before anything can fire
@@ -376,7 +377,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   try {
     mic = await getMic(useSettings.getState().settings.voice);
   } catch {
-    if (session === s) useUI.getState().toast("Microphone access was denied. You can listen, but nobody can hear you.", "error");
+    if (session === s) useUI.getState().toast(tr_("session.microphoneAccessWasDeniedYouCan"), "error");
   }
   if (session !== s || seq !== joinSeq) {
     // left while asking for the mic: leaving already closed the transport, but
@@ -389,7 +390,7 @@ export async function joinVoice(channelId: string): Promise<void> {
     s.mic = withInputGain(s, mic);
     if (lastInputChoice() === "missing") {
       // Better to say so than to carry a microphone nobody is talking into.
-      useUI.getState().toast("The microphone you picked is not available, so this call is using the system default.", "error");
+      useUI.getState().toast(tr_("session.theMicrophoneYouPickedIsNot"), "error");
     }
     const track = s.mic.getAudioTracks()[0] ?? null;
     transport.setLocalAudio(track);
@@ -526,7 +527,7 @@ export async function refreshMic(): Promise<void> {
     startMeter(s);
     applyTransmit();
   } catch {
-    useUI.getState().toast("Could not switch the microphone.", "error");
+    useUI.getState().toast(tr_("session.couldNotSwitchTheMicrophone"), "error");
   }
 }
 
@@ -567,7 +568,7 @@ async function switchCamera(): Promise<void> {
     s.transport.setLocalVideo(null);
     useVoice.getState().setLocalVideo(null);
     sendState(s.channelId);
-    useUI.getState().toast("Could not switch the camera.", "error");
+    useUI.getState().toast(tr_("session.couldNotSwitchTheCamera"), "error");
     return;
   }
   s.camera = stream;
@@ -601,7 +602,7 @@ export async function flipCamera(): Promise<void> {
   } catch {
     facing = cameraFacing;
     stream = await getCamera(cameraFacing).catch(() => null);
-    if (stream && session === s) useUI.getState().toast("This device has no other camera.", "error");
+    if (stream && session === s) useUI.getState().toast(tr_("session.thisDeviceHasNoOtherCamera"), "error");
   }
   s.cameraPending = false;
   if (session !== s) {
@@ -613,7 +614,7 @@ export async function flipCamera(): Promise<void> {
     s.transport.setLocalVideo(null);
     useVoice.getState().setLocalVideo(null);
     sendState(s.channelId);
-    useUI.getState().toast("Could not switch the camera.", "error");
+    useUI.getState().toast(tr_("session.couldNotSwitchTheCamera"), "error");
     return;
   }
   cameraFacing = facing;
@@ -639,7 +640,7 @@ export async function toggleCamera(): Promise<void> {
       stream = await getCamera(cameraFacing, chosenCamera());
     } catch {
       s.cameraPending = false;
-      if (session === s) useUI.getState().toast("Camera access was denied.", "error");
+      if (session === s) useUI.getState().toast(tr_("session.cameraAccessWasDenied"), "error");
       return;
     }
     s.cameraPending = false;
@@ -697,7 +698,7 @@ export async function toggleScreen(quality?: { resolution: ShareResolution; fps:
         // the app record at all; blaming the sound sends people the wrong way.
         const access = await desktopBridge()?.screenAccess?.().catch(() => null);
         if (access && !access.usable) useUI.getState().openModal("screenPermission", { stale: access.stale });
-        else if (soundFailed) useUI.getState().toast("Your screen share could not start with its sound. Try again, or turn Share audio off.", "error");
+        else if (soundFailed) useUI.getState().toast(tr_("session.yourScreenShareCouldNotStart"), "error");
       }
     }
     s.screenPending = false;
@@ -792,7 +793,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
             clearRing(vs.channel_id);
             if (session) {
               void leaveVoice(false);
-              useUI.getState().toast("Your call moved to another device.");
+              useUI.getState().toast(tr_("session.yourCallMovedToAnotherDevice"));
             } else if (store.mine) store.setMine(null);
             return;
           }

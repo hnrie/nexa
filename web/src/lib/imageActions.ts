@@ -1,4 +1,5 @@
-/**
+
+import { t } from "@/i18n";/**
  * Copying a picture to the clipboard and saving it, for the right-click menu
  * on pictures in chats and in the picture viewer.
  */
@@ -83,9 +84,9 @@ async function toPng(src: string): Promise<Blob> {
   canvas.width = Math.max(1, Math.floor(w0 * scale));
   canvas.height = Math.max(1, Math.floor(h0 * scale));
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("The picture could not be copied.");
+  if (!ctx) throw new Error(t("imageActions.thePictureCouldNotBeCopied"));
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("The picture could not be copied."))), "image/png"));
+  return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(t("imageActions.thePictureCouldNotBeCopied")))), "image/png"));
 }
 
 function download(href: string, name: string): void {
@@ -105,7 +106,7 @@ function download(href: string, name: string): void {
  */
 export function copyImage(src: string): Promise<void> {
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
-    return Promise.reject(new Error("This browser can't copy pictures. Save it instead."));
+    return Promise.reject(new Error(t("imageActions.thisBrowserCanTCopyPictures")));
   }
   return navigator.clipboard.write([new ClipboardItem({ "image/png": toPng(src) })]);
 }
@@ -121,7 +122,7 @@ export async function saveImage(src: string, name: string): Promise<void> {
     return;
   }
   const res = await fetch(src);
-  if (!res.ok) throw new Error("The picture could not be loaded.");
+  if (!res.ok) throw new Error(t("imageActions.thePictureCouldNotBeLoaded"));
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   download(url, withExtension(name, blob.type));

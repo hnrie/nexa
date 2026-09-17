@@ -6,7 +6,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { memberName } from "@/lib/names";
 import { memberMenuItems } from "@/components/server/memberMenu";
 import { useAuth } from "@/stores/auth";
-import { activitiesOf, statusOf, usePresence } from "@/stores/presence";
+import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { useChannels } from "@/stores/channels";
 import { isInstanceAdmin, memberColor, permRolesOf, rolesByPosition, useServers } from "@/stores/servers";
@@ -171,16 +171,13 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
                 {name}
                 {st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
               </span>
-              {p?.status_text || p?.status_emoji || activitiesOf(p)[0] ? (
-                // a custom status wins the words; what they are doing still marks the line with its own icon
-                <StatusLine
-                  className={s.sub}
-                  testId="member-activity"
-                  status={p?.status_text || p?.status_emoji ? { text: p.status_text, emoji: p.status_emoji } : null}
-                  activity={activitiesOf(p)[0]}
-                  more={Math.max(0, activitiesOf(p).length - 1)}
-                />
-              ) : null}
+              <StatusLine
+                className={s.sub}
+                testId="member-activity"
+                status={customStatus(p)}
+                activity={activitiesOf(p)[0]}
+                more={Math.max(0, activitiesOf(p).length - 1)}
+              />
             </span>
           </button>
         );

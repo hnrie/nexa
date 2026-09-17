@@ -21,7 +21,7 @@ export function CreateCategoryModal({ onClose, serverId }: { onClose: () => void
       upsert(await serversApi.createChannel(serverId, { type: "category", name: name.trim() }));
       onClose();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create the category.", "error");
+      toast(err instanceof ApiError ? err.message : t("modals.createCategory.couldNotCreateTheCategory"), "error");
     } finally {
       setBusy(false);
     }

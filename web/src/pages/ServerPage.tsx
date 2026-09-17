@@ -88,7 +88,7 @@ export default function ServerPage() {
     if (missing) nav("/channels/@me", { replace: true });
   }, [missing, nav]);
 
-  if (!st) return <FullScreenSpinner text="Opening server…" />;
+  if (!st) return <FullScreenSpinner text={tr_("server.openingServer")} />;
   if (!channelId || (channelId && !channel && firstText)) {
     if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace />;
     if (!channelId) return <NoChannels />;

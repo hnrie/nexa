@@ -20,7 +20,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const me = useAuth((a) => a.me);
   const toast = useUI((u) => u.toast);
   const [mode, setMode] = useState<"create" | "join">("create");
-  const [name, setName] = useState(() => (me ? `${me.display_name || me.username}'s server` : "My server"));
+  const [name, setName] = useState(() => (me ? `${me.display_name || me.username}'s server` : t("modals.createServer.myServer")));
   const [code, setCode] = useState("");
   const [icon, setIcon] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -38,14 +38,14 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
         try {
           useServers.getState().updateServer(await serversApi.uploadIcon(view.id, icon));
         } catch (err) {
-          toast(err instanceof ApiError ? `The server was made, but its icon did not upload: ${err.message}` : "The server was made, but its icon did not upload.", "error");
+          toast(err instanceof ApiError ? `The server was made, but its icon did not upload: ${err.message}` : t("modals.createServer.theServerWasMadeButIts"), "error");
         }
       }
       onClose();
       const general = view.channels.find((c) => c.type === "text");
       nav(general ? `/channels/${view.id}/${general.id}` : `/channels/${view.id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create the server.", "error");
+      toast(err instanceof ApiError ? err.message : t("modals.createServer.couldNotCreateTheServer"), "error");
     } finally {
       setBusy(false);
     }
@@ -55,7 +55,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
     // a pasted link often ends in a space, which would cut the key off the end of the hash
     const c = code.trim();
     const m = /(?:invite\/)?([A-Za-z0-9_-]{4,32})(?:[#?].*)?$/.exec(c);
-    if (!m) return toast("That doesn't look like an invite link or code.", "error");
+    if (!m) return toast(t("modals.createServer.thatDoesnTLookLikeAn"), "error");
     const hash = c.includes("#") ? c.slice(c.indexOf("#")) : "";
     onClose();
     nav(`/invite/${m[1]}${hash}`);
@@ -69,7 +69,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
           <Field label={t("modals.createServer.inviteLink")} required>
             <TextInput value={code} onChange={(e) => setCode(e.target.value)} placeholder={`${window.location.origin}/invite/hTKzmak`} autoFocus onKeyDown={(e) => e.key === "Enter" && join()} />
           </Field>
-          <p className={s.fine}>Invites look like {window.location.origin}/invite/hTKzmak or just the code.</p>
+          <p className={s.fine}>{t("modals.createServer.invitesLookLike", { example: `${window.location.origin}/invite/hTKzmak` })}</p>
         </div>
       </Modal>
     );

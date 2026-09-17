@@ -4,6 +4,7 @@
  */
 import type { Member, Overwrite, Role } from "@/api/types";
 
+import { t } from "@/i18n";
 export const P = {
   CREATE_INSTANT_INVITE: 1n << 0n,
   KICK_MEMBERS: 1n << 1n,
@@ -45,61 +46,63 @@ export const DEFAULT_EVERYONE: bigint =
 export const TIMED_OUT_KEEP: bigint = P.VIEW_CHANNEL | P.READ_MESSAGE_HISTORY;
 
 /** Permissions shown in the role and channel editors, grouped as Discord groups them. */
-export const PERM_GROUPS: { group: string; items: { name: PermName; label: string; description: string; channel?: ("text" | "voice")[] }[] }[] = [
+export function permGroups(): { group: string; items: { name: PermName; label: string; description: string; channel?: ("text" | "voice")[] }[] }[] {
+  return [
   {
-    group: "General Server Permissions",
+    group: t("perms.generalServerPermissions"),
     items: [
-      { name: "VIEW_CHANNEL", label: "View Channels", description: "Allows members to view channels by default (excluding private channels).", channel: ["text", "voice"] },
-      { name: "MANAGE_CHANNELS", label: "Manage Channels", description: "Allows members to create, edit, or delete channels.", channel: ["text", "voice"] },
-      { name: "MANAGE_ROLES", label: "Manage Roles", description: "Allows members to create new roles and edit or delete roles lower than their highest role. Also allows editing channel permissions.", channel: ["text", "voice"] },
-      { name: "MANAGE_EMOJIS", label: "Manage Expressions", description: "Allows members to add or remove custom emoji, stickers and sounds in this server." },
-      { name: "VIEW_AUDIT_LOG", label: "View Audit Log", description: "Allows members to view a record of who made which changes in this server." },
-      { name: "MANAGE_SERVER", label: "Manage Server", description: "Allows members to change this server's name, icon, description and invites." },
+      { name: "VIEW_CHANNEL", label: t("perms.viewChannels"), description: t("perms.allowsMembersToViewChannelsBy"), channel: ["text", "voice"] },
+      { name: "MANAGE_CHANNELS", label: t("perms.manageChannels"), description: t("perms.allowsMembersToCreateEditOr"), channel: ["text", "voice"] },
+      { name: "MANAGE_ROLES", label: t("perms.manageRoles"), description: t("perms.allowsMembersToCreateNewRoles"), channel: ["text", "voice"] },
+      { name: "MANAGE_EMOJIS", label: t("perms.manageExpressions"), description: t("perms.allowsMembersToAddOrRemove") },
+      { name: "VIEW_AUDIT_LOG", label: t("perms.viewAuditLog"), description: t("perms.allowsMembersToViewARecord") },
+      { name: "MANAGE_SERVER", label: t("perms.manageServer"), description: t("perms.allowsMembersToChangeThisServer") },
     ],
   },
   {
-    group: "Membership Permissions",
+    group: t("perms.membershipPermissions"),
     items: [
-      { name: "CREATE_INSTANT_INVITE", label: "Create Invite", description: "Allows members to invite new people to this server.", channel: ["text", "voice"] },
-      { name: "CHANGE_NICKNAME", label: "Change Nickname", description: "Allows members to change their own nickname." },
-      { name: "MANAGE_NICKNAMES", label: "Manage Nicknames", description: "Allows members to change the nicknames of other members." },
-      { name: "KICK_MEMBERS", label: "Kick Members", description: "Allows members to remove other members from this server. Kicked members can rejoin with an invite." },
-      { name: "BAN_MEMBERS", label: "Ban Members", description: "Allows members to permanently ban other members from this server." },
-      { name: "MODERATE_MEMBERS", label: "Time out Members", description: "Members with this permission can time out other members: they cannot send messages, react, or speak in voice until the timeout ends." },
+      { name: "CREATE_INSTANT_INVITE", label: t("server.invites.createInvite"), description: t("perms.allowsMembersToInviteNewPeople"), channel: ["text", "voice"] },
+      { name: "CHANGE_NICKNAME", label: t("perms.changeNickname"), description: t("perms.allowsMembersToChangeTheirOwn") },
+      { name: "MANAGE_NICKNAMES", label: t("perms.manageNicknames"), description: t("perms.allowsMembersToChangeTheNicknames") },
+      { name: "KICK_MEMBERS", label: t("perms.kickMembers"), description: t("perms.allowsMembersToRemoveOtherMembers") },
+      { name: "BAN_MEMBERS", label: t("perms.banMembers"), description: t("perms.allowsMembersToPermanentlyBanOther") },
+      { name: "MODERATE_MEMBERS", label: t("perms.timeOutMembers"), description: t("perms.membersWithThisPermissionCanTime") },
     ],
   },
   {
-    group: "Text Channel Permissions",
+    group: t("perms.textChannelPermissions"),
     items: [
-      { name: "SEND_MESSAGES", label: "Send Messages", description: "Allows members to send messages in text channels.", channel: ["text"] },
-      { name: "EMBED_LINKS", label: "Embed Links", description: "Allows links that members share to show embedded content.", channel: ["text"] },
-      { name: "ATTACH_FILES", label: "Attach Files", description: "Allows members to upload files or media.", channel: ["text"] },
-      { name: "ADD_REACTIONS", label: "Add Reactions", description: "Allows members to add new emoji reactions to a message.", channel: ["text"] },
-      { name: "MENTION_EVERYONE", label: "Mention @everyone and All Roles", description: "Allows members to use @everyone and any role mention, notifying everyone.", channel: ["text"] },
-      { name: "MANAGE_MESSAGES", label: "Manage Messages", description: "Allows members to delete messages by other members or pin any message.", channel: ["text"] },
-      { name: "READ_MESSAGE_HISTORY", label: "Read Message History", description: "Allows members to read previous messages sent in channels.", channel: ["text"] },
-      { name: "CREATE_POLLS", label: "Create Polls", description: "Allows members to create polls.", channel: ["text"] },
+      { name: "SEND_MESSAGES", label: t("perms.sendMessages"), description: t("perms.allowsMembersToSendMessagesIn"), channel: ["text"] },
+      { name: "EMBED_LINKS", label: t("perms.embedLinks"), description: t("perms.allowsLinksThatMembersShareTo"), channel: ["text"] },
+      { name: "ATTACH_FILES", label: t("perms.attachFiles"), description: t("perms.allowsMembersToUploadFilesOr"), channel: ["text"] },
+      { name: "ADD_REACTIONS", label: t("perms.addReactions"), description: t("perms.allowsMembersToAddNewEmoji"), channel: ["text"] },
+      { name: "MENTION_EVERYONE", label: t("perms.mentionEveryoneAndAllRoles"), description: t("perms.allowsMembersToUseEveryoneAnd"), channel: ["text"] },
+      { name: "MANAGE_MESSAGES", label: t("perms.manageMessages"), description: t("perms.allowsMembersToDeleteMessagesBy"), channel: ["text"] },
+      { name: "READ_MESSAGE_HISTORY", label: t("perms.readMessageHistory"), description: t("perms.allowsMembersToReadPreviousMessages"), channel: ["text"] },
+      { name: "CREATE_POLLS", label: t("perms.createPolls"), description: t("perms.allowsMembersToCreatePolls"), channel: ["text"] },
     ],
   },
   {
-    group: "Voice Channel Permissions",
+    group: t("perms.voiceChannelPermissions"),
     items: [
-      { name: "CONNECT", label: "Connect", description: "Allows members to join voice channels and hear others.", channel: ["voice"] },
-      { name: "SPEAK", label: "Speak", description: "Allows members to talk in voice channels.", channel: ["voice"] },
-      { name: "STREAM", label: "Video", description: "Allows members to share their video, screen share, or stream a game in this server.", channel: ["voice"] },
-      { name: "USE_SOUNDBOARD", label: "Use Soundboard", description: "Allows members to send sounds from the soundboard.", channel: ["voice"] },
-      { name: "USE_VAD", label: "Use Voice Activity", description: "Allows members to speak in voice channels by simply talking. When disabled, members must use Push-to-talk.", channel: ["voice"] },
-      { name: "PRIORITY_SPEAKER", label: "Priority Speaker", description: "Allows members to be more easily heard in voice channels; other people's volume is lowered while they speak.", channel: ["voice"] },
-      { name: "MUTE_MEMBERS", label: "Mute Members", description: "Allows members to mute other members in voice channels for everyone.", channel: ["voice"] },
-      { name: "DEAFEN_MEMBERS", label: "Deafen Members", description: "Allows members to deafen other members in voice channels.", channel: ["voice"] },
-      { name: "MOVE_MEMBERS", label: "Move Members", description: "Allows members to move other members between voice channels.", channel: ["voice"] },
+      { name: "CONNECT", label: t("perms.connect"), description: t("perms.allowsMembersToJoinVoiceChannels"), channel: ["voice"] },
+      { name: "SPEAK", label: t("perms.speak"), description: t("perms.allowsMembersToTalkInVoice"), channel: ["voice"] },
+      { name: "STREAM", label: t("perms.video"), description: t("perms.allowsMembersToShareTheirVideo"), channel: ["voice"] },
+      { name: "USE_SOUNDBOARD", label: t("perms.useSoundboard"), description: t("perms.allowsMembersToSendSoundsFrom"), channel: ["voice"] },
+      { name: "USE_VAD", label: t("perms.useVoiceActivity"), description: t("perms.allowsMembersToSpeakInVoice"), channel: ["voice"] },
+      { name: "PRIORITY_SPEAKER", label: t("perms.prioritySpeaker"), description: t("perms.allowsMembersToBeMoreEasily"), channel: ["voice"] },
+      { name: "MUTE_MEMBERS", label: t("perms.muteMembers"), description: t("perms.allowsMembersToMuteOtherMembers"), channel: ["voice"] },
+      { name: "DEAFEN_MEMBERS", label: t("perms.deafenMembers"), description: t("perms.allowsMembersToDeafenOtherMembers"), channel: ["voice"] },
+      { name: "MOVE_MEMBERS", label: t("perms.moveMembers"), description: t("perms.allowsMembersToMoveOtherMembers"), channel: ["voice"] },
     ],
   },
   {
-    group: "Advanced Permissions",
-    items: [{ name: "ADMINISTRATOR", label: "Administrator", description: "Members with this permission have every permission and bypass channel-specific permissions. This is a dangerous permission to grant." }],
+    group: t("perms.advancedPermissions"),
+    items: [{ name: "ADMINISTRATOR", label: t("perms.administrator"), description: t("perms.membersWithThisPermissionHaveEvery") }],
   },
 ];
+}
 
 export function parsePerm(s: string | bigint | number | null | undefined): bigint {
   if (typeof s === "bigint") return s;

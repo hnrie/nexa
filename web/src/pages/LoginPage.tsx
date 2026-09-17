@@ -39,7 +39,7 @@ export default function LoginPage() {
     // fetch rejects with a TypeError when the request never got an answer
     // ("Failed to fetch", "Load failed"), which says nothing about the password.
     if (err instanceof TypeError || (typeof navigator !== "undefined" && !navigator.onLine)) {
-      return "Can't reach the server. Check your connection and try again.";
+      return t("login.canTReachTheServerCheck");
     }
     return fallback;
   };
@@ -58,7 +58,7 @@ export default function LoginPage() {
       }
       go();
     } catch (err) {
-      setError(describe(err, "Could not decrypt your keys with that password."));
+      setError(describe(err, t("login.couldNotDecryptYourKeysWith")));
     } finally {
       setBusy(false);
     }
@@ -80,7 +80,7 @@ export default function LoginPage() {
         setPassword("");
         setError(err.message);
       } else {
-        setError(describe(err, "That code did not work."));
+        setError(describe(err, t("login.thatCodeDidNotWork")));
       }
     } finally {
       setBusy(false);
@@ -100,12 +100,12 @@ export default function LoginPage() {
     return (
       <AuthLayout
         title={t("login.oneMoreStep")}
-        subtitle={useBackup ? "Enter one of the backup codes you saved." : "Enter the six-digit code from your authenticator app."}
+        subtitle={useBackup ? t("login.enterOneOfTheBackupCodes") : t("login.enterTheSixDigitCodeFrom")}
         width={420}
       >
         <form className={s.form} onSubmit={(e) => void onCode(e)}>
           {error ? <div className={s.error} role="alert">{error}</div> : null}
-          <Field label={useBackup ? "Backup code" : "Authentication code"} required>
+          <Field label={useBackup ? t("login.backupCode") : t("login.authenticationCode")} required>
             <TextInput
               ref={codeInput}
               value={code}
@@ -121,7 +121,7 @@ export default function LoginPage() {
           </Field>
           <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">{t("login.signIn")}</Button>
           <Button type="button" variant="link" onClick={() => { setUseBackup((v) => !v); setCode(""); setError(null); }}>
-            {useBackup ? "Use your authenticator instead" : `Use a backup code${codesLeft ? ` (${codesLeft} left)` : ""}`}
+            {useBackup ? t("login.useYourAuthenticatorInstead") : `Use a backup code${codesLeft ? ` (${codesLeft} left)` : ""}`}
           </Button>
           <Button type="button" variant="link" onClick={backToPassword}>{t("modals.createServer.back")}</Button>
         </form>

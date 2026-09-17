@@ -11,6 +11,7 @@
 
 import { ApiError, api } from "@/api/client";
 
+import { t } from "@/i18n";
 const SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
 interface Turnstile {
@@ -64,11 +65,11 @@ function loadTurnstile(): Promise<Turnstile> {
     const script = document.createElement("script");
     script.src = SCRIPT;
     script.async = true;
-    script.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(captchaError("captcha_unavailable", "The captcha could not start.")));
+    script.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(captchaError("captcha_unavailable", t("captcha.theCaptchaCouldNotStart"))));
     script.onerror = () => {
       loading = null;
       script.remove();
-      reject(captchaError("captcha_unavailable", "The captcha could not load. Check your connection and try again."));
+      reject(captchaError("captcha_unavailable", t("captcha.theCaptchaCouldNotLoadCheck")));
     };
     document.head.appendChild(script);
   });
@@ -92,7 +93,7 @@ export async function captchaToken(action: string): Promise<string | null> {
     sheet.className = "captcha-sheet";
     const title = document.createElement("div");
     title.className = "captcha-title";
-    title.textContent = "One quick check";
+    title.textContent = t("captcha.oneQuickCheck");
     const slot = document.createElement("div");
     const cancel = document.createElement("button");
     cancel.type = "button";
@@ -115,7 +116,7 @@ export async function captchaToken(action: string): Promise<string | null> {
       overlay.remove();
       then();
     };
-    cancel.onclick = () => finish(() => reject(captchaError("captcha_cancelled", "The captcha was cancelled.")));
+    cancel.onclick = () => finish(() => reject(captchaError("captcha_cancelled", t("captcha.theCaptchaWasCancelled"))));
     try {
       id = turnstile.render(slot, {
         sitekey: key,
@@ -123,13 +124,13 @@ export async function captchaToken(action: string): Promise<string | null> {
         // stays out of sight unless a click is needed
         appearance: "interaction-only",
         callback: (token: string) => finish(() => resolve(token)),
-        "error-callback": () => finish(() => reject(captchaError("captcha_failed", "The captcha check failed. Please try again."))),
-        "timeout-callback": () => finish(() => reject(captchaError("captcha_failed", "The captcha timed out. Please try again."))),
+        "error-callback": () => finish(() => reject(captchaError("captcha_failed", t("captcha.theCaptchaCheckFailedPleaseTry")))),
+        "timeout-callback": () => finish(() => reject(captchaError("captcha_failed", t("captcha.theCaptchaTimedOutPleaseTry")))),
         "before-interactive-callback": () => overlay.classList.add("captcha-shown"),
         "after-interactive-callback": () => overlay.classList.remove("captcha-shown"),
       });
     } catch {
-      finish(() => reject(captchaError("captcha_unavailable", "The captcha could not start.")));
+      finish(() => reject(captchaError("captcha_unavailable", t("captcha.theCaptchaCouldNotStart"))));
     }
   });
 }

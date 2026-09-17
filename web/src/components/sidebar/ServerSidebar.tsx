@@ -103,7 +103,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     try {
       upsert(await serversApi.setChannelPositions(serverId, list));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not reorder channels.", "error");
+      toast(err instanceof ApiError ? err.message : t("sidebar.serverSidebar.couldNotReorderChannels"), "error");
       try {
         upsert(await serversApi.channels(serverId));
       } catch {
@@ -196,12 +196,12 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         </button>
         <span className={s.actions}>
           {canI(st, P.CREATE_INSTANT_INVITE, ch.id) ? (
-            <Tooltip text="Create Invite" side="top">
+            <Tooltip text={t("server.invites.createInvite")} side="top">
               <button className={s.action} aria-label={t("server.invites.createInvite")} onClick={() => openModal("invite", { serverId, channelId: ch.id })}><UserPlus size={16} /></button>
             </Tooltip>
           ) : null}
           {canI(st, P.MANAGE_CHANNELS, ch.id) ? (
-            <Tooltip text="Edit Channel" side="top">
+            <Tooltip text={t("sidebar.serverSidebar.editChannel")} side="top">
               <button className={s.action} aria-label={t("sidebar.serverSidebar.editChannel")} onClick={() => openModal("channelSettings", { channelId: ch.id })}><Settings size={16} /></button>
             </Tooltip>
           ) : null}
@@ -241,7 +241,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
                   <span className={s.catName}>{category.name}</span>
                 </button>
                 {canManage ? (
-                  <Tooltip text="Create Channel" side="top">
+                  <Tooltip text={t("modals.createChannel.createChannel")} side="top">
                     <button className={s.catAdd} aria-label={t("modals.createChannel.createChannel")} onClick={() => openModal("createChannel", { serverId, parentId: category.id })}><Plus size={16} /></button>
                   </Tooltip>
                 ) : null}

@@ -7,6 +7,7 @@ import OfflinePage from "@/pages/OfflinePage";
 import PasscodePage from "@/pages/PasscodePage";
 import { useAuth } from "@/stores/auth";
 
+import { t } from "@/i18n";
 /** Gates the app behind a logged-in, unlocked session and keeps the gateway connected. */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const status = useAuth((a) => a.status);
@@ -24,7 +25,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     if (status === "anonymous" || status === "pinlocked") stopSession();
   }, [status]);
 
-  if (status === "idle" || status === "loading") return <FullScreenSpinner text="Connecting…" />;
+  if (status === "idle" || status === "loading") return <FullScreenSpinner text={t("shell.requireAuth.connecting")} />;
   if (status === "anonymous") return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
   if (status === "offline") return <OfflinePage />;
   if (status === "pinlocked") return <PasscodePage />;

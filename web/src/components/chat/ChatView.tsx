@@ -9,7 +9,7 @@ import { Tooltip } from "@/components/common/Tooltip";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
-import { activityLine } from "@/lib/activity";
+import { StatusLine } from "@/components/activity/StatusLine";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { conversationOf, useChannels } from "@/stores/channels";
@@ -181,7 +181,7 @@ export function ChatView({ channel }: { channel: Channel }) {
           cs || act ? (
             <span className={[s.hSub, s.hStatus].join(" ")} data-testid="dm-status">
               <StatusDot status={otherStatus} size={10} />
-              <span className={s.hStatusText}>{cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : ""}</span>
+              <StatusLine className={s.hStatusText} status={cs} activity={act} more={Math.max(0, activitiesOf(presence[other!]).length - 1)} />
             </span>
           ) : (
             <span className={s.hSub} data-status={otherStatus} data-testid="dm-status">{statusLabel(otherStatus)}</span>
@@ -193,22 +193,22 @@ export function ChatView({ channel }: { channel: Channel }) {
         )}
         <span className={s.hSpacer} />
         {!isServer && !mobile ? (
-          <Tooltip text="Subchats" side="bottom">
+          <Tooltip text={tr_("chat.chat.subchats")} side="bottom">
             <button className={s.hBtn} data-on={subchats} aria-label={tr_("chat.chat.subchats")} onClick={() => setSubchats((v) => !v)} data-testid="subchats-button" data-pop-toggle="subchats"><MessageCircle size={22} /></button>
           </Tooltip>
         ) : null}
         {!isServer ? (
           <>
-            <Tooltip text="Start Voice Call" side="bottom">
+            <Tooltip text={tr_("chat.chat.startVoiceCall")} side="bottom">
               <button className={s.hBtn} aria-label={tr_("chat.chat.startVoiceCall")} onClick={() => void startCall(false)} data-testid="start-call"><Phone size={22} /></button>
             </Tooltip>
-            <Tooltip text="Start Video Call" side="bottom">
+            <Tooltip text={tr_("chat.chat.startVideoCall")} side="bottom">
               <button className={s.hBtn} aria-label={tr_("chat.chat.startVideoCall")} onClick={() => void startCall(true)}><Video size={22} /></button>
             </Tooltip>
           </>
         ) : null}
         {mobile ? (
-          <Tooltip text="Search" side="bottom">
+          <Tooltip text={tr_("chat.chat.search")} side="bottom">
             <button className={s.hBtn} data-on={searchOpen} aria-label={tr_("chat.chat.searchMessages")} onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
           </Tooltip>
         ) : (
@@ -237,27 +237,27 @@ export function ChatView({ channel }: { channel: Channel }) {
           </label>
         )}
         {!mobile ? (
-          <Tooltip text="Pinned Messages" side="bottom">
+          <Tooltip text={tr_("chat.chat.pinnedMessages")} side="bottom">
             <button className={s.hBtn} data-on={pins} aria-label={tr_("chat.chat.pinnedMessages")} onClick={() => setPins((v) => !v)} data-pop-toggle="pins"><Pin size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && isServer ? (
-          <Tooltip text="Invite People" side="bottom">
+          <Tooltip text={tr_("chat.chat.invitePeople")} side="bottom">
             <button className={s.hBtn} aria-label={tr_("chat.chat.invitePeople")} onClick={() => openModal("invite", { serverId, channelId: channel.id })}><UserPlus size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && !isServer ? (
-          <Tooltip text={convo.type === "dm" ? "Add Friends to DM" : "Invite to Group"} side="bottom">
+          <Tooltip text={convo.type === "dm" ? tr_("chat.chat.addFriendsToDm") : tr_("chat.chat.inviteToGroup")} side="bottom">
             <button className={s.hBtn} aria-label={tr_("chat.chat.addFriends")} onClick={() => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id })}><UserPlus size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && channel.type === "dm" && other ? (
-          <Tooltip text={profileOpen ? "Hide User Profile" : "Show User Profile"} side="bottom">
-            <button className={s.hBtn} data-on={profileOpen} aria-label={profileOpen ? "Hide User Profile" : "Show User Profile"} aria-pressed={profileOpen} onClick={toggleProfile} data-testid="toggle-profile"><UserRound size={22} /></button>
+          <Tooltip text={profileOpen ? tr_("chat.chat.hideUserProfile") : tr_("chat.chat.showUserProfile")} side="bottom">
+            <button className={s.hBtn} data-on={profileOpen} aria-label={profileOpen ? tr_("chat.chat.hideUserProfile") : tr_("chat.chat.showUserProfile")} aria-pressed={profileOpen} onClick={toggleProfile} data-testid="toggle-profile"><UserRound size={22} /></button>
           </Tooltip>
         ) : null}
         {!mobile && (convo.type === "group_dm" || isServer) ? (
-          <Tooltip text="Member List" side="bottom">
+          <Tooltip text={tr_("chat.chat.memberList")} side="bottom">
             <button className={s.hBtn} data-on={membersOpen} aria-label={tr_("chat.chat.memberList")} onClick={toggleMembers}><Users size={22} /></button>
           </Tooltip>
         ) : null}
@@ -269,15 +269,15 @@ export function ChatView({ channel }: { channel: Channel }) {
             onClick={(e) => {
               const r = e.currentTarget.getBoundingClientRect();
               const items: ContextMenuItem[] = [
-                { id: "pins", label: "Pinned Messages", onSelect: () => setPins(true) },
+                { id: "pins", label: tr_("chat.chat.pinnedMessages"), onSelect: () => setPins(true) },
                 // server channels have no subchats
-                ...(!isServer ? [{ id: "subchats", label: "Subchats", onSelect: () => setSubchats(true) }] : []),
+                ...(!isServer ? [{ id: "subchats", label: tr_("chat.chat.subchats"), onSelect: () => setSubchats(true) }] : []),
               ];
-              if (isServer) items.push({ id: "invite", label: "Invite People", onSelect: () => openModal("invite", { serverId, channelId: channel.id }) });
-              else items.push({ id: "add", label: convo.type === "dm" ? "Add Friends to DM" : "Invite to Group", onSelect: () => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id }) });
-              if (isServer || convo.type === "group_dm") items.push({ id: "members", label: membersOpen ? "Hide Members" : "Show Members", onSelect: toggleMembers });
+              if (isServer) items.push({ id: "invite", label: tr_("chat.chat.invitePeople"), onSelect: () => openModal("invite", { serverId, channelId: channel.id }) });
+              else items.push({ id: "add", label: convo.type === "dm" ? tr_("chat.chat.addFriendsToDm") : tr_("chat.chat.inviteToGroup"), onSelect: () => openModal(convo.type === "group_dm" ? "groupInvite" : "createDM", convo.type === "dm" ? { initial: other ? [other] : [] } : { channelId: convo.id }) });
+              if (isServer || convo.type === "group_dm") items.push({ id: "members", label: membersOpen ? tr_("chat.chat.hideMembers") : tr_("chat.chat.showMembers"), onSelect: toggleMembers });
               // a phone's call bar has no room for it, so inviting guests to the call is here too
-              if (!isServer && inThisCall && (convo.type === "dm" || convo.type === "group_dm")) items.push({ id: "guests", label: "Invite Guests to Call", onSelect: () => openModal("guestLink", { channelId: convo.id }) });
+              if (!isServer && inThisCall && (convo.type === "dm" || convo.type === "group_dm")) items.push({ id: "guests", label: tr_("chat.chat.inviteGuestsToCall"), onSelect: () => openModal("guestLink", { channelId: convo.id }) });
               openContextMenu({ x: Math.max(8, r.right - 200), y: r.bottom + 4, items });
             }}
           >

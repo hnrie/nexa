@@ -7,6 +7,7 @@ import { AudioKeeper, isHomeScreenApp } from "@/lib/audioKeeper";
 import type { ShareFps, ShareResolution, VoiceSettings } from "@/stores/settings";
 import { shareVideoConstraints } from "./shareQuality";
 
+import { t } from "@/i18n";
 /** Why the microphone that opened is the one that opened. */
 export type InputChoice = "default" | "chosen" | "matched-by-name" | "missing";
 
@@ -298,7 +299,7 @@ function choiceWords(c: InputChoice): string {
     case "matched-by-name":
       return "found again by name after its id changed";
     case "missing":
-      return "NOT AVAILABLE — this is the system default instead";
+      return t("media.notAvailableThisIsTheSystem");
     default:
       return "system default";
   }

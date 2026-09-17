@@ -2,6 +2,7 @@ import { useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
 import { defaultDeviceLabel, listDevices, realDevices as real } from "@/voice/media";
 
+import { t } from "@/i18n";
 type OpenModal = (kind: string, props?: Record<string, unknown>) => void;
 
 /** Whether this browser can send call audio to a chosen speaker. */
@@ -25,7 +26,7 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
   const store = useSettings.getState();
   const v = store.settings.voice;
   const set = (patch: Partial<typeof v>) => store.patch({ voice: { ...useSettings.getState().settings.voice, ...patch } });
-  const items: ContextMenuItem[] = [{ id: "input-heading", label: "Input Device", heading: true }];
+  const items: ContextMenuItem[] = [{ id: "input-heading", label: t("voice.deviceMenus.inputDevice"), heading: true }];
   items.push({ id: "input-default", label: defaultDeviceLabel(devices.inputs), checked: !v.inputDeviceId, onSelect: () => set({ inputDeviceId: null, inputDeviceLabel: null }) });
   real(devices.inputs).forEach((d, i) => {
     items.push({ id: `input-${d.deviceId}`, label: nameOf(d, i, "Microphone"), checked: v.inputDeviceId === d.deviceId, onSelect: () => set({ inputDeviceId: d.deviceId, inputDeviceLabel: d.label || null }) });
@@ -33,7 +34,7 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
   const outputs = real(devices.outputs);
   if (canPickOutput() && outputs.length > 0) {
     items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "output-heading", label: "Output Device", heading: true });
+    items.push({ id: "output-heading", label: t("voice.deviceMenus.outputDevice"), heading: true });
     items.push({ id: "output-default", label: defaultDeviceLabel(devices.outputs), checked: !v.outputDeviceId, onSelect: () => set({ outputDeviceId: null, outputDeviceLabel: null }) });
     outputs.forEach((d, i) => {
       items.push({ id: `output-${d.deviceId}`, label: nameOf(d, i, "Speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => set({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) });
@@ -41,7 +42,7 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
   }
   if (opts.settings === false) return items;
   items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "voice-settings", label: "Voice Settings", onSelect: () => openModal("settings", { page: "voice" }) });
+  items.push({ id: "voice-settings", label: t("voice.deviceMenus.voiceSettings"), onSelect: () => openModal("settings", { page: "voice" }) });
   return items;
 }
 
@@ -52,9 +53,9 @@ export async function cameraMenuItems(openModal: OpenModal, opts: { settings?: b
   const v = store.settings.voice;
   const set = (patch: Partial<typeof v>) => store.patch({ voice: { ...useSettings.getState().settings.voice, ...patch } });
   const cameras = real(devices.cameras);
-  const items: ContextMenuItem[] = [{ id: "camera-heading", label: "Camera", heading: true }];
+  const items: ContextMenuItem[] = [{ id: "camera-heading", label: t("settings.voice.camera"), heading: true }];
   if (cameras.length === 0) {
-    items.push({ id: "camera-none", label: "No camera found", disabled: true });
+    items.push({ id: "camera-none", label: t("voice.deviceMenus.noCameraFound"), disabled: true });
   } else {
     items.push({ id: "camera-default", label: defaultDeviceLabel(devices.cameras), checked: !v.cameraDeviceId, onSelect: () => set({ cameraDeviceId: null, cameraDeviceLabel: null }) });
     cameras.forEach((d, i) => {
@@ -63,6 +64,6 @@ export async function cameraMenuItems(openModal: OpenModal, opts: { settings?: b
   }
   if (opts.settings === false) return items;
   items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "video-settings", label: "Video Settings", onSelect: () => openModal("settings", { page: "voice" }) });
+  items.push({ id: "video-settings", label: t("voice.deviceMenus.videoSettings"), onSelect: () => openModal("settings", { page: "voice" }) });
   return items;
 }

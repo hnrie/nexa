@@ -55,14 +55,14 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
   }, [tab, q]);
 
   const create = async () => {
-    const name = await promptText(kind === "emoji" ? "Create Emoji Pack" : "Create Sticker Pack", { label: "Pack name", initial: kind === "emoji" ? "My emoji" : "My stickers", maxLength: 60 }, "Create");
+    const name = await promptText(kind === "emoji" ? "Create Emoji Pack" : "Create Sticker Pack", { label: tr_("server.packEditor.packName"), initial: kind === "emoji" ? "My emoji" : "My stickers", maxLength: 60 }, "Create");
     if (!name?.trim()) return;
     try {
       const pack = await expressionsApi.createPack({ name: name.trim(), kind });
       upsertPack(pack);
       setSelected(pack.id);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create the pack.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("server.serverStickers.couldNotCreateThePack"), "error");
     }
   };
   const install = async (p: StickerPack) => {
@@ -71,7 +71,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
       upsertPack(await expressionsApi.install(p.id));
       setFound((cur) => cur?.map((x) => (x.id === p.id ? { ...x, installed: true } : x)) ?? null);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not install the pack.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("modals.stickerPack.couldNotInstallThePack"), "error");
     } finally {
       setBusy(null);
     }

@@ -1,5 +1,5 @@
 /**
- * nexa for the desktop: one window on the live site, a tray icon, the
+ * Nexa for the desktop: one window on the live site, a tray icon, the
  * Rich Presence server, and updates.
  */
 import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
@@ -56,6 +56,15 @@ function fromApp(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
 }
 
 async function start(): Promise<void> {
+  // the panel behind "About Nexa" on macOS, which is otherwise the bare name
+  app.setAboutPanelOptions({
+    applicationName: "Nexa",
+    applicationVersion: app.getVersion(),
+    version: "",
+    copyright: "Copyright © 2026 Evilion",
+    credits: "End to end encrypted chat, voice and servers.",
+    iconPath: resourcePath("icon.png"),
+  });
   lockPermissions();
   // opened at login: Windows passes the argument given below, macOS says so itself
   const launchedHidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin === true);
@@ -232,7 +241,7 @@ function linuxAutostart(on: boolean): void {
     // an AppImage is started through its own file, not the mount it unpacks to
     const exec = (process.env.APPIMAGE || process.execPath).replace(/(["\\`$])/g, "\\$1");
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=nexa\nExec="${exec}" --hidden\nX-GNOME-Autostart-enabled=true\nTerminal=false\n`);
+    fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=Nexa\nExec="${exec}" --hidden\nX-GNOME-Autostart-enabled=true\nTerminal=false\n`);
   } catch (err) {
     log("autostart", { err: String(err) });
   }

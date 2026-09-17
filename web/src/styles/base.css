@@ -21,7 +21,7 @@ a:hover { text-decoration: underline; }
 img, video { max-width: 100%; display: block; }
 code, pre, kbd { font-family: var(--font-mono); }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--radius-xs); }
-::selection { background: rgba(88, 101, 242, 0.45); }
+::selection { background: rgba(128, 0, 255, 0.45); }
 
 /* Thin overlay scrollbars everywhere, Discord-style. */
 * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }

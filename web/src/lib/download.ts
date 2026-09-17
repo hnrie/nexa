@@ -14,6 +14,7 @@ import { decryptFile, encryptedSize } from "@/crypto/file";
 import { DecryptError } from "@/crypto/keys";
 import type { AttachmentMeta } from "@/crypto/message";
 
+import { t } from "@/i18n";
 /** Above this, a download streams through the service worker when it can. */
 export const STREAM_ABOVE = 64 * 1024 * 1024;
 
@@ -141,7 +142,7 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
           return;
         case "error":
           end();
-          reject(new Error(msg.message || "The download failed."));
+          reject(new Error(msg.message || t("download.theDownloadFailed")));
           return;
       }
     };
@@ -184,7 +185,7 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
   try {
     plain = await decryptFile(cipher, b64.dec(att.key), decrypted);
   } catch (err) {
-    if (err instanceof DecryptError) throw new Error("This file could not be decrypted.");
+    if (err instanceof DecryptError) throw new Error(t("download.thisFileCouldNotBeDecrypted"));
     throw err;
   }
   const url = URL.createObjectURL(new Blob([plain], { type: att.type || "application/octet-stream" }));
@@ -203,7 +204,7 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
 export async function saveAttachment(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
   if (att.size > STREAM_ABOVE) {
     if ((await streamThroughWorker(att, onProgress)) === "done") return;
-    if (att.size > IN_PAGE_MAX) throw new Error("This file is too large to save from this tab right now. Reload the page and try again.");
+    if (att.size > IN_PAGE_MAX) throw new Error(t("download.thisFileIsTooLargeTo"));
   }
   await saveInPage(att, onProgress);
 }

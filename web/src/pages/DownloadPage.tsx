@@ -11,16 +11,21 @@ import { useUI } from "@/stores/ui";
 import s from "./DownloadPage.module.css";
 
 import { t } from "@/i18n";
-const LABEL: Record<string, string> = {
-  "windows:installer": "Windows",
-  "mac:installer": "macOS",
-  "linux:appimage": "Linux (AppImage)",
-  "linux:deb": "Linux (.deb, Debian and Ubuntu)",
-};
-const ARCH: Record<DesktopFile["arch"], Record<DesktopFile["os"], string>> = {
-  x64: { windows: "64-bit", mac: "Intel", linux: "x86-64" },
-  arm64: { windows: "ARM", mac: "Apple Silicon (M1 and later)", linux: "ARM64" },
-};
+/** The name each build goes by, per render so it follows the language. */
+function labels(): Record<string, string> {
+  return {
+    "windows:installer": "Windows",
+    "mac:installer": "macOS",
+    "linux:appimage": t("download.linuxAppImage"),
+    "linux:deb": t("download.linuxDeb"),
+  };
+}
+function arches(): Record<DesktopFile["arch"], Record<DesktopFile["os"], string>> {
+  return {
+    x64: { windows: t("download.arch64Bit"), mac: "Intel", linux: "x86-64" },
+    arm64: { windows: "ARM", mac: t("download.appleSiliconM1"), linux: "ARM64" },
+  };
+}
 const ORDER: DesktopFile["os"][] = ["windows", "mac", "linux"];
 
 function icon(os: DesktopFile["os"]) {
@@ -37,7 +42,7 @@ export default function DownloadPage() {
   const toast = useUI((u) => u.toast);
 
   useEffect(() => {
-    document.title = "Download nexa";
+    document.title = t("download.downloadNexa");
     void currentPlatform().then(setTarget);
     desktop.latest().then(setRel, () => setFailed(true));
     android.latest().then(setApk, () => setApk(null));
@@ -47,21 +52,21 @@ export default function DownloadPage() {
   // a Mac that would not say which chip it has gets the other one offered too
   const otherMac = rel && mine && target.os === "mac" && target.arch === null ? rel.files.find((f) => f.os === "mac" && f.kind === "installer" && f.arch !== mine.arch) : undefined;
   const shown = rel ? rel.files.filter((f) => f.kind !== "zip").sort((a, b) => ORDER.indexOf(a.os) - ORDER.indexOf(b.os) || a.kind.localeCompare(b.kind) || a.arch.localeCompare(b.arch)) : [];
-  const copyHash = (f: DesktopFile) => void navigator.clipboard?.writeText(f.sha256).then(() => toast("SHA-256 copied.", "success"));
+  const copyHash = (f: DesktopFile) => void navigator.clipboard?.writeText(f.sha256).then(() => toast(t("download.sha256Copied"), "success"));
 
   return (
     <div className={s.page}>
       <div className={s.card}>
         <div className={s.head}>
           <img className={s.logo} src="/icons/icon-192.png" alt="" />
-          <h1 className={s.title}>{onAndroid ? "nexa for Android" : "nexa for your computer"}</h1>
-          <p className={s.sub}>{onAndroid ? "Calls, notifications and a real app." : "RPC support and a better experience."}</p>
+          <h1 className={s.title}>{onAndroid ? "Nexa for Android" : "Nexa for your computer"}</h1>
+          <p className={s.sub}>{onAndroid ? t("download.callsNotificationsAndARealApp") : t("download.rpcSupportAndABetterExperience")}</p>
         </div>
 
         {/* Nothing published for Android right now: say so rather than leave a page with no download on it. */}
         {onAndroid && apk === null ? (
           <div className={s.empty} data-testid="android-paused">
-            The Android app is being worked on and is not available to download at the moment. It will be back here when it is ready; until then, nexa runs in this browser.
+            The Android app is being worked on and is not available to download at the moment. It will be back here when it is ready; until then, Nexa runs in this browser.
           </div>
         ) : null}
 
@@ -90,12 +95,12 @@ export default function DownloadPage() {
             {mine ? (
               <div className={s.primary}>
                 <a className={s.bigButton} href={desktop.fileUrl(mine.name)} data-testid="download-primary">
-                  <Download size={20} /> Download for {LABEL[`${mine.os}:${mine.kind}`]?.split(" (")[0] ?? mine.os}
+                  <Download size={20} /> {t("download.downloadFor", { what: labels()[`${mine.os}:${mine.kind}`]?.split(" (")[0] ?? mine.os })}
                 </a>
-                <span className={s.meta}>Version {rel.version} · {ARCH[mine.arch][mine.os]} · {formatBytes(mine.size)}</span>
+                <span className={s.meta}>{t("download.versionLine", { version: rel.version })} · {arches()[mine.arch][mine.os]} · {formatBytes(mine.size)}</span>
                 {otherMac ? (
                   <span className={s.meta}>
-                    {otherMac.arch === "x64" ? "On a Mac with an Intel processor? " : "On a Mac with Apple Silicon? "}
+                    {otherMac.arch === "x64" ? `${t("download.onIntelMac")} ` : `${t("download.onAppleSilicon")} `}
                     <a href={desktop.fileUrl(otherMac.name)} data-testid="download-other-mac">{t("download.downloadThatVersion")}</a>
                   </span>
                 ) : null}
@@ -109,13 +114,13 @@ export default function DownloadPage() {
                   <div key={f.name} className={s.file} data-mine={mine?.name === f.name} data-testid="download-file">
                     <span className={s.fileIcon}>{icon(f.os)}</span>
                     <span className={s.fileText}>
-                      <span className={s.fileName}>{LABEL[`${f.os}:${f.kind}`] ?? f.name} · {ARCH[f.arch][f.os]}</span>
+                      <span className={s.fileName}>{labels()[`${f.os}:${f.kind}`] ?? f.name} · {arches()[f.arch][f.os]}</span>
                       <span className={s.fileSub}>
                         {formatBytes(f.size)} · <span className={s.hash} title={t("download.copySha256")} onClick={() => copyHash(f)}>SHA-256 {f.sha256.slice(0, 16)}…</span>
                       </span>
                     </span>
                     <Button size="sm" variant={mine?.name === f.name ? "primary" : "secondary"} onClick={() => { location.href = desktop.fileUrl(f.name); }}>
-                      <Download size={16} /> Download
+                      <Download size={16} /> {t("chat.attachments.download")}
                     </Button>
                   </div>
                 ))}
@@ -129,9 +134,9 @@ export default function DownloadPage() {
                   <div className={s.file} data-mine={onAndroid} data-testid="download-file">
                     <span className={s.fileIcon}><Smartphone size={22} /></span>
                     <span className={s.fileText}>
-                      <span className={s.fileName}>Android · {apk.abis?.includes("arm64-v8a") ? "every phone" : (apk.abis ?? []).join(", ")}</span>
+                      <span className={s.fileName}>Android · {apk.abis?.includes("arm64-v8a") ? t("download.everyPhone") : (apk.abis ?? []).join(", ")}</span>
                       <span className={s.fileSub}>
-                        {formatBytes(apk.size)} · Android {androidVersionName(apk.min_sdk)}+ · <span className={s.hash} title={t("download.copySha256")} onClick={() => void navigator.clipboard?.writeText(apk.sha256).then(() => toast("SHA-256 copied.", "success"))}>SHA-256 {apk.sha256.slice(0, 16)}…</span>
+                        {formatBytes(apk.size)} · {t("download.androidMin", { version: androidVersionName(apk.min_sdk) })} · <span className={s.hash} title={t("download.copySha256")} onClick={() => void navigator.clipboard?.writeText(apk.sha256).then(() => toast(t("download.sha256Copied"), "success"))}>SHA-256 {apk.sha256.slice(0, 16)}…</span>
                       </span>
                     </span>
                     <Button size="sm" variant={onAndroid ? "primary" : "secondary"} onClick={() => { location.href = android.fileUrl(apk.name); }}>
@@ -146,7 +151,7 @@ export default function DownloadPage() {
               <h2 className={s.label}>{t("download.theFirstTimeYouOpenIt")}</h2>
               <ul className={s.notes}>
                 <li><b>{t("download.windows")}</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>{t("download.moreInfo")}</b>, then <b>{t("download.runAnyway")}</b>.</li>
-                <li><b>macOS</b>: open the disk image and drag nexa into Applications. The first time, right-click the app and choose <b>{t("chat.lockedChannel.open")}</b>.</li>
+                <li><b>macOS</b>: open the disk image and drag Nexa into Applications. The first time, right-click the app and choose <b>{t("chat.lockedChannel.open")}</b>.</li>
                 <li><b>{t("download.linux")}</b>: make the AppImage executable (<code>{t("download.chmodX")}</code>{t("download.andRunItItUpdatesItself")}</li>
                 {apk ? <li><b>{t("download.android")}</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>{t("settings.stickers.install")}</b>.</li> : null}
               </ul>

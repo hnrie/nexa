@@ -11,6 +11,7 @@ import { useUI } from "@/stores/ui";
 import { displayName } from "@/stores/users";
 import s from "./StickerPackModal.module.css";
 
+import { t } from "@/i18n";
 /**
  * A public sticker pack, opened from one of its stickers in a message: every
  * sticker in it, the picked one's name and who made it, and a button to
@@ -36,7 +37,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
       useExpressions.getState().upsertPack(await expressions.install(pack.id));
       useUI.getState().toast(`${pack.name} is installed. Its stickers are in your picker.`, "success");
     } catch (err) {
-      useUI.getState().toast(err instanceof ApiError ? err.message : "Could not install the pack.", "error");
+      useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.stickerPack.couldNotInstallThePack"), "error");
     } finally {
       setBusy(false);
     }

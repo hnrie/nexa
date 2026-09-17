@@ -4,6 +4,7 @@ import { avatarColor, initials } from "@/lib/avatarColor";
 import type { StatusKind } from "@/stores/presence";
 import s from "./Avatar.module.css";
 
+import { t } from "@/i18n";
 interface Props {
   id: string;
   avatarId: string | null;
@@ -66,7 +67,7 @@ export function statusLabel(st: StatusKind): string {
     case "idle":
       return "Idle";
     case "dnd":
-      return "Do Not Disturb";
+      return t("shell.user.doNotDisturb");
     case "invisible":
       return "Invisible";
     default:

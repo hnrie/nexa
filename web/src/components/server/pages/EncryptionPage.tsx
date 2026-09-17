@@ -36,10 +36,10 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
     setBusy(conv);
     try {
       await rotate(conv, "manual");
-      toast("A new key was created and shared with everyone entitled to it.", "success");
+      toast(t("server.encryption.aNewKeyWasCreatedAnd"), "success");
       await load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not rotate the key.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.encryption.couldNotRotateTheKey"), "error");
     } finally {
       setBusy(null);
     }
@@ -48,7 +48,7 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
     setBusy("reconcile");
     try {
       await reconcile();
-      toast("Checked everyone's keys.", "success");
+      toast(t("server.encryption.checkedEveryoneSKeys"), "success");
     } finally {
       setBusy(null);
     }
@@ -79,7 +79,7 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
               <span className={s.keySub}>
                 {latest ? `Key epoch ${latest.epoch} · created ${formatFull(latest.created_at)} by ${displayName(users[latest.created_by])}${latest.reason ? ` (${latest.reason})` : ""}` : "No key yet: one is created with the first message."}
                 {" · "}
-                {holdLatest ? "You hold the current key." : held ? "You hold an older key; waiting for the current one." : "You don't hold this key yet."}
+                {holdLatest ? t("server.encryption.youHoldTheCurrentKey") : held ? t("server.encryption.youHoldAnOlderKeyWaiting") : t("server.encryption.youDonTHoldThisKey")}
               </span>
             </div>
             <Button size="sm" variant="secondary" disabled={!holdLatest || busy === c.conv_id} loading={busy === c.conv_id} onClick={() => void doRotate(c.conv_id)} title={holdLatest ? "Create a fresh key and share it with everyone entitled" : "Only holders of the current key can rotate it"}>

@@ -14,16 +14,16 @@ export function createTray(actions: TrayActions): Tray {
   const image = nativeImage.createFromPath(resourcePath(process.platform === "darwin" ? "trayTemplate.png" : "tray.png"));
   if (process.platform === "darwin") image.setTemplateImage(true);
   const tray = new Tray(image);
-  tray.setToolTip("nexa");
+  tray.setToolTip("Nexa");
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "Open nexa", click: actions.show },
+      { label: "Open Nexa", click: actions.show },
       { type: "separator" },
       { label: "Mute", click: actions.mute },
       { label: "Deafen", click: actions.deafen },
       { type: "separator" },
       { label: "Check for Updates", click: actions.checkUpdates },
-      { label: "Quit nexa", click: actions.quit },
+      { label: "Quit Nexa", click: actions.quit },
     ]),
   );
   // Windows and Linux open the window on a click; macOS keeps the click for the menu

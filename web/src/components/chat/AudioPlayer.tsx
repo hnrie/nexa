@@ -169,14 +169,14 @@ export function AudioPlayer({ src, name, size, duration: hinted }: Props) {
       <div className={s.side}>
         <span className={s.time}>{clock(time)} / {clock(duration)}</span>
         <div className={s.tools}>
-          <Tooltip text="Playback speed" side="top">
+          <Tooltip text={tr_("chat.audioPlayer.playbackSpeed")} side="top">
             <button className={s.speed} onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1)} aria-label={tr_("chat.audioPlayer.playbackSpeed")}>{speed}×</button>
           </Tooltip>
           <Tooltip text={muted ? "Unmute" : "Mute"} side="top">
             <button className={s.ctl} onClick={() => setMuted((v) => !v)} aria-label={muted ? "Unmute" : "Mute"}>{muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}</button>
           </Tooltip>
           <input className={s.volume} type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} aria-label={tr_("chat.audioPlayer.volume")} onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} />
-          <Tooltip text="Download" side="top">
+          <Tooltip text={tr_("chat.attachments.download")} side="top">
             <a className={s.ctl} href={src} download={name} aria-label={`Download ${name}`}><Download size={16} /></a>
           </Tooltip>
         </div>

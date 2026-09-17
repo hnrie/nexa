@@ -6,13 +6,16 @@ import { LANGUAGES } from "@/i18n";
 import s from "./Settings.module.css";
 
 import { t as tr_ } from "@/i18n";
-const THEMES: { id: Theme; name: string; colors: string[] }[] = [
-  { id: "dark", name: "Dark", colors: ["#2c2d32", "#323339", "#393a41"] },
-  { id: "light", name: "Light", colors: ["#f3f3f4", "#ffffff", "#ebeced"] },
-  { id: "ash", name: "Ash", colors: ["#1a1a1e", "#232428", "#27272c"] },
-  { id: "onyx", name: "Onyx", colors: ["#000000", "#000000", "#131416"] },
-  { id: "system", name: "Sync with system", colors: ["#2c2d32", "#f3f3f4", "#8000ff"] },
-];
+/** The themes, named per render so the names follow the language. */
+function themes(): { id: Theme; name: string; colors: string[] }[] {
+  return [
+    { id: "dark", name: tr_("settings.appearance.themeDark"), colors: ["#2c2d32", "#323339", "#393a41"] },
+    { id: "light", name: tr_("settings.appearance.themeLight"), colors: ["#f3f3f4", "#ffffff", "#ebeced"] },
+    { id: "ash", name: tr_("settings.appearance.themeAsh"), colors: ["#1a1a1e", "#232428", "#27272c"] },
+    { id: "onyx", name: tr_("settings.appearance.themeOnyx"), colors: ["#000000", "#000000", "#131416"] },
+    { id: "system", name: tr_("settings.appearance.themeSystem"), colors: ["#2c2d32", "#f3f3f4", "#8000ff"] },
+  ];
+}
 const ACCENTS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#3498db", "#e91e63"];
 
 export default function AppearancePage() {
@@ -55,7 +58,7 @@ export default function AppearancePage() {
       </div>
       <h3 className={s.h5}>{tr_("settings.appearance.theme")}</h3>
       <div className={s.themes}>
-        {THEMES.map((t) => (
+        {themes().map((t) => (
           <button key={t.id} className={s.themeCard} data-on={st.theme === t.id} onClick={() => patch({ theme: t.id })}>
             <div className={s.themeSwatch}>{t.colors.map((c, i) => <i key={i} style={{ background: c }} />)}</div>
             <div className={s.themeName}>{t.name}</div>
@@ -75,8 +78,8 @@ export default function AppearancePage() {
         <label key={m} className={s.radio} data-on={st.messageDisplay === m}>
           <input type="radio" name="display" checked={st.messageDisplay === m} onChange={() => patch({ messageDisplay: m })} />
           <span className={s.radioText}>
-            <span className={s.radioLabel}>{m === "cozy" ? "Cozy" : "Compact"}</span>
-            <span className={s.radioDesc}>{m === "cozy" ? "Modern, beautiful, and easy on your eyes." : "Fit more messages on screen at one time. #IRC"}</span>
+            <span className={s.radioLabel}>{m === "cozy" ? tr_("settings.appearance.cozy") : tr_("settings.appearance.compact")}</span>
+            <span className={s.radioDesc}>{m === "cozy" ? tr_("settings.appearance.cozyDesc") : tr_("settings.appearance.compactDesc")}</span>
           </span>
         </label>
       ))}

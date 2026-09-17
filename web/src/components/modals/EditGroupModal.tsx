@@ -45,7 +45,7 @@ export function EditGroupModal({ channelId, onClose }: { channelId: string; onCl
       useChannels.getState().upsert(next);
       onClose();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save the group.", "error");
+      toast(err instanceof ApiError ? err.message : t("modals.editGroup.couldNotSaveTheGroup"), "error");
     } finally {
       setBusy(false);
     }
@@ -82,7 +82,7 @@ export function EditGroupModal({ channelId, onClose }: { channelId: string; onCl
             disabled={!owner}
             testId="group-icon"
           />
-          <p className={s.hint}>{owner ? "Pick a picture for the group. It is cropped round, the way a profile picture is." : "Only the group's owner can change its icon."}</p>
+          <p className={s.hint}>{owner ? t("modals.editGroup.pickAPictureForTheGroup") : t("modals.editGroup.onlyTheGroupSOwnerCan")}</p>
         </div>
         <Field label={t("modals.editGroup.groupName")}>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder={channelDisplayName({ ...ch, name: "" }, users, meId)} data-testid="group-name" onKeyDown={(e) => e.key === "Enter" && dirty && void save()} />

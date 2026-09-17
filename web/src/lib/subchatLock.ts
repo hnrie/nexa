@@ -12,6 +12,7 @@ import { deriveAuthKey, deriveMaster, DEFAULT_KDF, type KdfParams } from "@/cryp
 import { api } from "@/api/client";
 import type { Snowflake } from "@/api/types";
 
+import { t } from "@/i18n";
 export const MIN_SUBCHAT_PASSWORD = 4;
 
 /** The fields a create or edit request carries when a password is set. */
@@ -23,7 +24,7 @@ export interface LockFields {
 
 export function passwordProblem(pw: string): string | null {
   if (pw.length < MIN_SUBCHAT_PASSWORD) return `Use at least ${MIN_SUBCHAT_PASSWORD} characters.`;
-  if (pw.length > 128) return "That is too long.";
+  if (pw.length > 128) return t("appLock.thatIsTooLong");
   return null;
 }
 

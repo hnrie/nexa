@@ -1,7 +1,7 @@
 /**
  * Updates on macOS without an Apple Developer ID. The system updater
  * (Squirrel.Mac) only installs signed updates, so this one downloads the new
- * zip from nexa, checks it against the manifest's sha512, unpacks it
+ * zip from Nexa, checks it against the manifest's sha512, unpacks it
  * in a temporary folder and, on restart, swaps it for the running app and
  * opens the new one. If the app cannot be replaced where it is (read-only, or run from
  * the disk image), it says so and points to the download page instead.
@@ -122,7 +122,7 @@ export function installMacUpdate(update: MacUpdate): void {
   const backup = `${update.staged}.previous`;
   // the update's folder in the temporary directory, which holds the unpacked app
   const work = path.dirname(path.dirname(update.staged));
-  // a release that renames the app (Evilion Chat -> nexa) lands under its new
+  // a release that renames the app (nexa -> Nexa, Evilion Chat -> Nexa) lands under its
   // name; the swap itself still goes through the old path, so a failure puts
   // the old app back exactly where it was.
   const renamed = path.join(path.dirname(bundle), path.basename(update.staged));
@@ -132,7 +132,9 @@ while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
 if mv "$1" "$3"; then
   if mv "$2" "$1"; then
     xattr -dr com.apple.quarantine "$1" 2>/dev/null
-    if [ "$6" != "$1" ] && [ ! -e "$6" ] && mv "$1" "$6"; then
+    # a rename that only changes case (nexa.app -> Nexa.app) looks like a
+    # collision on a case-insensitive disk, so it goes through a temporary name
+    if [ "$6" != "$1" ] && { [ ! -e "$6" ] || [ "$1" -ef "$6" ]; } && mv "$1" "$1.rename" && mv "$1.rename" "$6"; then
       set -- "$6" "$2" "$3" "$4" "$5" "$6"
     fi
   else

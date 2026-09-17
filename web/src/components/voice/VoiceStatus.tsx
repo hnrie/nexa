@@ -44,11 +44,11 @@ export function VoiceStatus() {
       <div className={s.statusRow}>
         <div className={s.statusText}>
           <span className={s.statusHead} data-level={level} data-connecting={!mine}>
-            <Signal size={14} /> {mine ? "Voice Connected" : "Connecting…"}
+            <Signal size={14} /> {mine ? t("voice.voiceStatus.voiceConnected") : "Connecting…"}
           </span>
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>
-        <Tooltip text="Disconnect" side="top">
+        <Tooltip text={t("voice.voiceStatus.disconnect")} side="top">
           <button className={s.statusBtn} aria-label={t("voice.voiceStatus.disconnect")} onClick={() => void leaveVoice()} data-testid="voice-status-leave"><HangUp size={18} /></button>
         </Tooltip>
       </div>
@@ -65,7 +65,7 @@ export function VoiceStatus() {
             void cameraMenuItems(openModal).then((items) => useUI.getState().openContextMenu({ ...at, above: true, items }));
           }}
         >
-          <Video size={16} /> {localVideo ? "Camera on" : "Camera"}
+          <Video size={16} /> {localVideo ? t("voice.voiceStatus.cameraOn") : "Camera"}
         </button>
         {/* phone browsers cannot share a screen, so the camera gets the row */}
         {canShareScreen ? <button className={s.statusWide} data-on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} disabled={!mine}><MonitorUp size={16} /> {localScreen ? "Sharing" : "Share"}</button> : null}

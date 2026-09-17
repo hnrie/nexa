@@ -44,7 +44,7 @@ export function SelectionBar({ channelId }: { channelId: string }) {
     openModal("confirm", {
       title: count === 1 ? "Delete Message" : `Delete ${count} Messages`,
       body: count === 1 ? "Are you sure you want to delete this message?" : `Are you sure you want to delete these ${count} messages? This cannot be undone.`,
-      confirmLabel: "Delete",
+      confirmLabel: tr_("chat.messageItem.delete"),
       danger: true,
       onConfirm: async () => {
         await deleteMessagesNow(channelId, ids);

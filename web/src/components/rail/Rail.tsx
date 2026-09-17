@@ -121,8 +121,8 @@ export function Rail() {
     <nav className={s.rail} aria-label={t("rail.rail.servers")} ref={railRef} onDragEnd={() => { setDragId(null); setOver(null); }}>
       <div className={s.item} data-selected={home} data-unread={(unread || friendRequests > 0) && !home} data-testid="home">
         <span className={s.pill} />
-        <Tooltip text="Direct Messages" side="right">
-          <button className={s.btn} aria-label={homeCount > 0 ? `Direct Messages, ${homeLabel(homeCount - friendRequests, friendRequests)}` : "Direct Messages"} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
+        <Tooltip text={t("sidebar.dMSidebar.directMessages")} side="right">
+          <button className={s.btn} aria-label={homeCount > 0 ? `Direct Messages, ${homeLabel(homeCount - friendRequests, friendRequests)}` : t("sidebar.dMSidebar.directMessages")} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
             <NexaMark size={30} />
           </button>
         </Tooltip>
@@ -197,7 +197,7 @@ export function Rail() {
       })}
       <div className={[s.item, s.add].join(" ")}>
         <span className={s.pill} />
-        <Tooltip text="Add a Server" side="right">
+        <Tooltip text={t("rail.rail.addAServer")} side="right">
           <button className={s.btn} aria-label={t("rail.rail.addAServer")} onClick={() => openModal("createServer")}>
             <Plus size={24} />
           </button>

@@ -118,7 +118,7 @@ export default function InvitePage() {
       nav(first ? `/channels/${res.server.id}/${first.id}` : `/channels/${res.server.id}`, { replace: true });
     } catch (err) {
       // the invite itself is still fine, so this sits by the button rather than replacing the card
-      setAcceptError(err instanceof ApiError ? err.message : "Could not accept the invite.");
+      setAcceptError(err instanceof ApiError ? err.message : t("invite.couldNotAcceptTheInvite"));
     } finally {
       setBusy(false);
     }
@@ -146,20 +146,20 @@ export default function InvitePage() {
         ) : null}
         {preview && target ? (
           <>
-            <p className={s.kicker}>{preview.inviter ? `${preview.inviter.display_name || preview.inviter.username} invited you to join` : "You've been invited to join"}</p>
+            <p className={s.kicker}>{preview.inviter ? t("invite.invitedYouToJoin", { name: preview.inviter.display_name || preview.inviter.username }) : t("invite.youveBeenInvited")}</p>
             <div className={s.iconBox}>{icon ? <img src={icon} alt="" /> : initials(target.name)}</div>
             <h1 className={s.title}>{target.name}</h1>
             {preview.server?.description ? <p className={s.sub}>{preview.server.description}</p> : null}
             <div className={s.counts}>
               {preview.server ? <span><i className={s.online} /> {t("invite.onlineCount", { count: preview.server.online_count })}</span> : null}
-              <span><i className={s.offline} /> {target.member_count} {isGroup ? "in this group" : "Members"}</span>
+              <span><i className={s.offline} /> {isGroup ? t("invite.inThisGroupCount", { count: target.member_count }) : t("invite.membersCount", { count: target.member_count })}</span>
             </div>
             {status === "ready" ? (
               member ? (
                 <Button block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>{t("invite.youReAlreadyInOpen")}</Button>
               ) : (
                 <>
-                  <Button block loading={busy} onClick={() => void accept()}>{isGroup ? "Join Group" : "Accept Invite"}</Button>
+                  <Button block loading={busy} onClick={() => void accept()}>{isGroup ? t("invite.joinGroup") : t("invite.acceptInvite")}</Button>
                   {acceptError ? <p className={s.acceptError} role="alert">{acceptError}</p> : null}
                 </>
               )

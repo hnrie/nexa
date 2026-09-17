@@ -1,8 +1,9 @@
 /* The page is the scroller: body hides overflow, so a form taller than a short
    phone screen must scroll here. Auto margins centre it when it fits and let it
    start at the top when it does not. */
-.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(88, 101, 242, 0.18), transparent); overflow-y: auto; overscroll-behavior: contain; }
+.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
 .brand { margin-top: auto; flex-shrink: 0; color: var(--text-strong); display: flex; }
+@media (max-width: 480px) { .brand svg { height: 32px; } }
 .card { margin-bottom: auto; flex-shrink: 0; max-width: 100%; padding: 32px; background: var(--bg-raised); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); display: flex; flex-direction: column; gap: 20px; }
 .title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); text-align: center; }
 .subtitle { margin: -12px 0 0; color: var(--text-muted); text-align: center; font-size: 16px; }

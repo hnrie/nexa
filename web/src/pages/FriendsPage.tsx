@@ -50,10 +50,10 @@ export default function FriendsPage() {
   const pendingCount = Object.values(rels).filter((r) => r.type === "incoming").length;
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "online", label: "Online" },
-    { id: "all", label: "All" },
+    { id: "online", label: tr_("shell.user.online") },
+    { id: "all", label: tr_("friends.all") },
     { id: "pending", label: pendingCount ? `Pending (${pendingCount})` : "Pending" },
-    { id: "blocked", label: "Blocked" },
+    { id: "blocked", label: tr_("friends.blocked") },
   ];
 
   return (
@@ -86,10 +86,10 @@ export default function FriendsPage() {
 
 function Empty({ tab }: { tab: Tab }) {
   const text: Record<Tab, string> = {
-    online: "No one's around to play with Wumpus… I mean, nobody is online right now.",
-    all: "Wumpus is waiting on friends. You don't have to though!",
-    pending: "There are no pending friend requests. Here's Wumpus for now.",
-    blocked: "You can't unblock the Wumpus. But you can unblock people here.",
+    online: tr_("friends.noOneSAroundToPlay"),
+    all: tr_("friends.wumpusIsWaitingOnFriendsYou"),
+    pending: tr_("friends.thereAreNoPendingFriendRequests"),
+    blocked: tr_("friends.youCanTUnblockTheWumpus"),
     add: "",
   };
   return (
@@ -122,7 +122,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       nav(`/channels/@me/${ch.id}`);
       return ch.id;
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not open a conversation.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("profile.profileCard.couldNotOpenAConversation"), "error");
       return null;
     }
   };
@@ -146,7 +146,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         nav(`/channels/@me/${res.channel.id}`);
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not accept.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("profile.profileCard.couldNotAccept"), "error");
     }
   };
   const remove = async (label: string) => {
@@ -156,7 +156,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       removeRel(rel.user.id);
       toast(label, "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not update.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("friends.couldNotUpdate"), "error");
     }
   };
   const more = (e: React.MouseEvent) => {
@@ -165,14 +165,14 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       x: e.clientX,
       y: e.clientY,
       items: [
-        { id: "profile", label: "Profile", onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
-        { id: "msg", label: "Message", onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
-        ...(rel.type === "friend" ? [{ id: "call", label: "Start Voice Call", onSelect: () => void call(), separatorAfter: true }] : []),
-        ...(rel.type === "friend" ? [{ id: "rm", label: "Remove Friend", danger: true, onSelect: () => void remove("Friend removed.") }] : []),
+        { id: "profile", label: tr_("profile.profile.profile"), onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
+        { id: "msg", label: tr_("profile.profileCard.message"), onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
+        ...(rel.type === "friend" ? [{ id: "call", label: tr_("chat.chat.startVoiceCall"), onSelect: () => void call(), separatorAfter: true }] : []),
+        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => void remove("Friend removed.") }] : []),
         ...(rel.type !== "blocked"
-          ? [{ id: "block", label: "Block", danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" })) }]
-          : [{ id: "unblock", label: "Unblock", onSelect: () => void remove("Unblocked.") }]),
-        { id: "copy", label: "Copy User ID", onSelect: () => void navigator.clipboard?.writeText(rel.user.id) },
+          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" })) }]
+          : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
+        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(rel.user.id) },
       ],
     });
   };
@@ -190,19 +190,19 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       <div className={s.actions}>
         {rel.type === "friend" ? (
           <>
-            <Tooltip text="Message"><button className={s.act} aria-label={tr_("profile.profileCard.message")} onClick={() => void message()}><MessageSquare size={20} /></button></Tooltip>
-            <Tooltip text="Start Voice Call"><button className={s.act} aria-label={tr_("chat.chat.startVoiceCall")} onClick={() => void call()} data-testid="friend-call"><Phone size={20} /></button></Tooltip>
-            <Tooltip text="More"><button className={s.act} aria-label={tr_("chat.chat.more")} onClick={more}><MoreVertical size={20} /></button></Tooltip>
+            <Tooltip text={tr_("profile.profileCard.message")}><button className={s.act} aria-label={tr_("profile.profileCard.message")} onClick={() => void message()}><MessageSquare size={20} /></button></Tooltip>
+            <Tooltip text={tr_("chat.chat.startVoiceCall")}><button className={s.act} aria-label={tr_("chat.chat.startVoiceCall")} onClick={() => void call()} data-testid="friend-call"><Phone size={20} /></button></Tooltip>
+            <Tooltip text={tr_("chat.chat.more")}><button className={s.act} aria-label={tr_("chat.chat.more")} onClick={more}><MoreVertical size={20} /></button></Tooltip>
           </>
         ) : rel.type === "incoming" ? (
           <>
-            <Tooltip text="Accept"><button className={[s.act, s.ok].join(" ")} aria-label={tr_("voice.incomingCall.accept")} onClick={() => void accept()}><Check size={20} /></button></Tooltip>
-            <Tooltip text="Ignore"><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.ignore")} onClick={() => void remove("Request ignored.")}><X size={20} /></button></Tooltip>
+            <Tooltip text={tr_("voice.incomingCall.accept")}><button className={[s.act, s.ok].join(" ")} aria-label={tr_("voice.incomingCall.accept")} onClick={() => void accept()}><Check size={20} /></button></Tooltip>
+            <Tooltip text={tr_("friends.ignore")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.ignore")} onClick={() => void remove("Request ignored.")}><X size={20} /></button></Tooltip>
           </>
         ) : rel.type === "outgoing" ? (
-          <Tooltip text="Cancel"><button className={[s.act, s.no].join(" ")} aria-label={tr_("chat.editMessage.cancel")} onClick={() => void remove("Request cancelled.")}><X size={20} /></button></Tooltip>
+          <Tooltip text={tr_("chat.editMessage.cancel")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("chat.editMessage.cancel")} onClick={() => void remove("Request cancelled.")}><X size={20} /></button></Tooltip>
         ) : (
-          <Tooltip text="Unblock"><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove("Unblocked.")}><X size={20} /></button></Tooltip>
+          <Tooltip text={tr_("friends.unblock")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove("Unblocked.")}><X size={20} /></button></Tooltip>
         )}
       </div>
       {meId ? null : null}
@@ -228,13 +228,13 @@ function AddFriend() {
       setValue("");
     } catch (err) {
       const map: Record<string, string> = {
-        user_not_found: "Hm, didn't work. Double check that the username is correct.",
-        self: "You can't add yourself, but we admire the confidence.",
-        blocked: "You can't send a request to this user.",
-        already_friends: "You're already friends with that user!",
-        already_sent: "You already sent a request to that user.",
+        user_not_found: tr_("friends.hmDidnTWorkDoubleCheck"),
+        self: tr_("friends.youCanTAddYourselfBut"),
+        blocked: tr_("friends.youCanTSendARequest"),
+        already_friends: tr_("friends.youReAlreadyFriendsWithThat"),
+        already_sent: tr_("friends.youAlreadySentARequestTo"),
       };
-      setMsg({ ok: false, text: err instanceof ApiError ? (map[err.code] ?? err.message) : "Something went wrong." });
+      setMsg({ ok: false, text: err instanceof ApiError ? (map[err.code] ?? err.message) : tr_("modals.confirm.somethingWentWrong") });
     } finally {
       setBusy(false);
     }

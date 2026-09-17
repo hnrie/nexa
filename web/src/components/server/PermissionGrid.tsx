@@ -1,13 +1,13 @@
 import { Check, Minus, X } from "lucide-react";
 import { Toggle } from "@/components/common/Toggle";
-import { P, PERM_GROUPS, has, type PermName } from "@/lib/perms";
+import { P, permGroups, has, type PermName } from "@/lib/perms";
 import s from "./PermissionGrid.module.css";
 
 import { t } from "@/i18n";
 /** Which permissions a channel of this type exposes; categories show everything channel-scoped. */
 export function permsForChannel(type: "text" | "voice" | "category" | undefined): PermName[] {
   const out: PermName[] = [];
-  for (const g of PERM_GROUPS) {
+  for (const g of permGroups()) {
     for (const it of g.items) {
       if (!it.channel) continue;
       if (!type || type === "category" || it.channel.includes(type)) out.push(it.name);
@@ -21,7 +21,7 @@ export function RoleGrid({ value, onChange, editable, filter }: { value: bigint;
   const q = (filter ?? "").trim().toLowerCase();
   return (
     <div className={s.grid}>
-      {PERM_GROUPS.map((g) => {
+      {permGroups().map((g) => {
         const items = g.items.filter((it) => !q || it.label.toLowerCase().includes(q) || it.description.toLowerCase().includes(q));
         if (items.length === 0) return null;
         return (
@@ -74,7 +74,7 @@ export function OverwriteGrid({
   };
   return (
     <div className={s.grid}>
-      {PERM_GROUPS.map((g) => {
+      {permGroups().map((g) => {
         const items = g.items.filter((it) => names.has(it.name));
         if (items.length === 0) return null;
         return (

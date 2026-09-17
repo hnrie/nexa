@@ -1,4 +1,4 @@
-// Command chatd is the nexa server: REST API, WebSocket gateway, media
+// Command chatd is the Nexa server: REST API, WebSocket gateway, media
 // storage and the built web app, in one process.
 package main
 

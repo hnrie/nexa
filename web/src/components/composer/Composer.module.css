@@ -44,7 +44,6 @@
 .acEmoji { font-size: 22px; width: 28px; text-align: center; }
 .acEmojiImg { width: 22px; height: 22px; margin: 0 3px; object-fit: contain; flex: none; }
 .acSub { margin-inline-start: auto; color: var(--text-muted); font-size: 13px; }
-.drop { position: absolute; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(88, 101, 242, 0.9); color: #fff; font-size: 20px; font-weight: 700; border-radius: var(--radius-sm); pointer-events: none; }
 .hint { position: absolute; inset-inline-start: 16px; bottom: 6px; font-size: 12px; color: var(--text-muted); }
 .sendMobile { display: none; }
 @media (max-width: 767px) { .wrap { padding: 0 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); } .sendMobile { display: flex; } .counter { display: none; } }

@@ -6,11 +6,13 @@ import { useSettings, type NotificationLevel } from "@/stores/settings";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
-const LEVELS: { v: NotificationLevel; label: string; desc: string }[] = [
-  { v: "all", label: "All Messages", desc: "Every message in this server notifies you." },
-  { v: "mentions", label: "Only @mentions", desc: "Only messages that mention you notify you." },
-  { v: "none", label: "Nothing", desc: "No notifications from this server, but unread markers still show." },
+function levels(): { v: NotificationLevel; label: string; desc: string }[] {
+  return [
+  { v: "all", label: t("server.serverOverview.allMessages"), desc: t("modals.serverNotifications.everyMessageInThisServerNotifies") },
+  { v: "mentions", label: t("server.serverOverview.onlyMentions"), desc: t("modals.serverNotifications.onlyMessagesThatMentionYouNotify") },
+  { v: "none", label: t("modals.serverNotifications.nothing"), desc: t("modals.serverNotifications.noNotificationsFromThisServerBut") },
 ];
+}
 
 export function ServerNotificationsModal({ onClose, serverId }: { onClose: () => void; serverId: string }) {
   const st = useServers((x) => x.byId[serverId]);
@@ -27,7 +29,7 @@ export function ServerNotificationsModal({ onClose, serverId }: { onClose: () =>
         <Toggle checked={muted} onChange={setMuted} label={`Mute ${st?.server.name ?? "server"}`} description={t("modals.serverNotifications.mutingAServerPreventsUnreadIndicators")} />
         <div className={s.sep} />
         <div className={s.radioList}>
-          {LEVELS.map((l) => (
+          {levels().map((l) => (
             <label key={l.v} className={s.radio} data-on={level === l.v}>
               <input type="radio" name="level" checked={level === l.v} onChange={() => setLevel(l.v)} />
               <span className={s.typeText}><span className={s.typeLabel}>{l.label}</span><span className={s.typeDesc}>{l.desc}</span></span>

@@ -4,12 +4,15 @@
  */
 import type { ShareFps, ShareResolution } from "@/stores/settings";
 
-export const SHARE_RESOLUTIONS: { value: ShareResolution; label: string; box?: { width: number; height: number } }[] = [
+import { t } from "@/i18n";
+export function shareResolutions(): { value: ShareResolution; label: string; box?: { width: number; height: number } }[] {
+  return [
   { value: "720p", label: "720p", box: { width: 1280, height: 720 } },
   { value: "1080p", label: "1080p", box: { width: 1920, height: 1080 } },
   { value: "1440p", label: "1440p", box: { width: 2560, height: 1440 } },
-  { value: "source", label: "Source" },
+  { value: "source", label: t("shareQuality.source") },
 ];
+}
 
 export const SHARE_FRAME_RATES: ShareFps[] = [15, 30, 60];
 
@@ -18,7 +21,7 @@ export const SHARE_FRAME_RATES: ShareFps[] = [15, 30, 60];
  * window keeps its shape inside it) at no more than the chosen frame rate.
  */
 export function shareVideoConstraints(res: ShareResolution, fps: ShareFps): MediaTrackConstraints {
-  const box = SHARE_RESOLUTIONS.find((r) => r.value === res)?.box;
+  const box = shareResolutions().find((r) => r.value === res)?.box;
   const c: MediaTrackConstraints = {};
   if (box) {
     c.width = { max: box.width };

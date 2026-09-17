@@ -1,7 +1,7 @@
 // Package rpcapps looks up the public face of a Discord Rich Presence
 // application: the name and icon its activity shows under, and the art assets
 // its images name. chatd asks Discord once per application and keeps the
-// answer, so nobody using nexa contacts Discord for it themselves.
+// answer, so nobody using Nexa contacts Discord for it themselves.
 package rpcapps
 
 import (

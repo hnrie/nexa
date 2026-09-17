@@ -45,7 +45,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : t("modals.confirm.somethingWentWrong"));
     } finally {
       setBusy(false);
     }
@@ -56,9 +56,9 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       if (field === "username") {
         const p = usernameProblem(v.toLowerCase());
         if (p) throw new Error(p);
-      } else if (!v) throw new Error("Display name cannot be empty.");
+      } else if (!v) throw new Error(t("settings.account.displayNameCannotBeEmpty"));
       setMe(await usersApi.patchMe(field === "username" ? { username: v.toLowerCase() } : { display_name: v }));
-      toast("Saved.", "success");
+      toast(t("settings.account.saved"), "success");
       close();
     });
   const banner = bannerUrl(me.banner_id, 600);
@@ -93,9 +93,9 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       <p className={s.hint}>{t("settings.account.yourPasswordProtectsYourAccountAnd")}</p>
       <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Button onClick={() => open("password")}>{t("settings.account.changePassword")}</Button>
-        <Button variant="secondary" onClick={() => open("recovery")}>{me.has_recovery ? "Generate a new recovery key" : "Set up a recovery key"}</Button>
+        <Button variant="secondary" onClick={() => open("recovery")}>{me.has_recovery ? t("settings.account.generateANewRecoveryKey") : t("settings.account.setUpARecoveryKey")}</Button>
       </div>
-      <p className={s.hint}>{me.has_recovery ? "A recovery key is set. Generating a new one replaces it." : "Without a recovery key, a forgotten password means your message history cannot be recovered."}</p>
+      <p className={s.hint}>{me.has_recovery ? t("settings.account.aRecoveryKeyIsSetGenerating") : t("settings.account.withoutARecoveryKeyAForgotten")}</p>
 
       <div className={s.sep} />
       <h3 className={s.h5}>{t("settings.account.accountRemoval")}</h3>
@@ -113,7 +113,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       ) : null}
 
       {dialog === "password" ? (
-        <Modal open onClose={close} title={t("settings.account.updateYourPassword")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={value.length < 1 || pw.length < 8 || pw !== pw2} onClick={() => void run(async () => { await changePassword(value, pw); toast("Password changed. Other devices were logged out.", "success"); close(); })}>{t("modals.serverNotifications.done")}</Button></>}>
+        <Modal open onClose={close} title={t("settings.account.updateYourPassword")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={value.length < 1 || pw.length < 8 || pw !== pw2} onClick={() => void run(async () => { await changePassword(value, pw); toast(t("settings.account.passwordChangedOtherDevicesWereLogged"), "success"); close(); })}>{t("modals.serverNotifications.done")}</Button></>}>
           <div className={s.form}>
             {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
             <Field label={t("settings.account.currentPassword")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>

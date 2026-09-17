@@ -13,35 +13,38 @@ import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
-const VERBS: Record<string, string> = {
-  server_update: "updated the server",
-  server_transfer: "transferred ownership to",
-  channel_create: "created the channel",
-  channel_update: "updated the channel",
-  channel_delete: "deleted the channel",
-  channel_positions: "reordered channels",
-  overwrite_update: "updated permissions in",
-  overwrite_delete: "removed a permission overwrite in",
-  role_create: "created the role",
-  role_update: "updated the role",
-  role_delete: "deleted the role",
-  role_positions: "reordered roles",
-  member_update: "updated the member",
-  member_role_add: "added a role to",
-  member_role_remove: "removed a role from",
-  member_kick: "kicked",
-  member_ban: "banned",
-  member_unban: "unbanned",
-  member_voice: "changed the voice state of",
-  emoji_create: "added the emoji",
-  emoji_update: "updated the emoji",
-  emoji_delete: "deleted the emoji",
-  sticker_pack_create: "created the sticker pack",
-  sticker_pack_update: "updated the sticker pack",
-  sticker_pack_delete: "deleted the sticker pack",
-  invite_create: "created an invite",
-  invite_delete: "revoked an invite",
-};
+/** What each audited action says, looked up per render so it follows the language. */
+function verbs(): Record<string, string> {
+  return {
+    server_update: t("server.auditLog.verb.server_update"),
+    server_transfer: t("server.auditLog.verb.server_transfer"),
+    channel_create: t("server.auditLog.verb.channel_create"),
+    channel_update: t("server.auditLog.verb.channel_update"),
+    channel_delete: t("server.auditLog.verb.channel_delete"),
+    channel_positions: t("server.auditLog.verb.channel_positions"),
+    overwrite_update: t("server.auditLog.verb.overwrite_update"),
+    overwrite_delete: t("server.auditLog.verb.overwrite_delete"),
+    role_create: t("server.auditLog.verb.role_create"),
+    role_update: t("server.auditLog.verb.role_update"),
+    role_delete: t("server.auditLog.verb.role_delete"),
+    role_positions: t("server.auditLog.verb.role_positions"),
+    member_update: t("server.auditLog.verb.member_update"),
+    member_role_add: t("server.auditLog.verb.member_role_add"),
+    member_role_remove: t("server.auditLog.verb.member_role_remove"),
+    member_kick: t("server.auditLog.verb.member_kick"),
+    member_ban: t("server.auditLog.verb.member_ban"),
+    member_unban: t("server.auditLog.verb.member_unban"),
+    member_voice: t("server.auditLog.verb.member_voice"),
+    emoji_create: t("server.auditLog.verb.emoji_create"),
+    emoji_update: t("server.auditLog.verb.emoji_update"),
+    emoji_delete: t("server.auditLog.verb.emoji_delete"),
+    sticker_pack_create: t("server.auditLog.verb.sticker_pack_create"),
+    sticker_pack_update: t("server.auditLog.verb.sticker_pack_update"),
+    sticker_pack_delete: t("server.auditLog.verb.sticker_pack_delete"),
+    invite_create: t("server.auditLog.verb.invite_create"),
+    invite_delete: t("server.auditLog.verb.invite_delete"),
+  };
+}
 
 export default function AuditLogPage({ serverId }: { serverId: string }) {
   const users = useUsers((u) => u.byId);
@@ -101,7 +104,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     const obj = e.changes as Record<string, unknown>;
     const parts: string[] = [];
     for (const [k, v] of Object.entries(obj)) {
-      if (Array.isArray(v) && v.length > 3) parts.push(`${k}: ${v.length} items`);
+      if (Array.isArray(v) && v.length > 3) parts.push(`${k}: ${t("server.auditLog.itemsCount", { count: v.length })}`);
       else parts.push(`${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
     }
     return parts.join(" · ").slice(0, 300);
@@ -118,8 +121,8 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
         <div key={e.id} className={s.auditRow}>
           <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
           <div className={s.auditText}>
-            <b>{displayName(users[e.actor_id])}</b> {VERBS[e.action] ?? e.action} {targetName(e) ? <b>{targetName(e)}</b> : null}
-            <div className={s.auditMeta}>{formatFull(e.created_at)}{e.reason ? ` · Reason: ${e.reason}` : ""}</div>
+            <b>{displayName(users[e.actor_id])}</b> {verbs()[e.action] ?? e.action} {targetName(e) ? <b>{targetName(e)}</b> : null}
+            <div className={s.auditMeta}>{formatFull(e.created_at)}{e.reason ? ` · ${t("server.auditLog.reason", { reason: e.reason })}` : ""}</div>
             {changesText(e) ? <div className={s.auditChanges}>{changesText(e)}</div> : null}
           </div>
         </div>

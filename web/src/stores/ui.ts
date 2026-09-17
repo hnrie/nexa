@@ -85,6 +85,9 @@ interface UIState {
 }
 
 let toastSeq = 0;
+/** Modals that replace themselves rather than stacking. */
+const ONE_AT_A_TIME = new Set(["profile", "serverProfile", "memberAction"]);
+
 let modalSeq = 0;
 
 export const useUI = create<UIState>()((set) => ({
@@ -111,7 +114,11 @@ export const useUI = create<UIState>()((set) => ({
     set((s) => {
       modalSeq += 1;
       const entry: ModalState = props ? { id: modalSeq, kind, props } : { id: modalSeq, kind };
-      const modals = [...s.modals, entry];
+      // A profile leads to another profile — mutual friends, a group's member
+      // list — and stacking them leaves a pile to close one at a time. One of
+      // these is open at once: the one being looked at.
+      const kept = ONE_AT_A_TIME.has(kind) ? s.modals.filter((m) => m.kind !== kind) : s.modals;
+      const modals = [...kept, entry];
       return { modals, modal: entry };
     }),
   closeModal: (id) =>

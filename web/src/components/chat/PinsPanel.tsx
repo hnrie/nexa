@@ -71,7 +71,7 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
                   channelsApi
                     .unpin(channelId, m.id)
                     .then(() => setPins((cur) => (cur ?? []).filter((x) => x.id !== m.id)))
-                    .catch((err) => useUI.getState().toast(err instanceof Error ? err.message : "That message could not be unpinned.", "error"))
+                    .catch((err) => useUI.getState().toast(err instanceof Error ? err.message : t("chat.pins.thatMessageCouldNotBeUnpinned"), "error"))
                     .finally(() => setUnpinning(null));
                 }}
               >

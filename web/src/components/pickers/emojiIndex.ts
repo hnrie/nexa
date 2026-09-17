@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { hasTwemoji, twemojiFiles, twemojiIndexSettledPromise } from "@/lib/twemoji";
 
+import { t as tr_ } from "@/i18n";
 export interface EmojiEntry {
   unicode: string;
   hexcode: string;
@@ -54,16 +55,16 @@ interface CompactEmoji {
   skins?: { hexcode: string; unicode: string; label: string; tone?: number | number[] }[];
 }
 
-export const GROUPS: { id: number; name: string }[] = [
-  { id: 0, name: "Smileys & Emotion" },
-  { id: 1, name: "People & Body" },
-  { id: 3, name: "Animals & Nature" },
-  { id: 4, name: "Food & Drink" },
-  { id: 5, name: "Travel & Places" },
-  { id: 6, name: "Activities" },
-  { id: 7, name: "Objects" },
-  { id: 8, name: "Symbols" },
-  { id: 9, name: "Flags" },
+export const groups = (): { id: number; name: string }[] => [
+  { id: 0, name: tr_("pickers.emojiIndex.smileysEmotion") },
+  { id: 1, name: tr_("pickers.emojiIndex.peopleBody") },
+  { id: 3, name: tr_("pickers.emojiIndex.animalsNature") },
+  { id: 4, name: tr_("pickers.emojiIndex.foodDrink") },
+  { id: 5, name: tr_("pickers.emojiIndex.travelPlaces") },
+  { id: 6, name: tr_("pickers.emojiIndex.activities") },
+  { id: 7, name: tr_("pickers.emojiIndex.objects") },
+  { id: 8, name: tr_("pickers.emojiIndex.symbols") },
+  { id: 9, name: tr_("pickers.emojiIndex.flags") },
 ];
 
 let loaded: Promise<EmojiEntry[]> | null = null;
@@ -114,7 +115,7 @@ export function loadEmoji(): Promise<EmojiEntry[]> {
         if (skins?.length) entry.skins = skins;
         return entry;
       });
-    grouped = GROUPS.map((g) => ({ ...g, items: all.filter((e) => e.group === g.id) })).filter((g) => g.items.length > 0);
+    grouped = groups().map((g) => ({ ...g, items: all.filter((e) => e.group === g.id) })).filter((g) => g.items.length > 0);
     byShortcode = new Map();
     byUnicode = new Map();
     for (const e of all) {

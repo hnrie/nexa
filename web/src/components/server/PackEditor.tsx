@@ -111,9 +111,9 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       // the server tidies whitespace, so show what it kept or the save bar never goes away
       setName(saved.name);
       setDescription(saved.description);
-      toast("Pack saved.", "success");
+      toast(t("server.packEditor.packSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save the pack.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotSaveThePack"), "error");
     } finally {
       setBusy(false);
     }
@@ -122,7 +122,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     try {
       upsertPack(await expressionsApi.patchPack(pack.id, { public: v }));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not change visibility.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotChangeVisibility"), "error");
     }
   };
   const stage = (files: FileList | File[]) => {
@@ -161,7 +161,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       upsertPack(await expressionsApi.pack(pack.id));
       toast(done === 1 ? `${isEmoji ? "Emoji" : "Sticker"} added.` : `${done} ${noun} added.`, "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Upload failed.", "error");
+      toast(err instanceof ApiError ? err.message : t("composer.composer.uploadFailed"), "error");
       upsertPack(await expressionsApi.pack(pack.id).catch(() => pack));
     } finally {
       setBusy(false);
@@ -171,8 +171,8 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     const values = await promptFields({
       title: `Edit ${isEmoji ? "Emoji" : "Sticker"}`,
       fields: [
-        { key: "name", label: "Name", initial: st.name, maxLength: 30 },
-        { key: "tags", label: "Tags", hint: "Space separated, used by search.", initial: st.tags, maxLength: 200 },
+        { key: "name", label: t("modals.subchat.name"), initial: st.name, maxLength: 30 },
+        { key: "tags", label: t("server.packEditor.tags"), hint: t("server.packEditor.spaceSeparatedUsedBySearch"), initial: st.tags, maxLength: 200 },
       ],
     });
     if (!values) return;
@@ -182,13 +182,13 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       .patchSticker(pack.id, st.id, { name: next.trim().slice(0, 30) || st.name, tags: tags.trim().slice(0, 200) })
       .then(() => expressionsApi.pack(pack.id))
       .then(upsertPack)
-      .catch((err) => toast(err instanceof ApiError ? err.message : "Could not rename.", "error"));
+      .catch((err) => toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotRename"), "error"));
   };
   const remove = (st: Sticker) =>
     openModal("confirm", {
       title: `Delete '${st.name}'`,
-      body: "This sticker is removed from the pack for everyone.",
-      confirmLabel: "Delete Sticker",
+      body: t("server.packEditor.thisStickerIsRemovedFromThe"),
+      confirmLabel: t("server.packEditor.deleteSticker"),
       danger: true,
       onConfirm: async () => {
         await expressionsApi.deleteSticker(pack.id, st.id);
@@ -199,7 +199,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     try {
       upsertPack(await expressionsApi.patchPack(pack.id, { cover_sticker_id: st.id }));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not set the cover.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotSetTheCover"), "error");
     }
   };
   const onDrop = async (e: DragEvent) => {
@@ -217,7 +217,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     try {
       upsertPack(await expressionsApi.setStickerPositions(pack.id, list.map((x, i) => ({ id: x.id, position: i }))));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not reorder.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotReorder"), "error");
     }
   };
   const copyLink = () => {
@@ -239,7 +239,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
         else upsertPack({ ...pack, installed: false });
       } else upsertPack(await expressionsApi.install(pack.id));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not change the pack.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotChangeThePack"), "error");
     } finally {
       setBusy(false);
     }
@@ -255,7 +255,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
         <div className={s.actions}>
           {!manage ? <Button size="sm" variant={pack.installed ? "secondary" : "primary"} loading={busy} onClick={() => void toggleInstall()}>{pack.installed ? "Remove" : "Install"}</Button> : null}
           {manage ? (
-            <Button size="sm" variant="danger" onClick={() => openModal("confirm", { title: `Delete '${pack.name}'`, body: "Everyone who installed this pack loses it. This cannot be undone.", confirmLabel: "Delete Pack", danger: true, onConfirm: async () => { await expressionsApi.deletePack(pack.id); removePack(pack.id); onDeleted(); } })}>
+            <Button size="sm" variant="danger" onClick={() => openModal("confirm", { title: `Delete '${pack.name}'`, body: t("server.packEditor.everyoneWhoInstalledThisPackLoses"), confirmLabel: t("server.packEditor.deletePack"), danger: true, onConfirm: async () => { await expressionsApi.deletePack(pack.id); removePack(pack.id); onDeleted(); } })}>
               <Trash2 size={14} /> Delete Pack
             </Button>
           ) : null}
@@ -285,8 +285,9 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDragOver={(e) => { e.preventDefault(); setOver(true); }}
             onDragLeave={() => setOver(false)}
             onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) stage(e.dataTransfer.files); }}
+            data-drop-zone
           >
-            <Upload size={20} /> Drop PNG, APNG, GIF or WebP files here or click to choose ({Math.round(maxBytes / (1024 * 1024))} MB each, no limit on how many).{isEmoji ? " Emoji names are letters, numbers and underscores." : ""}
+            <Upload size={20} /> Drop PNG, APNG, GIF or WebP files here or click to choose ({Math.round(maxBytes / (1024 * 1024))} MB each, no limit on how many).{isEmoji ? t("server.packEditor.emojiNamesAreLettersNumbersAnd") : ""}
             <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
           </div>
           {pending.map((p) => (
@@ -297,7 +298,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
               <Button size="sm" variant="ghost" onClick={() => unstage(p.preview)}>{t("composer.composer.remove")}</Button>
             </div>
           ))}
-          {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">Upload {pending.length} {isEmoji ? "emoji" : `sticker${pending.length === 1 ? "" : "s"}`}</Button></div> : null}
+          {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">{isEmoji ? t("server.packEditor.uploadEmojiCount", { count: pending.length }) : t("server.packEditor.uploadStickerCount", { count: pending.length })}</Button></div> : null}
         </>
       ) : pack.description ? <p className={s.sub}>{pack.description}</p> : null}
       <div className={s.grid}>
@@ -328,7 +329,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
           </div>
         ))}
       </div>
-      {pack.stickers.length === 0 ? <div className={s.empty}>{manage ? `Add your first ${noun} above.` : "This pack is empty."}</div> : null}
+      {pack.stickers.length === 0 ? <div className={s.empty}>{manage ? t("server.packEditor.addYourFirst", { noun }) : t("pickers.stickerPicker.thisPackIsEmpty")}</div> : null}
       {manage ? <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(pack.name); setDescription(pack.description); }} onSave={() => void save()} /> : null}
     </div>
   );

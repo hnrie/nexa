@@ -142,7 +142,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
       onClose?.();
       nav(`/channels/@me/${ch.id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not open a conversation.", "error");
+      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotOpenAConversation"), "error");
     }
   };
   const addFriend = async () => {
@@ -150,7 +150,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
       const res = await guarded("friend_request", (captcha) => relApi.request(user.username, captcha));
       setRel({ user: res.user, type: res.type as "friend" | "outgoing", nickname: "", created_at: Date.now() });
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not send the request.", "error");
+      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotSendTheRequest"), "error");
     }
   };
   const accept = async () => {
@@ -158,33 +158,33 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
       const res = await relApi.accept(userId);
       setRel({ user: res.user, type: "friend", nickname: "", created_at: Date.now() });
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not accept.", "error");
+      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotAccept"), "error");
     }
   };
-  const failed = (err: unknown) => toast(err instanceof ApiError ? err.message : "Could not update this person.", "error");
+  const failed = (err: unknown) => toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotUpdateThisPerson"), "error");
   const editNickname = async () => {
     if (!rel || rel.type !== "friend") return;
-    const values = await promptFields({ title: "Friend Nickname", fields: [{ key: "nickname", label: "Nickname", initial: rel.nickname, placeholder: user.display_name, maxLength: 32, hint: "Only you see it." }], confirmLabel: "Save", allowEmpty: true });
+    const values = await promptFields({ title: t("profile.profileCard.friendNickname"), fields: [{ key: "nickname", label: t("modals.serverProfile.nickname"), initial: rel.nickname, placeholder: user.display_name, maxLength: 32, hint: t("profile.profileCard.onlyYouSeeIt") }], confirmLabel: t("chat.editMessage.save"), allowEmpty: true });
     const next = values?.["nickname"]?.trim();
     if (next === undefined || next === rel.nickname) return;
     try {
       setRel(await relApi.setNickname(userId, next));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save the nickname.", "error");
+      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotSaveTheNickname"), "error");
     }
   };
   const more = (e: MouseEvent<HTMLButtonElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const items: ContextMenuItem[] = [];
-    if (panel) items.push({ id: "full", label: "View Full Profile", onSelect: () => openModal("profile", { userId }), separatorAfter: true });
+    if (panel) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => openModal("profile", { userId }), separatorAfter: true });
     if (friend) {
-      items.push({ id: "nick", label: rel.nickname ? "Edit Friend Nickname" : "Add Friend Nickname", onSelect: () => void editNickname() });
-      items.push({ id: "rm", label: "Remove Friend", danger: true, onSelect: () => void relApi.remove(userId).then(() => removeRel(userId), failed) });
+      items.push({ id: "nick", label: rel.nickname ? t("profile.profileCard.editFriendNickname") : t("profile.profileCard.addFriendNickname"), onSelect: () => void editNickname() });
+      items.push({ id: "rm", label: t("profile.profileCard.removeFriend"), danger: true, onSelect: () => void relApi.remove(userId).then(() => removeRel(userId), failed) });
     }
-    if (rel?.type === "blocked") items.push({ id: "unblock", label: "Unblock", onSelect: () => void relApi.unblock(userId).then(() => removeRel(userId), failed) });
-    else items.push({ id: "block", label: "Block", danger: true, onSelect: () => void relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() }), failed) });
+    if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), onSelect: () => void relApi.unblock(userId).then(() => removeRel(userId), failed) });
+    else items.push({ id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() }), failed) });
     items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "copy", label: "Copy User ID", onSelect: () => void navigator.clipboard?.writeText(userId) });
+    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(userId) });
     openContextMenu({ x: r.left, y: r.bottom + 4, items });
   };
   const setNote = (value: string) => {
@@ -261,8 +261,8 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
             {panel ? <button className={s.displayBtn} onClick={viewFull} data-testid="profile-name">{shownName}</button> : shownName}
           </h2>
           {interactive && !isMe ? (
-            <Tooltip text={note ? "Edit Note" : "Add Note"} side="top">
-              <button className={s.noteBtn} aria-label={note ? "Edit note" : "Add note"} onClick={() => setNoteOpen((v) => !v)} data-testid="profile-note-toggle">
+            <Tooltip text={note ? t("profile.profileCard.editNote") : t("profile.profileCard.addNote")} side="top">
+              <button className={s.noteBtn} aria-label={note ? t("profile.profileCard.editNote2") : t("profile.profileCard.addNote2")} onClick={() => setNoteOpen((v) => !v)} data-testid="profile-note-toggle">
                 <NotebookPen size={18} />
               </button>
             </Tooltip>
@@ -273,7 +273,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
           {user.pronouns ? (
             <>
               <span className={s.sep} aria-hidden="true">•</span>
-              <Tooltip text="Pronouns" side="top">
+              <Tooltip text={t("settings.profile.pronouns")} side="top">
                 <span className={s.pronouns} data-testid="profile-pronouns">{user.pronouns}</span>
               </Tooltip>
             </>
@@ -286,12 +286,12 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
           <div className={s.actions}>
             {primary}
             {!isMe && !friend ? (
-              <Tooltip text="Message" side="top">
+              <Tooltip text={t("profile.profileCard.message")} side="top">
                 <button className={s.square} aria-label={t("profile.profileCard.message")} onClick={() => void message()}><MessageCircle size={18} /></button>
               </Tooltip>
             ) : null}
             {!isMe ? (
-              <Tooltip text="More" side="top">
+              <Tooltip text={t("chat.chat.more")} side="top">
                 <button className={s.square} aria-label={t("chat.chat.more")} onClick={more} data-testid="profile-more"><MoreHorizontal size={18} /></button>
               </Tooltip>
             ) : null}
@@ -307,7 +307,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
                 ))}
               </span>
             ) : null}
-            <span>{[mutual.friends.length ? plural(mutual.friends.length, "Mutual Friend") : "", mutualServers.length ? plural(mutualServers.length, "Mutual Server") : ""].filter(Boolean).join(" • ")}</span>
+            <span>{[mutual.friends.length ? plural(mutual.friends.length, t("profile.profileCard.mutualFriend")) : "", mutualServers.length ? plural(mutualServers.length, "Mutual Server") : ""].filter(Boolean).join(" • ")}</span>
           </button>
         ) : null}
 

@@ -35,7 +35,7 @@ export function IncomingCallHost() {
           <Avatar id={from} avatarId={caller?.avatar_id ?? null} name={displayName(caller)} size={80} />
         </div>
         <div className={s.ringName}>{displayName(caller)}</div>
-        <div className={s.ringSub}>{channel && channel.type === "group_dm" ? `Incoming call in ${channelDisplayName(channel, users, meId)}` : "Incoming call…"}</div>
+        <div className={s.ringSub}>{channel && channel.type === "group_dm" ? t("voice.incomingCall.inGroup", { name: channelDisplayName(channel, users, meId) }) : t("voice.incomingCall.incomingCall")}</div>
         <div className={s.ringBtns}>
           <button className={[s.ringBtn, s.ringDecline].join(" ")} aria-label={t("voice.incomingCall.decline")} onClick={() => void declineCall(channelId)}><HangUp size={24} /></button>
           <button className={[s.ringBtn, s.ringAccept].join(" ")} aria-label={t("voice.incomingCall.accept")} onClick={() => void accept()} data-testid="accept-call"><Phone size={24} /></button>

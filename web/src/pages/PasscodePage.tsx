@@ -37,9 +37,9 @@ export default function PasscodePage() {
       input.current?.focus();
       if (err instanceof WrongPasscode) {
         setLeft(err.left);
-        setError(err.left > 0 ? err.message : "Too many wrong tries. Log in with your password to get back in.");
+        setError(err.left > 0 ? err.message : t("passcode.tooManyWrongTriesLogIn"));
       } else {
-        setError(err instanceof Error ? err.message : "That did not work.");
+        setError(err instanceof Error ? err.message : t("passcode.thatDidNotWork"));
       }
     } finally {
       setBusy(false);
@@ -48,10 +48,10 @@ export default function PasscodePage() {
 
   return (
     <AuthLayout
-      title={adopting ? "This account has a passcode" : "Locked"}
+      title={adopting ? t("passcode.thisAccountHasAPasscode") : "Locked"}
       subtitle={
         adopting
-          ? "Enter it to finish setting this device up. Your keys are then kept wrapped by it here too."
+          ? t("passcode.enterItToFinishSettingThis")
           : `Enter your passcode to unlock, ${me?.display_name ?? me?.username ?? "you"}.`
       }
       width={420}
@@ -70,8 +70,8 @@ export default function PasscodePage() {
             required
           />
         </Field>
-        {left <= 3 ? <div className={s.warn}>{t("passcode.triesLeft", { count: left })} You would then sign in with your password.</div> : null}
-        <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">{adopting ? "Set up this device" : "Unlock"}</Button>
+        {left <= 3 ? <div className={s.warn}>{t("passcode.triesLeft", { count: left })} {t("passcode.thenSignInWithPassword")}</div> : null}
+        <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">{adopting ? t("passcode.setUpThisDevice") : t("lock.unlock")}</Button>
         <Button type="button" variant="link" onClick={() => void logout()}>{t("lock.logOutInstead")}</Button>
       </form>
     </AuthLayout>

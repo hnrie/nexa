@@ -68,20 +68,20 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
     }
   };
   const rename = async (e: Emoji) => {
-    const next = await promptText("Rename Emoji", { label: "Emoji name", hint: "Letters, numbers and underscores.", initial: e.name, maxLength: 32 }, "Rename");
+    const next = await promptText(t("server.emoji.renameEmoji"), { label: t("server.emoji.emojiName"), hint: t("server.emoji.lettersNumbersAndUnderscores"), initial: e.name, maxLength: 32 }, "Rename");
     if (next === null || next.trim() === e.name) return;
     try {
       await expressionsApi.renameEmoji(serverId, e.id, next.trim());
       setEmojis(serverId, await expressionsApi.emojis(serverId));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not rename.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotRename"), "error");
     }
   };
   const remove = (e: Emoji) =>
     openModal("confirm", {
       title: `Delete :${e.name}:`,
-      body: "Messages that used it will show the name instead.",
-      confirmLabel: "Delete Emoji",
+      body: t("server.emoji.messagesThatUsedItWillShow"),
+      confirmLabel: t("server.emoji.deleteEmoji"),
       danger: true,
       onConfirm: async () => {
         await expressionsApi.deleteEmoji(serverId, e.id);
@@ -132,6 +132,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
           onDragOver={(e) => { e.preventDefault(); setOver(true); }}
           onDragLeave={() => setOver(false)}
           onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}
+          data-drop-zone
         >
           <Upload size={20} /> {busy ? "Uploading…" : "Drop images here or click to upload (PNG, GIF, WebP, JPEG; 2 MB each; 512×512 or smaller works best)."}
           <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void upload(e.target.files); e.target.value = ""; }} data-testid="emoji-file" />
@@ -139,7 +140,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
       ) : null}
       {emojis.length === 0 ? <p className={st.hint} style={{ marginTop: 16 }}>{t("server.emoji.noCustomEmojiYet")}</p> : null}
       {section("Emoji", still)}
-      {section("Animated emoji", animated)}
+      {section(t("server.emoji.animatedEmoji"), animated)}
       {manage ? <div style={{ marginTop: 16 }}><Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} loading={busy}>{t("server.emoji.uploadEmoji")}</Button></div> : null}
     </>
   );

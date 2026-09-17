@@ -21,10 +21,13 @@ const VoicePage = lazyPage(() => import("./VoicePage"));
 const AdminPage = lazyPage(() => import("./AdminPage"));
 const DesktopPage = lazyPage(() => import("./DesktopPage"));
 
-const NAV: { head: string; items: { id: string; label: string }[] }[] = [
-  { head: "User Settings", items: [{ id: "account", label: "My Account" }, { id: "profiles", label: "Profiles" }, { id: "privacy", label: "Privacy & Safety" }, { id: "security", label: "Security" }, { id: "devices", label: "Devices" }] },
-  { head: "App Settings", items: [{ id: "appearance", label: "Appearance" }, { id: "voice", label: "Voice & Video" }, { id: "notifications", label: "Notifications" }, { id: "stickers", label: "Expression Packs" }] },
-];
+/** The navigation, built per render so it follows the language. */
+function navGroups(): { id: string; head: string; items: { id: string; label: string }[] }[] {
+  return [
+    { id: "user", head: t("settings.settings.userSettings"), items: [{ id: "account", label: t("settings.account.myAccount") }, { id: "profiles", label: t("settings.profile.profiles") }, { id: "privacy", label: t("settings.privacy.privacySafety") }, { id: "security", label: t("settings.security.security") }, { id: "devices", label: t("settings.devices.devices") }] },
+    { id: "app", head: t("settings.settings.appSettings"), items: [{ id: "appearance", label: t("settings.appearance.appearance") }, { id: "voice", label: t("settings.voice.voiceVideo") }, { id: "notifications", label: t("settings.notifications.notifications") }, { id: "stickers", label: t("settings.stickers.expressionPacks") }] },
+  ];
+}
 
 export default function SettingsModal({ onClose, page: initial, packId }: { onClose: () => void; page: string; packId?: string | undefined }) {
   const [page, setPage] = useState(initial);
@@ -32,9 +35,9 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
   const inApp = !!desktopBridge();
   const mobile = useIsMobile();
-  const appItems = inApp ? [{ id: "desktop", label: "Desktop App" }] : [];
-  const base = NAV.map((g) => (g.head === "App Settings" ? { ...g, items: [...g.items, ...appItems] } : g));
-  const nav = isAdmin ? [...base, { head: "Instance", items: [{ id: "admin", label: "Instance Admin" }] }] : base;
+  const appItems = inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : [];
+  const base = navGroups().map((g) => (g.id === "app" ? { ...g, items: [...g.items, ...appItems] } : g));
+  const nav = isAdmin ? [...base, { id: "instance", head: t("settings.settings.instance"), items: [{ id: "admin", label: t("settings.admin.instanceAdmin") }] }] : base;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -53,7 +56,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
       <div className={s.navWrap}>
         <nav className={s.nav}>
           {nav.map((g) => (
-            <div key={g.head}>
+            <div key={g.id}>
               <div className={s.navHead}>{g.head}</div>
               {g.items.map((it) => (
                 <button key={it.id} className={s.navItem} data-selected={page === it.id} data-nav={it.id} onClick={() => setPage(it.id)}>{it.label}</button>

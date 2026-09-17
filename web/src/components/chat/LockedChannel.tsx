@@ -25,7 +25,7 @@ export function LockedChannel({ channel, onUnlocked }: { channel: Channel; onUnl
       setPassword("");
       onUnlocked();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That could not be checked. Try again.");
+      setError(err instanceof ApiError ? err.message : t("chat.lockedChannel.thatCouldNotBeCheckedTry"));
     } finally {
       setBusy(false);
     }

@@ -310,6 +310,8 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 	s.Bcast.EmitUsers([]ids.ID{uid}, "channel_create", updated)
 	s.Bcast.EmitUsers(ch.Recipients, "channel_update", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_add", []ids.ID{uid}, nil)
+	// the group has never seen the newcomer's presence, nor they the group's
+	s.Bcast.PresenceChanged(uid)
 	s.Bcast.KeysMaybeNeeded(ch.ID)
 	s.subchatsJoined(r.Context(), subs, uid)
 	WriteJSON(w, http.StatusOK, updated)

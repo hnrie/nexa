@@ -185,11 +185,11 @@ export function QuickSwitcher() {
                     <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={author?.display_name ?? "?"} size={24} />
                     <span className={s.hitBody}>
                       <span className={s.hitHead}>
-                        <b>{author?.display_name ?? "Unknown"}</b>
+                        <b>{author?.display_name ?? t("modals.quickSwitcher.unknown")}</b>
                         <span className={s.sub}>{ch ? (ch.server_id ? `#${ch.name}` : channelDisplayName(ch, users, meId)) : ""} · {formatTimestamp(m.created_at)}</span>
                       </span>
                       <span className={s.hitText}>
-                        {m.payload?.t ? highlight(m.payload.t, parsed).map((r, k) => (r.hit ? <mark key={k}>{r.text}</mark> : <span key={k}>{r.text}</span>)) : m.payload?.sticker ? "[sticker]" : m.payload?.att?.length ? `[${m.payload.att.length} file${m.payload.att.length === 1 ? "" : "s"}]` : ""}
+                        {m.payload?.t ? highlight(m.payload.t, parsed).map((r, k) => (r.hit ? <mark key={k}>{r.text}</mark> : <span key={k}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("modals.quickSwitcher.filesCount", { count: m.payload.att.length }) : ""}
                       </span>
                     </span>
                   </button>

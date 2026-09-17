@@ -50,7 +50,7 @@
 .msg[data-mentioned="true"] { background: var(--mention-bg); }
 .msg[data-mentioned="true"]::before { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 2px; background: var(--warning); }
 .msg[data-highlight="true"] { animation: flash 2s ease-out; }
-@keyframes flash { 0% { background: rgba(88, 101, 242, 0.4); } 100% { background: transparent; } }
+@keyframes flash { 0% { background: rgba(128, 0, 255, 0.4); } 100% { background: transparent; } }
 .msg[data-pending="true"] { opacity: 0.55; }
 .msg[data-failed="true"] .content { color: var(--danger); }
 .avatar { position: absolute; inset-inline-start: 16px; top: 2px; cursor: pointer; }

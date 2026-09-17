@@ -60,7 +60,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
       setSelected(r.id);
       setTab("display");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create the role.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.roles.couldNotCreateTheRole"), "error");
     } finally {
       setBusy(false);
     }
@@ -78,7 +78,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
     try {
       upsertRoles(serverId, await serversApi.setRolePositions(serverId, positions));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not reorder roles.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.roles.couldNotReorderRoles"), "error");
     }
   };
 
@@ -152,9 +152,9 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       setColor(saved.color);
       setHoist(saved.hoist);
       setMentionable(saved.mentionable);
-      toast("Role saved.", "success");
+      toast(t("server.roles.roleSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save the role.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.roles.couldNotSaveTheRole"), "error");
     } finally {
       setBusy(false);
     }
@@ -182,7 +182,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       <Toggle checked={mentionable} disabled={!editable} onChange={setMentionable} label={t("server.roles.allowAnyoneToMentionThisRole")} description={t("server.roles.membersWithMentionEveryoneCanAlways")} />
       {!everyone && editable ? (
         <div>
-          <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: `Delete '${role.name}'`, body: "Members lose this role and any permissions it granted. This cannot be undone.", confirmLabel: "Delete Role", danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> {t("server.roles.deleteRole")}</Button>
+          <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: `Delete '${role.name}'`, body: t("server.roles.membersLoseThisRoleAndAny"), confirmLabel: t("server.roles.deleteRole"), danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> {t("server.roles.deleteRole")}</Button>
         </div>
       ) : null}
       <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(role.name); setColor(role.color); setHoist(role.hoist); setMentionable(role.mentionable); }} onSave={() => void save()} />
@@ -201,9 +201,9 @@ function PermissionsTab({ role, editable, actorPerms, onSaved }: { role: Role; e
     setBusy(true);
     try {
       onSaved(await serversApi.patchRole(role.server_id, role.id, { permissions: permString(value) }));
-      toast("Permissions saved.", "success");
+      toast(t("server.channelSettings.permissionsSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save permissions.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.channelSettings.couldNotSavePermissions"), "error");
     } finally {
       setBusy(false);
     }
@@ -214,7 +214,7 @@ function PermissionsTab({ role, editable, actorPerms, onSaved }: { role: Role; e
         <TextInput value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("server.roles.searchPermissions")} />
         <Button variant="ghost" size="sm" onClick={() => setValue(0n)} disabled={!editable}>{t("modals.quickSwitcher.clear")}</Button>
       </div>
-      <p className={st.hint} style={{ marginBottom: 8 }}>You can only grant permissions you hold yourself{(actorPerms & (1n << 3n)) !== 0n ? " (you have all of them)" : ""}.</p>
+      <p className={st.hint} style={{ marginBottom: 8 }}>{(actorPerms & (1n << 3n)) !== 0n ? t("server.roles.grantHintAll") : t("server.roles.grantHint")}</p>
       <RoleGrid value={value} onChange={setValue} editable={editable} filter={filter} />
       <SaveBar dirty={dirty} busy={busy} onReset={() => setValue(original)} onSave={() => void save()} />
     </div>
@@ -240,7 +240,7 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
     try {
       upsertMember(on ? await serversApi.addRole(serverId, userId, role.id) : await serversApi.removeRole(serverId, userId, role.id));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not change roles.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.memberAction.couldNotChangeRoles"), "error");
     } finally {
       setBusy(null);
     }

@@ -21,7 +21,7 @@ CATALOG = ROOT / "web/src/i18n/locales/en.json"
 
 # Attributes whose value a person reads.
 ATTRS = ("label", "placeholder", "title", "aria-label", "description", "confirmLabel",
-         "hint", "subtitle", "alt", "emptyText", "tooltip")
+         "hint", "subtitle", "alt", "emptyText", "tooltip", "text")
 
 # Object properties whose value a person reads. Menus, settings navigation and
 # confirm dialogs are built as data, so their text never appears between tags.
@@ -30,6 +30,32 @@ PROPS = ("label", "title", "head", "desc", "description", "text", "hint", "place
 
 # Calls whose first argument is a sentence: a toast, a prompt's heading.
 CALLS = ("toast", "promptText")
+
+# Strings that are not interface text however much they read like it: protocol
+# names, the messages the platform itself throws, values the code compares to.
+NOT_UI = {
+    "Content-Type", "Content-Range", "Content-Disposition", "Content-Length", "Cache-Control",
+    "Retry-After", "Failed to fetch", "Load failed", "Illegal invocation",
+    "This environment has no fetch().", "Uploads need a browser environment with XMLHttpRequest.",
+    "Cannot resume a closed AudioContext.", "Failed to start the audio device",
+}
+# Files whose strings never reach a person, or reach them outside the app.
+NOT_UI_FILES = ("download-sw.ts", "client.ts", "fakeAudio.ts")
+# A literal on one of these lines is being compared or looked up, not shown.
+USED_NOT_SHOWN = re.compile(r'===|!==|\.(?:includes|startsWith|endsWith|indexOf|match|test|get|set|has|delete)\s*\(\s*"')
+
+
+def sentence(s: str) -> bool:
+    """Whether a bare literal is prose rather than a name the code uses."""
+    if s[0].islower() or any(c in s for c in "{}[]()<>|\\`$"):
+        return False
+    if "/" in s or "_" in s:
+        return False
+    # a header or an identifier: one hyphenated or camel-cased word, no space
+    if " " not in s:
+        return s.endswith((".", "?", "!"))
+    # a header with spaces is unlikely; a sentence has at least two real words
+    return len(re.findall(r"[A-Za-z]{2,}", s)) >= 2
 
 # Files that hold no interface text, or whose strings are not for reading.
 SKIP_DIRS = ("i18n", "test")
@@ -88,6 +114,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--dry", action="store_true")
+    ap.add_argument("--all", action="store_true", help="also take bare sentences, not only text and attributes")
     args = ap.parse_args()
     if not args.write and not args.dry:
         args.dry = True
@@ -166,6 +193,26 @@ def main() -> int:
             return f'{head}({fn}("{key_for(value)}")'
 
         out = re.sub(r'\b(' + "|".join(CALLS) + r')\("([^"\\\n]+)"', call_sub, out)
+
+        # Sentences standing on their own: the message an error carries, the
+        # label a ternary picks. Only with --all, and never where the string is
+        # being compared rather than shown.
+        if args.all and path.name not in NOT_UI_FILES:
+            lines = out.split("\n")
+            for n, line in enumerate(lines):
+                if line.lstrip().startswith(("//", "*", "/*")) or USED_NOT_SHOWN.search(line):
+                    continue
+                if re.match(r"^\s*(import|export)\b", line):
+                    continue
+
+                def bare_sub(m):
+                    value = m.group(1)
+                    if value in NOT_UI or not is_text(value) or not sentence(value):
+                        return m.group(0)
+                    return f'{fn}("{key_for(value)}")'
+
+                lines[n] = re.sub(r'"([^"\\\n]{4,})"', bare_sub, line)
+            out = "\n".join(lines)
 
         if out == text:
             continue

@@ -1,5 +1,5 @@
 /* the landing card: the page scrolls, and auto margins centre the card when it fits */
-.page { height: 100%; display: flex; align-items: flex-start; padding: 24px 16px; background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(88, 101, 242, 0.18), transparent); overflow-y: auto; overscroll-behavior: contain; }
+.page { height: 100%; display: flex; align-items: flex-start; padding: 24px 16px; background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
 .card { margin: auto; flex-shrink: 0; width: 100%; max-width: 420px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
 .icon { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--positive); color: #fff; margin-bottom: 4px; }
 .icon[data-state="off"] { background: var(--bg-active); color: var(--text-muted); }

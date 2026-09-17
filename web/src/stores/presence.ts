@@ -27,8 +27,17 @@ export function statusOf(p: Presence | undefined): StatusKind {
   return p.status;
 }
 
+/** Whether a presence is one other people can see anything of. */
+function shown(p: Presence | undefined): p is Presence {
+  // invisible is offline as far as anyone else is concerned, and your own
+  // screen should agree: otherwise you sit there reading a status nobody else
+  // can see, wondering whether invisible worked.
+  return !!p && p.status !== "offline" && p.status !== "invisible";
+}
+
+/** The status someone set, if it is theirs to show right now. */
 export function customStatus(p: Presence | undefined): { text: string; emoji: string } | null {
-  if (!p) return null;
+  if (!shown(p)) return null;
   if (p.status_expires_at !== null && p.status_expires_at < Date.now()) return null;
   if (!p.status_text && !p.status_emoji) return null;
   return { text: p.status_text, emoji: p.status_emoji };
@@ -36,6 +45,11 @@ export function customStatus(p: Presence | undefined): { text: string; emoji: st
 
 /** What someone is doing right now; nothing while they show as offline. */
 export function activitiesOf(p: Presence | undefined): Activity[] {
-  if (!p || p.status === "offline") return [];
+  if (!shown(p)) return [];
   return p.activities ?? [];
+}
+
+/** The status text as it was set, even while hidden — for the box you edit it in. */
+export function ownStatusDraft(p: Presence | undefined): { text: string; emoji: string; expiresAt: number | null } {
+  return { text: p?.status_text ?? "", emoji: p?.status_emoji ?? "", expiresAt: p?.status_expires_at ?? null };
 }

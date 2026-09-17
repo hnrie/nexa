@@ -460,6 +460,23 @@ func (h *Hub) selfPresence(ctx context.Context, u *store.User) Presence {
 	return p
 }
 
+// PresenceChanged re-announces a user's presence to everyone who should see
+// it. Joining a server gives them a new audience: without this the people
+// already there add them to the member list with nothing to say about them,
+// and they sit at the bottom under Offline until something else happens.
+func (h *Hub) PresenceChanged(uid ids.ID) {
+	if !h.Online(uid) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	u, err := h.st.UserByID(ctx, uid)
+	if err != nil || u == nil {
+		return
+	}
+	h.broadcastPresence(ctx, u)
+}
+
 // broadcastPresence pushes the user's current presence to interested users.
 func (h *Hub) broadcastPresence(ctx context.Context, u *store.User) {
 	interested := h.interestedIn(ctx, u.ID)

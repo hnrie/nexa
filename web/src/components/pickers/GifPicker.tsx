@@ -107,7 +107,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
 
   const resultTiles = useMemo<ResultTile[]>(() => results.map((g) => ({ key: g.id, src: g.preview, label: g.title || "GIF", w: g.w, h: g.h, gif: g })), [results]);
   const favoriteTiles = useMemo<FavoriteTile[]>(
-    () => favs.map((f) => ({ key: f.url, src: f.url, label: "Favorite GIF", w: f.w, h: f.h, dead: dead.has(f.url), fav: f })),
+    () => favs.map((f) => ({ key: f.url, src: f.url, label: tr_("pickers.gifPicker.favoriteGif"), w: f.w, h: f.h, dead: dead.has(f.url), fav: f })),
     [favs, dead],
   );
 
@@ -126,7 +126,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
       </div>
       {tab === "favorites" ? (
         favs.length === 0 ? (
-          <div className={s.empty}>No favorite GIFs yet. {enabled ? "Star a GIF in search to keep it here." : "Hover any GIF in chat and press the star to save it here."}</div>
+          <div className={s.empty}>{tr_("pickers.gifPicker.noFavoritesYet")} {enabled ? tr_("pickers.gifPicker.starInSearch") : tr_("pickers.gifPicker.starInChat")}</div>
         ) : (
           <GifGrid
             key="favorites"
@@ -135,8 +135,8 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
             onDead={(t) => setDead((d) => (d.has(t.key) ? d : new Set(d).add(t.key)))}
             onMenu={(t, x, y) =>
               menu(x, y, [
-                ...(t.dead ? [] : [{ id: "send", label: "Send GIF", onSelect: () => onPick(t.fav) }]),
-                { id: "unfavorite", label: "Remove from Favorites", danger: true, onSelect: () => removeFavoriteGifs(new Set([t.key])) },
+                ...(t.dead ? [] : [{ id: "send", label: tr_("pickers.gifPicker.sendGif"), onSelect: () => onPick(t.fav) }]),
+                { id: "unfavorite", label: tr_("pickers.gifPicker.removeFromFavorites"), danger: true, onSelect: () => removeFavoriteGifs(new Set([t.key])) },
               ])
             }
             overlay={(t) => <button className={s.gifRemove} aria-label={tr_("pickers.gifPicker.removeFavorite")} onClick={() => removeFavoriteGifs(new Set([t.key]))}><X size={14} /></button>}
@@ -159,14 +159,14 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           onMenu={(t, x, y) => {
             const fav = favSet.has(t.gif.url);
             menu(x, y, [
-              { id: "send", label: "Send GIF", onSelect: () => sendResult(t.gif) },
-              { id: "favorite", label: fav ? "Remove from Favorites" : "Add to Favorites", onSelect: () => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h }) },
+              { id: "send", label: tr_("pickers.gifPicker.sendGif"), onSelect: () => sendResult(t.gif) },
+              { id: "favorite", label: fav ? tr_("pickers.gifPicker.removeFromFavorites") : tr_("pickers.gifPicker.addToFavorites"), onSelect: () => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h }) },
             ]);
           }}
           overlay={(t) => {
             const fav = favSet.has(t.gif.url);
             return (
-              <button className={s.gifStar} data-on={fav} aria-label={fav ? "Remove favorite" : "Add favorite"} onClick={() => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h })}>
+              <button className={s.gifStar} data-on={fav} aria-label={fav ? tr_("pickers.gifPicker.removeFavorite") : tr_("pickers.gifPicker.addFavorite")} onClick={() => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h })}>
                 <Star size={14} fill={fav ? "currentColor" : "none"} />
               </button>
             );

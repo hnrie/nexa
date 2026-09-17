@@ -41,8 +41,8 @@ export default function ChannelSettingsModal({ onClose, channelId, page: initial
   if (!channel || !channel.server_id) return null;
   const isCat = channel.type === "category";
   const groups: NavGroup[] = [
-    { head: (isCat ? "" : "#") + channel.name, items: [{ id: "overview", label: "Overview" }, { id: "permissions", label: "Permissions" }] },
-    { head: "", items: [{ id: "delete", label: isCat ? "Delete Category" : "Delete Channel", danger: true }] },
+    { head: (isCat ? "" : "#") + channel.name, items: [{ id: "overview", label: tr_("server.channelSettings.overview") }, { id: "permissions", label: tr_("server.channelSettings.permissions") }] },
+    { head: "", items: [{ id: "delete", label: isCat ? tr_("server.channelSettings.deleteCategory") : tr_("server.channelSettings.deleteChannel"), danger: true }] },
   ];
   return (
     <SettingsLayer label={tr_("server.channelSettings.channelSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose}>
@@ -85,9 +85,9 @@ function OverviewPage({ channel }: { channel: Channel }) {
       setSlow(ch.slowmode_seconds);
       setNsfw(ch.nsfw);
       setLimit(ch.user_limit);
-      toast("Channel saved.", "success");
+      toast(tr_("server.channelSettings.channelSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save the channel.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("server.channelSettings.couldNotSaveTheChannel"), "error");
     } finally {
       setBusy(false);
     }
@@ -182,10 +182,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
         await useKeys.getState().ensureConvKey(channel.id);
         await refresh();
       }
-      toast("Permissions saved.", "success");
+      toast(tr_("server.channelSettings.permissionsSaved"), "success");
       return true;
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save permissions.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("server.channelSettings.couldNotSavePermissions"), "error");
       return false;
     } finally {
       setBusy(false);
@@ -198,7 +198,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
       await refresh();
       if (selected === targetId) setSelected(serverId);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not remove the overwrite.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("server.channelSettings.couldNotRemoveTheOverwrite"), "error");
     } finally {
       setBusy(false);
     }
@@ -223,7 +223,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
   return (
     <>
       <h2 className={st.title}>{tr_("server.channelSettings.permissions")}</h2>
-      <p className={st.hint}>Use permissions to customise who can do what in this {channel.type === "category" ? "category" : "channel"}. {isPrivate ? "This channel is private: only the roles and members listed here can see it, and it has its own encryption key." : ""}</p>
+      <p className={st.hint}>{channel.type === "category" ? tr_("server.channelSettings.permsCategory") : tr_("server.channelSettings.permsChannel")} {isPrivate ? tr_("server.channelSettings.permsPrivate") : ""}</p>
       <div className={s.permLayout}>
         <div className={s.permList}>
           <div className={s.permListHead}>
@@ -306,16 +306,16 @@ function DeletePage({ channel, onDone }: { channel: Channel; onDone: () => void 
       remove(channel.id);
       onDone();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not delete.", "error");
+      toast(err instanceof ApiError ? err.message : tr_("chat.messageMenu.couldNotDelete"), "error");
       setBusy(false);
     }
   };
   return (
     <>
-      <h2 className={st.title}>{isCat ? "Delete Category" : "Delete Channel"}</h2>
-      <p className={st.hint}>{isCat ? `Deleting '${channel.name}' keeps the channels inside it; they move to the top of the channel list.` : `Are you sure you want to delete #${channel.name}? Every message in it is deleted for everyone. This cannot be undone.`}</p>
+      <h2 className={st.title}>{isCat ? tr_("server.channelSettings.deleteCategory") : tr_("server.channelSettings.deleteChannel")}</h2>
+      <p className={st.hint}>{isCat ? tr_("server.channelSettings.deleteCategoryHint", { name: channel.name }) : tr_("server.channelSettings.deleteChannelHint", { name: channel.name })}</p>
       <div style={{ marginTop: 24 }}>
-        <Button variant="danger" loading={busy} onClick={() => void go()} data-testid="delete-channel"><Trash2 size={16} /> {isCat ? "Delete Category" : "Delete Channel"}</Button>
+        <Button variant="danger" loading={busy} onClick={() => void go()} data-testid="delete-channel"><Trash2 size={16} /> {isCat ? tr_("server.channelSettings.deleteCategory") : tr_("server.channelSettings.deleteChannel")}</Button>
       </div>
     </>
   );

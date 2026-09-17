@@ -66,19 +66,19 @@ export default function DesktopPage() {
 
   const discord = rpc?.discord ?? "absent";
   const status = !rpc?.enabled
-    ? { tone: "muted", icon: <Info size={18} />, text: "Rich Presence is off. Programs talk only to Discord, if it is running." }
+    ? { tone: "muted", icon: <Info size={18} />, text: tr_("settings.desktop.richPresenceIsOffProgramsTalk") }
     : !rpc.relay
-      ? { tone: "muted", icon: <Info size={18} />, text: "Activity shows here only; Discord does not get it from nexa." }
+      ? { tone: "muted", icon: <Info size={18} />, text: tr_("settings.desktop.activityShowsHereOnlyDiscordDoes") }
       : discord === "connected"
-        ? { tone: "good", icon: <CheckCircle2 size={18} />, text: "Discord is running: activity shows here and on Discord." }
+        ? { tone: "good", icon: <CheckCircle2 size={18} />, text: tr_("settings.desktop.discordIsRunningActivityShowsHere") }
         : discord === "first"
-          ? { tone: "warn", icon: <TriangleAlert size={18} />, text: "Discord started before nexa, so programs talk only to Discord. Restart Discord and they will reach both." }
-          : { tone: "good", icon: <CheckCircle2 size={18} />, text: "Discord isn't running: activity shows here, and will reach Discord too once it opens." };
+          ? { tone: "warn", icon: <TriangleAlert size={18} />, text: tr_("settings.desktop.discordStartedBeforeNexaSoPrograms") }
+          : { tone: "good", icon: <CheckCircle2 size={18} />, text: tr_("settings.desktop.discordIsnTRunningActivityShows") };
 
   const restartDiscord = async () => {
     setRestarting(true);
     try {
-      if (!(await bridge.rpc.restartDiscord())) toast("Discord doesn't seem to be running.", "info");
+      if (!(await bridge.rpc.restartDiscord())) toast(tr_("settings.desktop.discordDoesnTSeemToBe"), "info");
     } finally {
       setRestarting(false);
     }
@@ -150,12 +150,12 @@ function UpdateRow({ version, update: u }: { version: string; update: UpdateStat
         : u?.status === "ready" ? `Version ${u.version} is ready to install.`
           : u?.status === "manual" ? `Version ${u.version} is out.`
             : u?.status === "error" ? `Could not check for updates: ${u.error ?? "unknown error"}`
-              : "You're up to date.";
+              : tr_("settings.desktop.youReUpToDate");
   return (
     <div>
       <div className={d.version}>
         <div className={d.versionText}>
-          nexa {version}
+          Nexa {version}
           <small>{line}{u?.lastCheck ? ` Last checked ${formatRelative(u.lastCheck)}.` : ""}</small>
         </div>
         {u?.status === "ready" ? (
@@ -178,14 +178,14 @@ function ProgramRow({ app, preview, onHide }: { app: RpcApp; preview: Activity |
       <div className={d.appHead}>
         <div style={{ minWidth: 0 }}>
           <div className={d.appName}>{name}</div>
-          <div className={d.appSub}>Connected {formatRelative(app.connectedAt)}</div>
+          <div className={d.appSub}>{tr_("settings.desktop.connectedAt", { when: formatRelative(app.connectedAt) })}</div>
         </div>
-        <Toggle checked={!app.hidden} onChange={(on) => onHide(!on)} ariaLabel={`Show ${name} on my profile`} />
+        <Toggle checked={!app.hidden} onChange={(on) => onHide(!on)} ariaLabel={tr_("settings.desktop.showOnMyProfile", { name })} />
       </div>
       {app.activity && preview ? (
         <div className={d.preview}><ActivityCard activity={preview} /></div>
       ) : (
-        <div className={d.appIdle}>{app.activity ? "Loading preview…" : "Connected, not showing anything right now."}</div>
+        <div className={d.appIdle}>{app.activity ? tr_("settings.desktop.loadingPreview") : tr_("settings.desktop.connectedNotShowingAnythingRightNow")}</div>
       )}
     </div>
   );

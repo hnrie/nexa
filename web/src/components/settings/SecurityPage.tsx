@@ -12,7 +12,7 @@ import { Toggle } from "@/components/common/Toggle";
 import { b64 } from "@/crypto/bytes";
 import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
 import { users as usersApi } from "@/api/users";
-import { AUTO_LOCK_CHOICES, BLUR_DELAY_CHOICES, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
+import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -77,7 +77,7 @@ export default function SecurityPage() {
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : t("modals.confirm.somethingWentWrong"));
     } finally {
       setBusy(false);
     }
@@ -103,7 +103,7 @@ export default function SecurityPage() {
       setSetup(null);
       setCode("");
       await refresh();
-      toast("Two-factor authentication is on.", "success");
+      toast(t("settings.security.twoFactorAuthenticationIsOn"), "success");
     });
 
   const disable = () =>
@@ -111,7 +111,7 @@ export default function SecurityPage() {
       await authApi.mfaDisable(await authKeyFor(password));
       await refresh();
       close();
-      toast("Two-factor authentication is off.", "success");
+      toast(t("settings.security.twoFactorAuthenticationIsOff"), "success");
     });
 
   const regenerate = () =>
@@ -130,7 +130,7 @@ export default function SecurityPage() {
       await setPasscode(pin, lock ?? DEFAULT_LOCK);
       setLock(loadLock(me.id));
       close();
-      toast("This device now asks for your passcode.", "success");
+      toast(t("settings.security.thisDeviceNowAsksForYour"), "success");
     });
 
   const dropPasscode = () =>
@@ -138,7 +138,7 @@ export default function SecurityPage() {
       await removePasscode();
       setLock(null);
       close();
-      toast("Passcode removed.", "success");
+      toast(t("settings.security.passcodeRemoved"), "success");
     });
 
   const patch = (p: Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" | "blurDelayMs">>) => {
@@ -156,13 +156,13 @@ export default function SecurityPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast("Could not reach the clipboard. Select the codes and copy them.", "error");
+      toast(t("settings.security.couldNotReachTheClipboardSelect"), "error");
     }
   };
 
   const downloadCodes = () => {
     if (!codes) return;
-    const body = `nexa backup codes for @${me.username}\nEach code works once.\n\n${codes.join("\n")}\n`;
+    const body = `Nexa backup codes for @${me.username}\nEach code works once.\n\n${codes.join("\n")}\n`;
     const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
     const a = document.createElement("a");
     a.href = url;
@@ -184,7 +184,7 @@ export default function SecurityPage() {
       </p>
       <div className={s.device} data-testid="mfa-row">
         <div>
-          <div className={s.deviceName}>{on ? "Authenticator app is on" : "Authenticator app is off"}</div>
+          <div className={s.deviceName}>{on ? t("settings.security.authenticatorAppIsOn") : t("settings.security.authenticatorAppIsOff")}</div>
           <div className={s.deviceSub}>
             {on ? `${left} backup ${left === 1 ? "code" : "codes"} left${status?.enabled_at ? ` · on since ${new Date(status.enabled_at).toLocaleDateString()}` : ""}` : "Works with any TOTP app, such as Aegis, Ente Auth, 1Password or Google Authenticator."}
           </div>
@@ -206,8 +206,8 @@ export default function SecurityPage() {
       </p>
       <div className={s.device} data-testid="lock-row">
         <div>
-          <div className={s.deviceName}>{policy ? "Passcode is on for this account" : "No passcode set"}</div>
-          <div className={s.deviceSub}>{policy ? "Every device you sign in on asks for it, on each reload and whenever the app locks." : "The app opens straight into your messages."}</div>
+          <div className={s.deviceName}>{policy ? t("settings.security.passcodeIsOnForThisAccount") : t("settings.security.noPasscodeSet")}</div>
+          <div className={s.deviceSub}>{policy ? t("settings.security.everyDeviceYouSignInOn") : t("settings.security.theAppOpensStraightIntoYour")}</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {policy ? <Button size="sm" variant="secondary" onClick={() => setDialog("passcode")}>{t("settings.security.change")}</Button> : null}
@@ -228,7 +228,7 @@ export default function SecurityPage() {
             </div>
             <div className={s.rowValue}>
               <Select value={String(lock.autoLockMs)} onChange={(e) => patch({ autoLockMs: Number(e.target.value) })} aria-label={t("settings.security.lockAfterInactivity")} data-testid="lock-idle">
-                {AUTO_LOCK_CHOICES.map((c) => <option key={c.ms} value={c.ms}>{c.label}</option>)}
+                {autoLockChoices().map((c) => <option key={c.ms} value={c.ms}>{c.label}</option>)}
               </Select>
             </div>
           </div>
@@ -242,7 +242,7 @@ export default function SecurityPage() {
               <div className={s.rowLabel}>{t("settings.security.lockOnceItIsInThe")}</div>
               <div className={s.rowValue}>
                 <Select value={String(lock.blurDelayMs)} onChange={(e) => patch({ blurDelayMs: Number(e.target.value) })} aria-label={t("settings.security.lockOnceInTheBackground")}>
-                  {BLUR_DELAY_CHOICES.map((c) => <option key={c.ms} value={c.ms}>{c.label}</option>)}
+                  {blurDelayChoices().map((c) => <option key={c.ms} value={c.ms}>{c.label}</option>)}
                 </Select>
               </div>
             </div>
@@ -255,7 +255,7 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "enable" ? (
-        <Modal title={codes ? "Save your backup codes" : setup ? "Scan this with your authenticator" : "Set up two-factor authentication"} open onClose={close} closeOnOverlay={!codes} width={460}>
+        <Modal title={codes ? t("settings.security.saveYourBackupCodes") : setup ? t("settings.security.scanThisWithYourAuthenticator") : t("settings.security.setUpTwoFactorAuthentication")} open onClose={close} closeOnOverlay={!codes} width={460}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             {codes ? (
@@ -274,7 +274,7 @@ export default function SecurityPage() {
                   <QrCode text={setup.uri} size={188} label={t("settings.security.authenticatorSetupCode")} />
                 </div>
                 <button type="button" className={s.hint} style={{ textAlign: "center", textDecoration: "underline" }} onClick={() => setShowSecret((v) => !v)}>
-                  {showSecret ? "Hide the key" : "Can't scan it?"}
+                  {showSecret ? t("settings.security.hideTheKey") : t("settings.security.canTScanIt")}
                 </button>
                 {showSecret ? <div className={s.recovery} data-testid="totp-secret">{setup.formatted}</div> : null}
                 <Field label={t("settings.security.enterTheSixDigitCodeIt")} required>
@@ -301,7 +301,7 @@ export default function SecurityPage() {
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             {!codes ? (
               <>
-                <p className={s.hint}>Each code signs you in once when you cannot reach your authenticator. Making a new set cancels the old one. You have {left} left.</p>
+                <p className={s.hint}>{t("settings.security.backupCodesHint")} {t("settings.security.backupCodesLeft", { count: left })}</p>
                 <Field label={t("chat.lockedChannel.password")} required>
                   <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
@@ -328,7 +328,7 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "passcode" ? (
-        <Modal title={lock ? "Change your passcode" : "Set a passcode"} open onClose={close} width={440}>
+        <Modal title={lock ? t("settings.security.changeYourPasscode") : t("settings.security.setAPasscode")} open onClose={close} width={440}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             <p className={s.hint}>{t("settings.security.digitsOrAPhraseAtLeast")}</p>
@@ -338,7 +338,7 @@ export default function SecurityPage() {
             <Field label={t("settings.security.passcodeAgain")} required>
               <TextInput type="password" value={pin2} onChange={(e) => setPin2(e.target.value)} autoComplete="new-password" data-testid="passcode-confirm" />
             </Field>
-            <Button block loading={busy} disabled={!pin || !pin2} onClick={() => void savePasscode()} data-testid="passcode-save">{lock ? "Change it" : "Turn it on"}</Button>
+            <Button block loading={busy} disabled={!pin || !pin2} onClick={() => void savePasscode()} data-testid="passcode-save">{lock ? t("settings.security.changeIt") : t("settings.security.turnItOn")}</Button>
           </div>
         </Modal>
       ) : null}

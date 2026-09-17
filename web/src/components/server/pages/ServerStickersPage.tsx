@@ -21,14 +21,14 @@ export default function ServerStickersPage({ serverId }: { serverId: string }) {
   const list = useMemo(() => Object.values(packs).filter((p) => p.server_id === serverId).sort((a, b) => b.updated_at - a.updated_at), [packs, serverId]);
 
   const create = async () => {
-    const name = await promptText("Create Server Pack", { label: "Pack name", initial: `${server?.server.name ?? "Server"} stickers`, maxLength: 60 }, "Create");
+    const name = await promptText(t("server.serverStickers.createServerPack"), { label: t("server.packEditor.packName"), initial: `${server?.server.name ?? "Server"} stickers`, maxLength: 60 }, "Create");
     if (!name?.trim()) return;
     try {
       const pack = await expressionsApi.createPack({ name: name.trim(), server_id: serverId });
       upsertPack(pack);
       setSelected(pack.id);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not create the pack.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.serverStickers.couldNotCreateThePack"), "error");
     }
   };
 
@@ -36,7 +36,7 @@ export default function ServerStickersPage({ serverId }: { serverId: string }) {
     <>
       <h2 className={st.title}>{t("pickers.expressionPicker.stickers")}</h2>
       <p className={st.hint}>{t("server.serverStickers.stickerPacksThatBelongToThis")}</p>
-      <PackEditor packs={list} selectedId={selected} onSelect={setSelected} canManage={() => manage} onCreate={manage ? () => void create() : undefined} createLabel="Create Server Pack" emptyText={manage ? "This server has no sticker packs yet." : "This server has no sticker packs yet. Members with Manage Expressions can add some."} />
+      <PackEditor packs={list} selectedId={selected} onSelect={setSelected} canManage={() => manage} onCreate={manage ? () => void create() : undefined} createLabel={t("server.serverStickers.createServerPack")} emptyText={manage ? t("server.serverStickers.thisServerHasNoStickerPacks") : t("server.serverStickers.thisServerHasNoStickerPacks2")} />
     </>
   );
 }

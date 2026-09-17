@@ -11,11 +11,13 @@ import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
-const DM: { value: MeUser["dm_privacy"]; label: string; desc: string }[] = [
-  { value: "everyone", label: "Everyone", desc: "Anyone on this server can message you." },
-  { value: "friends", label: "Friends only", desc: "Only your friends can start a conversation with you." },
-  { value: "nobody", label: "Nobody", desc: "Nobody can start a new direct message with you. Existing conversations keep working." },
+function dmChoices(): { value: MeUser["dm_privacy"]; label: string; desc: string }[] {
+  return [
+  { value: "everyone", label: t("settings.privacy.everyone"), desc: t("settings.privacy.anyoneOnThisServerCanMessage") },
+  { value: "friends", label: t("settings.privacy.friendsOnly"), desc: t("settings.privacy.onlyYourFriendsCanStartA") },
+  { value: "nobody", label: t("settings.privacy.nobody"), desc: t("settings.privacy.nobodyCanStartANewDirect") },
 ];
+}
 
 export default function PrivacyPage() {
   const [exporting, setExporting] = useState(false);
@@ -26,7 +28,7 @@ export default function PrivacyPage() {
       const bytes = await exportMyData(setExportStatus);
       downloadBytes(`evilion-chat-export-${new Date().toISOString().slice(0, 10)}.zip`, bytes);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not export your data.", "error");
+      toast(err instanceof ApiError ? err.message : t("settings.privacy.couldNotExportYourData"), "error");
     } finally {
       setExporting(false);
       setExportStatus("");
@@ -42,14 +44,14 @@ export default function PrivacyPage() {
     try {
       setMe(await usersApi.patchMe({ dm_privacy: value }));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not save.", "error");
+      toast(err instanceof ApiError ? err.message : t("settings.privacy.couldNotSave"), "error");
     }
   };
   return (
     <>
       <h2 className={s.title}>{t("settings.privacy.privacySafety")}</h2>
       <h3 className={s.h5}>{t("settings.privacy.directMessages")}</h3>
-      {DM.map((o) => (
+      {dmChoices().map((o) => (
         <label key={o.value} className={s.radio} data-on={me.dm_privacy === o.value}>
           <input type="radio" name="dm" checked={me.dm_privacy === o.value} onChange={() => void setDM(o.value)} />
           <span className={s.radioText}><span className={s.radioLabel}>{o.label}</span><span className={s.radioDesc}>{o.desc}</span></span>

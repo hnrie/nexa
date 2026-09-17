@@ -35,7 +35,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
 
   const save = async () => {
     const trimmed = name.trim();
-    if (!trimmed) return setError("Give the subchat a name.");
+    if (!trimmed) return setError(t("modals.subchat.giveTheSubchatAName"));
     if (changingPassword) {
       const problem = passwordProblem(password);
       if (problem) return setError(problem);
@@ -54,14 +54,14 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
       }
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That could not be saved.");
+      setError(err instanceof ApiError ? err.message : t("modals.subchat.thatCouldNotBeSaved"));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Modal title={editing ? "Edit Subchat" : "New Subchat"} open onClose={onClose} width={440}>
+    <Modal title={editing ? t("chat.subchat.editSubchat") : t("modals.subchat.newSubchat")} open onClose={onClose} width={440}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Field label={t("modals.subchat.name")} required>
           <TextInput value={name} maxLength={MAX_NAME} autoFocus onChange={(e) => setName(e.target.value)} data-testid="subchat-modal-name" />
@@ -78,12 +78,12 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
         />
         {wantsPassword ? (
           <>
-            <Field label={channel?.locked ? "New password" : "Password"}>
+            <Field label={channel?.locked ? t("settings.account.newPassword") : "Password"}>
               <TextInput
                 type="password"
                 value={password}
                 autoComplete="new-password"
-                placeholder={channel?.locked ? "Leave empty to keep the current one" : undefined}
+                placeholder={channel?.locked ? t("modals.subchat.leaveEmptyToKeepTheCurrent") : undefined}
                 onChange={(e) => setPassword(e.target.value)}
                 data-testid="subchat-modal-password"
               />
@@ -97,7 +97,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
         ) : null}
         {error ? <div style={{ color: "var(--danger)", fontSize: 14 }}>{error}</div> : null}
         <Button block loading={busy} disabled={!name.trim()} onClick={() => void save()} data-testid="subchat-modal-save">
-          {editing ? "Save" : "Create Subchat"}
+          {editing ? "Save" : t("modals.subchat.createSubchat")}
         </Button>
       </div>
     </Modal>

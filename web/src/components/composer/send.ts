@@ -15,6 +15,7 @@ import { useSlowmode } from "@/stores/slowmode";
 import { extractUrls } from "@/markdown";
 import { extractMentions } from "./mentions";
 
+import { t } from "@/i18n";
 export interface SendOptions {
   replyTo?: string;
   ping?: boolean;
@@ -72,13 +73,13 @@ export async function sendMessage(channelId: string, rawText: string, opts: Send
   } catch (err) {
     useMessages.getState().failPending(channelId, tmp);
     const ui = useUI.getState();
-    if (err instanceof Error && err.message === "waiting_for_key") ui.toast("Waiting for the encryption key for this conversation. Someone who has it needs to be online.", "error");
+    if (err instanceof Error && err.message === "waiting_for_key") ui.toast(t("composer.send.waitingForTheEncryptionKeyFor"), "error");
     else if (err instanceof ApiError && err.code === "slowmode") {
       const secs = Number(err.retryAfter ?? 0) || 5;
       useSlowmode.getState().setUntil(channelId, Date.now() + secs * 1000);
       ui.toast(`Slow mode is on. Try again in ${secs}s.`, "error");
     } else if (err instanceof ApiError) ui.toast(err.code === "rate_limited" ? "You are sending messages too quickly." : err.message, "error");
-    else ui.toast("Your message could not be sent.", "error");
+    else ui.toast(t("composer.send.yourMessageCouldNotBeSent"), "error");
     throw err;
   }
 }

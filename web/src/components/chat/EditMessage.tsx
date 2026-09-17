@@ -43,7 +43,7 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       await editMessage(msg.channel_id, msg.id, body);
       endEdit(msg.channel_id, msg.id);
     } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not save the edit.", "error");
+      toast(err instanceof Error ? err.message : t("chat.editMessage.couldNotSaveTheEdit"), "error");
     } finally {
       setBusy(false);
     }

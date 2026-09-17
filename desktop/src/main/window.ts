@@ -20,13 +20,33 @@ export function openExternal(url: string): void {
   }
 }
 
+/** The brand artwork, so the app looks like itself before the site answers. */
+const WORDMARK = `<svg viewBox="0 0 229.45 100" width="196" height="85" aria-label="Nexa"><path d="M119.0 20.43 136.82 20.43 136.58 29.22 137.29 31.59 138.95 34.44 144.18 39.19 149.64 34.44 151.78 31.35 152.26 20.43 169.6 20.43 169.6 35.63 156.29 48.69 170.31 63.42 170.31 72.92 168.88 73.4 155.58 76.25 152.02 76.25 152.26 71.02 151.07 66.51 148.22 62.23 144.89 59.38 143.94 59.38 140.38 62.0 137.29 66.75 136.58 69.36 136.82 76.25 118.29 76.01 118.29 63.66 131.83 49.64 119.0 36.1ZM0.0 21.62 40.14 21.62 41.81 22.8 29.45 25.65 50.59 30.17 52.49 38.72 52.49 76.25 33.73 76.25 33.73 66.98 33.73 35.87 18.53 35.87 18.53 76.25 0.0 76.25ZM70.31 21.62 99.52 21.62 104.28 24.23 109.74 29.69 110.93 31.12 110.93 49.64 106.65 55.34 76.96 55.34 76.96 62.71 109.26 62.71 109.26 66.27 109.26 76.25 68.17 76.25 64.13 71.97 58.67 67.7 58.67 34.2 59.62 30.17 80.52 25.65 68.41 22.8ZM180.52 22.09 219.24 22.09 229.45 31.35 229.45 76.72 200.48 76.72 195.96 75.53 181.24 72.45 177.2 52.49 184.09 43.94 211.88 43.94 211.88 35.87 180.52 35.63ZM77.2 34.44 76.96 44.42 92.64 44.42 92.64 34.44ZM195.72 55.34 195.49 63.18 211.64 63.18 211.64 55.34Z" fill="#f3f3f4"/><path d="M54.87 0.0 59.62 20.9 80.52 25.42 59.62 29.93 55.11 50.83 50.36 29.93 29.45 25.65 50.59 20.9ZM176.96 53.21 181.24 72.45 200.48 76.48 181.24 80.76 177.2 100.0 172.92 80.76 153.68 76.72 172.92 72.45Z" fill="#8000ff"/></svg>`;
+
+/**
+ * What the window shows while the site loads.
+ *
+ * Without it the first thing a new install draws is an empty grey rectangle,
+ * which reads as a broken app rather than a starting one. This is the same
+ * wordmark and the same background the app itself uses, so the seam between
+ * the two is hard to see.
+ */
+const splashPage = (): string =>
+  "data:text/html;charset=utf-8," +
+  encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><title>Nexa</title>
+<style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#2c2d32}
+.mark{animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.55;transform:scale(.99)}50%{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.mark{animation:none;opacity:1}}</style></head>
+<body><div class="mark">${WORDMARK}</div></body></html>`);
+
 const offlinePage = (): string =>
   "data:text/html;charset=utf-8," +
-  encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5;url=${START_URL}"><title>nexa</title>
+  encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5;url=${START_URL}"><title>Nexa</title>
 <style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#2c2d32;color:#f3f3f4;font:16px system-ui,-apple-system,"Segoe UI",sans-serif}
-main{text-align:center;max-width:360px;padding:24px}h1{font-size:20px;margin:0 0 8px}p{color:#abacb2;margin:0 0 20px;line-height:1.4}
-a{display:inline-block;padding:10px 20px;border-radius:4px;background:#5865f2;color:#fff;text-decoration:none;font-weight:600}</style></head>
-<body><main><h1>Can't reach nexa</h1><p>Check your connection. Trying again in a few seconds.</p><a href="${START_URL}">Try now</a></main></body></html>`);
+main{text-align:center;max-width:360px;padding:24px}svg{margin:0 auto 20px;display:block}h1{font-size:20px;margin:0 0 8px}p{color:#abacb2;margin:0 0 20px;line-height:1.4}
+a{display:inline-block;padding:10px 20px;border-radius:4px;background:#8000ff;color:#fff;text-decoration:none;font-weight:600}</style></head>
+<body><main>${WORDMARK}<h1>Can't reach Nexa</h1><p>Check your connection. Trying again in a few seconds.</p><a href="${START_URL}">Try now</a></main></body></html>`);
 
 export function createMainWindow(settings: SettingsStore, opts: { preload: string; hidden: boolean; icon?: string }): BrowserWindow {
   const saved = settings.get("bounds");
@@ -42,7 +62,7 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
     minHeight: 520,
     show: false,
     backgroundColor: "#2c2d32",
-    title: "nexa",
+    title: "Nexa",
     autoHideMenuBar: true,
     ...(opts.icon ? { icon: opts.icon } : {}),
     webPreferences: {
@@ -100,7 +120,8 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
   win.on("maximize", remember);
   win.on("unmaximize", remember);
 
-  void win.loadURL(START_URL);
+  // the splash is a data URL, so it paints immediately; the site replaces it
+  void win.loadURL(splashPage()).then(() => win.loadURL(START_URL));
   return win;
 }
 
@@ -133,7 +154,7 @@ export function applicationMenu(win: () => BrowserWindow | null, checkUpdates: (
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: "nexa",
+        label: "Nexa",
         submenu: [
           { role: "about" },
           { label: "Check for Updates…", click: checkUpdates },

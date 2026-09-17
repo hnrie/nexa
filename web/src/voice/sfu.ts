@@ -15,6 +15,7 @@ import { Playback } from "./playback";
 import { PlayoutDelay } from "./playoutDelay";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 
+import { t as tr_ } from "@/i18n";
 type PubKind = "audio" | "video" | "screen" | "screen_audio";
 
 /** A track pulled from someone else, arriving on one of this connection's mids. */
@@ -133,7 +134,7 @@ const UPLINK_MIN_PACKETS = 40;
 const LOSS_GRACE_MS = 4_000;
 /** After the server pauses video, this device leaves it alone this long before asking again. */
 const VIDEO_PAUSE_MS = 10 * 60_000;
-const VIDEO_PAUSED = "Video is paused until next month to keep calls free.";
+
 
 /** Thrown by a step whose connection was replaced or closed while it waited. */
 class Stale extends Error {}
@@ -824,7 +825,7 @@ export class SfuTransport implements VoiceTransport {
       await voiceApi.sfuRenegotiate({ session_id: session, description: description(pc.localDescription) }, timeout());
       this.live(pc);
     }
-    if (paused && !this.videoPaused()) this.pauseVideo(VIDEO_PAUSED);
+    if (paused && !this.videoPaused()) this.pauseVideo(tr_("sfu.videoIsPausedUntilNextMonth"));
     // a track not there yet (its publisher still connecting) is asked for again shortly; what is no longer wanted by then is not
     if (refused) this.retryLater(false, PULL_RETRY_BASE_MS);
   }

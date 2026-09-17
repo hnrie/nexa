@@ -17,15 +17,17 @@ import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
-const AGES: { v: number; label: string }[] = [
-  { v: 1800, label: "30 minutes" },
-  { v: 3600, label: "1 hour" },
-  { v: 21600, label: "6 hours" },
-  { v: 43200, label: "12 hours" },
-  { v: 86400, label: "1 day" },
-  { v: 604800, label: "7 days" },
-  { v: 0, label: "Never" },
+function ages(): { v: number; label: string }[] {
+  return [
+  { v: 1800, label: t("modals.customStatus.30Minutes") },
+  { v: 3600, label: t("modals.customStatus.1Hour") },
+  { v: 21600, label: t("modals.invite.6Hours") },
+  { v: 43200, label: t("modals.invite.12Hours") },
+  { v: 86400, label: t("modals.groupInvite.1Day") },
+  { v: 604800, label: t("modals.groupInvite.7Days") },
+  { v: 0, label: t("modals.groupInvite.never") },
 ];
+}
 const USES = [0, 1, 5, 10, 25, 50, 100];
 
 export function InviteModal({ onClose, serverId, channelId }: { onClose: () => void; serverId: string; channelId?: string | undefined }) {
@@ -89,23 +91,23 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
         </Field>
         <div className={s.keyNote} data-warn={!key}>
           <KeyRound size={16} />
-          <span>{key ? "This link carries the server's current encryption key, so whoever opens it can read the channels right away. Anyone with the link can read the history it unlocks; keys rotate when someone is removed." : "You don't hold this server's encryption key yet, so the link can't carry it. New members will receive a key from a member who is online."}</span>
+          <span>{key ? t("modals.invite.thisLinkCarriesTheServerS") : t("modals.invite.youDonTHoldThisServer")}</span>
         </div>
         <Toggle checked={withKey && !!key} disabled={!key} onChange={setWithKey} label={t("modals.invite.includeTheEncryptionKeyInThe")} />
         <div className={s.sep} />
         <div className={s.row2}>
           <Field label={t("modals.groupInvite.expireAfter")}>
             <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(channel, v, uses); }}>
-              {AGES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
+              {ages().map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
           <Field label={t("modals.groupInvite.maxNumberOfUses")}>
             <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); void generate(channel, age, v); }}>
-              {USES.map((u) => <option key={u} value={u}>{u === 0 ? "No limit" : `${u} use${u === 1 ? "" : "s"}`}</option>)}
+              {USES.map((u) => <option key={u} value={u}>{u === 0 ? t("modals.invite.noLimit") : t("modals.invite.usesCount", { count: u })}</option>)}
             </Select>
           </Field>
         </div>
-        <p className={s.fine}><Hash size={12} /> {chName ? `People who use this link land in #${chName}.` : "Pick a channel to invite people to."}</p>
+        <p className={s.fine}><Hash size={12} /> {chName ? t("modals.invite.landInChannel", { name: chName }) : t("modals.invite.pickAChannel")}</p>
       </div>
     </Modal>
   );

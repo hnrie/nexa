@@ -22,7 +22,7 @@ export default function LockPage() {
     try {
       await unlock(password);
     } catch {
-      setError("That password could not unlock your keys.");
+      setError(t("lock.thatPasswordCouldNotUnlockYour"));
     } finally {
       setBusy(false);
     }

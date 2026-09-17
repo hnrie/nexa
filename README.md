@@ -1,4 +1,4 @@
-# nexa
+# Nexa
 
 A self-hosted, end-to-end-encrypted chat platform with a Discord-shaped UI, served at
 `https://chat.evilion.xyz` through the Cloudflare tunnel that already fronts this box.

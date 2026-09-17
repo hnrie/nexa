@@ -29,7 +29,7 @@ export default function DeleteServerPage({ serverId, onDone }: { serverId: strin
       remove(serverId);
       onDone();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : "Could not delete the server.", "error");
+      toast(err instanceof ApiError ? err.message : t("server.deleteServer.couldNotDeleteTheServer"), "error");
       setBusy(false);
     }
   };

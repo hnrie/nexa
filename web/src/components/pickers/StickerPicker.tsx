@@ -32,8 +32,8 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   // right click, or a long press on a phone
   const packMenu = (p: StickerPack) => (e: MouseEvent) => {
     const items: ContextMenuItem[] = [];
-    if (p.owner_user_id === meId) items.push({ id: "edit", label: "Edit Pack", onSelect: () => edit(p) });
-    if (canRemovePack(p, meId)) items.push({ id: "remove", label: "Remove Pack", danger: true, onSelect: () => confirmRemovePack(p) });
+    if (p.owner_user_id === meId) items.push({ id: "edit", label: t("pickers.stickerPicker.editPack"), onSelect: () => edit(p) });
+    if (canRemovePack(p, meId)) items.push({ id: "remove", label: t("pickers.stickerPicker.removePack"), danger: true, onSelect: () => confirmRemovePack(p) });
     if (!items.length) return;
     e.preventDefault();
     openContextMenu({ x: e.clientX, y: e.clientY, items });

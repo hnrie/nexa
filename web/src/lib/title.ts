@@ -4,7 +4,7 @@ import { useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 
-const BASE = "nexa";
+const BASE = "Nexa";
 
 /** Friend requests waiting for an answer. */
 export function pendingFriendRequests(): number {
