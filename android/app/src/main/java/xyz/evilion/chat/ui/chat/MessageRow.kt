@@ -173,6 +173,18 @@ fun MessageRow(
                                 }
                             },
                         )
+                        Spacer(Modifier.width(10.dp))
+                        // Retrying is the only thing this offered, so a message
+                        // the server will never take — no permission, too long —
+                        // sat at the bottom of the conversation for good.
+                        Text(
+                            t("messageRow.discard"),
+                            color = colors.textMuted,
+                            fontSize = 11.sp,
+                            modifier = Modifier.clickable {
+                                MessageService.dropFailed(message.raw.channelId, message.id)
+                            },
+                        )
                     }
                 }
             }

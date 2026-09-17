@@ -163,7 +163,18 @@ object MessagesApi {
             putJsonArray("ids") { for (id in ids) add(id) }
         }))
 
-    suspend fun ack(channelId: String, messageId: String) = Api.request<Unit>("POST", "/channels/$channelId/messages/$messageId/ack")
+    /**
+     * Marks a channel read up to a message.
+     *
+     * An ordinary ack never moves backwards, so marking something *unread*
+     * has to say it means it. Without the flag the request is accepted and
+     * quietly changes nothing.
+     */
+    suspend fun ack(channelId: String, messageId: String, manual: Boolean = false) =
+        Api.request<Unit>(
+            "POST", "/channels/$channelId/messages/$messageId/ack",
+            if (manual) Api.body(buildJsonObject { put("manual", true) }) else null,
+        )
 
     suspend fun addReaction(channelId: String, messageId: String, emoji: String) =
         Api.request<Unit>("PUT", "/channels/$channelId/messages/$messageId/reactions/${encode(emoji)}/@me")

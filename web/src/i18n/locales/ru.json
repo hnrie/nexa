@@ -608,6 +608,7 @@
   "messageActions.markUnread": "Отметить непрочитанным",
   "messageActions.pin": "Закрепить",
   "messageActions.thatMessageCouldNotBeDeleted": "Это сообщение не удалось удалить.",
+  "messageRow.discard": "Отбросить",
   "messageRow.notSentTapToTryAgain": "Не отправлено. Нажмите, чтобы повторить.",
   "messageRow.originalMessage": "Исходное сообщение",
   "messageRow.pinned": "Закреплено",

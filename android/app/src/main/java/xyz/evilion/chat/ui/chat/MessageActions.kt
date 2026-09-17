@@ -148,8 +148,15 @@ fun MessageActions(
                     val previous = AppState.messages(channelId).value
                         .filter { (it.raw.id.toLongOrNull() ?: 0) < (message.raw.id.toLongOrNull() ?: 0) }
                         .maxByOrNull { it.raw.id.toLongOrNull() ?: 0 }
+                    val upTo = previous?.raw?.id ?: "0"
+                    // show it straight away, as the web does, rather than
+                    // waiting for the round trip to say nothing
+                    AppState.putReadState(
+                        (AppState.readStates.value[channelId] ?: xyz.evilion.chat.net.ReadState(channelId))
+                            .copy(lastReadMessageId = upTo, unreadCount = 1),
+                    )
                     runCatching {
-                        xyz.evilion.chat.net.MessagesApi.ack(channelId, previous?.raw?.id ?: "0")
+                        xyz.evilion.chat.net.MessagesApi.ack(channelId, upTo, manual = true)
                     }
                 }
                 onDismiss()

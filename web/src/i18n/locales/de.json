@@ -603,6 +603,7 @@
   "messageActions.markUnread": "Als ungelesen markieren",
   "messageActions.pin": "Anpinnen",
   "messageActions.thatMessageCouldNotBeDeleted": "Diese Nachricht konnte nicht gelöscht werden.",
+  "messageRow.discard": "Verwerfen",
   "messageRow.notSentTapToTryAgain": "Nicht gesendet. Zum Wiederholen tippen.",
   "messageRow.originalMessage": "Ursprüngliche Nachricht",
   "messageRow.pinned": "Angepinnt",

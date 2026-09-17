@@ -71,6 +71,9 @@ fun Sidebar(route: Route, onPick: () -> Unit) {
 private fun ServerRail(route: Route) {
     val colors = chatColors
     val servers by AppState.servers.collectAsState()
+    // the settings document, so an order saved on another device shows here
+    AppState.readStates.collectAsState()
+    SettingsStore.doc.collectAsState()
     val order = SettingsStore.serverOrder
     val list = servers.values.sortedWith(compareBy({ order.indexOf(it.id).let { i -> if (i < 0) Int.MAX_VALUE else i } }, { it.server.name }))
     val activeServer = (route as? Route.Chat)?.serverId
@@ -148,6 +151,10 @@ private fun ServerChannels(serverId: String, activeChannel: String?, onPick: () 
     val servers by AppState.servers.collectAsState()
     val channelMap by AppState.channels.collectAsState()
     val state = servers[serverId] ?: return
+    // collapsing a category, muting a channel and reading one all live in
+    // flows this composable has to be watching to redraw for
+    SettingsStore.doc.collectAsState()
+    AppState.readStates.collectAsState()
     val collapsed = SettingsStore.collapsedCategories
     val channels = AppState.channelsOf(serverId).filter { AppState.permissionsIn(it.id).has(P.VIEW_CHANNEL) }
     val byParent = channels.groupBy { it.parentId }
@@ -216,6 +223,9 @@ private fun ServerChannels(serverId: String, activeChannel: String?, onPick: () 
 @Composable
 private fun ChannelRow(channel: Channel, selected: Boolean, serverId: String, onPick: () -> Unit) {
     val colors = chatColors
+    AppState.readStates.collectAsState()
+    AppState.voiceStates.collectAsState()
+    SettingsStore.doc.collectAsState()
     val (unread, mentions) = AppState.unreadOf(channel.id)
     val voice = AppState.voiceIn(channel.id)
     val private = xyz.evilion.chat.data.Permissions.isPrivateChannel(serverId, channel.overwrites)
@@ -284,6 +294,9 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
     val colors = chatColors
     val channels by AppState.channels.collectAsState()
     val me by AppState.me.collectAsState()
+    AppState.readStates.collectAsState()
+    AppState.presences.collectAsState()
+    AppState.relationships.collectAsState()
     val dms = AppState.dmChannels()
 
     Column(Modifier.fillMaxSize()) {

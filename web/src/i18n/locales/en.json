@@ -603,6 +603,7 @@
   "messageActions.markUnread": "Mark unread",
   "messageActions.pin": "Pin",
   "messageActions.thatMessageCouldNotBeDeleted": "That message could not be deleted.",
+  "messageRow.discard": "Discard",
   "messageRow.notSentTapToTryAgain": "Not sent. Tap to try again.",
   "messageRow.originalMessage": "Original message",
   "messageRow.pinned": "Pinned",

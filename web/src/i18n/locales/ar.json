@@ -610,6 +610,7 @@
   "messageActions.markUnread": "تحديد كغير مقروءة",
   "messageActions.pin": "تثبيت",
   "messageActions.thatMessageCouldNotBeDeleted": "تعذّر حذف تلك الرسالة.",
+  "messageRow.discard": "تجاهل",
   "messageRow.notSentTapToTryAgain": "لم تُرسل. انقر للمحاولة مرة أخرى.",
   "messageRow.originalMessage": "الرسالة الأصلية",
   "messageRow.pinned": "مثبَّتة",

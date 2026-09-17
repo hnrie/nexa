@@ -590,6 +590,7 @@
   "messageActions.markUnread": "标为未读",
   "messageActions.pin": "置顶",
   "messageActions.thatMessageCouldNotBeDeleted": "那条消息无法删除。",
+  "messageRow.discard": "丢弃",
   "messageRow.notSentTapToTryAgain": "未发送。点一下重试。",
   "messageRow.originalMessage": "原始消息",
   "messageRow.pinned": "已置顶",
