@@ -1,14 +1,20 @@
 /**
  * The front page: what Nexa is, in as few words as it takes.
  *
- * Everything here is a claim the app actually keeps, shown with real pictures
- * of it rather than an illustration of one. The page reveals each block as it
- * scrolls into view and holds still for anyone who asked for less motion.
+ * Every claim here is one the app keeps, shown with pictures and short loops
+ * taken from it actually running (tools/home_shots.py, tools/home_gifs.py)
+ * rather than an illustration of it. Blocks appear as they are scrolled to and
+ * the pictures sit on a plane that tips towards the pointer; all of it holds
+ * still for anyone who asked for less motion.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Gift, Lock, MonitorPlay, Server, Sparkles, Zap } from "lucide-react";
+import {
+  AtSign, Gauge, Images, KeyRound, Languages, Link2, Lock, MessagesSquare,
+  MonitorPlay, ScanSearch, Smile, Sparkles, UserPlus, ZoomIn,
+} from "lucide-react";
 import { NexaWordmark } from "@/components/common/Brand";
+import { FloatingPlane } from "@/components/common/FloatingPlane";
 import { useAuth } from "@/stores/auth";
 import { useReveal } from "@/hooks/useReveal";
 import { currentPlatform } from "@/lib/platform";
@@ -26,22 +32,54 @@ function Reveal({ children, delay = 0, className }: { children: ReactNode; delay
 }
 
 /** A picture of the app, in a frame that reads as a window. */
-function Shot({ src, alt, wide }: { src: string; alt: string; wide?: boolean }) {
+function Shot({ src, alt }: { src: string; alt: string }) {
   return (
-    <figure className={s.shot} data-wide={wide || undefined}>
-      <div className={s.chrome}><i /><i /><i /></div>
-      <img src={src} alt={alt} loading="lazy" decoding="async" />
-    </figure>
+    <FloatingPlane>
+      <figure className={s.shot}>
+        <div className={s.chrome}><i /><i /><i /></div>
+        <img src={src} alt={alt} loading="lazy" decoding="async" />
+      </figure>
+    </FloatingPlane>
+  );
+}
+
+/**
+ * A short loop of the app in use. The video is a fraction of the size of the
+ * same thing as a GIF, and the GIF is there for anything that cannot play it.
+ */
+function Loop({ name, alt }: { name: string; alt: string }) {
+  return (
+    <FloatingPlane>
+      <figure className={s.shot}>
+        <div className={s.chrome}><i /><i /><i /></div>
+        <video autoPlay muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt}>
+          <source src={`/home/${name}.webm`} type="video/webm" />
+          <img src={`/home/${name}.gif`} alt={alt} loading="lazy" />
+        </video>
+      </figure>
+    </FloatingPlane>
   );
 }
 
 const POINTS = () => [
   { icon: Lock, title: t("home.point.encryptedTitle"), body: t("home.point.encryptedBody") },
-  { icon: Gift, title: t("home.point.freeTitle"), body: t("home.point.freeBody") },
-  { icon: MonitorPlay, title: t("home.point.callsTitle"), body: t("home.point.callsBody") },
-  { icon: Server, title: t("home.point.yoursTitle"), body: t("home.point.yoursBody") },
+  { icon: MessagesSquare, title: t("home.point.subchatsTitle"), body: t("home.point.subchatsBody") },
+  { icon: Smile, title: t("home.point.packsTitle"), body: t("home.point.packsBody") },
+  { icon: AtSign, title: t("home.point.noEmailTitle"), body: t("home.point.noEmailBody") },
+  { icon: UserPlus, title: t("home.point.guestsTitle"), body: t("home.point.guestsBody") },
+  { icon: ScanSearch, title: t("home.point.searchTitle"), body: t("home.point.searchBody") },
+  { icon: KeyRound, title: t("home.point.lockTitle"), body: t("home.point.lockBody") },
+  { icon: Link2, title: t("home.point.previewsTitle"), body: t("home.point.previewsBody") },
+  { icon: ZoomIn, title: t("home.point.zoomTitle"), body: t("home.point.zoomBody") },
   { icon: Sparkles, title: t("home.point.presenceTitle"), body: t("home.point.presenceBody") },
-  { icon: Zap, title: t("home.point.fastTitle"), body: t("home.point.fastBody") },
+  { icon: Images, title: t("home.point.exportTitle"), body: t("home.point.exportBody") },
+  { icon: Languages, title: t("home.point.languagesTitle"), body: t("home.point.languagesBody") },
+];
+
+const NUMBERS = () => [
+  { value: "264 KB", label: t("home.speed.size") },
+  { value: "50 ms", label: t("home.speed.switch") },
+  { value: "50 MB", label: t("home.speed.memory") },
 ];
 
 export default function HomePage() {
@@ -86,8 +124,45 @@ export default function HomePage() {
           <p className={s.fine}>{t("home.hero.fine")}</p>
         </Reveal>
         <Reveal delay={90} className={s.heroShot}>
-          <Shot src="/home/app.png" alt={t("home.shot.app")} wide />
+          <Shot src="/home/app.png" alt={t("home.shot.app")} />
         </Reveal>
+      </section>
+
+      <section className={s.strip}>
+        <Reveal>
+          <h2 className={s.h2}>{t("home.calls.title")}</h2>
+          <p className={s.body}>{t("home.calls.body")}</p>
+          <ul className={s.list}>
+            <li>{t("home.calls.a")}</li>
+            <li>{t("home.calls.b")}</li>
+            <li>{t("home.calls.c")}</li>
+          </ul>
+        </Reveal>
+        <Reveal delay={80}><Loop name="call-loop" alt={t("home.shot.call")} /></Reveal>
+      </section>
+
+      <section className={s.strip} data-flip="">
+        <Reveal>
+          <h2 className={s.h2}>{t("home.speed.title")}</h2>
+          <p className={s.body}>{t("home.speed.body")}</p>
+          <div className={s.numbers}>
+            {NUMBERS().map((n) => (
+              <div key={n.label} className={s.number}>
+                <span className={s.numberValue}>{n.value}</span>
+                <span className={s.numberLabel}>{n.label}</span>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+        <Reveal delay={80}><Loop name="speed" alt={t("home.shot.speed")} /></Reveal>
+      </section>
+
+      <section className={s.strip}>
+        <Reveal>
+          <h2 className={s.h2}>{t("home.express.title")}</h2>
+          <p className={s.body}>{t("home.express.body")}</p>
+        </Reveal>
+        <Reveal delay={80}><Shot src="/home/express.png" alt={t("home.shot.express")} /></Reveal>
       </section>
 
       <section className={s.points}>
@@ -102,25 +177,10 @@ export default function HomePage() {
         ))}
       </section>
 
-      <section className={s.strip}>
-        <Reveal>
-          <h2 className={s.h2}>{t("home.calls.title")}</h2>
-          <p className={s.body}>{t("home.calls.body")}</p>
-        </Reveal>
-        <Reveal delay={80}><Shot src="/home/call.png" alt={t("home.shot.call")} wide /></Reveal>
-      </section>
-
-      <section className={s.strip} data-flip="">
-        <Reveal>
-          <h2 className={s.h2}>{t("home.express.title")}</h2>
-          <p className={s.body}>{t("home.express.body")}</p>
-        </Reveal>
-        <Reveal delay={80}><Shot src="/home/express.png" alt={t("home.shot.express")} /></Reveal>
-      </section>
-
       <section className={s.compare}>
         <Reveal>
           <h2 className={s.h2}>{t("home.compare.title")}</h2>
+          <p className={s.body}>{t("home.compare.body")}</p>
           <table className={s.table}>
             <thead>
               <tr><th /><th>Nexa</th><th>{t("home.compare.them")}</th></tr>
@@ -128,11 +188,15 @@ export default function HomePage() {
             <tbody>
               {[
                 ["home.compare.e2ee", true, false],
-                ["home.compare.uploads", true, false],
-                ["home.compare.emoji", true, false],
-                ["home.compare.selfHost", true, false],
-                ["home.compare.ads", true, false],
+                ["home.compare.subchats", true, false],
+                ["home.compare.packs", true, false],
+                ["home.compare.emojiEverywhere", true, false],
+                ["home.compare.noEmail", true, false],
+                ["home.compare.guests", true, false],
+                ["home.compare.lock", true, false],
+                ["home.compare.zoom", true, false],
                 ["home.compare.rpc", true, true],
+                ["home.compare.calls", true, true],
               ].map(([key, ours, theirs]) => (
                 <tr key={String(key)}>
                   <td>{t(String(key))}</td>

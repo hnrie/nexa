@@ -75,10 +75,13 @@ def png_bytes(w=64, h=64, rgb=(218, 62, 68)):
 class Session:
     """One user in one browser context."""
 
-    def __init__(self, browser, base, name, out, viewport=(1366, 768), service_workers="allow"):
+    def __init__(self, browser, base, name, out, viewport=(1366, 768), service_workers="allow", record=None):
         self.base, self.name, self.out = base, name, out
         w, h = viewport
-        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"], service_workers=service_workers)
+        # record is a directory: the context films itself into it, for the
+        # loops the front page plays (tools/home_gifs.py)
+        film = {"record_video_dir": record, "record_video_size": {"width": w, "height": h}} if record else {}
+        self.ctx = browser.new_context(viewport={"width": w, "height": h}, is_mobile=w < 768, has_touch=w < 768, permissions=["microphone", "camera"], service_workers=service_workers, **film)
         self.page = self.ctx.new_page()
         self.errors = []
         self.trace = []

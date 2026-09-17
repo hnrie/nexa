@@ -1,0 +1,19 @@
+/* The stage gives the plane something to rotate inside; without perspective a
+   rotation is just a squash. */
+.stage { perspective: 1400px; perspective-origin: 50% 40%; }
+.plane {
+  --rx: 0deg;
+  --ry: 0deg;
+  --lift: 0;
+  transform: rotateX(var(--rx)) rotateY(var(--ry)) translateY(calc(var(--lift) * -6px)) scale(calc(1 + var(--lift) * 0.012));
+  transform-style: preserve-3d;
+  transition: transform 420ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation: drift 9s ease-in-out infinite;
+  will-change: transform;
+}
+/* the slow rise and fall it does with nobody near it */
+@keyframes drift {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -8px; }
+}
+@media (prefers-reduced-motion: reduce) { .plane { animation: none; transition: none; transform: none; } }
