@@ -66,9 +66,8 @@ import xyz.evilion.chat.media.Uploads
 import xyz.evilion.chat.net.AttachmentRef
 import xyz.evilion.chat.net.ChannelsApi
 import xyz.evilion.chat.ui.common.Avatar
-import xyz.evilion.chat.ui.pickers.EmojiPickerSheet
-import xyz.evilion.chat.ui.pickers.GifPickerSheet
-import xyz.evilion.chat.ui.pickers.StickerPickerSheet
+import xyz.evilion.chat.ui.pickers.EmojiIndex
+import xyz.evilion.chat.ui.pickers.ExpressionSheet
 import xyz.evilion.chat.ui.theme.chatColors
 
 /** A file waiting to be sent with the next message. */
@@ -110,13 +109,17 @@ fun Composer(
     var value by remember(channelId) { mutableStateOf(TextFieldValue(SettingsStore.draft(channelId))) }
     var staged by remember(channelId) { mutableStateOf(listOf<Staged>()) }
     var sending by remember(channelId) { mutableStateOf(false) }
-    var picker by remember { mutableStateOf<String?>(null) }
+    var picker by remember { mutableStateOf(false) }
     var lastTyping by remember(channelId) { mutableStateOf(0L) }
     var slowModeUntil by remember(channelId) { mutableStateOf(0L) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
     val canSend = channel?.isDm == true || AppState.permissionsIn(channelId).has(P.SEND_MESSAGES)
     val canAttach = channel?.isDm == true || AppState.permissionsIn(channelId).has(P.ATTACH_FILES)
+
+    // the emoji set loads in a quiet moment, so the picker and `:shortcodes:`
+    // never wait for it — the same thing the web client does
+    LaunchedEffect(Unit) { EmojiIndex.load(context) }
 
     LaunchedEffect(editing) {
         editing?.let {
@@ -152,7 +155,9 @@ fun Composer(
 
     fun doSend() {
         if (sending) return
-        val text = value.text.trim()
+        // `:shrug:` finally means something on the phone: the expansion existed
+        // and had no call site at all, so R8 was stripping it out of releases
+        val text = EmojiIndex.expandShortcodes(value.text.trim())
         val files = staged
         if (text.isEmpty() && files.isEmpty()) return
         sending = true
@@ -321,37 +326,31 @@ fun Composer(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            IconButton(onClick = { picker = "emoji" }) {
-                Icon(Lucide.Smile, t("modals.customStatus.emoji"), tint = colors.icon)
+            // one button for emoji, GIFs and stickers, and it never goes away:
+            // the GIF button used to share this slot with Send, so typing one
+            // character put GIFs and stickers out of reach entirely
+            IconButton(onClick = { picker = true }) {
+                Icon(Lucide.Smile, t("pickers.expressionPicker.expressionPicker"), tint = colors.icon)
             }
-            if (value.text.isBlank() && staged.isEmpty()) {
-                IconButton(onClick = { picker = "gif" }) {
-                    Icon(Lucide.Sticker, t("composer.gifsAndStickers"), tint = colors.icon)
-                }
-            } else {
-                IconButton(onClick = { doSend() }, enabled = canSend && !sending) {
-                    if (sending) CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
-                    else Icon(Lucide.Send, t("composer.send"), tint = colors.brand)
-                }
+            IconButton(onClick = { doSend() }, enabled = canSend && !sending && (value.text.isNotBlank() || staged.isNotEmpty())) {
+                if (sending) CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
+                else Icon(Lucide.Send, t("composer.send"), tint = if (value.text.isBlank() && staged.isEmpty()) colors.icon else colors.brand)
             }
         }
     }
 
-    when (picker) {
-        "emoji" -> EmojiPickerSheet(
+    if (picker) {
+        ExpressionSheet(
             serverId = serverId,
-            onDismiss = { picker = null },
-            onPick = { token ->
+            onDismiss = { picker = false },
+            onEmoji = { token ->
                 val at = value.selection.start.coerceIn(0, value.text.length)
                 val next = value.text.substring(0, at) + token + value.text.substring(at)
                 value = TextFieldValue(next, TextRange(at + token.length))
-                picker = null
+                SettingsStore.setDraft(channelId, next)
+                // the sheet stays open, so several emoji can go in at once
             },
-        )
-        "gif" -> GifPickerSheet(
-            onDismiss = { picker = null },
-            onPickGif = { gif ->
-                picker = null
+            onGif = { gif ->
                 scope.launch {
                     runCatching {
                         MessageService.send(
@@ -361,12 +360,7 @@ fun Composer(
                     }
                 }
             },
-            onOpenStickers = { picker = "sticker" },
-        )
-        "sticker" -> StickerPickerSheet(
-            onDismiss = { picker = null },
-            onPick = { sticker ->
-                picker = null
+            onSticker = { sticker ->
                 scope.launch {
                     runCatching {
                         MessageService.send(

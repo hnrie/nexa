@@ -44,10 +44,11 @@ import xyz.evilion.chat.data.UiMessage
 import xyz.evilion.chat.data.has
 import xyz.evilion.chat.net.Api
 import xyz.evilion.chat.net.ChannelsApi
-import xyz.evilion.chat.ui.pickers.EmojiPickerSheet
+import xyz.evilion.chat.ui.pickers.ExpressionMode
+import xyz.evilion.chat.ui.pickers.ExpressionSheet
+import xyz.evilion.chat.ui.pickers.Expressions
+import xyz.evilion.chat.ui.pickers.Pick
 import xyz.evilion.chat.ui.theme.chatColors
-
-private val QUICK = listOf("👍", "😂", "❤️", "🔥", "😮", "😢")
 
 /** What a long press on a message offers. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +66,8 @@ fun MessageActions(
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val clipboard = LocalClipboardManager.current
     val me by AppState.me.collectAsState()
-    var pickingEmoji by remember { mutableStateOf(false) }
+    val settings by SettingsStore.doc.collectAsState()
+    var reacting by remember { mutableStateOf(false) }
 
     val mine = message.raw.authorId == me?.id
     val perms = AppState.permissionsIn(channelId)
@@ -73,10 +75,25 @@ fun MessageActions(
     val canReact = message.raw.channelId.isNotEmpty() && (AppState.channels.value[channelId]?.isDm == true || perms.has(P.ADD_REACTIONS))
     val pinned = message.raw.flags and 1 != 0
 
-    fun react(emoji: String) {
-        scope.launch { runCatching { MessageService.react(channelId, message.raw.id, emoji, true) } }
-        SettingsStore.rememberEmoji(emoji)
+    fun react(key: String) {
+        scope.launch { runCatching { MessageService.react(channelId, message.raw.id, key, true) } }
         onDismiss()
+    }
+
+    /**
+     * The picker replaces this sheet rather than stacking on top of it.
+     *
+     * A second `ModalBottomSheet` used to be mounted with this one still behind
+     * it, scrimmed: two sheets, two scrims, and Back closing the wrong one.
+     */
+    if (reacting) {
+        ExpressionSheet(
+            serverId = serverId,
+            mode = ExpressionMode.Reaction(AppState.nameFor(message.raw.authorId, serverId)),
+            onDismiss = onDismiss,
+            onEmoji = { key -> react(key) },
+        )
+        return
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
@@ -87,14 +104,26 @@ fun MessageActions(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val recents = SettingsStore.recentEmoji.filter { !it.startsWith("<") }.take(4)
-                    for (emoji in (recents + QUICK).distinct().take(6)) {
-                        TwemojiImage(emoji, 28.dp, modifier = Modifier.clickable { react(emoji) }.padding(4.dp), fallbackSize = 26.sp)
+                    val recents = remember(settings) { Expressions.recentUnicode(settings).take(4) }
+                    for (emoji in (recents + Expressions.QUICK).distinct().take(6)) {
+                        TwemojiImage(
+                            emoji, 28.dp,
+                            modifier = Modifier.clickable {
+                                Expressions.remember(Pick.Unicode(emoji, emoji))
+                                react(emoji)
+                            }.padding(4.dp),
+                            fallbackSize = 26.sp,
+                        )
                     }
                     Icon(
                         Lucide.Smile, t("chat.chat.more"),
                         tint = colors.icon,
-                        modifier = Modifier.size(26.dp).clickable { pickingEmoji = true },
+                        modifier = Modifier.size(26.dp).clickable {
+                            scope.launch {
+                                sheet.hide()
+                                reacting = true
+                            }
+                        },
                     )
                 }
             }
@@ -148,18 +177,6 @@ fun MessageActions(
         }
     }
 
-    if (pickingEmoji) {
-        EmojiPickerSheet(
-            serverId = serverId,
-            onDismiss = { pickingEmoji = false },
-            onPick = { token ->
-                pickingEmoji = false
-                // a custom emoji reacts by its key, not its markdown token
-                val custom = Regex("^<(a)?:([^:]+):(\\d+)>$").find(token)
-                react(if (custom != null) "${custom.groupValues[1]}:${custom.groupValues[2]}:${custom.groupValues[3]}" else token)
-            },
-        )
-    }
 }
 
 @Composable
