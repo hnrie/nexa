@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"evilion.xyz/chat/internal/unfurl"
 )
@@ -32,14 +33,24 @@ var proxyTypes = map[string]bool{
 	"audio/mpeg": true, "audio/mp4": true, "audio/ogg": true,
 }
 
+// proxyTTL is how long a signed media link stays usable. Long enough for a
+// page someone left open overnight, short enough that a link lifted from a
+// response does not become a permanent way to make this server fetch things.
+const proxyTTL = 24 * time.Hour
+
 func (s *Server) proxyRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /media/proxy/{sig}/{url}", s.handleMediaProxy)
-	mux.HandleFunc("HEAD /media/proxy/{sig}/{url}", s.handleMediaProxy)
+	// Fetching on a caller's behalf costs this server bandwidth in both
+	// directions, so it is metered per address whether or not anyone is
+	// signed in.
+	mux.Handle("GET /media/proxy/{sig}/{url}", ipLimited(s.limProxy, s.handleMediaProxy))
+	mux.Handle("HEAD /media/proxy/{sig}/{url}", ipLimited(s.limProxy, s.handleMediaProxy))
 }
 
-func (s *Server) proxySignature(encoded string) string {
+func (s *Server) proxySignature(expires, encoded string) string {
 	mac := hmac.New(sha256.New, s.Secret)
-	mac.Write([]byte("media-proxy/v1"))
+	mac.Write([]byte("media-proxy/v2"))
+	mac.Write([]byte(expires))
+	mac.Write([]byte{0})
 	mac.Write([]byte(encoded))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)[:proxySigLength])
 }
@@ -56,13 +67,23 @@ func (s *Server) ProxyURL(raw string) string {
 		return raw
 	}
 	encoded := base64.RawURLEncoding.EncodeToString([]byte(raw))
-	return "/media/proxy/" + s.proxySignature(encoded) + "/" + encoded
+	// The expiry rides in the signature segment rather than a segment of its
+	// own, so the path keeps the shape clients already read a filename out of.
+	expires := strconv.FormatInt(time.Now().Add(proxyTTL).Unix(), 10)
+	return "/media/proxy/" + expires + "-" + s.proxySignature(expires, encoded) + "/" + encoded
 }
 
 func (s *Server) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	encoded := r.PathValue("url")
-	if !hmac.Equal([]byte(r.PathValue("sig")), []byte(s.proxySignature(encoded))) {
+	expires, mac, ok := strings.Cut(r.PathValue("sig"), "-")
+	if !ok || !hmac.Equal([]byte(mac), []byte(s.proxySignature(expires, encoded))) {
 		http.Error(w, "bad signature", http.StatusForbidden)
+		return
+	}
+	// A signature with no expiry is a capability that never goes away: lift one
+	// out of any response and this server fetches for you, for good.
+	if at, err := strconv.ParseInt(expires, 10, 64); err != nil || time.Now().Unix() > at {
+		http.Error(w, "expired", http.StatusForbidden)
 		return
 	}
 	rawBytes, err := base64.RawURLEncoding.DecodeString(encoded)

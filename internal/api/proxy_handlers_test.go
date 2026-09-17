@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -161,5 +162,36 @@ func TestMediaProxyPlaysLongVideoInPieces(t *testing.T) {
 	res2.Body.Close()
 	if res2.StatusCode != http.StatusRequestEntityTooLarge {
 		t.Errorf("the whole file at once: %d", res2.StatusCode)
+	}
+}
+
+// A signed media link used to be a capability that never expired: lift one out
+// of any response and the server would keep fetching for you, for anyone, for
+// good. The signature now covers a deadline, and a stale one is refused.
+func TestProxyLinksExpire(t *testing.T) {
+	s, ts := newTestServer(t)
+
+	signed := s.ProxyURL("https://example.com/a.png")
+	if !strings.HasPrefix(signed, "/media/proxy/") {
+		t.Fatalf("not a proxy path: %q", signed)
+	}
+	// the path still has the shape clients read a filename out of
+	if parts := strings.Split(strings.TrimPrefix(signed, "/"), "/"); len(parts) != 4 {
+		t.Fatalf("want media/proxy/sig/url, got %q", signed)
+	}
+
+	// a deadline in the past, signed correctly, is still refused
+	encoded := base64.RawURLEncoding.EncodeToString([]byte("https://example.com/a.png"))
+	past := strconv.FormatInt(time.Now().Add(-time.Minute).Unix(), 10)
+	stale := "/media/proxy/" + past + "-" + s.proxySignature(past, encoded) + "/" + encoded
+	if res, _ := do(t, ts, "GET", stale, "", nil); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("an expired link should be refused, got %d", res.StatusCode)
+	}
+
+	// and so is a deadline moved forward without re-signing
+	future := strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)
+	forged := "/media/proxy/" + future + "-" + s.proxySignature(past, encoded) + "/" + encoded
+	if res, _ := do(t, ts, "GET", forged, "", nil); res.StatusCode != http.StatusForbidden {
+		t.Fatalf("a moved deadline should be refused, got %d", res.StatusCode)
 	}
 }
