@@ -9,6 +9,8 @@ import android.os.LocaleList
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -91,25 +93,35 @@ object Strings {
 
     val rtl: Boolean get() = LANGUAGES.firstOrNull { it.tag == tag }?.rtl == true
 
-    /** Reads English and settles on a language before anything is drawn. Calling it twice changes nothing. */
+    /**
+     * Reads English, which is the fallback for everything, and settles on it.
+     *
+     * Only English is read here, and only because nothing can be drawn without
+     * some words. The language the account actually wants is read by [use] off
+     * the main thread — parsing a second catalogue before the first frame is a
+     * fifth of a second of a cold start spent on something that can happen a
+     * moment later. Calling this twice changes nothing.
+     */
     fun init(context: Context) {
         if (assets != null) return
         assets = context.applicationContext.assets
         english = read("en")
         catalog = english
         apply("en")
-        use(null)
     }
 
     /**
-     * Switches language. `null` follows the phone's own preference, which is
-     * what someone who has never chosen expects.
+     * Switches language, reading the catalogue away from the main thread.
+     * `null` follows the phone's own preference, which is what someone who has
+     * never chosen expects.
      */
-    fun use(wanted: String?) {
+    suspend fun use(wanted: String?) {
         chosen = wanted
         val next = pick(if (wanted != null) listOf(wanted) else deviceLanguages())
         if (next == tag) return
-        catalog = if (next == "en") english else read(next)
+        val loaded = if (next == "en") english else withContext(Dispatchers.IO) { read(next) }
+        if (chosen != wanted) return
+        catalog = loaded
         apply(next)
         epoch++
     }

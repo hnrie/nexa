@@ -32,8 +32,9 @@ class App : Application() {
         super.onCreate()
         instance = this
 
-        // The catalogue first: the notification channels below are named from
-        // it, Android remembers those names, and it never asks again.
+        // English first: nothing can be drawn without some words, and it is the
+        // fallback for every other language. The one the account wants is read
+        // off the main thread once the settings have arrived.
         Strings.init(this)
         // Then the crash reporter, so anything below that goes wrong is recorded.
         CrashReport.install(this)

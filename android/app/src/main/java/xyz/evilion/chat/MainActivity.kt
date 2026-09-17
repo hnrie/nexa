@@ -85,7 +85,12 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) { Session.bootstrap() }
             // the account's language, which the web client writes to the same
             // settings field, so one choice follows someone between devices
-            LaunchedEffect(settings) { Strings.use(SettingsStore.locale) }
+            LaunchedEffect(settings) {
+                Strings.use(SettingsStore.locale)
+                // Android keeps the name a notification channel was created
+                // with, so it has to be told again once the language is known.
+                xyz.evilion.chat.notify.Notifications.ensureChannels(this@MainActivity)
+            }
 
             NexaTheme(colors = palette) {
                 // Keyed on the language: a screen that built its words once —
