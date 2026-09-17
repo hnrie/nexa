@@ -2,11 +2,14 @@ package xyz.evilion.chat.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -20,6 +23,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import xyz.evilion.chat.crypto.Aes
 import xyz.evilion.chat.crypto.Bytes
 import xyz.evilion.chat.crypto.Kdf
+import xyz.evilion.chat.net.ApiException
 import xyz.evilion.chat.net.Api
 import xyz.evilion.chat.net.UsersApi
 
@@ -44,6 +48,26 @@ object SettingsStore {
     private var saveJob: Job? = null
     private lateinit var prefs: SharedPreferences
 
+    /**
+     * What has been changed here and not yet confirmed saved.
+     *
+     * A save used to be `runCatching { … }.getOrDefault(false)` against a
+     * version that only moved on success. One conflict — another device saving
+     * in the same moment — left the local version behind the server's forever,
+     * so every save after it failed the same way and nothing was ever stored
+     * again: not the theme, not the language, not a muted channel, not a
+     * draft. And a `settings_update` from another device replaced the whole
+     * document, taking any unsaved change with it.
+     *
+     * Keeping the changed fields apart from the document means a failure can
+     * put them back, a conflict can take the server's copy and lay them on top
+     * again, and a push from elsewhere cannot quietly drop them.
+     */
+    private val pending = mutableMapOf<String, JsonElement>()
+    private var sending: Map<String, JsonElement>? = null
+    private var failures = 0
+    private val saveLock = Mutex()
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences("device", Context.MODE_PRIVATE)
     }
@@ -51,13 +75,14 @@ object SettingsStore {
     private fun key(): ByteArray? = KeyService.identity?.let { Kdf.settingsKey(it.privateKey) }
 
     fun load(blob: String?, version: Int) {
+        // a save of ours may have landed while this copy was on its way
+        if (this.version > 0 && version < this.version) return
         this.version = version
         val k = key()
-        if (blob.isNullOrEmpty() || k == null) {
-            _doc.value = JsonObject(emptyMap())
-            return
-        }
-        _doc.value = decrypt(k, blob) ?: JsonObject(emptyMap())
+        val base = if (blob.isNullOrEmpty() || k == null) JsonObject(emptyMap()) else decrypt(k, blob) ?: JsonObject(emptyMap())
+        val unsaved = synchronized(pending) { (sending.orEmpty() + pending).toMap() }
+        _doc.value = if (unsaved.isEmpty()) base else JsonObject(base.toMutableMap().apply { putAll(unsaved) })
+        if (unsaved.isNotEmpty()) scheduleSave()
     }
 
     suspend fun reload() {
@@ -80,6 +105,7 @@ object SettingsStore {
     /** Changes one field and saves shortly after, so a burst of edits is one request. */
     fun put(name: String, value: JsonElement) {
         _doc.value = JsonObject(_doc.value.toMutableMap().apply { this[name] = value })
+        synchronized(pending) { pending[name] = value }
         scheduleSave()
     }
 
@@ -93,22 +119,62 @@ object SettingsStore {
         put(parent, JsonObject(current.toMutableMap().apply { this[name] = value }))
     }
 
-    private fun scheduleSave() {
+    private fun scheduleSave(after: Long = 600) {
         saveJob?.cancel()
         saveJob = Session.scope.launch {
-            delay(600)
+            delay(after)
             flush()
         }
     }
 
-    suspend fun flush(): Boolean {
-        val k = key() ?: return false
-        return runCatching {
+    /**
+     * One save of everything changed so far.
+     *
+     * A conflict means another device got there first: take its copy, lay the
+     * unsaved changes back on top and try again, a few times. Anything else
+     * transient backs off and retries. Either way the changes stay pending
+     * until the server has actually taken them.
+     */
+    suspend fun flush(): Boolean = saveLock.withLock {
+        val k = key() ?: return@withLock false
+        val mine = synchronized(pending) {
+            if (pending.isEmpty() && sending == null) return@withLock true
+            val take = pending.toMap()
+            pending.clear()
+            sending = (sending.orEmpty() + take)
+            sending!!
+        }
+        try {
             val saved = UsersApi.putSettings(encrypt(k, _doc.value), version + 1)
             version = saved.version
+            synchronized(pending) { sending = null }
+            failures = 0
             true
-        }.getOrDefault(false)
+        } catch (e: Throwable) {
+            synchronized(pending) {
+                // put them back, but never over a newer local edit
+                for ((name, value) in mine) pending.putIfAbsent(name, value)
+                sending = null
+            }
+            val status = (e as? ApiException)?.status ?: 0
+            if (status == 409 && failures < 3) {
+                failures++
+                // someone else saved first: take theirs, put ours back on top
+                runCatching { reload() }.onFailure { scheduleSave(backoff()) }
+                return@withLock false
+            }
+            if (status == 409 || (e as? ApiException)?.isTransient != false) {
+                failures++
+                scheduleSave(backoff())
+            } else {
+                Log.w(LOG_TAG, "settings did not save", e)
+            }
+            false
+        }
     }
+
+    /** 2s, 4s, 8s … up to a minute. */
+    private fun backoff(): Long = (2000L shl (failures - 1).coerceIn(0, 5)).coerceAtMost(60_000)
 
     // --- typed views over the document ------------------------------------
 

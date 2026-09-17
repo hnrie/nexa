@@ -30,6 +30,9 @@ import kotlin.random.Random
 /** How many messages a page of history holds. */
 private const val PAGE = 50
 
+/** How far a reconnect will walk forward before giving up and reloading the channel. */
+private const val MAX_GAP_PAGES = 5
+
 /**
  * Reading and writing messages: fetching history, decrypting it with whatever
  * keys this device holds, and sending with an optimistic copy that is replaced
@@ -126,13 +129,81 @@ object MessageService {
         }
     }
 
+    /**
+     * Counts the times a channel's history has been thrown away and reloaded.
+     *
+     * The first page used to be assigned over whatever was there. Open a
+     * channel on a slow connection, write and send before it lands, and the
+     * message you just sent is replaced by the page when it arrives — and if
+     * the send then fails, its failure is written to a list that no longer
+     * holds it, so the text is gone. Anything that arrived meanwhile went the
+     * same way. A loader that finds the count has moved on has been overtaken
+     * and leaves the list alone.
+     */
+    private val generations = mutableMapOf<String, Int>()
+
+    private fun generationOf(channelId: String): Int = synchronized(generations) { generations[channelId] ?: 0 }
+
+    /** Marks a channel's history stale, so a loader in flight will not apply. */
+    fun bumpGeneration(channelId: String) {
+        synchronized(generations) { generations[channelId] = (generations[channelId] ?: 0) + 1 }
+    }
+
     /** The first page of a channel's history. */
     suspend fun loadInitial(channelId: String) {
+        val gen = generationOf(channelId)
         val list = MessagesApi.list(channelId, limit = PAGE)
+        if (gen != generationOf(channelId)) return
         val decrypted = list.map { decrypt(it) }
-        AppState.messages(channelId).value = decrypted.sortedBy { idOf(it) }
+        // merged, not assigned: an optimistic message written while this page
+        // was on its way is still the only copy of what someone typed
+        insert(channelId, decrypted)
         AppState.loadedChannels.update { it + (channelId to (list.size < PAGE)) }
         noteMissingKeys(decrypted)
+    }
+
+    /**
+     * Fills the hole a dropped connection leaves.
+     *
+     * Nothing arrives as `message_create` while the socket is down, and a
+     * `ready` does not carry history, so without this the messages sent during
+     * the gap are simply never seen: leaving the channel and coming back does
+     * not help, because it is already marked loaded. Walk forward from what is
+     * held until the server has nothing newer, then re-read the newest page so
+     * edits, deletes and reactions made during the gap are reconciled too.
+     */
+    suspend fun syncGap(channelId: String) {
+        val gen = generationOf(channelId)
+        var newest = AppState.messagesOrNull(channelId)?.value?.lastOrNull { !it.pending }?.raw?.id
+        if (newest == null) {
+            // nothing held: an ordinary first load is the same thing
+            runCatching { loadInitial(channelId) }
+            return
+        }
+        var pages = 0
+        while (pages < MAX_GAP_PAGES) {
+            val page = MessagesApi.list(channelId, after = newest, limit = PAGE)
+            if (gen != generationOf(channelId)) return
+            if (page.isEmpty()) break
+            val decrypted = page.map { decrypt(it) }
+            insert(channelId, decrypted)
+            noteMissingKeys(decrypted)
+            newest = page.maxByOrNull { it.id.toLongOrNull() ?: Long.MAX_VALUE }?.id ?: break
+            pages++
+            if (page.size < PAGE) break
+        }
+        if (pages >= MAX_GAP_PAGES) {
+            // too far behind to walk: start the channel again
+            bumpGeneration(channelId)
+            AppState.loadedChannels.update { it - channelId }
+            AppState.messages(channelId).value = emptyList()
+            runCatching { loadInitial(channelId) }
+            return
+        }
+        // and pick up what changed rather than what was added
+        val refreshed = runCatching { MessagesApi.list(channelId, limit = PAGE) }.getOrNull() ?: return
+        if (gen != generationOf(channelId)) return
+        insert(channelId, refreshed.map { decrypt(it) })
     }
 
     /** One page further back; true when the beginning has been reached. */

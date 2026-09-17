@@ -667,6 +667,17 @@ object Session {
         if (changed.isNotEmpty()) MessageService.redecrypt(changed.toSet())
         VoiceSession.onReady(ready.voiceStates, ready.sessionId)
         scope.launch { runCatching { KeyService.reconcile() } }
+        // Nothing arrived while the socket was down, and `ready` carries no
+        // history. The channel being looked at catches up now; the rest are
+        // marked stale so they reload when they are next opened, rather than
+        // staying silently short of whatever was said during the gap.
+        val open = Focus.activeChannel
+        for (id in AppState.loadedChannels.value.keys.toList()) {
+            if (id == open) continue
+            MessageService.bumpGeneration(id)
+            AppState.loadedChannels.update { it - id }
+        }
+        if (open != null) scope.launch { runCatching { MessageService.syncGap(open) } }
         for (hook in readyHooks) hook()
     }
 

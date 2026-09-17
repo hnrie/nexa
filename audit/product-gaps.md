@@ -232,7 +232,7 @@ is the web cell. Rows where the shell genuinely changes things say so.
 | Unread count on DMs | full | full | full | server counts DMs only, capped at 100 (`readstates.go:79`) |
 | New-messages divider | full | full | missing | `web/.../chat/MessageList.tsx:113-115`; Android has only a day divider |
 | Jump to the first unread message | missing | missing | missing | the divider is drawn but nothing navigates to it |
-| Mark a channel read | full | full | missing | Esc, or the context menu |
+| Mark a channel read | full | full | missing | Esc (`shell/Shortcuts.tsx:77-85`) or the channel menu (`sidebar/serverMenu.ts:99-105`) |
 | Mark a server read | full | full | missing | `web/.../sidebar/serverMenu.ts:23` |
 | Mark everything read / an inbox | missing | missing | missing | no "inbox" anywhere in the repo |
 | System notifications | full | full | full | Android keeps a socket in a foreground service — no push service exists |
@@ -245,7 +245,7 @@ is the web cell. Rows where the shell genuinely changes things say so.
 | Mute for a duration | missing | missing | missing | `notifications.muted` is a flat list of ids (`web/src/stores/settings.ts:78`) |
 | Suppress `@everyone` | missing | missing | missing | |
 | Hide message text in notifications | missing | missing | missing | the body always carries the decrypted preview (`notify.ts:129`) |
-| Reply from the notification | n-a | missing | missing | desktop takes the `Notification` constructor path, which has no actions (`notify.ts:44-55`); Android has no `RemoteInput` |
+| Reply from the notification | missing | missing | missing | web goes through the service worker, which supports `actions`, and passes none (`notify.ts:47-50,129`); inside Electron the constructor path is taken instead, which cannot have them (`notify.ts:44-55`); Android has no `RemoteInput` |
 | Do Not Disturb silences notifications | full | full | missing | `notify.ts:121`; Android cannot set DND at all |
 | Notification for a friend request | full | full | missing | `notify.ts:133` |
 
@@ -256,8 +256,8 @@ is the web cell. Rows where the shell genuinely changes things say so.
 | Voice channels, DM calls, ringing, decline | full | full | full | |
 | Mute / deafen | full | full | full | |
 | Camera | full | full | full | |
-| Screen share | full | full | partial | web picks resolution to source and 60 fps; Android shares but has no quality controls |
-| Share computer audio | full | full (adds per-window / per-app audio, Win ≥ 19041 and macOS ≥ 13) | missing | `desktop/src/main/appAudio.ts:73-187`; nothing on Linux (`permissions.ts:282-290`) |
+| Screen share | full | full | partial | web picks 720p→source at 15/30/60 fps (`stores/settings.ts:31-32`); Android is hardcoded to 1280×720 at 30 fps with no control (`android/.../voice/VoiceSession.kt:316`) |
+| Share computer audio | full | full (adds per-window / per-app audio, Win ≥ 19041 and macOS ≥ 13) | missing | `desktop/src/main/appAudio.ts:73-187`; nothing on Linux (`permissions.ts:282-290`); Android's `ScreenCapturerAndroid` takes video only — no `AudioPlaybackCaptureConfiguration` anywhere |
 | Screen-source picker with thumbnails | full (browser's) | full (own picker) | n-a | `desktop/src/main/permissions.ts:159-256` |
 | Per-user volume to 200 % | full | full | missing | `VoiceSession.setVolume` (`android/.../voice/VoiceSession.kt:254`) has no caller |
 | Push to talk | full | partial | missing | web binds it in-page (`web/src/voice/session.ts:982`); the desktop shell registers no global shortcut at all; the Android toggle writes `voiceMode` and nothing reads it |
@@ -781,7 +781,7 @@ not notify them", which the tooltip does not say because there is no tooltip.
 ### <a id="q22"></a>Q22. Confirmations: right on web, absent on Android
 **Value: medium. Cost: small.** On Android, **Delete Server** and **Leave Server** are
 plain buttons that fire on the first tap (`ui/server/ServerSettingsScreen.kt:172-184`
-and `:185-197`): no dialog, no undo, and the server and every message in it are gone.
+and `:185-198`): no dialog, no undo, and the server and every message in it are gone.
 The web client makes you type the server's name to delete it
 (`web/.../server/pages/DeleteServerPage.tsx:41`) and asks before leaving
 (`sidebar/serverMenu.ts:77-85`). This is the clearest case in the product of a
