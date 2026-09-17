@@ -322,32 +322,51 @@ private fun CallButton(
     }
 }
 
-/** A remote or local video track, drawn by WebRTC's own renderer. */
+/**
+ * A remote or local video track, drawn by WebRTC's own renderer.
+ *
+ * The renderer belongs to the view, not to the track. Keying it on the track
+ * meant that someone turning their camera on, or switching between camera and
+ * screen share, released the renderer while the `AndroidView` it belonged to
+ * carried on living — its factory does not run twice — so the tile went black
+ * for the rest of the call, and any frame still on its way to a released
+ * native renderer was a crash with no Java stack to show for it. The view is
+ * made once and kept; only the sink moves.
+ */
 @Composable
 fun VideoView(track: VideoTrack, mirror: Boolean = false, modifier: Modifier = Modifier) {
-    val renderer = remember(track) { mutableStateOfRenderer() }
+    val renderer = remember { mutableStateOfRenderer() }
+    val attached = remember { mutableStateOfTrack() }
     AndroidView(
         factory = { context ->
             SurfaceViewRenderer(context).apply {
                 init(VoiceEngine.eglBase.eglBaseContext, null)
                 setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
-                setMirror(mirror)
                 setEnableHardwareScaler(true)
-                track.addSink(this)
                 renderer.value = this
+            }
+        },
+        update = { view ->
+            view.setMirror(mirror)
+            if (attached.value !== track) {
+                attached.value?.let { runCatching { it.removeSink(view) } }
+                runCatching { track.addSink(view) }
+                attached.value = track
             }
         },
         modifier = modifier.fillMaxSize(),
     )
-    DisposableEffect(track) {
+    DisposableEffect(Unit) {
         onDispose {
-            renderer.value?.let { view ->
-                runCatching { track.removeSink(view) }
-                view.release()
-            }
+            val view = renderer.value ?: return@onDispose
+            attached.value?.let { runCatching { it.removeSink(view) } }
+            attached.value = null
+            view.release()
             renderer.value = null
         }
     }
 }
 
 private fun mutableStateOfRenderer() = androidx.compose.runtime.mutableStateOf<SurfaceViewRenderer?>(null)
+
+private fun mutableStateOfTrack() = androidx.compose.runtime.mutableStateOf<VideoTrack?>(null)

@@ -133,6 +133,18 @@ object Notifications {
         post(context, callId(channelId), notification)
     }
 
+    /**
+     * Takes down the notice for a conversation that has been read.
+     *
+     * Nothing did this, so a message you read — here, or in a browser, or on
+     * the desktop — left its notification sitting in the shade indefinitely.
+     */
+    fun clearMessages(context: Context, channelId: String) {
+        runCatching {
+            context.getSystemService(NotificationManager::class.java)?.cancel(channelId.hashCode())
+        }
+    }
+
     fun clearRing(context: Context, channelId: String) {
         NotificationManagerCompat.from(context).cancel(callId(channelId))
     }

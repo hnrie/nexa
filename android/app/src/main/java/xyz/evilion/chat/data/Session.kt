@@ -19,6 +19,8 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import xyz.evilion.chat.App
+import xyz.evilion.chat.notify.Notifications
 import xyz.evilion.chat.crypto.Bytes
 import xyz.evilion.chat.crypto.Identity
 import xyz.evilion.chat.crypto.Kdf
@@ -573,7 +575,13 @@ object Session {
                 AppState.relationships.update { it - id }
             }
 
-            "read_state" -> AppState.putReadState(d.into<ReadState>() ?: return)
+            "read_state" -> {
+                val rs = d.into<ReadState>() ?: return
+                AppState.putReadState(rs)
+                // read somewhere else — a browser, the desktop app — so the
+                // notice on this phone is about something already dealt with
+                if (rs.unreadCount == 0) Notifications.clearMessages(App.instance, rs.channelId)
+            }
 
             "key_grant" -> {
                 val grant = d.into<KeyGrant>() ?: return

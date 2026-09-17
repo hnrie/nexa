@@ -8,6 +8,8 @@ import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import xyz.evilion.chat.App
+import xyz.evilion.chat.notify.Notifications
 import xyz.evilion.chat.crypto.Aad
 import xyz.evilion.chat.crypto.Envelope
 import xyz.evilion.chat.crypto.AttachmentMeta
@@ -362,6 +364,7 @@ object MessageService {
                 lastReadMessageId = messageId, mentionCount = 0, unreadCount = 0,
             ),
         )
+        Notifications.clearMessages(App.instance, channelId)
         runCatching { MessagesApi.ack(channelId, messageId) }
     }
 
