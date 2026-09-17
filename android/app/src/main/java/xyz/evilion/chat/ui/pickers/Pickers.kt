@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.common.TwemojiImage
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.SettingsStore
@@ -74,7 +75,7 @@ fun EmojiPickerSheet(serverId: String?, onDismiss: () -> Unit, onPick: (String) 
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().height(460.dp)) {
-            SearchField(query, { query = it }, "Search emoji")
+            SearchField(query, { query = it }, t("pickers.emojiPicker.searchEmoji"))
             if (!ready) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = colors.brand) }
                 return@Column
@@ -91,7 +92,7 @@ fun EmojiPickerSheet(serverId: String?, onDismiss: () -> Unit, onPick: (String) 
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(8.dp),
             ) {
                 if (query.isBlank() && recents.isNotEmpty()) {
-                    header("Recent")
+                    header(t("pickers.pickers.recent"))
                     items(recents) { token ->
                         EmojiCell(token) {
                             SettingsStore.rememberEmoji(token)
@@ -101,7 +102,7 @@ fun EmojiPickerSheet(serverId: String?, onDismiss: () -> Unit, onPick: (String) 
                 }
                 val matchingCustom = custom.filter { query.isBlank() || it.name.contains(query, true) }
                 if (matchingCustom.isNotEmpty()) {
-                    header("Custom")
+                    header(t("settings.appearance.custom"))
                     items(matchingCustom, key = { it.id }) { emoji ->
                         CustomEmojiCell(emoji) {
                             val token = "<${if (emoji.animated) "a" else ""}:${emoji.name}:${emoji.blobId}>"
@@ -112,7 +113,7 @@ fun EmojiPickerSheet(serverId: String?, onDismiss: () -> Unit, onPick: (String) 
                 }
                 val matchingPack = packEmoji.filter { query.isBlank() || it.name.contains(query, true) }
                 if (matchingPack.isNotEmpty()) {
-                    header("Your packs")
+                    header(t("pickers.pickers.yourPacks"))
                     items(matchingPack, key = { it.id }) { sticker ->
                         PackEmojiCell(sticker) {
                             val token = "<${if (sticker.animated) "a" else ""}:${sticker.name}:${sticker.blobId}>"
@@ -124,7 +125,7 @@ fun EmojiPickerSheet(serverId: String?, onDismiss: () -> Unit, onPick: (String) 
                 if (query.isNotBlank()) {
                     val results = EmojiIndex.search(query)
                     if (results.isNotEmpty()) {
-                        header("Emoji")
+                        header(t("modals.customStatus.emoji"))
                         items(results, key = { it.unicode }) { entry ->
                             EmojiCell(EmojiIndex.withTone(entry, SettingsStore.skinTone)) {
                                 val value = EmojiIndex.withTone(entry, SettingsStore.skinTone)
@@ -213,17 +214,17 @@ fun GifPickerSheet(onDismiss: () -> Unit, onPickGif: (GifResult) -> Unit, onOpen
         error = null
         runCatching {
             results = if (query.isBlank()) ExpressionsApi.gifTrending().results else ExpressionsApi.gifSearch(query).results
-        }.onFailure { error = "GIF search is not set up on this server." }
+        }.onFailure { error = t("pickers.pickers.gifSearchIsNotSetUp") }
         loading = false
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().height(460.dp)) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { SearchField(query, { query = it }, "Search GIFs") }
+                Box(Modifier.weight(1f)) { SearchField(query, { query = it }, t("pickers.gifPicker.searchGifs")) }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    "Stickers",
+                    t("pickers.expressionPicker.stickers"),
                     color = colors.textBrand,
                     fontSize = 14.sp,
                     modifier = Modifier.clickable(onClick = onOpenStickers).padding(8.dp),
@@ -270,10 +271,10 @@ fun StickerPickerSheet(onDismiss: () -> Unit, onPick: (Sticker) -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().height(460.dp)) {
-            SearchField(query, { query = it }, "Search stickers")
+            SearchField(query, { query = it }, t("pickers.stickerPicker.searchStickers"))
             if (installed.isEmpty()) {
                 Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text("No sticker packs yet.", color = colors.textMuted, fontSize = 14.sp)
+                    Text(t("pickers.pickers.noStickerPacksYet"), color = colors.textMuted, fontSize = 14.sp)
                 }
                 return@Column
             }

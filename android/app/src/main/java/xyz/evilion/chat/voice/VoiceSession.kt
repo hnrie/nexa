@@ -2,6 +2,7 @@ package xyz.evilion.chat.voice
 
 import android.content.Intent
 import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,7 +31,9 @@ import org.webrtc.VideoTrack
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.KeyService
 import xyz.evilion.chat.data.Session
+import xyz.evilion.chat.data.readable
 import xyz.evilion.chat.data.SettingsStore
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.GatewayEvent
 import xyz.evilion.chat.net.IceConfig
 import xyz.evilion.chat.net.VoiceApi
@@ -74,7 +77,22 @@ data class CallState(
 object VoiceSession {
     private const val TAG = "VoiceSession"
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /**
+     * Nothing a call does may take the app down with it.
+     *
+     * Most of the work here is launched into this scope, and WebRTC throws
+     * from places a caller cannot see coming — a track disposed by a peer
+     * connection that was rebuilt after the network changed is still held by
+     * the stats tick, by the deafen button and by the view drawing it. Without
+     * a handler, one of those ends the process. With one, the call fails and
+     * says so.
+     */
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e ->
+            Log.e(TAG, "call failed", e)
+            Session.toasts.tryEmit(e.readable("call"))
+        },
+    )
     private val lock = Mutex()
 
     private val _state = MutableStateFlow(CallState())
@@ -114,7 +132,7 @@ object VoiceSession {
 
         val ice = runCatching { VoiceApi.ice() }.getOrNull()
         if (ice == null) {
-            fail("Could not reach the server to start the call.")
+            fail(t("voiceSession.couldNotReachTheServerTo"))
             return
         }
         if (ice.sfu) {
@@ -122,11 +140,11 @@ object VoiceSession {
             val conv = AppState.convFor(channelId)
             val key = runCatching { KeyService.ensureConvKey(conv) }.getOrNull()
             if (key == null) {
-                fail("This conversation's keys have not reached this device yet. Try again in a moment.")
+                fail(t("guestLink.thisConversationSKeysHaveNot"))
                 return
             }
         } else {
-            fail("This server is not set up for calls from the app yet.")
+            fail(t("voiceSession.thisServerIsNotSetUp"))
             return
         }
 
@@ -157,9 +175,9 @@ object VoiceSession {
 
         try {
             sfu.start()
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "could not get the call ready", e)
-            fail(e.message ?: "The call could not be started.")
+            fail(e.message ?: t("voiceSession.theCallCouldNotBeStarted"))
             return
         }
 
@@ -227,7 +245,7 @@ object VoiceSession {
 
     /** Told when the microphone was refused, so the call says so rather than looking broken. */
     fun noteNoMicrophone() {
-        _state.update { it.copy(error = "Microphone access was denied. You can listen, but nobody can hear you.") }
+        _state.update { it.copy(error = t("session.microphoneAccessWasDeniedYouCan")) }
     }
 
     // --- controls ----------------------------------------------------------
@@ -383,7 +401,7 @@ object VoiceSession {
             syncTracks()
         } catch (e: Exception) {
             Log.w(TAG, "could not open the call session", e)
-            _state.update { it.copy(error = e.message ?: "The call could not be started.") }
+            _state.update { it.copy(error = e.message ?: t("voiceSession.theCallCouldNotBeStarted")) }
             // The server only knows this device is in the call once its own
             // voice state comes back; a race there is worth one more try.
             if (e is xyz.evilion.chat.net.ApiException && e.code == "not_in_voice") {

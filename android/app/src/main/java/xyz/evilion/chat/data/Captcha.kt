@@ -1,6 +1,7 @@
 package xyz.evilion.chat.data
 
 import kotlinx.coroutines.CompletableDeferred
+import xyz.evilion.chat.i18n.t
 
 /**
  * Cloudflare Turnstile, for the actions a bot would abuse: signing up, signing
@@ -16,7 +17,7 @@ object Captcha {
     @Volatile
     var present: (suspend (action: String, siteKey: String) -> String?)? = null
 
-    class Cancelled : Exception("The captcha was cancelled.")
+    class Cancelled : Exception(t("captcha.theCaptchaWasCancelled"))
 
     suspend fun token(action: String, siteKey: String): String? {
         val show = present ?: return null

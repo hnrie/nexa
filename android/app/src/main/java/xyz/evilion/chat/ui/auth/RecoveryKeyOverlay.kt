@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.auth
 
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,10 +53,10 @@ fun RecoveryKeyOverlay(key: String, onDone: () -> Unit) {
         ) {
             Icon(Lucide.Key, null, tint = colors.brand, modifier = Modifier.size(44.dp))
             Spacer(Modifier.height(16.dp))
-            Text("Save your recovery key", color = colors.textStrong, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(t("register.saveYourRecoveryKey"), color = colors.textStrong, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Text(
-                "This is shown once. Without it, a forgotten password means losing every message on this account.",
+                t("auth.recoveryKeyOverlay.thisIsShownOnceWithoutIt"),
                 color = colors.textMuted, fontSize = 14.sp, textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
@@ -73,14 +74,14 @@ fun RecoveryKeyOverlay(key: String, onDone: () -> Unit) {
             TextButton(onClick = { clipboard.setText(AnnotatedString(key)) }) {
                 Icon(Lucide.Copy, null, Modifier.size(16.dp), tint = colors.textBrand)
                 Spacer(Modifier.size(6.dp))
-                Text("Copy", color = colors.textBrand)
+                Text(t("modals.groupInvite.copy"), color = colors.textBrand)
             }
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = onDone,
                 colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-            ) { Text("I have written it down", fontWeight = FontWeight.SemiBold) }
+            ) { Text(t("auth.recoveryKeyOverlay.iHaveWrittenItDown"), fontWeight = FontWeight.SemiBold) }
         }
     }
 }

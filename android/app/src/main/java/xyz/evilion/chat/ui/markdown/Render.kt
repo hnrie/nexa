@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import coil3.compose.AsyncImage
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.media.Media
 import xyz.evilion.chat.media.Twemoji
 import xyz.evilion.chat.ui.theme.ChatColors
@@ -269,8 +270,8 @@ private fun AnnotatedString.Builder.appendNodes(
                     MentionKind.USER -> "@" + (render.ctx.nameOfUser(node.id) ?: "unknown")
                     MentionKind.CHANNEL -> "#" + (render.ctx.nameOfChannel(node.id) ?: "unknown")
                     MentionKind.ROLE -> "@" + (render.ctx.roleName(node.id)?.first ?: "deleted-role")
-                    MentionKind.EVERYONE -> "@everyone"
-                    MentionKind.HERE -> "@here"
+                    MentionKind.EVERYONE -> t("render.everyone")
+                    MentionKind.HERE -> t("render.here")
                 }
                 val pingsMe = when (node.kind) {
                     MentionKind.USER -> node.id == render.ctx.meId

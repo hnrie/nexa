@@ -4,6 +4,9 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import xyz.evilion.chat.i18n.LANGUAGES
+import xyz.evilion.chat.data.readable
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -85,7 +88,7 @@ fun SettingsScreen(startPage: String) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Lucide.ArrowLeft, "Back", tint = colors.icon,
+                Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon,
                 modifier = Modifier.size(24.dp).clickable {
                     if (page == "root") Nav.go(Route.Chat(null, null)) else page = "root"
                 },
@@ -93,16 +96,16 @@ fun SettingsScreen(startPage: String) {
             Spacer(Modifier.width(16.dp))
             Text(
                 when (page) {
-                    "root" -> "Settings"
-                    "account" -> "My account"
-                    "appearance" -> "Appearance"
-                    "notifications" -> "Notifications"
-                    "voice" -> "Voice & video"
-                    "privacy" -> "Privacy"
-                    "security" -> "Security"
-                    "sessions" -> "Devices"
-                    "admin" -> "Instance"
-                    else -> "About"
+                    "root" -> t("main.sidebar.settings")
+                    "account" -> t("settings.settingsScreen.myAccount")
+                    "appearance" -> t("settings.appearance.appearance")
+                    "notifications" -> t("settings.notifications.notifications")
+                    "voice" -> t("settings.settingsScreen.voiceVideo")
+                    "privacy" -> t("settings.settingsScreen.privacy")
+                    "security" -> t("settings.security.security")
+                    "sessions" -> t("settings.devices.devices")
+                    "admin" -> t("settings.settings.instance")
+                    else -> t("settings.settingsScreen.about")
                 },
                 color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp,
             )
@@ -122,15 +125,15 @@ fun SettingsScreen(startPage: String) {
                             Text("@${me?.username ?: ""}", color = colors.textMuted, fontSize = 13.sp)
                         }
                     }
-                    SettingsRow(Lucide.User, "My account") { page = "account" }
-                    SettingsRow(Lucide.Brush, "Appearance") { page = "appearance" }
-                    SettingsRow(Lucide.Bell, "Notifications") { page = "notifications" }
-                    SettingsRow(Lucide.Mic, "Voice & video") { page = "voice" }
-                    SettingsRow(Lucide.ShieldAlert, "Privacy") { page = "privacy" }
-                    SettingsRow(Lucide.ShieldCheck, "Security") { page = "security" }
-                    SettingsRow(Lucide.MonitorSmartphone, "Devices") { page = "sessions" }
-                    if (me?.flags?.and(1) == 1) SettingsRow(Lucide.Shield, "Instance") { page = "admin" }
-                    SettingsRow(Lucide.Info, "About") { page = "about" }
+                    SettingsRow(Lucide.User, t("settings.settingsScreen.myAccount")) { page = "account" }
+                    SettingsRow(Lucide.Brush, t("settings.appearance.appearance")) { page = "appearance" }
+                    SettingsRow(Lucide.Bell, t("settings.notifications.notifications")) { page = "notifications" }
+                    SettingsRow(Lucide.Mic, t("settings.settingsScreen.voiceVideo")) { page = "voice" }
+                    SettingsRow(Lucide.ShieldAlert, t("settings.settingsScreen.privacy")) { page = "privacy" }
+                    SettingsRow(Lucide.ShieldCheck, t("settings.security.security")) { page = "security" }
+                    SettingsRow(Lucide.MonitorSmartphone, t("settings.devices.devices")) { page = "sessions" }
+                    if (me?.flags?.and(1) == 1) SettingsRow(Lucide.Shield, t("settings.settings.instance")) { page = "admin" }
+                    SettingsRow(Lucide.Info, t("settings.settingsScreen.about")) { page = "about" }
                     SignOutRow()
                 }
                 "account" -> AccountPage()
@@ -170,7 +173,7 @@ private fun SignOutRow() {
     ) {
         Icon(Lucide.LogOut, null, tint = colors.danger, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(16.dp))
-        Text("Sign out", color = colors.danger, fontSize = 15.sp)
+        Text(t("settings.settingsScreen.signOut"), color = colors.danger, fontSize = 15.sp)
     }
 }
 
@@ -252,7 +255,7 @@ private fun AccountPage() {
                 val type = context.contentResolver.getType(uri) ?: "image/png"
                 UsersApi.uploadAvatar("avatar", bytes, type)
                 AppState.me.value = UsersApi.me()
-            }.onFailure { Session.toasts.emit(it.message ?: "That picture could not be uploaded.") }
+            }.onFailure { Session.toasts.emit(it.message ?: t("settings.settingsScreen.thatPictureCouldNotBeUploaded")) }
         }
     }
     val pickBanner = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
@@ -263,23 +266,23 @@ private fun AccountPage() {
                 val type = context.contentResolver.getType(uri) ?: "image/png"
                 UsersApi.uploadAvatar("banner", bytes, type)
                 AppState.me.value = UsersApi.me()
-            }.onFailure { Session.toasts.emit(it.message ?: "That picture could not be uploaded.") }
+            }.onFailure { Session.toasts.emit(it.message ?: t("settings.settingsScreen.thatPictureCouldNotBeUploaded")) }
         }
     }
 
-    Section("Profile picture") {
+    Section(t("settings.settingsScreen.profilePicture")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Avatar(me?.id ?: "0", me?.name ?: "?", me?.avatarId, 64.dp)
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(
-                    "Change avatar", color = colors.textBrand, fontSize = 14.sp,
+                    t("settings.settingsScreen.changeAvatar"), color = colors.textBrand, fontSize = 14.sp,
                     modifier = Modifier.clickable {
                         pickAvatar.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }.padding(vertical = 4.dp),
                 )
                 Text(
-                    "Change banner", color = colors.textBrand, fontSize = 14.sp,
+                    t("settings.settingsScreen.changeBanner"), color = colors.textBrand, fontSize = 14.sp,
                     modifier = Modifier.clickable {
                         pickBanner.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }.padding(vertical = 4.dp),
@@ -287,16 +290,16 @@ private fun AccountPage() {
             }
         }
     }
-    Section("About you") {
-        Field(displayName, { displayName = it }, "Display name")
+    Section(t("settings.settingsScreen.aboutYou")) {
+        Field(displayName, { displayName = it }, t("register.displayName"))
         Spacer(Modifier.height(8.dp))
-        Field(pronouns, { pronouns = it }, "Pronouns")
+        Field(pronouns, { pronouns = it }, t("settings.profile.pronouns"))
         Spacer(Modifier.height(8.dp))
-        Field(aboutMe, { aboutMe = it }, "About me", lines = 4)
+        Field(aboutMe, { aboutMe = it }, t("settings.settingsScreen.aboutMe"), lines = 4)
         Spacer(Modifier.height(8.dp))
-        Field(status, { status = it }, "Custom status")
+        Field(status, { status = it }, t("settings.settingsScreen.customStatus"))
         Spacer(Modifier.height(12.dp))
-        Action("Save", enabled = !saving) {
+        Action(t("chat.editMessage.save"), enabled = !saving) {
             saving = true
             scope.launch {
                 runCatching {
@@ -307,15 +310,15 @@ private fun AccountPage() {
                         put("status_text", status)
                     })
                     AppState.me.value = updated
-                    Session.toasts.emit("Saved.")
-                }.onFailure { Session.toasts.emit(it.message ?: "That did not save.") }
+                    Session.toasts.emit(t("settings.account.saved"))
+                }.onFailure { Session.toasts.emit(it.message ?: t("server.serverSettingsScreen.thatDidNotSave")) }
                 saving = false
             }
         }
     }
-    Section("Username") {
+    Section(t("settings.account.username")) {
         Text("@${me?.username ?: ""}", color = colors.textSubtle, fontSize = 15.sp)
-        Text("Your username is how people find you.", color = colors.textMuted, fontSize = 12.sp)
+        Text(t("settings.settingsScreen.yourUsernameIsHowPeopleFind"), color = colors.textMuted, fontSize = 12.sp)
     }
 }
 
@@ -323,8 +326,8 @@ private fun AccountPage() {
 private fun AppearancePage() {
     val colors = chatColors
     val doc by SettingsStore.doc.collectAsState()
-    Section("Theme") {
-        for ((id, label) in listOf("dark" to "Dark", "light" to "Light", "ash" to "Ash", "onyx" to "Onyx", "system" to "Follow the system")) {
+    Section(t("settings.appearance.theme")) {
+        for ((id, label) in listOf("dark" to t("settings.appearance.themeDark"), "light" to t("settings.appearance.themeLight"), "ash" to t("settings.appearance.themeAsh"), "onyx" to t("settings.appearance.themeOnyx"), "system" to t("settings.settingsScreen.followTheSystem"))) {
             Row(
                 Modifier.fillMaxWidth().clickable { SettingsStore.put("theme", id) }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -338,13 +341,41 @@ private fun AppearancePage() {
             }
         }
     }
-    Section("Messages") {
-        Toggle("Compact mode", "Less space between messages.", SettingsStore.messageDisplay == "compact") {
+    Section(t("settings.appearance.language")) {
+        Text(
+            t("settings.appearance.languageHint"),
+            color = colors.textMuted,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+        // null follows the phone, which is what someone who has never chosen expects
+        for ((tag, label) in listOf<Pair<String?, String>>(null to t("settings.appearance.matchMyPhone")) +
+            LANGUAGES.map { it.tag as String? to it.endonym }) {
+            Row(
+                Modifier.fillMaxWidth().clickable { if (tag == null) SettingsStore.put("locale", "") else SettingsStore.put("locale", tag) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier.size(18.dp).clip(RoundedCornerShape(9.dp))
+                        .background(if (SettingsStore.locale == tag) colors.brand else colors.bgSurface),
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(label, color = colors.text, fontSize = 15.sp)
+                LANGUAGES.firstOrNull { it.tag == tag }?.let {
+                    Spacer(Modifier.width(8.dp))
+                    Text(it.english, color = colors.textMuted, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+    Section(t("modals.quickSwitcher.messages")) {
+        Toggle(t("settings.settingsScreen.compactMode"), t("settings.settingsScreen.lessSpaceBetweenMessages"), SettingsStore.messageDisplay == "compact") {
             SettingsStore.put("messageDisplay", if (it) "compact" else "cozy")
         }
-        Toggle("Show link previews", null, SettingsStore.linkPreviews) { SettingsStore.put("linkPreviews", it) }
-        Toggle("Show images", null, SettingsStore.imagePreviews) { SettingsStore.put("imagePreviews", it) }
-        Toggle("Reduce motion", null, SettingsStore.reducedMotion) { SettingsStore.put("reducedMotion", it) }
+        Toggle(t("settings.settingsScreen.showLinkPreviews"), null, SettingsStore.linkPreviews) { SettingsStore.put("linkPreviews", it) }
+        Toggle(t("settings.settingsScreen.showImages"), null, SettingsStore.imagePreviews) { SettingsStore.put("imagePreviews", it) }
+        Toggle(t("settings.settingsScreen.reduceMotion"), null, SettingsStore.reducedMotion) { SettingsStore.put("reducedMotion", it) }
     }
 }
 
@@ -352,14 +383,14 @@ private fun AppearancePage() {
 private fun NotificationsPage() {
     val doc by SettingsStore.doc.collectAsState()
     val muted = SettingsStore.mutedChannels
-    Section("Notifications") {
-        Toggle("Notifications on this device", "Messages while the app is closed.", SettingsStore.deviceBool("notifications", true)) {
+    Section(t("settings.notifications.notifications")) {
+        Toggle(t("settings.settingsScreen.notificationsOnThisDevice"), t("settings.settingsScreen.messagesWhileTheAppIsClosed"), SettingsStore.deviceBool("notifications", true)) {
             SettingsStore.setDeviceBool("notifications", it)
         }
-        Toggle("Sounds", null, SettingsStore.soundsOn) { SettingsStore.putIn("notifications", "sounds", JsonPrimitive(it)) }
+        Toggle(t("settings.notifications.sounds"), null, SettingsStore.soundsOn) { SettingsStore.putIn("notifications", "sounds", JsonPrimitive(it)) }
     }
     if (muted.isNotEmpty()) {
-        Section("Muted conversations") {
+        Section(t("settings.settingsScreen.mutedConversations")) {
             for (id in muted) {
                 val channel = AppState.channels.value[id]
                 Text(
@@ -374,22 +405,22 @@ private fun NotificationsPage() {
 
 @Composable
 private fun VoicePage() {
-    Section("Microphone") {
-        Toggle("Push to talk", "Hold the button in a call instead of sending whenever you speak.", SettingsStore.deviceString("voiceMode", "vad") == "ptt") {
+    Section(t("settings.voice.microphone")) {
+        Toggle(t("settings.settingsScreen.pushToTalk"), t("settings.settingsScreen.holdTheButtonInACall"), SettingsStore.deviceString("voiceMode", "vad") == "ptt") {
             SettingsStore.setDeviceString("voiceMode", if (it) "ptt" else "vad")
         }
-        Toggle("Echo cancellation", null, SettingsStore.deviceBool("echoCancellation", true)) {
+        Toggle(t("settings.voice.echoCancellation"), null, SettingsStore.deviceBool("echoCancellation", true)) {
             SettingsStore.setDeviceBool("echoCancellation", it)
         }
-        Toggle("Noise suppression", null, SettingsStore.deviceBool("noiseSuppression", true)) {
+        Toggle(t("settings.voice.noiseSuppression"), null, SettingsStore.deviceBool("noiseSuppression", true)) {
             SettingsStore.setDeviceBool("noiseSuppression", it)
         }
-        Toggle("Automatic gain", null, SettingsStore.deviceBool("autoGain", true)) {
+        Toggle(t("settings.settingsScreen.automaticGain"), null, SettingsStore.deviceBool("autoGain", true)) {
             SettingsStore.setDeviceBool("autoGain", it)
         }
     }
-    Section("Video") {
-        Toggle("Start calls with video off", null, SettingsStore.deviceBool("videoOffByDefault", true)) {
+    Section(t("perms.video")) {
+        Toggle(t("settings.settingsScreen.startCallsWithVideoOff"), null, SettingsStore.deviceBool("videoOffByDefault", true)) {
             SettingsStore.setDeviceBool("videoOffByDefault", it)
         }
     }
@@ -400,8 +431,8 @@ private fun PrivacyPage() {
     val colors = chatColors
     val scope = rememberCoroutineScope()
     val me by AppState.me.collectAsState()
-    Section("Direct messages") {
-        for ((id, label) in listOf("everyone" to "Anyone", "friends" to "Friends only", "nobody" to "Nobody")) {
+    Section(t("settings.privacy.directMessages")) {
+        for ((id, label) in listOf("everyone" to t("settings.settingsScreen.anyone"), "friends" to t("settings.privacy.friendsOnly"), "nobody" to t("settings.privacy.nobody"))) {
             Row(
                 Modifier.fillMaxWidth().clickable {
                     scope.launch {
@@ -421,16 +452,16 @@ private fun PrivacyPage() {
             }
         }
     }
-    Section("Blocked") {
+    Section(t("friends.blocked")) {
         val blocked = AppState.relationships.value.values.filter { it.type == "blocked" }
         if (blocked.isEmpty()) {
-            Text("Nobody is blocked.", color = colors.textMuted, fontSize = 14.sp)
+            Text(t("settings.settingsScreen.nobodyIsBlocked"), color = colors.textMuted, fontSize = 14.sp)
         } else {
             for (relationship in blocked) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(relationship.user.name, color = colors.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
                     Text(
-                        "Unblock", color = colors.textBrand, fontSize = 13.sp,
+                        t("friends.unblock"), color = colors.textBrand, fontSize = 13.sp,
                         modifier = Modifier.clickable {
                             scope.launch { runCatching { xyz.evilion.chat.net.RelationshipsApi.unblock(relationship.user.id) } }
                         },
@@ -458,61 +489,61 @@ private fun SecurityPage() {
 
     LaunchedEffect(Unit) { runCatching { status = AuthApi.mfaStatus() } }
 
-    Section("Password") {
-        Field(password, { password = it }, "Current password")
+    Section(t("chat.lockedChannel.password")) {
+        Field(password, { password = it }, t("settings.account.currentPassword"))
         Spacer(Modifier.height(8.dp))
-        Field(newPassword, { newPassword = it }, "New password")
+        Field(newPassword, { newPassword = it }, t("settings.account.newPassword"))
         Spacer(Modifier.height(12.dp))
-        Action("Change password", enabled = !busy && password.isNotEmpty() && newPassword.length >= 8) {
+        Action(t("settings.settingsScreen.changePassword"), enabled = !busy && password.isNotEmpty() && newPassword.length >= 8) {
             busy = true
             scope.launch {
                 runCatching { Session.changePassword(password, newPassword) }
-                    .onSuccess { note = "Password changed."; password = ""; newPassword = "" }
-                    .onFailure { note = it.message }
+                    .onSuccess { note = t("settings.settingsScreen.passwordChanged"); password = ""; newPassword = "" }
+                    .onFailure { note = it.readable("SettingsScreen") }
                 busy = false
             }
         }
     }
 
-    Section("Two-factor authentication") {
+    Section(t("settings.security.twoFactorAuthentication")) {
         Text(
-            if (status?.enabled == true) "On. Sign-ins ask for a code." else "Off. Anyone with your password can sign in.",
+            if (status?.enabled == true) t("settings.settingsScreen.onSignInsAskForA") else t("settings.settingsScreen.offAnyoneWithYourPasswordCan"),
             color = colors.textMuted, fontSize = 13.sp,
         )
         Spacer(Modifier.height(10.dp))
         if (status?.enabled == true) {
-            Action("Turn off", danger = true, enabled = !busy && password.isNotEmpty()) {
+            Action(t("settings.security.turnOff"), danger = true, enabled = !busy && password.isNotEmpty()) {
                 busy = true
                 scope.launch {
                     runCatching { Session.mfaDisable(password) }
-                        .onSuccess { status = AuthApi.mfaStatus(); note = "Two-factor is off." }
-                        .onFailure { note = it.message }
+                        .onSuccess { status = AuthApi.mfaStatus(); note = t("settings.settingsScreen.twoFactorIsOff") }
+                        .onFailure { note = it.readable("SettingsScreen") }
                     busy = false
                 }
             }
             Spacer(Modifier.height(8.dp))
-            Action("New backup codes", enabled = !busy && password.isNotEmpty()) {
+            Action(t("settings.settingsScreen.newBackupCodes"), enabled = !busy && password.isNotEmpty()) {
                 busy = true
                 scope.launch {
                     runCatching { Session.newBackupCodes(password) }
                         .onSuccess { backupCodes = it }
-                        .onFailure { note = it.message }
+                        .onFailure { note = it.readable("SettingsScreen") }
                     busy = false
                 }
             }
         } else if (setup == null) {
-            Action("Set up with an authenticator app", enabled = !busy && password.isNotEmpty()) {
+            Action(t("settings.settingsScreen.setUpWithAnAuthenticatorApp"), enabled = !busy && password.isNotEmpty()) {
                 busy = true
                 scope.launch {
                     runCatching { Session.totpSetup(password) }
                         .onSuccess { setup = it }
-                        .onFailure { note = it.message }
+                        .onFailure { note = it.readable("SettingsScreen") }
                     busy = false
                 }
             }
-            Text("Enter your password above first.", color = colors.textMuted, fontSize = 12.sp)
+            Text(t("settings.settingsScreen.enterYourPasswordAboveFirst"), color = colors.textMuted, fontSize = 12.sp)
         } else {
-            Text("Add this secret to your authenticator app:", color = colors.textSubtle, fontSize = 13.sp)
+            Text(t("settings.settingsScreen.addThisSecretToYourAuthenticator"), color = colors.textSubtle, fontSize = 13.sp)
             Spacer(Modifier.height(6.dp))
             Text(
                 setup!!.formatted.ifEmpty { setup!!.secret },
@@ -521,7 +552,7 @@ private fun SecurityPage() {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Open in your authenticator app",
+                t("settings.settingsScreen.openInYourAuthenticatorApp"),
                 color = colors.textBrand, fontSize = 13.sp,
                 modifier = Modifier.clickable {
                     runCatching {
@@ -532,7 +563,7 @@ private fun SecurityPage() {
             Spacer(Modifier.height(10.dp))
             Field(code, { code = it }, "6-digit code")
             Spacer(Modifier.height(10.dp))
-            Action("Turn on", enabled = !busy && code.length >= 6) {
+            Action(t("settings.security.turnOn"), enabled = !busy && code.length >= 6) {
                 busy = true
                 scope.launch {
                     runCatching { AuthApi.totpEnable(setup!!.ticket, code.trim()) }
@@ -541,9 +572,9 @@ private fun SecurityPage() {
                             setup = null
                             code = ""
                             status = AuthApi.mfaStatus()
-                            note = "Two-factor is on. Save these backup codes."
+                            note = t("settings.settingsScreen.twoFactorIsOnSaveThese")
                         }
-                        .onFailure { note = it.message }
+                        .onFailure { note = it.readable("SettingsScreen") }
                     busy = false
                 }
             }
@@ -557,24 +588,24 @@ private fun SecurityPage() {
                 )
             }
             Text(
-                "Copy these", color = colors.textBrand, fontSize = 13.sp,
+                t("settings.settingsScreen.copyThese"), color = colors.textBrand, fontSize = 13.sp,
                 modifier = Modifier.clickable { clipboard.setText(AnnotatedString(backupCodes.joinToString("\n"))) }.padding(top = 4.dp),
             )
         }
     }
 
-    Section("Recovery key") {
+    Section(t("settings.account.recoveryKey")) {
         Text(
-            "A recovery key is the only way back in if you forget your password.",
+            t("settings.settingsScreen.aRecoveryKeyIsTheOnly"),
             color = colors.textMuted, fontSize = 13.sp,
         )
         Spacer(Modifier.height(8.dp))
-        Action("Make a new recovery key", enabled = !busy && password.isNotEmpty()) {
+        Action(t("settings.settingsScreen.makeANewRecoveryKey"), enabled = !busy && password.isNotEmpty()) {
             busy = true
             scope.launch {
                 runCatching { Session.newRecoveryKey(password) }
-                    .onSuccess { note = "Your new recovery key: $it" }
-                    .onFailure { note = it.message }
+                    .onSuccess { note = t("settings.settingsScreen.yourNewRecoveryKey", "key" to it) }
+                    .onFailure { note = it.readable("SettingsScreen") }
                 busy = false
             }
         }
@@ -592,25 +623,25 @@ private fun SessionsPage() {
     var sessions by remember { mutableStateOf<List<ApiSession>?>(null) }
     LaunchedEffect(Unit) { runCatching { sessions = AuthApi.sessions() } }
 
-    Section("Where you are signed in") {
+    Section(t("settings.settingsScreen.whereYouAreSignedIn")) {
         when {
             sessions == null -> CircularProgressIndicator(color = colors.brand, modifier = Modifier.size(24.dp))
-            sessions!!.isEmpty() -> Text("No other devices.", color = colors.textMuted, fontSize = 14.sp)
+            sessions!!.isEmpty() -> Text(t("settings.settingsScreen.noOtherDevices"), color = colors.textMuted, fontSize = 14.sp)
             else -> for (session in sessions!!) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            session.userAgent.take(60).ifEmpty { "Unknown device" },
+                            session.userAgent.take(60).ifEmpty { t("settings.devices.unknownDevice") },
                             color = colors.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            (if (session.current) "This device · " else "") + session.ip,
+                            (if (session.current) t("settings.settingsScreen.thisDevice") else "") + session.ip,
                             color = colors.textMuted, fontSize = 12.sp,
                         )
                     }
                     if (!session.current) {
                         Text(
-                            "Sign out", color = colors.danger, fontSize = 13.sp,
+                            t("settings.settingsScreen.signOut"), color = colors.danger, fontSize = 13.sp,
                             modifier = Modifier.clickable {
                                 scope.launch {
                                     runCatching { AuthApi.deleteSession(session.id) }
@@ -631,19 +662,19 @@ private fun AdminPage() {
     var stats by remember { mutableStateOf<xyz.evilion.chat.net.AdminStats?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
-        runCatching { stats = xyz.evilion.chat.net.AdminApi.stats() }.onFailure { error = "Only instance admins can see this." }
+        runCatching { stats = xyz.evilion.chat.net.AdminApi.stats() }.onFailure { error = t("settings.settingsScreen.onlyInstanceAdminsCanSeeThis") }
     }
-    Section("This instance") {
+    Section(t("settings.settingsScreen.thisInstance")) {
         when {
             error != null -> Text(error!!, color = colors.textMuted, fontSize = 14.sp)
             stats == null -> CircularProgressIndicator(color = colors.brand, modifier = Modifier.size(24.dp))
             else -> Column {
-                StatRow("Version", stats!!.version)
-                StatRow("Accounts", stats!!.users.toString())
-                StatRow("Servers", stats!!.servers.toString())
-                StatRow("Messages", stats!!.messages.toString())
-                StatRow("Online now", stats!!.online.toString())
-                StatRow("Files", "${stats!!.blobs} (${formatSize(stats!!.blobBytes)})")
+                StatRow(t("settings.admin.version"), stats!!.version)
+                StatRow(t("settings.settingsScreen.accounts"), stats!!.users.toString())
+                StatRow(t("rail.rail.servers"), stats!!.servers.toString())
+                StatRow(t("modals.quickSwitcher.messages"), stats!!.messages.toString())
+                StatRow(t("settings.settingsScreen.onlineNow"), stats!!.online.toString())
+                StatRow(t("settings.settingsScreen.files"), "${stats!!.blobs} (${formatSize(stats!!.blobBytes)})")
             }
         }
     }
@@ -664,21 +695,20 @@ private fun AboutPage() {
     val scope = rememberCoroutineScope()
     var usage by remember { mutableStateOf(AttachmentStore.usage()) }
     val instance by AppState.instance.collectAsState()
-    Section("Nexa for Android") {
-        StatRow("App version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-        StatRow("Server", xyz.evilion.chat.net.Api.baseUrl.removePrefix("https://"))
-        StatRow("Server version", instance?.version ?: "—")
-        StatRow("Cached files", formatSize(usage))
+    Section(t("download.nexaForAndroid")) {
+        StatRow(t("settings.settingsScreen.appVersion"), "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        StatRow(t("settings.settingsScreen.server"), xyz.evilion.chat.net.Api.baseUrl.removePrefix("https://"))
+        StatRow(t("settings.settingsScreen.serverVersion"), instance?.version ?: "—")
+        StatRow(t("settings.settingsScreen.cachedFiles"), formatSize(usage))
         Spacer(Modifier.height(12.dp))
-        Action("Clear cached files") {
+        Action(t("settings.settingsScreen.clearCachedFiles")) {
             AttachmentStore.clear()
             usage = AttachmentStore.usage()
         }
     }
-    Section("End-to-end encryption") {
+    Section(t("settings.settingsScreen.endToEndEncryption")) {
         Text(
-            "Messages, files and calls are encrypted on this device. The server only ever holds ciphertext, " +
-                "and your identity key is kept in this phone's hardware key store.",
+            t("settings.settingsScreen.messagesFilesAndCallsAreEncrypted"),
             color = colors.textMuted, fontSize = 13.sp,
         )
     }

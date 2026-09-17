@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.main
 
 import xyz.evilion.chat.R
 
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -89,7 +90,7 @@ private fun ServerRail(route: Route) {
                     selected = route is Route.Friends || (route is Route.Chat && route.serverId == null),
                     onClick = { Nav.go(Route.Chat(null, (route as? Route.Chat)?.channelId)) },
                 ) {
-                    Icon(painterResource(R.drawable.nexa_mark), "Direct messages", tint = colors.text, modifier = Modifier.size(28.dp))
+                    Icon(painterResource(R.drawable.nexa_mark), t("settings.privacy.directMessages"), tint = colors.text, modifier = Modifier.size(28.dp))
                 }
             }
             item { Box(Modifier.width(32.dp).height(2.dp).clip(CircleShape).background(colors.borderSubtle)) }
@@ -116,7 +117,7 @@ private fun ServerRail(route: Route) {
             }
             item {
                 RailButton(selected = false, onClick = { Nav.push(Layer.CreateServer) }) {
-                    Icon(Lucide.Plus, "Create a server", tint = colors.positive, modifier = Modifier.size(24.dp))
+                    Icon(Lucide.Plus, t("main.sidebar.createAServer"), tint = colors.positive, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -165,7 +166,7 @@ private fun ServerChannels(serverId: String, activeChannel: String?, onPick: () 
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Icon(Lucide.Settings, "Server settings", tint = colors.icon, modifier = Modifier.size(18.dp))
+            Icon(Lucide.Settings, t("main.sidebar.serverSettings"), tint = colors.icon, modifier = Modifier.size(18.dp))
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(colors.borderSubtle))
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)) {
@@ -290,9 +291,9 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
             Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Direct messages", color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(t("settings.privacy.directMessages"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Icon(
-                Lucide.Plus, "New message",
+                Lucide.Plus, t("notify.newMessage"),
                 tint = colors.icon,
                 modifier = Modifier.size(20.dp).clickable { Nav.push(Layer.NewMessage) },
             )
@@ -307,7 +308,7 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
                 ) {
                     Icon(Lucide.Users, null, tint = colors.icon, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Friends", color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Text(t("sidebar.dMSidebar.friends"), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                     val pending = AppState.relationships.value.values.count { it.type == "incoming" }
                     if (pending > 0) Badge(pending)
                 }
@@ -369,7 +370,7 @@ private fun SelfPanel() {
             )
         }
         Icon(
-            Lucide.Settings, "Settings",
+            Lucide.Settings, t("main.sidebar.settings"),
             tint = colors.icon,
             modifier = Modifier.size(22.dp).clickable { Nav.go(Route.Settings()) },
         )

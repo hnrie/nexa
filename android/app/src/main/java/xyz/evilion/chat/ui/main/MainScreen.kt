@@ -1,6 +1,7 @@
 package xyz.evilion.chat.ui.main
 
 import androidx.activity.compose.BackHandler
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -86,8 +87,8 @@ fun MainScreen() {
                     if (channelId == null) {
                         EmptyState(
                             Lucide.Hash,
-                            "No conversation open",
-                            "Pick one from the list, or start a new message.",
+                            t("main.mainScreen.noConversationOpen"),
+                            t("main.mainScreen.pickOneFromTheListOr"),
                         )
                         LaunchedEffect(Unit) { drawer.open() }
                     } else {

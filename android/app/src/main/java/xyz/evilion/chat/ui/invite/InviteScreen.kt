@@ -35,6 +35,8 @@ import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.InviteLink
 import xyz.evilion.chat.data.KeyService
 import xyz.evilion.chat.data.Session
+import xyz.evilion.chat.data.readable
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.InvitePreview
 import xyz.evilion.chat.net.ServersApi
 import xyz.evilion.chat.ui.Nav
@@ -53,7 +55,7 @@ fun InviteScreen(code: String, guest: Boolean = false, fragment: String? = null)
 
     LaunchedEffect(code) {
         runCatching { preview = ServersApi.invitePreview(code) }
-            .onFailure { error = "This invite is not valid any more." }
+            .onFailure { error = t("invite.inviteScreen.thisInviteIsNotValidAny") }
     }
 
     Box(Modifier.fillMaxSize().background(colors.bgBase), Alignment.Center) {
@@ -65,7 +67,7 @@ fun InviteScreen(code: String, guest: Boolean = false, fragment: String? = null)
                 error != null -> {
                     Text(error!!, color = colors.danger, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = { Nav.go(Route.Chat(null, null)) }) { Text("Back", color = colors.textMuted) }
+                    TextButton(onClick = { Nav.go(Route.Chat(null, null)) }) { Text(t("modals.createServer.back"), color = colors.textMuted) }
                 }
                 preview == null -> CircularProgressIndicator(color = colors.brand)
                 else -> {
@@ -73,12 +75,12 @@ fun InviteScreen(code: String, guest: Boolean = false, fragment: String? = null)
                     val group = preview!!.group
                     ServerIcon(
                         server?.id ?: group?.id ?: code,
-                        server?.name ?: group?.name ?: "Invite",
+                        server?.name ?: group?.name ?: t("invite.inviteScreen.invite"),
                         server?.iconId ?: group?.iconId,
                         80.dp,
                     )
                     Spacer(Modifier.height(16.dp))
-                    Text("You have been invited to", color = colors.textMuted, fontSize = 14.sp)
+                    Text(t("invite.inviteScreen.youHaveBeenInvitedTo"), color = colors.textMuted, fontSize = 14.sp)
                     Text(
                         server?.name ?: group?.name ?: "a conversation",
                         color = colors.textStrong, fontSize = 22.sp, fontWeight = FontWeight.Bold,
@@ -111,16 +113,16 @@ fun InviteScreen(code: String, guest: Boolean = false, fragment: String? = null)
                                         KeyService.adopt(view.id, key.epoch, key.root)
                                     }
                                     Nav.openChannel(view.id, view.channels.firstOrNull { it.isText }?.id)
-                                }.onFailure { error = it.message }
+                                }.onFailure { error = it.readable("InviteScreen") }
                                 busy = false
                             }
                         },
                         enabled = !busy,
                         colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
                         modifier = Modifier.fillMaxWidth().height(48.dp),
-                    ) { Text(if (busy) "Joining…" else "Accept invite", fontWeight = FontWeight.SemiBold) }
+                    ) { Text(if (busy) t("voice.callBanner.joining") else t("invite.inviteScreen.acceptInvite"), fontWeight = FontWeight.SemiBold) }
                     Spacer(Modifier.height(8.dp))
-                    TextButton(onClick = { Nav.go(Route.Chat(null, null)) }) { Text("Not now", color = colors.textMuted) }
+                    TextButton(onClick = { Nav.go(Route.Chat(null, null)) }) { Text(t("invite.inviteScreen.notNow"), color = colors.textMuted) }
                 }
             }
         }

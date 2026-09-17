@@ -6,6 +6,7 @@ import android.content.Intent
 import android.media.projection.MediaProjectionManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -146,22 +147,22 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    Lucide.ChevronDown, "Back to the conversation", tint = colors.icon,
+                    Lucide.ChevronDown, t("callScreen.backToTheConversation"), tint = colors.icon,
                     modifier = Modifier.size(28.dp).clickable(onClick = onClose),
                 )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        channel?.let { AppState.channelName(it, me?.id) } ?: "Call",
+                        channel?.let { AppState.channelName(it, me?.id) } ?: t("services.call"),
                         color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         when {
                             call.error != null -> call.error!!
-                            call.connecting -> "Connecting…"
+                            call.connecting -> t("shell.requireAuth.connecting")
                             call.connected -> "${participants.size} in the call · encrypted end to end"
-                            else -> "Waiting for the call…"
+                            else -> t("callScreen.waitingForTheCall")
                         },
                         color = if (call.error != null) colors.danger else colors.textMuted,
                         fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -208,7 +209,7 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                if (mine) "You" else AppState.nameFor(state.userId, channel?.serverId),
+                                if (mine) t("callScreen.you") else AppState.nameFor(state.userId, channel?.serverId),
                                 color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                             if (state.selfMute || state.serverMute) {
@@ -240,17 +241,17 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
             ) {
                 CallButton(
                     if (call.muted) Lucide.MicOff else Lucide.Mic,
-                    if (call.muted) "Unmute" else "Mute",
+                    if (call.muted) t("settings.notifications.unmute") else t("settings.notifications.mute"),
                     active = call.muted,
                 ) { VoiceSession.setMuted(!call.muted) }
                 CallButton(
                     if (call.deafened) Lucide.HeadphoneOff else Lucide.Headphones,
-                    if (call.deafened) "Undeafen" else "Deafen",
+                    if (call.deafened) t("shell.user.undeafen") else t("shell.user.deafen"),
                     active = call.deafened,
                 ) { VoiceSession.setDeafened(!call.deafened) }
                 CallButton(
                     if (call.video) Lucide.Video else Lucide.VideoOff,
-                    "Camera",
+                    t("settings.voice.camera"),
                     active = call.video,
                 ) {
                     if (call.video || androidx.core.content.ContextCompat.checkSelfPermission(
@@ -264,7 +265,7 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
                 }
                 CallButton(
                     if (call.screen) Lucide.MonitorX else Lucide.MonitorUp,
-                    "Share screen",
+                    t("callScreen.shareScreen"),
                     active = call.screen,
                 ) {
                     if (call.screen) {
@@ -274,10 +275,10 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
                         screenCapture.launch(manager.createScreenCaptureIntent())
                     }
                 }
-                CallButton(Lucide.Volume2, "Speaker", active = call.speaker) {
+                CallButton(Lucide.Volume2, t("settings.voice.speaker"), active = call.speaker) {
                     VoiceSession.setSpeaker(!call.speaker)
                 }
-                CallButton(Lucide.Phone, "Leave", danger = true, hangUp = true) {
+                CallButton(Lucide.Phone, t("guestCall.leave"), danger = true, hangUp = true) {
                     VoiceSession.leave()
                     CallService.stop(context)
                     onClose()

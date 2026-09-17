@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import xyz.evilion.chat.crypto.MessagePayload
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.Channel
 import xyz.evilion.chat.net.Emoji
 import xyz.evilion.chat.net.GuestInfo
@@ -181,13 +182,13 @@ object AppState {
         val member = serverId?.let { servers.value[it]?.members?.get(userId) }
         member?.nickname?.takeIf { it.isNotEmpty() }?.let { return it }
         relationships.value[userId]?.nickname?.takeIf { it.isNotEmpty() }?.let { return it }
-        return user(userId)?.name ?: "Unknown"
+        return user(userId)?.name ?: t("modals.quickSwitcher.unknown")
     }
 
     fun channelName(channel: Channel, myId: String? = me.value?.id): String = when {
-        channel.type == "dm" -> channel.recipientIds.firstOrNull { it != myId }?.let { nameFor(it) } ?: "Direct message"
+        channel.type == "dm" -> channel.recipientIds.firstOrNull { it != myId }?.let { nameFor(it) } ?: t("appState.directMessage")
         channel.type == "group_dm" -> channel.name.ifEmpty {
-            channel.recipientIds.filter { it != myId }.joinToString(", ") { nameFor(it) }.ifEmpty { "Group" }
+            channel.recipientIds.filter { it != myId }.joinToString(", ") { nameFor(it) }.ifEmpty { t("appState.group") }
         }
         else -> channel.name
     }

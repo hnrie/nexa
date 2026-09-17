@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.i18n.Strings
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -121,14 +123,14 @@ fun MessageRow(
                         Text(shortTime(message.raw.createdAt), color = colors.textMuted, fontSize = 11.sp)
                         if (message.raw.flags and 1 != 0) {
                             Spacer(Modifier.width(4.dp))
-                            Icon(Lucide.Pin, "Pinned", tint = colors.textMuted, modifier = Modifier.size(12.dp))
+                            Icon(Lucide.Pin, t("messageRow.pinned"), tint = colors.textMuted, modifier = Modifier.size(12.dp))
                         }
                     }
                 }
 
                 when {
-                    message.decryptError == "no_key" -> Locked("Waiting for the key to this conversation.")
-                    message.decryptError == "bad" -> Locked("This message could not be decrypted.")
+                    message.decryptError == "no_key" -> Locked(t("messageRow.waitingForTheKeyToThis"))
+                    message.decryptError == "bad" -> Locked(t("chat.messageItem.thisMessageCouldNotBeDecrypted"))
                     else -> {
                         val payload = message.payload
                         val nodes = remember(payload?.text) { Markdown.parse(payload?.text.orEmpty()) }
@@ -156,13 +158,13 @@ fun MessageRow(
                 }
 
                 if (message.pending) {
-                    Text("Sending…", color = colors.textMuted, fontSize = 11.sp)
+                    Text(t("messageRow.sending"), color = colors.textMuted, fontSize = 11.sp)
                 } else if (message.failed) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Lucide.CircleAlert, null, tint = colors.danger, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            "Not sent. Tap to try again.",
+                            t("messageRow.notSentTapToTryAgain"),
                             color = colors.danger,
                             fontSize = 11.sp,
                             modifier = Modifier.clickable {
@@ -255,7 +257,7 @@ private fun ReplyPreview(messageId: String, channelId: String, serverId: String?
         Icon(Lucide.Reply, null, tint = colors.textMuted, modifier = Modifier.size(14.dp))
         Spacer(Modifier.width(4.dp))
         if (target == null) {
-            Text("Original message", color = colors.textMuted, fontSize = 12.sp)
+            Text(t("messageRow.originalMessage"), color = colors.textMuted, fontSize = 12.sp)
         } else {
             val author = AppState.nameFor(target.raw.authorId, serverId)
             Text("$author  ", color = colors.textSubtle, fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -356,10 +358,26 @@ private fun DayDivider(timestamp: Long) {
     }
 }
 
-private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
-private val dayFormat = SimpleDateFormat("d MMMM yyyy", Locale.getDefault())
+/**
+ * Dates and times in the language the app is set to, not the phone's.
+ *
+ * Someone reading Nexa in Arabic on an English phone wants Arabic months
+ * beside Arabic words. A formatter is built once per language and kept, since
+ * building one is the expensive part and a message list asks for hundreds.
+ */
+private val formats = HashMap<String, SimpleDateFormat>()
 
-fun shortTime(millis: Long): String = timeFormat.format(Date(millis))
+private fun format(pattern: String): SimpleDateFormat = synchronized(formats) {
+    formats.getOrPut("${Strings.tag}:$pattern") {
+        SimpleDateFormat(pattern, Locale.forLanguageTag(Strings.tag))
+    }
+}
+
+/** The long date the profile sheet shows, in the app's language. */
+fun longDate(millis: Long): String =
+    java.text.DateFormat.getDateInstance(java.text.DateFormat.LONG, Locale.forLanguageTag(Strings.tag)).format(Date(millis))
+
+fun shortTime(millis: Long): String = format("HH:mm").format(Date(millis))
 
 fun dayLabel(millis: Long): String {
     val now = Calendar.getInstance()
@@ -367,9 +385,9 @@ fun dayLabel(millis: Long): String {
     val sameYear = now.get(Calendar.YEAR) == then.get(Calendar.YEAR)
     val dayDelta = now.get(Calendar.DAY_OF_YEAR) - then.get(Calendar.DAY_OF_YEAR)
     return when {
-        sameYear && dayDelta == 0 -> "Today"
-        sameYear && dayDelta == 1 -> "Yesterday"
-        else -> dayFormat.format(Date(millis))
+        sameYear && dayDelta == 0 -> t("modals.customStatus.today")
+        sameYear && dayDelta == 1 -> t("messageRow.yesterday")
+        else -> format("d MMMM yyyy").format(Date(millis))
     }
 }
 

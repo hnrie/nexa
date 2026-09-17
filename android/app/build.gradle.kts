@@ -12,6 +12,37 @@ val keystoreProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
+/**
+ * The translations are the web client's: one catalogue for the browser, the
+ * desktop app and this one, copied into the assets at build time so a string
+ * translated once is translated everywhere and the two cannot drift.
+ */
+abstract class CopyLocales : DefaultTask() {
+    @get:InputDirectory abstract val source: DirectoryProperty
+
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val into = outputDir.get().asFile.resolve("locales")
+        into.mkdirs()
+        into.listFiles()?.forEach { it.delete() }
+        source.get().asFile.listFiles()?.filter { it.name.endsWith(".json") }?.forEach {
+            it.copyTo(into.resolve(it.name), overwrite = true)
+        }
+    }
+}
+
+val copyLocales = tasks.register<CopyLocales>("copyLocales") {
+    source.set(rootProject.file("../web/src/i18n/locales"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyLocales, CopyLocales::outputDir)
+    }
+}
+
 android {
     namespace = "xyz.evilion.chat"
     compileSdk = 37
@@ -25,7 +56,10 @@ android {
         versionCode = 2
         versionName = "1.0.1"
 
-        buildConfigField("String", "DEFAULT_SERVER", "\"https://chat.evilion.xyz\"")
+        // -PserverUrl=http://10.0.2.2:1234 points a build at a local chatd
+        val defaultServer = (findProperty("serverUrl") as String?)?.trim().takeUnless { it.isNullOrEmpty() }
+            ?: "https://chat.evilion.xyz"
+        buildConfigField("String", "DEFAULT_SERVER", "\"$defaultServer\"")
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
@@ -96,6 +130,7 @@ android {
         compose = true
         buildConfig = true
     }
+
 
     packaging {
         resources {

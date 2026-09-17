@@ -1,6 +1,7 @@
 package xyz.evilion.chat.ui.auth
 
 import xyz.evilion.chat.R
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -105,7 +106,7 @@ fun AuthScreen(locked: Boolean = false) {
             } catch (e: ApiException) {
                 error = e.message
             } catch (e: Exception) {
-                error = e.message ?: "Something went wrong."
+                error = e.message ?: t("modals.confirm.somethingWentWrong")
             } finally {
                 busy = false
             }
@@ -135,11 +136,11 @@ fun AuthScreen(locked: Boolean = false) {
             Spacer(Modifier.height(16.dp))
             Text(
                 when (mode) {
-                    Mode.SIGN_IN -> "Welcome back"
-                    Mode.REGISTER -> "Create an account"
-                    Mode.RECOVER -> "Get your account back"
-                    Mode.MFA -> "One more step"
-                    Mode.UNLOCK -> "Unlock this device"
+                    Mode.SIGN_IN -> t("auth.authScreen.welcomeBack")
+                    Mode.REGISTER -> t("home.hero.start")
+                    Mode.RECOVER -> t("auth.authScreen.getYourAccountBack")
+                    Mode.MFA -> t("login.oneMoreStep")
+                    Mode.UNLOCK -> t("auth.authScreen.unlockThisDevice")
                 },
                 style = MaterialTheme.typography.titleLarge,
                 color = colors.textStrong,
@@ -148,10 +149,10 @@ fun AuthScreen(locked: Boolean = false) {
             Text(
                 when (mode) {
                     Mode.SIGN_IN -> instance?.name?.ifEmpty { null } ?: "Nexa"
-                    Mode.REGISTER -> "Your password never leaves this device."
-                    Mode.RECOVER -> "Your recovery key unwraps your account's keys."
-                    Mode.MFA -> "Enter the code from your authenticator app."
-                    Mode.UNLOCK -> "Your password unlocks the keys for this device."
+                    Mode.REGISTER -> t("auth.authScreen.yourPasswordNeverLeavesThisDevice")
+                    Mode.RECOVER -> t("auth.authScreen.yourRecoveryKeyUnwrapsYourAccount")
+                    Mode.MFA -> t("auth.authScreen.enterTheCodeFromYourAuthenticator")
+                    Mode.UNLOCK -> t("auth.authScreen.yourPasswordUnlocksTheKeysFor")
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textMuted,
@@ -164,21 +165,21 @@ fun AuthScreen(locked: Boolean = false) {
                     Field(
                         value = code,
                         onChange = { code = it },
-                        label = if (useBackupCode) "Backup code" else "6-digit code",
+                        label = if (useBackupCode) t("login.backupCode") else "6-digit code",
                         keyboardType = if (useBackupCode) KeyboardType.Text else KeyboardType.NumberPassword,
                     )
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton("Continue", busy) {
+                    PrimaryButton(t("settings.security.continue"), busy) {
                         run {
                             if (useBackupCode) Session.completeMfa(null, code.trim())
                             else Session.completeMfa(code.trim(), null)
                         }
                     }
                     TextButton(onClick = { useBackupCode = !useBackupCode; code = "" }) {
-                        Text(if (useBackupCode) "Use your authenticator app" else "Use a backup code", color = colors.textBrand)
+                        Text(if (useBackupCode) t("auth.authScreen.useYourAuthenticatorApp") else t("login.useABackupCode"), color = colors.textBrand)
                     }
                     TextButton(onClick = { Session.cancelMfa(); mode = Mode.SIGN_IN }) {
-                        Text("Back", color = colors.textMuted)
+                        Text(t("modals.createServer.back"), color = colors.textMuted)
                     }
                 }
 
@@ -186,68 +187,68 @@ fun AuthScreen(locked: Boolean = false) {
                     Field(
                         value = password,
                         onChange = { password = it },
-                        label = "Password",
+                        label = t("chat.lockedChannel.password"),
                         password = !showPassword,
                         trailing = {
                             IconButton(onClick = { showPassword = !showPassword }) {
                                 Icon(
                                     if (showPassword) Lucide.EyeOff else Lucide.Eye,
-                                    "Show password", tint = colors.icon,
+                                    t("auth.authScreen.showPassword"), tint = colors.icon,
                                 )
                             }
                         },
                     )
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton("Unlock", busy) { run { Session.unlock(password) } }
+                    PrimaryButton(t("lock.unlock"), busy) { run { Session.unlock(password) } }
                     TextButton(onClick = { run { Session.logout() } }) {
-                        Text("Sign out instead", color = colors.textMuted)
+                        Text(t("auth.authScreen.signOutInstead"), color = colors.textMuted)
                     }
                 }
 
                 Mode.RECOVER -> {
-                    Field(username, { username = it }, "Username")
+                    Field(username, { username = it }, t("settings.account.username"))
                     Spacer(Modifier.height(10.dp))
-                    Field(recoveryKey, { recoveryKey = it }, "Recovery key", mono = true)
+                    Field(recoveryKey, { recoveryKey = it }, t("settings.account.recoveryKey"), mono = true)
                     Spacer(Modifier.height(10.dp))
-                    Field(password, { password = it }, "New password", password = true)
+                    Field(password, { password = it }, t("settings.account.newPassword"), password = true)
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton("Set a new password", busy) {
+                    PrimaryButton(t("auth.authScreen.setANewPassword"), busy) {
                         run { Session.recover(username.trim(), recoveryKey.trim(), password) }
                     }
-                    TextButton(onClick = { mode = Mode.SIGN_IN }) { Text("Back to sign in", color = colors.textMuted) }
+                    TextButton(onClick = { mode = Mode.SIGN_IN }) { Text(t("auth.authScreen.backToSignIn"), color = colors.textMuted) }
                 }
 
                 Mode.REGISTER -> {
-                    Field(username, { username = it }, "Username", hint = "Letters, numbers, dots and underscores")
+                    Field(username, { username = it }, t("settings.account.username"), hint = t("auth.authScreen.lettersNumbersDotsAndUnderscores"))
                     Spacer(Modifier.height(10.dp))
-                    Field(displayName, { displayName = it }, "Display name")
+                    Field(displayName, { displayName = it }, t("register.displayName"))
                     Spacer(Modifier.height(10.dp))
-                    Field(password, { password = it }, "Password", password = !showPassword, trailing = {
+                    Field(password, { password = it }, t("chat.lockedChannel.password"), password = !showPassword, trailing = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
                                 if (showPassword) Lucide.EyeOff else Lucide.Eye,
-                                "Show password", tint = colors.icon,
+                                t("auth.authScreen.showPassword"), tint = colors.icon,
                             )
                         }
                     })
                     Spacer(Modifier.height(10.dp))
-                    Field(confirm, { confirm = it }, "Confirm password", password = true)
+                    Field(confirm, { confirm = it }, t("register.confirmPassword"), password = true)
                     if (instance?.registration == "invite") {
                         Spacer(Modifier.height(10.dp))
-                        Field(inviteCode, { inviteCode = it }, "Invite code")
+                        Field(inviteCode, { inviteCode = it }, t("auth.authScreen.inviteCode"))
                     }
                     if (instance?.needsKey == true) {
                         Spacer(Modifier.height(10.dp))
-                        Field(registrationKey, { registrationKey = it }, "Registration key")
+                        Field(registrationKey, { registrationKey = it }, t("auth.authScreen.registrationKey"))
                     }
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton("Create account", busy) {
+                    PrimaryButton(t("auth.authScreen.createAccount"), busy) {
                         if (password != confirm) {
-                            error = "Those passwords do not match."
+                            error = t("auth.authScreen.thosePasswordsDoNotMatch")
                             return@PrimaryButton
                         }
                         if (password.length < 8) {
-                            error = "Use at least 8 characters."
+                            error = t("auth.authScreen.useAtLeast8Characters")
                             return@PrimaryButton
                         }
                         run {
@@ -257,22 +258,22 @@ fun AuthScreen(locked: Boolean = false) {
                             )
                         }
                     }
-                    TextButton(onClick = { mode = Mode.SIGN_IN }) { Text("I already have an account", color = colors.textBrand) }
+                    TextButton(onClick = { mode = Mode.SIGN_IN }) { Text(t("auth.authScreen.iAlreadyHaveAnAccount"), color = colors.textBrand) }
                 }
 
                 Mode.SIGN_IN -> {
-                    Field(username, { username = it }, "Username")
+                    Field(username, { username = it }, t("settings.account.username"))
                     Spacer(Modifier.height(10.dp))
-                    Field(password, { password = it }, "Password", password = !showPassword, imeAction = ImeAction.Done, trailing = {
+                    Field(password, { password = it }, t("chat.lockedChannel.password"), password = !showPassword, imeAction = ImeAction.Done, trailing = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
                                 if (showPassword) Lucide.EyeOff else Lucide.Eye,
-                                "Show password", tint = colors.icon,
+                                t("auth.authScreen.showPassword"), tint = colors.icon,
                             )
                         }
                     })
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton("Sign in", busy) {
+                    PrimaryButton(t("login.signIn"), busy) {
                         run {
                             val outcome = Session.login(username.trim(), password)
                             if (outcome.mfaRequired) {
@@ -282,9 +283,9 @@ fun AuthScreen(locked: Boolean = false) {
                         }
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                        TextButton(onClick = { mode = Mode.RECOVER }) { Text("Forgot password", color = colors.textMuted) }
+                        TextButton(onClick = { mode = Mode.RECOVER }) { Text(t("auth.authScreen.forgotPassword"), color = colors.textMuted) }
                         if (instance?.registration != "closed") {
-                            TextButton(onClick = { mode = Mode.REGISTER }) { Text("Create account", color = colors.textBrand) }
+                            TextButton(onClick = { mode = Mode.REGISTER }) { Text(t("auth.authScreen.createAccount"), color = colors.textBrand) }
                         }
                     }
                 }
@@ -305,7 +306,7 @@ fun AuthScreen(locked: Boolean = false) {
                         modifier = Modifier.clickable { serverUrl = Api.baseUrl; changingServer = true }.padding(8.dp),
                     )
                 } else {
-                    Field(serverUrl, { serverUrl = it }, "Server address", imeAction = ImeAction.Done)
+                    Field(serverUrl, { serverUrl = it }, t("auth.authScreen.serverAddress"), imeAction = ImeAction.Done)
                     Spacer(Modifier.height(8.dp))
                     Row {
                         TextButton(onClick = {
@@ -314,8 +315,8 @@ fun AuthScreen(locked: Boolean = false) {
                             SecureStore.saveServerUrl(next)
                             changingServer = false
                             scope.launch { Session.loadInstance() }
-                        }) { Text("Use this server", color = colors.textBrand) }
-                        TextButton(onClick = { changingServer = false }) { Text("Cancel", color = colors.textMuted) }
+                        }) { Text(t("auth.authScreen.useThisServer"), color = colors.textBrand) }
+                        TextButton(onClick = { changingServer = false }) { Text(t("chat.editMessage.cancel"), color = colors.textMuted) }
                     }
                 }
             }

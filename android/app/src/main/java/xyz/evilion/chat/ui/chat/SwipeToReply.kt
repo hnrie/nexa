@@ -26,6 +26,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import xyz.evilion.chat.ui.theme.chatColors
 import kotlin.math.roundToInt
@@ -65,7 +66,7 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
             Box(Modifier.fillMaxHeight().padding(start = 14.dp), contentAlignment = Alignment.CenterStart) {
                 Icon(
                     Lucide.Reply,
-                    "Reply",
+                    t("chat.messageItem.reply"),
                     tint = if (progress >= 1f) colors.brand else colors.textMuted,
                     modifier = Modifier.size(20.dp).alpha(progress).scale(0.7f + 0.3f * progress),
                 )

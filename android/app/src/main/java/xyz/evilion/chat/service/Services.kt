@@ -16,6 +16,7 @@ import xyz.evilion.chat.MainActivity
 import xyz.evilion.chat.R
 import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.Session
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.notify.Notifications
 
 /**
@@ -30,7 +31,7 @@ class GatewayService : Service() {
         val notification = NotificationCompat.Builder(this, Notifications.CHANNEL_SERVICE)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Nexa")
-            .setContentText("Connected")
+            .setContentText(t("services.connected"))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .setContentIntent(
@@ -73,10 +74,10 @@ class CallService : Service() {
         val sharing = intent?.getBooleanExtra("sharing", false) == true
         val name = channelId?.let { id ->
             AppState.channels.value[id]?.let { AppState.channelName(it) }
-        } ?: "Call"
+        } ?: t("services.call")
         val notification: Notification = NotificationCompat.Builder(this, Notifications.CHANNEL_CALLS)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle("In a call")
+            .setContentTitle(t("services.inACall"))
             .setContentText(name)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setOngoing(true)

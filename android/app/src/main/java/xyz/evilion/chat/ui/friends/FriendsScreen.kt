@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.friends
 
+import xyz.evilion.chat.data.readable
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,14 +73,14 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
             Modifier.fillMaxWidth().background(colors.bgRaised).statusBarsPadding().height(52.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onOpenDrawer) { Icon(Lucide.Menu, "Channels", tint = colors.icon) }
-            Text("Friends", color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+            IconButton(onClick = onOpenDrawer) { Icon(Lucide.Menu, t("chatScreen.channels"), tint = colors.icon) }
+            Text(t("sidebar.dMSidebar.friends"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
         }
         Row(
             Modifier.fillMaxWidth().background(colors.bgRaised).padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            for ((id, label) in listOf("online" to "Online", "all" to "All", "pending" to "Pending", "blocked" to "Blocked")) {
+            for ((id, label) in listOf("online" to t("chat.memberList.online"), "all" to t("friends.all"), "pending" to t("friends.friendsScreen.pending"), "blocked" to t("friends.blocked"))) {
                 val selected = tab == id
                 val count = when (id) {
                     "pending" -> all.count { it.type == "incoming" }
@@ -103,7 +105,7 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
             OutlinedTextField(
                 value = adding,
                 onValueChange = { adding = it; message = null },
-                placeholder = { Text("Add a friend by username", color = colors.textPlaceholder) },
+                placeholder = { Text(t("friends.friendsScreen.addAFriendByUsername"), color = colors.textPlaceholder) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = colors.bgInput, unfocusedContainerColor = colors.bgInput,
@@ -113,7 +115,7 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                "Send",
+                t("composer.send"),
                 color = if (adding.isBlank()) colors.textMuted else colors.brand,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.clickable(enabled = adding.isNotBlank()) {
@@ -121,9 +123,9 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
                         runCatching {
                             Session.guarded("friend_request") { captcha -> RelationshipsApi.request(adding.trim(), captcha) }
                         }.onSuccess {
-                            message = "Request sent to @${adding.trim()}."
+                            message = t("friends.friendsScreen.requestSentTo", "username" to adding.trim())
                             adding = ""
-                        }.onFailure { message = it.message }
+                        }.onFailure { message = it.readable("FriendsScreen") }
                     }
                 }.padding(8.dp),
             )
@@ -133,7 +135,7 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
         }
 
         if (list.isEmpty()) {
-            EmptyState(Lucide.Users, "Nobody here yet", "Add someone by their username to get started.")
+            EmptyState(Lucide.Users, t("friends.friendsScreen.nobodyHereYet"), t("friends.friendsScreen.addSomeoneByTheirUsernameTo"))
         } else {
             LazyColumn(Modifier.weight(1f)) {
                 items(list.size, key = { list[it].user.id }) { index ->
@@ -151,9 +153,9 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
                             Text(AppState.nameFor(user.id), color = colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
                             Text(
                                 when (relationship.type) {
-                                    "incoming" -> "Wants to be friends"
-                                    "outgoing" -> "Request sent"
-                                    "blocked" -> "Blocked"
+                                    "incoming" -> t("friends.friendsScreen.wantsToBeFriends")
+                                    "outgoing" -> t("friends.friendsScreen.requestSent")
+                                    "blocked" -> t("friends.blocked")
                                     else -> presences[user.id]?.statusText?.ifEmpty { null } ?: status.replaceFirstChar { it.uppercase() }
                                 },
                                 color = colors.textMuted, fontSize = 12.sp,
@@ -161,20 +163,20 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
                         }
                         when (relationship.type) {
                             "incoming" -> {
-                                ActionIcon(Lucide.Check, colors.positive, "Accept friend request") {
+                                ActionIcon(Lucide.Check, colors.positive, t("friends.friendsScreen.acceptFriendRequest")) {
                                     scope.launch { runCatching { RelationshipsApi.accept(user.id) } }
                                 }
-                                ActionIcon(Lucide.X, colors.danger, "Decline friend request") {
+                                ActionIcon(Lucide.X, colors.danger, t("friends.friendsScreen.declineFriendRequest")) {
                                     scope.launch { runCatching { RelationshipsApi.remove(user.id) } }
                                 }
                             }
-                            "outgoing" -> ActionIcon(Lucide.X, colors.textMuted, "Cancel friend request") {
+                            "outgoing" -> ActionIcon(Lucide.X, colors.textMuted, t("friends.friendsScreen.cancelFriendRequest")) {
                                 scope.launch { runCatching { RelationshipsApi.remove(user.id) } }
                             }
-                            "blocked" -> ActionIcon(Lucide.Ban, colors.textMuted, "Unblock") {
+                            "blocked" -> ActionIcon(Lucide.Ban, colors.textMuted, t("friends.unblock")) {
                                 scope.launch { runCatching { RelationshipsApi.unblock(user.id) } }
                             }
-                            else -> ActionIcon(Lucide.MessageCircle, colors.icon, "Message") {
+                            else -> ActionIcon(Lucide.MessageCircle, colors.icon, t("profile.profileCard.message")) {
                                 scope.launch {
                                     runCatching {
                                         val channel = ChannelsApi.createDm(listOf(user.id))

@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.server
 
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,7 +84,7 @@ fun ServerSettingsScreen(serverId: String, startPage: String) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                Lucide.ArrowLeft, "Back", tint = colors.icon,
+                Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon,
                 modifier = Modifier.size(24.dp).clickable {
                     if (page == "overview") Nav.openChannel(serverId, AppState.channelsOf(serverId).firstOrNull { it.isText }?.id)
                     else page = "overview"
@@ -130,12 +131,12 @@ private fun OverviewPage(serverId: String, go: (String) -> Unit) {
         Spacer(Modifier.height(20.dp))
         if (perms.has(P.MANAGE_SERVER)) {
             OutlinedTextField(
-                value = name, onValueChange = { name = it }, label = { Text("Server name") }, singleLine = true,
+                value = name, onValueChange = { name = it }, label = { Text(t("modals.createServer.serverName")) }, singleLine = true,
                 colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
-                value = description, onValueChange = { description = it }, label = { Text("Description") },
+                value = description, onValueChange = { description = it }, label = { Text(t("server.packEditor.description")) },
                 colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(12.dp))
@@ -149,22 +150,22 @@ private fun OverviewPage(serverId: String, go: (String) -> Unit) {
                                 put("description", description)
                             })
                             AppState.updateServer(serverId) { it.copy(server = updated) }
-                            Session.toasts.emit("Saved.")
-                        }.onFailure { Session.toasts.emit(it.message ?: "That did not save.") }
+                            Session.toasts.emit(t("settings.account.saved"))
+                        }.onFailure { Session.toasts.emit(it.message ?: t("server.serverSettingsScreen.thatDidNotSave")) }
                         busy = false
                     }
                 },
                 enabled = !busy,
                 colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
-            ) { Text("Save") }
+            ) { Text(t("chat.editMessage.save")) }
             Spacer(Modifier.height(20.dp))
         }
 
-        NavRow("Members") { go("members") }
-        if (perms.has(P.MANAGE_ROLES)) NavRow("Roles") { go("roles") }
-        if (perms.has(P.CREATE_INSTANT_INVITE)) NavRow("Invites") { go("invites") }
-        if (perms.has(P.BAN_MEMBERS)) NavRow("Bans") { go("bans") }
-        if (perms.has(P.VIEW_AUDIT_LOG)) NavRow("Audit log") { go("audit") }
+        NavRow(t("server.serverSettings.members")) { go("members") }
+        if (perms.has(P.MANAGE_ROLES)) NavRow(t("server.members.roles")) { go("roles") }
+        if (perms.has(P.CREATE_INSTANT_INVITE)) NavRow(t("server.invites.invites")) { go("invites") }
+        if (perms.has(P.BAN_MEMBERS)) NavRow(t("server.bans.bans")) { go("bans") }
+        if (perms.has(P.VIEW_AUDIT_LOG)) NavRow(t("server.serverSettingsScreen.auditLog")) { go("audit") }
 
         Spacer(Modifier.height(24.dp))
         if (isOwner) {
@@ -175,12 +176,12 @@ private fun OverviewPage(serverId: String, go: (String) -> Unit) {
                             ServersApi.delete(serverId)
                             AppState.removeServer(serverId)
                             Nav.go(Route.Chat(null, null))
-                        }.onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                        }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = colors.danger, contentColor = Color.White),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Delete server") }
+            ) { Text(t("server.serverSettingsScreen.deleteServer")) }
         } else {
             Button(
                 onClick = {
@@ -189,12 +190,12 @@ private fun OverviewPage(serverId: String, go: (String) -> Unit) {
                             ServersApi.leave(serverId)
                             AppState.removeServer(serverId)
                             Nav.go(Route.Chat(null, null))
-                        }.onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                        }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = colors.danger, contentColor = Color.White),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Leave server") }
+            ) { Text(t("server.serverSettingsScreen.leaveServer")) }
         }
     }
 }
@@ -250,13 +251,13 @@ private fun MembersPage(serverId: String) {
                 Column(Modifier.weight(1f)) {
                     Text(AppState.nameFor(member.userId, serverId), color = colors.text, fontSize = 15.sp)
                     Text(
-                        member.roleIds.mapNotNull { state.roles[it]?.name }.joinToString(", ").ifEmpty { "No roles" },
+                        member.roleIds.mapNotNull { state.roles[it]?.name }.joinToString(", ").ifEmpty { t("server.serverSettingsScreen.noRoles") },
                         color = colors.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
                 if (canAct && state.myPermissions.has(P.KICK_MEMBERS)) {
                     Text(
-                        "Kick", color = colors.danger, fontSize = 13.sp,
+                        t("server.members.kick"), color = colors.danger, fontSize = 13.sp,
                         modifier = Modifier.clickable {
                             scope.launch { runCatching { ServersApi.kick(serverId, member.userId) } }
                         }.padding(8.dp),
@@ -281,11 +282,11 @@ private fun RolesPage(serverId: String) {
         var permissions by remember(role.id) { mutableStateOf(role.permissions.toPerm()) }
         var name by remember(role.id) { mutableStateOf(role.name) }
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("Editing ${role.name}", color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(t("server.serverSettingsScreen.editingRole", "name" to role.name), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
             Spacer(Modifier.height(12.dp))
             if (role.id != serverId) {
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it }, label = { Text("Role name") }, singleLine = true,
+                    value = name, onValueChange = { name = it }, label = { Text(t("server.roles.roleName")) }, singleLine = true,
                     colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(12.dp))
@@ -320,15 +321,15 @@ private fun RolesPage(serverId: String) {
                                 })
                                 AppState.updateServer(serverId) { it.copy(roles = it.roles + (updated.id to updated)) }
                                 editing = null
-                            }.onFailure { Session.toasts.emit(it.message ?: "That did not save.") }
+                            }.onFailure { Session.toasts.emit(it.message ?: t("server.serverSettingsScreen.thatDidNotSave")) }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
-                ) { Text("Save") }
+                ) { Text(t("chat.editMessage.save")) }
                 Button(
                     onClick = { editing = null },
                     colors = ButtonDefaults.buttonColors(containerColor = colors.bgSurface, contentColor = colors.text),
-                ) { Text("Cancel") }
+                ) { Text(t("chat.editMessage.cancel")) }
             }
         }
         return
@@ -337,19 +338,19 @@ private fun RolesPage(serverId: String) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
-                value = newName, onValueChange = { newName = it }, label = { Text("New role") }, singleLine = true,
+                value = newName, onValueChange = { newName = it }, label = { Text(t("server.serverSettingsScreen.newRole")) }, singleLine = true,
                 colors = fieldColors(), modifier = Modifier.weight(1f),
             )
             Spacer(Modifier.width(8.dp))
             Icon(
-                Lucide.Plus, "Create role", tint = colors.brand,
+                Lucide.Plus, t("server.serverSettingsScreen.createRole"), tint = colors.brand,
                 modifier = Modifier.size(28.dp).clickable(enabled = newName.isNotBlank()) {
                     scope.launch {
                         runCatching {
                             val created = ServersApi.createRole(serverId, buildJsonObject { put("name", newName.trim()) })
                             AppState.updateServer(serverId) { it.copy(roles = it.roles + (created.id to created)) }
                             newName = ""
-                        }.onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                        }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
                 },
             )
@@ -366,12 +367,12 @@ private fun RolesPage(serverId: String) {
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    if (r.id == serverId) "@everyone" else r.name,
+                    if (r.id == serverId) t("render.everyone") else r.name,
                     color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f),
                 )
                 if (r.id != serverId) {
                     Icon(
-                        Lucide.Trash2, "Delete role", tint = colors.danger,
+                        Lucide.Trash2, t("server.serverSettingsScreen.deleteRole"), tint = colors.danger,
                         modifier = Modifier.size(18.dp).clickable {
                             scope.launch {
                                 runCatching {
@@ -397,7 +398,7 @@ private fun InvitesPage(serverId: String) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         when {
             invites == null -> CircularProgressIndicator(color = colors.brand, modifier = Modifier.size(24.dp))
-            invites!!.isEmpty() -> Text("No invites yet.", color = colors.textMuted, fontSize = 14.sp)
+            invites!!.isEmpty() -> Text(t("server.serverSettingsScreen.noInvitesYet"), color = colors.textMuted, fontSize = 14.sp)
             else -> for (invite in invites!!) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -408,7 +409,7 @@ private fun InvitesPage(serverId: String) {
                         )
                     }
                     Text(
-                        "Revoke", color = colors.danger, fontSize = 13.sp,
+                        t("server.invites.revoke"), color = colors.danger, fontSize = 13.sp,
                         modifier = Modifier.clickable {
                             scope.launch {
                                 runCatching { ServersApi.deleteInvite(invite.code) }
@@ -432,7 +433,7 @@ private fun BansPage(serverId: String) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         when {
             bans == null -> CircularProgressIndicator(color = colors.brand, modifier = Modifier.size(24.dp))
-            bans!!.isEmpty() -> Text("Nobody is banned.", color = colors.textMuted, fontSize = 14.sp)
+            bans!!.isEmpty() -> Text(t("server.serverSettingsScreen.nobodyIsBanned"), color = colors.textMuted, fontSize = 14.sp)
             else -> for (ban in bans!!) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -440,7 +441,7 @@ private fun BansPage(serverId: String) {
                         if (ban.reason.isNotEmpty()) Text(ban.reason, color = colors.textMuted, fontSize = 12.sp)
                     }
                     Text(
-                        "Unban", color = colors.textBrand, fontSize = 13.sp,
+                        t("server.serverSettingsScreen.unban"), color = colors.textBrand, fontSize = 13.sp,
                         modifier = Modifier.clickable {
                             scope.launch {
                                 runCatching { ServersApi.unban(serverId, ban.userId) }
@@ -463,7 +464,7 @@ private fun AuditPage(serverId: String) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         when {
             entries == null -> CircularProgressIndicator(color = colors.brand, modifier = Modifier.size(24.dp))
-            entries!!.isEmpty() -> Text("Nothing has happened yet.", color = colors.textMuted, fontSize = 14.sp)
+            entries!!.isEmpty() -> Text(t("server.auditLog.nothingHasHappenedYet"), color = colors.textMuted, fontSize = 14.sp)
             else -> for (entry in entries!!) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                     Text(

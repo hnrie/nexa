@@ -16,6 +16,7 @@ import xyz.evilion.chat.data.Session
 import xyz.evilion.chat.data.SettingsStore
 import xyz.evilion.chat.media.AttachmentStore
 import xyz.evilion.chat.media.Images
+import xyz.evilion.chat.i18n.Strings
 import xyz.evilion.chat.net.Api
 import xyz.evilion.chat.notify.Notifications
 import xyz.evilion.chat.service.GatewayService
@@ -31,14 +32,21 @@ class App : Application() {
         super.onCreate()
         instance = this
 
-        // First, so anything below that goes wrong is still recorded.
+        // The catalogue first: the notification channels below are named from
+        // it, Android remembers those names, and it never asks again.
+        Strings.init(this)
+        // Then the crash reporter, so anything below that goes wrong is recorded.
         CrashReport.install(this)
         SecureStore.init(this)
         SettingsStore.init(this)
         AttachmentStore.init(this)
         Images.install(this)
         VoiceEngine.init(this)
-        FrameCryptoNative.load()
+        if (!FrameCryptoNative.load()) {
+            // Calls seal their frames in native code. Without it there is no
+            // call, and finding that out here beats finding it out mid-join.
+            android.util.Log.e("Nexa", "the call frame crypto did not load; calls are unavailable")
+        }
         Notifications.ensureChannels(this)
 
         Api.baseUrl = SecureStore.serverUrl() ?: BuildConfig.DEFAULT_SERVER

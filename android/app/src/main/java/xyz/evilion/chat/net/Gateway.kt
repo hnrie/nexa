@@ -57,16 +57,38 @@ class Gateway(
     private val _status = MutableStateFlow(GatewayStatus.IDLE)
     val status: StateFlow<GatewayStatus> = _status.asStateFlow()
 
-    private val _events = MutableSharedFlow<GatewayEvent>(replay = 0, extraBufferCapacity = 256)
+    /**
+     * Events reach the app in the order the socket delivered them.
+     *
+     * A coroutine per frame let the thread pool decide the order, which is no
+     * order at all: a `message_create` could be handled before the `ready`
+     * that replaces the channel it belongs to, an edit before the message it
+     * edits, a reaction's removal before the reaction. One writer, from the
+     * socket's own thread, into a queue one collector drains.
+     */
+    private val _events = MutableSharedFlow<GatewayEvent>(replay = 0, extraBufferCapacity = 1024)
     val events: SharedFlow<GatewayEvent> = _events.asSharedFlow()
 
+    @Volatile
     private var socket: WebSocket? = null
+
+    /**
+     * The listener whose frames still count.
+     *
+     * `socket` is only assigned once `newWebSocket` returns, and OkHttp may
+     * deliver the first frames before that, so comparing against it would
+     * throw away the `ready` of the connection being opened. The listener
+     * exists before the socket does, which makes it the thing to compare.
+     */
+    @Volatile
+    private var live: Listener? = null
     private var beat: Job? = null
     private var reconnect: Job? = null
     private var attempt = 0
     private var closedByUser = false
     private var ready = false
-    private var framesSeen = 0L
+    /** Written by the socket's reader thread, read by the heartbeat: it has to cross threads. */
+    private val framesSeen = java.util.concurrent.atomic.AtomicLong(0)
     private val queue = ArrayDeque<String>()
 
     @Synchronized
@@ -81,7 +103,9 @@ class Gateway(
         _status.value = GatewayStatus.CONNECTING
         ready = false
         val request = Request.Builder().url(url()).build()
-        socket = Api.http.newWebSocket(request, Listener(auth))
+        val listener = Listener(auth)
+        live = listener
+        socket = Api.http.newWebSocket(request, listener)
     }
 
     @Synchronized
@@ -92,6 +116,7 @@ class Gateway(
         beat?.cancel()
         beat = null
         queue.clear()
+        live = null
         socket?.close(1000, "bye")
         socket = null
         ready = false
@@ -123,7 +148,11 @@ class Gateway(
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
-            framesSeen++
+            // a connection this object has already given up on may still
+            // deliver what it had buffered; a `ready` from it would wipe out
+            // everything the new one has done
+            if (live !== this) return
+            framesSeen.incrementAndGet()
             val frame = runCatching { Api.json.parseToJsonElement(text).jsonObject }.getOrNull() ?: return
             val type = frame["t"]?.jsonPrimitive?.content ?: return
             if (type == "ready") {
@@ -135,7 +164,11 @@ class Gateway(
                     startHeartbeat(webSocket)
                 }
             }
-            scope.launch { _events.emit(GatewayEvent(type, frame["d"])) }
+            // tryEmit keeps the order the socket gave us; the buffer is large
+            // enough that only a collector that has stopped collecting fills it
+            if (!_events.tryEmit(GatewayEvent(type, frame["d"]))) {
+                Log.w(TAG, "dropped $type: the event queue is full")
+            }
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = dropped(webSocket, code, reason)
@@ -145,7 +178,8 @@ class Gateway(
 
         private fun dropped(webSocket: WebSocket, code: Int, reason: String) {
             synchronized(this@Gateway) {
-                if (socket !== webSocket) return
+                if (live !== this) return
+                live = null
                 socket = null
                 ready = false
                 beat?.cancel()
@@ -164,14 +198,15 @@ class Gateway(
         beat = scope.launch {
             while (true) {
                 delay(HEARTBEAT_MS)
-                val before = framesSeen
+                val before = framesSeen.get()
                 ws.send("""{"op":"heartbeat"}""")
                 delay(ACK_TIMEOUT_MS)
                 // A healthy socket answers, or at least says something else.
-                if (framesSeen == before) {
+                if (framesSeen.get() == before) {
                     Log.i(TAG, "heartbeat went unanswered; reconnecting")
                     synchronized(this@Gateway) {
                         if (socket === ws) {
+                            live = null
                             socket = null
                             ready = false
                             _status.value = GatewayStatus.CLOSED

@@ -3,6 +3,7 @@ package xyz.evilion.chat.ui.chat
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,7 +72,19 @@ import xyz.evilion.chat.ui.pickers.StickerPickerSheet
 import xyz.evilion.chat.ui.theme.chatColors
 
 /** A file waiting to be sent with the next message. */
-private data class Staged(val file: PickedFile, var progress: Float = 0f, var error: String? = null)
+/**
+ * A file waiting to be sent. The id is its own, not the content URI: picking
+ * the same photo twice is ordinary, and two rows with one key is what makes a
+ * lazy list throw.
+ */
+private data class Staged(
+    val file: PickedFile,
+    var progress: Float = 0f,
+    var error: String? = null,
+    val id: Long = nextStagedId++,
+)
+
+private var nextStagedId = 1L
 
 /**
  * The box you type in: attachments, emoji, stickers and GIFs, replies and
@@ -178,7 +191,7 @@ fun Composer(
                     slowModeUntil = System.currentTimeMillis() + slow * 1000L
                 }
             } catch (e: Exception) {
-                Session.toasts.emit(e.message ?: "Your message could not be sent.")
+                Session.toasts.emit(e.message ?: t("composer.send.yourMessageCouldNotBeSent"))
             } finally {
                 sending = false
             }
@@ -192,11 +205,11 @@ fun Composer(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Replying to ${AppState.nameFor(replyTo.raw.authorId, serverId)}",
+                    t("composer.replyingTo", "name" to AppState.nameFor(replyTo.raw.authorId, serverId)),
                     color = colors.textMuted, fontSize = 12.sp, modifier = Modifier.weight(1f),
                 )
                 Icon(
-                    Lucide.X, "Cancel reply", tint = colors.icon,
+                    Lucide.X, t("composer.composer.cancelReply"), tint = colors.icon,
                     modifier = Modifier.size(16.dp).clickable(onClick = onClearReply),
                 )
             }
@@ -206,9 +219,9 @@ fun Composer(
                 Modifier.fillMaxWidth().background(colors.bgSurface).padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Editing message", color = colors.warning, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(t("composer.editingMessage"), color = colors.warning, fontSize = 12.sp, modifier = Modifier.weight(1f))
                 Icon(
-                    Lucide.X, "Cancel edit", tint = colors.icon,
+                    Lucide.X, t("composer.cancelEdit"), tint = colors.icon,
                     modifier = Modifier.size(16.dp).clickable {
                         onClearEdit()
                         value = TextFieldValue("")
@@ -222,7 +235,7 @@ fun Composer(
                 Modifier.fillMaxWidth().padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(staged.size, key = { staged[it].file.uri.toString() }) { index ->
+                items(staged.size, key = { staged[it].id }) { index ->
                     val item = staged[index]
                     Box(Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)).background(colors.bgSurface)) {
                         if (item.file.mime.startsWith("image/")) {
@@ -250,7 +263,7 @@ fun Composer(
                             }
                         } else {
                             Icon(
-                                Lucide.X, "Remove",
+                                Lucide.X, t("composer.composer.remove"),
                                 tint = Color.White,
                                 modifier = Modifier.align(Alignment.TopEnd).padding(2.dp).size(18.dp)
                                     .clip(CircleShape).background(colors.bgOverlay)
@@ -270,7 +283,7 @@ fun Composer(
         ) {
             if (canAttach) {
                 IconButton(onClick = { pickFiles.launch(arrayOf("*/*")) }, enabled = !sending) {
-                    Icon(Lucide.CirclePlus, "Attach", tint = colors.icon)
+                    Icon(Lucide.CirclePlus, t("composer.attach"), tint = colors.icon)
                 }
             }
             Box(
@@ -283,10 +296,10 @@ fun Composer(
                 if (value.text.isEmpty()) {
                     Text(
                         when {
-                            !canSend -> "You cannot send messages here"
-                            waiting > 0 -> "Slow mode: ${waiting}s"
-                            editing != null -> "Edit your message"
-                            else -> "Message ${channel?.let { AppState.channelName(it, me?.id) } ?: ""}"
+                            !canSend -> t("composer.youCannotSendMessagesHere")
+                            waiting > 0 -> t("composer.slowModeSeconds", "seconds" to waiting)
+                            editing != null -> t("composer.editYourMessage")
+                            else -> t("composer.composer.messageGroup", "name" to (channel?.let { AppState.channelName(it, me?.id) } ?: ""))
                         },
                         color = colors.textPlaceholder, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
@@ -309,16 +322,16 @@ fun Composer(
                 )
             }
             IconButton(onClick = { picker = "emoji" }) {
-                Icon(Lucide.Smile, "Emoji", tint = colors.icon)
+                Icon(Lucide.Smile, t("modals.customStatus.emoji"), tint = colors.icon)
             }
             if (value.text.isBlank() && staged.isEmpty()) {
                 IconButton(onClick = { picker = "gif" }) {
-                    Icon(Lucide.Sticker, "GIFs and stickers", tint = colors.icon)
+                    Icon(Lucide.Sticker, t("composer.gifsAndStickers"), tint = colors.icon)
                 }
             } else {
                 IconButton(onClick = { doSend() }, enabled = canSend && !sending) {
                     if (sending) CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
-                    else Icon(Lucide.Send, "Send", tint = colors.brand)
+                    else Icon(Lucide.Send, t("composer.send"), tint = colors.brand)
                 }
             }
         }

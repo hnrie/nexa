@@ -1,5 +1,6 @@
 package xyz.evilion.chat.data
 
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.Member
 import xyz.evilion.chat.net.Overwrite
 import xyz.evilion.chat.net.Role
@@ -53,45 +54,45 @@ object P {
     data class Item(val bit: ULong, val label: String, val description: String, val channels: Set<String> = emptySet())
 
     val GROUPS: List<Pair<String, List<Item>>> = listOf(
-        "General Server Permissions" to listOf(
-            Item(VIEW_CHANNEL, "View Channels", "Allows members to view channels by default (excluding private channels).", setOf("text", "voice")),
-            Item(MANAGE_CHANNELS, "Manage Channels", "Allows members to create, edit, or delete channels.", setOf("text", "voice")),
-            Item(MANAGE_ROLES, "Manage Roles", "Allows members to create roles and edit ones below their highest, and to edit channel permissions.", setOf("text", "voice")),
-            Item(MANAGE_EMOJIS, "Manage Expressions", "Allows members to add or remove custom emoji and stickers in this server."),
-            Item(VIEW_AUDIT_LOG, "View Audit Log", "Allows members to see a record of who made which changes in this server."),
-            Item(MANAGE_SERVER, "Manage Server", "Allows members to change this server's name, icon, description and invites."),
+        t("perms.generalServerPermissions") to listOf(
+            Item(VIEW_CHANNEL, t("perms.viewChannels"), t("perms.allowsMembersToViewChannelsBy"), setOf("text", "voice")),
+            Item(MANAGE_CHANNELS, t("perms.manageChannels"), t("perms.allowsMembersToCreateEditOr"), setOf("text", "voice")),
+            Item(MANAGE_ROLES, t("perms.manageRoles"), t("perms.allowsMembersToCreateRolesAnd"), setOf("text", "voice")),
+            Item(MANAGE_EMOJIS, t("perms.manageExpressions"), t("perms.allowsMembersToAddOrRemove2")),
+            Item(VIEW_AUDIT_LOG, t("perms.viewAuditLog"), t("perms.allowsMembersToSeeARecord")),
+            Item(MANAGE_SERVER, t("perms.manageServer"), t("perms.allowsMembersToChangeThisServer")),
         ),
-        "Membership Permissions" to listOf(
-            Item(CREATE_INSTANT_INVITE, "Create Invite", "Allows members to invite new people to this server.", setOf("text", "voice")),
-            Item(CHANGE_NICKNAME, "Change Nickname", "Allows members to change their own nickname."),
-            Item(MANAGE_NICKNAMES, "Manage Nicknames", "Allows members to change the nicknames of other members."),
-            Item(KICK_MEMBERS, "Kick Members", "Allows members to remove others from this server. They can rejoin with an invite."),
-            Item(BAN_MEMBERS, "Ban Members", "Allows members to permanently ban other members."),
-            Item(MODERATE_MEMBERS, "Time out Members", "Allows members to time others out: no messages, reactions or speaking until it ends."),
+        t("perms.membershipPermissions") to listOf(
+            Item(CREATE_INSTANT_INVITE, t("server.invites.createInvite"), t("perms.allowsMembersToInviteNewPeople"), setOf("text", "voice")),
+            Item(CHANGE_NICKNAME, t("modals.serverProfile.changeNickname"), t("perms.allowsMembersToChangeTheirOwn")),
+            Item(MANAGE_NICKNAMES, t("perms.manageNicknames"), t("perms.allowsMembersToChangeTheNicknames")),
+            Item(KICK_MEMBERS, t("perms.kickMembers"), t("perms.allowsMembersToRemoveOthersFrom")),
+            Item(BAN_MEMBERS, t("perms.banMembers"), t("perms.allowsMembersToPermanentlyBanOther2")),
+            Item(MODERATE_MEMBERS, t("perms.timeOutMembers"), t("perms.allowsMembersToTimeOthersOut")),
         ),
-        "Text Channel Permissions" to listOf(
-            Item(SEND_MESSAGES, "Send Messages", "Allows members to send messages in text channels.", setOf("text")),
-            Item(EMBED_LINKS, "Embed Links", "Allows links that members share to show embedded content.", setOf("text")),
-            Item(ATTACH_FILES, "Attach Files", "Allows members to upload files or media.", setOf("text")),
-            Item(ADD_REACTIONS, "Add Reactions", "Allows members to add new emoji reactions to a message.", setOf("text")),
-            Item(MENTION_EVERYONE, "Mention @everyone and All Roles", "Allows members to use @everyone and any role mention.", setOf("text")),
-            Item(MANAGE_MESSAGES, "Manage Messages", "Allows members to delete other people's messages or pin any message.", setOf("text")),
-            Item(READ_MESSAGE_HISTORY, "Read Message History", "Allows members to read messages sent before they arrived.", setOf("text")),
-            Item(CREATE_POLLS, "Create Polls", "Allows members to create polls.", setOf("text")),
+        t("perms.textChannelPermissions") to listOf(
+            Item(SEND_MESSAGES, t("perms.sendMessages"), t("perms.allowsMembersToSendMessagesIn"), setOf("text")),
+            Item(EMBED_LINKS, t("perms.embedLinks"), t("perms.allowsLinksThatMembersShareTo"), setOf("text")),
+            Item(ATTACH_FILES, t("perms.attachFiles"), t("perms.allowsMembersToUploadFilesOr"), setOf("text")),
+            Item(ADD_REACTIONS, t("perms.addReactions"), t("perms.allowsMembersToAddNewEmoji"), setOf("text")),
+            Item(MENTION_EVERYONE, t("perms.mentionEveryoneAndAllRoles"), t("perms.allowsMembersToUseEveryoneAnd2"), setOf("text")),
+            Item(MANAGE_MESSAGES, t("perms.manageMessages"), t("perms.allowsMembersToDeleteOtherPeople"), setOf("text")),
+            Item(READ_MESSAGE_HISTORY, t("perms.readMessageHistory"), t("perms.allowsMembersToReadMessagesSent"), setOf("text")),
+            Item(CREATE_POLLS, t("perms.createPolls"), t("perms.allowsMembersToCreatePolls"), setOf("text")),
         ),
-        "Voice Channel Permissions" to listOf(
-            Item(CONNECT, "Connect", "Allows members to join voice channels and hear others.", setOf("voice")),
-            Item(SPEAK, "Speak", "Allows members to talk in voice channels.", setOf("voice")),
-            Item(STREAM, "Video", "Allows members to share their camera or screen.", setOf("voice")),
-            Item(USE_SOUNDBOARD, "Use Soundboard", "Allows members to send sounds from the soundboard.", setOf("voice")),
-            Item(USE_VAD, "Use Voice Activity", "Allows talking without push-to-talk.", setOf("voice")),
-            Item(PRIORITY_SPEAKER, "Priority Speaker", "Lowers other people's volume while they speak.", setOf("voice")),
-            Item(MUTE_MEMBERS, "Mute Members", "Allows muting other members for everyone.", setOf("voice")),
-            Item(DEAFEN_MEMBERS, "Deafen Members", "Allows deafening other members.", setOf("voice")),
-            Item(MOVE_MEMBERS, "Move Members", "Allows moving members between voice channels.", setOf("voice")),
+        t("perms.voiceChannelPermissions") to listOf(
+            Item(CONNECT, t("perms.connect"), t("perms.allowsMembersToJoinVoiceChannels"), setOf("voice")),
+            Item(SPEAK, t("perms.speak"), t("perms.allowsMembersToTalkInVoice"), setOf("voice")),
+            Item(STREAM, t("perms.video"), t("perms.allowsMembersToShareTheirCamera"), setOf("voice")),
+            Item(USE_SOUNDBOARD, t("perms.useSoundboard"), t("perms.allowsMembersToSendSoundsFrom"), setOf("voice")),
+            Item(USE_VAD, t("perms.useVoiceActivity"), t("perms.allowsTalkingWithoutPushToTalk"), setOf("voice")),
+            Item(PRIORITY_SPEAKER, t("perms.prioritySpeaker"), t("perms.lowersOtherPeopleSVolumeWhile"), setOf("voice")),
+            Item(MUTE_MEMBERS, t("perms.muteMembers"), t("perms.allowsMutingOtherMembersForEveryone"), setOf("voice")),
+            Item(DEAFEN_MEMBERS, t("perms.deafenMembers"), t("perms.allowsDeafeningOtherMembers"), setOf("voice")),
+            Item(MOVE_MEMBERS, t("perms.moveMembers"), t("perms.allowsMovingMembersBetweenVoiceChannels"), setOf("voice")),
         ),
-        "Advanced Permissions" to listOf(
-            Item(ADMINISTRATOR, "Administrator", "Every permission, and channel permissions are bypassed. Grant with care."),
+        t("perms.advancedPermissions") to listOf(
+            Item(ADMINISTRATOR, t("perms.administrator"), t("perms.everyPermissionAndChannelPermissionsAre")),
         ),
     )
 }

@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -127,8 +128,8 @@ fun AudioPlayer(meta: AttachmentMeta) {
     }) {
         when {
             loading -> CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
-            playing -> Icon(Lucide.Pause, "Pause", tint = colors.icon)
-            else -> Icon(Lucide.Play, "Play", tint = colors.icon)
+            playing -> Icon(Lucide.Pause, t("players.pause"), tint = colors.icon)
+            else -> Icon(Lucide.Play, t("chat.videoPlayer.play"), tint = colors.icon)
         }
     }
     Column(Modifier.weight(1f)) {

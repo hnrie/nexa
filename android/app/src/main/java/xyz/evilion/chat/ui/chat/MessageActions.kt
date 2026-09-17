@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -91,29 +92,29 @@ fun MessageActions(
                         TwemojiImage(emoji, 28.dp, modifier = Modifier.clickable { react(emoji) }.padding(4.dp), fallbackSize = 26.sp)
                     }
                     Icon(
-                        Lucide.Smile, "More",
+                        Lucide.Smile, t("chat.chat.more"),
                         tint = colors.icon,
                         modifier = Modifier.size(26.dp).clickable { pickingEmoji = true },
                     )
                 }
             }
 
-            ActionRow(Lucide.Reply, "Reply") { onReply() }
-            if (mine && message.raw.ciphertext != null) ActionRow(Lucide.Pencil, "Edit") { onEdit() }
+            ActionRow(Lucide.Reply, t("chat.messageItem.reply")) { onReply() }
+            if (mine && message.raw.ciphertext != null) ActionRow(Lucide.Pencil, t("pickers.stickerPicker.edit")) { onEdit() }
             if (!message.payload?.text.isNullOrEmpty()) {
-                ActionRow(Lucide.Copy, "Copy text") {
+                ActionRow(Lucide.Copy, t("messageActions.copyText")) {
                     clipboard.setText(AnnotatedString(message.payload?.text.orEmpty()))
                     onDismiss()
                 }
             }
-            ActionRow(Lucide.Link2, "Copy link") {
+            ActionRow(Lucide.Link2, t("server.packEditor.copyLink")) {
                 val base = Api.baseUrl.trimEnd('/')
                 val path = if (serverId != null) "$base/channels/$serverId/$channelId/${message.raw.id}"
                 else "$base/channels/@me/$channelId/${message.raw.id}"
                 clipboard.setText(AnnotatedString(path))
                 onDismiss()
             }
-            ActionRow(Lucide.MessageCircleMore, "Mark unread") {
+            ActionRow(Lucide.MessageCircleMore, t("messageActions.markUnread")) {
                 scope.launch {
                     val previous = AppState.messages(channelId).value
                         .filter { (it.raw.id.toLongOrNull() ?: 0) < (message.raw.id.toLongOrNull() ?: 0) }
@@ -125,21 +126,21 @@ fun MessageActions(
                 onDismiss()
             }
             if (canManage || mine) {
-                ActionRow(Lucide.Pin, if (pinned) "Unpin" else "Pin") {
+                ActionRow(Lucide.Pin, if (pinned) t("chat.pins.unpin") else t("messageActions.pin")) {
                     scope.launch {
                         runCatching {
                             if (pinned) ChannelsApi.unpin(channelId, message.raw.id)
                             else ChannelsApi.pin(channelId, message.raw.id)
-                        }.onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                        }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
                     onDismiss()
                 }
             }
             if (mine || canManage) {
-                ActionRow(Lucide.Trash2, "Delete", colors.danger) {
+                ActionRow(Lucide.Trash2, t("chat.messageItem.delete"), colors.danger) {
                     scope.launch {
                         runCatching { MessageService.delete(channelId, message.raw.id) }
-                            .onFailure { Session.toasts.emit(it.message ?: "That message could not be deleted.") }
+                            .onFailure { Session.toasts.emit(it.message ?: t("messageActions.thatMessageCouldNotBeDeleted")) }
                     }
                     onDismiss()
                 }

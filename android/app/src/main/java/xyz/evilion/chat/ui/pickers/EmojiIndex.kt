@@ -3,6 +3,7 @@ package xyz.evilion.chat.ui.pickers
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import xyz.evilion.chat.i18n.t
 
 /** One unicode emoji, with the names and words it can be found by. */
 data class EmojiEntry(
@@ -21,15 +22,15 @@ data class EmojiEntry(
  */
 object EmojiIndex {
     val GROUPS = listOf(
-        0 to "Smileys & Emotion",
-        1 to "People & Body",
-        3 to "Animals & Nature",
-        4 to "Food & Drink",
-        5 to "Travel & Places",
-        6 to "Activities",
-        7 to "Objects",
-        8 to "Symbols",
-        9 to "Flags",
+        0 to t("pickers.emojiIndex.smileysEmotion"),
+        1 to t("pickers.emojiIndex.peopleBody"),
+        3 to t("pickers.emojiIndex.animalsNature"),
+        4 to t("pickers.emojiIndex.foodDrink"),
+        5 to t("pickers.emojiIndex.travelPlaces"),
+        6 to t("pickers.emojiIndex.activities"),
+        7 to t("pickers.emojiIndex.objects"),
+        8 to t("pickers.emojiIndex.symbols"),
+        9 to t("pickers.emojiIndex.flags"),
     )
 
     @Volatile

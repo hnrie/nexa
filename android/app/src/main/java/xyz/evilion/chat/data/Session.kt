@@ -23,6 +23,7 @@ import xyz.evilion.chat.crypto.Bytes
 import xyz.evilion.chat.crypto.Identity
 import xyz.evilion.chat.crypto.Kdf
 import xyz.evilion.chat.crypto.Keys
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.*
 import xyz.evilion.chat.voice.VoiceSession
 
@@ -123,13 +124,20 @@ object Session {
                 return
             }
             goLive(me, identity)
-        } catch (e: ApiException) {
+        } catch (e: Throwable) {
+            if (e !is ApiException) {
+                // A response the app cannot parse, a keystore that will not
+                // open: whatever it is, starting up must not end the process.
+                _error.value = e.readable("bootstrap")
+                _status.value = AuthStatus.OFFLINE
+                return
+            }
             when {
                 e.isAuth -> signOutLocally()
                 e.isTransient -> {
                     // Only the server turning us down means signed out. A dropped
                     // connection or a restart keeps the session and waits.
-                    _error.value = "Could not reach the server."
+                    _error.value = t("offline.couldNotReachTheServer")
                     _status.value = AuthStatus.OFFLINE
                 }
                 else -> {
@@ -158,7 +166,7 @@ object Session {
     }
 
     suspend fun completeMfa(code: String?, backupCode: String?) {
-        val pending = pendingMfa ?: throw IllegalStateException("Start again from your password.")
+        val pending = pendingMfa ?: throw IllegalStateException(t("auth.startAgainFromYourPassword"))
         val res = AuthApi.loginMfa(pending.third, code?.replace(" ", ""), backupCode)
         finishLogin(res, pending.second)
         pendingMfa = null
@@ -169,7 +177,7 @@ object Session {
     }
 
     private suspend fun finishLogin(res: LoginResponse, encKey: ByteArray) {
-        val me = res.user ?: throw ApiException(0, "bad_response", "The server's answer could not be read.")
+        val me = res.user ?: throw ApiException(0, "bad_response", t("attachments.theServerSAnswerCouldNot"))
         val priv = Keys.unwrapPrivateKey(Bytes.unb64(res.encPrivateKey), encKey)
         val identity = Identity(Bytes.unb64(res.publicKey), priv)
         SecureStore.saveToken(res.token, me.id)
@@ -182,7 +190,7 @@ object Session {
 
     /** Signing in on a device that has the session but not the keys. */
     suspend fun unlock(password: String) {
-        val me = AppState.me.value ?: throw IllegalStateException("Sign in again.")
+        val me = AppState.me.value ?: throw IllegalStateException(t("session.signInAgain"))
         val kdf = AuthApi.kdf(me.username)
         val master = withContext(Dispatchers.Default) {
             Kdf.deriveMaster(password, Bytes.unb64(kdf.salt), Kdf.Params(kdf.params.m, kdf.params.t, kdf.params.p))
@@ -204,7 +212,7 @@ object Session {
         goLive(mine, identity)
     }
 
-    class DecryptFailed : Exception("That password does not open the keys on this device.")
+    class DecryptFailed : Exception(t("session.thatPasswordDoesNotOpenThe"))
 
     suspend fun register(
         username: String,
@@ -282,7 +290,7 @@ object Session {
 
     /** The key the server checks, derived from a password with this account's parameters. */
     private suspend fun authKeyFor(password: String): Pair<ByteArray, ByteArray> {
-        val me = AppState.me.value ?: throw IllegalStateException("Sign in again.")
+        val me = AppState.me.value ?: throw IllegalStateException(t("session.signInAgain"))
         val kdf = AuthApi.kdf(me.username)
         val master = withContext(Dispatchers.Default) {
             Kdf.deriveMaster(password, Bytes.unb64(kdf.salt), Kdf.Params(kdf.params.m, kdf.params.t, kdf.params.p))
@@ -298,7 +306,7 @@ object Session {
      * readable.
      */
     suspend fun changePassword(current: String, next: String) {
-        val identity = KeyService.identity ?: throw IllegalStateException("This device does not hold your keys.")
+        val identity = KeyService.identity ?: throw IllegalStateException(t("session.thisDeviceDoesNotHoldYour"))
         val (authKey, _) = authKeyFor(current)
         val salt = Bytes.random(16)
         val params = Kdf.DEFAULT
@@ -317,7 +325,7 @@ object Session {
 
     /** Replaces the recovery key, and hands back the new one to write down. */
     suspend fun newRecoveryKey(password: String): String {
-        val identity = KeyService.identity ?: throw IllegalStateException("This device does not hold your keys.")
+        val identity = KeyService.identity ?: throw IllegalStateException(t("session.thisDeviceDoesNotHoldYour"))
         val (authKey, _) = authKeyFor(password)
         val (bytes, display) = Kdf.newRecoveryKey()
         val (recoveryAuth, recoveryEnc) = Kdf.recoveryKeys(bytes)
@@ -393,11 +401,15 @@ object Session {
                 if (decrypted.decryptError == "no_key" && m.keyConvId != null) {
                     AppState.waitingForKeys.update { it + m.keyConvId }
                 }
-                ensureUser(m.authorId)
-                ensureChannel(m.channelId)
+                // Fetching a stranger's name, or telling the server this was
+                // read, must not hold up the next event: the whole stream is
+                // one coroutine, and a slow connection would put typing,
+                // presence and call signalling behind message traffic.
+                scope.launch { ensureUser(m.authorId) }
+                scope.launch { ensureChannel(m.channelId) }
                 val mine = meId == m.authorId
                 if (mine || (Focus.activeChannel == m.channelId && Focus.foreground)) {
-                    MessageService.ack(m.channelId, m.id)
+                    scope.launch { MessageService.ack(m.channelId, m.id) }
                 } else {
                     bumpUnread(m, meId)
                 }

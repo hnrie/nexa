@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.sheets
 
+import xyz.evilion.chat.i18n.t
+import xyz.evilion.chat.ui.chat.longDate
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,7 +60,6 @@ import xyz.evilion.chat.ui.markdown.InlineMarkdown
 import xyz.evilion.chat.ui.markdown.Markdown
 import xyz.evilion.chat.ui.chat.rememberMdContext
 import xyz.evilion.chat.ui.theme.chatColors
-import java.text.DateFormat
 import java.util.Date
 
 /** Someone's profile: the banner, what they wrote about themselves, and what you can do. */
@@ -100,7 +101,7 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                 )
             }
             Column(Modifier.padding(horizontal = 16.dp).offset(y = (-24).dp)) {
-                Text(user?.name ?: "Unknown", color = colors.textStrong, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(user?.name ?: t("modals.quickSwitcher.unknown"), color = colors.textStrong, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("@${user?.username ?: ""}", color = colors.textMuted, fontSize = 14.sp)
                     if (!user?.pronouns.isNullOrEmpty()) {
@@ -116,7 +117,7 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                 }
                 if (!user?.aboutMe.isNullOrEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    Text("ABOUT ME", color = colors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(t("sheets.profileSheet.aboutMe"), color = colors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
                     InlineMarkdown(
                         nodes = remember(user?.aboutMe) { Markdown.parseInline(user?.aboutMe.orEmpty()) },
@@ -150,7 +151,7 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                 user?.createdAt?.takeIf { it > 0 }?.let {
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Joined ${DateFormat.getDateInstance(DateFormat.LONG).format(Date(it))}",
+                        t("sheets.profileSheet.joinedOn", "date" to longDate(it)),
                         color = colors.textMuted, fontSize = 12.sp,
                     )
                 }
@@ -176,28 +177,28 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                         ) {
                             Icon(Lucide.MessageCircle, null, Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Message")
+                            Text(t("profile.profileCard.message"))
                         }
                         when (relationship?.type) {
-                            "friend" -> OutlineAction("Remove friend", Lucide.UserMinus, colors.danger) {
+                            "friend" -> OutlineAction(t("sheets.profileSheet.removeFriend"), Lucide.UserMinus, colors.danger) {
                                 scope.launch { runCatching { RelationshipsApi.remove(userId) } }
                             }
-                            "incoming" -> OutlineAction("Accept", Lucide.UserPlus, colors.positive) {
+                            "incoming" -> OutlineAction(t("voice.incomingCall.accept"), Lucide.UserPlus, colors.positive) {
                                 scope.launch { runCatching { RelationshipsApi.accept(userId) } }
                             }
-                            "outgoing" -> OutlineAction("Cancel request", Lucide.UserMinus, colors.textMuted) {
+                            "outgoing" -> OutlineAction(t("sheets.profileSheet.cancelRequest"), Lucide.UserMinus, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.remove(userId) } }
                             }
-                            "blocked" -> OutlineAction("Unblock", Lucide.Ban, colors.textMuted) {
+                            "blocked" -> OutlineAction(t("friends.unblock"), Lucide.Ban, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.unblock(userId) } }
                             }
-                            else -> OutlineAction("Add friend", Lucide.UserPlus, colors.positive) {
+                            else -> OutlineAction(t("sheets.profileSheet.addFriend"), Lucide.UserPlus, colors.positive) {
                                 scope.launch {
                                     runCatching {
                                         Session.guarded("friend_request") { captcha ->
                                             RelationshipsApi.request(user?.username.orEmpty(), captcha)
                                         }
-                                    }.onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                                    }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                                 }
                             }
                         }

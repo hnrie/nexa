@@ -132,6 +132,9 @@ object SettingsStore {
     /** "dark", "light", "ash", "onyx" or "system"; the app follows the same names as the web. */
     val theme: String get() = string("theme", "dark")
 
+    /** The chosen language, or null to follow the phone. Shared with the web client. */
+    val locale: String? get() = string("locale", "").ifEmpty { null }
+
     val messageDisplay: String get() = string("messageDisplay", "cozy")
 
     val fontScale: Float get() = float("fontScale", 1f)
@@ -150,10 +153,26 @@ object SettingsStore {
 
     val soundsOn: Boolean get() = (obj("notifications")["sounds"] as? JsonPrimitive)?.booleanOrNull ?: true
 
-    /** "all", "mentions" or "none" for one channel. */
-    fun notificationLevel(channelId: String): String {
+    /**
+     * "all", "mentions" or "none" for one channel: its own setting, else the
+     * server's, else the default. A server channel defaults to mentions only —
+     * a busy server that notified on every message would make the phone
+     * useless, which is why the web client resolves it the same way.
+     */
+    fun notificationLevel(channelId: String, serverId: String? = null): String {
         val per = obj("notifications")["perChannel"] as? JsonObject
-        return (per?.get(channelId) as? JsonPrimitive)?.content ?: "all"
+        (per?.get(channelId) as? JsonPrimitive)?.content?.let { return it }
+        if (serverId != null) {
+            (per?.get(serverId) as? JsonPrimitive)?.content?.let { return it }
+            return "mentions"
+        }
+        return "all"
+    }
+
+    /** Whether a conversation is silenced, by itself or by its server. */
+    fun isMuted(channelId: String, serverId: String? = null): Boolean {
+        val muted = mutedChannels
+        return channelId in muted || (serverId != null && serverId in muted)
     }
 
     fun draft(channelId: String): String =

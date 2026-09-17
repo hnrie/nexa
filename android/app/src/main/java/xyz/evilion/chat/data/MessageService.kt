@@ -15,6 +15,7 @@ import xyz.evilion.chat.crypto.Embed
 import xyz.evilion.chat.crypto.MessageCrypto
 import xyz.evilion.chat.crypto.MessagePayload
 import xyz.evilion.chat.crypto.StickerRef
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.Api
 import xyz.evilion.chat.net.ApiException
 import xyz.evilion.chat.net.AttachmentRef
@@ -151,7 +152,7 @@ object MessageService {
         if (waiting.isNotEmpty()) AppState.waitingForKeys.update { it + waiting }
     }
 
-    class WaitingForKey : Exception("Waiting for the encryption key for this conversation.")
+    class WaitingForKey : Exception(t("messageService.waitingForTheEncryptionKeyFor"))
 
     /**
      * Encrypts and sends. The optimistic copy shows at once and is replaced by

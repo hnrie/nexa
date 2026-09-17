@@ -1,5 +1,6 @@
 package xyz.evilion.chat.net
 
+import xyz.evilion.chat.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -44,8 +45,13 @@ class ApiException(
 object Api {
     private const val API_PREFIX = "/api/v1"
 
+    /**
+     * Where the API lives. The build says which instance this app ships
+     * pointing at; whoever signs in can send it somewhere else, and that
+     * choice is what SecureStore puts back on the next launch.
+     */
     @Volatile
-    var baseUrl: String = "https://chat.evilion.xyz"
+    var baseUrl: String = BuildConfig.DEFAULT_SERVER
 
     @Volatile
     var token: String? = null

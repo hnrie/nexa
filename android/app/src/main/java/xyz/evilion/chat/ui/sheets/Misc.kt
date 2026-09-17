@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.sheets
 
+import xyz.evilion.chat.data.readable
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -102,7 +104,7 @@ fun ImageViewerLayer(blobId: String, name: String, onDismiss: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    Lucide.X, "Close", tint = Color.White,
+                    Lucide.X, t("chat.attachments.close"), tint = Color.White,
                     modifier = Modifier.size(26.dp).clickable(onClick = onDismiss),
                 )
                 Spacer(Modifier.width(12.dp))
@@ -111,7 +113,7 @@ fun ImageViewerLayer(blobId: String, name: String, onDismiss: () -> Unit) {
                 val scope = rememberCoroutineScope()
                 if (meta != null) {
                     Icon(
-                        Lucide.Download, "Open", tint = Color.White,
+                        Lucide.Download, t("chat.lockedChannel.open"), tint = Color.White,
                         modifier = Modifier.size(24.dp).clickable {
                             scope.launch { xyz.evilion.chat.ui.chat.openAttachment(context, meta) }
                         },
@@ -158,10 +160,10 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
-            Text("New message", color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
+            Text(t("notify.newMessage"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
-                placeholder = { Text("Find someone by username", color = colors.textPlaceholder) },
+                placeholder = { Text(t("sheets.misc.findSomeoneByUsername"), color = colors.textPlaceholder) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = colors.bgInput, unfocusedContainerColor = colors.bgInput,
@@ -198,13 +200,13 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
                             AppState.putChannel(channel)
                             Nav.openChannel(null, channel.id)
                             onDismiss()
-                        }.onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                        }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
                 },
                 enabled = picked.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
-            ) { Text(if (picked.size > 1) "Start group of ${picked.size}" else "Start conversation") }
+            ) { Text(if (picked.size > 1) t("sheets.misc.startGroupOf", "count" to picked.size) else t("sheets.misc.startConversation")) }
         }
     }
 }
@@ -223,10 +225,10 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-            Text("Create a server", color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text(t("main.sidebar.createAServer"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
-                value = name, onValueChange = { name = it }, label = { Text("Server name") }, singleLine = true,
+                value = name, onValueChange = { name = it }, label = { Text(t("modals.createServer.serverName")) }, singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = colors.bgInput, unfocusedContainerColor = colors.bgInput,
                     focusedTextColor = colors.text, unfocusedTextColor = colors.text, cursorColor = colors.brand,
@@ -244,21 +246,21 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
                             AppState.putServerView(view, AppState.me.value?.id)
                             Nav.openChannel(view.id, view.channels.firstOrNull { it.isText }?.id)
                             onDismiss()
-                        }.onFailure { error = it.message }
+                        }.onFailure { error = it.readable("Misc") }
                         busy = false
                     }
                 },
                 enabled = !busy && name.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Create") }
+            ) { Text(t("modals.createServer.create")) }
 
             Spacer(Modifier.height(24.dp))
-            Text("Or join with an invite", color = colors.textStrong, fontWeight = FontWeight.SemiBold)
+            Text(t("sheets.misc.orJoinWithAnInvite"), color = colors.textStrong, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = invite, onValueChange = { invite = it },
-                label = { Text("Invite link or code") }, singleLine = true,
+                label = { Text(t("sheets.misc.inviteLinkOrCode")) }, singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = colors.bgInput, unfocusedContainerColor = colors.bgInput,
                     focusedTextColor = colors.text, unfocusedTextColor = colors.text, cursorColor = colors.brand,
@@ -275,7 +277,7 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
                 enabled = invite.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = colors.bgSurface, contentColor = colors.text),
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Join") }
+            ) { Text(t("chat.embeds.join")) }
             if (error != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(error!!, color = colors.danger, fontSize = 13.sp)
@@ -295,17 +297,17 @@ fun StickerPackScreen(packId: String) {
     var busy by remember { mutableStateOf(false) }
 
     LaunchedEffect(packId) {
-        runCatching { pack = ExpressionsApi.pack(packId) }.onFailure { error = it.message }
+        runCatching { pack = ExpressionsApi.pack(packId) }.onFailure { error = it.readable("Misc") }
     }
 
     Column(Modifier.fillMaxSize().background(colors.bgBase).statusBarsPadding().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Lucide.X, "Back", tint = colors.icon,
+                Lucide.X, t("modals.createServer.back"), tint = colors.icon,
                 modifier = Modifier.size(24.dp).clickable { Nav.go(xyz.evilion.chat.ui.Route.Chat(null, null)) },
             )
             Spacer(Modifier.width(12.dp))
-            Text(pack?.name ?: "Sticker pack", color = colors.textStrong, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(pack?.name ?: t("stickerPack.stickerPack"), color = colors.textStrong, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(12.dp))
         when {
@@ -335,14 +337,14 @@ fun StickerPackScreen(packId: String) {
                         scope.launch {
                             runCatching { ExpressionsApi.install(packId, !(pack?.installed ?: false)) }
                                 .onSuccess { pack = pack?.copy(installed = !(pack?.installed ?: false)) }
-                                .onFailure { Session.toasts.emit(it.message ?: "That did not work.") }
+                                .onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                             busy = false
                         }
                     },
                     enabled = !busy,
                     colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
                     modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
-                ) { Text(if (pack?.installed == true) "Remove from your packs" else "Add to your packs") }
+                ) { Text(if (pack?.installed == true) t("sheets.misc.removeFromYourPacks") else t("sheets.misc.addToYourPacks")) }
             }
         }
     }

@@ -24,9 +24,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -39,6 +43,8 @@ import xyz.evilion.chat.data.AuthStatus
 import xyz.evilion.chat.data.Captcha
 import xyz.evilion.chat.data.Session
 import xyz.evilion.chat.data.SettingsStore
+import xyz.evilion.chat.i18n.Strings
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.Api
 import xyz.evilion.chat.ui.Layer
 import xyz.evilion.chat.ui.Nav
@@ -57,6 +63,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // the words before anything is drawn, so no screen starts in English and changes its mind
+        Strings.init(this)
         enableEdgeToEdge()
 
         Captcha.present = { action, siteKey ->
@@ -79,23 +87,36 @@ class MainActivity : ComponentActivity() {
             }
 
             LaunchedEffect(Unit) { Session.bootstrap() }
+            // the account's language, which the web client writes to the same
+            // settings field, so one choice follows someone between devices
+            LaunchedEffect(settings) { Strings.use(SettingsStore.locale) }
 
             NexaTheme(dark = dark) {
-                Box(Modifier.fillMaxSize().background(chatColors.bgBase)) {
-                    when (status) {
-                        AuthStatus.LOADING -> LoadingBox()
-                        AuthStatus.OFFLINE -> OfflineScreen()
-                        AuthStatus.ANONYMOUS -> AuthScreen()
-                        AuthStatus.LOCKED -> AuthScreen(locked = true)
-                        AuthStatus.READY -> MainScreen()
-                    }
-                    Session.pendingRecoveryKey.collectAsState().value?.let { key ->
-                        xyz.evilion.chat.ui.auth.RecoveryKeyOverlay(key) { Session.pendingRecoveryKey.value = null }
-                    }
-                    Toasts()
-                    IncomingCall()
-                    captchaRequest.collectAsState().value?.let { request ->
-                        CaptchaDialog(request)
+                // Keyed on the language: a screen that built its words once —
+                // a menu, an empty state — is built again rather than holding
+                // the ones it was born with. Navigation lives in Nav, above
+                // this, so nothing is lost by starting over.
+                key(Strings.epoch) {
+                    CompositionLocalProvider(
+                        LocalLayoutDirection provides if (Strings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                    ) {
+                        Box(Modifier.fillMaxSize().background(chatColors.bgBase)) {
+                            when (status) {
+                                AuthStatus.LOADING -> LoadingBox()
+                                AuthStatus.OFFLINE -> OfflineScreen()
+                                AuthStatus.ANONYMOUS -> AuthScreen()
+                                AuthStatus.LOCKED -> AuthScreen(locked = true)
+                                AuthStatus.READY -> MainScreen()
+                            }
+                            Session.pendingRecoveryKey.collectAsState().value?.let { key ->
+                                xyz.evilion.chat.ui.auth.RecoveryKeyOverlay(key) { Session.pendingRecoveryKey.value = null }
+                            }
+                            Toasts()
+                            IncomingCall()
+                            captchaRequest.collectAsState().value?.let { request ->
+                                CaptchaDialog(request)
+                            }
+                        }
                     }
                 }
             }
@@ -178,7 +199,7 @@ private fun CaptchaDialog(request: CaptchaRequest) {
 private fun OfflineScreen() {
     val colors = chatColors
     Box(Modifier.fillMaxSize().background(colors.bgBase), Alignment.Center) {
-        Text("Could not reach the server. Trying again…", color = colors.textMuted, fontSize = 15.sp)
+        Text(t("mainActivity.couldNotReachTheServerTrying"), color = colors.textMuted, fontSize = 15.sp)
     }
     LaunchedEffect(Unit) {
         while (true) {

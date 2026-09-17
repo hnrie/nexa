@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.chat
 
 import android.content.Context
 import android.content.Intent
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -100,7 +101,7 @@ private fun ImageAttachment(meta: AttachmentMeta) {
                 ) {
                     Icon(Lucide.EyeOff, null, tint = Color.White, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Spoiler", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text(t("composer.composer.spoiler"), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -147,7 +148,7 @@ private fun VideoAttachment(meta: AttachmentMeta) {
                 contentAlignment = Alignment.Center,
             ) {
                 if (busy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
-                else Icon(Lucide.Play, "Play", tint = Color.White, modifier = Modifier.size(30.dp))
+                else Icon(Lucide.Play, t("chat.videoPlayer.play"), tint = Color.White, modifier = Modifier.size(30.dp))
             }
         }
     }
@@ -193,7 +194,7 @@ private fun FileAttachment(meta: AttachmentMeta) {
         if (progress != null) {
             CircularProgressIndicator(Modifier.size(20.dp), color = colors.brand, strokeWidth = 2.dp)
         } else {
-            Icon(Lucide.Download, "Open", tint = colors.icon, modifier = Modifier.size(20.dp))
+            Icon(Lucide.Download, t("chat.lockedChannel.open"), tint = colors.icon, modifier = Modifier.size(20.dp))
         }
     }
 }
@@ -217,7 +218,7 @@ fun StickerView(sticker: StickerRef) {
     Box(Modifier.padding(top = 4.dp).size(160.dp)) {
         AsyncImage(
             model = Media.sticker(blob, 320),
-            contentDescription = sticker.name ?: "Sticker",
+            contentDescription = sticker.name ?: t("attachmentViews.sticker"),
             modifier = Modifier.size(160.dp),
         )
     }

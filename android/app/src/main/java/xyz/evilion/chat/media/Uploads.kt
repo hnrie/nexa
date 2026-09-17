@@ -12,6 +12,7 @@ import kotlinx.coroutines.withContext
 import xyz.evilion.chat.crypto.AttachmentMeta
 import xyz.evilion.chat.crypto.Bytes
 import xyz.evilion.chat.crypto.FileCrypto
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.ApiException
 import xyz.evilion.chat.net.AttachmentRef
 import xyz.evilion.chat.net.UploadsApi
@@ -223,7 +224,7 @@ class ChunkReader(
         var input = stream
         if (input == null || position > start) {
             input?.close()
-            input = resolver.openInputStream(uri) ?: throw IllegalStateException("That file could not be read.")
+            input = resolver.openInputStream(uri) ?: throw IllegalStateException(t("uploads.thatFileCouldNotBeRead"))
             stream = input
             position = 0
         }
@@ -233,7 +234,7 @@ class ChunkReader(
                 // some providers refuse to skip; read it away instead
                 val waste = ByteArray(minOf(1 shl 16, (start - position).toInt()))
                 val n = input.read(waste)
-                if (n <= 0) throw IllegalStateException("That file ended sooner than expected.")
+                if (n <= 0) throw IllegalStateException(t("uploads.thatFileEndedSoonerThanExpected"))
                 position += n
             } else {
                 position += skipped

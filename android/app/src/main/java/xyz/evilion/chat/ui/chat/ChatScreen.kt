@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.chat
 
+import xyz.evilion.chat.data.readable
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -87,7 +89,7 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
         if (!loaded.containsKey(channelId)) {
             failedLoad = null
             runCatching { MessageService.loadInitial(channelId) }
-                .onFailure { failedLoad = it.message }
+                .onFailure { failedLoad = it.readable("ChatScreen") }
         }
     }
 
@@ -116,14 +118,14 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when {
-                channel == null -> EmptyState(Lucide.Hash, "This conversation is not available.")
-                failedLoad != null -> EmptyState(Lucide.Hash, "Could not load messages", failedLoad)
+                channel == null -> EmptyState(Lucide.Hash, t("chatScreen.thisConversationIsNotAvailable"))
+                failedLoad != null -> EmptyState(Lucide.Hash, t("chatScreen.couldNotLoadMessages"), failedLoad)
                 messages.isEmpty() && !loaded.containsKey(channelId) ->
                     Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = colors.brand) }
                 messages.isEmpty() -> EmptyState(
                     Lucide.Hash,
-                    "This is the beginning of #${AppState.channelName(channel, me?.id)}",
-                    "Say something to start it off.",
+                    t("chatScreen.thisIsTheBeginningOf", "name" to AppState.channelName(channel, me?.id)),
+                    t("chatScreen.saySomethingToStartItOff"),
                 )
                 else -> LazyColumn(
                     state = listState,
@@ -159,7 +161,7 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
                         .clickable { scope.launch { listState.animateScrollToItem(0) } },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Lucide.ChevronDown, "Jump to the newest", tint = colors.icon, modifier = Modifier.size(22.dp))
+                    Icon(Lucide.ChevronDown, t("chatScreen.jumpToTheNewest"), tint = colors.icon, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -204,7 +206,7 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onOpenDrawer) {
-                Icon(Lucide.Menu, "Channels", tint = colors.icon)
+                Icon(Lucide.Menu, t("chatScreen.channels"), tint = colors.icon)
             }
             if (other != null) {
                 val user = AppState.user(other)
@@ -238,21 +240,21 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
             }
             if (channel.isDm || AppState.permissionsIn(channelId).has(P.CONNECT)) {
                 IconButton(onClick = { Nav.push(Layer.Call(channelId)) }) {
-                    Icon(Lucide.Phone, "Start a call", tint = colors.icon)
+                    Icon(Lucide.Phone, t("chatScreen.startACall"), tint = colors.icon)
                 }
                 IconButton(onClick = { Nav.push(Layer.Call(channelId, video = true)) }) {
-                    Icon(Lucide.Video, "Start a video call", tint = colors.icon)
+                    Icon(Lucide.Video, t("chatScreen.startAVideoCall"), tint = colors.icon)
                 }
             }
             IconButton(onClick = { Nav.push(Layer.Pins(channelId)) }) {
-                Icon(Lucide.Pin, "Pinned messages", tint = colors.icon)
+                Icon(Lucide.Pin, t("chatScreen.pinnedMessages"), tint = colors.icon)
             }
             IconButton(onClick = { Nav.push(Layer.Search(channelId)) }) {
-                Icon(Lucide.Search, "Search", tint = colors.icon)
+                Icon(Lucide.Search, t("chat.chat.search"), tint = colors.icon)
             }
             if (serverId != null || channel.type == "group_dm") {
                 IconButton(onClick = { Nav.push(Layer.Members(channelId)) }) {
-                    Icon(Lucide.Users, "Members", tint = colors.icon)
+                    Icon(Lucide.Users, t("server.serverSettings.members"), tint = colors.icon)
                 }
             }
         }
@@ -278,7 +280,7 @@ private fun TypingBar(channelId: String, serverId: String?) {
     val text = when {
         users.size == 1 -> "${names[0]} is typing…"
         users.size <= 3 -> "${names.dropLast(1).joinToString(", ")} and ${names.last()} are typing…"
-        else -> "Several people are typing…"
+        else -> t("chat.typingBar.severalPeopleAreTyping")
     }
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),

@@ -1,5 +1,7 @@
 package xyz.evilion.chat.ui.sheets
 
+import xyz.evilion.chat.data.readable
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -104,7 +106,7 @@ fun MembersSheet(channelId: String, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
             Text(
-                "Members — ${servers[serverId]?.memberCount ?: sorted.size}",
+                t("sheets.channelSheets.membersCount", "count" to (servers[serverId]?.memberCount ?: sorted.size)),
                 color = colors.textStrong, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
@@ -153,13 +155,13 @@ fun PinsSheet(channelId: String, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
             Text(
-                "Pinned messages",
+                t("chatScreen.pinnedMessages"),
                 color = colors.textStrong, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             )
             when {
                 pins == null -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = colors.brand) }
-                pins!!.isEmpty() -> EmptyState(Lucide.Pin, "Nothing pinned yet", "Long press a message to pin it.")
+                pins!!.isEmpty() -> EmptyState(Lucide.Pin, t("sheets.channelSheets.nothingPinnedYet"), t("sheets.channelSheets.longPressAMessageToPin"))
                 else -> LazyColumn(Modifier.weight(1f)) {
                     items(pins!!.size, key = { pins!![it].raw.id }) { index ->
                         val message = pins!![index]
@@ -209,7 +211,7 @@ fun SearchSheet(channelId: String, onDismiss: () -> Unit) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Search this conversation", color = colors.textPlaceholder) },
+                placeholder = { Text(t("sheets.channelSheets.searchThisConversation"), color = colors.textPlaceholder) },
                 singleLine = true,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = colors.bgInput,
@@ -223,8 +225,8 @@ fun SearchSheet(channelId: String, onDismiss: () -> Unit) {
             if (results.isEmpty()) {
                 EmptyState(
                     Lucide.Search,
-                    if (query.length < 2) "Type to search" else "Nothing found",
-                    "Only messages this device has decrypted are searched.",
+                    if (query.length < 2) t("sheets.channelSheets.typeToSearch") else t("sheets.channelSheets.nothingFound"),
+                    t("sheets.channelSheets.onlyMessagesThisDeviceHasDecrypted"),
                 )
             } else {
                 LazyColumn(Modifier.weight(1f)) {
@@ -268,11 +270,11 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
-            Text("Channel", color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text(t("server.invites.channel"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
             if (canManage) {
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it }, label = { Text("Name") }, singleLine = true,
+                    value = name, onValueChange = { name = it }, label = { Text(t("modals.subchat.name")) }, singleLine = true,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = colors.bgInput, unfocusedContainerColor = colors.bgInput,
                         focusedTextColor = colors.text, unfocusedTextColor = colors.text, cursorColor = colors.brand,
@@ -281,7 +283,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = topic, onValueChange = { topic = it }, label = { Text("Topic") },
+                    value = topic, onValueChange = { topic = it }, label = { Text(t("sheets.channelSheets.topic")) },
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = colors.bgInput, unfocusedContainerColor = colors.bgInput,
                         focusedTextColor = colors.text, unfocusedTextColor = colors.text, cursorColor = colors.brand,
@@ -300,17 +302,17 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
                                 })
                                 AppState.putChannel(updated)
                                 onDismiss()
-                            }.onFailure { Session.toasts.emit(it.message ?: "That did not save.") }
+                            }.onFailure { Session.toasts.emit(it.message ?: t("server.serverSettingsScreen.thatDidNotSave")) }
                             saving = false
                         }
                     },
                     enabled = !saving,
                     colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
-                ) { Text("Save") }
+                ) { Text(t("chat.editMessage.save")) }
                 Spacer(Modifier.height(16.dp))
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("Mute this conversation", color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                Text(t("sheets.channelSheets.muteThisConversation"), color = colors.text, fontSize = 15.sp, modifier = Modifier.weight(1f))
                 Switch(
                     checked = muted,
                     onCheckedChange = { on ->
@@ -333,7 +335,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
                 ) {
                     Icon(Lucide.UserPlus, null, tint = colors.icon, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text("Invite people", color = colors.text, fontSize = 15.sp)
+                    Text(t("sheets.channelSheets.invitePeople"), color = colors.text, fontSize = 15.sp)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -362,12 +364,12 @@ fun InviteSheet(channelId: String, onDismiss: () -> Unit) {
                 val key = KeyService.ring.latest(conv)?.let { (epoch, root) -> InviteKey(epoch, root) }
                 link = InviteLink.url(Api.baseUrl, it.code, key)
             }
-            .onFailure { error = it.message }
+            .onFailure { error = it.readable("ChannelSheets") }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-            Text("Invite people", color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+            Text(t("sheets.channelSheets.invitePeople"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
             when {
                 error != null -> Text(error!!, color = colors.danger, fontSize = 14.sp)
@@ -380,12 +382,12 @@ fun InviteSheet(channelId: String, onDismiss: () -> Unit) {
                     ) {
                         Text(shown, color = colors.text, fontSize = 14.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Icon(
-                            Lucide.Copy, "Copy", tint = colors.icon,
+                            Lucide.Copy, t("modals.groupInvite.copy"), tint = colors.icon,
                             modifier = Modifier.size(20.dp).clickable { clipboard.setText(AnnotatedString(shown)) },
                         )
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text("Anyone with this link can join. It lasts a week.", color = colors.textMuted, fontSize = 12.sp)
+                    Text(t("sheets.channelSheets.anyoneWithThisLinkCanJoin"), color = colors.textMuted, fontSize = 12.sp)
                 }
             }
             Spacer(Modifier.height(16.dp))

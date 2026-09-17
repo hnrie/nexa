@@ -17,6 +17,7 @@ import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.data.Session
 import xyz.evilion.chat.data.SettingsStore
 import xyz.evilion.chat.data.UiMessage
+import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.Message
 
 /**
@@ -32,19 +33,19 @@ object Notifications {
     fun ensureChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_MESSAGES, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "New messages and mentions"
+            NotificationChannel(CHANNEL_MESSAGES, t("modals.quickSwitcher.messages"), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = t("notifications.newMessagesAndMentions")
             },
         )
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_CALLS, "Calls", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Incoming and ongoing calls"
+            NotificationChannel(CHANNEL_CALLS, t("notifications.calls"), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = t("notifications.incomingAndOngoingCalls")
                 setSound(null, null)
             },
         )
         manager.createNotificationChannel(
-            NotificationChannel(CHANNEL_SERVICE, "Staying connected", NotificationManager.IMPORTANCE_MIN).apply {
-                description = "Keeps messages arriving while the app is in the background"
+            NotificationChannel(CHANNEL_SERVICE, t("notifications.stayingConnected"), NotificationManager.IMPORTANCE_MIN).apply {
+                description = t("notifications.keepsMessagesArrivingWhileTheApp")
             },
         )
     }
@@ -63,26 +64,26 @@ object Notifications {
     /** A message that arrived while this device was not looking at it. */
     fun message(context: Context, raw: Message, decrypted: UiMessage) {
         if (!SettingsStore.deviceBool("notifications", true)) return
-        if (raw.channelId in SettingsStore.mutedChannels) return
         val me = AppState.me.value?.id
-        val mentionsMe = raw.mentionEveryone || (me != null && me in raw.mentions)
         val channel = AppState.channels.value[raw.channelId]
-        val level = SettingsStore.notificationLevel(raw.channelId)
-        val wanted = when (level) {
+        val serverId = channel?.serverId
+        if (SettingsStore.isMuted(raw.channelId, serverId)) return
+        val mentionsMe = raw.mentionEveryone || (me != null && me in raw.mentions)
+        val wanted = when (SettingsStore.notificationLevel(raw.channelId, serverId)) {
             "none" -> false
             "mentions" -> mentionsMe
-            else -> channel?.isDm == true || mentionsMe || channel?.serverId == null || true
+            else -> true
         }
         if (!wanted) return
 
-        val title = channel?.let { AppState.channelName(it, me) } ?: "Message"
+        val title = channel?.let { AppState.channelName(it, me) } ?: t("profile.profileCard.message")
         val author = AppState.nameFor(raw.authorId, channel?.serverId)
         val body = when {
-            decrypted.decryptError != null -> "Sent you a message"
+            decrypted.decryptError != null -> t("notifications.sentYouAMessage")
             !decrypted.payload?.text.isNullOrEmpty() -> decrypted.payload?.text.orEmpty()
-            decrypted.payload?.attachments?.isNotEmpty() == true -> "Sent an attachment"
-            decrypted.payload?.sticker != null -> "Sent a sticker"
-            else -> "Sent a message"
+            decrypted.payload?.attachments?.isNotEmpty() == true -> t("notifications.sentAnAttachment")
+            decrypted.payload?.sticker != null -> t("notify.sentASticker")
+            else -> t("notifications.sentAMessage")
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_MESSAGES)
@@ -121,13 +122,13 @@ object Notifications {
         val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("$name is calling")
-            .setContentText("Incoming call")
+            .setContentText(t("settings.notifications.incomingCall"))
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .setFullScreenIntent(answer, true)
-            .addAction(0, "Answer", answer)
-            .addAction(0, "Decline", decline)
+            .addAction(0, t("notifications.answer"), answer)
+            .addAction(0, t("voice.incomingCall.decline"), decline)
             .build()
         post(context, callId(channelId), notification)
     }
