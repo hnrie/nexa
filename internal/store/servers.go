@@ -26,15 +26,33 @@ func scanServer(r rowScanner) (*Server, error) {
 	return &s, nil
 }
 
+// DefaultNames is what a new server's first categories and channels are
+// called. They are records, not interface text, so the client sends them in
+// the language the person is reading; anything left empty falls back to
+// English.
+type DefaultNames struct {
+	TextCategory  string
+	VoiceCategory string
+	TextChannel   string
+	VoiceChannel  string
+}
+
+func or(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
+}
+
 // CreateServer creates a server with its @everyone role (id = server id),
 // default categories and channels, and the owner as first member.
-func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string) (*Server, error) {
+func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string, defaults DefaultNames) (*Server, error) {
 	now := nowMs()
 	srv := &Server{ID: ids.New(), Name: name, OwnerID: owner, CreatedAt: now}
-	textCat := &Channel{ServerID: &srv.ID, Type: "category", Name: "Text Channels", Position: 0}
-	voiceCat := &Channel{ServerID: &srv.ID, Type: "category", Name: "Voice Channels", Position: 1}
-	general := &Channel{ServerID: &srv.ID, Type: "text", Name: "general", Position: 0}
-	voice := &Channel{ServerID: &srv.ID, Type: "voice", Name: "General", Position: 0}
+	textCat := &Channel{ServerID: &srv.ID, Type: "category", Name: or(defaults.TextCategory, "Text Channels"), Position: 0}
+	voiceCat := &Channel{ServerID: &srv.ID, Type: "category", Name: or(defaults.VoiceCategory, "Voice Channels"), Position: 1}
+	general := &Channel{ServerID: &srv.ID, Type: "text", Name: or(defaults.TextChannel, "general"), Position: 0}
+	voice := &Channel{ServerID: &srv.ID, Type: "voice", Name: or(defaults.VoiceChannel, "General"), Position: 0}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `INSERT INTO servers (`+serverCols+`, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, int64(srv.ID), srv.Name, nil, nil, int64(owner), "", nil, 0, 0, now, now); err != nil {
 			return err

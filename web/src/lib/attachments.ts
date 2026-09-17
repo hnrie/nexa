@@ -162,7 +162,7 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
  * memory holds one request's worth at most, however big the file is.
  */
 export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
-  if (!fitsUploadLimit(st.file.size)) throw new Error(`That file is over this server's ${formatSize(limits.max)} limit.`);
+  if (!fitsUploadLimit(st.file.size)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(limits.max) }));
   const total = encryptedSize(st.file.size);
   const key = newFileKey();
   const baseIv = newBaseIv();
@@ -275,7 +275,7 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
       const count = Math.min(perPiece, chunks - first);
       const start = first === 0 ? 0 : frameOffset(first);
       const end = Math.min(total, frameOffset(first + count));
-      if (sent !== start) throw new Error("The upload lost its place.");
+      if (sent !== start) throw new Error(t("attachments.theUploadLostItsPlace"));
       let tries = 0;
       while (sent < end) {
         try {
@@ -304,7 +304,7 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
         onProgress(sent);
       }
     }
-    if (sent !== total) throw new Error("The upload came out a different size than expected.");
+    if (sent !== total) throw new Error(t("attachments.theUploadCameOutADifferentSize"));
     return await finishUpload(session.id);
   } catch (err) {
     await uploadsApi.cancel(session.id).catch(() => undefined);

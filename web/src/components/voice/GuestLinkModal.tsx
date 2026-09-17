@@ -11,6 +11,7 @@ import { guestLinkFor } from "@/lib/guestLink";
 import { P } from "@/lib/perms";
 import { useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
+import { formatFull } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "@/components/modals/ServerModals.module.css";
 
@@ -53,7 +54,7 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
       const next = await guestLinkFor(channelId, opts);
       if (n === seq.current) setState(next);
     } catch (err) {
-      if (n === seq.current) setError(errorText(err, "Could not make a guest link."));
+      if (n === seq.current) setError(errorText(err, t("voice.guestLink.couldNotMakeAGuestLink")));
     } finally {
       if (n === seq.current) setBusy(false);
     }
@@ -91,9 +92,9 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
     <Modal open onClose={onClose} title={t("voice.guestLink.inviteGuestsToThisCall")} width={480}>
       <div className={s.form}>
         <p className={s.hint}>{t("voice.guestLink.anyoneWithThisLinkCanJoin")}</p>
-        <Field label={t("voice.guestLink.guestLink")} hint={expires ? `New guests can use it until ${expires.toLocaleString()}. A guest can stay for up to 12 hours.` : undefined}>
+        <Field label={t("voice.guestLink.guestLink")} hint={expires ? t("voice.guestLink.newGuestsCanUseItUntil", { when: formatFull(expires.getTime()) }) : undefined}>
           <div className={s.linkRow}>
-            <TextInput readOnly value={state?.url ?? ""} placeholder={busy ? "Making a link…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="guest-link" />
+            <TextInput readOnly value={state?.url ?? ""} placeholder={busy ? t("voice.guestLink.makingALink") : ""} onFocus={(e) => e.currentTarget.select()} data-testid="guest-link" />
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!state} data-testid="guest-link-copy">{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>

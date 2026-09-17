@@ -55,7 +55,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
   }, [tab, q]);
 
   const create = async () => {
-    const name = await promptText(kind === "emoji" ? "Create Emoji Pack" : "Create Sticker Pack", { label: tr_("server.packEditor.packName"), initial: kind === "emoji" ? "My emoji" : "My stickers", maxLength: 60 }, "Create");
+    const name = await promptText(kind === "emoji" ? tr_("settings.stickers.createEmojiPack") : tr_("settings.stickers.createStickerPack"), { label: tr_("server.packEditor.packName"), initial: kind === "emoji" ? tr_("settings.stickers.myEmoji") : tr_("settings.stickers.myStickers"), maxLength: 60 }, tr_("settings.stickers.create"));
     if (!name?.trim()) return;
     try {
       const pack = await expressionsApi.createPack({ name: name.trim(), kind });
@@ -94,14 +94,14 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
           canManage={(p) => p.owner_user_id === meId}
           canRemove={(p) => canRemovePack(p, meId)}
           onCreate={() => void create()}
-          createLabel={kind === "emoji" ? "Create Emoji Pack" : "Create Sticker Pack"}
-          emptyText={kind === "emoji" ? "No emoji packs yet. Create one and drop images in; type them as :name: anywhere." : "You have no sticker packs yet. Create one, or install some from Discover."}
+          createLabel={kind === "emoji" ? tr_("settings.stickers.createEmojiPack") : tr_("settings.stickers.createStickerPack")}
+          emptyText={kind === "emoji" ? tr_("settings.stickers.noEmojiPacksYet") : tr_("settings.stickers.noStickerPacksYet")}
         />
       ) : (
         <>
           <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr_("settings.stickers.searchPublicPacks")} autoFocus />
           {found === null ? <div style={{ marginTop: 16 }}><Spinner /></div> : null}
-          {found && found.length === 0 ? <div className={s.empty}>{q ? "No public packs match." : "No public packs yet. Make one of yours public to be the first."}</div> : null}
+          {found && found.length === 0 ? <div className={s.empty}>{q ? tr_("settings.stickers.noPublicPacksMatch") : tr_("settings.stickers.noPublicPacksYet")}</div> : null}
           <div className={s.browseGrid}>
             {found?.map((p) => {
               const cover = packCover(p);

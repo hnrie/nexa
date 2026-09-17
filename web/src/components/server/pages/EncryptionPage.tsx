@@ -77,13 +77,13 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
             <div className={s.keyText}>
               <span className={s.keyName}>{c.name}</span>
               <span className={s.keySub}>
-                {latest ? `Key epoch ${latest.epoch} · created ${formatFull(latest.created_at)} by ${displayName(users[latest.created_by])}${latest.reason ? ` (${latest.reason})` : ""}` : "No key yet: one is created with the first message."}
+                {latest ? `${t("server.encryption.keyEpochCreatedBy", { epoch: latest.epoch, when: formatFull(latest.created_at), who: displayName(users[latest.created_by]) })}${latest.reason ? ` (${latest.reason})` : ""}` : t("server.encryption.noKeyYet")}
                 {" · "}
                 {holdLatest ? t("server.encryption.youHoldTheCurrentKey") : held ? t("server.encryption.youHoldAnOlderKeyWaiting") : t("server.encryption.youDonTHoldThisKey")}
               </span>
             </div>
-            <Button size="sm" variant="secondary" disabled={!holdLatest || busy === c.conv_id} loading={busy === c.conv_id} onClick={() => void doRotate(c.conv_id)} title={holdLatest ? "Create a fresh key and share it with everyone entitled" : "Only holders of the current key can rotate it"}>
-              <RefreshCw size={14} /> Rotate
+            <Button size="sm" variant="secondary" disabled={!holdLatest || busy === c.conv_id} loading={busy === c.conv_id} onClick={() => void doRotate(c.conv_id)} title={holdLatest ? t("server.encryption.createAFreshKey") : t("server.encryption.onlyHoldersCanRotate")}>
+              <RefreshCw size={14} /> {t("server.encryption.rotate")}
             </Button>
           </div>
         );

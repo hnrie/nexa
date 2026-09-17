@@ -69,7 +69,7 @@ export default function RegisterPage() {
 
   if (recovery) {
     const download = () => {
-      const blob = new Blob([`Nexa recovery key for @${uname}\n\n${recovery}\n\nKeep this somewhere safe. It is the only way to recover your messages if you forget your password.\n`], { type: "text/plain" });
+      const blob = new Blob([`${t("register.recoveryKeyFileHeading", { username: uname })}\n\n${recovery}\n\n${t("register.keepThisSomewhereSafe")}\n`], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -113,7 +113,7 @@ export default function RegisterPage() {
             </div>
           ) : null}
         </Field>
-        <Field label={t("register.confirmPassword")} required error={confirm && confirm !== password ? "Passwords do not match." : null}>
+        <Field label={t("register.confirmPassword")} required error={confirm && confirm !== password ? t("settings.account.passwordsDoNotMatch") : null}>
           <TextInput type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
         <details>

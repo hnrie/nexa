@@ -38,7 +38,7 @@ export default function DeleteServerPage({ serverId, onDone }: { serverId: strin
       <h2 className={st.title}>{t("server.deleteServer.deleteServer")}</h2>
       <div className={s.danger}>
         <p className={st.hint} style={{ margin: 0 }}>Are you sure you want to delete <b>{server.name}</b>{t("server.deleteServer.everyChannelMessageAndRoleIn")}</p>
-        <Field label={`Type "${server.name}" to confirm`}>
+        <Field label={t("server.deleteServer.typeToConfirm", { name: server.name })}>
           <TextInput value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={server.name} autoCapitalize="none" autoCorrect="off" autoComplete="off" spellCheck={false} data-testid="delete-server-confirm" />
         </Field>
         <div>

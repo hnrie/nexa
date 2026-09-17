@@ -71,7 +71,7 @@ export const DEFAULT_LOCK = { autoLockMs: 5 * 60_000, lockOnBlur: false, blurDel
 export class WrongPasscode extends Error {
   readonly left: number;
   constructor(left: number) {
-    super(left > 0 ? `Wrong passcode. ${left} ${left === 1 ? "try" : "tries"} left.` : "Too many wrong passcodes.");
+    super(left > 0 ? t("appLock.wrongPasscodeTriesLeft", { count: left }) : t("appLock.tooManyWrongPasscodes"));
     this.name = "WrongPasscode";
     this.left = left;
   }
@@ -148,7 +148,7 @@ export function isNumeric(passcode: string): boolean {
 
 /** Returns why a passcode is unacceptable, or null when it is fine. */
 export function passcodeProblem(passcode: string): string | null {
-  if (passcode.length < MIN_PASSCODE) return `Use at least ${MIN_PASSCODE} characters.`;
+  if (passcode.length < MIN_PASSCODE) return t("appLock.useAtLeastCharacters", { count: MIN_PASSCODE });
   if (passcode.length > 128) return t("appLock.thatIsTooLong");
   if (/^(.)\1*$/.test(passcode)) return t("appLock.pickSomethingLessGuessableThanOne");
   return null;

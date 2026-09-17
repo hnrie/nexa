@@ -245,7 +245,7 @@ func TestMentionsBeforeJoiningDoNotCount(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	owner, old, newbie := mkUser(t, s, "owner"), mkUser(t, s, "old"), mkUser(t, s, "newbie")
-	srv, err := s.CreateServer(ctx, owner.ID, "S")
+	srv, err := s.CreateServer(ctx, owner.ID, "S", DefaultNames{})
 	if err != nil {
 		t.Fatal(err)
 	}

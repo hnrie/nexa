@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PublicUser } from "@/api/types";
+import { t } from "@/i18n";
 
 interface UsersState {
   byId: Record<string, PublicUser>;
@@ -24,7 +25,7 @@ export const useUsers = create<UsersState>()((set, get) => ({
 }));
 
 /** Display name with username fallback. */
-export function displayName(u: PublicUser | undefined, fallback = "Unknown User"): string {
+export function displayName(u: PublicUser | undefined, fallback = t("names.unknownUser")): string {
   if (!u) return fallback;
   return u.display_name || u.username || fallback;
 }

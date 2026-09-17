@@ -18,9 +18,13 @@ export function canRemovePack(pack: StickerPack, meId: string | undefined): bool
 /** What to ask before removing a pack. */
 export function removePackQuestion(pack: StickerPack): { title: string; body: string; confirmLabel: string } {
   const count = pack.stickers.length;
-  const what = pack.kind === "emoji" ? "emoji" : count === 1 ? "sticker" : "stickers";
-  const leaving = count === 0 ? "It leaves your picker." : `Its ${count} ${what} ${count === 1 ? "leaves" : "leave"} your picker.`;
-  return { title: `Remove '${pack.name}'`, body: `${leaving} You can install it again for as long as it stays public.`, confirmLabel: t("pickers.stickerPicker.removePack") };
+  const leaving =
+    count === 0
+      ? t("packRemoval.itLeavesYourPicker")
+      : pack.kind === "emoji"
+        ? t("packRemoval.itsEmojiLeaveYourPicker", { count })
+        : t("packRemoval.itsStickersLeaveYourPicker", { count });
+  return { title: t("packRemoval.removePackNamed", { name: pack.name }), body: `${leaving} ${t("packRemoval.youCanInstallItAgain")}`, confirmLabel: t("pickers.stickerPicker.removePack") };
 }
 
 /** Uninstalls the pack and takes it out of the pickers. Says what went wrong if it could not. */

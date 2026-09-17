@@ -19,7 +19,7 @@ function statusOptions(): { value: "online" | "idle" | "dnd" | "invisible"; labe
   return [
   { value: "online", label: t("shell.user.online") },
   { value: "idle", label: t("shell.user.idle") },
-  { value: "dnd", label: t("shell.user.doNotDisturb"), sub: "You will not receive any desktop notifications." },
+  { value: "dnd", label: t("shell.user.doNotDisturb"), sub: t("shell.user.youWillNotReceiveAnyDesktop") },
   { value: "invisible", label: t("shell.user.invisible"), sub: t("shell.user.youWillAppearOfflineButKeep") },
 ];
 }
@@ -97,19 +97,19 @@ export function UserPanel() {
           </button>
         </Tooltip>
         <Tooltip text={deafened ? "Undeafen" : "Deafen"}>
-          <button className={s.icon} data-on={!deafened} onClick={toggleDeafen} aria-label={deafened ? "Undeafen" : "Deafen"}>
+          <button className={s.icon} data-on={!deafened} onClick={toggleDeafen} aria-label={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
             {deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
           </button>
         </Tooltip>
         {update?.status === "ready" ? (
-          <Tooltip text={`Restart to update to ${update.version ?? "the new version"}`}>
+          <Tooltip text={t("shell.user.restartToUpdateTo", { version: update.version ?? t("shell.user.theNewVersion") })}>
             <button className={[s.icon, s.update].join(" ")} onClick={() => void desktopBridge()?.updates.restart()} aria-label={t("settings.desktop.restartToUpdate")} data-testid="update-ready">
               <Download size={20} />
             </button>
           </Tooltip>
         ) : null}
         <Tooltip text={t("settings.settings.userSettings")}>
-          <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label={t("settings.settings.userSettings")}>
+          <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label={t("settings.settings.userSettings")} data-testid="user-settings">
             <Settings size={20} />
           </button>
         </Tooltip>

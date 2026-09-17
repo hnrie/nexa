@@ -14,7 +14,7 @@ func TestServerLifecycleAndPerms(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	owner, mod, plain, outsider := mkUser(t, s, "owner"), mkUser(t, s, "mod"), mkUser(t, s, "plain"), mkUser(t, s, "outsider")
-	srv, err := s.CreateServer(ctx, owner.ID, "My Server")
+	srv, err := s.CreateServer(ctx, owner.ID, "My Server", DefaultNames{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestInvitesBansAudit(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	owner, u := mkUser(t, s, "owner"), mkUser(t, s, "u")
-	srv, _ := s.CreateServer(ctx, owner.ID, "S")
+	srv, _ := s.CreateServer(ctx, owner.ID, "S", DefaultNames{})
 	in, err := s.CreateInvite(ctx, &srv.ID, srv.SystemChannelID, owner.ID, 0, 2)
 	if err != nil || len(in.Code) != 8 {
 		t.Fatalf("invite: %v %+v", err, in)

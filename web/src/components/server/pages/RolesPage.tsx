@@ -55,7 +55,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
   const create = async () => {
     setBusy(true);
     try {
-      const r = await serversApi.createRole(serverId, { name: "new role" });
+      const r = await serversApi.createRole(serverId, { name: t("server.roles.newRole") });
       upsertRoles(serverId, await serversApi.roles(serverId));
       setSelected(r.id);
       setTab("display");

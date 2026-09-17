@@ -97,14 +97,14 @@ function OverviewPage({ channel }: { channel: Channel }) {
     <>
       <h2 className={st.title}>{tr_("server.channelSettings.overview")}</h2>
       <div className={st.form}>
-        <Field label={channel.type === "category" ? "Category name" : "Channel name"} required>
+        <Field label={channel.type === "category" ? tr_("server.channelSettings.categoryName") : tr_("server.channelSettings.channelName")} required>
           <div className={s.iconInput}>
             {channel.type === "text" ? <Hash size={16} /> : channel.type === "voice" ? <Volume2 size={16} /> : null}
             <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="channel-settings-name" {...(isText ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
           </div>
         </Field>
         {isText ? (
-          <Field label={tr_("server.channelSettings.channelTopic")} hint={`${1024 - topic.length} characters left`}>
+          <Field label={tr_("server.channelSettings.channelTopic")} hint={tr_("server.channelSettings.charactersLeft", { count: 1024 - topic.length })}>
             <TextArea value={topic} onChange={(e) => setTopic(e.target.value.slice(0, 1024))} placeholder={tr_("server.channelSettings.letEveryoneKnowHowToUse")} maxLength={1024} />
           </Field>
         ) : null}
@@ -117,7 +117,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
         ) : null}
         {isText ? <Toggle checked={nsfw} onChange={setNsfw} label={tr_("server.channelSettings.ageRestrictedChannel")} description={tr_("server.channelSettings.usersWillNeedToConfirmThey")} /> : null}
         {channel.type === "voice" ? (
-          <Field label={`User limit — ${limit === 0 ? "No limit" : `${limit} users`}`} hint={tr_("server.channelSettings.limitHowManyPeopleCanJoin")}>
+          <Field label={tr_("server.channelSettings.userLimitValue", { limit: limit === 0 ? tr_("server.channelSettings.noLimit") : tr_("server.channelSettings.usersCount", { count: limit }) })} hint={tr_("server.channelSettings.limitHowManyPeopleCanJoin")}>
             <input type="range" className={st.slider} min={0} max={99} value={limit} onChange={(e) => setLimit(Number(e.target.value))} />
           </Field>
         ) : null}

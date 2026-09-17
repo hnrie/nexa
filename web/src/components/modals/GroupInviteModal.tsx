@@ -8,6 +8,7 @@ import { Modal } from "@/components/common/Modal";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { inviteUrl } from "@/lib/inviteLink";
+import { formatFull } from "@/lib/time";
 import { channelDisplayName } from "@/lib/names";
 import { ring } from "@/lib/keyring";
 import { useAuth } from "@/stores/auth";
@@ -49,7 +50,7 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
       const inv = await channelsApi.createGroupInvite(channelId, { max_age: a, max_uses: u });
       if (n === seq.current) setInvite(inv);
     } catch (err) {
-      if (n === seq.current) toast(err instanceof ApiError ? err.message : "Could not create an invite.", "error");
+      if (n === seq.current) toast(err instanceof ApiError ? err.message : t("modals.groupInvite.couldNotCreateAnInvite"), "error");
     } finally {
       if (n === seq.current) setBusy(false);
     }
@@ -70,12 +71,12 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
     });
   };
   return (
-    <Modal open onClose={onClose} title={`Invite people to ${name}`} width={480}>
+    <Modal open onClose={onClose} title={t("modals.groupInvite.invitePeopleTo", { name })} width={480}>
       <div className={s.form}>
         <p className={s.hint}>{t("modals.groupInvite.anyoneWithThisLinkJoinsThe")}</p>
-        <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? `Expires ${new Date(invite.expires_at).toLocaleString()}.` : t("modals.groupInvite.thisLinkNeverExpires")}>
+        <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? t("modals.groupInvite.expiresOn", { when: formatFull(invite.expires_at) }) : t("modals.groupInvite.thisLinkNeverExpires")}>
           <div className={s.linkRow}>
-            <TextInput readOnly value={link} placeholder={busy ? "Generating…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="group-invite-link" />
+            <TextInput readOnly value={link} placeholder={busy ? t("modals.groupInvite.generating") : ""} onFocus={(e) => e.currentTarget.select()} data-testid="group-invite-link" />
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>
@@ -91,7 +92,7 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
           </Field>
           <Field label={t("modals.groupInvite.maxNumberOfUses")}>
             <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); void generate(age, v); }}>
-              {USES.map((u) => <option key={u} value={u}>{u === 0 ? "No limit" : `${u} use${u === 1 ? "" : "s"}`}</option>)}
+              {USES.map((u) => <option key={u} value={u}>{u === 0 ? t("modals.groupInvite.noLimit") : t("modals.groupInvite.usesCount", { count: u })}</option>)}
             </Select>
           </Field>
         </div>

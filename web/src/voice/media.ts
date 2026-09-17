@@ -295,13 +295,13 @@ export function sentStream(ctx: AudioContext, mic: MediaStream, inputVolume: num
 function choiceWords(c: InputChoice): string {
   switch (c) {
     case "chosen":
-      return "the one you picked";
+      return t("media.theOneYouPicked");
     case "matched-by-name":
-      return "found again by name after its id changed";
+      return t("media.foundAgainByName");
     case "missing":
       return t("media.notAvailableThisIsTheSystem");
     default:
-      return "system default";
+      return t("media.systemDefault");
   }
 }
 
@@ -316,7 +316,7 @@ export function describeInput(ctx: AudioContext, mic: MediaStream, sent: MediaSt
     `format: ${st.sampleRate ?? "?"} Hz, ${st.channelCount ?? "?"} channel(s)`,
     `processing: echo=${String(st.echoCancellation ?? "?")} noise=${String(st.noiseSuppression ?? "?")} gain=${String(st.autoGainControl ?? "?")}`,
     `audio engine: ${ctx.state}, ${Math.round(ctx.sampleRate)} Hz`,
-    `input volume: ${inputVolume}% (${sent === mic ? "sent straight through" : "through the slider"})`,
+    `input volume: ${inputVolume}% (${sent === mic ? t("media.sentStraightThrough") : t("media.throughTheSlider")})`,
     `chosen device: ${choiceWords(lastChoice)}`,
     `sent track: ${out?.readyState ?? "none"}`,
   ];

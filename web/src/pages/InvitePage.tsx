@@ -78,7 +78,7 @@ export default function InvitePage() {
     serversApi
       .invitePreview(code)
       .then((p) => alive && setPreview(p))
-      .catch((err) => alive && setError(err instanceof ApiError && err.status === 404 ? "This invite is invalid or has expired." : "Could not load the invite."));
+      .catch((err) => alive && setError(err instanceof ApiError && err.status === 404 ? t("invite.thisInviteIsInvalidOrHasExpired") : t("invite.couldNotLoadTheInvite")));
     return () => {
       alive = false;
     };

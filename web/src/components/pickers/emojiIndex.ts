@@ -191,7 +191,8 @@ export function withTone(e: EmojiEntry, tone: number): string {
 }
 
 /** The skin tones in the order the picker offers them, default first. */
-export const TONE_NAMES = ["Default", "Light", "Medium-Light", "Medium", "Medium-Dark", "Dark"];
+/** Skin-tone names, per call so they follow the language. */
+export const toneNames = (): string[] => [tr_("pickers.emojiPicker.toneDefault"), tr_("pickers.emojiPicker.toneLight"), tr_("pickers.emojiPicker.toneMediumLight"), tr_("pickers.emojiPicker.toneMedium"), tr_("pickers.emojiPicker.toneMediumDark"), tr_("pickers.emojiPicker.toneDark")];
 
 /**
  * The CSS that draws an emoji from the sprite sheets at a size, or null when

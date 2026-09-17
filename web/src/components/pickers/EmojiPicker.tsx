@@ -8,7 +8,7 @@ import { emojiToken, packEmoji, packImageUrl, searchCustomEmoji, searchPackEmoji
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { Twemoji } from "@/components/common/Twemoji";
-import { TONE_NAMES, emojiGroups, emojiLoaded, loadEmoji, searchEmoji, spriteStyle, withTone, type EmojiEntry } from "./emojiIndex";
+import { toneNames, emojiGroups, emojiLoaded, loadEmoji, searchEmoji, spriteStyle, withTone, type EmojiEntry } from "./emojiIndex";
 import s from "./Picker.module.css";
 
 import { t } from "@/i18n";
@@ -193,8 +193,8 @@ function ToneSelector({ tone, onChange }: { tone: number; onChange: (tone: numbe
               className={s.toneOption}
               role="menuitemradio"
               aria-checked={i === tone}
-              aria-label={`${TONE_NAMES[i]} skin tone`}
-              title={`${TONE_NAMES[i]} skin tone`}
+              aria-label={t("pickers.emojiPicker.skinToneNamed", { tone: toneNames()[i]! })}
+              title={t("pickers.emojiPicker.skinToneNamed", { tone: toneNames()[i]! })}
               data-testid={`skin-tone-${i}`}
               onClick={() => {
                 onChange(i);

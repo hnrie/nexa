@@ -91,7 +91,7 @@ export default function VoicePage() {
       listDevices().then(setDevices).catch(() => {});
     } catch (err) {
       if (stream && testRef.current?.stream !== stream) stream.getTracks().forEach((x) => x.stop());
-      setDiag(`The microphone could not be opened: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`);
+      setDiag(tr_("settings.voice.theMicrophoneCouldNotBeOpened", { error: err instanceof Error ? `${err.name}: ${err.message}` : String(err) }));
     } finally {
       startingRef.current = false;
       setStarting(false);
@@ -134,7 +134,7 @@ export default function VoicePage() {
               }}
             >
               <option value="">{defaultDeviceLabel(devices?.inputs ?? [])}</option>
-              {realDevices(devices?.inputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Microphone")}</option>)}
+              {realDevices(devices?.inputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, tr_("settings.voice.microphone"))}</option>)}
             </Select>
           </Field>
           <Field label={tr_("settings.voice.outputDevice")}>
@@ -147,15 +147,15 @@ export default function VoicePage() {
               }}
             >
               <option value="">{defaultDeviceLabel(devices?.outputs ?? [])}</option>
-              {realDevices(devices?.outputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Speaker")}</option>)}
+              {realDevices(devices?.outputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, tr_("settings.voice.speaker"))}</option>)}
             </Select>
           </Field>
         </div>
         <div className={`${st.twoCol} ${st.twoEqual}`}>
-          <Field label={`Input volume — ${settings.inputVolume}%`}>
+          <Field label={tr_("settings.voice.inputVolumeValue", { percent: settings.inputVolume })}>
             <input type="range" className={st.slider} min={0} max={200} value={settings.inputVolume} onChange={(e) => set({ inputVolume: Number(e.target.value) })} />
           </Field>
-          <Field label={`Output volume — ${settings.outputVolume}%`}>
+          <Field label={tr_("settings.voice.outputVolumeValue", { percent: settings.outputVolume })}>
             <input type="range" className={st.slider} min={0} max={200} value={settings.outputVolume} onChange={(e) => set({ outputVolume: Number(e.target.value) })} />
           </Field>
         </div>
@@ -202,7 +202,7 @@ export default function VoicePage() {
           <>
             <Toggle checked={settings.autoSensitivity} onChange={(on) => set({ autoSensitivity: on })} label={tr_("settings.voice.automaticallyDetermineInputSensitivity")} description={tr_("settings.voice.learnsYourBackgroundNoiseAndOnly")} />
             {!settings.autoSensitivity ? (
-              <Field label={`Input sensitivity — ${settings.sensitivity} dB`}>
+              <Field label={tr_("settings.voice.inputSensitivityValue", { db: settings.sensitivity })}>
                 <input type="range" className={st.slider} min={-100} max={0} value={settings.sensitivity} onChange={(e) => set({ sensitivity: Number(e.target.value) })} />
               </Field>
             ) : null}
@@ -223,8 +223,8 @@ export default function VoicePage() {
               set({ cameraDeviceId: id, cameraDeviceLabel: chosen?.label || null });
             }}
           >
-            <option value="">{devices?.cameras.length ? defaultDeviceLabel(devices.cameras) : "No camera found"}</option>
-            {realDevices(devices?.cameras ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "Camera")}</option>)}
+            <option value="">{devices?.cameras.length ? defaultDeviceLabel(devices.cameras) : tr_("settings.voice.noCameraFound")}</option>
+            {realDevices(devices?.cameras ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, tr_("settings.voice.cameraDevice"))}</option>)}
           </Select>
         </Field>
       </div>

@@ -145,7 +145,7 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
       </div>
       <div className={s.foot}>
         <span>{t("search.search.messagesIndexed", { count: indexed })}</span>
-        <Button size="sm" variant="secondary" loading={loading} disabled={exhausted} onClick={() => void loadMore()} data-testid="search-older">{exhausted ? "All history loaded" : t("search.search.loadOlder")}</Button>
+        <Button size="sm" variant="secondary" loading={loading} disabled={exhausted} onClick={() => void loadMore()} data-testid="search-older">{exhausted ? t("search.search.allHistoryLoaded") : t("search.search.loadOlder")}</Button>
       </div>
     </aside>
   );

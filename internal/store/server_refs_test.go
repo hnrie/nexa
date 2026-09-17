@@ -12,7 +12,7 @@ func TestJoinByInviteIsAtomic(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
 	owner, bob, carol, troll := mkUser(t, s, "owner"), mkUser(t, s, "bob"), mkUser(t, s, "carol"), mkUser(t, s, "troll")
-	srv, err := s.CreateServer(ctx, owner.ID, "Joins")
+	srv, err := s.CreateServer(ctx, owner.ID, "Joins", DefaultNames{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestDeletesReleaseImages(t *testing.T) {
 		}
 		return b.RefCount
 	}
-	srv, err := s.CreateServer(ctx, owner.ID, "Pictures")
+	srv, err := s.CreateServer(ctx, owner.ID, "Pictures", DefaultNames{})
 	if err != nil {
 		t.Fatal(err)
 	}

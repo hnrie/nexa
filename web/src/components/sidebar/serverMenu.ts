@@ -76,8 +76,8 @@ export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: `Leave '${st.server.name}'`,
-          body: `Are you sure you want to leave ${st.server.name}? You won't be able to rejoin this server unless you are re-invited.`,
+          title: t("sidebar.serverMenu.leaveNamed", { name: st.server.name }),
+          body: t("sidebar.serverMenu.areYouSureYouWantToLeave", { name: st.server.name }),
           confirmLabel: t("sidebar.serverMenu.leaveServer"),
           danger: true,
           onConfirm: () => leaveServer(serverId, ctx.nav),
@@ -108,7 +108,7 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
   // a voice channel's call takes guests without an account, through a link
   if (ch.type === "voice" && canI(st, P.CREATE_INSTANT_INVITE | P.CONNECT, channelId)) items.push({ id: "guests", label: t("chat.chat.inviteGuestsToCall"), onSelect: () => ctx.openModal("guestLink", { channelId }) });
   items.push({ id: "link", label: t("sidebar.serverMenu.copyLink"), onSelect: () => copy(`${window.location.origin}/channels/${ch.server_id}/${ch.id}`), separatorAfter: true });
-  if (ch.type === "text") items.push({ id: "mute", label: muted ? "Unmute Channel" : "Mute Channel", onSelect: () => toggleMuted(channelId), separatorAfter: true });
+  if (ch.type === "text") items.push({ id: "mute", label: muted ? t("sidebar.serverMenu.unmuteChannel") : t("sidebar.serverMenu.muteChannel"), onSelect: () => toggleMuted(channelId), separatorAfter: true });
   if (canI(st, P.MANAGE_CHANNELS, channelId)) {
     items.push({ id: "edit", label: t("sidebar.serverSidebar.editChannel"), onSelect: () => ctx.openModal("channelSettings", { channelId }) });
     items.push({
@@ -118,7 +118,7 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
       onSelect: () =>
         ctx.openModal("confirm", {
           title: t("sidebar.serverMenu.deleteChannel"),
-          body: `Are you sure you want to delete #${ch.name}? This cannot be undone.`,
+          body: t("sidebar.serverMenu.areYouSureYouWantToDeleteChannel", { name: ch.name }),
           confirmLabel: t("sidebar.serverMenu.deleteChannel"),
           danger: true,
           onConfirm: async () => {
@@ -148,7 +148,7 @@ export function categoryMenuItems(categoryId: string, ctx: MenuCtx & { collapsed
       onSelect: () =>
         ctx.openModal("confirm", {
           title: t("sidebar.serverMenu.deleteCategory"),
-          body: `Delete the category '${ch.name}'? Channels inside it are kept and moved to the top of the list.`,
+          body: t("sidebar.serverMenu.deleteTheCategoryNamed", { name: ch.name }),
           confirmLabel: t("sidebar.serverMenu.deleteCategory"),
           danger: true,
           onConfirm: async () => {

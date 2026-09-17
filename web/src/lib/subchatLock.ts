@@ -23,7 +23,7 @@ export interface LockFields {
 }
 
 export function passwordProblem(pw: string): string | null {
-  if (pw.length < MIN_SUBCHAT_PASSWORD) return `Use at least ${MIN_SUBCHAT_PASSWORD} characters.`;
+  if (pw.length < MIN_SUBCHAT_PASSWORD) return t("appLock.useAtLeastCharacters", { count: MIN_SUBCHAT_PASSWORD });
   if (pw.length > 128) return t("appLock.thatIsTooLong");
   return null;
 }

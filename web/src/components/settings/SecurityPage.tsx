@@ -13,6 +13,7 @@ import { b64 } from "@/crypto/bytes";
 import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
 import { users as usersApi } from "@/api/users";
 import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
+import { formatDateDivider } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -126,7 +127,7 @@ export default function SecurityPage() {
     run(async () => {
       const problem = passcodeProblem(pin);
       if (problem) throw new Error(problem);
-      if (pin !== pin2) throw new Error("Those two passcodes are different.");
+      if (pin !== pin2) throw new Error(t("settings.security.thoseTwoPasscodesAreDifferent"));
       await setPasscode(pin, lock ?? DEFAULT_LOCK);
       setLock(loadLock(me.id));
       close();
@@ -162,7 +163,7 @@ export default function SecurityPage() {
 
   const downloadCodes = () => {
     if (!codes) return;
-    const body = `Nexa backup codes for @${me.username}\nEach code works once.\n\n${codes.join("\n")}\n`;
+    const body = `${t("settings.security.backupCodesFileHeading", { username: me.username })}\n${t("settings.security.eachCodeWorksOnce")}\n\n${codes.join("\n")}\n`;
     const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
     const a = document.createElement("a");
     a.href = url;
@@ -180,13 +181,13 @@ export default function SecurityPage() {
 
       <h3 className={s.h}><ShieldCheck size={16} /> {t("settings.security.twoFactorAuthentication")}</h3>
       <p className={s.hint}>
-        An authenticator app adds a six-digit code to every sign-in, so your password alone is not enough. Your messages stay end-to-end encrypted either way; this protects the account itself.
+        {t("settings.security.anAuthenticatorAppAdds")}
       </p>
       <div className={s.device} data-testid="mfa-row">
         <div>
           <div className={s.deviceName}>{on ? t("settings.security.authenticatorAppIsOn") : t("settings.security.authenticatorAppIsOff")}</div>
           <div className={s.deviceSub}>
-            {on ? `${left} backup ${left === 1 ? "code" : "codes"} left${status?.enabled_at ? ` · on since ${new Date(status.enabled_at).toLocaleDateString()}` : ""}` : "Works with any TOTP app, such as Aegis, Ente Auth, 1Password or Google Authenticator."}
+            {on ? `${t("settings.security.backupCodesLeftCount", { count: left })}${status?.enabled_at ? t("settings.security.onSince", { when: formatDateDivider(status.enabled_at) }) : ""}` : t("settings.security.worksWithAnyTotpApp")}
           </div>
         </div>
         {on ? (

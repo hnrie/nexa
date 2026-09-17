@@ -77,8 +77,8 @@ export async function sendMessage(channelId: string, rawText: string, opts: Send
     else if (err instanceof ApiError && err.code === "slowmode") {
       const secs = Number(err.retryAfter ?? 0) || 5;
       useSlowmode.getState().setUntil(channelId, Date.now() + secs * 1000);
-      ui.toast(`Slow mode is on. Try again in ${secs}s.`, "error");
-    } else if (err instanceof ApiError) ui.toast(err.code === "rate_limited" ? "You are sending messages too quickly." : err.message, "error");
+      ui.toast(t("composer.send.slowModeTryAgain", { seconds: secs }), "error");
+    } else if (err instanceof ApiError) ui.toast(err.code === "rate_limited" ? t("composer.send.youAreSendingMessagesTooQuickly") : err.message, "error");
     else ui.toast(t("composer.send.yourMessageCouldNotBeSent"), "error");
     throw err;
   }

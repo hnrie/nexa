@@ -138,7 +138,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 
   if (msg.type.startsWith("system_")) return <SystemMessage msg={msg} />;
 
-  const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : "Unknown User");
+  const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : t("names.unknownUser"));
   // A nickname you gave a friend applies everywhere their name appears, not
   // just in the sidebar; a server nickname wins inside that server.
   const name = member?.nickname || friendNickname || baseName;
@@ -239,7 +239,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
               ) : null}
             </>
           ) : null}
-          <ToolButton label={shift ? t("chat.messageItem.everythingElse") : "More (hold Shift for all actions)"} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
+          <ToolButton label={shift ? t("chat.messageItem.everythingElse") : t("chat.messageItem.moreHoldShiftForAllActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
         </div>
       ) : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}

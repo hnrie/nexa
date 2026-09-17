@@ -33,10 +33,13 @@ describe("locales", () => {
 
   for (const { tag } of translations) {
     const catalog = files[`./locales/${tag}.json`]!.default;
-    // the categories each language actually selects, so no form sits unused
+    // The categories this language actually selects, so no form sits unused.
+    // The big round numbers matter: Spanish, French and Portuguese only reach
+    // `many` up in the millions, and a loop over small integers never sees it.
+    const rules = new Intl.PluralRules(tag);
     const allowed = new Set<string>(["other"]);
-    for (let n = 0; n < 200; n++) allowed.add(new Intl.PluralRules(tag).select(n));
-    allowed.add(new Intl.PluralRules(tag).select(1.5));
+    for (let n = 0; n < 200; n++) allowed.add(rules.select(n));
+    for (const n of [1.5, 1e3, 1e6, 1e9, 2e6, 1.000001e6]) allowed.add(rules.select(n));
 
     it(`${tag} has every key, and no key English does not`, () => {
       expect(Object.keys(catalog).sort()).toEqual(Object.keys(english).sort());

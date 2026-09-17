@@ -303,7 +303,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     if (channel.type === "subchat") {
       const parent = channel.parent_id ? byIdChannels[channel.parent_id] : undefined;
-      const where = parent ? channelDisplayName(parent, users, me?.id) : "this conversation";
+      const where = parent ? channelDisplayName(parent, users, me?.id) : t("chat.messageList.thisConversation");
       return (
         <div className={s.empty}>
           <h2 className={s.emptyName}>{name}</h2>

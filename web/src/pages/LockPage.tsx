@@ -29,7 +29,7 @@ export default function LockPage() {
   };
 
   return (
-    <AuthLayout title={t("lock.unlockYourMessages")} subtitle={`Welcome back, ${me?.display_name ?? me?.username ?? ""}. Enter your password to decrypt your keys on this device.`}>
+    <AuthLayout title={t("lock.unlockYourMessages")} subtitle={t("lock.welcomeBackEnterYourPassword", { name: me?.display_name ?? me?.username ?? "" })}>
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("chat.lockedChannel.password")} required>

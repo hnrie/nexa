@@ -116,8 +116,8 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
       for (const m of list) out.push({ kind: "member", key: m.user_id, member: m, user: users[m.user_id], color: memberColor(st, m.user_id), offline: off });
     };
     for (const [id, g] of groups) push(id, g.label, g.members, false);
-    push("online", "Online", online, false);
-    push("offline", "Offline", offline, true);
+    push("online", t("chat.memberList.online"), online, false);
+    push("offline", t("chat.memberList.offline"), offline, true);
     return out;
   }, [st, visible, users, presence, serverId]);
 
@@ -154,7 +154,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             </div>
           );
         }
-        const name = memberName(row.member.nickname, row.user, row.member.user_id === meId ? "You" : "Unknown User");
+        const name = memberName(row.member.nickname, row.user, row.member.user_id === meId ? "You" : t("names.unknownUser"));
         const p = presence[row.member.user_id];
         return (
           <button

@@ -59,7 +59,7 @@ export default function DownloadPage() {
       <div className={s.card}>
         <div className={s.head}>
           <img className={s.logo} src="/icons/icon-192.png" alt="" />
-          <h1 className={s.title}>{onAndroid ? "Nexa for Android" : "Nexa for your computer"}</h1>
+          <h1 className={s.title}>{onAndroid ? t("download.nexaForAndroid") : t("download.nexaForYourComputer")}</h1>
           <p className={s.sub}>{onAndroid ? t("download.callsNotificationsAndARealApp") : t("download.rpcSupportAndABetterExperience")}</p>
         </div>
 

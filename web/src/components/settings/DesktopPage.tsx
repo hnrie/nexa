@@ -145,18 +145,18 @@ export default function DesktopPage() {
 
 function UpdateRow({ version, update: u }: { version: string; update: UpdateState | null }) {
   const line =
-    u?.status === "checking" ? "Checking for updates…"
-      : u?.status === "downloading" ? `Downloading version ${u.version ?? ""}…`
-        : u?.status === "ready" ? `Version ${u.version} is ready to install.`
-          : u?.status === "manual" ? `Version ${u.version} is out.`
-            : u?.status === "error" ? `Could not check for updates: ${u.error ?? "unknown error"}`
+    u?.status === "checking" ? tr_("settings.desktop.checkingForUpdates")
+      : u?.status === "downloading" ? tr_("settings.desktop.downloadingVersion", { version: u.version ?? "" })
+        : u?.status === "ready" ? tr_("settings.desktop.versionIsReadyToInstall", { version: u.version })
+          : u?.status === "manual" ? tr_("settings.desktop.versionIsOut", { version: u.version })
+            : u?.status === "error" ? tr_("settings.desktop.couldNotCheckForUpdates", { error: u.error ?? tr_("settings.desktop.unknownError") })
               : tr_("settings.desktop.youReUpToDate");
   return (
     <div>
       <div className={d.version}>
         <div className={d.versionText}>
           Nexa {version}
-          <small>{line}{u?.lastCheck ? ` Last checked ${formatRelative(u.lastCheck)}.` : ""}</small>
+          <small>{line}{u?.lastCheck ? tr_("settings.desktop.lastChecked", { when: formatRelative(u.lastCheck) }) : ""}</small>
         </div>
         {u?.status === "ready" ? (
           <Button onClick={() => void desktopBridge()?.updates.restart()} data-testid="update-restart">{tr_("settings.desktop.restartToUpdate")}</Button>

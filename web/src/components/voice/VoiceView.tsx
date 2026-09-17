@@ -355,7 +355,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   // a phone showing someone's picture stays awake, the way a video call app does
   useWakeLock(connected && tiles.some(showsStream));
 
-  const nameOf = (uid: string) => memberName(serverState?.members[uid]?.nickname, users[uid], uid === meId ? "You" : "Unknown User");
+  const nameOf = (uid: string) => memberName(serverState?.members[uid]?.nickname, users[uid], uid === meId ? "You" : tr_("names.unknownUser"));
   const inDM = channel.type === "dm" || channel.type === "group_dm";
   // guests are let in by a link: anyone in a DM or group may make one, and in a server whoever may invite people and join the channel
   const canInviteGuests = !guest && guestLinksOn() !== false && (inDM || (channel.type === "voice" && canI(serverState, P.CREATE_INSTANT_INVITE | P.CONNECT, channel.id)));
@@ -578,7 +578,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
                     setWatching(t.userId, false);
                   }}
                 >
-                  <EyeOff size={16} /> {place === "strip" ? "Stop" : "Stop Watching"}
+                  <EyeOff size={16} /> {place === "strip" ? tr_("voice.voice.stop") : tr_("voice.voice.stopWatching")}
                 </button>
               </>
             ) : (
@@ -592,7 +592,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
                     setWatching(t.userId, true);
                   }}
                 >
-                  <Eye size={16} /> {place === "strip" ? "Watch" : "Watch Stream"}
+                  <Eye size={16} /> {place === "strip" ? tr_("voice.voice.watch") : tr_("voice.voice.watchStream")}
                 </button>
               </>
             )}
@@ -605,7 +605,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         <div className={s.tileBar}>
           {t.kind === "screen" ? <span className={s.live}>LIVE</span> : null}
           <span className={s.tileName} style={color ? { color } : undefined}>
-            {t.kind === "screen" ? (t.me ? "Your screen" : `${nameOf(t.userId)}'s screen`) : nameOf(t.userId)}
+            {t.kind === "screen" ? (t.me ? tr_("voice.voice.yourScreen") : tr_("voice.voice.theirScreen", { name: nameOf(t.userId) })) : nameOf(t.userId)}
           </span>
           {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>{tr_("voice.voiceParticipants.guest")}</span> : null}
           {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
@@ -662,7 +662,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
             ))}
           </div>
           <button className={s.joinBtn} onClick={() => void joinVoice(channel.id)} disabled={joining === channel.id} data-testid="join-voice">
-            {joining === channel.id ? "Connecting…" : channel.type === "voice" ? "Join Voice" : "Join Call"}
+            {joining === channel.id ? tr_("voice.voice.connecting") : channel.type === "voice" ? tr_("voice.voice.joinVoice") : tr_("voice.callBanner.joinCall")}
           </button>
         </div>
       </div>

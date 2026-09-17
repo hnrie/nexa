@@ -34,6 +34,8 @@ CALLS = ("toast", "promptText")
 # Strings that are not interface text however much they read like it: protocol
 # names, the messages the platform itself throws, values the code compares to.
 NOT_UI = {
+    # the brand reads the same in every language
+    "Nexa",
     "Content-Type", "Content-Range", "Content-Disposition", "Content-Length", "Cache-Control",
     "Retry-After", "Failed to fetch", "Load failed", "Illegal invocation",
     "This environment has no fetch().", "Uploads need a browser environment with XMLHttpRequest.",

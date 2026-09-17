@@ -115,9 +115,9 @@ export function groupPacks(packs: Record<string, StickerPack>, serverId: string 
     rest = rest.filter((p) => !test(p));
     groups.push({ label, packs });
   };
-  take("This server", (p) => !!serverId && p.server_id === serverId);
-  take("My packs", (p) => !!p.owner_user_id && p.owner_user_id === meId);
-  take("Installed", (p) => p.installed);
+  take(tr_("expressions.thisServer"), (p) => !!serverId && p.server_id === serverId);
+  take(tr_("expressions.myPacks"), (p) => !!p.owner_user_id && p.owner_user_id === meId);
+  take(tr_("expressions.installed"), (p) => p.installed);
   take(tr_("expressions.otherServers"), (p) => !!p.server_id);
   return groups;
 }

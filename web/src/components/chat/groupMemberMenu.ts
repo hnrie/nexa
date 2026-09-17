@@ -44,7 +44,7 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   const group = channelDisplayName(ch, users, me.id, nicknames);
   const manage = managesGroup(ch);
   const isOwner = ch.owner_id === userId;
-  const owner = ch.owner_id ? nicknames[ch.owner_id] || displayName(users[ch.owner_id], "its current owner") : "its current owner";
+  const owner = ch.owner_id ? nicknames[ch.owner_id] || displayName(users[ch.owner_id], t("chat.groupMemberMenu.itsCurrentOwner")) : t("chat.groupMemberMenu.itsCurrentOwner");
 
   const items: ContextMenuItem[] = [
     { id: "profile", label: t("profile.profile.profile"), onSelect: () => ctx.openModal("profile", { userId }) },
@@ -64,12 +64,12 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
       label: self ? t("chat.groupMemberMenu.takeOwnership") : t("chat.groupMemberMenu.transferOwnership"),
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: self ? `Take ownership of '${group}'` : `Transfer ownership of '${group}'`,
+          title: self ? t("chat.groupMemberMenu.takeOwnershipOf", { group }) : t("chat.groupMemberMenu.transferOwnershipOf", { group }),
           body: self
-            ? `You become the group's owner in place of ${owner}.`
+            ? t("chat.groupMemberMenu.youBecomeTheOwnerInPlaceOf", { owner })
             : ch.owner_id === me.id
-              ? `${name} becomes the group's owner, able to remove people and delete the group, and you become a member like everyone else.`
-              : `${name} becomes the group's owner in place of ${owner}.`,
+              ? t("chat.groupMemberMenu.theyBecomeTheOwnerAndYouAMember", { name })
+              : t("chat.groupMemberMenu.theyBecomeTheOwnerInPlaceOf", { name, owner }),
           confirmLabel: self ? t("chat.groupMemberMenu.takeOwnership") : t("chat.groupMemberMenu.transferOwnership"),
           onConfirm: () => channelsApi.patch(channelId, { owner_id: userId }),
         }),
@@ -82,8 +82,8 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: `Remove ${name}`,
-          body: `${name} is removed from '${group}' and stops receiving its messages. They need a new invite to come back.`,
+          title: t("chat.groupMemberMenu.removeNamed", { name }),
+          body: t("chat.groupMemberMenu.theyAreRemovedFromTheGroup", { name, group }),
           confirmLabel: t("composer.composer.remove"),
           danger: true,
           onConfirm: () => channelsApi.removeRecipient(channelId, userId),

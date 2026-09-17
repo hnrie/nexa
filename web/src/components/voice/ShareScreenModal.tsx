@@ -112,7 +112,7 @@ export function ShareScreenModal({ onClose }: { onClose: () => void }) {
           />
         </div>
         <p className={s.shareHint}>
-          {resolution === "source" ? "Shares at your screen's own resolution. " : ""}Uses up to {Number.isInteger(mbps) ? mbps : mbps.toFixed(1)} Mbps of upload. Your browser asks what to share next.
+          {resolution === "source" ? t("voice.shareScreen.sharesAtYourScreenSOwn") : ""}{t("voice.shareScreen.usesUpToMbps", { mbps: Number.isInteger(mbps) ? String(mbps) : mbps.toFixed(1) })}
         </p>
       </div>
     </Modal>

@@ -95,6 +95,12 @@ export function browserLanguage(): string {
 export function I18nProvider({ locale, children }: { locale?: string | null; children: ReactNode }) {
   const [tag, setTag] = useState(() => (locale && LANGUAGE_TAGS.includes(locale) ? locale : browserLanguage()));
   const [catalog, setCatalog] = useState<Catalog>(() => loaded.get(tag) ?? english);
+  // A catalogue is fetched, so the first render after picking a language is
+  // still English. Counting the catalogues that have arrived gives the tree
+  // below a key that changes when one does, which is what makes a memoised
+  // piece of interface — a channel's empty state, a menu built once — pick up
+  // the new words instead of holding the English it was born with.
+  const [epoch, setEpoch] = useState(0);
 
   useEffect(() => {
     const want = locale && LANGUAGE_TAGS.includes(locale) ? locale : browserLanguage();
@@ -103,7 +109,13 @@ export function I18nProvider({ locale, children }: { locale?: string | null; chi
 
   useEffect(() => {
     let alive = true;
-    void loadCatalog(tag).then((c) => alive && setCatalog(c));
+    void loadCatalog(tag).then((c) => {
+      if (!alive) return;
+      setCatalog((was) => {
+        if (was !== c) setEpoch((n) => n + 1);
+        return c;
+      });
+    });
     return () => {
       alive = false;
     };
@@ -122,10 +134,11 @@ export function I18nProvider({ locale, children }: { locale?: string | null; chi
     current = tr;
     return { tr, setLocale: setTag };
   }, [tag, catalog]);
-  // keyed on the language, so every string is built again when it changes
+  // keyed on the language and on the catalogue behind it, so every string is
+  // built again when either changes
   return (
     <I18nContext.Provider value={value}>
-      <Fragment key={tag}>{children}</Fragment>
+      <Fragment key={`${tag}:${epoch}`}>{children}</Fragment>
     </I18nContext.Provider>
   );
 }

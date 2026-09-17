@@ -75,7 +75,7 @@ export default function AdminPage() {
     try {
       await adminApi.deleteUser(u.id);
       setUsers((cur) => cur?.filter((x) => x.id !== u.id) ?? null);
-      toast(`@${u.username}'s account was deleted.`, "success");
+      toast(tr_("settings.admin.accountWasDeleted", { username: u.username }), "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : tr_("settings.admin.couldNotDeleteThatAccount"), "error");
     } finally {
@@ -115,7 +115,7 @@ export default function AdminPage() {
             <label key={m} className={st.radio} data-on={settings.registration === m}>
               <input type="radio" checked={settings.registration === m} onChange={() => void setMode(m)} />
               <span className={st.radioText}>
-                <span className={st.radioLabel}>{m === "open" ? "Open" : m === "invite" ? "Invite only" : "Closed"}</span>
+                <span className={st.radioLabel}>{m === "open" ? tr_("settings.admin.open") : m === "invite" ? tr_("settings.admin.inviteOnly") : tr_("settings.admin.closed")}</span>
                 <span className={st.radioDesc}>{m === "open" ? tr_("settings.admin.regOpen") : m === "invite" ? tr_("settings.admin.regInvite") : tr_("settings.admin.regClosed")}</span>
               </span>
             </label>
@@ -146,7 +146,7 @@ export default function AdminPage() {
           {u.id !== meId ? (
             <div className={st.adminActions}>
               <Button size="sm" variant="secondary" disabled={busy === u.id} onClick={() => void patchUser(u, { admin: !u.admin })}>{u.admin ? tr_("settings.admin.removeAdmin") : tr_("settings.admin.makeAdmin")}</Button>
-              <Button size="sm" variant={u.disabled ? "positive" : "danger"} disabled={busy === u.id} onClick={() => (u.disabled ? void patchUser(u, { disabled: false }) : openModal("confirm", { title: `Disable @${u.username}`, body: tr_("settings.admin.theyAreLoggedOutEverywhereAnd"), confirmLabel: tr_("settings.admin.disable"), danger: true, onConfirm: () => patchUser(u, { disabled: true }) }))}>{u.disabled ? "Enable" : "Disable"}</Button>
+              <Button size="sm" variant={u.disabled ? "positive" : "danger"} disabled={busy === u.id} onClick={() => (u.disabled ? void patchUser(u, { disabled: false }) : openModal("confirm", { title: tr_("settings.admin.disableNamed", { username: u.username }), body: tr_("settings.admin.theyAreLoggedOutEverywhereAnd"), confirmLabel: tr_("settings.admin.disable"), danger: true, onConfirm: () => patchUser(u, { disabled: true }) }))}>{u.disabled ? tr_("settings.admin.enable") : tr_("settings.admin.disable")}</Button>
               <Button
                 size="sm"
                 variant="danger"

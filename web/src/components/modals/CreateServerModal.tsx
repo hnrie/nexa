@@ -38,7 +38,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
         try {
           useServers.getState().updateServer(await serversApi.uploadIcon(view.id, icon));
         } catch (err) {
-          toast(err instanceof ApiError ? `The server was made, but its icon did not upload: ${err.message}` : t("modals.createServer.theServerWasMadeButIts"), "error");
+          toast(err instanceof ApiError ? t("modals.createServer.theServerWasMadeButItsIcon", { error: err.message }) : t("modals.createServer.theServerWasMadeButIts"), "error");
         }
       }
       onClose();
@@ -75,7 +75,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
     );
   }
   return (
-    <Modal open onClose={onClose} title={t("modals.createServer.createYourServer")} width={440} footer={<><Button variant="ghost" onClick={() => setMode("join")}>{t("modals.createServer.haveAnInviteAlready")}</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>{t("modals.createServer.create")}</Button></>}>
+    <Modal open onClose={onClose} title={t("modals.createServer.createYourServer")} width={440} footer={<><Button variant="ghost" onClick={() => setMode("join")}>{t("modals.createServer.haveAnInviteAlready")}</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()} data-testid="create-server-submit">{t("modals.createServer.create")}</Button></>}>
       <div className={s.form}>
         <p className={s.hint}>{t("modals.createServer.yourServerIsWhereYouAnd")}</p>
         <div style={{ display: "flex", justifyContent: "center" }}>

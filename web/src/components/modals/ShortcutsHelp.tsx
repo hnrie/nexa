@@ -8,7 +8,7 @@ const rows = (): [string, string][] => [
   [`${mod} K`, t("modals.shortcutsHelp.quickSwitcherJumpToAnyConversation")],
   ["Alt ↑ / ↓", t("modals.shortcutsHelp.previousNextConversation")],
   ["Esc", t("modals.shortcutsHelp.markTheChannelAsReadCancel")],
-  ["↑ (empty composer)", t("modals.shortcutsHelp.editYourLastMessage")],
+  [t("modals.shortcutsHelp.upEmptyComposer"), t("modals.shortcutsHelp.editYourLastMessage")],
   ["Enter / Shift Enter", t("modals.shortcutsHelp.sendNewLine")],
   [`${mod} E`, t("modals.shortcutsHelp.openTheEmojiPicker")],
   [`${mod} Shift M`, t("modals.shortcutsHelp.toggleMute")],

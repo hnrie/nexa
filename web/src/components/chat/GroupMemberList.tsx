@@ -35,7 +35,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
     return channel.recipient_ids
       .map((id) => {
         const status = statusOf(presence[id]);
-        const name = nicknames[id] || displayName(users[id], id === me?.id ? me.display_name : "Unknown User");
+        const name = nicknames[id] || displayName(users[id], id === me?.id ? me.display_name : t("names.unknownUser"));
         return { id, name, offline: status === "offline" || status === "invisible" };
       })
       .sort((a, b) => Number(a.offline) - Number(b.offline) || nameOrder.compare(a.name, b.name));

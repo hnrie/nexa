@@ -81,7 +81,7 @@ export default function ProfilePage() {
     try {
       const res = kind === "avatar" ? await usersApi.uploadAvatar(file) : await usersApi.uploadBanner(file);
       setMe(res.user);
-      toast(kind === "avatar" ? "Avatar updated." : "Banner updated.", "success");
+      toast(kind === "avatar" ? t("settings.profile.avatarUpdated") : t("settings.profile.bannerUpdated"), "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("composer.composer.uploadFailed"), "error");
     } finally {
@@ -164,7 +164,7 @@ export default function ProfilePage() {
           aspect={crop.kind === "avatar" ? 1 : 600 / 240}
           round={crop.kind === "avatar"}
           maxSize={crop.kind === "avatar" ? 1024 : 1920}
-          title={crop.kind === "avatar" ? "Crop your avatar" : "Crop your banner"}
+          title={crop.kind === "avatar" ? t("settings.profile.cropYourAvatar") : t("settings.profile.cropYourBanner")}
           onClose={() => setCrop(null)}
           onDone={({ blob }) => {
             const kind = crop.kind;

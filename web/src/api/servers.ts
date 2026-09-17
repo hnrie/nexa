@@ -1,4 +1,5 @@
 import { api, captchaOptions } from "./client";
+import { t } from "@/i18n";
 import type { AuditEntry, Ban, Channel, Invite, InvitePreview, Member, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerView, Snowflake } from "./types";
 
 type Progress = (loaded: number, total: number) => void;
@@ -45,8 +46,19 @@ function upload<T>(path: string, file: Blob, onProgress?: Progress): Promise<T> 
 }
 
 export const servers = {
+  /**
+   * The first categories and channels are records people can rename, not
+   * interface text, so they are created in the language the maker is reading
+   * rather than always in English.
+   */
   create(name: string, captcha?: string | null): Promise<ServerView> {
-    return api.request<ServerView>("POST", "/servers", { name }, captchaOptions(captcha));
+    const defaults = {
+      text_category: t("servers.defaults.textChannels"),
+      voice_category: t("servers.defaults.voiceChannels"),
+      text_channel: t("servers.defaults.general"),
+      voice_channel: t("servers.defaults.generalVoice"),
+    };
+    return api.request<ServerView>("POST", "/servers", { name, defaults }, captchaOptions(captcha));
   },
   get(id: Snowflake): Promise<{ server: ServerView; users: PublicUser[] }> {
     return api.request("GET", `/servers/${id}`);

@@ -173,7 +173,7 @@ export default function GuestCallPage() {
         .check(code)
         .then(() => setPhase((p) => (p === "checking" ? "form" : p)))
         .catch((err) => {
-          setError(err instanceof ApiError && err.status === 404 ? "This link is invalid or has expired." : "Could not check the link. Try again in a moment.");
+          setError(err instanceof ApiError && err.status === 404 ? t("guestCall.thisLinkIsInvalidOrHasExpired") : t("guestCall.couldNotCheckTheLink"));
           setPhase("invalid");
         });
     }
@@ -236,7 +236,7 @@ export default function GuestCallPage() {
         </div>
         {phase === "checking" || phase === "joining" ? (
           <>
-            <h1 className={s.title}>{phase === "joining" ? "Joining the call…" : "Checking the link…"}</h1>
+            <h1 className={s.title}>{phase === "joining" ? t("guestCall.joiningTheCall") : t("guestCall.checkingTheLink")}</h1>
             <Spinner size={28} />
           </>
         ) : phase === "invalid" ? (

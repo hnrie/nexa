@@ -43,11 +43,11 @@ export default function RecoverPage() {
     } catch (err) {
       justRecovered.current = false;
       if (err instanceof ApiError) {
-        if (err.code === "invalid_credentials") setError("Username or recovery key is wrong.");
-        else if (err.code === "no_recovery_key") setError("This account has no recovery key, so its messages cannot be recovered.");
+        if (err.code === "invalid_credentials") setError(t("recover.usernameOrRecoveryKeyIsWrong"));
+        else if (err.code === "no_recovery_key") setError(t("recover.thisAccountHasNoRecoveryKey"));
         else setError(err.message);
       } else if (err instanceof Error && /invalid recovery key/i.test(err.message)) {
-        setError("That does not look like a recovery key (64 hex characters).");
+        setError(t("recover.thatDoesNotLookLikeARecoveryKey"));
       } else {
         setError(t("recover.recoveryFailedCheckTheKeyAnd"));
       }
@@ -90,7 +90,7 @@ export default function RecoverPage() {
         <Field label={t("settings.account.newPassword")} required>
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>
-        <Field label={t("settings.account.confirmNewPassword")} required error={confirm && confirm !== password ? "Passwords do not match." : null}>
+        <Field label={t("settings.account.confirmNewPassword")} required error={confirm && confirm !== password ? t("settings.account.passwordsDoNotMatch") : null}>
           <TextInput type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
         <Button type="submit" size="lg" block loading={busy}>{t("recover.resetPassword")}</Button>

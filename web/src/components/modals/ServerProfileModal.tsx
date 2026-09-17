@@ -31,9 +31,9 @@ export function ServerProfileModal({ onClose, serverId, userId }: { onClose: () 
     }
   };
   return (
-    <Modal open onClose={onClose} title={target === me?.id ? "Change Nickname" : "Change Their Nickname"} width={440} footer={<><Button variant="ghost" onClick={() => void save("")} disabled={busy}>{t("modals.serverProfile.resetNickname")}</Button><Button onClick={() => void save(nick)} loading={busy}>{t("chat.editMessage.save")}</Button></>}>
+    <Modal open onClose={onClose} title={target === me?.id ? t("modals.serverProfile.changeNickname") : t("modals.serverProfile.changeTheirNickname")} width={440} footer={<><Button variant="ghost" onClick={() => void save("")} disabled={busy}>{t("modals.serverProfile.resetNickname")}</Button><Button onClick={() => void save(nick)} loading={busy}>{t("chat.editMessage.save")}</Button></>}>
       <div className={s.form}>
-        <Field label={t("modals.serverProfile.nickname")} hint={`How you appear in ${st?.server.name ?? "this server"}. Leave it empty to use your display name.`}>
+        <Field label={t("modals.serverProfile.nickname")} hint={t("modals.serverProfile.howYouAppearIn", { name: st?.server.name ?? t("modals.serverProfile.thisServer") })}>
           <TextInput value={nick} onChange={(e) => setNick(e.target.value)} maxLength={32} placeholder={me?.display_name} autoFocus onKeyDown={(e) => e.key === "Enter" && void save(nick)} />
         </Field>
       </div>

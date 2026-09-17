@@ -67,7 +67,7 @@ function useDecrypted(att: AttachmentMeta, eager: boolean): { url: string | null
 function LoadFailed({ error, what, onRetry }: { error: LoadError; what: string; onRetry: () => void }) {
   return (
     <span className={s.loadFailed}>
-      {error === "decrypt" ? `This ${what} could not be decrypted.` : `This ${what} could not be loaded.`}
+      {error === "decrypt" ? tr_("chat.attachments.couldNotBeDecrypted", { what }) : tr_("chat.attachments.couldNotBeLoaded", { what })}
       {error === "load" ? (
         <button
           className={s.retry}

@@ -105,8 +105,8 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       </div>
 
       {dialog === "displayName" || dialog === "username" ? (
-        <Modal open onClose={close} title={dialog === "username" ? "Change your username" : "Change your display name"} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} onClick={() => void saveName(dialog === "username" ? "username" : "display_name")}>{t("modals.serverNotifications.done")}</Button></>}>
-          <Field label={dialog === "username" ? "Username" : "Display name"} error={error}>
+        <Modal open onClose={close} title={dialog === "username" ? t("settings.account.changeYourUsername") : t("settings.account.changeYourDisplayName")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} onClick={() => void saveName(dialog === "username" ? "username" : "display_name")}>{t("modals.serverNotifications.done")}</Button></>}>
+          <Field label={dialog === "username" ? t("settings.account.username") : t("settings.account.displayName")} error={error}>
             <TextInput value={value} onChange={(e) => setValue(e.target.value)} autoFocus maxLength={32} autoCapitalize={dialog === "username" ? "none" : undefined} />
           </Field>
         </Modal>
@@ -118,7 +118,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
             {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
             <Field label={t("settings.account.currentPassword")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
             <Field label={t("settings.account.newPassword")} required hint={t("settings.account.atLeast8Characters")}><TextInput type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
-            <Field label={t("settings.account.confirmNewPassword")} required error={pw2 && pw2 !== pw ? "Passwords do not match." : null}><TextInput type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
+            <Field label={t("settings.account.confirmNewPassword")} required error={pw2 && pw2 !== pw ? t("settings.account.passwordsDoNotMatch") : null}><TextInput type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
           </div>
         </Modal>
       ) : null}

@@ -63,14 +63,14 @@ export function StatusDot({ status, size = 10, className }: { status: StatusKind
 export function statusLabel(st: StatusKind): string {
   switch (st) {
     case "online":
-      return "Online";
+      return t("shell.user.online");
     case "idle":
-      return "Idle";
+      return t("shell.user.idle");
     case "dnd":
       return t("shell.user.doNotDisturb");
     case "invisible":
-      return "Invisible";
+      return t("shell.user.invisible");
     default:
-      return "Offline";
+      return t("chat.memberList.offline");
   }
 }

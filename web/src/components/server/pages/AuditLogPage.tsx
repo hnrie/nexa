@@ -82,11 +82,11 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     if (e.target_type === "channel") {
       const ch = channels[e.target_id];
       const changes = e.changes as { name?: string } | null;
-      return ch ? (ch.type === "category" ? ch.name : `#${ch.name}`) : changes?.name ? `#${changes.name}` : "a deleted channel";
+      return ch ? (ch.type === "category" ? ch.name : `#${ch.name}`) : changes?.name ? `#${changes.name}` : t("server.auditLog.aDeletedChannel");
     }
     if (e.target_type === "role") {
       const changes = e.changes as { name?: string } | null;
-      return server?.roles[e.target_id]?.name ?? changes?.name ?? "a deleted role";
+      return server?.roles[e.target_id]?.name ?? changes?.name ?? t("server.auditLog.aDeletedRole");
     }
     if (e.target_type === "emoji") {
       const changes = e.changes as { name?: string } | null;

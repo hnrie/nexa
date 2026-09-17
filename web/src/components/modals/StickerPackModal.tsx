@@ -35,7 +35,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
     setBusy(true);
     try {
       useExpressions.getState().upsertPack(await expressions.install(pack.id));
-      useUI.getState().toast(`${pack.name} is installed. Its stickers are in your picker.`, "success");
+      useUI.getState().toast(t("modals.stickerPack.isInstalled", { name: pack.name }), "success");
     } catch (err) {
       useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.stickerPack.couldNotInstallThePack"), "error");
     } finally {
@@ -70,11 +70,11 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
         <div className={s.info}>
           <div className={s.stickerName} data-testid="sticker-pack-name">{current.name}</div>
           <div className={s.creator}>
-            Created by{" "}
+            {t("modals.stickerPack.createdBy")}{" "}
             {creator ? (
               <button className={s.creatorLink} onClick={() => openModal("profile", { userId: creator.id })}>{displayName(creator)}</button>
             ) : (
-              "someone no longer here"
+              t("modals.stickerPack.someoneNoLongerHere")
             )}
           </div>
           {pack.description ? <div className={s.desc}>{pack.description}</div> : null}

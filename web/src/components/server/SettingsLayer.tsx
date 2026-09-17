@@ -54,7 +54,7 @@ export function SettingsLayer({ label, groups, page, setPage, onClose, children,
 }
 
 /** The sticky "You have unsaved changes" bar. */
-export function SaveBar({ dirty, busy, onReset, onSave, label = "Save Changes" }: { dirty: boolean; busy: boolean; onReset: () => void; onSave: () => void; label?: string }) {
+export function SaveBar({ dirty, busy, onReset, onSave, label = t("server.settingsLayer.saveChanges") }: { dirty: boolean; busy: boolean; onReset: () => void; onSave: () => void; label?: string }) {
   if (!dirty) return null;
   return (
     <div className={s.saveBar} data-testid="save-bar">

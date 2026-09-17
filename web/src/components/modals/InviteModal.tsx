@@ -9,6 +9,7 @@ import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { inviteUrl } from "@/lib/inviteLink";
+import { formatFull } from "@/lib/time";
 import { ring } from "@/lib/keyring";
 import { P } from "@/lib/perms";
 import { selectServerChannels, useChannels } from "@/stores/channels";
@@ -54,7 +55,7 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
       const inv = await serversApi.createInvite(ch, { max_age: a, max_uses: u });
       if (n === seq.current) setInvite(inv);
     } catch (err) {
-      if (n === seq.current) toast(err instanceof ApiError ? err.message : "Could not create an invite.", "error");
+      if (n === seq.current) toast(err instanceof ApiError ? err.message : t("modals.groupInvite.couldNotCreateAnInvite"), "error");
     } finally {
       if (n === seq.current) setBusy(false);
     }
@@ -76,16 +77,16 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
   const chName = channels[channel]?.name ?? "";
 
   return (
-    <Modal open onClose={onClose} title={`Invite friends to ${st?.server.name ?? "the server"}`} width={480}>
+    <Modal open onClose={onClose} title={t("modals.invite.inviteFriendsTo", { name: st?.server.name ?? t("modals.invite.theServer") })} width={480}>
       <div className={s.form}>
         <Field label={t("modals.invite.inviteToChannel")}>
           <Select value={channel} onChange={(e) => { setChannel(e.target.value); void generate(e.target.value); }}>
             {candidates.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
           </Select>
         </Field>
-        <Field label={t("modals.invite.sendAServerInviteLinkTo")} hint={invite ? `Your invite link expires ${invite.expires_at ? `on ${new Date(invite.expires_at).toLocaleString()}` : "never"}${invite.max_uses ? ` and can be used ${invite.max_uses} times` : ""}.` : undefined}>
+        <Field label={t("modals.invite.sendAServerInviteLinkTo")} hint={invite ? `${invite.expires_at ? t("modals.invite.yourInviteLinkExpiresOn", { when: formatFull(invite.expires_at) }) : t("modals.invite.yourInviteLinkExpiresNever")}${invite.max_uses ? t("modals.invite.andCanBeUsedTimes", { count: invite.max_uses }) : ""}.` : undefined}>
           <div className={s.linkRow}>
-            <TextInput readOnly value={link} placeholder={busy ? "Generating…" : ""} onFocus={(e) => e.currentTarget.select()} data-testid="invite-link" />
+            <TextInput readOnly value={link} placeholder={busy ? t("modals.groupInvite.generating") : ""} onFocus={(e) => e.currentTarget.select()} data-testid="invite-link" />
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>

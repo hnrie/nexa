@@ -27,7 +27,6 @@ import s from "./Profile.module.css";
 
 import { t } from "@/i18n";
 const dateOf = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 interface Props {
   userId: string;
@@ -234,7 +233,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
         </div>
         <div className={s.avatar}>
           {panel ? (
-            <button className={s.avatarBtn} aria-label={`View ${shownName}'s full profile`} onClick={viewFull} data-testid="profile-avatar">
+            <button className={s.avatarBtn} aria-label={t("profile.profileCard.viewFullProfileOf", { name: shownName })} onClick={viewFull} data-testid="profile-avatar">
               <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={avatarSize} status={st} dotSize={18} />
             </button>
           ) : (
@@ -307,7 +306,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
                 ))}
               </span>
             ) : null}
-            <span>{[mutual.friends.length ? plural(mutual.friends.length, t("profile.profileCard.mutualFriend")) : "", mutualServers.length ? plural(mutualServers.length, "Mutual Server") : ""].filter(Boolean).join(" • ")}</span>
+            <span>{[mutual.friends.length ? t("profile.profileCard.mutualFriendCount", { count: mutual.friends.length }) : "", mutualServers.length ? t("profile.profileCard.mutualServerCount", { count: mutualServers.length }) : ""].filter(Boolean).join(" • ")}</span>
           </button>
         ) : null}
 

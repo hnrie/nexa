@@ -75,7 +75,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
               ) : null}
             </div>
           </Field>
-          <Field label={`What's cookin', ${me?.display_name ?? ""}?`} className={s.textField}>
+          <Field label={tr_("modals.customStatus.whatSCookin", { name: me?.display_name ?? "" })} className={s.textField}>
             <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder={tr_("modals.customStatus.supportHasArrived")} maxLength={128} autoFocus />
           </Field>
         </div>

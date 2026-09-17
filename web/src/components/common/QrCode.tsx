@@ -1,5 +1,6 @@
 import qrcode from "qrcode-generator";
 import { useMemo } from "react";
+import { t } from "@/i18n";
 
 interface Props {
   text: string;
@@ -13,7 +14,7 @@ interface Props {
  * A QR code drawn as one SVG path, so it stays crisp at any size and needs no
  * canvas. Error correction is M: enough to survive a phone camera at an angle.
  */
-export function QrCode({ text, size = 184, className, label = "QR code" }: Props) {
+export function QrCode({ text, size = 184, className, label = t("common.qrCode.qrCode") }: Props) {
   const { path, count } = useMemo(() => {
     const qr = qrcode(0, "M");
     qr.addData(text);

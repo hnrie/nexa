@@ -52,7 +52,7 @@ export default function PasscodePage() {
       subtitle={
         adopting
           ? t("passcode.enterItToFinishSettingThis")
-          : `Enter your passcode to unlock, ${me?.display_name ?? me?.username ?? "you"}.`
+          : t("passcode.enterYourPasscodeToUnlock", { name: me?.display_name ?? me?.username ?? t("passcode.you") })
       }
       width={420}
     >

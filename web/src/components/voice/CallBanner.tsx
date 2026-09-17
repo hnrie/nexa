@@ -29,7 +29,7 @@ export function CallBanner({ channelId }: { channelId: string }) {
       </div>
       <button className={s.bannerJoin} onClick={() => void joinVoice(channelId)} disabled={joining === channelId}>
         <Phone size={14} style={{ verticalAlign: -2, marginInlineEnd: 6 }} />
-        {joining === channelId ? "Joining…" : "Join Call"}
+        {joining === channelId ? t("voice.callBanner.joining") : t("voice.callBanner.joinCall")}
       </button>
     </div>
   );

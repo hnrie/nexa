@@ -30,7 +30,7 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
   return (
     <div className={s.participants} data-testid="voice-participants">
       {list.map((p) => {
-        const name = memberName(server?.members[p.user_id]?.nickname, users[p.user_id], p.user_id === meId ? "You" : "Unknown User");
+        const name = memberName(server?.members[p.user_id]?.nickname, users[p.user_id], p.user_id === meId ? "You" : t("names.unknownUser"));
         // a guest has no profile to open; whoever may move members may put one out
         const guest = !!p.guest || isGuest(users[p.user_id]);
         const removeGuest = () => void guestsApi.remove(channelId, p.user_id).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : t("voice.voiceParticipants.couldNotRemoveTheGuest"), "error"));

@@ -76,7 +76,7 @@ export function DownloadBanner() {
           <b>{t("shell.downloadBanner.getTheAndroidApp")}</b><span className={s.tagline}> {t("shell.downloadBanner.callsNotificationsAndARealApp")}</span>
         </span>
         <a className={s.download} href={android.fileUrl(apk.name)} data-testid="android-banner-button">
-          <Download size={14} /> Download <span style={{ opacity: 0.7 }}>{formatBytes(apk.size)}</span>
+          <Download size={14} /> {t("shell.downloadBanner.download")} <span style={{ opacity: 0.7 }}>{formatBytes(apk.size)}</span>
         </a>
         <button className={s.other} onClick={close} data-testid="android-banner-dismiss">{t("shell.downloadBanner.noThanks")}</button>
         <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={close}><X size={16} /></button>
@@ -95,7 +95,7 @@ export function DownloadBanner() {
       {sure ? (
         <>
           <a className={s.download} href={desktop.fileUrl(file.name)} data-testid="download-banner-button">
-            <Download size={14} /> Download <span style={{ opacity: 0.7 }}>{formatBytes(file.size)}</span>
+            <Download size={14} /> {t("shell.downloadBanner.download")} <span style={{ opacity: 0.7 }}>{formatBytes(file.size)}</span>
           </a>
           <Link className={s.other} to="/download">{t("shell.downloadBanner.otherPlatforms")}</Link>
         </>

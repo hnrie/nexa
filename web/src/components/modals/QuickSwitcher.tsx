@@ -93,7 +93,7 @@ export function QuickSwitcher() {
     }
     for (const r of Object.values(rels)) {
       if (r.type !== "friend" || dmUsers.has(r.user.id)) continue;
-      out.push({ id: "u" + r.user.id, kind: "friend", label: r.user.display_name, sub: `@${r.user.username}`, avatarId: r.user.avatar_id, userId: r.user.id, go: () => void channelsApi.createDM([r.user.id]).then((ch) => { upsert(ch); nav(`/channels/@me/${ch.id}`); }).catch((err: unknown) => useUI.getState().toast(err instanceof ApiError ? err.message : "Could not open the conversation.", "error")) });
+      out.push({ id: "u" + r.user.id, kind: "friend", label: r.user.display_name, sub: `@${r.user.username}`, avatarId: r.user.avatar_id, userId: r.user.id, go: () => void channelsApi.createDM([r.user.id]).then((ch) => { upsert(ch); nav(`/channels/@me/${ch.id}`); }).catch((err: unknown) => useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.quickSwitcher.couldNotOpenTheConversation"), "error")) });
     }
     const query = q.trim().toLowerCase().replace(/^[@#]/, "");
     if (!query) return out.slice(0, 10);
@@ -144,7 +144,7 @@ export function QuickSwitcher() {
             ref={inputRef}
             className={s.input}
             value={q}
-            placeholder={mode === "messages" ? "Search everything you can read — try from:me" : "Where would you like to go?"}
+            placeholder={mode === "messages" ? t("modals.quickSwitcher.searchEverythingYouCanRead") : t("modals.quickSwitcher.whereWouldYouLikeToGo")}
             data-testid="switcher-input"
             onChange={(e) => { setQ(e.target.value); setSel(0); }}
             onKeyDown={(e) => {

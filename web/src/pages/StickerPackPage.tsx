@@ -36,7 +36,7 @@ export default function StickerPackPage() {
     expressionsApi
       .pack(packId)
       .then((res) => alive && setPack(res))
-      .catch((err) => alive && setError(err instanceof ApiError && err.status === 404 ? "This pack is private or no longer exists." : "Could not load the pack."));
+      .catch((err) => alive && setError(err instanceof ApiError && err.status === 404 ? t("stickerPack.thisPackIsPrivate") : t("stickerPack.couldNotLoadThePack")));
     return () => {
       alive = false;
     };
@@ -82,7 +82,7 @@ export default function StickerPackPage() {
         ) : null}
         {pack ? (
           <>
-            <p className={s.kicker}>{pack.kind === "emoji" ? "Emoji pack" : "Sticker pack"}</p>
+            <p className={s.kicker}>{pack.kind === "emoji" ? t("stickerPack.emojiPack") : t("stickerPack.stickerPack")}</p>
             <div className={s.iconBox}>{cover ? <img src={packImageUrl(pack, cover)} alt="" style={{ objectFit: "contain" }} /> : pack.name.slice(0, 1).toUpperCase()}</div>
             <h1 className={s.title}>{pack.name}</h1>
             {pack.description ? <p className={s.sub}>{pack.description}</p> : null}

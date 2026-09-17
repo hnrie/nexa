@@ -28,7 +28,7 @@ interface Props {
 const VIEW = 320;
 
 /** Pan-and-zoom cropper. Animated files can be kept whole instead of flattened. */
-export function ImageCropModal({ file, aspect, round = false, title = "Edit image", maxSize = 1024, onDone, onClose }: Props) {
+export function ImageCropModal({ file, aspect, round = false, title = t("common.imageCrop.editImage"), maxSize = 1024, onDone, onClose }: Props) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });

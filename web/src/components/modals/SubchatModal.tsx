@@ -39,7 +39,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
     if (changingPassword) {
       const problem = passwordProblem(password);
       if (problem) return setError(problem);
-      if (password !== confirm) return setError("Those two passwords are different.");
+      if (password !== confirm) return setError(t("modals.subchat.thoseTwoPasswordsAreDifferent"));
     }
     setBusy(true);
     setError(null);

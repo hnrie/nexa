@@ -33,9 +33,10 @@ export function orderedServerIds(order: string[], positions: string[]): string[]
 /** What Home's badge counts, read out: "3 unread messages and 1 friend request". */
 export function homeLabel(messages: number, requests: number): string {
   const parts: string[] = [];
-  if (messages > 0) parts.push(`${messages} unread ${messages === 1 ? "message" : "messages"}`);
-  if (requests > 0) parts.push(`${requests} ${requests === 1 ? "friend request" : "friend requests"}`);
-  return parts.join(" and ");
+  if (messages > 0) parts.push(t("rail.rail.unreadMessagesCount", { count: messages }));
+  if (requests > 0) parts.push(t("rail.rail.friendRequestsCount", { count: requests }));
+  if (parts.length === 2) return t("rail.rail.and", { first: parts[0]!, second: parts[1]! });
+  return parts.join("");
 }
 
 /** How many waiting conversations the rail shows under home; the DM list has the rest. */
@@ -122,7 +123,7 @@ export function Rail() {
       <div className={s.item} data-selected={home} data-unread={(unread || friendRequests > 0) && !home} data-testid="home">
         <span className={s.pill} />
         <Tooltip text={t("sidebar.dMSidebar.directMessages")} side="right">
-          <button className={s.btn} aria-label={homeCount > 0 ? `Direct Messages, ${homeLabel(homeCount - friendRequests, friendRequests)}` : t("sidebar.dMSidebar.directMessages")} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
+          <button className={s.btn} aria-label={homeCount > 0 ? t("rail.rail.directMessagesWith", { what: homeLabel(homeCount - friendRequests, friendRequests) }) : t("sidebar.dMSidebar.directMessages")} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
             <NexaMark size={30} />
           </button>
         </Tooltip>
@@ -131,7 +132,7 @@ export function Rail() {
       {waiting.map(({ channel: ch, count }) => {
         const name = channelDisplayName(ch, users, meId, nicknames);
         const other = ch.type === "dm" ? (ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0] ?? "") : "";
-        const label = `${name}, ${count > 99 ? "more than 99" : count} unread ${count === 1 ? "message" : "messages"}`;
+        const label = t("rail.rail.channelUnread", { name, what: count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count }) });
         return (
           <div key={ch.id} className={[s.item, s.waiting].join(" ")} data-unread="true" data-waiting={ch.id}>
             <span className={s.pill} />
@@ -198,7 +199,7 @@ export function Rail() {
       <div className={[s.item, s.add].join(" ")}>
         <span className={s.pill} />
         <Tooltip text={t("rail.rail.addAServer")} side="right">
-          <button className={s.btn} aria-label={t("rail.rail.addAServer")} onClick={() => openModal("createServer")}>
+          <button className={s.btn} aria-label={t("rail.rail.addAServer")} data-testid="add-server" onClick={() => openModal("createServer")}>
             <Plus size={24} />
           </button>
         </Tooltip>

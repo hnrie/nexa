@@ -222,6 +222,14 @@ func (s *Server) handleServerCreate(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	var req struct {
 		Name string `json:"name"`
+		// what the first categories and channels are called, in the
+		// language the person is using; empty means the English defaults
+		Defaults struct {
+			TextCategory  string `json:"text_category"`
+			VoiceCategory string `json:"voice_category"`
+			TextChannel   string `json:"text_channel"`
+			VoiceChannel  string `json:"voice_channel"`
+		} `json:"defaults"`
 	}
 	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
 		WriteError(w, err)
@@ -232,7 +240,13 @@ func (s *Server) handleServerCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_name", "Server names are 1–100 characters."))
 		return
 	}
-	srv, err := s.Store.CreateServer(r.Context(), me.ID, name)
+	defaults := store.DefaultNames{
+		TextCategory:  cleanDefaultName(req.Defaults.TextCategory),
+		VoiceCategory: cleanDefaultName(req.Defaults.VoiceCategory),
+		TextChannel:   cleanDefaultName(req.Defaults.TextChannel),
+		VoiceChannel:  cleanDefaultName(req.Defaults.VoiceChannel),
+	}
+	srv, err := s.Store.CreateServer(r.Context(), me.ID, name, defaults)
 	if err != nil {
 		WriteError(w, err)
 		return
@@ -497,6 +511,16 @@ func (s *Server) handleServerChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	WriteJSON(w, http.StatusOK, view.Channels)
+}
+
+// cleanDefaultName is a name a new server starts with, offered by the client.
+// Anything it cannot use becomes empty, which the store reads as "use English".
+func cleanDefaultName(name string) string {
+	clean, ok := cleanServerName(name)
+	if !ok {
+		return ""
+	}
+	return clean
 }
 
 // cleanServerName collapses whitespace in a server or role name.

@@ -46,7 +46,7 @@ interface Props {
 }
 
 /** Pack list on the left, the selected pack's editor on the right. */
-export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, onCreate, createLabel = "Create Pack", emptyText = "No packs yet." }: Props) {
+export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, onCreate, createLabel = t("server.packEditor.createPack"), emptyText = t("server.packEditor.noPacksYet") }: Props) {
   const selected = packs.find((p) => p.id === selectedId) ?? packs[0] ?? null;
   return (
     <div className={s.layout}>
@@ -129,11 +129,11 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     const list: typeof pending = [];
     for (const f of Array.from(files)) {
       if (!ACCEPT.split(",").includes(f.type)) {
-        toast(`${f.name}: images must be PNG, APNG, GIF or WebP.`, "error");
+        toast(t("server.packEditor.mustBeAnImage", { name: f.name }), "error");
         continue;
       }
       if (f.size > maxBytes) {
-        toast(`${f.name} is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`, "error");
+        toast(t("server.packEditor.isLargerThan", { name: f.name, megabytes: Math.round(maxBytes / (1024 * 1024)) }), "error");
         continue;
       }
       const base = f.name.replace(/\.[a-z0-9]+$/i, "");
@@ -250,13 +250,13 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       <div className={s.head}>
         <div className={s.headText}>
           <h3 className={s.title}>{pack.name}</h3>
-          <span className={s.sub}>{pack.stickers.length} {isEmoji ? "emoji" : `sticker${pack.stickers.length === 1 ? "" : "s"}`} · {pack.public ? "Public: anyone with the link can install it" : "Private: only you can see it"}{pack.server_id ? " · Server pack" : ""}</span>
+          <span className={s.sub}>{isEmoji ? t("server.packEditor.emojiCount", { count: pack.stickers.length }) : t("server.packEditor.stickerCount", { count: pack.stickers.length })} · {pack.public ? t("server.packEditor.publicAnyoneWithTheLink") : t("server.packEditor.privateOnlyYouCanSeeIt")}{pack.server_id ? ` · ${t("server.packEditor.serverPack")}` : ""}</span>
         </div>
         <div className={s.actions}>
-          {!manage ? <Button size="sm" variant={pack.installed ? "secondary" : "primary"} loading={busy} onClick={() => void toggleInstall()}>{pack.installed ? "Remove" : "Install"}</Button> : null}
+          {!manage ? <Button size="sm" variant={pack.installed ? "secondary" : "primary"} loading={busy} onClick={() => void toggleInstall()}>{pack.installed ? t("server.packEditor.remove") : t("server.packEditor.install")}</Button> : null}
           {manage ? (
-            <Button size="sm" variant="danger" onClick={() => openModal("confirm", { title: `Delete '${pack.name}'`, body: t("server.packEditor.everyoneWhoInstalledThisPackLoses"), confirmLabel: t("server.packEditor.deletePack"), danger: true, onConfirm: async () => { await expressionsApi.deletePack(pack.id); removePack(pack.id); onDeleted(); } })}>
-              <Trash2 size={14} /> Delete Pack
+            <Button size="sm" variant="danger" onClick={() => openModal("confirm", { title: t("server.packEditor.deleteNamed", { name: pack.name }), body: t("server.packEditor.everyoneWhoInstalledThisPackLoses"), confirmLabel: t("server.packEditor.deletePack"), danger: true, onConfirm: async () => { await expressionsApi.deletePack(pack.id); removePack(pack.id); onDeleted(); } })}>
+              <Trash2 size={14} /> {t("server.packEditor.deletePack")}
             </Button>
           ) : null}
         </div>

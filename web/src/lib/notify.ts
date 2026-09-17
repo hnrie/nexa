@@ -98,7 +98,7 @@ function previewOf(m: Message): string {
   const p = stored?.payload;
   if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
   if (p.t) return plainText(parse(p.t, { inline: true })).slice(0, 140);
-  if (p.att?.length) return p.att.length === 1 ? `Sent ${p.att[0]!.name}` : `Sent ${p.att.length} files`;
+  if (p.att?.length) return p.att.length === 1 ? t("notify.sentFile", { name: p.att[0]!.name }) : t("notify.sentFiles", { count: p.att.length });
   if (p.sticker) return t("notify.sentASticker");
   return t("notify.newMessage");
 }
@@ -137,7 +137,7 @@ function onFriendRequest(r: Relationship): void {
   if (settings.notifications.sounds) playSound("friend");
   if (appOnScreen()) return;
   if (!notificationsEnabled(settings)) return;
-  void showNotification(t("notify.friendRequest"), { body: `${displayName(r.user)} sent you a friend request.`, tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
+  void showNotification(t("notify.friendRequest"), { body: t("notify.sentYouAFriendRequest", { name: displayName(r.user) }), tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
 }
 
 let installed = false;

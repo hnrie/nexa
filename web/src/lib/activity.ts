@@ -30,7 +30,7 @@ export function activityLine(a: Activity): string {
 
 /** The card's heading: "Listening to Music Player", or "Playing a game". */
 export function activityHeading(a: Activity): string {
-  return a.type === 0 ? "Playing a game" : `${activityVerb(a)} ${a.name}`;
+  return a.type === 0 ? t("activity.statusLine.playingAGame") : `${activityVerb(a)} ${a.name}`;
 }
 
 export type ActivityClock =

@@ -138,7 +138,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: group ? `Delete '${name}'` : `Delete your conversation with ${name}`,
+          title: group ? t("sidebar.dmMenu.deleteNamed", { name }) : t("sidebar.dmMenu.deleteYourConversationWith", { name }),
           body: group
             ? t("sidebar.dmMenu.theGroupAndEveryMessageIn")
             : t("sidebar.dmMenu.everyMessageIsRemovedForBoth"),

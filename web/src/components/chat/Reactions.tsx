@@ -72,7 +72,7 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
       {msg.reactions.map((r) => {
         const custom = isCustom(r.emoji);
         return (
-          <button key={r.emoji} className={s.pill} data-me={r.me} title={who[r.emoji] ? `${who[r.emoji]} reacted with ${r.emoji}` : `React with ${r.emoji}`} onMouseEnter={() => void hover(r.emoji)} onClick={() => void toggleReaction(msg, r.emoji)}>
+          <button key={r.emoji} className={s.pill} data-me={r.me} title={who[r.emoji] ? t("chat.reactions.reactedWith", { who: who[r.emoji]!, emoji: r.emoji }) : t("chat.reactions.reactWith", { emoji: r.emoji })} onMouseEnter={() => void hover(r.emoji)} onClick={() => void toggleReaction(msg, r.emoji)}>
             {custom ? <img src={emojiUrl(custom.id, custom.animated, 24)} alt={r.emoji} /> : <Twemoji text={r.emoji} className={s.pillImg} fallbackClassName={s.pillEmoji} title="" />}
             <span>{r.count}</span>
           </button>

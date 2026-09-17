@@ -42,8 +42,8 @@ export function SelectionBar({ channelId }: { channelId: string }) {
 
   const confirm = () =>
     openModal("confirm", {
-      title: count === 1 ? "Delete Message" : `Delete ${count} Messages`,
-      body: count === 1 ? "Are you sure you want to delete this message?" : `Are you sure you want to delete these ${count} messages? This cannot be undone.`,
+      title: tr_("chat.selectionBar.deleteMessages", { count }),
+      body: tr_("chat.selectionBar.areYouSureDeleteMessages", { count }),
       confirmLabel: tr_("chat.messageItem.delete"),
       danger: true,
       onConfirm: async () => {
@@ -59,10 +59,10 @@ export function SelectionBar({ channelId }: { channelId: string }) {
           <X size={20} />
         </button>
         <span className={s.selectCount} aria-live="polite">
-          {count === 0 ? "Select messages to delete" : `${count} message${count === 1 ? "" : "s"} selected`}
+          {count === 0 ? tr_("chat.selectionBar.selectMessagesToDelete") : tr_("chat.selectionBar.messagesSelected", { count })}
         </span>
         <Button variant="danger" size="sm" className={s.selectDelete} disabled={count === 0} onClick={confirm} data-testid="delete-selected">
-          <Trash2 size={16} /> Delete
+          <Trash2 size={16} /> {tr_("chat.messageItem.delete")}
         </Button>
       </div>
     </div>

@@ -86,16 +86,16 @@ export default function FriendsPage() {
 
 function Empty({ tab }: { tab: Tab }) {
   const text: Record<Tab, string> = {
-    online: tr_("friends.noOneSAroundToPlay"),
-    all: tr_("friends.wumpusIsWaitingOnFriendsYou"),
+    online: tr_("friends.nobodyIsOnlineRightNow"),
+    all: tr_("friends.noFriendsYet"),
     pending: tr_("friends.thereAreNoPendingFriendRequests"),
-    blocked: tr_("friends.youCanTUnblockTheWumpus"),
+    blocked: tr_("friends.youHaveNotBlockedAnyone"),
     add: "",
   };
   return (
     <div className={s.empty}>
       <Users size={48} />
-      <p>{text[tab].replace(/Wumpus/g, "anyone").replace("the anyone", "anyone")}</p>
+      <p>{text[tab]}</p>
     </div>
   );
 }
@@ -112,7 +112,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   const status = statusOf(p);
   const cs = customStatus(p);
   const act = activitiesOf(p)[0];
-  const sub = rel.type === "incoming" ? "Incoming Friend Request" : rel.type === "outgoing" ? "Outgoing Friend Request" : rel.type === "blocked" ? "Blocked" : cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(status);
+  const sub = rel.type === "incoming" ? tr_("friends.incomingFriendRequest") : rel.type === "outgoing" ? tr_("friends.outgoingFriendRequest") : rel.type === "blocked" ? tr_("friends.blocked") : cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(status);
 
   /** Opens (or makes) the DM with them; returns its id, or null when that failed. */
   const openDM = async (): Promise<string | null> => {
@@ -168,7 +168,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         { id: "profile", label: tr_("profile.profile.profile"), onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
         { id: "msg", label: tr_("profile.profileCard.message"), onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
         ...(rel.type === "friend" ? [{ id: "call", label: tr_("chat.chat.startVoiceCall"), onSelect: () => void call(), separatorAfter: true }] : []),
-        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => void remove("Friend removed.") }] : []),
+        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => void remove(tr_("friends.friendRemoved")) }] : []),
         ...(rel.type !== "blocked"
           ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" })) }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
@@ -197,12 +197,12 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         ) : rel.type === "incoming" ? (
           <>
             <Tooltip text={tr_("voice.incomingCall.accept")}><button className={[s.act, s.ok].join(" ")} aria-label={tr_("voice.incomingCall.accept")} onClick={() => void accept()}><Check size={20} /></button></Tooltip>
-            <Tooltip text={tr_("friends.ignore")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.ignore")} onClick={() => void remove("Request ignored.")}><X size={20} /></button></Tooltip>
+            <Tooltip text={tr_("friends.ignore")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.ignore")} onClick={() => void remove(tr_("friends.requestIgnored"))}><X size={20} /></button></Tooltip>
           </>
         ) : rel.type === "outgoing" ? (
-          <Tooltip text={tr_("chat.editMessage.cancel")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("chat.editMessage.cancel")} onClick={() => void remove("Request cancelled.")}><X size={20} /></button></Tooltip>
+          <Tooltip text={tr_("chat.editMessage.cancel")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("chat.editMessage.cancel")} onClick={() => void remove(tr_("friends.requestCancelled"))}><X size={20} /></button></Tooltip>
         ) : (
-          <Tooltip text={tr_("friends.unblock")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove("Unblocked.")}><X size={20} /></button></Tooltip>
+          <Tooltip text={tr_("friends.unblock")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove(tr_("friends.unblocked"))}><X size={20} /></button></Tooltip>
         )}
       </div>
       {meId ? null : null}
@@ -224,7 +224,7 @@ function AddFriend() {
     try {
       const res = await guarded("friend_request", (captcha) => relApi.request(username, captcha));
       setRel({ user: res.user, type: res.type as Relationship["type"], nickname: "", created_at: Date.now() });
-      setMsg({ ok: true, text: res.type === "friend" ? `You and ${res.user.display_name} are now friends!` : `Success! Your friend request to ${res.user.display_name} was sent.` });
+      setMsg({ ok: true, text: res.type === "friend" ? tr_("friends.youAreNowFriends", { name: res.user.display_name }) : tr_("friends.friendRequestSent", { name: res.user.display_name }) });
       setValue("");
     } catch (err) {
       const map: Record<string, string> = {

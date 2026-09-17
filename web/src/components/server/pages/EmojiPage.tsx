@@ -44,11 +44,11 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
     try {
       for (const f of Array.from(files)) {
         if (!ACCEPT.split(",").includes(f.type)) {
-          toast(`${f.name}: emoji must be PNG, GIF, WebP or JPEG.`, "error");
+          toast(t("server.emoji.mustBeAnImage", { name: f.name }), "error");
           continue;
         }
         if (f.size > 2 * 1024 * 1024) {
-          toast(`${f.name} is larger than 2 MB.`, "error");
+          toast(t("server.emoji.isLargerThan2Mb", { name: f.name }), "error");
           continue;
         }
         let name = slug(f.name);
@@ -58,11 +58,11 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
           await expressionsApi.uploadEmoji(serverId, name, f);
           added++;
         } catch (err) {
-          toast(err instanceof ApiError ? `${f.name}: ${err.message}` : `${f.name}: upload failed.`, "error");
+          toast(err instanceof ApiError ? `${f.name}: ${err.message}` : t("server.emoji.uploadFailedFor", { name: f.name }), "error");
         }
       }
       setEmojis(serverId, await expressionsApi.emojis(serverId));
-      if (added) toast(added === 1 ? "Emoji added." : `${added} emoji added.`, "success");
+      if (added) toast(t("server.emoji.emojiAddedCount", { count: added }), "success");
     } finally {
       setBusy(false);
     }
@@ -134,12 +134,12 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
           onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}
           data-drop-zone
         >
-          <Upload size={20} /> {busy ? "Uploading…" : "Drop images here or click to upload (PNG, GIF, WebP, JPEG; 2 MB each; 512×512 or smaller works best)."}
+          <Upload size={20} /> {busy ? t("server.emoji.uploading") : t("server.emoji.dropImagesHere")}
           <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void upload(e.target.files); e.target.value = ""; }} data-testid="emoji-file" />
         </div>
       ) : null}
       {emojis.length === 0 ? <p className={st.hint} style={{ marginTop: 16 }}>{t("server.emoji.noCustomEmojiYet")}</p> : null}
-      {section("Emoji", still)}
+      {section(t("server.emoji.emoji"), still)}
       {section(t("server.emoji.animatedEmoji"), animated)}
       {manage ? <div style={{ marginTop: 16 }}><Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} loading={busy}>{t("server.emoji.uploadEmoji")}</Button></div> : null}
     </>

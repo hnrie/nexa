@@ -149,7 +149,7 @@ export function Composer({ channel }: { channel: Channel }) {
   useKeepFocused(taRef);
 
   const name = channelDisplayName(channel, users, me?.id);
-  const placeholder = channel.type === "dm" ? `Message @${name}` : isServer ? `Message #${name}` : `Message ${name}`;
+  const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
 
   useEffect(() => {
     if (lastTyping.current) {
@@ -298,7 +298,7 @@ export function Composer({ channel }: { channel: Channel }) {
       const max = uploadLimit();
       if (!fitsUploadLimit(f.size)) {
         const gb = max / (1024 * 1024 * 1024);
-        toast(`${f.name} is over this server's ${gb >= 1 ? `${Math.round(gb * 10) / 10} GB` : `${Math.round(max / (1024 * 1024))} MB`} limit.`, "error");
+        toast(tr_("composer.composer.overServerLimit", { name: f.name, limit: gb >= 1 ? tr_("composer.composer.gigabytes", { n: Math.round(gb * 10) / 10 }) : tr_("composer.composer.megabytes", { n: Math.round(max / (1024 * 1024)) }) }), "error");
         continue;
       }
       staged.push(stage(f));
@@ -308,9 +308,9 @@ export function Composer({ channel }: { channel: Channel }) {
 
   const send = async () => {
     if (sending) return;
-    if (remaining > 0) return toast(`Slow mode is on. You can send again in ${remaining}s.`, "error");
+    if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
     let body = text.trim();
-    if (body.length > MAX_LEN) return toast(`Messages are limited to ${MAX_LEN} characters.`, "error");
+    if (body.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
     const expanded = applyCommand(body);
     if (expanded !== null) body = expanded;
     if (!body && files.length === 0) return;

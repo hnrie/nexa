@@ -112,7 +112,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       <Modal
         open
         onClose={onClose}
-        title={timedOut ? `Remove timeout from ${name}` : `Time out ${name}`}
+        title={timedOut ? t("server.memberAction.removeTimeoutFrom", { name }) : t("server.memberAction.timeOutNamed", { name })}
         width={440}
         footer={
           <>

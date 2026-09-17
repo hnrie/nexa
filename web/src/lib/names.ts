@@ -1,4 +1,5 @@
 import type { Channel, PublicUser } from "@/api/types";
+import { t } from "@/i18n";
 import { displayName } from "@/stores/users";
 
 /** The name shown for a DM or group DM. */
@@ -11,7 +12,7 @@ export function channelDisplayName(ch: Channel, users: Record<string, PublicUser
   if (ch.type === "group_dm") {
     if (ch.name) return ch.name;
     const names = ch.recipient_ids.filter((id) => id !== meId).map(name);
-    return names.length ? names.join(", ") : "Unnamed group";
+    return names.length ? names.join(", ") : t("names.unnamedGroup");
   }
   return ch.name;
 }
@@ -24,7 +25,7 @@ export function friendNicknames(rels: Record<string, { nickname: string }>): Rec
 }
 
 /** A member's name in a server: nickname, else display name, else username. */
-export function memberName(nickname: string | undefined, u: PublicUser | undefined, fallback = "Unknown User"): string {
+export function memberName(nickname: string | undefined, u: PublicUser | undefined, fallback = t("names.unknownUser")): string {
   if (nickname) return nickname;
   return displayName(u, fallback);
 }

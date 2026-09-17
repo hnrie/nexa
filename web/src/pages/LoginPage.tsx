@@ -32,8 +32,8 @@ export default function LoginPage() {
 
   const describe = (err: unknown, fallback: string) => {
     if (err instanceof ApiError) {
-      if (err.code === "invalid_credentials") return "Username or password is wrong.";
-      if (err.code === "rate_limited") return "Too many attempts. Wait a minute and try again.";
+      if (err.code === "invalid_credentials") return t("login.usernameOrPasswordIsWrong");
+      if (err.code === "rate_limited") return t("login.tooManyAttempts");
       return err.message;
     }
     // fetch rejects with a TypeError when the request never got an answer
@@ -121,7 +121,7 @@ export default function LoginPage() {
           </Field>
           <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">{t("login.signIn")}</Button>
           <Button type="button" variant="link" onClick={() => { setUseBackup((v) => !v); setCode(""); setError(null); }}>
-            {useBackup ? t("login.useYourAuthenticatorInstead") : `Use a backup code${codesLeft ? ` (${codesLeft} left)` : ""}`}
+            {useBackup ? t("login.useYourAuthenticatorInstead") : codesLeft ? t("login.useABackupCodeLeft", { count: codesLeft }) : t("login.useABackupCode")}
           </Button>
           <Button type="button" variant="link" onClick={backToPassword}>{t("modals.createServer.back")}</Button>
         </form>

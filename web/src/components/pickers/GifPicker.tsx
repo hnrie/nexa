@@ -174,10 +174,10 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           footer={
             <>
               {loading ? <div className={s.gifNote}>{tr_("chat.pins.loading")}</div> : null}
-              {!loading && results.length === 0 && shownFor !== null ? <div className={s.empty}>{shownFor.trim() ? "No GIFs match." : "Nothing trending right now."}</div> : null}
+              {!loading && results.length === 0 && shownFor !== null ? <div className={s.empty}>{shownFor.trim() ? tr_("pickers.gifPicker.noGifsMatch") : tr_("pickers.gifPicker.nothingTrendingRightNow")}</div> : null}
               {failed ? (
                 <div className={s.gifNote}>
-                  More GIFs could not be loaded.{" "}
+                  {tr_("pickers.gifPicker.moreGifsCouldNotBeLoaded")}{" "}
                   <button className={s.gifTab} onClick={() => { setFailed(false); if (shownFor !== null && next) void load(shownFor, next); }}>{tr_("chat.messageList.tryAgain")}</button>
                 </div>
               ) : null}

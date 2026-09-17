@@ -309,10 +309,10 @@ async function play(name: SoundName): Promise<boolean> {
 /** Why the last sound could not play, for the settings page to say. */
 export function soundTrouble(): string {
   if (!contextClass()) return tr_("sounds.thisBrowserCanTPlaySounds");
-  if (trouble?.state === "running") return "The sound took too long to load. Check the connection and try again.";
-  const detail = trouble ? ` (${trouble.problem ?? `audio stayed ${trouble.state}`})` : "";
-  if (isHomeScreenApp()) return `The sound couldn't start${detail}. Since iOS 26, sound in apps added to the Home Screen can stop working until the phone restarts. Restarting brings it back, and ${location.host} opened in Safari isn't affected.`;
-  return `The sound couldn't start${detail}. Tap the page and try again, and check that the volume is up.`;
+  if (trouble?.state === "running") return tr_("sounds.theSoundTookTooLong");
+  const detail = trouble ? ` (${trouble.problem ?? tr_("sounds.audioStayed", { state: trouble.state })})` : "";
+  if (isHomeScreenApp()) return tr_("sounds.homeScreenSoundProblem", { detail, host: location.host });
+  return tr_("sounds.soundProblem", { detail });
 }
 
 interface Loop {

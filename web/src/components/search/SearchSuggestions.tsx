@@ -8,6 +8,7 @@ import { CalendarDays } from "lucide-react";
 import { useMemo } from "react";
 import type { Channel, PublicUser } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
+import { t } from "@/i18n";
 import s from "./Search.module.css";
 
 /** The filter being typed at the end of a query, if any. */
@@ -75,11 +76,11 @@ export function SearchSuggestions({
       <div className={s.suggest} data-testid="search-suggest">
         <label className={s.suggestDate}>
           <CalendarDays size={16} />
-          <span>{tok.key === "before" ? "Sent before" : "Sent after"}</span>
+          <span>{tok.key === "before" ? t("search.suggestions.sentBefore") : t("search.suggestions.sentAfter")}</span>
           <input
             type="date"
             value={/^\d{4}-\d{2}-\d{2}$/.test(tok.value) ? tok.value : ""}
-            aria-label={tok.key === "before" ? "Sent before" : "Sent after"}
+            aria-label={tok.key === "before" ? t("search.suggestions.sentBefore") : t("search.suggestions.sentAfter")}
             data-testid="search-date"
             onChange={(e) => e.target.value && onPick(completeToken(query, tok, e.target.value))}
           />
