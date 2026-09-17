@@ -8,13 +8,14 @@
  */
 import { app } from "electron";
 import { execFile, spawn } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey, verify } from "node:crypto";
 import fs from "node:fs";
 import https from "node:https";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { compareVersions, parseManifest, type ManifestFile } from "./manifest";
+import { RELEASE_PUBLIC_KEY } from "./releaseKey";
 
 export interface MacUpdate {
   version: string;
@@ -87,9 +88,34 @@ export function canReplace(bundle = runningBundle()): boolean {
   }
 }
 
+/**
+ * Whether this manifest is one we published.
+ *
+ * The sha512 in the manifest only says the download matches what the manifest
+ * describes — and the manifest comes from the same place as the file. Anyone
+ * who can write to the release directory could serve both. The bundles are
+ * ad-hoc signed, which anyone can do, and the installer strips the quarantine
+ * flag, so macOS will not object either. A signature over the manifest, made
+ * with a key that is not on the release host, is the thing that actually says
+ * where a build came from.
+ */
+function manifestIsOurs(body: string, signature: string): boolean {
+  try {
+    return verify(null, Buffer.from(body), createPublicKey(RELEASE_PUBLIC_KEY), Buffer.from(signature.trim(), "base64"));
+  } catch {
+    return false;
+  }
+}
+
 /** Finds, downloads and unpacks a newer version; null when this one is current. */
 export async function stageMacUpdate(base: string, onProgress: (fraction: number) => void): Promise<MacUpdate | null> {
-  const manifest = parseManifest(await fetchText(new URL("latest-mac.yml", base).toString()));
+  const manifestUrl = new URL("latest-mac.yml", base).toString();
+  const body = await fetchText(manifestUrl);
+  const signature = await fetchText(`${manifestUrl}.sig`).catch(() => "");
+  if (!manifestIsOurs(body, signature)) {
+    throw new Error("this update is not signed by Nexa; refusing to install it");
+  }
+  const manifest = parseManifest(body);
   if (!manifest.version || compareVersions(manifest.version, app.getVersion()) <= 0) return null;
   const arch = process.arch === "arm64" ? "arm64" : "x64";
   const file: ManifestFile | undefined = manifest.files.find((f) => f.url.endsWith(`-mac-${arch}.zip`)) ?? manifest.files.find((f) => f.url.endsWith(".zip") && f.url.includes(arch));

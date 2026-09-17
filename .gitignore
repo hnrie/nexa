@@ -14,6 +14,8 @@
 /android/app/.cxx/
 /android/local.properties
 /android/release.jks
+# the key desktop releases are signed with; losing it stops every installed app updating
+/desktop/update-key.pem
 /android/keystore.properties
 
 # tooling

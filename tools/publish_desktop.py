@@ -9,7 +9,7 @@ which /api/v1/desktop/latest serves to the download page and banner. Files of
 older releases are left in place, so updates already downloading can finish;
 the update manifests always name the newest.
 """
-import argparse, hashlib, json, os, re, shutil, sys, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,11 +66,29 @@ def main() -> int:
             shutil.copy2(blockmap, dest / blockmap.name)
         files.append({"os": OS[m["os"]], "arch": ARCH[m["arch"]], "kind": KIND[m["ext"]], "name": p.name, "size": p.stat().st_size, "sha256": sha256(p)})
         print(f"  {p.name} ({p.stat().st_size / 1048576:.1f} MB)")
-    # the update manifests go last, once everything they name is in place
+    # Sign the manifests before they are published. Without a signature the
+    # only thing an app can check is a hash that came from the same host as
+    # the file, which catches a bad download and nothing else.
+    sign = subprocess.run(
+        ["node", "scripts/sign-release.mjs", str(dist)],
+        cwd=str(ROOT / "desktop"), capture_output=True, text=True,
+    )
+    if sign.returncode != 0:
+        print(sign.stdout + sign.stderr, file=sys.stderr)
+        print("could not sign the release; nothing was published", file=sys.stderr)
+        return 1
+    print(sign.stdout.rstrip())
+
+    # the update manifests and their signatures go last, once everything they
+    # name is in place
     for y in manifests:
-        tmp = dest / (y.name + ".tmp")
-        shutil.copy2(y, tmp)
-        tmp.replace(dest / y.name)
+        for src in (y, y.with_name(y.name + ".sig")):
+            if not src.exists():
+                print(f"missing {src.name}", file=sys.stderr)
+                return 1
+            tmp = dest / (src.name + ".tmp")
+            shutil.copy2(src, tmp)
+            tmp.replace(dest / src.name)
     manifest = {"version": version, "released_at": int(time.time() * 1000), "files": files}
     tmp = dest / "manifest.json.tmp"
     tmp.write_text(json.dumps(manifest, indent=2))

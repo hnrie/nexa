@@ -1,11 +1,17 @@
 /**
  * Which Nexa the app opens: the public one, or another given in
- * EVILION_URL (a local server while testing). Everything the page may do
- * through the app is allowed for this origin only.
+ * EVILION_URL while developing. Everything the page may do through the app is
+ * allowed for this origin only.
  */
+import { app } from "electron";
 
 function baseUrl(): URL {
-  const raw = process.env.EVILION_URL?.trim();
+  // Only while developing. A packaged app that honoured this would let
+  // anything able to set an environment variable point it at a page of its
+  // choosing — and that page would get the bridge, plus the camera,
+  // microphone and screen-recording grants macOS has already given this
+  // bundle by name.
+  const raw = app.isPackaged ? "" : process.env.EVILION_URL?.trim();
   if (raw) {
     try {
       const u = new URL(raw);
