@@ -88,6 +88,49 @@ func TestTOTPSetupNeedsPasswordAndCode(t *testing.T) {
 	}
 }
 
+// The reply to the enable request is the only copy of the backup codes anyone
+// gets. A repeat of that request — a double submit, a retry after a proxy gave
+// up — used to hand out a fresh set and quietly void the list the person had
+// just written down, leaving them holding codes that no longer work.
+func TestEnablingTOTPTwiceKeepsTheFirstBackupCodes(t *testing.T) {
+	_, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+
+	res, body := do(t, ts, "POST", "/api/v1/auth/mfa/totp/setup", token, map[string]any{"auth_key": b64(key32)})
+	if res.StatusCode != 200 {
+		t.Fatalf("setup: %d %v", res.StatusCode, body)
+	}
+	secret, ticket := body["secret"].(string), body["ticket"].(string)
+
+	code, err := totp.Code(secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, body = do(t, ts, "POST", "/api/v1/auth/mfa/totp/enable", token, map[string]any{"ticket": ticket, "code": code})
+	if res.StatusCode != 200 {
+		t.Fatalf("enable: %d %v", res.StatusCode, body)
+	}
+	first, _ := body["backup_codes"].([]any)
+	if len(first) != backupCount {
+		t.Fatalf("want %d backup codes, got %d", backupCount, len(first))
+	}
+
+	// the same request again, as a retry would send it
+	res, body = do(t, ts, "POST", "/api/v1/auth/mfa/totp/enable", token, map[string]any{"ticket": ticket, "code": code})
+	if res.StatusCode != 409 || errCode(body) != "already_enabled" {
+		t.Fatalf("a repeat must be refused, not served a new set: %d %v", res.StatusCode, body)
+	}
+	if _, ok := body["backup_codes"]; ok {
+		t.Fatalf("a refused repeat must not hand out codes: %v", body)
+	}
+
+	// and the set handed out the first time is still the set that counts
+	res, body = do(t, ts, "GET", "/api/v1/users/@me", token, nil)
+	if res.StatusCode != 200 || body["backup_codes_left"].(float64) != float64(backupCount) {
+		t.Fatalf("the first set should be untouched: %d %v", res.StatusCode, body)
+	}
+}
+
 func TestLoginRequiresSecondFactor(t *testing.T) {
 	srv, ts := newTestServer(t)
 	token, _ := register(t, ts, "alice")

@@ -211,7 +211,10 @@ func (s *Server) detachUser(r *http.Request, id, actor ids.ID) error {
 	}
 	for _, srv := range servers {
 		if srv.OwnerID == id {
-			next, ok := s.successor(ctx, srv, id, actor)
+			next, ok, err := s.successor(ctx, srv, id, actor)
+			if err != nil {
+				return err
+			}
 			if !ok {
 				// nobody else is in it: there is nothing left to keep
 				if err := s.Store.DeleteServer(ctx, srv.ID); err != nil {
@@ -250,11 +253,13 @@ func (s *Server) detachUser(r *http.Request, id, actor ids.ID) error {
 }
 
 // successor picks who takes a server over from an owner who is going: the
-// admin doing it if they are a member, otherwise whoever ranks highest.
-func (s *Server) successor(ctx context.Context, srv *store.Server, leaving, admin ids.ID) (ids.ID, bool) {
+// admin doing it if they are a member, otherwise whoever ranks highest. The
+// error is kept apart from "there is nobody": the caller deletes the server
+// when nobody is left, and a failed read must not look like that.
+func (s *Server) successor(ctx context.Context, srv *store.Server, leaving, admin ids.ID) (ids.ID, bool, error) {
 	members, err := s.Store.MemberIDs(ctx, srv.ID)
 	if err != nil {
-		return 0, false
+		return 0, false, err
 	}
 	var best ids.ID
 	bestRank, found := 0, false
@@ -263,13 +268,13 @@ func (s *Server) successor(ctx context.Context, srv *store.Server, leaving, admi
 			continue
 		}
 		if m == admin {
-			return m, true
+			return m, true, nil
 		}
 		if rank, _ := s.actorHighest(ctx, srv, m); !found || rank > bestRank {
 			best, bestRank, found = m, rank, true
 		}
 	}
-	return best, found
+	return best, found, nil
 }
 
 func (s *Server) adminSettingsView(r *http.Request) map[string]any {

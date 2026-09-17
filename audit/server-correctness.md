@@ -38,7 +38,13 @@ Three themes dominate:
    full member list of every server the user is in
    (`internal/api/server_glue.go:167`). These are correct, just quadratic.
 
-Counts: **2 DATA-LOSS, 8 BROKEN, 2 RACE, 26 BAD, 24 POLISH.**
+A fourth theme runs through the four DATA-LOSS findings and half the BROKEN ones:
+**a multi-step change with no transaction and no compensation.** Ban = ban +
+remove + purge. Enable 2FA = flip the flag + write the codes. Block = delete
+their row + write mine. Delete an account = detach from every server and group +
+anonymise. Each of these can stop in the middle, and none of them says so.
+
+Counts: **4 DATA-LOSS, 14 BROKEN, 3 RACE, 37 BAD, 28 POLISH** (86 findings).
 
 ---
 
@@ -92,6 +98,180 @@ Counts: **2 DATA-LOSS, 8 BROKEN, 2 RACE, 26 BAD, 24 POLISH.**
 - **Fix**: do the whole purge in one `s.Tx`, collecting ids as they are deleted,
   and return the partial list alongside the error so the caller can still emit
   what went. Cap the batch and page.
+
+### [DATA-LOSS] A read error while deleting an account deletes a whole server
+- **Where**: `internal/api/admin_handlers.go:254-258` (`successor`), acted on at
+  `:213-222` (`detachUser`)
+- **What**:
+  ```go
+  members, err := s.Store.MemberIDs(ctx, srv.ID)
+  if err != nil { return 0, false }
+  ```
+  `successor` collapses "the query failed" into the same `(0, false)` it returns
+  for "there is no one else". `detachUser` reads that as
+  *"nobody else is in it: there is nothing left to keep"* and calls
+  `s.Store.DeleteServer(ctx, srv.ID)`.
+- **How it fails**: `DELETE /api/v1/admin/users/{id}` (or the user's own
+  `POST /users/@me/delete`, same code path) for someone who owns a server with
+  5 000 other members. `ServersForUser` succeeds; the `MemberIDs` read fails.
+  `MemberIDs` runs on the read pool (`internal/store/servers.go:409`) while
+  `DeleteServer` runs on the write pool, so a read-pool-only failure — a reset
+  pooled connection, a `SQLITE_BUSY` past the 5 s timeout during a WAL
+  checkpoint — is enough. The server, every channel, every message and every key
+  epoch are deleted by `DeleteServer` + cascade. The 5 000 members are never told:
+  line 220 emits `server_delete` only to the departing user. They keep a dead
+  server in their sidebar until they reload.
+- **Fix**: return the error from `successor` and abort the deletion, rather than
+  treating a failed read as an empty server.
+
+### [DATA-LOSS] Enabling TOTP twice silently invalidates the backup codes the user wrote down
+- **Where**: `internal/api/mfa_handlers.go:245-279`
+- **What**: the setup ticket is stateless (`readTicket`, 15-minute TTL, no
+  server-side record), `EnableTOTP` is an upsert, and the enable path — unlike the
+  login path — never calls `SpendTOTPStep`, so the TOTP code is not burned either.
+  `ReplaceBackupCodes` (`internal/store/mfa.go`) is delete-all-then-insert-ten.
+  Nothing makes the request single-use.
+- **How it fails**: a user finishes 2FA setup, and the response hands them 10
+  backup codes which they write down — this response is the only copy. The client
+  sends the same `POST /api/v1/auth/mfa/totp/enable` body again: a double submit,
+  an offline-retry queue, a proxy 504 followed by a retry. Within the code's skew
+  window the same code verifies again, and `ReplaceBackupCodes` deletes the ten
+  codes and issues ten new ones. The user is holding a list that no longer works
+  and has no way to know. Months later they lose their phone, every code is
+  refused, and the account is unrecoverable. The same happens with any request
+  reusing that ticket plus a fresh code at any point in the next 15 minutes.
+  Note the asymmetry: `handleBackupCodes` requires the account password to
+  regenerate codes; this path regenerates the same codes with a ticket.
+- **Fix**: make the enable request single-use — burn the TOTP step with
+  `SpendTOTPStep` as the login path does, and refuse when MFA is already enabled.
+
+### [BROKEN] Enabling TOTP can leave MFA on with zero backup codes
+- **Where**: `internal/api/mfa_handlers.go:265-277`
+- **What**: `EnableTOTP` and `ReplaceBackupCodes` are two separate writes with no
+  transaction between them.
+- **How it fails**: `EnableTOTP` commits; `ReplaceBackupCodes` fails. The handler
+  returns 500, which reads to the user as "setup failed" — but MFA is now **on**,
+  with no backup codes at all. The next sign-in demands a TOTP code from a setup
+  they believe never completed, and there is no code to fall back on. If they also
+  deleted the authenticator entry after the apparent failure, the account is gone.
+- **Fix**: one transaction, or write the backup codes first and flip `enabled`
+  last.
+
+### [BROKEN] A rejected admin-settings request applies half of itself
+- **Where**: `internal/api/admin_handlers.go:296-330`
+- **What**: `registration` is validated and **written** (line 308) before
+  `registration_key` is validated (lines 315-323). There is no pre-validation pass
+  and no transaction.
+- **How it fails**: `PATCH /api/v1/admin/settings` with
+  `{"registration":"closed","registration_key":"<129 chars>"}`. The response is
+  `400 invalid_value` — "registration_key is too long" — and registration is now
+  **closed**. The admin reads an error and reasonably concludes nothing changed;
+  in fact the instance has stopped accepting accounts. Same with
+  `{"registration":"open","registration_key":12}`. Even with both values valid,
+  the two `SetInstanceSetting` calls can half-apply on a database error.
+- **Fix**: validate everything into a local struct, then write.
+
+### [BROKEN] A failed visibility snapshot floods every member with duplicate `channel_create`
+- **Where**: `internal/api/admin_handlers.go:140-142`, consumed at
+  `internal/api/server_handlers.go:163-196`
+- **What**:
+  ```go
+  vis, _ := s.snapshotVisibility(r.Context(), srv.ID)
+  before = append(before, vis)
+  ```
+  `snapshotVisibility` returns `(nil, err)` if a single `ViewableServerChannels`
+  call fails (`server_handlers.go:148-150`). `syncVisibility` then does
+  `prev := before[uid]` on a nil map, so `prev[chID]` is false for everything.
+- **How it fails**: `PATCH /api/v1/admin/users/{id}` toggling `admin` on a user
+  who belongs to a large server, with one `ViewableServerChannels` erroring.
+  Every channel now looks newly visible to every member, so `syncVisibility` sends
+  one `channel_create` per (member, channel) — 2 000 members × 50 channels =
+  100 000 events. Clients whose reducer is not idempotent show duplicated
+  channels until reload; the hub spends the whole time under `RLock`.
+  The inverse bites too: when `syncVisibility`'s *own* snapshot fails it returns
+  at line 165-167, so a real visibility change reaches nobody and private channels
+  stay wrongly visible until each client reconnects.
+- **Fix**: propagate the snapshot error and skip the sync rather than syncing
+  against nothing; distinguish "no previous state" from "empty previous state".
+
+### [BROKEN] Blocking someone deletes their relationship row before writing yours
+- **Where**: `internal/api/relationship_handlers.go:192-199`
+- **What**:
+  ```go
+  s.Store.DeleteRelationship(r.Context(), id, me.ID)        // their row
+  s.Store.SetRelationship(r.Context(), me.ID, id, "blocked") // my row
+  ```
+  Two statements, no transaction, and the destructive one first.
+- **How it fails**, two ways:
+  (a) `PUT /api/v1/users/@me/blocks/{id}` on an existing friend; the second write
+  fails → 500. Their friendship row is gone; mine still says `friend`. My list
+  shows them as a friend, theirs does not show me, and I am not actually blocking
+  them. Nothing restores their row — retrying the block only writes mine.
+  (b) In the window between the two statements, their concurrent
+  `POST /api/v1/relationships` passes the `Blocked` check at
+  `relationship_handlers.go:86-94` (no block exists yet) and writes the pair. My
+  `SetRelationship` then stamps my row `blocked` but leaves theirs at `outgoing` —
+  a friend request pending forever to someone who has blocked them, which they
+  cannot cancel because the other side no longer exists.
+- **Fix**: `s.Store.Tx` around both, mine first.
+
+### [BROKEN] `emitRelationship` reports "removed" when a read fails
+- **Where**: `internal/api/relationship_handlers.go:53-62`
+- **What**:
+  ```go
+  rel, err := s.Store.Relationship(r.Context(), pair[0].ID, pair[1].ID)
+  if err != nil {
+      s.Bcast.EmitUsers(..., "relationship_remove", ...)
+  ```
+  `store.ErrNotFound` and a genuine read error take the same branch.
+- **How it fails**: `POST /api/v1/relationships` accepting a friend request.
+  `SetRelationshipPair` commits — they are friends. The read-back errors
+  transiently. The other side receives `relationship_remove` and drops the friend
+  from their list, while the database still says `friend`. Their list is wrong
+  until they reload. Reachable from `handleFriendRequest`, `handleFriendAccept`,
+  `handleBlock`, `handleUnblock` and `handleRelationshipDelete`.
+- **Fix**: only emit `relationship_remove` on `errors.Is(err, store.ErrNotFound)`.
+
+### [BROKEN] Crash-report truncation produces invalid UTF-8, which Postgres rejects
+- **Where**: `internal/api/crash_handlers.go:26-38`
+- **What**:
+  ```go
+  cut := v[:n]
+  for len(cut) > 0 && !utf8Start(cut[len(cut)-1]) { cut = cut[:len(cut)-1] }
+  ```
+  `utf8Start(b) = b&0xC0 != 0x80` is true for a **lead** byte as well as for
+  ASCII. The loop strips trailing continuation bytes and then stops on the lead
+  byte of the truncated sequence — and keeps it. Running it:
+  `clip(strings.Repeat("a",499) + "€xxxx", 500)` returns a 500-byte string ending
+  `61 61 e2`, which `utf8.ValidString` rejects. Line 67
+  (`ua = ua[:maxUserAgent]`) does not even attempt the trim.
+- **How it fails**: any `POST /api/v1/client-errors` whose message, stack,
+  component or path crosses its limit on a multi-byte rune — an emoji in a React
+  error, a non-ASCII component name, a CJK path. On SQLite the mangled byte is
+  stored and `GET /api/v1/admin/errors` renders U+FFFD. On **Postgres**, `text`
+  refuses invalid UTF-8, so the INSERT fails, `RecordClientError` returns an
+  error and `handleCrashReport` returns **500** — from the one endpoint whose
+  entire job is to record that something already went wrong. The crash report is
+  lost, and the client's error reporter now has an error of its own to report.
+- **Fix**: after the loop, drop the lead byte too — or use
+  `strings.ToValidUTF8(cut, "")` / `utf8.DecodeLastRuneInString`.
+
+### [BROKEN] A failed admin account-deletion can hand a server to someone who never asked for it
+- **Where**: `internal/api/admin_handlers.go:213-235` inside `detachUser`,
+  called at `:185-192`
+- **What**: the ownership transfer (`UpdateServer` with a new `OwnerID`, line 223)
+  and the removal of the old owner (`removeMember`, line 232) are separate writes,
+  and `DeleteAccount` is a third, after the loop.
+- **How it fails**: `DELETE /api/v1/admin/users/{id}` for a user who owns server S.
+  `UpdateServer` succeeds — S now belongs to `next`, and every member has been
+  told via `server_update`. `removeMember` then fails, `detachUser` returns the
+  error, and the handler returns 500 **without deleting the account**. S has
+  silently changed hands; the original owner is still a member and still owns
+  nothing. Retrying converges (the transfer branch is skipped the second time),
+  but an admin who sees a 500 and backs off has left a server owned by a person
+  who never asked for it and was never told why.
+- **Fix**: see the account-deletion finding below; the transfer and the removal
+  belong in one transaction.
 
 ### [BROKEN] A newly created DM is sent to clients with `key_conv_id: "0"`
 - **Where**: `internal/store/channels.go:64-98` (specifically the return at 96-97)
@@ -282,6 +462,22 @@ Counts: **2 DATA-LOSS, 8 BROKEN, 2 RACE, 26 BAD, 24 POLISH.**
 - **Fix**: start `writeLoop` before `goLive`, and have `goLive` publish `pending`
   under the lock but send outside it (or use the same non-blocking
   `select`/`default` that `enqueue` uses).
+
+### [RACE] The admin flag patch is a lost-update read-modify-write
+- **Where**: `internal/api/admin_handlers.go:100-144`
+- **What**: `UserByID` reads `u.Flags` (line 100), the handler computes a new
+  bitfield in Go (lines 117-131), and `SetUserFlags` writes the **whole** value
+  (`internal/store/users.go:277`). No transaction, no compare-and-set, no
+  `flags = flags | ?` in SQL.
+- **How it fails**: two admins act on the same user at the same time — admin A
+  sends `{"disabled": true}`, admin B sends `{"admin": true}`. Both read
+  `flags == 0`. A computes `2`, B computes `1`. Both write. Whichever lands second
+  wins and the other change is gone. Worse, the response at line 157 is built from
+  the handler's **local** `flags`, so both admins are shown the change they made
+  and both believe it applied. The user ends up either an admin who was supposed
+  to be disabled, or disabled and not promoted.
+- **Fix**: do it in SQL — `UPDATE users SET flags = (flags | ?) &~ ? WHERE id = ?`
+  — or read and write inside one transaction and return the stored value.
 
 ### [BAD] `role, _ = s.Store.RoleByID(...)` then `&role.ID` — nil dereference in a handler
 - **Where**: `internal/api/server_handlers.go:993-997`
@@ -767,6 +963,132 @@ Counts: **2 DATA-LOSS, 8 BROKEN, 2 RACE, 26 BAD, 24 POLISH.**
 - **Fix**: log at minimum; better, make the emit failures visible in the response
   or retryable.
 
+### [BAD] A failed avatar swap leaks a blob reference that the GC can never collect
+- **Where**: `internal/api/media_handlers.go:57-66`
+- **What**:
+  ```go
+  b, err := s.Media.PutPublic(r.Context(), kind, r.Body, lim, u.ID)  // ref_count = 1
+  ...
+  if err := s.Store.SwapImage(r.Context(), "users", kind+"_id", u.ID, &bid); err != nil {
+      WriteError(w, err); return      // no AddBlobRef(b.ID, -1)
+  }
+  ```
+  Every comparable path does release the reference on failure —
+  `internal/api/expression_handlers.go:95` (emoji), `:549`, `:554`, `:563`
+  (stickers). This one does not.
+- **How it fails**: `PUT /api/v1/users/@me/avatar`. The image is committed to disk
+  with `ref_count = 1`. `SwapImage` fails — a busy timeout, a cancelled context
+  because the user navigated away, `ErrNotFound`. The handler returns 500 and the
+  user retries, which uploads again. The first blob is now referenced by nothing
+  and pointed at by nothing, but `UnreferencedBlobs` only selects
+  `ref_count <= 0` (`internal/store/blobs.go:65`), so the GC at
+  `cmd/chatd/main.go:160` never sees it. The bytes are on disk forever. Each retry
+  adds another. Deduplication makes it worse, not better: the same image uploaded
+  again finds the orphan by SHA and bumps it to 2.
+- **Fix**: `defer` a release that is cancelled on success, as the expression
+  handlers do.
+
+### [BAD] The compensating `AddBlobRef(-1)` uses the context that just failed
+- **Where**: `internal/api/expression_handlers.go:95`, `:549`, `:554`, `:563`
+- **What**: `_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)` — the release runs on
+  the same request context whose cancellation most likely caused the failure it is
+  compensating for, and its own error is discarded.
+- **How it fails**: a user starts an emoji upload and closes the tab.
+  `PutPublic` finishes (the bytes were already read); `CreateEmoji` fails with
+  `context.Canceled`; the handler calls `AddBlobRef` with the same cancelled
+  context, which also fails, silently. Same permanent orphan as above, just from
+  the one path that was written to avoid it.
+- **Fix**: use `context.WithoutCancel(r.Context())` (or a fresh short-timeout
+  context) for compensating writes, and log failures.
+
+### [BAD] `packRights` turns a read error into "this pack does not exist"
+- **Where**: `internal/api/expression_handlers.go:179-192`, surfaced at
+  `:327-331` (`packTarget`)
+- **What**: `ServerPerms`'s error is dropped by `if err == nil && ...` (line 179)
+  and `Installers`'s by `installed, _ :=` (line 187). `packTarget` then answers
+  `ErrNotFound`.
+- **How it fails**: `GET /api/v1/stickers/packs/{id}` for a pack the caller
+  installed while it was public and which has since been made private. The
+  `Installers` read errors transiently → `(false, false)` → the handler returns
+  **404**. The client is told the pack does not exist, which is a perfectly good
+  reason for it to drop the pack from its local collection — permanently, from a
+  transient error. A 500 would be honest and retryable.
+- **Fix**: propagate the error; reserve 404 for "the row is not there".
+
+### [BAD] The sticker-info popup reads the entire install table of the most-installed packs
+- **Where**: `internal/api/expression_handlers.go:344`, `:374`
+- **What**: `GET /api/v1/stickers/{sid}` checks `p.Public` and then
+  unconditionally calls `Installers(p.ID)` — every row of
+  `sticker_installs` for that pack — only to test whether the caller's id is in
+  the list. `s.Store.installedSet(ctx, uid)` already does the per-user lookup and
+  is what `PacksForUser` uses (`internal/store/expressions.go:329`).
+- **How it fails**: this is the "where is this sticker from?" popup, opened for any
+  sticker in any message. The packs it is opened on are by definition the popular
+  public ones — the ones with the most installs. On an instance where a pack has
+  50 000 installs, every popup reads 50 000 rows to answer a boolean.
+- **Fix**: `SELECT 1 FROM sticker_installs WHERE user_id = ? AND pack_id = ?`.
+
+### [BAD] `/invite/*` is an unauthenticated, unlimited O(members) amplifier
+- **Where**: route via the catch-all at `internal/api/static.go:30` and `:144-193`,
+  work done at `internal/api/unfurl_handlers.go:122-129`
+- **What**: `GET /invite/<code>` is served by the static handler — no auth, no rate
+  limiter. Each hit does `os.ReadFile(index.html)` plus `inviteUnfurl`, which for a
+  server invite runs `MemberIDs` and then `h.Online(id)` per member, each taking
+  `Hub.mu.RLock()` (`internal/gateway/hub.go:234`). The authenticated unfurl route
+  is limited to 30/min per user (`unfurl_handlers.go:23`); this bypasses it.
+  (This is a second instance of the same shape as the `/api/v1/invites/{code}`
+  finding above, on a different route.)
+- **How it fails**: someone pastes an invite link into a group chat and every
+  messaging app's link-preview crawler fetches it at once; or anyone loops the URL.
+  For a 5 000-member server that is 5 000 hub read-lock acquisitions plus a full
+  `index.html` read per request, contending directly with the gateway's
+  `register`/`unregister` writers.
+- **Fix**: wrap the invite/call static routes in `ipLimited`, and compute the
+  online count from one `OnlineUsers()` snapshot.
+
+### [BAD] The media proxy has no rate limit and silently truncates chunked responses
+- **Where**: `internal/api/proxy_handlers.go:36-37`, `:120`, `:143`
+- **What**: registered with bare `mux.HandleFunc`, outside `s.authed` and
+  `ipLimited`. A signed proxy URL has no expiry (`ProxyURL` mints no deadline), and
+  each request pulls up to 25 MB from upstream. Separately, the
+  `Content-Length > maxProxyBytes` guard at line 120 only fires when upstream
+  *sends* a Content-Length.
+- **How it fails**: (a) one leaked proxy URL replayed in a loop is unmetered
+  upstream bandwidth on the server's bill, forever. (b) A chunked `200` larger
+  than 25 MB is cut by `io.LimitReader` at line 143 and delivered to the client as
+  a **200 with a truncated body** and no error — a corrupt image or a video that
+  stops mid-frame, with nothing to distinguish it from a network failure.
+- **Fix**: `ipLimited` the route, put an expiry in the signature, and return an
+  error (or at least stop with a distinguishable status) when the limit is hit.
+
+### [BAD] Every crash report costs a full-table scan on the single SQLite writer
+- **Where**: `internal/api/crash_handlers.go:79` → `internal/store/errors_log.go:31-41`
+- **What**: `RecordClientError` does an `INSERT` plus
+  `DELETE FROM client_errors WHERE id NOT IN (SELECT id FROM client_errors ORDER BY id DESC LIMIT 500)`
+  — a full scan — on **every** call, as two separate statements outside a
+  transaction. There is no dedup by message+stack.
+- **How it fails**: this is the endpoint most likely to be hit in a tight loop — a
+  React render error that re-renders and crashes again. `limGeneric` allows
+  600/min with a burst of 300 per user, so one looping client drives up to 1 200
+  write statements a minute through `SetMaxOpenConns(1)`
+  (`internal/db/db.go:60`), starving every real write on the instance. A crash
+  between the two statements leaves the table one row over cap (self-healing).
+- **Fix**: trim on a timer or only when the count exceeds the cap by 10 %, and
+  dedup identical reports within a window.
+
+### [BAD] `DeleteUserSessions` and `ServersForUser` failures are swallowed in the admin patch
+- **Where**: `internal/api/admin_handlers.go:153` and `:138`
+- **What**: `_ = s.Store.DeleteUserSessions(...)` and `servers, _ = ...`, both with
+  a 200 response.
+- **How it fails**: (a) disabling an account returns 200 saying it is disabled
+  while live session rows survive until the hourly sweep. API access does stop —
+  `internal/auth/middleware.go:49` re-checks `FlagDisabled` per request — so this
+  is misleading rather than dangerous. (b) When `ServersForUser` fails, `servers`
+  is nil, so the loop at lines 148-150 does nothing: promoting or demoting an
+  instance admin leaves every member's private-channel view stale until they
+  reconnect, again with a 200.
+- **Fix**: report both failures.
+
 ### [POLISH] `Dialect.Bump` is dead code that corrupts SQL when a column name is a substring
 - **Where**: `internal/db/dialect.go:59-64`
 - **What**: `strings.ReplaceAll(expr, column+",", table+"."+column+",")`. Nothing
@@ -1013,6 +1335,113 @@ Counts: **2 DATA-LOSS, 8 BROKEN, 2 RACE, 26 BAD, 24 POLISH.**
 - **Fix**: none needed; noted so nobody "fixes" the ping loop and quietly disables
   the sweep's only real case.
 
+### [POLISH] `narrowRange` overflows on an absurd Range header
+- **Where**: `internal/api/proxy_handlers.go:151-170`
+- **What**: `narrowRange("bytes=9223372036854775807-", 25<<20)` returns
+  `"bytes=9223372036854775807--9223372036828561410"` — `start + max` wraps negative
+  and the malformed value is forwarded upstream.
+- **Why it is only POLISH**: no real client sends that, and most upstreams ignore
+  a malformed Range and return a full 200, which is then truncated at 25 MB by the
+  limit reader (see the proxy finding above). Verified by running the function,
+  not observed in traffic.
+- **Fix**: clamp with `if start > math.MaxInt64-max`.
+
+### [POLISH] `gifCache` is a package-level map shared across `Server` instances
+- **Where**: `internal/api/expression_handlers.go:756-765`, evicted at `:806-816`
+- **What**: a package-level cache keyed on `query|pos`, storing signed proxy URLs
+  that were minted with a **per-instance** `s.Secret`
+  (`internal/api/router.go:111-114`). Eviction drops all 500 entries at once
+  rather than the oldest.
+- **How it fails**: with two `Server`s in one process (the test suite does this),
+  instance B serves instance A's URLs, whose signatures B cannot verify → broken
+  GIF previews. The all-at-once eviction also produces a thundering herd against
+  the upstream GIF provider every time the cache fills.
+- **Fix**: make it a field on `Server`; evict the oldest entries.
+
+### [POLISH] Smaller sharp edges in the secondary handlers
+- **Where**: as listed
+- **What / how it fails**:
+  - `internal/api/expression_handlers.go:659-687` — `handleStickerPositions`
+    accepts arbitrary client positions with no uniqueness or range check;
+    duplicates tie-break on `s.id`, and duplicate ids in the array silently
+    collapse in the `positions` map.
+  - `internal/api/expression_handlers.go:644-657` — deleting the cover sticker
+    clears `cover_sticker_id` but never picks a new one, so a pack with stickers
+    renders coverless.
+  - `internal/api/expression_handlers.go:569` — `_ = s.Store.UpdatePack(…)`; on
+    failure the first sticker never becomes the cover and nobody is told.
+  - `internal/api/expression_handlers.go:629-641` — `handleStickerPatch` returns
+    the **stale** pre-patch sticker with a 200 when the re-read misses.
+  - `internal/api/expression_handlers.go:833` — `body, _ := io.ReadAll(...)`; a
+    truncated read becomes a JSON parse failure and a generic 502, losing the
+    cause.
+  - `internal/api/expression_handlers.go:892-898`, `:870-889` — `pos` is
+    client-controlled with no upper bound (`page=999999` is forwarded upstream);
+    `gifPreview` iterates a Go map and tie-breaks on width only, so equal-width
+    renditions are picked nondeterministically between runs.
+  - `internal/api/admin_handlers.go:93-116` — `handleAdminUserPatch` never checks
+    `FlagDeleted`, so an admin can set `admin: true` on a deleted account. It
+    grants nothing (`IsInstanceAdmin` excludes deleted users) but `AdminUsers`
+    filters deleted rows out, so the flag is invisible and sticky.
+  - `internal/api/admin_handlers.go:83` — `before, _ := ids.Parse(...)`; a
+    malformed cursor silently restarts pagination at page 1 instead of 400.
+  - `internal/api/admin_handlers.go:261-271` — `successor` does not exclude
+    members carrying `FlagDisabled`, so a server can be handed to a disabled
+    account; `rank, _ := s.actorHighest(...)` also drops its error, scoring that
+    member 0.
+  - `internal/api/admin_handlers.go:64-80` vs `internal/store/instance.go:85` —
+    `Stats` counts deleted users while `AdminUsers` excludes them, so the two
+    numbers on the admin page disagree.
+  - `internal/api/admin_handlers.go:16` — `GET /api/v1/instance` is registered
+    with bare `mux.HandleFunc` (no auth, no limiter) and does two DB reads per
+    call via `registrationPolicy`.
+  - `internal/api/relationship_handlers.go:95-119` vs `:122-133` — accepting a
+    request via `POST /relationships` makes you friends but does **not** open the
+    DM, while `PUT /relationships/{id}` does. Same outcome, two behaviours. A
+    second `PUT` after a successful accept returns `404 no_request`, so a
+    double-clicking client sees a failure for something that worked.
+  - `internal/api/relationship_handlers.go:44-48` — a relationship whose target is
+    missing from `UsersByIDs` is dropped from the response, so the row exists but
+    is invisible and unremovable through the UI.
+  - `internal/api/relationship_handlers.go:27-50` — no pagination or cap on the
+    relationship list.
+  - `internal/api/relationship_handlers.go:20-22` — `relationshipRoutes` mutates
+    `s.Profile.MutualFriends` as a side effect of route registration. Safe
+    (`Handler()` runs before serving) but surprising.
+  - `internal/api/mfa_handlers.go:339` and `:197` — `BackupCodesLeft` is called
+    with `context.Background()` inside a request (not cancellable), and on error
+    reports `0`, telling a user with ten unused codes that they have none.
+  - `internal/api/mfa_handlers.go:337-344` — `mfaChallenge` answers `200 OK` for
+    an incomplete login.
+  - `internal/api/crash_handlers.go:54-57` — an empty message returns `204` rather
+    than `400`.
+  - `internal/api/static.go:144-193`, `:198-226` — `os.ReadFile(index.html)` on
+    every invite/call page hit rather than `ServeContent`, so no `If-None-Match`
+    handling; `HEAD` sends a bare `WriteHeader(200)` with no `Content-Length`.
+  - `internal/api/static.go:36` — `dist, _ := filepath.Abs(...)`; on failure
+    `dist` is `""` and the prefix check at line 49 rejects everything, so the
+    server quietly serves `index.html` for every asset path.
+  - `internal/api/captcha.go:68` — `||` short-circuits, so a non-200 from
+    siteverify never reads the body, and the limited decode does not drain the
+    rest; both cost connection reuse on the package-level client.
+  - `internal/api/android_handlers.go:221` — `_ = captchaPage.Execute(w, ...)`
+    after the headers are sent; a mid-render error leaves a truncated 200.
+  - `internal/api/disk.go` — no build tag and a hard `golang.org/x/sys/unix`
+    import, so `internal/api` does not compile on Windows. Not a runtime bug;
+    noted as implicit platform lock-in.
+
+### [POLISH] Clean files
+`internal/api/groups.go`, `internal/api/activity_glue.go`,
+`internal/api/desktop_handlers.go`, `internal/api/captcha.go` and
+`internal/api/unfurl_handlers.go` hold no correctness bugs beyond the notes above.
+Bug classes explicitly looked for and **not** found anywhere in
+`internal/api`: a `defer f.Close()` that drops an error on a write path (the two
+write paths, `internal/media/store.go:85-88` and
+`internal/media/variants.go:152-155`, both capture it and use temp+rename);
+unclosed HTTP response bodies (all three outbound sites close); unclosed
+`sql.Rows`; goroutines started per request (none); and `LIMIT` without
+`ORDER BY` in the paged admin/expression queries (all use proper keyset cursors).
+
 ---
 
 ## Where a test would have caught it
@@ -1082,3 +1511,31 @@ Postgres dialect.
     thorough but single-connection per user. A test joining an empty DM call from
     two connections of the same user and asserting exactly one `call_ring` and one
     `system_call` message would catch `voice_glue.go:254-258`.
+
+11. **`clip` is a pure function with an off-by-one and no test.**
+    A three-line property test — `for n := 1..len(s) { require utf8.ValidString(clip(s, n)) }`
+    over a string with multi-byte runes — catches
+    `internal/api/crash_handlers.go:26-38` immediately. There is no
+    `crash_handlers_test.go` at all. The same applies to `narrowRange`
+    (`proxy_handlers.go:151`), which `internal/api/proxy_handlers_test.go` does
+    not exercise with extreme values.
+
+12. **Validate-then-write ordering.** `internal/api/admin_handlers_test.go` does
+    not test a rejected `PATCH /api/v1/admin/settings`. A test asserting that a
+    request rejected for *any* field leaves *every* setting unchanged would catch
+    `admin_handlers.go:296-330`, and the same assertion shape applies to the ban,
+    block, TOTP-enable and account-delete sequences.
+
+13. **Idempotency of the mutating endpoints.** There is no test that sends the
+    same request twice. A table of (method, path, body) run twice, asserting the
+    second call is either identical or a clean 409 — never a different side
+    effect — would catch the TOTP backup-code wipe
+    (`mfa_handlers.go:245-279`), the `PUT /relationships/{id}` 404
+    (`relationship_handlers.go:122`), and the pin/unpin 409/404 asymmetry.
+
+14. **Blob reference accounting.** A test that uploads an avatar, forces
+    `SwapImage` to fail, and then asserts the blob's `ref_count` is 0 (so the GC
+    will take it) would catch `media_handlers.go:57-66` and the cancelled-context
+    variant at `expression_handlers.go:95`. `internal/store/blobs.go` already has
+    `TestSwapImageReleasesTheOldPictureOnce`, which is the right shape — it just
+    tests the success path.

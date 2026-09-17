@@ -1,9 +1,10 @@
 # Web client bugs
 
-Scope: `web/src` at working tree `main` (HEAD `47e5bb5`) — every store, the
-gateway session and dispatcher, the HTTP client, `lib/`, the crypto *usage*,
-`markdown/`, `voice/`, the service workers, and the React tree under
-`components/` and `pages/`. Roughly 46,000 lines of TypeScript and TSX.
+Scope: `web/src` on `main`, read at HEAD `47e5bb5` and unchanged since (`0fef40f`
+touched only `android/`) — every store, the gateway session and dispatcher, the
+HTTP client, `lib/`, the crypto *usage*, `markdown/`, `voice/`, the service
+workers, and the React tree under `components/` and `pages/`. Roughly 46,000
+lines of TypeScript and TSX.
 
 Baseline before reading anything: `npx tsc --noEmit -p tsconfig.json` exits 0,
 and `npx vitest run` passes 842 tests across 89 files. Nothing was already
@@ -17,40 +18,68 @@ store has a generation counter that kills stale pages, the settings store keeps
 halves, the gateway counts frames rather than timestamps to decide a heartbeat
 was answered, the markdown parser caps depth and source length and memoises
 failed closer searches (measured: the worst hostile input I could build costs
-14 ms against 1.3 ms for ordinary prose — bounded, not quadratic), and the
-service worker deliberately has no fetch handler. Most of the obvious classes of
-bug the brief asks about have already been thought about and defended against
-somewhere.
+14 ms against 1.3 ms for ordinary prose — bounded, not quadratic), the GIF
+picker sequences its searches properly, and the service worker deliberately has
+no fetch handler. Markdown link hrefs are validated against `^https?://` before
+they reach an `<a>`, highlight.js output is parsed into React elements rather
+than injected as HTML, and the Rich Presence URLs a local program can supply are
+sanitised server-side (`internal/gateway/activity_test.go:97` tests
+`javascript:alert(1)` explicitly). Most of the obvious classes of bug the brief
+asks about have already been thought about and defended against somewhere — and
+several of the findings below are cases where the defence exists in one file and
+was not copied to its neighbour.
 
-What is left falls into four groups.
+What is left falls into five groups.
 
-**Promises nobody catches.** Three `void f()` calls in the gateway path have no
-`.catch`. The worst is `syncGap`, the function whose entire job is to fill in
-what arrived while the socket was down: one failed request after a reconnect and
-the open conversation silently misses every message from the outage, with no
-spinner, no error and no retry.
+**One failure poisons a memo forever.** The same shape recurs in five places,
+and it is the single most damaging pattern here. `loadEmoji()` memoises its
+promise *before* it settles, so one 404 leaves "Loading emoji…" on screen for
+the life of the tab. `captcha.ts` resets its memo on `onerror` but not on the
+`onload`-with-no-`turnstile` path, so a content blocker can disable signing in,
+logging in, recovering an account and joining a server until a reload.
+`twemoji.ts` returns early on a non-array body and leaves a resolved promise
+behind, which silently downgrades every emoji in the app *and* chains into the
+stuck picker. `keys.ts`'s `pendingEnsure` can cache a `null` for a conversation
+permanently. `sfu.ts` keeps its per-connection repull counter across a rebuild,
+which can leave one participant inaudible for the rest of a call.
 
-**One flag with two owners.** `ui.focused` is written both by `ThemeEffect` from
-`document.hasFocus()` and by `DesktopEffects` from the desktop app's real window
-state. `document.hasFocus()` is known to lie inside Electron — the repo's own
-comments say so — and `ui.focused` is what decides whether an incoming message
-is silently marked read.
+**Promises nobody catches.** Several `void f()` calls have no `.catch`. The
+worst is `syncGap`, the function whose entire job is to fill in what arrived
+while the socket was down: one failed request after a reconnect and the open
+conversation silently misses every message from the outage, with no spinner, no
+error and no retry. `reconcile()` is the same, and there one failure abandons
+every conversation after it in the loop.
 
 **Read state drifting.** Three independent paths mark things read that the
 reader never saw: the dispatcher acks any message arriving in the active channel
-regardless of where the reader is scrolled (contradicting `MessageList`'s own
-much more careful rule twenty lines away), Escape acks the newest *loaded*
-message even when the list stops short of the present, and a deleted mention
-decrements `unread` but never `mentions`, so the red pill sticks.
+regardless of where the reader is scrolled — contradicting `MessageList`'s own
+much more careful rule twenty lines away, which the comment there spells out —
+Escape acks the newest *loaded* message even when the list stops short of the
+present, and a deleted mention decrements `unread` but never `mentions`, so the
+red pill sticks. Related: `dispatch.ts` reads the raw `ui.focused` flag while
+`notify.ts` was fixed to prefer the desktop app's real window state, so the
+notification decision and the mark-as-read decision now disagree.
+
+**Devices and media that go away.** The microphone is the only track in the
+voice path with no `ended` handler, and nothing listens for `devicechange`
+during a call — unplug a headset mid-call and the VAD gate closes you to silence
+with the mute button still reading "Mute". Android is not affected. Decrypted
+video and audio attachments under 25 MB load eagerly with no viewport gate and
+hold a cache reference that makes them permanently un-evictable, so the media
+cache's 200 MB budget cannot be enforced.
 
 **Untranslated strings.** The app ships eleven languages and routes essentially
 everything through `t()`, which makes the exceptions stand out: the connection
-banner, the search panel's result count, `<t:…>` timestamps (which also use the
-*browser's* locale rather than the app's, the exact thing `lib/time.ts` was
-written to avoid), slowmode labels and the Rich Presence card.
+banner (the most-seen text in the app when anything is wrong), the search
+panel's result count, the spinner's accessible name, the captcha's only escape
+hatch, `<t:…>` timestamps and profile dates — which also use the *browser's*
+locale rather than the app's, the exact thing `lib/time.ts` was written to
+avoid.
 
-Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
-**17 POLISH** — 84 findings.
+Counts: **3 DATA-LOSS**, **17 BROKEN**, **9 RACE**, **11 LEAK**, **48 BAD**,
+**35 POLISH** — 123 findings, grouped worst first.
+
+Nothing was changed. `git status` on `web/` is clean.
 
 ## Findings
 
@@ -159,6 +188,41 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **Repro**: Open a guest link, enter a name, submit, and have the WebSocket fail to establish (server restarting, a proxy dropping `/gateway`, a captive portal). `guestsApi.join` succeeded so no error is shown; the page shows a spinner and "Joining the call…" indefinitely, with nothing clickable.
 - **Fix**: Pass an `onStatus` and a timeout through `begin()`; after N seconds without `ready`, set an error and fall back to `phase: "form"`.
 
+### [BROKEN] A malformed twemoji index dead-ends the emoji picker and every emoji glyph in the app
+
+- **Where**: `web/src/lib/twemoji.ts:52`
+- **What**: `if (!Array.isArray(names)) return;` leaves `available` null, `loading` set to a *resolved* promise (so `ensureTwemojiIndex` at `:48` refuses to try again), `unlisted` false, and never runs the `waiting` callbacks. `twemojiIndexSettled()` (`:94`) returns false forever, so `Twemoji` (`Twemoji.tsx:33`) renders the system glyph for everything, and `twemojiIndexSettledPromise()` (`:65`) never resolves — which means `loadEmoji()` (`emojiIndex.ts:91`) never resolves either, chaining into a permanently stuck picker. Every other error shape is handled by the `.catch` at `:56`; only this one leaks.
+- **Repro**: Serve `/twemoji/available.json` as `{}` or `null` — a misbuilt asset, or a proxy returning a JSON error object with a 200. Emoji render as system glyphs everywhere and the picker spins forever, with nothing in the console.
+- **Fix**: Treat a non-array body like a fetch failure — set `unlisted = true`, `loading = null`, and fire the waiters.
+
+### [BROKEN] The emoji picker shows "Loading emoji…" forever after one failed import, and never retries
+
+- **Where**: `web/src/components/pickers/EmojiPicker.tsx:242`
+- **What**: `if (!emojiLoaded()) void loadEmoji().then(() => setReady(true));` has no `.catch`. `loadEmoji()` (`emojiIndex.ts:84`) memoises `loaded` *before* the `Promise.all` settles, so a single failure poisons it permanently — every later call returns the same rejected promise. `ready` stays false and `:388` renders `t("pickers.emojiPicker.loadingEmoji")` indefinitely. The rejection is also unhandled; the `void` silences the linter, not the runtime.
+- **Repro**: Deploy a new build while a tab stays open, so the old chunk hashes 404. Open the emoji picker: "Loading emoji…" forever. Close and reopen it — still forever, because `loaded` is cached as rejected. `lib/lazyChunk.ts` exists for exactly this case and is not used here.
+- **Fix**: `.catch(() => { loaded = null; setFailed(true); })` in `loadEmoji`, reset the memo on failure, and render a "couldn't load — retry" state.
+
+### [BROKEN] `ImageCropModal` never handles a picture that fails to decode — Apply stays disabled forever
+
+- **Where**: `web/src/components/common/ImageCropModal.tsx:45`, button at `:134`
+- **What**: The loader sets only `el.onload = () => setImg(el)`. There is no `onerror`. If the browser cannot decode the file — a truncated PNG, a `.jpg` that is really something else, an image too large to rasterise — `img` stays null forever, the footer button is `disabled={!img}`, and nothing says why.
+- **Repro**: Settings → change avatar → pick a corrupt PNG. The crop dialog opens with an empty frame and a greyed-out Apply that never comes back. Only Cancel works, with no explanation.
+- **Fix**: Add `el.onerror = () => setError(...)` alongside `onload` and show the message in the dialog.
+
+### [BROKEN] Canvas failures in the cropper are swallowed, so Apply silently does nothing
+
+- **Where**: `web/src/components/common/ImageCropModal.tsx:110` and `:117`
+- **What**: `const ctx = canvas.getContext("2d"); if (!ctx) return;` bails inside the `try`, so `finally` clears `busy` and the dialog just sits there. Same at `:117`: `if (blob) onDone(...)` — when `canvas.toBlob` yields null (out of memory on a large `maxSize`, or a canvas the browser refuses), `onDone` is never called and no error is raised.
+- **Repro**: On a memory-constrained phone, crop a very large image. The Apply spinner runs and stops, the dialog stays open, the avatar is never set, and no toast appears.
+- **Fix**: Throw or toast on both paths instead of returning, so the caller sees a failure rather than a no-op.
+
+### [BROKEN] Double-click to zoom never works in the lightbox: the first click closes it
+
+- **Where**: `web/src/components/common/ZoomPan.tsx:161-168`
+- **What**: The double-tap branch is gated on `e.detail === 0`, which only synthetic and touch-derived clicks produce. A real mouse click has `detail` 1 or 2, so it falls through to `lastTap.current = now; onIdleClick?.()`. In the lightbox (`Attachments.tsx:128` passes `onIdleClick={onClose}`) that closes the viewer on click one, so the `dblclick` at `:145` never reaches a mounted component. The file's own doc comment (`:4`) promises "a double click or double tap to go in and back out again".
+- **Repro**: Open an image attachment and double-click it with a mouse. It closes instead of zooming. Zooming back *out* by double-click does work, because the `scale > 1` guard at `:156` swallows the first click.
+- **Fix**: Track the tap time for mouse clicks too — drop the `detail === 0` gate, or defer `onIdleClick` past the double-click window.
+
 ### [RACE] `startSession` can build two gateway clients and double-apply every event
 
 - **Where**: `web/src/gateway/session.ts:33` (the `await`) and `:41` (the guard)
@@ -214,6 +278,13 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **What**: The old tracks are stopped (`t.onended = null; t.stop()`) *before* `s.cameraPending = true` and before `await getCamera(...)`. Throughout that await `s.camera` still points at the dead stream, `useVoice.localVideo` still holds it, and the transport's sender still carries the stopped track. `flipCamera` (`:592-596`) has the same shape, but the comment at `:589-591` shows it is deliberate for phones; `switchCamera` is triggered by a settings change on desktop, where it is not.
 - **Repro**: With your camera on in a call, open the camera menu and pick a different camera. Your own tile freezes on the last frame and everyone else sees a frozen picture for as long as `getUserMedia` takes. If the new camera is busy (another app holds it) you end up with the camera off entirely and a toast, having lost a working camera.
 - **Fix**: Open the new camera first and stop the old one only once the new stream is in hand; keep the stop-first path behind the phone check `flipCamera` documents.
+
+### [RACE] The profile panel shows the previous person's mutual friends and servers
+
+- **Where**: `web/src/components/profile/ProfileCard.tsx:77` (state) and `:96` (the only writer)
+- **What**: `mutual` is written only on a successful `usersApi.profile` response. When `userId` changes on an already-mounted card — exactly what the `variant="panel"` card beside a DM does — the previous user's `{friends, servers}` stays on screen until the new request lands, and stays forever if it fails (the `.catch` at `:98` deliberately swallows). The stale data drives the avatar stack (`:304`), the count (`:198`) and the mutual-servers list (`:359`).
+- **Repro**: Open a DM with A whose panel says "3 mutual friends". Go offline and switch to a DM with B. B's panel shows A's three mutual friends and A's mutual servers, under B's name.
+- **Fix**: `setMutual({ friends: [], servers: [] })` at the top of the effect, before the request.
 
 ### [LEAK] Auto-loaded video and audio attachments are pinned in memory and can never be evicted
 
@@ -271,6 +342,27 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **Repro**: Theoretical in production (one page, one singleton). Visible in tests and under Vite HMR, where each module re-evaluation stacks another pair of listeners all calling `k.release()`.
 - **Fix**: Keep the handler references on the keeper and remove them in a `dispose()`.
 
+### [LEAK] The keystore drops its IndexedDB handle on any failure without closing the connection
+
+- **Where**: `web/src/crypto/keystore.ts:108`
+- **What**: `withDb` nulls `dbHandle` whenever the work throws but never calls `db.close()` on the old `IDBDatabase` — there is no `.close()` anywhere in the file. Every transaction-level failure (a quota abort, a Safari background eviction) leaves one more open connection and opens another. Two consequences: connections accumulate for the life of the tab, and because open connections block version changes, the `onblocked` reject at `:44` becomes permanent the moment `DB_VERSION` (`:14`) is bumped.
+- **Repro**: Fill the origin's storage quota so `saveRoot` transactions abort; each failed save opens a fresh connection. Then ship a build with `DB_VERSION = 2`: the upgrade is blocked by the stale handles and `openDb` rejects every time, so the keystore fails for good and the identity has to be re-derived from the password on every reload until the tab is closed.
+- **Fix**: `(await handle).close()` in the catch before nulling, guarded by a `try`.
+
+### [LEAK] `ServerSidebar` subscribes to the UI store outside an effect and can never unsubscribe
+
+- **Where**: `web/src/components/sidebar/ServerSidebar.tsx:66-71`
+- **What**: `openHeaderMenu` calls `useUI.subscribe(...)` in an event handler; `unsub()` runs only when `state.contextMenu` later becomes falsy. If the component unmounts while the menu is open the subscriber survives on the global store, holding the unmounted component's `setMenuOpen` closure. Same shape as `MessageItem.tsx:116` above — two independent copies of the same mistake.
+- **Repro**: Open a server's header menu, then hit the quick switcher (Ctrl+K) and jump to a different server while the menu is open. The old sidebar unmounts with a live store subscription attached.
+- **Fix**: Keep the unsubscriber in a ref and call it from `useEffect(() => () => unsubRef.current?.(), [])`.
+
+### [LEAK] A half-loaded Turnstile script permanently breaks every captcha in the session
+
+- **Where**: `web/src/lib/captcha.ts:64-68`
+- **What**: `loading ??= new Promise(...)` memoises the load. The `onerror` path (`:70`) correctly resets `loading = null` so a retry is possible; the `onload`-but-no-`window.turnstile` path at `:68` rejects **without** resetting it. Every later `captchaToken()` then awaits the same already-rejected promise.
+- **Repro**: An extension or content blocker that neutralises the Cloudflare script but still fires `load` — common for "allow but stub" rules. One failed attempt and signing up, logging in, recovering an account, sending a friend request, creating and joining servers all fail with "The captcha could not start" until the page is reloaded.
+- **Fix**: Set `loading = null` in the `onload` failure branch too.
+
 ### [BAD] Two owners fight over `ui.focused`, and one of them is known to lie in Electron
 
 - **Where**: `web/src/components/shell/ThemeEffect.tsx:29` against `web/src/components/desktop/DesktopEffects.tsx:133`
@@ -326,6 +418,13 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **What**: Every other member mutation recomputes the current user's permissions — `updateServer` (`:85`), `upsertRole` (`:99`), `upsertRoles` (`:107`), `removeRole` (`:119`), `upsertMember` (`:129`). The bulk loader does not: it writes `members` and `membersComplete`, leaving `cur.me` and `cur.myPermissions` untouched.
 - **Repro**: Open a server with more than a thousand members so the member list pages in (`components/server/pages/MembersPage.tsx:33-50` and `components/chat/MemberList.tsx:59`). Your own `Member` row comes down in that bulk load. If your roles changed since `ready` — a moderator gave you a role, and `member_update` was missed across a reconnect — `st.members[me]` is now fresh while `st.me` is stale, so `memberColor` shows the new colour while `canI()` still uses the old permission bits. The moderation buttons on that very page (`MembersPage.tsx:62-65`) are drawn from the stale value.
 - **Fix**: In `upsertMembers`, refresh `me` when the list contains it and recompute `myPermissions`, as every sibling does.
+
+### [BAD] A timeout that expires never gives the server-level permissions back
+
+- **Where**: `web/src/stores/servers.ts:156-158` (`recomputeMine`), `web/src/lib/perms.ts:143` (`toPermMember`), consumed at `servers.ts:214-218` (`canI`)
+- **What**: `myPermissions` is computed once, inside a zustand `set` updater, and `toPermMember(m, userId, now = Date.now())` snapshots `timedOut` at that instant. `compute` then applies `if (m.timedOut) p &= TIMED_OUT_KEEP` (`perms.ts:178`), reducing the bitset to view-and-read-history. Nothing recomputes it on a clock tick, and the server has no reason to emit a `member_update` when a timeout simply lapses. `canI(st, need)` without a channel id returns that frozen value; `canI(st, need, channelId)` goes through `channelPerms`, which *does* recompute with a fresh `Date.now()`, so the two disagree.
+- **Repro**: Be timed out in a server for five minutes. Wait it out with the tab open. Every server-scoped check — creating an invite, the buttons on the members page, anything reading `st.myPermissions` — stays disabled indefinitely, while channel-scoped checks quietly start working again. Only a reload or an unrelated role/member event brings the rest back.
+- **Fix**: Store `timeout_until` alongside `myPermissions` and recompute when it passes, or make `canI` recompute rather than read a cached bitset.
 
 ### [BAD] `installTitleBadge` walks every channel on every change to any of four stores
 
@@ -544,10 +643,67 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **Repro**: Leave a call (or switch sidebars, which unmounts `VoiceView`) while `enumerateDevices()` is still pending and `setCanFlip` runs on an unmounted component. Separately, plug in a second camera mid-call with your camera already on and the flip button (`:706`) never appears until you toggle the camera off and on.
 - **Fix**: Add a `let alive = true` guard with a cleanup, and re-run on `devicechange`.
 
+### [BAD] An upload whose worker never answers hangs forever and blocks app updates
+
+- **Where**: `web/src/lib/attachments.ts:106-153`
+- **What**: The promise settles only on a worker message or `onerror`. There is no timeout. If a worker is killed without either — a browser reclaiming a backgrounded tab's workers, a worker that hangs before `xhr.send` — `send()` never resolves, so `uploadStaged`'s `finally` at `:180` never runs `release()`. The `holdReload()` taken at `:171` is then held for the life of the tab, which is exactly what `reloadAllowed()` (`lib/busy.ts:40`) waits on before applying a new build.
+- **Repro**: Start a large upload and background the tab on a memory-pressured phone long enough for the worker to be reclaimed. Return: the attachment shows a frozen progress bar with no error and no way to cancel, and a newly deployed version never applies to that tab.
+- **Fix**: Race the promise against a stall timeout that terminates the worker and rejects, mirroring `upload.worker.ts`'s own `STALL_MS`.
+
+### [BAD] A dialog loses everything typed into it when the page enters or leaves full screen
+
+- **Where**: `web/src/components/common/Modal.tsx:29` and `:69`
+- **What**: `usePortalRoot()` swaps the portal container between `document.body` and the fullscreen element on every `fullscreenchange`. Passing a different container to `createPortal` makes React unmount and remount the entire subtree, so uncontrolled inputs reset and controlled ones re-mount from their initial props.
+- **Repro**: In a call, open a dialog (Create Channel), type a name, then press Escape out of the fullscreen stream behind it. The field is empty again.
+- **Fix**: Keep the portal container stable for a given dialog instance, or move the DOM node rather than re-parenting through a new `createPortal` target.
+
+### [BAD] `Modal` claims `aria-modal` but has no focus trap
+
+- **Where**: `web/src/components/common/Modal.tsx:56`
+- **What**: The card sets `role="dialog" aria-modal="true"` and focuses the first field (`:47`), but nothing handles Tab and nothing marks the background `inert`. Tab walks straight out of the dialog into the sidebar and message list behind the overlay, where clicks are blocked but focus is not.
+- **Repro**: Open any dialog (Create Channel) and press Tab past the last control. Focus lands on the channel list behind the overlay; Enter there navigates away while the dialog is still on screen.
+- **Fix**: Cycle Tab and Shift-Tab inside `ref.current`, or set `inert` on the app root while a modal layer is open.
+
+### [BAD] `ScrollingText` rebuilds its `ResizeObserver` and forces a layout read on every parent render
+
+- **Where**: `web/src/components/common/ScrollingText.tsx:42`
+- **What**: The effect's dep is `[children]`. Callers pass JSX (`StatusLine.tsx:58` wraps several elements), so `children` is a brand-new object on every render. The effect therefore tears down and recreates a `ResizeObserver` and runs `measure()` — which reads `text.scrollWidth` and `outer.clientWidth`, forcing a synchronous reflow — on every re-render, not just when the text changes.
+- **Repro**: Open the DM sidebar with twenty conversations, several with custom statuses. Every presence packet re-renders `DMSidebar`, which re-renders every `StatusLine`, which triggers twenty observer teardowns plus twenty forced reflows. Visible as scroll jank on a busy instance.
+- **Fix**: Key the effect on a stable value (the measured text), not on `children`.
+
+### [BAD] Sidebar drag-and-drop re-renders the whole tree on every `dragover`
+
+- **Where**: `web/src/components/sidebar/ServerSidebar.tsx:96` and `:99`
+- **What**: `setDrop({ id, where })` allocates a new object on every `dragover` event — roughly sixty a second while the pointer moves — so React never bails out even when the drop target is unchanged. Every one re-renders the full channel tree, each `Tooltip` and each `VoiceParticipants` (`:211`).
+- **Repro**: With Manage Channels, drag a channel slowly across a server with fifty channels while a call is running. The drag indicator stutters and the voice participant rows flicker.
+- **Fix**: Guard the setter: `setDrop(d => d && d.id === id && d.where === where ? d : { id, where })`.
+
+### [BAD] The DM close control is a `role="button"` span nested inside a real `<button>`
+
+- **Where**: `web/src/components/sidebar/DMSidebar.tsx:109-121`, inside the `<button>` opened at `:91`
+- **What**: Nested interactive content is invalid HTML, and the span has neither `tabIndex` nor a key handler, so the accessible name it advertises is unreachable. The row is announced as one button with two conflicting labels.
+- **Repro**: Tab to a DM row and press Enter — it navigates. There is no way to reach the X, so a keyboard or screen-reader user can never close a DM or leave a group from the sidebar.
+- **Fix**: Make the row a `<div>` with a nested `<button>` for navigation plus a sibling `<button>` for close, or move the close action into the context menu only.
+
+### [BAD] `GifGrid` constructs a `ResizeObserver` with no availability guard
+
+- **Where**: `web/src/components/pickers/GifGrid.tsx:69`
+- **What**: `const resize = new ResizeObserver(() => read());` runs unguarded inside `useLayoutEffect`. Both sibling call sites guard it — `EmojiPicker.tsx:253` and `ScrollingText.tsx:37` each do `if (typeof ResizeObserver === "undefined") return;`. Where the API is missing the constructor throws during layout and takes the whole picker down instead of degrading to a fixed-size grid.
+- **Repro**: Render `<GifPicker />` in a jsdom test environment without a polyfill, or in an old WebView. The GIF tab throws rather than rendering.
+- **Fix**: Add the same guard used elsewhere.
+
+### [BAD] GIF paging can loop on a provider that repeats a page
+
+- **Where**: `web/src/components/pickers/GifPicker.tsx:100-104`, with `GifGrid.tsx:92-94`
+- **What**: `loadMore`'s identity changes whenever `loading` flips, and `GifGrid`'s effect re-fires `onNearEnd` on every `onNearEnd` identity change while `nearEnd` holds. If a page comes back non-empty but entirely duplicate (the dedupe at `:66-69` drops all of it), `tiles.length` is unchanged, `next` is unchanged (`:75` keeps it because `page.results.length` is truthy), `nearEnd` stays true, and `loading` toggling alone restarts the cycle.
+- **Repro**: Needs a provider that returns an overlapping page with a non-advancing cursor; this could not be reproduced against the live Klipy proxy, so treat it as a latent hazard rather than a confirmed loop.
+- **Fix**: Stop when a page adds zero new rows, not just when it is empty.
+
 ### [POLISH] `GatewayClient.ready` is written five times and never read
 
 - **Where**: `web/src/gateway/client.ts:49`, written at `:88`, `:116`, `:125`, `:187`, `:207`
 - **What**: Dead state. The field is carefully maintained across connect, the `ready` frame, close, heartbeat timeout and user close — and nothing consults it. Whatever it was meant to gate (probably "do not flush until identify is acknowledged") is not implemented.
+- **Repro**: No user-visible failure; it is dead state that reads as if it gates something. The thing it plausibly meant to gate — not flushing the queue until `identify` is acknowledged — is not implemented, so a reader auditing the reconnect path is misled.
 - **Fix**: Delete it, or use it: `flush()` currently sends queued frames in `onopen`, immediately after `identify` and before the server has answered.
 
 ### [POLISH] `authorFetches` retries a permanently-missing user on every page load
@@ -561,6 +717,7 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 
 - **Where**: `web/src/stores/typing.ts:25-38`
 - **What**: The sweep allocates a new inner object for every channel on every tick and writes `byChannel[ch] = kept` even when `kept` is empty, so the outer map accumulates one permanently-empty entry per channel anyone has ever typed in.
+- **Repro**: Type in fifty different channels over a session; `byChannel` keeps fifty permanently-empty objects, and every sweep tick allocates fifty replacements and re-renders every `TypingBar`. Small in absolute terms, but it is a timer-driven cost that only grows.
 - **Fix**: Only rebuild the channels that changed, and delete entries that end up empty.
 
 ### [POLISH] A hostile message of open brackets costs eleven times an ordinary parse
@@ -581,12 +738,14 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 
 - **Where**: `web/src/components/composer/Composer.tsx:129-147`
 - **What**: Declared with no second argument, so the window listener is removed and re-added after every render of the Composer — every keystroke. It is written that way to read a fresh `text`, but the file already has the idiomatic tool for that (`textRef`, `:103-104`).
+- **Repro**: Not user-visible; it is churn on a hot path (one `removeEventListener` plus one `addEventListener` per keystroke) and an easy source of a future "the handler ran twice" bug.
 - **Fix**: Use `textRef.current` inside the handler and give the effect `[]`.
 
 ### [POLISH] `unreadFrom` is a ref written during render
 
 - **Where**: `web/src/components/chat/MessageList.tsx:102`
 - **What**: `if (unreadFrom.current === undefined && loaded) unreadFrom.current = readState?.lastReadId ?? null;` mutates a ref in the render body, and the `rows` memo that consumes it lists `loaded` as a proxy dependency (`:129`) rather than the value. It is idempotent under StrictMode's double render, but it is a side effect during render.
+- **Repro**: No current user-visible failure — it is idempotent under StrictMode's double render, because the second pass sees it already set. Flagged as the fragile pattern it is: it will misbehave the moment a render is interrupted and restarted.
 - **Fix**: Capture it in a `useEffect` keyed on `loaded`, or derive it into state.
 
 ### [POLISH] Embeds are keyed by array index
@@ -607,48 +766,56 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 
 - **Where**: `web/src/components/chat/SubchatPanel.tsx:79-80`, rendered at `:133`
 - **What**: `.catch(() => undefined).finally(() => alive && setLoading(false))` — a failed fetch is indistinguishable from an empty result. Same shape as the pins panel.
+- **Repro**: Open the subchat panel in a DM while offline. It says the conversation has no subchats, which is indistinguishable from the truth and equally indistinguishable from a server error.
 - **Fix**: Track the error and say so.
 
 ### [POLISH] `StickerPopout`'s info cache grows without bound and repositions on every scroll
 
 - **Where**: `web/src/components/chat/StickerPopout.tsx:20` and `:100`
 - **What**: `infoCache` is a module-level `Map` with a 60 s freshness check but no eviction — entries are deleted only on failure (`:28`) — so it grows one entry per distinct sticker ever clicked. Separately, `window.addEventListener("scroll", reposition, true)` calls `setAt(...)` on every capture-phase scroll anywhere in the app while the popout is open.
+- **Repro**: Click a few hundred distinct stickers over a long session and `infoCache` keeps an entry for each. Separately, with the popout open, scroll the message list: `setAt(...)` runs on every capture-phase scroll event in the app, re-rendering the popout at frame rate without rAF.
 - **Fix**: Cap the map (or delete on TTL expiry) and rAF-throttle `reposition`.
 
 ### [POLISH] Dead expression subscribes every friend row to the auth store
 
 - **Where**: `web/src/pages/FriendsPage.tsx:208`
 - **What**: `{meId ? null : null}` renders nothing either way, but `const meId = useAuth((a) => a.me?.id)` at `:111` means every friend row re-renders on any auth store change.
+- **Repro**: Nothing renders either way. The cost is that every friend row re-renders on any auth store change, including each `lockVersion` bump.
 - **Fix**: Delete `:208` and the now-unused `meId`.
 
 ### [POLISH] The connection banner is not translated
 
 - **Where**: `web/src/components/shell/AppShell.tsx:162`
 - **What**: `{connection === "connecting" ? "Connecting…" : "Disconnected — reconnecting…"}` — two literal English strings in a component where every other string goes through `t()`. This is the most visible text in the app when anything goes wrong, and it is the one piece nobody in Arabic, Japanese or Hindi can read.
+- **Repro**: Switch the app to Arabic, Japanese or Hindi and drop the network. The one line telling you what is wrong is in English, inside a right-to-left layout in the Arabic case.
 - **Fix**: Add the two keys to the catalogues.
 
 ### [POLISH] The search panel's heading, hints and result summaries are not translated
 
 - **Where**: `web/src/components/search/SearchPanel.tsx:101`, `:121`, `:139`
 - **What**: `"Search"`, the pluralised `` `${results.length} result${results.length === 1 ? "" : "s"}` ``, `-word` / `exclude`, `"[sticker]"` and `` `[${n} file${n === 1 ? "" : "s"}]` `` are literal, sitting between properly translated siblings. The `s`-suffix pluralisation is also wrong for most of the eleven languages the app ships; `i18n/core.ts` has plural forms for exactly this.
+- **Repro**: Open search in Russian and type a query. The header reads "3 results" in English, and the `s`-suffix pluralisation is wrong for Russian's three plural forms, which `i18n/core.ts` already knows how to pick.
 - **Fix**: Route through `t()` with `count` values.
 
-### [POLISH] The GIF picker's tab labels and dead-favourite note are not translated
+### [POLISH] The GIF picker's tab label and dead-favourite note are not translated
 
 - **Where**: `web/src/components/pickers/GifPicker.tsx:124` and `:146`
-- **What**: `{q.trim() ? "Results" : "Trending"}` and `` `${dead.size} favourite${dead.size === 1 ? "" : "s"} no longer load.` `` — the latter on the same line as two `tr_()` calls.
-- **Fix**: Route through `tr_()`.
+- **What**: `:124` renders `{q.trim() ? "Results" : "Trending"}` as a tab label beside a translated "Favorites". `:146` is worse: `` `${dead.size} favourite${dead.size === 1 ? "" : "s"} no longer load.` `` hardcodes both the sentence and English plural formation, on the same line as two `tr_()` calls, when `i18n/core.ts:101` already handles plurals through `Intl.PluralRules`.
+- **Repro**: In Spanish, the GIF tabs read "Favoritos | Trending", and a single broken favourite reads "1 favourite no longer load."
+- **Fix**: `tr_()` with a `{count}` parameter.
 
 ### [POLISH] Slowmode durations are not translated
 
 - **Where**: `web/src/components/server/ChannelSettingsModal.tsx:27-31`
 - **What**: `slowLabel` returns `"Off"`, `` `${v}s` ``, `` `${v / 60}m` ``, `` `${v / 3600}h` `` — English abbreviations that do not survive translation, inside a page whose every other label is translated.
+- **Repro**: Open a channel's settings in Japanese. Every label around the slowmode dropdown is Japanese and its options read "Off", "5s", "10m", "6h".
 - **Fix**: Use `t()` with counts, or `Intl.RelativeTimeFormat`'s unit strings.
 
 ### [POLISH] The Rich Presence card's connective text is not translated
 
 - **Where**: `web/src/components/activity/ActivityCard.tsx:37`, `:38`, `:41`, `:67`, `:68`
 - **What**: `` `by ${a.state}` ``, `` `on ${a.assets.large_text}` ``, `` ` (${size[0]} of ${size[1]})` ``, `"left"` and `"elapsed"`. `lib/activity.ts` translates the verbs ("Listening to", "Playing") properly; the card that displays them does not translate the words around them. Word order is also fixed in English, which no amount of key-adding fixes without restructuring — `<Tr>` exists for exactly this (`i18n/index.tsx:166`).
+- **Repro**: With the desktop app playing music, view your own profile in Spanish. The heading "Escuchando Spotify" is followed by "by Rick Astley", "on Whenever You Need Somebody" and "2:14 left".
 - **Fix**: Move the whole line into a `<Tr>` template so the language decides the order.
 
 ### [POLISH] `SettingsLayer` portals to `document.body` rather than the fullscreen root
@@ -679,6 +846,13 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **Repro**: Copy the guest link and close the modal within two seconds; the timer fires against an unmounted component. Harmless under React 18, but it is the one uncleaned timer in the folder — `VoiceView.tsx:526-531`, `session.ts:93-96` and `sfu.ts:1033-1037` all clean up.
 - **Fix**: Keep the handle in a ref and clear it on unmount.
 
+### [POLISH] `splice(indexOf(hook), 1)` removes the wrong hook when the hook is already gone
+
+- **Where**: `web/src/components/server/pages/InvitesPage.tsx:39` and `web/src/components/server/pages/BansPage.tsx:44`
+- **What**: Both cleanups do `dispatchHooks.onUnhandled.splice(dispatchHooks.onUnhandled.indexOf(hook), 1)`. When `indexOf` returns `-1`, `splice(-1, 1)` removes the *last* element of the array — someone else's hook.
+- **Repro**: Theoretical: React runs each cleanup exactly once, so `indexOf` always finds the hook today. It is a footgun that fires the moment anything removes a hook out of band.
+- **Fix**: `const i = arr.indexOf(hook); if (i >= 0) arr.splice(i, 1);`
+
 ### [POLISH] The security page ignores `lockVersion`, so a passcode adopted elsewhere is invisible to it
 
 - **Where**: `web/src/components/settings/SecurityPage.tsx:52`
@@ -699,3 +873,73 @@ Counts: **3 DATA-LOSS**, **8 BROKEN**, **12 RACE**, **11 LEAK**, **33 BAD**,
 - **What**: `let ringTimers = new Map<...>()` — only `.set`/`.get`/`.delete` are ever used (`:774-775`, `:888-889`). Every other module-level collection in the file is `const`.
 - **Repro**: None; it only misleads a reader into thinking the map is swapped somewhere.
 - **Fix**: `const`.
+
+### [POLISH] Profile dates follow the browser locale, not the app's
+
+- **Where**: `web/src/components/profile/ProfileCard.tsx:29`
+- **What**: `new Date(ms).toLocaleDateString(undefined, …)` — `undefined` means "the browser's locale". This is the same divergence as the `<t:…>` timestamps above: `lib/time.ts:24-29` exists precisely to pass `translator().locale`, and its header comment says why.
+- **Repro**: Set the app language to Arabic on an English system and open any profile. "Member since" (`:346`) and "Friends since" (`:351`) are Arabic labels followed by "Mar 4, 2025".
+- **Fix**: Use `formatLongDate` from `@/lib/time` rather than the local `dateOf`.
+
+### [POLISH] Hardcoded English: the icon picker's hover overlay
+
+- **Where**: `web/src/components/common/IconPicker.tsx:62`
+- **What**: `<span>{shown ? "Change" : "Upload"}</span>` — the label on the hover overlay of every server icon, group icon and pack icon picker.
+- **Repro**: Switch to any non-English language, open Server Settings → Overview and hover the icon. It reads "Change".
+- **Fix**: `t("common.iconPicker.change")` / `t("common.iconPicker.upload")`.
+
+### [POLISH] Hardcoded English: the spinner's accessible name
+
+- **Where**: `web/src/components/common/Spinner.tsx:3`
+- **What**: `label = "Loading"` is the default `aria-label` on `role="status"` for every spinner in the app, and `FullScreenSpinner` (`:16`) always uses the default.
+- **Repro**: A screen reader on a non-English UI announces "Loading" in English during every load.
+- **Fix**: Default to a `t()` call evaluated per invocation, as `stores/users.ts:28` does.
+
+### [POLISH] Hardcoded English: the captcha sheet's Cancel button
+
+- **Where**: `web/src/lib/captcha.ts:101` (and `:91`)
+- **What**: `cancel.textContent = "Cancel";` is a visible button next to a title that *is* translated (`:96`, `t("captcha.oneQuickCheck")`). `:91`'s `aria-label` is the literal `"Captcha"`.
+- **Repro**: Sign up with the app in German. The sheet's heading is German and its only escape hatch is English.
+- **Fix**: `t("chat.editMessage.cancel")`, already in the catalogue and used at `ImageCropModal.tsx:133`.
+
+### [POLISH] Hardcoded English: the sticker picker's empty state and remove label
+
+- **Where**: `web/src/components/pickers/StickerPicker.tsx:68` and `:84`
+- **What**: `:68` renders the bare text `No sticker packs yet.` directly above a translated link (`:70`). `:84` builds `` aria-label={`Remove ${p.name}`} `` while the visible label beside it goes through `t`.
+- **Repro**: Open the Stickers tab with no packs installed, in any non-English language: one English sentence above one translated link.
+- **Fix**: Route both through `t()`, interpolating the pack name.
+
+### [POLISH] Hardcoded English: the DM unread badge's accessible name
+
+- **Where**: `web/src/components/sidebar/DMSidebar.tsx:108`
+- **What**: `` aria-label={`${count > 99 ? "more than 99" : count} unread`} `` — both "more than 99" and "unread" are literals.
+- **Repro**: A screen reader on a Japanese UI announces "5 unread" in English for every DM badge.
+- **Fix**: `t("sidebar.dMSidebar.unreadCount", { count })`.
+
+### [POLISH] Hardcoded English: emoji picker fallback heading and pack removal toast
+
+- **Where**: `web/src/components/pickers/EmojiPicker.tsx:262`, `web/src/lib/packRemoval.ts:44`
+- **What**: `EmojiPicker:262` falls back to the literal `"Server"` as a custom-emoji section heading when the servers store has not caught up. `packRemoval:44` toasts `` `Removed '${pack.name}'.` `` — the only untranslated string in a file whose confirm title, body and error (`:27`, `:36`) all go through `t()`.
+- **Repro**: Remove a sticker pack with the app in French: the confirmation dialog is French and the success toast is English.
+- **Fix**: `t()` both.
+
+### [POLISH] Hardcoded English: export progress and the DM leave dialog
+
+- **Where**: `web/src/lib/export.ts:164`, `:168`, `:180`; `web/src/components/sidebar/dmMenu.ts:126`
+- **What**: `onProgress("Profile…")`, `onProgress("Friends…")` and `` `${i+1}/${all.length} ${label} (${n} messages)` `` are shown live in the export dialog. `dmMenu:126` sets the confirm dialog's `title` to `` `Leave '${name}'` `` while its body, confirm label and every sibling entry use `t()` — and the analogous server dialog does it correctly at `serverMenu.ts:79` with `t("sidebar.serverMenu.leaveNamed", { name })`.
+- **Repro**: Export your data, or right-click a group DM → Leave, in any other language. Mixed-language progress text and a mixed-language dialog.
+- **Fix**: Route through `t()`; the `leaveNamed` pattern already exists to copy. The `README.txt` body at `export.ts:186` is file content rather than UI and is arguably fine in English.
+
+### [POLISH] Attachment failures interpolate an untranslated English noun into a translated sentence
+
+- **Where**: `web/src/components/chat/Attachments.tsx:169`, `:204`, `:224` (the `what` prop), `:70` (where it lands), plus literals at `:79` and `:209`
+- **What**: `<LoadFailed … what="image" />` / `"video"` / `"audio"` feed `tr_("chat.attachments.couldNotBeLoaded", { what })`. The sentence is translated and the noun inside it is not — so every language gets its own grammar wrapped around an English word, and no language can decline or agree with it. `:79` renders the literal `Retry` and `:209` the literal `` Load video ({formatBytes(att.size)}) ``.
+- **Repro**: Set the app to German and let a video attachment fail to load. The message reads correct German with "video" in the middle of it, above a button marked "Retry".
+- **Fix**: Pass a translated noun (`t("chat.attachments.nounVideo")`) or, better, give each kind its own full sentence key so word order and agreement are the translator's to decide.
+
+### [POLISH] Hardcoded English: the "Timeout" moderation label
+
+- **Where**: `web/src/components/server/memberMenu.ts:44`, `web/src/components/server/pages/MembersPage.tsx:101`
+- **What**: Both render the literal `"Timeout"` as the menu label and the button `title`, with a translated `aria-label` right beside it — `t("server.members.timeout")` at `MembersPage:101` — and a translated "Remove timeout" on the other branch of the same ternary.
+- **Repro**: Right-click a member in a non-English UI: every entry is translated except "Timeout".
+- **Fix**: Add the key; the `removeTimeout` half already exists.

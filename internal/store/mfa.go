@@ -68,6 +68,48 @@ func (s *Store) SpendTOTPStep(ctx context.Context, id ids.ID, step int64) (bool,
 	return n > 0, err
 }
 
+// ErrMFAAlreadyOn says the second factor was already on, so this request is a
+// repeat of one that has already finished.
+var ErrMFAAlreadyOn = errors.New("mfa already enabled")
+
+// FinishTOTPSetup turns the second factor on and writes its backup codes, as
+// one change or none.
+//
+// Both halves have to land together. Turning it on and then failing to write
+// the codes leaves an account locked to an authenticator with nothing to fall
+// back on, after a response that said setup failed. Writing the codes first
+// and then failing hands out a list that does not work.
+//
+// It also refuses when the second factor is already on, which is what makes
+// the request once-only: the reply to this call is the only copy of the codes
+// anyone gets, and a repeat would quietly replace the list just written down.
+func (s *Store) FinishTOTPSetup(ctx context.Context, id ids.ID, sealed []byte, step int64, hashes []string) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		var enabled int
+		err := tx.QueryRowContext(ctx, `SELECT enabled FROM user_mfa WHERE user_id = ?`, int64(id)).Scan(&enabled)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		if err == nil && enabled != 0 {
+			return ErrMFAAlreadyOn
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO user_mfa (user_id, totp_secret, last_step, enabled, created_at) VALUES (?,?,?,1,?)
+			ON CONFLICT(user_id) DO UPDATE SET totp_secret = excluded.totp_secret, last_step = excluded.last_step, enabled = 1, created_at = excluded.created_at`,
+			int64(id), sealed, step, nowMs()); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM mfa_backup_codes WHERE user_id = ?`, int64(id)); err != nil {
+			return err
+		}
+		for _, h := range hashes {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO mfa_backup_codes (user_id, code_hash, used_at) VALUES (?,?,NULL)`, int64(id), h); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // DisableMFA removes the second factor and every backup code.
 func (s *Store) DisableMFA(ctx context.Context, id ids.ID) error {
 	return s.Tx(ctx, func(tx *db.Tx) error {

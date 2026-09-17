@@ -262,16 +262,19 @@ func (s *Server) handleTOTPEnable(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if err := s.Store.EnableTOTP(r.Context(), u.ID, sealed, step); err != nil {
-		WriteError(w, err)
-		return
-	}
 	codes, hashes, err := s.newBackupCodes(u.ID)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
-	if err := s.Store.ReplaceBackupCodes(r.Context(), u.ID, hashes); err != nil {
+	// One change or none, and only once: this response is the only copy of the
+	// backup codes, so a repeat of the request must not replace the list the
+	// person has already written down.
+	if err := s.Store.FinishTOTPSetup(r.Context(), u.ID, sealed, step, hashes); err != nil {
+		if errors.Is(err, store.ErrMFAAlreadyOn) {
+			WriteError(w, E(http.StatusConflict, "already_enabled", "Two-factor is already on. Turn it off first, or make new backup codes from Security."))
+			return
+		}
 		WriteError(w, err)
 		return
 	}

@@ -346,7 +346,14 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.subchatsLeft(r.Context(), ch.ID, subs, uid)
-	remaining, _ := s.Store.Participants(r.Context(), ch.ID)
+	// A failed read here used to look exactly like an empty group, and the
+	// next line deletes the conversation and every message in it. Whoever is
+	// left keeps their group; the caller can try again.
+	remaining, err := s.Store.Participants(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if len(remaining) == 0 {
 		_ = s.deleteConversation(r.Context(), ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
