@@ -298,6 +298,15 @@
   "desktop.displayPicker.windowsCount": {
     "other": "窗口（{count}）"
   },
+  "desktop.native.about": "端到端加密的聊天、语音和服务器。",
+  "desktop.native.addToDictionary": "添加到词典",
+  "desktop.native.offlineBody": "检查一下你的网络。几秒后会再试一次。",
+  "desktop.native.offlineRetry": "立即重试",
+  "desktop.native.offlineTitle": "无法连接到 Nexa",
+  "desktop.native.open": "打开 Nexa",
+  "desktop.native.openLinkInBrowser": "在浏览器中打开链接",
+  "desktop.native.quit": "退出 Nexa",
+  "desktop.native.view": "视图",
   "download.allDownloads": "所有下载",
   "download.andRunItItUpdatesItself": "）然后运行；它会自动更新。.deb 可用你的包管理器安装，有新版本时会提醒你。",
   "download.android": "Android",

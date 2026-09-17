@@ -313,6 +313,15 @@
   "desktop.displayPicker.windowsCount": {
     "other": "Окна ({count})"
   },
+  "desktop.native.about": "Чат, голос и серверы со сквозным шифрованием.",
+  "desktop.native.addToDictionary": "Добавить в словарь",
+  "desktop.native.offlineBody": "Проверьте соединение. Попробуем снова через несколько секунд.",
+  "desktop.native.offlineRetry": "Попробовать сейчас",
+  "desktop.native.offlineTitle": "Nexa недоступен",
+  "desktop.native.open": "Открыть Nexa",
+  "desktop.native.openLinkInBrowser": "Открыть ссылку в браузере",
+  "desktop.native.quit": "Выйти из Nexa",
+  "desktop.native.view": "Вид",
   "download.allDownloads": "Все загрузки",
   "download.andRunItItUpdatesItself": ") и запустите; оно обновляется само. Пакет .deb ставится вашим менеджером пакетов и сообщает о новой версии.",
   "download.android": "Android",

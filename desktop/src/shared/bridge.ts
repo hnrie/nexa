@@ -82,7 +82,32 @@ export interface Identity {
 }
 
 /** IPC channel names between the preload script and the main process. */
+/**
+ * The words the operating system shows for this app: the tray menu, the macOS
+ * menu bar, the right-click menu on text, the page that stands in when the
+ * site cannot be reached. The page holds the only catalogue, so it sends these
+ * across whenever its language changes rather than the app keeping a second
+ * set of translations that could drift.
+ */
+export interface NativeStrings {
+  open: string;
+  mute: string;
+  deafen: string;
+  checkForUpdates: string;
+  quit: string;
+  view: string;
+  reload: string;
+  addToDictionary: string;
+  copyLink: string;
+  openLinkInBrowser: string;
+  offlineTitle: string;
+  offlineBody: string;
+  offlineRetry: string;
+  about: string;
+}
+
 export const IPC = {
+  setStrings: "app:set-strings",
   rpcGetState: "rpc:get-state",
   rpcSetEnabled: "rpc:set-enabled",
   rpcSetRelay: "rpc:set-relay",

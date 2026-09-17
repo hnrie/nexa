@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Moved } from "./rpc/discord";
+import type { NativeStrings } from "../shared/bridge";
 
 export interface Stored {
   launchAtLogin: boolean;
@@ -19,6 +20,8 @@ export interface Stored {
   movedSocket: Moved | null;
   /** An update this app has already announced, so it does not nag. */
   lastUpdateSeen: string | null;
+  /** The page's words for the tray, the menu bar and the offline page, so the next launch is already in its language. */
+  strings: NativeStrings | null;
 }
 
 export const DEFAULTS: Stored = {
@@ -32,6 +35,7 @@ export const DEFAULTS: Stored = {
   bounds: null,
   movedSocket: null,
   lastUpdateSeen: null,
+  strings: null,
 };
 
 export class SettingsStore {
@@ -47,6 +51,7 @@ export class SettingsStore {
       }
       if (raw.bounds && typeof raw.bounds === "object") this.data.bounds = raw.bounds;
       if (raw.movedSocket && typeof raw.movedSocket === "object") this.data.movedSocket = raw.movedSocket;
+      if (raw.strings && typeof raw.strings === "object") this.data.strings = raw.strings;
       if (!Array.isArray(this.data.hiddenApps)) this.data.hiddenApps = [];
     } catch {
       /* first run, or a damaged file: defaults */

@@ -10,8 +10,9 @@ import { BASE, ORIGIN, isAppUrl } from "./config";
 import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSettings, restartApp, screenAccess, shareAudioFailed } from "./permissions";
 import { RpcService } from "./rpc/service";
 import { SettingsStore } from "./settings";
-import { createTray } from "./tray";
+import { createTray, fillTray, type TrayActions } from "./tray";
 import { Updater } from "./update";
+import { nativeStrings, setNativeStrings, stringsDiffer } from "./strings";
 import { applicationMenu, createMainWindow, resourcePath } from "./window";
 
 // tests run the app with a profile of their own
@@ -27,6 +28,8 @@ const log = (msg: string, extra?: Record<string, unknown>) => {
 
 let win: BrowserWindow | null = null;
 let quitting = false;
+let tray: Electron.Tray | null = null;
+let trayActions: TrayActions | null = null;
 let identity: Identity | null = null;
 let rpc: RpcService | null = null;
 let updater: Updater | null = null;
@@ -56,15 +59,10 @@ function fromApp(e: IpcMainEvent | IpcMainInvokeEvent): boolean {
 }
 
 async function start(): Promise<void> {
-  // the panel behind "About Nexa" on macOS, which is otherwise the bare name
-  app.setAboutPanelOptions({
-    applicationName: "Nexa",
-    applicationVersion: app.getVersion(),
-    version: "",
-    copyright: "Copyright © 2026 Evilion",
-    credits: "End to end encrypted chat, voice and servers.",
-    iconPath: resourcePath("icon.png"),
-  });
+  // the tray, the menu bar and the offline page all exist before a page has
+  // loaded, so they start from what the last run was told
+  setNativeStrings(settings.get("strings"));
+  aboutPanel();
   lockPermissions();
   // opened at login: Windows passes the argument given below, macOS says so itself
   const launchedHidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin === true);
@@ -91,7 +89,7 @@ async function start(): Promise<void> {
   // the page decides whether to notify from this rather than document.hasFocus()
   for (const event of ["focus", "blur", "show", "hide", "minimize", "restore"] as const) win.on(event as "focus", () => toPage(IPC.windowState, windowState()));
 
-  createTray({
+  trayActions = {
     show: showWindow,
     mute: () => toPage(IPC.trayAction, "mute"),
     deafen: () => toPage(IPC.trayAction, "deafen"),
@@ -100,7 +98,8 @@ async function start(): Promise<void> {
       quitting = true;
       app.quit();
     },
-  });
+  };
+  tray = createTray(trayActions);
   applyLoginItem(settings.get("launchAtLogin"));
 
   rpc = new RpcService({
@@ -125,6 +124,18 @@ async function start(): Promise<void> {
 
   registerIpc();
   log("started", { origin: ORIGIN });
+}
+
+/** The panel behind "About Nexa" on macOS, which is otherwise the bare name. */
+function aboutPanel(): void {
+  app.setAboutPanelOptions({
+    applicationName: "Nexa",
+    applicationVersion: app.getVersion(),
+    version: "",
+    copyright: "Copyright © 2026 Evilion",
+    credits: nativeStrings().about,
+    iconPath: resourcePath("icon.png"),
+  });
 }
 
 function registerIpc(): void {
@@ -155,6 +166,15 @@ function registerIpc(): void {
   handle(IPC.rpcRestartDiscord, () => rpc!.restartDiscord());
   on(IPC.setIdentity, (user: Identity | null) => {
     identity = user && typeof user.id === "string" ? user : null;
+  });
+  on(IPC.setStrings, (strings: unknown) => {
+    const before = nativeStrings();
+    const after = setNativeStrings(strings);
+    if (!stringsDiffer(before, after)) return;
+    settings.set({ strings: after });
+    if (tray && trayActions) fillTray(tray, trayActions);
+    applicationMenu(() => win, () => void updater?.check());
+    aboutPanel();
   });
 
   handle(IPC.updateGetState, () => updater!.state);

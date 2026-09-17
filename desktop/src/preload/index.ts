@@ -4,7 +4,7 @@
  * web/src/lib/desktopBridge.ts describes this object to the page.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import { IPC, type DesktopSettings, type DisplaySourceRequest, type Identity, type RpcActivity, type RpcState, type UpdateState, type WindowState } from "../shared/bridge";
+import { IPC, type DesktopSettings, type DisplaySourceRequest, type Identity, type NativeStrings, type RpcActivity, type RpcState, type UpdateState, type WindowState } from "../shared/bridge";
 
 const arg = (name: string): string => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3) ?? "";
 const origin = arg("evilion-origin");
@@ -48,6 +48,7 @@ if (origin && location.origin === origin) {
       get: (): Promise<DesktopSettings> => ipcRenderer.invoke(IPC.settingsGet),
       set: (patch: Partial<DesktopSettings>): Promise<DesktopSettings> => ipcRenderer.invoke(IPC.settingsSet, patch),
     },
+    setStrings: (strings: NativeStrings): void => ipcRenderer.send(IPC.setStrings, strings),
     setBadge: (count: number): void => ipcRenderer.send(IPC.setBadge, Number(count) || 0),
     setCallActive: (active: boolean): void => ipcRenderer.send(IPC.setCallActive, !!active),
     onDisplaySources: listen<DisplaySourceRequest>(IPC.displaySources),

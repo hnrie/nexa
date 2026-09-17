@@ -298,6 +298,15 @@
   "desktop.displayPicker.windowsCount": {
     "other": "ウインドウ（{count}）"
   },
+  "desktop.native.about": "エンドツーエンド暗号化のチャット・通話・サーバー。",
+  "desktop.native.addToDictionary": "辞書に追加",
+  "desktop.native.offlineBody": "接続を確認してください。数秒後にもう一度試します。",
+  "desktop.native.offlineRetry": "今すぐ試す",
+  "desktop.native.offlineTitle": "Nexa に接続できません",
+  "desktop.native.open": "Nexa を開く",
+  "desktop.native.openLinkInBrowser": "ブラウザーでリンクを開く",
+  "desktop.native.quit": "Nexa を終了",
+  "desktop.native.view": "表示",
   "download.allDownloads": "すべてのダウンロード",
   "download.andRunItItUpdatesItself": "）を実行してください。自動で更新されます。.deb はパッケージマネージャーでインストールでき、新しいバージョンが出ると知らせます。",
   "download.android": "Android",

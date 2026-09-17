@@ -6,6 +6,24 @@
  * desktop/src/preload/index.ts implements this; keep the two in step.
  */
 
+/** The words the desktop app shows outside the page. desktop/src/shared/bridge.ts holds the other copy. */
+export interface NativeStrings {
+  open: string;
+  mute: string;
+  deafen: string;
+  checkForUpdates: string;
+  quit: string;
+  view: string;
+  reload: string;
+  addToDictionary: string;
+  copyLink: string;
+  openLinkInBrowser: string;
+  offlineTitle: string;
+  offlineBody: string;
+  offlineRetry: string;
+  about: string;
+}
+
 /** A Rich Presence activity as a program sent it to the desktop app, cleaned there. */
 export interface RpcActivity {
   application_id: string;
@@ -131,6 +149,13 @@ export interface EvilionDesktop {
     get(): Promise<DesktopSettings>;
     set(patch: Partial<DesktopSettings>): Promise<DesktopSettings>;
   };
+  /**
+   * The words the app shows outside this page: the tray menu, the macOS menu
+   * bar, the right-click menu on text, the page that stands in when the site
+   * cannot be reached. Sent from here because the catalogue lives here (app
+   * 1.0.4 and later).
+   */
+  setStrings?(strings: NativeStrings): void;
   setBadge(count: number): void;
   setCallActive(active: boolean): void;
   onDisplaySources(cb: (req: DisplaySourceRequest) => void): () => void;

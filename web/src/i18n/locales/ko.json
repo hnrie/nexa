@@ -298,6 +298,15 @@
   "desktop.displayPicker.windowsCount": {
     "other": "창 ({count})"
   },
+  "desktop.native.about": "종단 간 암호화된 대화, 음성, 서버.",
+  "desktop.native.addToDictionary": "사전에 추가",
+  "desktop.native.offlineBody": "연결을 확인하세요. 몇 초 뒤에 다시 시도합니다.",
+  "desktop.native.offlineRetry": "지금 시도",
+  "desktop.native.offlineTitle": "Nexa에 연결할 수 없습니다",
+  "desktop.native.open": "Nexa 열기",
+  "desktop.native.openLinkInBrowser": "브라우저에서 링크 열기",
+  "desktop.native.quit": "Nexa 종료",
+  "desktop.native.view": "보기",
   "download.allDownloads": "모든 다운로드",
   "download.andRunItItUpdatesItself": ")하고 실행하세요. 스스로 업데이트합니다. .deb는 패키지 관리자로 설치되고 새 버전이 나오면 알려 줍니다.",
   "download.android": "Android",

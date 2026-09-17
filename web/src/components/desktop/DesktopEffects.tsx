@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { t, useLocale } from "@/i18n";
 import { gateway } from "@/gateway/session";
 import { desktopBridge, type DisplaySourceRequest, type RpcActivity } from "@/lib/desktopBridge";
 import { unreadTotal } from "@/lib/title";
@@ -21,6 +22,30 @@ import { DisplayPicker } from "./DisplayPicker";
  */
 export function DesktopEffects() {
   const [picker, setPicker] = useState<DisplaySourceRequest | null>(null);
+  const locale = useLocale();
+
+  // The app's tray, menu bar, right-click menu and offline page are drawn by
+  // the operating system, but the only catalogue is here, so the words go over
+  // whenever the language changes. The app keeps the last set, which is what
+  // makes a tray icon read correctly before any page has loaded.
+  useEffect(() => {
+    desktopBridge()?.setStrings?.({
+      open: t("desktop.native.open"),
+      mute: t("settings.notifications.mute"),
+      deafen: t("shell.user.deafen"),
+      checkForUpdates: t("settings.desktop.checkForUpdates"),
+      quit: t("desktop.native.quit"),
+      view: t("desktop.native.view"),
+      reload: t("shell.errorBoundary.reload"),
+      addToDictionary: t("desktop.native.addToDictionary"),
+      copyLink: t("sidebar.serverMenu.copyLink"),
+      openLinkInBrowser: t("desktop.native.openLinkInBrowser"),
+      offlineTitle: t("desktop.native.offlineTitle"),
+      offlineBody: t("desktop.native.offlineBody"),
+      offlineRetry: t("desktop.native.offlineRetry"),
+      about: t("desktop.native.about"),
+    });
+  }, [locale]);
 
   useEffect(() => {
     const bridge = desktopBridge();

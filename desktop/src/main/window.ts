@@ -8,6 +8,7 @@ import path from "node:path";
 import { BASE, ORIGIN, START_URL, isAppUrl } from "./config";
 import { windowAudioSupported } from "./appAudio";
 import { shareAudioMode } from "./permissions";
+import { nativeStrings } from "./strings";
 import type { SettingsStore } from "./settings";
 
 /** Hands a link to the system, for the web schemes only. */
@@ -40,13 +41,16 @@ const splashPage = (): string =>
 @media (prefers-reduced-motion:reduce){.mark{animation:none;opacity:1}}</style></head>
 <body><div class="mark">${WORDMARK}</div></body></html>`);
 
+/** Escapes text that goes into the data-URL pages below. */
+const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c);
+
 const offlinePage = (): string =>
   "data:text/html;charset=utf-8," +
   encodeURIComponent(`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5;url=${START_URL}"><title>Nexa</title>
 <style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;background:#2c2d32;color:#f3f3f4;font:16px system-ui,-apple-system,"Segoe UI",sans-serif}
 main{text-align:center;max-width:360px;padding:24px}svg{margin:0 auto 20px;display:block}h1{font-size:20px;margin:0 0 8px}p{color:#abacb2;margin:0 0 20px;line-height:1.4}
 a{display:inline-block;padding:10px 20px;border-radius:4px;background:#8000ff;color:#fff;text-decoration:none;font-weight:600}</style></head>
-<body><main>${WORDMARK}<h1>Can't reach Nexa</h1><p>Check your connection. Trying again in a few seconds.</p><a href="${START_URL}">Try now</a></main></body></html>`);
+<body><main>${WORDMARK}<h1>${esc(nativeStrings().offlineTitle)}</h1><p>${esc(nativeStrings().offlineBody)}</p><a href="${START_URL}">${esc(nativeStrings().offlineRetry)}</a></main></body></html>`);
 
 export function createMainWindow(settings: SettingsStore, opts: { preload: string; hidden: boolean; icon?: string }): BrowserWindow {
   const saved = settings.get("bounds");
@@ -93,7 +97,8 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
     return { action: "deny" };
   });
   wc.on("will-navigate", (event, url) => {
-    if (isAppUrl(url) || url === offlinePage()) return;
+    // the offline page is built from the words in use, so match what it is rather than its exact text
+    if (isAppUrl(url) || url.startsWith("data:text/html")) return;
     event.preventDefault();
     openExternal(url);
   });
@@ -130,7 +135,7 @@ function textMenu(wc: WebContents, p: ContextMenuParams): void {
   const items: Electron.MenuItemConstructorOptions[] = [];
   for (const s of p.dictionarySuggestions.slice(0, 5)) items.push({ label: s, click: () => wc.replaceMisspelling(s) });
   if (p.misspelledWord) {
-    items.push({ label: "Add to Dictionary", click: () => wc.session.addWordToSpellCheckerDictionary(p.misspelledWord) });
+    items.push({ label: nativeStrings().addToDictionary, click: () => wc.session.addWordToSpellCheckerDictionary(p.misspelledWord) });
     items.push({ type: "separator" });
   }
   if (p.isEditable) {
@@ -140,7 +145,7 @@ function textMenu(wc: WebContents, p: ContextMenuParams): void {
   }
   if (p.linkURL && /^https?:/i.test(p.linkURL)) {
     if (items.length) items.push({ type: "separator" });
-    items.push({ label: "Copy Link", click: () => clipboard.writeText(p.linkURL) }, { label: "Open Link in Browser", click: () => openExternal(p.linkURL) });
+    items.push({ label: nativeStrings().copyLink, click: () => clipboard.writeText(p.linkURL) }, { label: nativeStrings().openLinkInBrowser, click: () => openExternal(p.linkURL) });
   }
   if (items.length) Menu.buildFromTemplate(items).popup();
 }
@@ -157,7 +162,7 @@ export function applicationMenu(win: () => BrowserWindow | null, checkUpdates: (
         label: "Nexa",
         submenu: [
           { role: "about" },
-          { label: "Check for Updates…", click: checkUpdates },
+          { label: `${nativeStrings().checkForUpdates}…`, click: checkUpdates },
           { type: "separator" },
           { role: "hide" },
           { role: "hideOthers" },
@@ -168,9 +173,9 @@ export function applicationMenu(win: () => BrowserWindow | null, checkUpdates: (
       },
       { role: "editMenu" },
       {
-        label: "View",
+        label: nativeStrings().view,
         submenu: [
-          { label: "Reload", accelerator: "CmdOrCtrl+R", click: () => win()?.webContents.reload() },
+          { label: nativeStrings().reload, accelerator: "CmdOrCtrl+R", click: () => win()?.webContents.reload() },
           { role: "togglefullscreen" },
           { type: "separator" },
           { role: "resetZoom" },

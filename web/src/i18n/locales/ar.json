@@ -318,6 +318,15 @@
   "desktop.displayPicker.windowsCount": {
     "other": "النوافذ ({count})"
   },
+  "desktop.native.about": "محادثة وصوت وخوادم مشفّرة من طرف إلى طرف.",
+  "desktop.native.addToDictionary": "إضافة إلى القاموس",
+  "desktop.native.offlineBody": "تحقق من اتصالك. ستكون هناك محاولة أخرى بعد ثوانٍ.",
+  "desktop.native.offlineRetry": "حاول الآن",
+  "desktop.native.offlineTitle": "تعذّر الوصول إلى Nexa",
+  "desktop.native.open": "فتح Nexa",
+  "desktop.native.openLinkInBrowser": "فتح الرابط في المتصفح",
+  "desktop.native.quit": "إنهاء Nexa",
+  "desktop.native.view": "عرض",
   "download.allDownloads": "كل التنزيلات",
   "download.andRunItItUpdatesItself": ") ثم شغّله؛ فهو يحدّث نفسه. وتُثبَّت حزمة ‎.deb عبر مدير الحزم لديك وتخبرك عند صدور إصدار جديد.",
   "download.android": "أندرويد",
