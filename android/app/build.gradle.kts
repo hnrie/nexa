@@ -109,7 +109,24 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // No quiet fallback to the debug key. Without `keystore.properties`
+            // this used to produce a perfectly ordinary-looking release APK
+            // signed with the debug certificate: `make android && make
+            // publish-android` would both succeed, the manifest would advertise
+            // the debug certificate to /.well-known/assetlinks.json, and every
+            // installed app would refuse the update because its signature no
+            // longer matched. Failing is the only version of that anyone would
+            // notice.
+            //
+            // It fails only when a release is actually what was asked for, so
+            // that anyone without the keystore — which is one machine's, and in
+            // no repository — can still clone this and build a debug APK.
+            signingConfig = signingConfigs.findByName("release")
+                ?: if (project.gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }) {
+                    error("a release build needs android/keystore.properties and android/release.jks; without them it would be signed with the debug key, and no installed app could take the update")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
 

@@ -12,7 +12,18 @@ import { isAppUrl, originOf, ORIGIN } from "./config";
 
 type Log = (msg: string, extra?: Record<string, unknown>) => void;
 
-const ALLOWED = new Set(["media", "notifications", "clipboard-sanitized-write", "clipboard-read", "fullscreen", "display-capture", "speaker-selection", "pointerLock"]);
+/**
+ * `clipboard-read` is deliberately not here.
+ *
+ * The app writes to the clipboard in about fifteen places and reads from it in
+ * none — every call site is a "copy" action. Granting the read silently, which
+ * a browser would prompt for, bought nothing and would have let a compromised
+ * renderer take whatever was on the clipboard. On a machine where this app
+ * itself puts the account recovery key and the two-factor backup codes there,
+ * and where a password manager's output passes through all day, that is not a
+ * capability to hand over for free.
+ */
+const ALLOWED = new Set(["media", "notifications", "clipboard-sanitized-write", "fullscreen", "display-capture", "speaker-selection", "pointerLock"]);
 
 export function lockPermissions(): void {
   const ses = session.defaultSession;

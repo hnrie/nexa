@@ -69,6 +69,15 @@ def signing_cert(apk: Path) -> str:
     return ":".join(raw[i : i + 2] for i in range(0, len(raw), 2))
 
 
+# The certificate in android/release.jks, which is the only one Android will
+# accept as an update for an app already installed from this instance. It is
+# written down here so that a build signed with anything else — the debug key,
+# after a lost or mistyped keystore.properties, or a keystore replaced outright
+# — cannot be published. This value also reaches /.well-known/assetlinks.json
+# through the manifest, so getting it wrong breaks App Links at the same time.
+EXPECTED_CERT = "1C:44:61:22:7C:06:8E:AF:55:91:FC:52:13:2E:8E:8B:BF:45:87:94:72:5A:8F:3E:FD:25:DF:6D:F2:6A:37:CA"
+
+
 def baked_server(apk: Path) -> str:
     """The server BuildConfig.DEFAULT_SERVER points at, read out of the dex."""
     with zipfile.ZipFile(apk) as z:
@@ -105,6 +114,7 @@ def main() -> int:
     ap.add_argument("--to", default=os.environ.get("ANDROID_DIR") or str(ROOT / "data/android"))
     ap.add_argument("--version", help="only needed when the SDK's aapt2 is not here")
     ap.add_argument("--notes", default="", help="what changed, shown by the app when it offers the update")
+    ap.add_argument("--skip-cert-check", action="store_true", help="publish without confirming the signing certificate (only when the SDK build-tools are unavailable)")
     args = ap.parse_args()
 
     src, dest = Path(args.apk), Path(args.to)
@@ -128,6 +138,13 @@ def main() -> int:
         server = baked_server(apk)
         if looks_local(server):
             print(f"{apk.name} is built against {server}, not the real server. Rebuild with: make android", file=sys.stderr)
+            return 1
+        cert = signing_cert(apk)
+        if not cert and not args.skip_cert_check:
+            print(f"could not read {apk.name}'s signing certificate; install the SDK build-tools, or pass --skip-cert-check if you are certain", file=sys.stderr)
+            return 1
+        if cert and cert != EXPECTED_CERT:
+            print(f"{apk.name} is signed with {cert},\nnot the key this instance publishes under ({EXPECTED_CERT}).\nNo installed app could take this update. Check android/keystore.properties.", file=sys.stderr)
             return 1
         builds.append((apk, info, version, apk_kind(apk, info)))
 
