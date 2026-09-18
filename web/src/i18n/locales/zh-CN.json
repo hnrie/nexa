@@ -24,6 +24,7 @@
   "appLock.thisDeviceHasNoPasscode": "这台设备没有设置锁屏密码。",
   "appLock.tooManyWrongPasscodes": "错误的密码次数过多。",
   "appLock.useAtLeastCharacters": "至少使用 {count} 个字符。",
+  "appLock.wrongPasscode": "密码错误。",
   "appLock.wrongPasscodeTriesLeft": {
     "other": "密码不对。还剩 {count} 次机会。"
   },
@@ -218,6 +219,7 @@
   "chat.messageMenu.selectMessages": "选择消息",
   "chat.messageMenu.showEmbeds": "显示嵌入内容",
   "chat.pins.closePinnedMessages": "关闭置顶消息",
+  "chat.pins.couldNotLoadPinnedMessages": "无法加载置顶消息。",
   "chat.pins.loading": "加载中…",
   "chat.pins.thatMessageCouldNotBeUnpinned": "无法取消置顶那条消息。",
   "chat.pins.thisChannelDoesnTHaveAny": "这个频道还没有任何置顶消息……暂时还没有。",
@@ -285,6 +287,8 @@
   "common.imageCrop.dragToMoveScrollOrUse": "拖动可移动，滚动或用滑块缩放。",
   "common.imageCrop.editImage": "编辑图片",
   "common.imageCrop.reset": "重置",
+  "common.imageCrop.thatPictureCouldNotBeCropped": "无法裁剪这张图片，请换一张更小的。",
+  "common.imageCrop.thatPictureCouldNotBeOpened": "无法打开这张图片。",
   "common.imageCrop.uploadTheOriginalSoItKeeps": "上传原图才能保留动画（裁剪会让它变成静图）",
   "common.imageCrop.zoom": "缩放",
   "common.qrCode.qrCode": "二维码",
@@ -295,6 +299,7 @@
   "composer.commands.appendsToYourMessage3": "在你的消息后加上 ( ͡° ͜ʖ ͡°)。",
   "composer.commands.displaysTextWithEmphasis": "以强调的样式显示文字。",
   "composer.commands.marksYourMessageAsASpoiler": "把你的消息标记为剧透。",
+  "composer.composer.atMostFilesPerMessage": "每条消息最多 {count} 个文件。",
   "composer.composer.cancelReply": "取消回复",
   "composer.composer.dropToUploadTo": "松开即可上传到 {name}",
   "composer.composer.gigabytes": "{n} GB",
@@ -785,6 +790,14 @@
   },
   "packRemoval.removePackNamed": "移除“{name}”",
   "packRemoval.youCanInstallItAgain": "只要它保持公开，你随时可以再装回来。",
+  "panes.closePane": "关闭此窗格",
+  "panes.closeTab": "关闭标签页",
+  "panes.newTab": "新建标签页",
+  "panes.nothingOpenHere": "这里没有打开任何内容。",
+  "panes.openInNewTab": "在新标签页中打开",
+  "panes.splitDown": "向下分屏",
+  "panes.splitRight": "向右分屏",
+  "panes.thatConversationIsNoLongerHere": "该对话已不在这里。",
   "passcode.enterItToFinishSettingThis": "输入它来完成这台设备的设置。之后你的密钥在这里也会由它保护。",
   "passcode.enterYourPasscodeToUnlock": "{name}，输入密码以解锁。",
   "passcode.setUpThisDevice": "设置这台设备",
@@ -1036,24 +1049,39 @@
   "register.yourMessagesAreEndToEnd": "你的消息经过端到端加密。如果忘记密码，这个密钥是唯一的回来方式。",
   "render.everyone": "@everyone",
   "render.here": "@here",
-  "search.search.allHistoryLoaded": "已加载全部历史",
   "search.search.beforeAfter": "before: / after:",
+  "search.search.cancel": "取消",
+  "search.search.capped": {
+    "other": "在最近的 {count} 条消息处停止；为了节省此标签页的内存，更早的历史未被读取。"
+  },
   "search.search.channel": "#频道",
   "search.search.closeSearch": "关闭搜索",
   "search.search.exactPhrase": "精确短语",
   "search.search.fromHint": "@用户，或者 {me}",
-  "search.search.helpConversation": "在这台设备已解密的本对话消息中搜索。没有任何内容离开你的设备：服务器只有密文。",
-  "search.search.helpServer": "在这台设备已解密的本服务器消息中搜索。没有任何内容离开你的设备：服务器只有密文。",
+  "search.search.helpEverything": "在本机解密并搜索你能读到的每一条消息，涵盖所有对话。没有任何内容离开你的设备：服务器只持有密文，永远无法替你搜索。",
   "search.search.linkImageFileStickerEmbed": "链接、图片、文件、贴纸、嵌入",
-  "search.search.loadOlder": "加载更早的",
   "search.search.me": "我",
-  "search.search.messagesIndexed": {
-    "other": "已索引 {count} 条消息"
+  "search.search.noResultsAnywhere": {
+    "other": "在已搜索的 {count} 条消息中没有结果。"
   },
-  "search.search.noResultsInLoaded": {
-    "other": "在目前加载的 {count} 条消息里没有结果。"
-  },
+  "search.search.notStarted": "正在开始…",
   "search.search.quotes": "“引号”",
+  "search.search.results": {
+    "other": "{count} 条结果"
+  },
+  "search.search.searchAgain": "重新搜索",
+  "search.search.searched": {
+    "other": "已在 {total} 个对话中搜索 {count} 条消息"
+  },
+  "search.search.searching": {
+    "other": "正在搜索… {count} 条消息，{done}/{total} 个对话"
+  },
+  "search.search.stillLooking": "正在翻查你的历史记录…",
+  "search.search.typeToSearch": "输入以搜索所有对话",
+  "search.search.unreadable": {
+    "other": "有 {count} 个对话无法读取：此设备没有它们的密钥。"
+  },
+  "search.search.waitingForServer": "正在等待服务器…",
   "search.suggestions.sentAfter": "发送于此日期之后",
   "search.suggestions.sentBefore": "发送于此日期之前",
   "server.auditLog.aDeletedChannel": "一个已删除的频道",
@@ -1420,6 +1448,16 @@
   "settings.admin.enable": "启用",
   "settings.admin.instanceAdmin": "实例管理",
   "settings.admin.inviteOnly": "仅限邀请",
+  "settings.admin.legal.compileReport": "生成文件",
+  "settings.admin.legal.compileWhatThisInstanceHolds": "把本实例已经持有的某个账号的全部信息汇编成一份文件，可回复给已出具有效法律文书的执法人员。它只读取现有记录，不会额外收集任何内容。文件以英文撰写，注明每项数据来自哪张表，并明确说明消息内容、通话媒体和附件内容均为端到端加密，无法提供。",
+  "settings.admin.legal.compiledForOn": "为 @{username} 生成 · {when}",
+  "settings.admin.legal.copied": "已复制",
+  "settings.admin.legal.copy": "复制",
+  "settings.admin.legal.couldNotCompileTheReport": "无法生成该文件。",
+  "settings.admin.legal.couldNotReachTheClipboardSelect": "无法访问剪贴板。请手动选中文本并复制。",
+  "settings.admin.legal.download": "下载",
+  "settings.admin.legal.lawEnforcementResponse": "执法机关答复",
+  "settings.admin.legal.usernameOrAccountId": "用户名或账号 ID",
   "settings.admin.makeAdmin": "设为管理员",
   "settings.admin.newKey": "新密钥",
   "settings.admin.noStack": "（无堆栈）",
@@ -1529,6 +1567,18 @@
   "settings.devices.logOutAllOtherDevices": "登出所有其他设备",
   "settings.devices.thisDevice": "这台设备",
   "settings.devices.unknownDevice": "未知设备",
+  "settings.licenses.androidApp": "Android 应用",
+  "settings.licenses.desktopApp": "桌面应用",
+  "settings.licenses.everything": "全部",
+  "settings.licenses.fontsAndArtwork": "字体与图像",
+  "settings.licenses.licenses": "许可证",
+  "settings.licenses.nexaIsBuiltOnOpenSource": "Nexa 建立在开源软件之上。下面列出的一切都会随某个构建发布——网页应用、桌面应用、服务器或 Android 应用——并附上其所依据的许可证。构建工具和测试工具从不会到达你的设备，因此未在此列出。",
+  "settings.licenses.nexaItself": "Nexa 本身",
+  "settings.licenses.noPackageMatchesThat": "没有匹配的软件包。",
+  "settings.licenses.projectPage": "项目主页",
+  "settings.licenses.searchPackages": "搜索软件包",
+  "settings.licenses.server": "服务器",
+  "settings.licenses.webApp": "网页应用",
   "settings.notifications.desktopNotification": "桌面通知",
   "settings.notifications.enableDesktopNotifications": "开启桌面通知",
   "settings.notifications.friendRequest": "好友请求",
@@ -1995,6 +2045,7 @@
   "voice.voiceStatus.cameraOn": "摄像头已开",
   "voice.voiceStatus.disconnect": "断开连接",
   "voice.voiceStatus.voiceConnected": "语音已连接",
+  "voice.voiceView.pictureInPictureCouldNotStart": "无法启动画中画。",
   "voiceSession.couldNotReachTheServerTo": "无法连接服务器来开始通话。",
   "voiceSession.theCallCouldNotBeStarted": "通话没能开始。",
   "voiceSession.thisServerIsNotSetUp": "这个服务器还不支持从应用发起通话。"

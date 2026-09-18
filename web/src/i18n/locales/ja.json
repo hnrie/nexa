@@ -24,6 +24,7 @@
   "appLock.thisDeviceHasNoPasscode": "この端末にはパスコードがありません。",
   "appLock.tooManyWrongPasscodes": "パスコードの入力ミスが多すぎます。",
   "appLock.useAtLeastCharacters": "{count} 文字以上にしてください。",
+  "appLock.wrongPasscode": "パスコードが違います。",
   "appLock.wrongPasscodeTriesLeft": {
     "other": "パスコードが違います。あと {count} 回です。"
   },
@@ -218,6 +219,7 @@
   "chat.messageMenu.selectMessages": "メッセージを選択",
   "chat.messageMenu.showEmbeds": "埋め込みを表示",
   "chat.pins.closePinnedMessages": "ピン留めされたメッセージを閉じる",
+  "chat.pins.couldNotLoadPinnedMessages": "ピン留めされたメッセージを読み込めませんでした。",
   "chat.pins.loading": "読み込み中…",
   "chat.pins.thatMessageCouldNotBeUnpinned": "そのメッセージのピン留めを解除できませんでした。",
   "chat.pins.thisChannelDoesnTHaveAny": "このチャンネルにはまだピン留めされたメッセージがありません…今のところは。",
@@ -285,6 +287,8 @@
   "common.imageCrop.dragToMoveScrollOrUse": "ドラッグで移動、スクロールまたはスライダーで拡大縮小します。",
   "common.imageCrop.editImage": "画像を編集",
   "common.imageCrop.reset": "リセット",
+  "common.imageCrop.thatPictureCouldNotBeCropped": "この画像を切り抜けませんでした。もっと小さい画像でお試しください。",
+  "common.imageCrop.thatPictureCouldNotBeOpened": "この画像を開けませんでした。",
   "common.imageCrop.uploadTheOriginalSoItKeeps": "アニメーションを保つには元のファイルをアップロードしてください（切り抜くと静止画になります）",
   "common.imageCrop.zoom": "ズーム",
   "common.qrCode.qrCode": "QR コード",
@@ -295,6 +299,7 @@
   "composer.commands.appendsToYourMessage3": "メッセージの末尾に ( ͡° ͜ʖ ͡°) を付けます。",
   "composer.commands.displaysTextWithEmphasis": "テキストを強調して表示します。",
   "composer.commands.marksYourMessageAsASpoiler": "メッセージをネタバレとしてマークします。",
+  "composer.composer.atMostFilesPerMessage": "1 件のメッセージに添付できるファイルは最大 {count} 個です。",
   "composer.composer.cancelReply": "返信をキャンセル",
   "composer.composer.dropToUploadTo": "ドロップして {name} にアップロード",
   "composer.composer.gigabytes": "{n} GB",
@@ -785,6 +790,14 @@
   },
   "packRemoval.removePackNamed": "「{name}」を削除",
   "packRemoval.youCanInstallItAgain": "公開されているうちは、また入れ直せます。",
+  "panes.closePane": "このペインを閉じる",
+  "panes.closeTab": "タブを閉じる",
+  "panes.newTab": "新しいタブ",
+  "panes.nothingOpenHere": "ここには何も開かれていません。",
+  "panes.openInNewTab": "新しいタブで開く",
+  "panes.splitDown": "下に分割",
+  "panes.splitRight": "右に分割",
+  "panes.thatConversationIsNoLongerHere": "その会話はもうここにありません。",
   "passcode.enterItToFinishSettingThis": "入力してこの端末の設定を終えてください。あなたの鍵はここでもパスコードで保護されます。",
   "passcode.enterYourPasscodeToUnlock": "{name} さん、パスコードを入力してロックを解除してください。",
   "passcode.setUpThisDevice": "この端末を設定",
@@ -1036,24 +1049,39 @@
   "register.yourMessagesAreEndToEnd": "メッセージはエンドツーエンドで暗号化されています。パスワードを忘れた場合、このキーだけが戻る手段です。",
   "render.everyone": "@everyone",
   "render.here": "@here",
-  "search.search.allHistoryLoaded": "すべての履歴を読み込みました",
   "search.search.beforeAfter": "before: / after:",
+  "search.search.cancel": "キャンセル",
+  "search.search.capped": {
+    "other": "新しい方から {count} 件で止めました。このタブのメモリを守るため、それより古い履歴は読んでいません。"
+  },
   "search.search.channel": "#チャンネル",
   "search.search.closeSearch": "検索を閉じる",
   "search.search.exactPhrase": "完全一致のフレーズ",
   "search.search.fromHint": "@ユーザー、または {me}",
-  "search.search.helpConversation": "この会話でこの端末が復号したメッセージを検索します。何も端末の外には出ません。サーバーは暗号文しか持っていません。",
-  "search.search.helpServer": "このサーバーでこの端末が復号したメッセージを検索します。何も端末の外には出ません。サーバーは暗号文しか持っていません。",
+  "search.search.helpEverything": "読むことのできるすべてのメッセージを、すべての会話にわたってこの端末で復号しながら検索します。端末の外には何も出ません。サーバーが持っているのは暗号文だけで、代わりに検索することはできません。",
   "search.search.linkImageFileStickerEmbed": "リンク、画像、ファイル、スタンプ、埋め込み",
-  "search.search.loadOlder": "古いものを読み込む",
   "search.search.me": "自分",
-  "search.search.messagesIndexed": {
-    "other": "{count} 件のメッセージを索引化しました"
+  "search.search.noResultsAnywhere": {
+    "other": "検索した {count} 件のメッセージに一致するものはありませんでした。"
   },
-  "search.search.noResultsInLoaded": {
-    "other": "これまでに読み込んだ {count} 件のメッセージには見つかりませんでした。"
-  },
+  "search.search.notStarted": "開始しています…",
   "search.search.quotes": "「引用符」",
+  "search.search.results": {
+    "other": "{count} 件の結果"
+  },
+  "search.search.searchAgain": "もう一度検索",
+  "search.search.searched": {
+    "other": "{total} 件の会話で {count} 件のメッセージを検索しました"
+  },
+  "search.search.searching": {
+    "other": "検索中… {count} 件のメッセージ、{done}/{total} 件の会話"
+  },
+  "search.search.stillLooking": "履歴を調べています…",
+  "search.search.typeToSearch": "入力するとすべての会話を検索します",
+  "search.search.unreadable": {
+    "other": "{count} 件の会話は読めませんでした。この端末に鍵がありません。"
+  },
+  "search.search.waitingForServer": "サーバーを待っています…",
   "search.suggestions.sentAfter": "この日以降に送信",
   "search.suggestions.sentBefore": "この日以前に送信",
   "server.auditLog.aDeletedChannel": "削除済みのチャンネル",
@@ -1420,6 +1448,16 @@
   "settings.admin.enable": "有効化",
   "settings.admin.instanceAdmin": "インスタンス管理",
   "settings.admin.inviteOnly": "招待制",
+  "settings.admin.legal.compileReport": "文書を作成",
+  "settings.admin.legal.compileWhatThisInstanceHolds": "このインスタンスがすでに保持しているアカウント情報をすべてまとめ、正当な法的手続きを経た担当者に送り返せる文書にします。既存の記録を読むだけで、新たに集めるものはありません。文書は英語で書かれ、それぞれの項目がどのテーブル由来かを示し、メッセージ本文・通話・添付ファイルの中身は端末間で暗号化されており提出できないことを明記します。",
+  "settings.admin.legal.compiledForOn": "@{username} について作成 · {when}",
+  "settings.admin.legal.copied": "コピーしました",
+  "settings.admin.legal.copy": "コピー",
+  "settings.admin.legal.couldNotCompileTheReport": "文書を作成できませんでした。",
+  "settings.admin.legal.couldNotReachTheClipboardSelect": "クリップボードにアクセスできませんでした。テキストを選択してコピーしてください。",
+  "settings.admin.legal.download": "ダウンロード",
+  "settings.admin.legal.lawEnforcementResponse": "法執行機関への回答",
+  "settings.admin.legal.usernameOrAccountId": "ユーザー名またはアカウント ID",
   "settings.admin.makeAdmin": "管理者にする",
   "settings.admin.newKey": "新しいキー",
   "settings.admin.noStack": "（スタックなし）",
@@ -1529,6 +1567,18 @@
   "settings.devices.logOutAllOtherDevices": "他のすべての端末からログアウト",
   "settings.devices.thisDevice": "この端末",
   "settings.devices.unknownDevice": "不明な端末",
+  "settings.licenses.androidApp": "Android アプリ",
+  "settings.licenses.desktopApp": "デスクトップアプリ",
+  "settings.licenses.everything": "すべて",
+  "settings.licenses.fontsAndArtwork": "フォントと画像",
+  "settings.licenses.licenses": "ライセンス",
+  "settings.licenses.nexaIsBuiltOnOpenSource": "Nexa はオープンソースソフトウェアの上に成り立っています。以下に挙げたものはいずれかのビルド（ウェブアプリ、デスクトップアプリ、サーバー、Android アプリ）に含まれるもので、それぞれのライセンスとともに記載しています。お使いの端末に届くことのないビルドツールやテストツールは含めていません。",
+  "settings.licenses.nexaItself": "Nexa 自体",
+  "settings.licenses.noPackageMatchesThat": "一致するパッケージはありません。",
+  "settings.licenses.projectPage": "プロジェクトページ",
+  "settings.licenses.searchPackages": "パッケージを検索",
+  "settings.licenses.server": "サーバー",
+  "settings.licenses.webApp": "ウェブアプリ",
   "settings.notifications.desktopNotification": "デスクトップ通知",
   "settings.notifications.enableDesktopNotifications": "デスクトップ通知を有効にする",
   "settings.notifications.friendRequest": "フレンド申請",
@@ -1995,6 +2045,7 @@
   "voice.voiceStatus.cameraOn": "カメラ オン",
   "voice.voiceStatus.disconnect": "切断",
   "voice.voiceStatus.voiceConnected": "音声接続中",
+  "voice.voiceView.pictureInPictureCouldNotStart": "ピクチャー・イン・ピクチャーを開始できませんでした。",
   "voiceSession.couldNotReachTheServerTo": "通話を始めるためにサーバーへ接続できませんでした。",
   "voiceSession.theCallCouldNotBeStarted": "通話を開始できませんでした。",
   "voiceSession.thisServerIsNotSetUp": "このサーバーはまだアプリからの通話に対応していません。"

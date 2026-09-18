@@ -24,6 +24,7 @@
   "appLock.thisDeviceHasNoPasscode": "이 기기에는 패스코드가 없습니다.",
   "appLock.tooManyWrongPasscodes": "잘못된 암호를 너무 많이 입력했습니다.",
   "appLock.useAtLeastCharacters": "{count}자 이상 써 주세요.",
+  "appLock.wrongPasscode": "패스코드가 올바르지 않습니다.",
   "appLock.wrongPasscodeTriesLeft": {
     "other": "암호가 틀렸습니다. {count}번 남았습니다."
   },
@@ -218,6 +219,7 @@
   "chat.messageMenu.selectMessages": "메시지 선택",
   "chat.messageMenu.showEmbeds": "미리보기 표시",
   "chat.pins.closePinnedMessages": "고정된 메시지 닫기",
+  "chat.pins.couldNotLoadPinnedMessages": "고정된 메시지를 불러오지 못했습니다.",
   "chat.pins.loading": "불러오는 중…",
   "chat.pins.thatMessageCouldNotBeUnpinned": "그 메시지의 고정을 해제하지 못했습니다.",
   "chat.pins.thisChannelDoesnTHaveAny": "이 채널에는 아직 고정된 메시지가 없습니다… 아직은요.",
@@ -285,6 +287,8 @@
   "common.imageCrop.dragToMoveScrollOrUse": "드래그해서 옮기고, 스크롤하거나 슬라이더로 확대·축소하세요.",
   "common.imageCrop.editImage": "이미지 편집",
   "common.imageCrop.reset": "초기화",
+  "common.imageCrop.thatPictureCouldNotBeCropped": "이 사진을 자르지 못했습니다. 더 작은 사진으로 시도해 보세요.",
+  "common.imageCrop.thatPictureCouldNotBeOpened": "이 사진을 열지 못했습니다.",
   "common.imageCrop.uploadTheOriginalSoItKeeps": "움직임을 유지하려면 원본을 올리세요(자르면 정지 이미지가 됩니다)",
   "common.imageCrop.zoom": "확대/축소",
   "common.qrCode.qrCode": "QR 코드",
@@ -295,6 +299,7 @@
   "composer.commands.appendsToYourMessage3": "메시지 끝에 ( ͡° ͜ʖ ͡°) 를 붙입니다.",
   "composer.commands.displaysTextWithEmphasis": "텍스트를 강조해서 보여 줍니다.",
   "composer.commands.marksYourMessageAsASpoiler": "메시지를 스포일러로 표시합니다.",
+  "composer.composer.atMostFilesPerMessage": "메시지당 파일은 최대 {count}개까지 첨부할 수 있습니다.",
   "composer.composer.cancelReply": "답장 취소",
   "composer.composer.dropToUploadTo": "여기에 놓으면 {name}에 업로드됩니다",
   "composer.composer.gigabytes": "{n} GB",
@@ -785,6 +790,14 @@
   },
   "packRemoval.removePackNamed": "'{name}' 제거",
   "packRemoval.youCanInstallItAgain": "공개 상태로 남아 있는 동안에는 다시 설치할 수 있습니다.",
+  "panes.closePane": "이 창 닫기",
+  "panes.closeTab": "탭 닫기",
+  "panes.newTab": "새 탭",
+  "panes.nothingOpenHere": "여기에 열린 것이 없습니다.",
+  "panes.openInNewTab": "새 탭에서 열기",
+  "panes.splitDown": "아래로 분할",
+  "panes.splitRight": "오른쪽으로 분할",
+  "panes.thatConversationIsNoLongerHere": "그 대화는 더 이상 여기에 없습니다.",
   "passcode.enterItToFinishSettingThis": "입력해서 이 기기 설정을 마치세요. 그러면 여기서도 키가 패스코드로 보호됩니다.",
   "passcode.enterYourPasscodeToUnlock": "{name}님, 잠금을 풀려면 암호를 입력하세요.",
   "passcode.setUpThisDevice": "이 기기 설정",
@@ -1036,24 +1049,39 @@
   "register.yourMessagesAreEndToEnd": "메시지는 종단 간 암호화됩니다. 비밀번호를 잊으면 이 키만이 돌아올 방법입니다.",
   "render.everyone": "@everyone",
   "render.here": "@here",
-  "search.search.allHistoryLoaded": "모든 기록을 불러왔습니다",
   "search.search.beforeAfter": "before: / after:",
+  "search.search.cancel": "취소",
+  "search.search.capped": {
+    "other": "최근 {count}개에서 멈췄습니다. 이 탭의 메모리를 지키기 위해 더 오래된 기록은 읽지 않았습니다."
+  },
   "search.search.channel": "#채널",
   "search.search.closeSearch": "검색 닫기",
   "search.search.exactPhrase": "정확한 문구",
   "search.search.fromHint": "@사용자, 또는 {me}",
-  "search.search.helpConversation": "이 대화에서 이 기기가 복호화한 메시지를 검색합니다. 기기 밖으로 나가는 것은 없습니다. 서버는 암호문만 가지고 있습니다.",
-  "search.search.helpServer": "이 서버에서 이 기기가 복호화한 메시지를 검색합니다. 기기 밖으로 나가는 것은 없습니다. 서버는 암호문만 가지고 있습니다.",
+  "search.search.helpEverything": "읽을 수 있는 모든 메시지를 모든 대화에서 이 기기에서 복호화하며 검색합니다. 기기 밖으로 나가는 것은 없습니다. 서버는 암호문만 가지고 있어 대신 검색할 수 없습니다.",
   "search.search.linkImageFileStickerEmbed": "링크, 이미지, 파일, 스티커, 임베드",
-  "search.search.loadOlder": "이전 것 불러오기",
   "search.search.me": "나",
-  "search.search.messagesIndexed": {
-    "other": "메시지 {count}개를 색인했습니다"
+  "search.search.noResultsAnywhere": {
+    "other": "검색한 메시지 {count}개에서 결과가 없습니다."
   },
-  "search.search.noResultsInLoaded": {
-    "other": "지금까지 불러온 메시지 {count}개에서는 결과가 없습니다."
-  },
+  "search.search.notStarted": "시작하는 중…",
   "search.search.quotes": "\"따옴표\"",
+  "search.search.results": {
+    "other": "결과 {count}개"
+  },
+  "search.search.searchAgain": "다시 검색",
+  "search.search.searched": {
+    "other": "대화 {total}개에서 메시지 {count}개를 검색했습니다"
+  },
+  "search.search.searching": {
+    "other": "검색 중… 메시지 {count}개, 대화 {done}/{total}개"
+  },
+  "search.search.stillLooking": "기록을 살펴보는 중…",
+  "search.search.typeToSearch": "입력하면 모든 대화를 검색합니다",
+  "search.search.unreadable": {
+    "other": "대화 {count}개를 읽을 수 없습니다. 이 기기에 키가 없습니다."
+  },
+  "search.search.waitingForServer": "서버를 기다리는 중…",
   "search.suggestions.sentAfter": "이후에 보냄",
   "search.suggestions.sentBefore": "이전에 보냄",
   "server.auditLog.aDeletedChannel": "삭제된 채널",
@@ -1420,6 +1448,16 @@
   "settings.admin.enable": "활성화",
   "settings.admin.instanceAdmin": "인스턴스 관리",
   "settings.admin.inviteOnly": "초대 전용",
+  "settings.admin.legal.compileReport": "문서 작성",
+  "settings.admin.legal.compileWhatThisInstanceHolds": "이 인스턴스가 이미 보관 중인 한 계정에 관한 모든 내용을, 적법한 법적 절차를 밟은 담당자에게 보낼 수 있는 문서로 정리합니다. 기존 기록을 읽을 뿐 새로 수집하는 것은 없습니다. 문서는 영어로 작성되며, 각 항목이 어느 테이블에서 왔는지 밝히고, 메시지 내용과 통화, 첨부 파일 내용은 종단 간 암호화되어 제출할 수 없음을 분명히 밝힙니다.",
+  "settings.admin.legal.compiledForOn": "@{username} 대상 · {when}",
+  "settings.admin.legal.copied": "복사됨",
+  "settings.admin.legal.copy": "복사",
+  "settings.admin.legal.couldNotCompileTheReport": "문서를 작성할 수 없습니다.",
+  "settings.admin.legal.couldNotReachTheClipboardSelect": "클립보드에 접근할 수 없습니다. 텍스트를 선택해 직접 복사하세요.",
+  "settings.admin.legal.download": "다운로드",
+  "settings.admin.legal.lawEnforcementResponse": "사법기관 대응",
+  "settings.admin.legal.usernameOrAccountId": "사용자 이름 또는 계정 ID",
   "settings.admin.makeAdmin": "관리자로 지정",
   "settings.admin.newKey": "새 키",
   "settings.admin.noStack": "(스택 없음)",
@@ -1529,6 +1567,18 @@
   "settings.devices.logOutAllOtherDevices": "다른 모든 기기에서 로그아웃",
   "settings.devices.thisDevice": "이 기기",
   "settings.devices.unknownDevice": "알 수 없는 기기",
+  "settings.licenses.androidApp": "Android 앱",
+  "settings.licenses.desktopApp": "데스크톱 앱",
+  "settings.licenses.everything": "전체",
+  "settings.licenses.fontsAndArtwork": "글꼴과 그래픽",
+  "settings.licenses.licenses": "라이선스",
+  "settings.licenses.nexaIsBuiltOnOpenSource": "Nexa는 오픈소스 소프트웨어를 바탕으로 만들어졌습니다. 아래 목록은 모두 어느 빌드(웹 앱, 데스크톱 앱, 서버, Android 앱)에 포함되는 것으로, 각각의 라이선스와 함께 표시했습니다. 기기에 전달되지 않는 빌드 도구와 테스트 도구는 제외했습니다.",
+  "settings.licenses.nexaItself": "Nexa 자체",
+  "settings.licenses.noPackageMatchesThat": "일치하는 패키지가 없습니다.",
+  "settings.licenses.projectPage": "프로젝트 페이지",
+  "settings.licenses.searchPackages": "패키지 검색",
+  "settings.licenses.server": "서버",
+  "settings.licenses.webApp": "웹 앱",
   "settings.notifications.desktopNotification": "데스크톱 알림",
   "settings.notifications.enableDesktopNotifications": "데스크톱 알림 켜기",
   "settings.notifications.friendRequest": "친구 요청",
@@ -1995,6 +2045,7 @@
   "voice.voiceStatus.cameraOn": "카메라 켜짐",
   "voice.voiceStatus.disconnect": "연결 끊기",
   "voice.voiceStatus.voiceConnected": "음성 연결됨",
+  "voice.voiceView.pictureInPictureCouldNotStart": "PIP 모드를 시작하지 못했습니다.",
   "voiceSession.couldNotReachTheServerTo": "통화를 시작하려고 서버에 연결하지 못했습니다.",
   "voiceSession.theCallCouldNotBeStarted": "통화를 시작하지 못했습니다.",
   "voiceSession.thisServerIsNotSetUp": "이 서버는 아직 앱에서의 통화를 지원하지 않습니다."
