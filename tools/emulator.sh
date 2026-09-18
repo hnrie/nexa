@@ -54,7 +54,7 @@ fi
 window=()
 [ "${1:-}" = "headless" ] && window=(-no-window)
 
-nohup emulator -avd "$AVD" "${window[@]}" -gpu host -feature -ForceSwiftshader -no-boot-anim \
+nohup emulator -avd "$AVD" ${window[@]+"${window[@]}"} -gpu host -feature -ForceSwiftshader -no-boot-anim \
   >"${TMPDIR:-/tmp}/emulator.log" 2>&1 &
 
 for _ in $(seq 1 90); do
