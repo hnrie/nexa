@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { admin as adminApi, type ClientErrorReport } from "@/api/admin";
 import { ApiError } from "@/api/client";
-import type { AdminSettings, AdminStats, AdminUser } from "@/api/types";
+import type { AdminSettings, AdminStats, AdminUser, LegalReport } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
@@ -169,7 +169,101 @@ export default function AdminPage() {
           ) : <span className={s.memberSub}>you</span>}
         </div>
       ))}
+      <LegalResponse />
       <CrashLog />
+    </>
+  );
+}
+
+/**
+ * Answering legal process about one account.
+ *
+ * Every platform of any size can tell an officer what it holds; this does the
+ * same for whoever runs this instance. The button reads the rows that already
+ * exist and writes a document out of them — it collects nothing new, and the
+ * document says in plain terms which categories are end-to-end encrypted and
+ * therefore cannot be produced at all, so the same request does not come back.
+ *
+ * The document itself is English legal prose written by the server. It is not
+ * translated: it may be attached to a filing, and wording that changed with the
+ * operator's interface language would be worth less there.
+ */
+function LegalResponse() {
+  const toast = useUI((u) => u.toast);
+  const [who, setWho] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<LegalReport | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const compile = async () => {
+    const asked = who.trim();
+    if (!asked) return;
+    setBusy(true);
+    try {
+      setReport(await adminApi.legalReport(asked));
+    } catch (err) {
+      setReport(null);
+      toast(err instanceof ApiError ? err.message : tr_("settings.admin.legal.couldNotCompileTheReport"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const download = () => {
+    if (!report) return;
+    const url = URL.createObjectURL(new Blob([report.document], { type: "text/plain;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = report.filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const copy = async () => {
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(report.document);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast(tr_("settings.admin.legal.couldNotReachTheClipboardSelect"), "error");
+    }
+  };
+
+  return (
+    <>
+      <h5 className={st.h5}>{tr_("settings.admin.legal.lawEnforcementResponse")}</h5>
+      <p className={st.hint}>{tr_("settings.admin.legal.compileWhatThisInstanceHolds")}</p>
+      <div className={s.searchRow} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <TextInput
+          value={who}
+          onChange={(e) => setWho(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && void compile()}
+          placeholder={tr_("settings.admin.legal.usernameOrAccountId")}
+          data-testid="legal-report-account"
+        />
+        <Button size="sm" loading={busy} disabled={!who.trim()} onClick={() => void compile()} data-testid="legal-report-compile">
+          {tr_("settings.admin.legal.compileReport")}
+        </Button>
+      </div>
+      {report ? (
+        <>
+          <p className={st.hint} style={{ marginTop: 8 }}>
+            {tr_("settings.admin.legal.compiledForOn", { username: report.username, when: formatFull(report.generated_at) })}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            <Button size="sm" variant="secondary" onClick={download}>{tr_("settings.admin.legal.download")}</Button>
+            <Button size="sm" variant="secondary" onClick={() => void copy()}>{copied ? tr_("settings.admin.legal.copied") : tr_("settings.admin.legal.copy")}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setReport(null)}>{tr_("modals.quickSwitcher.clear")}</Button>
+          </div>
+          <pre
+            data-testid="legal-report-document"
+            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 11, lineHeight: 1.5, color: "var(--text-muted)", background: "var(--bg-raised)", borderRadius: "var(--radius-sm)", padding: 12, margin: "8px 0 0", maxHeight: 420, overflow: "auto" }}
+          >
+            {report.document}
+          </pre>
+        </>
+      ) : null}
     </>
   );
 }

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { AdminSettings, AdminStats, AdminUser, InstanceInfo, Snowflake } from "./types";
+import type { AdminSettings, AdminStats, AdminUser, InstanceInfo, LegalReport, Snowflake } from "./types";
 
 /** One crash a browser reported. */
 export interface ClientErrorReport {
@@ -43,5 +43,13 @@ export const admin = {
   },
   patchSettings(body: { registration?: string; registration_key?: string }): Promise<AdminSettings> {
     return api.request<AdminSettings>("PATCH", "/admin/settings", body);
+  },
+  /**
+   * Compiles what this instance holds about one account, for an officer who has
+   * served valid legal process. `user` is a username or an account id. This
+   * reads existing rows and writes nothing.
+   */
+  legalReport(user: string): Promise<LegalReport> {
+    return api.request<LegalReport>("GET", "/admin/legal-report", undefined, { query: { user } });
   },
 };

@@ -338,6 +338,24 @@ export interface AdminSettings {
   turn: boolean;
 }
 
+/**
+ * A compiled law-enforcement response: everything this instance already holds
+ * about one account, as a document to send back to an officer.
+ *
+ * `document` is English legal prose written by the server and is deliberately
+ * not translated — it may end up attached to a filing, where wording that
+ * changes with the operator's interface language would be worth less.
+ */
+export interface LegalReport {
+  user_id: Snowflake;
+  username: string;
+  /** When the snapshot was taken, in Unix milliseconds. */
+  generated_at: number;
+  /** What the download should be called. */
+  filename: string;
+  document: string;
+}
+
 export interface InstanceInfo {
   name: string;
   version: string;
