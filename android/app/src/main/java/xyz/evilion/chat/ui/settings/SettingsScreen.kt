@@ -4,9 +4,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.LinearProgressIndicator
+import xyz.evilion.chat.data.AppUpdate
 import xyz.evilion.chat.i18n.LANGUAGES
 import xyz.evilion.chat.data.readable
 import xyz.evilion.chat.i18n.t
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -706,10 +709,77 @@ private fun AboutPage() {
             usage = AttachmentStore.usage()
         }
     }
+    UpdateSection()
     Section(t("settings.settingsScreen.endToEndEncryption")) {
         Text(
             t("settings.settingsScreen.messagesFilesAndCallsAreEncrypted"),
             color = colors.textMuted, fontSize = 13.sp,
         )
+    }
+}
+
+/**
+ * Updates, for an app that came from a website rather than a store.
+ *
+ * The state machine is [AppUpdate]'s; this only draws it. The one piece of
+ * judgement here is the order of the last two steps: Android will not let this
+ * app install anything until the person has said so on a system screen, and
+ * asking for that *after* a 16 MB download, with the file sitting there and
+ * nothing happening, is how a sideloaded updater earns its reputation. So the
+ * permission is asked for first, with the reason on screen.
+ */
+@Composable
+private fun UpdateSection() {
+    val colors = chatColors
+    val context = LocalContext.current
+    val state by AppUpdate.state.collectAsState()
+
+    Section(t("appUpdate.updates")) {
+        when (val now = state) {
+            is AppUpdate.State.Available -> {
+                StatRow(t("appUpdate.newVersion"), "${now.release.version} · ${formatSize(now.build.size)}")
+                now.release.notes?.takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, color = colors.textMuted, fontSize = 13.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                Action(t("appUpdate.downloadVersion", "version" to now.release.version)) {
+                    if (!AppUpdate.mayInstall(context)) AppUpdate.askToInstall(context)
+                    else detached { AppUpdate.download(context, now.release, now.build) }
+                }
+                if (!AppUpdate.mayInstall(context)) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(t("appUpdate.androidAsksOncePerApp"), color = colors.textMuted, fontSize = 12.sp)
+                }
+            }
+            is AppUpdate.State.Downloading -> {
+                val total = now.build.size.coerceAtLeast(1)
+                StatRow(t("appUpdate.downloading"), "${formatSize(now.done)} / ${formatSize(now.build.size)}")
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { (now.done.toFloat() / total).coerceIn(0f, 1f) },
+                    color = colors.brand,
+                    trackColor = colors.bgSurface,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            is AppUpdate.State.Ready -> {
+                StatRow(t("appUpdate.ready"), now.release.version)
+                Spacer(Modifier.height(12.dp))
+                Action(t("appUpdate.install")) { AppUpdate.install(context, now.file) }
+            }
+            is AppUpdate.State.Failed -> {
+                Text(now.why, color = colors.danger, fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                Action(t("appUpdate.checkAgain")) { detached { AppUpdate.check(loud = true) } }
+            }
+            AppUpdate.State.Checking -> Text(t("appUpdate.checking"), color = colors.textMuted, fontSize = 13.sp)
+            AppUpdate.State.UpToDate -> {
+                Text(t("appUpdate.thisIsTheNewestBuild"), color = colors.textMuted, fontSize = 13.sp)
+                Spacer(Modifier.height(12.dp))
+                Action(t("appUpdate.checkAgain")) { detached { AppUpdate.check(loud = true) } }
+            }
+            AppUpdate.State.Idle -> Action(t("appUpdate.checkForUpdates")) { detached { AppUpdate.check(loud = true) } }
+        }
     }
 }

@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import kotlinx.coroutines.launch
 import xyz.evilion.chat.data.AppState
+import xyz.evilion.chat.data.AppUpdate
 import xyz.evilion.chat.data.CrashReport
 import xyz.evilion.chat.data.SecureStore
 import xyz.evilion.chat.data.Session
@@ -55,6 +56,15 @@ class App : Application() {
         Session.start()
         // What took the app down last time, now that there is a connection for it.
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { CrashReport.sendPending() }
+
+        // Whether there is a newer build, asked for quietly and late: the app
+        // came from a website rather than a store, so nothing else will ever
+        // mention it. A failure here says nothing to anybody — the button in
+        // settings is the one that reports what happened.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            kotlinx.coroutines.delay(20_000)
+            AppUpdate.check()
+        }
 
         // Messages that arrive while the app is not on screen become notifications.
         Session.messageHooks += { raw, decrypted, mine ->
