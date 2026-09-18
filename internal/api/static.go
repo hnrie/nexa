@@ -44,6 +44,17 @@ func (s *Server) staticHandler() http.Handler {
 			WriteError(w, ErrNotFound)
 			return
 		}
+		// Nothing beginning with a dot is part of the app. A build directory
+		// picks up .DS_Store, .vite and the like, and this handler served them
+		// with a sniffed content type — /desktop/ and /android/ have always
+		// refused dotfiles through their filename patterns, and this is the
+		// same rule. `.well-known` is the exception every site has: those paths
+		// are answered by routes of their own, and one that is not belongs to
+		// nobody either.
+		if hiddenPath(p) {
+			WriteError(w, ErrNotFound)
+			return
+		}
 		if p != "/" {
 			fp := filepath.Join(dist, filepath.FromSlash(p))
 			if strings.HasPrefix(fp, dist+string(filepath.Separator)) {
@@ -230,4 +241,17 @@ func plural(n int) string {
 		return ""
 	}
 	return "s"
+}
+
+// hiddenPath reports whether any segment of a cleaned path starts with a dot,
+// which is how a build directory's own leftovers are told from the app's
+// files. `.well-known` is excepted: it is a real, public convention, and its
+// paths have routes of their own.
+func hiddenPath(p string) bool {
+	for _, seg := range strings.Split(strings.TrimPrefix(p, "/"), "/") {
+		if strings.HasPrefix(seg, ".") && seg != ".well-known" {
+			return true
+		}
+	}
+	return false
 }
