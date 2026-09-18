@@ -595,6 +595,7 @@
   "messageActions.markUnread": "未読にする",
   "messageActions.pin": "ピン留め",
   "messageActions.thatMessageCouldNotBeDeleted": "そのメッセージは削除できませんでした。",
+  "messageRow.addAReaction": "リアクションを追加",
   "messageRow.discard": "破棄",
   "messageRow.notSentTapToTryAgain": "未送信。タップでやり直します。",
   "messageRow.originalMessage": "元のメッセージ",

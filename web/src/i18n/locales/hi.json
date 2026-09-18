@@ -608,6 +608,7 @@
   "messageActions.markUnread": "बिना पढ़ा चिह्नित करें",
   "messageActions.pin": "पिन करें",
   "messageActions.thatMessageCouldNotBeDeleted": "वह संदेश मिटाया नहीं जा सका।",
+  "messageRow.addAReaction": "प्रतिक्रिया जोड़ें",
   "messageRow.discard": "हटाएँ",
   "messageRow.notSentTapToTryAgain": "भेजा नहीं गया। फिर कोशिश के लिए टैप करें।",
   "messageRow.originalMessage": "मूल संदेश",

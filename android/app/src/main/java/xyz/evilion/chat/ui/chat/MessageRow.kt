@@ -63,6 +63,7 @@ fun MessageRow(
     previous: UiMessage?,
     serverId: String?,
     onLongPress: () -> Unit,
+    onReact: () -> Unit,
     onReply: () -> Unit,
 ) {
     val colors = chatColors
@@ -154,7 +155,7 @@ fun MessageRow(
                 }
 
                 if (message.raw.reactions.isNotEmpty()) {
-                    Reactions(message)
+                    Reactions(message, onReact)
                 }
 
                 if (message.pending) {
@@ -286,7 +287,7 @@ private fun ReplyPreview(messageId: String, channelId: String, serverId: String?
 }
 
 @Composable
-private fun Reactions(message: UiMessage) {
+private fun Reactions(message: UiMessage, onReact: () -> Unit) {
     val colors = chatColors
     Row(
         Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -325,6 +326,23 @@ private fun Reactions(message: UiMessage) {
                     fontWeight = FontWeight.Medium,
                 )
             }
+        }
+        // Adding a reaction that nobody has used yet was reachable only by
+        // long-pressing the message, which is not something anyone discovers.
+        // Beside reactions that are already there, a plus is obvious.
+        Row(
+            Modifier.clip(RoundedCornerShape(8.dp))
+                .background(colors.bgSurface)
+                .clickable(onClick = onReact)
+                .padding(horizontal = 7.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Lucide.Smile,
+                t("messageRow.addAReaction"),
+                tint = colors.textMuted,
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }

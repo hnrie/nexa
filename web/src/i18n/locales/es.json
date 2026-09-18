@@ -610,6 +610,7 @@
   "messageActions.markUnread": "Marcar como no leído",
   "messageActions.pin": "Fijar",
   "messageActions.thatMessageCouldNotBeDeleted": "Ese mensaje no se pudo eliminar.",
+  "messageRow.addAReaction": "Añadir una reacción",
   "messageRow.discard": "Descartar",
   "messageRow.notSentTapToTryAgain": "No enviado. Toca para reintentar.",
   "messageRow.originalMessage": "Mensaje original",

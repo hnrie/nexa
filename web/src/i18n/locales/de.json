@@ -608,6 +608,7 @@
   "messageActions.markUnread": "Als ungelesen markieren",
   "messageActions.pin": "Anpinnen",
   "messageActions.thatMessageCouldNotBeDeleted": "Diese Nachricht konnte nicht gelöscht werden.",
+  "messageRow.addAReaction": "Reaktion hinzufügen",
   "messageRow.discard": "Verwerfen",
   "messageRow.notSentTapToTryAgain": "Nicht gesendet. Zum Wiederholen tippen.",
   "messageRow.originalMessage": "Ursprüngliche Nachricht",

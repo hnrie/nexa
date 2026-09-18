@@ -11,6 +11,7 @@ import xyz.evilion.chat.crypto.Bytes
 import xyz.evilion.chat.crypto.Conv
 import xyz.evilion.chat.crypto.Envelope
 import xyz.evilion.chat.crypto.FileCrypto
+import xyz.evilion.chat.crypto.Fingerprint
 import xyz.evilion.chat.crypto.Kdf
 import xyz.evilion.chat.crypto.Keys
 import xyz.evilion.chat.crypto.MessageCrypto
@@ -39,6 +40,54 @@ class CryptoTest {
         assertEquals("xGjfFDfDO+c/ap4FLdWIBP5peEzu54TcIXAEdKHH11U=", Bytes.b64(Kdf.authKey(master)))
         assertEquals("pwWNf4CLwC2J3yPNihC4SVjS/VcTRwZOXV0ikfc+qm4=", Bytes.b64(Kdf.encKey(master)))
         assertEquals("7nhhlY8bXZRZriYfhVvfMP8hcC30fC9kbQswTHFI7Aw=", Bytes.b64(Kdf.settingsKey(identityPriv)))
+    }
+
+    /**
+     * The safety number two people read out to each other. It has to be the
+     * same thirty digits on a phone and in a browser, or a real pair comparing
+     * across platforms would be told they are talking to an impostor. The same
+     * expectation is pinned in web/src/crypto/fingerprint.test.ts for this same
+     * key; change one and the other fails.
+     */
+    @Test
+    fun `prints the same safety number as the web client`() {
+        assertEquals("84234 17400 39277 85751 92324 02841", Fingerprint.of(identityPub))
+        // A second vector with no structure to it, in case the first is ever
+        // regenerated: the bytes 0..31.
+        assertEquals(
+            "61271 82505 00669 17367 22914 44410",
+            Fingerprint.of(ByteArray(32) { it.toByte() }),
+        )
+        // The shape the API carries a key in, and the answers for one that is
+        // missing or is not a key at all.
+        assertEquals("84234 17400 39277 85751 92324 02841", Fingerprint.ofB64(Bytes.b64(identityPub)))
+        assertNull(Fingerprint.ofB64(null))
+        assertNull(Fingerprint.ofB64(""))
+        assertNull(Fingerprint.ofB64(Bytes.b64(ByteArray(16))))
+    }
+
+    /**
+     * The floor has to be the server's own rule for what a client may register
+     * with (validKDF, internal/api/auth_handlers.go), or an account the server
+     * accepted could not sign in on a client that refuses its parameters.
+     */
+    @Test
+    fun `refuses argon2id parameters that would give the password away`() {
+        assertTrue(Kdf.acceptable(Kdf.DEFAULT))
+        assertTrue(Kdf.acceptable(Kdf.FLOOR))
+        assertTrue(Kdf.acceptable(Kdf.Params(m = 1 shl 20, t = 20, p = 4)))
+        assertEquals(Kdf.Params(m = 32768, t = 2, p = 1), Kdf.FLOOR)
+        // Free to compute, so a server that asked for these would get the
+        // plaintext password back out of the proof it is handed.
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 8, t = 1, p = 1)))
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 32767, t = 2, p = 1)))
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 65536, t = 1, p = 1)))
+        // Heavy enough to wedge a phone, which is the other half of the range.
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 1 shl 22, t = 3, p = 1)))
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 65536, t = 100, p = 1)))
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 65536, t = 3, p = 64)))
+        // A params version this build does not know is not guessed at.
+        assertTrue(!Kdf.acceptable(Kdf.Params(m = 65536, t = 3, p = 1, v = 2)))
     }
 
     @Test

@@ -58,6 +58,8 @@ fun MessageActions(
     message: UiMessage,
     channelId: String,
     serverId: String?,
+    /** Opened by the `+` on the reaction row: skip the menu, show the picker. */
+    startReacting: Boolean = false,
     onDismiss: () -> Unit,
     onReply: () -> Unit,
     onEdit: () -> Unit,
@@ -68,7 +70,7 @@ fun MessageActions(
     val clipboard = LocalClipboardManager.current
     val me by AppState.me.collectAsState()
     val settings by SettingsStore.doc.collectAsState()
-    var reacting by remember { mutableStateOf(false) }
+    var reacting by remember { mutableStateOf(startReacting) }
 
     val mine = message.raw.authorId == me?.id
     val perms = AppState.permissionsIn(channelId)

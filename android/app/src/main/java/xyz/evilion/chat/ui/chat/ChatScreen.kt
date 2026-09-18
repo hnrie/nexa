@@ -81,6 +81,8 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
     var replyTo by remember(channelId) { mutableStateOf<UiMessage?>(null) }
     var editing by remember(channelId) { mutableStateOf<UiMessage?>(null) }
     var actionsFor by remember(channelId) { mutableStateOf<UiMessage?>(null) }
+    /** Whether that sheet opens on its menu or straight on the reaction picker. */
+    var actionsReacting by remember(channelId) { mutableStateOf(false) }
 
     DisposableEffect(channelId) {
         Session.Focus.activeChannel = channelId
@@ -142,7 +144,8 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
                             message = message,
                             previous = ordered.getOrNull(index + 1),
                             serverId = serverId,
-                            onLongPress = { actionsFor = message },
+                            onLongPress = { actionsFor = message; actionsReacting = false },
+                            onReact = { actionsFor = message; actionsReacting = true },
                             onReply = { replyTo = message },
                         )
                     }
@@ -186,6 +189,7 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
             message = message,
             channelId = channelId,
             serverId = serverId,
+            startReacting = actionsReacting,
             onDismiss = { actionsFor = null },
             onReply = { replyTo = message; actionsFor = null },
             onEdit = { editing = message; actionsFor = null },

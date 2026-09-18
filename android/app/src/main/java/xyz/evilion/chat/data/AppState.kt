@@ -104,6 +104,12 @@ object AppState {
 
     fun putUsers(list: Collection<PublicUser>) {
         if (list.isEmpty()) return
+        // Every user object the server sends carries that account's identity
+        // public key, and this is the one door they all come through — ready, a
+        // member joining, a profile opened, a user_update. Judging the key here
+        // means a swapped one is caught when it is offered, not when it is next
+        // used to seal a conversation key.
+        for (u in list) judgeKey(u.id, u.publicKey)
         users.update { current -> current + list.associateBy { it.id } }
     }
 

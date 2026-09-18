@@ -20,6 +20,40 @@ object Kdf {
 
     val DEFAULT = Params(m = 65536, t = 3, p = 1)
 
+    /**
+     * The weakest and the heaviest argon2id parameters this client will stretch
+     * a password with.
+     *
+     * Registration picks DEFAULT, but every later sign-in asks the *server*
+     * which parameters to use, because the account may have been registered
+     * with others. A server that answers {m = 8, t = 1} makes the stretching
+     * free, and since the client then hands `hkdf(argon2id(password, …), auth)`
+     * back as proof of knowledge, that server grinds the proof into the
+     * plaintext password in seconds — and with the password it unwraps the
+     * identity private key it already stores.
+     *
+     * The numbers are the server's own, from validKDF in
+     * internal/api/auth_handlers.go, which is what it accepts when a client
+     * *submits* parameters. Mirroring them exactly means no account the server
+     * ever allowed to register can be refused by its own client. The ceiling
+     * matters as much as the floor on a phone: without it a hostile server
+     * wedges the app with a gibibyte of memory and twenty passes, which is
+     * indistinguishable from a hang.
+     */
+    val FLOOR = Params(m = 32768, t = 2, p = 1)
+    val CEILING = Params(m = 1 shl 20, t = 20, p = 4)
+
+    /** Thrown instead of deriving anything with parameters outside that range. */
+    class WeakParams(message: String) : Exception(message)
+
+    /**
+     * Whether parameters are ones this client is willing to use. The params
+     * version is checked too: registration has only ever written 1, and a
+     * version this build does not know is not something to guess at.
+     */
+    fun acceptable(p: Params): Boolean =
+        p.v == 1 && p.m >= FLOOR.m && p.m <= CEILING.m && p.t >= FLOOR.t && p.t <= CEILING.t && p.p >= FLOOR.p && p.p <= CEILING.p
+
     private val INFO_AUTH = "evilion-chat/auth/v1".toByteArray()
     private val INFO_ENC = "evilion-chat/enc/v1".toByteArray()
     private val INFO_SETTINGS = "evilion-chat/settings/v1".toByteArray()
@@ -32,8 +66,17 @@ object Kdf {
 
     private val argon2 by lazy { Argon2Kt() }
 
-    /** Stretch a password into a 32-byte master key. Slow on purpose: seconds, not milliseconds. */
+    /**
+     * Stretch a password into a 32-byte master key. Slow on purpose: seconds,
+     * not milliseconds.
+     *
+     * The parameter check sits here, at the one place every argon2id
+     * derivation in the app passes through, rather than only where the
+     * parameters arrive: a path added later that forgets to check is then
+     * still safe.
+     */
     fun deriveMaster(password: String, salt: ByteArray, params: Params): ByteArray {
+        if (!acceptable(params)) throw WeakParams("argon2id parameters outside the accepted range: m=${params.m} t=${params.t} p=${params.p} v=${params.v}")
         val normalized = Normalizer.normalize(password, Normalizer.Form.NFKC).toByteArray(Charsets.UTF_8)
         val result = argon2.hash(
             mode = Argon2Mode.ARGON2_ID,

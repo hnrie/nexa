@@ -595,6 +595,7 @@
   "messageActions.markUnread": "읽지 않음으로 표시",
   "messageActions.pin": "고정",
   "messageActions.thatMessageCouldNotBeDeleted": "그 메시지를 삭제하지 못했습니다.",
+  "messageRow.addAReaction": "반응 추가",
   "messageRow.discard": "버리기",
   "messageRow.notSentTapToTryAgain": "보내지 못했습니다. 눌러서 다시 시도하세요.",
   "messageRow.originalMessage": "원본 메시지",

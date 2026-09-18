@@ -41,6 +41,10 @@ object KeyService {
     fun start(userId: String, identity: Identity) {
         this.userId = userId
         this.identity = identity
+        // Before the gateway connects: the first ready puts every user this
+        // account can see through judgeKey, and each of those keys has to be
+        // held against what this device remembers rather than pinned late.
+        KeyPins.open(userId)
         for ((conv, epoch, root) in SecureStore.roots(userId)) ring.set(conv, epoch, root)
     }
 
@@ -48,6 +52,10 @@ object KeyService {
         userId = null
         identity = null
         ring.clear()
+        // The pins themselves stay on the device — that is the point of them —
+        // but this session's unanswered questions and its log go with it.
+        KeyPins.close()
+        KeyAlerts.reset()
     }
 
     private fun persist() {
@@ -121,22 +129,104 @@ object KeyService {
         return created.epoch to root
     }
 
+    /**
+     * Who this device believes is in a conversation: the DM's recipients, or a
+     * server's members. A private server channel carries its own conversation,
+     * and who can view it is a subset of the server's members — the subset is
+     * not recomputed here, because this client's view of role overwrites can
+     * lag the server's and a member wrongly dropped loses messages they are
+     * entitled to. The superset still catches what matters: an account that is
+     * in no part of the conversation at all.
+     *
+     * Null means nothing can be said, which is not the same as "nobody".
+     */
+    private fun membersOf(conv: String): Set<String>? {
+        val channel = AppState.channels.value[conv]
+        if (channel != null) {
+            // Recipients ride on the channel object and are always complete: a
+            // group DM missing a member could not be drawn.
+            if (channel.isDm) return channel.recipientIds.toSet()
+            val serverId = channel.serverId ?: return null
+            return completeServerMembers(serverId)
+        }
+        return completeServerMembers(conv)
+    }
+
+    /**
+     * A server's members, but only when the whole list is in hand. A large
+     * server loads its members a page at a time, so an id missing from a
+     * partial list may simply not have been fetched yet, and a stranger cannot
+     * be told from a member. Refusing there would strand real members without
+     * keys for messages they may read, which is the worse of the two failures.
+     */
+    private fun completeServerMembers(serverId: String): Set<String>? {
+        val state = AppState.servers.value[serverId] ?: return null
+        if (state.members.size < state.memberCount) return null
+        return state.members.keys
+    }
+
+    /**
+     * Narrows a server-supplied recipient list to the accounts this device is
+     * willing to hand a conversation key to.
+     *
+     * Nothing about who gets a key was ever the client's decision before: the
+     * user_ids in a keys_needed event, in /keys/needs and in the answer to
+     * creating an epoch went straight into the wrapping, so one fabricated
+     * event naming an attacker's account was enough to make this device seal
+     * the conversation root for it and upload the result, silently. Here they
+     * are held against the membership this device already knows and draws, and
+     * anything outside it is dropped and written down where it can be seen.
+     */
+    private fun recipientsFor(conv: String, epoch: Int, wanted: List<String>): List<String> {
+        val known = membersOf(conv)
+        if (known == null) {
+            if (wanted.isNotEmpty()) KeyAlerts.report(KeyAlerts.Kind.UNCHECKED, conv = conv, count = wanted.size)
+            return wanted
+        }
+        // Never this account. A membership list that has not caught up with a
+        // join would otherwise leave this device holding a root with no grant
+        // of its own, which is the one way this check could lock somebody out
+        // of their own conversation.
+        val me = userId
+        val allowed = wanted.filter { it in known || it == me }
+        val outsiders = wanted.filter { it !in known && it != me }
+        if (outsiders.isNotEmpty()) {
+            Log.w(TAG, "refusing to wrap $conv epoch $epoch for ${outsiders.joinToString()} — not in this conversation")
+            KeyAlerts.report(KeyAlerts.Kind.OUTSIDER_REFUSED, userId = outsiders.singleOrNull(), conv = conv, count = outsiders.size)
+        }
+        return allowed
+    }
+
     /** Wraps a root for each member and uploads the grants; unknown users are skipped. */
-    private suspend fun putGrantsFor(conv: String, epoch: Int, root: ByteArray, userIds: List<String>) {
+    private suspend fun putGrantsFor(conv: String, epoch: Int, root: ByteArray, wanted: List<String>) {
+        // The one place every grant this client makes passes through, so the
+        // recipient check cannot be forgotten by a path added later: createEpoch,
+        // /keys/needs and the keys_needed event all end up here.
+        val userIds = recipientsFor(conv, epoch, wanted)
         val uploads = mutableListOf<GrantUpload>()
         for (uid in userIds) {
-            val pub = publicKeyOf(uid) ?: continue
+            val pubB64 = publicKeyOf(uid) ?: continue
+            // A key that is not the one this device pinned for that person does
+            // not get a copy of the conversation until a human has looked at
+            // it. judgeKey raises the question; this path just declines, and
+            // the grant is made on the next reconcile once it is answered.
+            if (judgeKey(uid, pubB64) == KeyPins.Verdict.CHANGED) {
+                KeyAlerts.report(KeyAlerts.Kind.GRANT_WITHHELD, userId = uid, conv = conv)
+                continue
+            }
+            val pub = Bytes.unb64OrNull(pubB64) ?: continue
             uploads += GrantUpload(conv, epoch, uid, Bytes.b64(Keys.wrapGrant(pub, root)))
         }
         uploads.chunked(200).forEach { KeysApi.putGrants(it) }
     }
 
-    private suspend fun publicKeyOf(userId: String): ByteArray? {
-        AppState.user(userId)?.publicKey?.takeIf { it.isNotEmpty() }?.let { return Bytes.unb64OrNull(it) }
-        return runCatching {
-            val key = UsersApi.publicKey(userId)
-            Bytes.unb64OrNull(key)
-        }.getOrNull()
+    /**
+     * The key to seal to, as base64 — the shape the pin file keeps, so the two
+     * can be compared without decoding either.
+     */
+    private suspend fun publicKeyOf(userId: String): String? {
+        AppState.user(userId)?.publicKey?.takeIf { it.isNotEmpty() }?.let { return it }
+        return runCatching { UsersApi.publicKey(userId) }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
     /** Takes in a key that arrived outside the grants, such as in an invite link. */

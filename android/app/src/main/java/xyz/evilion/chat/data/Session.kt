@@ -150,10 +150,34 @@ object Session {
         }
     }
 
+    /**
+     * The argon2id parameters to stretch a password with, as the server gave
+     * them.
+     *
+     * They have to come from the server — an account may have been registered
+     * with parameters other than today's default, and only the server knows
+     * which — but they cannot be taken on trust. The password is stretched with
+     * whatever arrives here and the result is then *handed to the server* as
+     * proof of knowledge, so parameters that are free to compute give the
+     * server the plaintext password, and with it the wrapped identity key it
+     * already stores.
+     *
+     * The floor is the server's own rule for what a client may register with,
+     * so nothing it ever accepted can be refused here.
+     */
+    private fun acceptKdf(p: KdfParamsJson): Kdf.Params {
+        val params = Kdf.Params(p.m, p.t, p.p, p.v)
+        if (!Kdf.acceptable(params)) {
+            Log.w(LOG_TAG, "refusing argon2id parameters the server sent: m=${p.m} t=${p.t} p=${p.p} v=${p.v}")
+            throw Kdf.WeakParams(t("auth.theServerAskedToProtectYourPassword"))
+        }
+        return params
+    }
+
     suspend fun login(username: String, password: String): LoginOutcome {
         val kdf = AuthApi.kdf(username)
         val salt = Bytes.unb64(kdf.salt)
-        val params = Kdf.Params(kdf.params.m, kdf.params.t, kdf.params.p)
+        val params = acceptKdf(kdf.params)
         val master = withContext(Dispatchers.Default) { Kdf.deriveMaster(password, salt, params) }
         val authKey = Kdf.authKey(master)
         val encKey = Kdf.encKey(master)
@@ -195,7 +219,7 @@ object Session {
         val me = AppState.me.value ?: throw IllegalStateException(t("session.signInAgain"))
         val kdf = AuthApi.kdf(me.username)
         val master = withContext(Dispatchers.Default) {
-            Kdf.deriveMaster(password, Bytes.unb64(kdf.salt), Kdf.Params(kdf.params.m, kdf.params.t, kdf.params.p))
+            Kdf.deriveMaster(password, Bytes.unb64(kdf.salt), acceptKdf(kdf.params))
         }
         val encKey = Kdf.encKey(master)
         Bytes.wipe(master)
@@ -295,7 +319,7 @@ object Session {
         val me = AppState.me.value ?: throw IllegalStateException(t("session.signInAgain"))
         val kdf = AuthApi.kdf(me.username)
         val master = withContext(Dispatchers.Default) {
-            Kdf.deriveMaster(password, Bytes.unb64(kdf.salt), Kdf.Params(kdf.params.m, kdf.params.t, kdf.params.p))
+            Kdf.deriveMaster(password, Bytes.unb64(kdf.salt), acceptKdf(kdf.params))
         }
         val keys = Kdf.authKey(master) to Kdf.encKey(master)
         Bytes.wipe(master)
@@ -594,6 +618,13 @@ object Session {
                 if (KeyService.ring.get(need.convId, need.epoch) != null) {
                     // Key upkeep can mean many requests; it runs beside the event
                     // queue so messages and calls never wait behind it.
+                    //
+                    // userIds is the server's answer to a question only the
+                    // server was ever asked, and one fabricated event naming an
+                    // attacker's account used to be enough to make this device
+                    // seal the conversation root for it. The list is held
+                    // against the membership this client knows in putGrantsFor,
+                    // which every grant goes through.
                     scope.launch { runCatching { KeyService.grantTo(need.convId, need.epoch, need.userIds) } }
                 }
             }
