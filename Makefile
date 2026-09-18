@@ -9,7 +9,12 @@ export PATH := $(NODE_BIN):$(PATH)
 
 .PHONY: build web server test test-go test-web test-desktop test-android desktop publish-desktop android publish-android licenses run clean
 
-build: web server
+# Nothing that ships is built without its tests having run. A desktop release
+# used to be `npm run build && electron-builder` — the typechecker and the test
+# suite both existed and were wired into targets nothing depended on, so a
+# release could carry code that did not compile in the main process or that
+# failed its own tests, and nobody would find out until it was installed.
+build: test-web test-go web server
 
 web:
 	cd web && npm ci --no-audit --no-fund && npm run build
@@ -30,11 +35,11 @@ test-desktop:
 
 # the Android app's own tests: the crypto against the web client's own output,
 # the markdown parser, invite links and mentions
-test-android:
+test-android: test-android
 	cd android && JAVA_HOME=$(ANDROID_JAVA_HOME) ANDROID_HOME=$(ANDROID_SDK) $(GRADLE) --no-daemon :app:testDebugUnitTest
 
 # the desktop app's installers for every platform, into desktop/dist (runs on macOS)
-desktop:
+desktop: test-desktop
 	cd desktop && npm ci --no-audit --no-fund && npm run build && npx electron-builder --mac --win --linux --publish never
 
 # copies desktop/dist into DESKTOP_DIR, where chatd serves downloads and updates
@@ -42,7 +47,7 @@ publish-desktop:
 	python3 tools/publish_desktop.py desktop/dist
 
 # the signed Android app (android/keystore.properties and android/release.jks)
-android:
+android: test-android
 	cd android && JAVA_HOME=$(ANDROID_JAVA_HOME) ANDROID_HOME=$(ANDROID_SDK) $(GRADLE) --no-daemon :app:assembleRelease
 
 # copies the APK into ANDROID_DIR, where chatd serves it to the download page

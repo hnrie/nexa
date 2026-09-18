@@ -203,7 +203,11 @@ function registerIpc(): void {
   handle(IPC.screenAccess, () => screenAccess());
   handle(IPC.openScreenSettings, () => openScreenSettings());
   handle(IPC.restartApp, () => restartApp());
-  on(IPC.displayChoose, (requestId: string, sourceId: string | null, withAudio: boolean) => chooseDisplaySource(String(requestId), sourceId === null ? null : String(sourceId), !!withAudio));
+  // Dismissal only. Which screen is shared is answered by the picker window,
+  // which this page cannot reach — the extra arguments the page used to send
+  // are ignored rather than accepted and dropped, so that a change here cannot
+  // quietly hand the decision back to it.
+  on(IPC.displayChoose, (requestId: string) => chooseDisplaySource(String(requestId)));
 }
 
 /**

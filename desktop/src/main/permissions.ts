@@ -9,6 +9,7 @@ import os from "node:os";
 import { IPC, type DisplaySourceRequest } from "../shared/bridge";
 import { WINDOWS_PROCESS_LOOPBACK_BUILD, windowAudioDevice } from "./appAudio";
 import { isAppUrl, originOf, ORIGIN } from "./config";
+import { askForDisplaySource } from "./displayPicker";
 
 type Log = (msg: string, extra?: Record<string, unknown>) => void;
 
@@ -56,7 +57,12 @@ export function lockPermissions(): void {
   });
 }
 
-const pending = new Map<string, { resolve: (sourceId: string | null, audio: boolean) => void }>();
+/**
+ * Requests waiting on the page — only the "this computer will not let the app
+ * record" explainer, which the page shows and dismisses. Choosing a source is
+ * not in here: it belongs to the picker window, which the page cannot reach.
+ */
+const pending = new Map<string, { resolve: () => void }>();
 
 /**
  * Sound that would not start on this computer this session. Chromium fails
@@ -234,30 +240,19 @@ export function handleDisplayMedia(getWindow: () => BrowserWindow | null, log: L
             await answerWith(again, true);
             return;
           }
-          const requestId = randomUUID();
-          const req: DisplaySourceRequest = {
-            requestId,
-            audio,
-            sources: sources.map((s) => ({
+          // The page does not get to answer this. See displayPicker.ts.
+          const answer = await askForDisplaySource(
+            win,
+            sources.map((s) => ({
               id: s.id,
               name: s.name,
               kind: s.id.startsWith("screen:") ? "screen" : "window",
               thumbnail: s.thumbnail.isEmpty() ? "" : s.thumbnail.toDataURL(),
               ...(s.appIcon && !s.appIcon.isEmpty() ? { icon: s.appIcon.toDataURL() } : {}),
             })),
-          };
-          const timer = setTimeout(() => answer(null, false), 120_000);
-          const answer = (sourceId: string | null, withAudio: boolean) => {
-            clearTimeout(timer);
-            pending.delete(requestId);
-            void answerWith(
-              sources.find((s) => s.id === sourceId),
-              withAudio,
-            ).catch(() => callback({}));
-          };
-          pending.set(requestId, { resolve: answer });
-          win.webContents.send(IPC.displaySources, req);
-          if (!win.isVisible()) win.show();
+            { audio },
+          );
+          await answerWith(answer ? sources.find((s) => s.id === answer.sourceId) : undefined, answer?.withAudio === true);
         } catch {
           callback({});
         }
@@ -301,6 +296,11 @@ export function shareAudioMode(): ShareAudioMode {
 }
 
 /** The page chose a source (null: the person cancelled). */
-export function chooseDisplaySource(requestId: string, sourceId: string | null, withAudio: boolean): void {
-  pending.get(requestId)?.resolve(sourceId, withAudio);
+/**
+ * Dismisses the explainer the page is showing. It takes no source and cannot
+ * start a share: the arguments are gone deliberately, so that no future edit
+ * can make the page the thing that answers a capture request again.
+ */
+export function chooseDisplaySource(requestId: string): void {
+  pending.get(requestId)?.resolve();
 }
