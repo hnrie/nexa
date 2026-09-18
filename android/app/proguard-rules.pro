@@ -7,6 +7,23 @@
 -keep class org.webrtc.** { *; }
 -dontwarn org.webrtc.**
 
+# And the layer it registers that JNI through. Nothing in Java names
+# org.jni_zero — only WebRTC's native library does, by string — so R8 saw dead
+# code and removed it. The release build then aborted the whole process the
+# moment a call started:
+#
+#   ClassNotFoundException: org.jni_zero.JniZero
+#     at org.webrtc.NativeLibrary$DefaultLoader.load
+#     at org.webrtc.PeerConnectionFactory.initialize
+#   JNI DETECTED ERROR IN APPLICATION: java_class == null in GetStaticMethodID
+#
+# Debug builds were fine, because nothing is shrunk there, which is exactly
+# why this shipped.
+-keep class org.jni_zero.** { *; }
+-keepclasseswithmembers class * { @org.jni_zero.* <methods>; }
+-keepclasseswithmembers class * { @org.jni_zero.* <fields>; }
+-dontwarn org.jni_zero.**
+
 # argon2kt loads its own native library and calls back into these.
 -keep class com.lambdapioneer.argon2kt.** { *; }
 
