@@ -8,6 +8,7 @@ import { newRootKey } from "@/crypto/conv";
 import { keystore } from "@/crypto/keystore";
 import { unwrapGrant, wrapGrant, type Identity } from "@/crypto/keys";
 import { hasLock } from "@/lib/appLock";
+import { clearSearchIndex } from "@/lib/fullSearch";
 import { clearKeyring, ring } from "@/lib/keyring";
 import { useMessages } from "./messages";
 import { useUsers } from "./users";
@@ -48,18 +49,34 @@ async function persistRoot(userId: string, conv: string, epoch: number, root: Ui
 /** Wraps a root for each user and uploads the grants; users without a public key are skipped. */
 async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, userIds: string[]): Promise<void> {
   const uploads: { conv_id: string; epoch: number; user_id: string; wrapped_key: string }[] = [];
+  const wrap = async (uid: string): Promise<boolean> => {
+    try {
+      const pub = await publicKeyOf(uid);
+      uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(pub, root)) });
+      return true;
+    } catch (err) {
+      // An account that is genuinely gone is skipped for good; anything else —
+      // a 500, a timeout, an offline fetch — says nothing about that person,
+      // and dropping them silently costs them every message of this epoch.
+      return err instanceof ApiError && err.status === 404;
+    }
+  };
+  const again: string[] = [];
   // a few keys looked up at a time: a large server's members are not all known here
   for (let i = 0; i < userIds.length; i += 16) {
-    await Promise.all(
-      userIds.slice(i, i + 16).map(async (uid) => {
-        try {
-          const pub = await publicKeyOf(uid);
-          uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(pub, root)) });
-        } catch {
-          /* unknown user: skip */
-        }
-      }),
-    );
+    const batch = userIds.slice(i, i + 16);
+    const ok = await Promise.all(batch.map(wrap));
+    for (const [j, fine] of ok.entries()) if (!fine) again.push(batch[j]!);
+  }
+  if (again.length > 0) {
+    await new Promise((r) => setTimeout(r, 500));
+    // The rotation itself still goes ahead if this fails: it is what takes the
+    // key away from whoever just left, and holding it back for one unreachable
+    // lookup would be worse. The server keeps track of who is still owed a
+    // grant, and reconcile() hands it over on the next connection.
+    const healed = await Promise.all(again.map(wrap));
+    const missed = again.filter((_, j) => !healed[j]);
+    if (missed.length > 0) console.warn(`keys: ${missed.length} member(s) could not be granted ${conv} epoch ${epoch}; the server will ask again`);
   }
   for (let i = 0; i < uploads.length; i += 200) {
     await keysApi.putGrants(uploads.slice(i, i + 200));
@@ -128,8 +145,10 @@ export const useKeys = create<KeysState>()((set, get) => ({
     if (inflight) return inflight;
     const job = (async () => {
       const { userId } = get();
-      if (!userId) return null;
+      // inside the try, so the finally below always takes the job back out of
+      // the map: a null cached here answered every later caller for good
       try {
+        if (!userId) return null;
         return await createAndGrant(conv, userId);
       } catch (err) {
         if (err instanceof ApiError && (err.status === 409 || err.code === "epoch_race")) {
@@ -154,14 +173,30 @@ export const useKeys = create<KeysState>()((set, get) => ({
     await putGrantsFor(conv, epoch, root, userIds);
   },
   reconcile: async () => {
-    const needs = await keysApi.needs();
+    // Every conversation stands on its own: one that throws used to end the
+    // walk, so everybody who joined the ones after it while this device was
+    // away kept seeing "encrypted message" until another holder came online.
+    let needs: Awaited<ReturnType<typeof keysApi.needs>>;
+    try {
+      needs = await keysApi.needs();
+    } catch (err) {
+      console.warn("keys: could not ask what needs granting", err);
+      return;
+    }
+    let failed = 0;
     for (const n of needs) {
       if (!ring.get(n.conv_id, n.epoch)) continue;
-      await get().grantTo(n.conv_id, n.epoch, n.user_ids);
-      // someone lost access while no holder was online; the server lets only
-      // the first device that asks create the new key
-      if (n.rotate) await get().rotate(n.conv_id, "membership change");
+      try {
+        await get().grantTo(n.conv_id, n.epoch, n.user_ids);
+        // someone lost access while no holder was online; the server lets only
+        // the first device that asks create the new key
+        if (n.rotate) await get().rotate(n.conv_id, "membership change");
+      } catch (err) {
+        failed += 1;
+        console.warn("keys: could not reconcile a conversation", n.conv_id, err);
+      }
     }
+    if (failed > 0) console.warn(`keys: ${failed} conversation(s) still need granting`);
   },
   rotate: async (conv, reason) => {
     const { userId } = get();
@@ -176,6 +211,10 @@ export const useKeys = create<KeysState>()((set, get) => ({
   markWaiting: (conv) => set((s) => (s.waiting[conv] ? s : { waiting: { ...s.waiting, [conv]: true } })),
   reset: () => {
     clearKeyring();
+    // The search index holds plaintext. Without the keys it must go too, or
+    // the next person on this tab could read a conversation they have no
+    // grant for by typing a word into search.
+    clearSearchIndex();
     pendingEnsure.clear();
     set({ userId: null, identity: null, waiting: {} });
   },

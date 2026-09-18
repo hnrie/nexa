@@ -15,9 +15,11 @@ const reactionPath = (channelId: Snowflake, mid: Snowflake, emoji: string): stri
   `/channels/${channelId}/messages/${mid}/reactions/${encodeURIComponent(emoji)}`;
 
 export const messages = {
-  list(channelId: Snowflake, q: HistoryQuery = {}): Promise<Message[]> {
+  /** `opts.signal` lets a long walk through history be called off mid-page. */
+  list(channelId: Snowflake, q: HistoryQuery = {}, opts?: { signal?: AbortSignal }): Promise<Message[]> {
     return api.request<Message[]>("GET", `/channels/${channelId}/messages`, undefined, {
       query: { before: q.before, after: q.after, around: q.around, limit: q.limit },
+      ...(opts?.signal ? { signal: opts.signal } : {}),
     });
   },
   get(channelId: Snowflake, mid: Snowflake): Promise<Message> {

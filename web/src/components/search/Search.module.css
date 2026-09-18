@@ -23,6 +23,12 @@
 .resultText mark { background: rgba(128, 0, 255, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
 .empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-muted); }
+/* A long count must not push the cancel button off the end of the panel. */
+.progress { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* What the walk could not do: conversations without a key, a server asking us
+   to wait, history left unread because the index filled. Said once, above the
+   footer, rather than as a toast that interrupts the reading. */
+.notes { flex: none; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 0; font-size: 12px; line-height: 1.35; color: var(--text-muted); }
 .searchBox { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); width: 180px; transition: width 150ms ease; }
 .searchBox:focus-within { width: 260px; color: var(--text); }
 .searchBox input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
