@@ -21,8 +21,15 @@ build: test-web test-go web server
 web:
 	cd web && npm ci --no-audit --no-fund && DEPLOY=1 npm run build
 
+# `bin/chatd` is the file launchd starts, so writing it is the deploy — a
+# reboot after any `go build -o bin/chatd` starts whatever was left there. The
+# build goes to a scratch name and is moved into place in one step, keeping the
+# one it replaces as bin/chatd.prev to roll back to.
 server:
-	$(GO) build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o bin/chatd ./cmd/chatd
+	$(GO) build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o bin/chatd.next ./cmd/chatd
+	@if [ -f bin/chatd ]; then cp -f bin/chatd bin/chatd.prev; fi
+	@mv -f bin/chatd.next bin/chatd
+	@echo "  bin/chatd is now $(VERSION); the one it replaced is bin/chatd.prev"
 
 test: test-go test-web test-desktop
 

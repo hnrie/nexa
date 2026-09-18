@@ -32,6 +32,13 @@ make build && sudo launchctl kickstart -k system/xyz.evilion.chat   # update
 bash backup.sh                                          # consistent DB + media backup
 ```
 
+`bin/chatd` is the file the daemon starts, so anything that writes it decides
+what runs after the next restart — including a reboot nobody planned. `make
+server` builds to a scratch name and moves it into place in one step, keeping
+what it replaced as `bin/chatd.prev`; a bare `go build -o bin/chatd` does not,
+and will deploy on the next restart without saying so. To check that the server
+compiles, `go build ./...` writes nothing.
+
 Settings live in `chatd.env` (documented in `chatd.env.example`); restart after
 editing. The database is `data/chat.db` (SQLite, WAL mode) and uploads live in
 `data/media/`; back them up with `backup.sh`, never by copying the live files.
