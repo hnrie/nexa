@@ -11,14 +11,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.icons.Lucide
 import xyz.evilion.chat.ui.theme.chatColors
 import kotlin.math.abs
@@ -67,7 +66,10 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
     }
     val colors = chatColors
     val density = LocalDensity.current
-    // Which way on screen is "toward the start": -1 is left.
+    // Which way the finger moves on screen to go toward the start: left, or
+    // right in a right-to-left language. Pointer positions are screen
+    // coordinates, so the gesture needs this; the offset below does not, since
+    // Compose already mirrors it in a right-to-left layout.
     val toStart = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else -1f
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -76,25 +78,34 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
     val offset = remember { Animatable(0f) }
     val trigger = with(density) { TRIGGER.toPx() }
     val limit = with(density) { LIMIT.toPx() }
-    val progress = (offset.value / trigger).coerceIn(0f, 1f)
+    // The only thing a drag changes in composition, and only when it crosses
+    // the line. Everything else it moves is read while laying out and drawing:
+    // reading the offset here recomposed the whole message, markdown, pictures
+    // and all, on every frame of the drag, which on a row with a few pictures
+    // was enough to stall the phone's input for seconds.
+    val armed by remember { derivedStateOf { offset.value >= trigger } }
 
     Box(Modifier.fillMaxWidth()) {
-        if (offset.value > 1f) {
-            Box(
-                Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 16.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                Icon(
-                    Lucide.Reply,
-                    t("chat.messageItem.reply"),
-                    tint = if (progress >= 1f) colors.brand else colors.textMuted,
-                    modifier = Modifier.size(20.dp).alpha(progress).scale(0.7f + 0.3f * progress),
-                )
-            }
+        Box(
+            Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(end = 16.dp),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            // decoration: the reply itself is in the message's long-press menu,
+            // and a "Reply" on every row would be noise to a screen reader
+            Icon(
+                Lucide.Reply,
+                null,
+                tint = if (armed) colors.brand else colors.textMuted,
+                modifier = Modifier.size(20.dp).graphicsLayer {
+                    val progress = (offset.value / trigger).coerceIn(0f, 1f)
+                    alpha = progress
+                    scaleX = 0.7f + 0.3f * progress
+                    scaleY = scaleX
+                },
+            )
         }
         Box(
             Modifier
-                .offset { IntOffset((offset.value * toStart).roundToInt(), 0) }
                 .pointerInput(toStart) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
@@ -142,7 +153,15 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
                             }
                         }
                     }
-                },
+                }
+                // After the gesture, not before it: laid out inside the offset,
+                // the finger was measured against a row that moved with it, so
+                // each step the row took cancelled most of the next one and a
+                // full swipe moved it a few dozen pixels. Negative is toward
+                // the start in either direction, since this overload of offset
+                // is already mirrored for right-to-left (mirroring it again
+                // sent an Arabic row the wrong way, over its own arrow).
+                .offset { IntOffset(-offset.value.roundToInt(), 0) },
         ) {
             content()
         }

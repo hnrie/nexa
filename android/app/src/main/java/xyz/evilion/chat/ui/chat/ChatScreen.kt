@@ -108,6 +108,26 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
         }
     }
 
+    // Following the conversation. The list is keyed, so a message added at the
+    // bottom is laid out under the one that was there, just out of sight:
+    // a message you had just sent did not appear until you scrolled for it.
+    // Your own is always brought into view, as the web client does; anyone
+    // else's only while you were already reading the end, so a new message
+    // never pulls you away from history you scrolled back to.
+    val newestId = messages.lastOrNull()?.id
+    var followed by remember(channelId) { mutableStateOf(newestId) }
+    LaunchedEffect(channelId, newestId) {
+        val newest = messages.lastOrNull() ?: return@LaunchedEffect
+        val previous = followed
+        followed = newest.id
+        // the first page arriving is not a new message
+        if (previous == null || previous == newest.id) return@LaunchedEffect
+        val mine = newest.pending || newest.raw.authorId == me?.id
+        if (mine || listState.firstVisibleItemIndex <= 2) {
+            runCatching { listState.animateScrollToItem(0) }
+        }
+    }
+
     // mark as read once the newest message is on screen. The raw scroll
     // position used to be the effect's key, so every item boundary crossed
     // while scrolling recomposed the whole screen and restarted this; a
