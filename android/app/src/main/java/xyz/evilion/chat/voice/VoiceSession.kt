@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -587,7 +588,12 @@ object VoiceSession {
 
     // --- the server's side -------------------------------------------------
 
-    private fun sendState(channelId: String?) {
+    /**
+     * Tells the server where this device is. [sfuSession], with [resume], is
+     * the SFU session this device still holds after a reconnect: the proof
+     * that it is the device whose call is waiting for it.
+     */
+    private fun sendState(channelId: String?, resume: Boolean = false, sfuSession: String? = null) {
         val current = _state.value
         Session.gateway.send("voice_state", buildJsonObject {
             if (channelId == null) put("channel_id", null as String?) else put("channel_id", channelId)
@@ -596,6 +602,8 @@ object VoiceSession {
             put("video", current.video)
             put("streaming", current.screen)
             if (channelId != null) put("sfu", true)
+            if (resume) put("resume", true)
+            if (resume && sfuSession != null) put("sfu_session", sfuSession)
         })
     }
 
@@ -674,7 +682,20 @@ object VoiceSession {
 
     fun onGatewayEvent(event: GatewayEvent) {
         when (event.type) {
-            "voice_resumed" -> Unit
+            // The answer to a resume: kept, and the call simply went on; or the
+            // server let it go, and this device starts it again from nothing —
+            // its old session is closed at Cloudflare, and a connection that
+            // still looks healthy would otherwise sit there silent.
+            "voice_resumed" -> {
+                val data = event.data as? JsonObject
+                val kept = data?.get("kept")?.jsonPrimitive?.booleanOrNull ?: true
+                val channel = data?.get("channel_id")?.jsonPrimitive?.content
+                val sfu = transport
+                if (!kept && sfu != null && channel == _state.value.channelId) {
+                    Log.i(TAG, "the server did not keep the call; starting it again")
+                    scope.launch { runCatching { sfu.rebuild() }.onFailure { Log.w(TAG, "could not start the call again", it) } }
+                }
+            }
             "voice_error" -> {
                 val message = (event.data as? JsonObject)?.get("message")?.jsonPrimitive?.content
                 if (message != null) _state.update { it.copy(error = message) }
@@ -698,7 +719,17 @@ object VoiceSession {
     fun onReady(states: List<VoiceState>, sessionId: String) {
         val channelId = _state.value.channelId ?: return
         scope.launch {
-            sendState(channelId)
+            // Media through the SFU never went through the gateway, so the call
+            // carried on while it reconnected, and the server kept it for this
+            // device: it is asked for back as it is, the way the web client
+            // does. Sent as a plain join, the server took the reconnect for
+            // another device picking the call up and closed this one's own
+            // session at Cloudflare — every network change that dropped the
+            // socket left the call on screen, connected and silent.
+            val held = transport?.currentSession()
+            sendState(channelId, resume = held != null, sfuSession = held)
+            // and a connection that dropped along with the socket tries again now
+            transport?.nudge()
             val here = states.filter { it.channelId == channelId }.map { it.userId }.toSet()
             _state.update { call ->
                 if (here.isEmpty()) call else call.copy(peers = call.peers.filterKeys { it in here || it == AppState.me.value?.id })

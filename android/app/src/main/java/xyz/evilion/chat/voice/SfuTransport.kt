@@ -1,6 +1,7 @@
 package xyz.evilion.chat.voice
 
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -10,6 +11,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import org.webrtc.CandidatePairChangeEvent
 import org.webrtc.DataChannel
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
@@ -68,6 +70,12 @@ class Pulled(
     val mid: String,
     @Volatile var track: MediaStreamTrack? = null,
     @Volatile var decryptor: NativeFrameDecryptor? = null,
+    /**
+     * The receiving transceiver, as `onTrack` handed it over. Kept so the pull
+     * can be stopped without asking the connection for its transceivers — see
+     * [SfuTransport] on why that is never done.
+     */
+    @Volatile var transceiver: RtpTransceiver? = null,
 )
 
 /** Something this device wants to pull. */
@@ -89,6 +97,14 @@ private class Want(val userId: String, val kind: PubKind, val tag: String)
  * process down with no stack to read. Two: a connection that goes down is
  * recovered rather than rebuilt where it can be, since a Wi-Fi-to-mobile
  * handover is the ordinary case a phone call has to survive.
+ *
+ * Three: nothing here ever asks the connection for its `transceivers` (nor
+ * its senders or receivers). libwebrtc's Java wrapper disposes every
+ * transceiver it handed out before it lists them again — including the ones
+ * `addTransceiver` returned, which is what [senders] holds. One such call, made
+ * to set codec preferences after the first pull, killed the microphone's
+ * sender: every restart after that threw "RtpTransceiver has been disposed"
+ * reading its mid, and a call that lost the network never came back.
  */
 class SfuTransport(
     private val scope: CoroutineScope,
@@ -156,7 +172,7 @@ class SfuTransport(
     private val keyGuard = Any()
 
     private var pc: PeerConnection? = null
-    private var sessionId: String? = null
+    @Volatile private var sessionId: String? = null
     private var keysHandle: Long = 0
     private var keyVersion: String? = null
     private val senders = mutableMapOf<PubKind, RtpTransceiver>()
@@ -188,6 +204,20 @@ class SfuTransport(
     @Volatile private var generation = 0
 
     private var recoverJob: Job? = null
+    private var rebuildJob: Job? = null
+
+    /**
+     * The ICE username of a restart that has not produced a path yet.
+     *
+     * An answered restart is not a working one. Moving back onto Wi-Fi while
+     * mobile data was still up, the old session's path stayed "connected" on
+     * the phone's side, so WebRTC never moved to the new session — and
+     * Cloudflare, which had let the old one go, sent nothing down it. The state
+     * never changed and the call stayed silent. A path chosen on the new
+     * username is the proof a restart took; without one it is tried again, and
+     * then the connection is made from nothing.
+     */
+    @Volatile private var pendingUfrag: String? = null
     private var iceRestarts = 0
     private var downSince: Long? = null
     private var wasUp = false
@@ -195,6 +225,18 @@ class SfuTransport(
     private var pullRetries = 0
 
     private fun slot(userId: String, kind: PubKind) = "$userId:${kind.wire}"
+
+    /** The ICE username a local candidate was gathered under, which a restart changes. */
+    private fun ufragOf(candidate: IceCandidate?): String? =
+        candidate?.sdp?.let { Regex(" ufrag (\\S+)").find(it)?.groupValues?.get(1) }
+
+    /** "relay/cellular" and the like, from a candidate: its type and network, not its address. */
+    private fun pathOf(candidate: IceCandidate?): String {
+        val sdp = candidate?.sdp ?: return "?"
+        val type = Regex(" typ (\\w+)").find(sdp)?.groupValues?.get(1) ?: "?"
+        val network = candidate.adapterType?.name?.lowercase()?.removePrefix("adapter_type_") ?: "?"
+        return "$type/$network"
+    }
 
     /** Gets the keys and the connection ready; the session waits for the server. */
     suspend fun start() {
@@ -217,13 +259,35 @@ class SfuTransport(
      */
     suspend fun openSession(audio: MediaStreamTrack?) {
         lock.withLock {
-            if (closed || sessionId != null) return@withLock
-            sessionId = VoiceApi.sfuSession().sessionId
+            // a rebuild opens its own session and publishes again: two at once
+            // left the server holding one session and this device the other
+            if (closed || rebuildJob?.isActive == true) return
+            if (sessionId == null) sessionId = VoiceApi.sfuSession().sessionId
         }
+        // published even when the session was already there: a session whose
+        // first publish failed is exactly the one nobody can hear
         audio?.let { setLocalTrack(PubKind.AUDIO, it) }
     }
 
     fun hasSession(): Boolean = sessionId != null
+
+    /** The SFU session this device holds, for resuming the call on a new gateway connection. */
+    fun currentSession(): String? = sessionId
+
+    /** The network looks back (the gateway reconnected): a connection still down tries again now. */
+    fun nudge() {
+        scope.launch {
+            val down = lock.withLock {
+                val state = if (closed) null else pc?.connectionState()
+                state == PeerConnection.PeerConnectionState.DISCONNECTED ||
+                    state == PeerConnection.PeerConnectionState.FAILED
+            }
+            if (!down || rebuildJob?.isActive == true) return@launch
+            recoverJob?.cancel()
+            recoverJob = null
+            scheduleRecover(0)
+        }
+    }
 
     /**
      * Whether a kind is actually published.
@@ -282,12 +346,36 @@ class SfuTransport(
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
             rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
-            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
+            // Once, not continually. Gathering on every network that comes up
+            // let WebRTC move a live call onto Wi-Fi by itself the moment it
+            // appeared, while mobile data was still up: the connection went on
+            // saying "connected", Cloudflare never followed, and the call was
+            // silent both ways — an ICE restart on top did not bring it back.
+            // Gathered once, the call stays on the network it has until that
+            // one goes (Android lets mobile data go 30 s after Wi-Fi returns),
+            // the connection drops, and the restart below finds the new one:
+            // the one sequence that was measured to come back every time.
+            continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_ONCE
         }
         return requireNotNull(
             VoiceEngine.factory.createPeerConnection(config, object : PeerConnection.Observer {
                 override fun onSignalingChange(state: PeerConnection.SignalingState?) = Unit
-                override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) = Unit
+                override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
+                    if (mine == generation && !closed) Log.i(TAG, "ice $state")
+                }
+
+                // Which network the call is on and why it moved: the question
+                // behind every "the call went silent when I walked in the
+                // door". Types only, never addresses.
+                override fun onSelectedCandidatePairChanged(event: CandidatePairChangeEvent?) {
+                    if (mine != generation || closed || event == null) return
+                    Log.i(TAG, "path now ${pathOf(event.local)} to ${pathOf(event.remote)} (${event.reason})")
+                    val ufrag = ufragOf(event.local)
+                    if (pendingUfrag != null && (ufrag == null || ufrag == pendingUfrag)) {
+                        Log.i(TAG, "the restarted session has a path")
+                        pendingUfrag = null
+                    }
+                }
                 override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
                 override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) = Unit
                 override fun onIceCandidate(candidate: IceCandidate?) = Unit
@@ -299,6 +387,7 @@ class SfuTransport(
 
                 override fun onConnectionChange(state: PeerConnection.PeerConnectionState) {
                     if (mine != generation || closed) return
+                    Log.i(TAG, "connection $state")
                     onState(state)
                     onConnectionState(state)
                 }
@@ -338,9 +427,14 @@ class SfuTransport(
             val old = entry.decryptor
             entry.decryptor = decryptor
             entry.track = receiver.track()
+            entry.transceiver = transceiver
             old
         }
         previous?.release()
+        // Here rather than after the offer is applied: onTrack runs inside
+        // setRemoteDescription, before the answer is made, and this is the one
+        // place the receiving transceiver can be had without listing them.
+        if (entry.kind.video) preferVp8OnReceive(transceiver)
         onRemoteTrack(entry.userId, entry.kind, entry.track)
     }
 
@@ -375,68 +469,111 @@ class SfuTransport(
         }
     }
 
+    /** What one pass of [recover] found. */
+    private enum class Recovery { UP, AGAIN, REMAKE }
+
+    /**
+     * Brings a dropped connection back, trying until it is up or the call ends.
+     *
+     * One job for the whole outage. It used to schedule its next try from
+     * inside itself, which the "already running" check here refused, so a
+     * restart that failed because the network was still down was the last one
+     * ever tried, and the call sat connected on screen and silent for good.
+     */
     private fun scheduleRecover(wait: Long) {
         if (closed || recoverJob?.isActive == true) return
         recoverJob = scope.launch {
             delay(wait)
-            runCatching { recover() }.onFailure { Log.w(TAG, "could not recover the call", it) }
+            while (isActive && !closed) {
+                val step = try {
+                    recover()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    Log.w(TAG, "could not restart the connection; making it again", e)
+                    Recovery.REMAKE
+                }
+                when (step) {
+                    Recovery.UP -> return@launch
+                    Recovery.AGAIN -> delay(RESTART_EVERY_MS)
+                    Recovery.REMAKE -> {
+                        startRebuild()
+                        return@launch
+                    }
+                }
+            }
         }
     }
 
     /**
-     * A connection that stayed down: restart ICE, keeping the session, its
-     * tracks and everyone's pulls, while the connection stays open to come
-     * back by itself. Only restarts that were answered and still did not
-     * reconnect, or a session the SFU no longer has, make it again from
+     * One try at bringing the connection back: restart ICE, keeping the
+     * session, its tracks and everyone's pulls, while the connection stays open
+     * to come back by itself. Only restarts that were answered and still did
+     * not reconnect, or a session the SFU no longer has, make it again from
      * nothing — which costs a new session and every peer re-pulling.
      */
-    private suspend fun recover() {
-        var again = false
-        var remake = false
-        lock.withLock {
-            if (closed) return@withLock
-            val connection = pc ?: return@withLock
-            val state = connection.connectionState()
-            if (state != PeerConnection.PeerConnectionState.DISCONNECTED &&
-                state != PeerConnection.PeerConnectionState.FAILED
-            ) {
-                return@withLock
-            }
-            val session = sessionId
-            val anchor = PubKind.entries.firstOrNull { it in published && senders[it]?.mid != null }
-            if (iceRestarts >= MAX_ICE_RESTARTS || session == null || anchor == null) {
-                remake = true
-                return@withLock
-            }
-            again = true
-            try {
-                connection.restartIce()
-                val offer = createOffer(connection, iceRestart = true)
-                connection.setLocal(offer)
-                val reply = VoiceApi.sfuRestart(
-                    SfuRestartRequest(
-                        sessionId = session,
-                        offer = SfuDescription("offer", offer.description),
-                        mid = senders[anchor]?.mid ?: throw IllegalStateException("the anchor track went away"),
-                        kind = anchor.wire,
-                    ),
-                )
-                val answer = reply.answer ?: throw IllegalStateException("no answer to the ICE restart")
-                connection.setRemote(SessionDescription(SessionDescription.Type.ANSWER, answer.sdp))
-                iceRestarts++
-            } catch (e: Throwable) {
-                rollback(connection)
-                // A session the SFU let go of cannot come back; anything else
-                // is the network still being down, and waits for the next try.
-                if (fatal(e)) {
-                    again = false
-                    remake = true
-                } else {
-                    Log.w(TAG, "the ICE restart did not go through", e)
-                }
+    private suspend fun recover(): Recovery = lock.withLock {
+        if (closed) return@withLock Recovery.UP
+        val connection = pc ?: return@withLock Recovery.UP
+        val state = connection.connectionState()
+        val down = state == PeerConnection.PeerConnectionState.DISCONNECTED ||
+            state == PeerConnection.PeerConnectionState.FAILED
+        // answered, and still no path on it after a whole wait
+        val stuck = pendingUfrag != null
+        if (!down && !stuck) {
+            iceRestarts = 0
+            return@withLock Recovery.UP
+        }
+        if (stuck && iceRestarts >= 2) {
+            Log.i(TAG, "restarts were answered but none took; making the connection again")
+            return@withLock Recovery.REMAKE
+        }
+        val session = sessionId
+        // a sender libwebrtc has disposed reads as no anchor, which remakes the
+        // connection, rather than as an exception that ends the recovery
+        val anchor = PubKind.entries.firstNotNullOfOrNull { kind ->
+            if (kind !in published) null
+            else runCatching { senders[kind]?.mid }.getOrNull()?.let { kind to it }
+        }
+        if (iceRestarts >= MAX_ICE_RESTARTS || session == null || anchor == null) {
+            Log.i(TAG, "remaking the connection (restarts $iceRestarts, session ${session != null}, anchor ${anchor != null})")
+            return@withLock Recovery.REMAKE
+        }
+        try {
+            Log.i(TAG, "restarting ICE ($state, ${iceRestarts} answered so far)")
+            connection.restartIce()
+            val offer = createOffer(connection, iceRestart = true)
+            connection.setLocal(offer)
+            // before the answer: a path on the new username can be chosen the
+            // moment it is applied, before this coroutine runs again
+            pendingUfrag = Regex("a=ice-ufrag:(\\S+)").find(offer.description)?.groupValues?.get(1)
+            val reply = VoiceApi.sfuRestart(
+                SfuRestartRequest(
+                    sessionId = session,
+                    offer = SfuDescription("offer", offer.description),
+                    mid = anchor.second,
+                    kind = anchor.first.wire,
+                ),
+            )
+            val answer = reply.answer ?: throw IllegalStateException("no answer to the ICE restart")
+            connection.setRemote(SessionDescription(SessionDescription.Type.ANSWER, answer.sdp))
+            iceRestarts++
+            Log.i(TAG, "ICE restart answered")
+            Recovery.AGAIN
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            pendingUfrag = null
+            rollback(connection)
+            // A session the SFU let go of cannot come back; anything else is
+            // the network still being down, and waits for the next try.
+            if (fatal(e)) {
+                Recovery.REMAKE
+            } else {
+                Log.w(TAG, "the ICE restart did not go through", e)
+                Recovery.AGAIN
             }
         }
-        if (remake) rebuild() else if (again) scheduleRecover(RESTART_EVERY_MS)
     }
 
     // --- publishing --------------------------------------------------------
@@ -592,15 +729,16 @@ class SfuTransport(
         for (p in drop) {
             if (pulled[slot(p.userId, p.kind)] === p) pulled.remove(slot(p.userId, p.kind))
             if (byMid[p.mid] === p) byMid.remove(p.mid)
-            val held = synchronized(p) {
-                val old = p.decryptor
+            val (held, receiving) = synchronized(p) {
+                val old = p.decryptor to p.transceiver
                 p.decryptor = null
                 p.track = null
+                p.transceiver = null
                 old
             }
             held?.release()
             onRemoteTrack(p.userId, p.kind, null)
-            connection.transceivers.firstOrNull { it.mid == p.mid }?.let { runCatching { it.stop() } }
+            receiving?.let { runCatching { it.stop() } }
         }
         try {
             val offer = createOffer(connection)
@@ -656,7 +794,6 @@ class SfuTransport(
         val offer = reply.offer
         if (offer != null) {
             connection.setRemote(SessionDescription(SessionDescription.Type.OFFER, offer.sdp))
-            preferVp8OnReceive(connection)
             val answer = createAnswer(connection)
             connection.setLocal(answer)
             VoiceApi.sfuRenegotiate(SfuRenegotiateRequest(session, SfuDescription("answer", answer.description)))
@@ -682,8 +819,33 @@ class SfuTransport(
      * including everyone else's tracks, which the call is still holding.
      */
     suspend fun rebuild() {
+        startRebuild().join()
+    }
+
+    /**
+     * The rebuild, in a job of its own and only one at a time.
+     *
+     * Run inside the recovery job, it cancelled that job — itself — as its
+     * first step, and died at the first suspension after tearing the old
+     * connection down: a new connection with no session and nothing on it.
+     */
+    private fun startRebuild(): Job = synchronized(this) {
+        rebuildJob?.takeIf { it.isActive } ?: scope.launch {
+            try {
+                remake()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                Log.w(TAG, "could not make the call connection again", e)
+                onError(t("voiceSession.theCallLostItsConnectionAnd"))
+            }
+        }.also { rebuildJob = it }
+    }
+
+    private suspend fun remake() {
         lock.withLock {
-            if (closed) return@withLock
+            if (closed) return
+            Log.i(TAG, "making the call connection again")
             recoverJob?.cancel()
             recoverJob = null
             pullRetryJob?.cancel()
@@ -693,6 +855,7 @@ class SfuTransport(
             downSince = null
             wasUp = false
             releaseConnection()
+            pendingUfrag = null
             pc = newConnection()
             sessionId = null
         }
@@ -745,6 +908,7 @@ class SfuTransport(
                 val old = p.decryptor
                 p.decryptor = null
                 p.track = null
+                p.transceiver = null
                 old
             }
             held?.release()
@@ -768,6 +932,8 @@ class SfuTransport(
             keyTimer = null
             recoverJob?.cancel()
             recoverJob = null
+            rebuildJob?.cancel()
+            rebuildJob = null
             pullRetryJob?.cancel()
             pullRetryJob = null
             releaseConnection()
@@ -853,22 +1019,19 @@ class SfuTransport(
      * H.264 would therefore have every tag check fail and show as a black tile
      * for ever; refusing it in the answer is better than decoding it wrong.
      */
-    private fun preferVp8OnReceive(connection: PeerConnection) {
+    private fun preferVp8OnReceive(transceiver: RtpTransceiver) {
+        val codecs = receiveVp8 ?: return
+        runCatching { transceiver.setCodecPreferences(codecs) }
+            .onFailure { Log.w(TAG, "could not ask for VP8 on the pulled video", it) }
+    }
+
+    /** VP8 and its retransmissions from what this phone can decode, or null if it cannot. */
+    private val receiveVp8: List<org.webrtc.RtpCapabilities.CodecCapability>? by lazy {
         val capabilities = runCatching {
             VoiceEngine.factory.getRtpReceiverCapabilities(MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO)
-        }.getOrNull() ?: return
-        val codecs = capabilities.codecs.filter {
-            it.name.equals("VP8", true) || it.name.equals("rtx", true)
-        }
-        if (codecs.none { it.name.equals("VP8", true) }) return
-        runCatching {
-            for (transceiver in connection.transceivers) {
-                if (transceiver.mediaType != MediaStreamTrack.MediaType.MEDIA_TYPE_VIDEO) continue
-                if (transceiver.mid == null || transceiver.isStopped) continue
-                if (senders.values.any { it.mid == transceiver.mid }) continue
-                transceiver.setCodecPreferences(codecs)
-            }
-        }.onFailure { Log.w(TAG, "could not ask for VP8 on the pulled video", it) }
+        }.getOrNull() ?: return@lazy null
+        capabilities.codecs.filter { it.name.equals("VP8", true) || it.name.equals("rtx", true) }
+            .takeIf { list -> list.any { it.name.equals("VP8", true) } }
     }
 
     /**

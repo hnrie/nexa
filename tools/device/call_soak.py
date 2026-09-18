@@ -83,6 +83,13 @@ def peer() -> dict:
     return s if time.time() - s.get("t", 0) < 10 else {}
 
 
+def grew(before: int, after: int) -> int:
+    """How much a counter moved. One that went down started again from zero:
+    the browser's packet count is per connection, and the connection can be
+    replaced in the middle of a measurement."""
+    return after - before if after >= before else after
+
+
 def moving(label: str, seconds: int = 20) -> bool:
     """Whether media flows both ways over the next few seconds."""
     first_phone = phone_frames(nodes())
@@ -96,9 +103,9 @@ def moving(label: str, seconds: int = 20) -> bool:
         failures.append(f"{label}: the call screen shows no frame counts")
         print(f"    ✗ no frame counts on the call screen")
         return False
-    ds, do = last_phone[0] - first_phone[0], last_phone[1] - first_phone[1]
-    pa = last_peer.get("audio_in", 0) - first_peer.get("audio_in", 0) if first_peer and last_peer else None
-    po = last_peer.get("opened", 0) - first_peer.get("opened", 0) if first_peer and last_peer else None
+    ds, do = grew(first_phone[0], last_phone[0]), grew(first_phone[1], last_phone[1])
+    pa = grew(first_peer.get("audio_in", 0), last_peer.get("audio_in", 0)) if first_peer and last_peer else None
+    po = grew(first_peer.get("opened", 0), last_peer.get("opened", 0)) if first_peer and last_peer else None
     print(f"    over {seconds}s: phone sealed +{ds}, opened +{do}; peer audio_in +{pa}, opened +{po}")
     if ds <= 0:
         failures.append(f"{label}: the phone stopped sending")
@@ -109,7 +116,9 @@ def moving(label: str, seconds: int = 20) -> bool:
     if pa is None:
         failures.append(f"{label}: call_peer.py is not reporting")
         ok = False
-    elif pa <= 0 or (po or 0) <= 0:
+    elif (po or 0) <= 0:
+        # frames the browser decrypted are the proof; its packet count is per
+        # connection and reads zero for a moment whenever that is replaced
         failures.append(f"{label}: the browser hears nothing from the phone (packets +{pa}, opened +{po})")
         ok = False
     return ok
@@ -171,33 +180,35 @@ def press(desc: str) -> bool:
 
 
 def share_screen() -> bool:
+    """Starts a share of the whole screen, through Android's own consent dialog.
+
+    Android 14 and up open it on "Share one app", whose button is Next and
+    leads to an app picker; the whole screen is the other entry of the
+    dropdown, and its button is "Share screen". Older versions have one
+    button, "Start now".
+    """
     if not press("Share screen"):
         return False
     time.sleep(3)
-    # Android's own consent dialog: pick the whole screen, then start
-    for _ in range(4):
+    for _ in range(8):
         ns = nodes()
-        whole = find(ns, text="Share entire screen") or find(ns, text="Entire screen")
-        if whole:
-            tap(whole)
-            time.sleep(1)
-            continue
-        choice = find(ns, text="A single app")
-        if choice:
-            tap(choice)
-            time.sleep(1)
-            continue
+        if find(ns, desc="Stop sharing", exact=True):
+            return True
         # buttons are text; the call screen's own "Share screen" is a description
-        start = None
-        for label in ("Start now", "Share screen", "Start", "Next"):
-            start = find(ns, text=label, exact=True)
-            if start:
-                break
-        if start:
-            tap(start)
-            time.sleep(4)
-            continue
-        break
+        button = find(ns, text="Share screen", exact=True) or find(ns, text="Start now", exact=True)
+        whole = find(ns, text="Share entire screen", exact=True) or find(ns, text="Entire screen", exact=True)
+        spinner = find(ns, text="Share one app", exact=True) or find(ns, text="A single app", exact=True)
+        if button and (whole or not spinner):
+            tap(button)          # the whole screen is chosen, or there is no choice
+            time.sleep(5)
+        elif whole:
+            tap(whole)           # the dropdown is open
+            time.sleep(2)
+        elif spinner:
+            tap(spinner)         # open the dropdown
+            time.sleep(2)
+        else:
+            time.sleep(2)
     return find(nodes(), desc="Stop sharing", exact=True) is not None
 
 
