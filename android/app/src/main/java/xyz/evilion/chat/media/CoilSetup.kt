@@ -41,6 +41,9 @@ object Images {
     private fun loader(platform: PlatformContext, context: Context): ImageLoader =
         ImageLoader.Builder(platform)
             .components {
+                // first: paths made into this server's addresses, stale proxy
+                // links signed again, and nobody else's address fetched at all
+                add(MediaLinks.LoaderInterceptor())
                 add(OkHttpNetworkFetcherFactory(callFactory = { Api.http }))
                 add(AttachmentFetcher.Factory())
                 add(Keyer<AttachmentMeta> { data, _ -> "attachment:${data.blobId}" })

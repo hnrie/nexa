@@ -298,6 +298,18 @@ object RelationshipsApi {
     suspend fun unblock(userId: String) = Api.request<Unit>("DELETE", "/users/@me/blocks/$userId")
 }
 
+/** Signs media links again once their deadline has passed; see media/MediaLinks.kt. */
+object MediaApi {
+    @kotlinx.serialization.Serializable
+    data class Refreshed(val urls: Map<String, String> = emptyMap())
+
+    suspend fun refresh(urls: List<String>): Map<String, String> =
+        Api.request<Refreshed>(
+            "POST", "/proxy/refresh",
+            Api.body(buildJsonObject { putJsonArray("urls") { for (u in urls) add(u) } }),
+        ).urls
+}
+
 object ExpressionsApi {
     suspend fun emojis(serverId: String): List<Emoji> = Api.request("GET", "/servers/$serverId/emojis")
 

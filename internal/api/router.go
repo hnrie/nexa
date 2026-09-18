@@ -72,6 +72,7 @@ type Server struct {
 	limUpload  *ratelimit.Limiter
 	limUnfurl  *ratelimit.Limiter
 	limProxy   *ratelimit.Limiter
+	limRefresh *ratelimit.Limiter
 	limVoice   *ratelimit.Limiter
 	limGuest   *ratelimit.Limiter
 	limRotate  *ratelimit.Limiter
@@ -135,6 +136,9 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// so an unmetered one is both a way to exhaust this instance's
 		// bandwidth and a way to aim this instance at someone else's.
 		limProxy: ratelimit.New(ratelimit.Every(120, time.Minute), 60, 10*time.Minute),
+		// re-signing old media links, per account: a conversation scrolled
+		// back through asks once per screenful, up to a hundred links a time
+		limRefresh: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
 		// a call renegotiates for every camera, share and person joining
 		limVoice: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
 		// joining a call as a guest, per address: a household or a meeting room, not a crowd of bots
@@ -149,7 +153,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 
 // limiters is every rate limiter this server keeps.
 func (s *Server) limiters() []*ratelimit.Limiter {
-	return []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limProxy, s.limVoice, s.limGuest, s.limRotate}
+	return []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limProxy, s.limRefresh, s.limVoice, s.limGuest, s.limRotate}
 }
 
 // StartLimiters runs the rate limiters' idle-key sweepers until ctx is done.

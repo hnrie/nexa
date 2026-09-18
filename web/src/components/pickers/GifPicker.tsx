@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { GifResult } from "@/api/types";
 import { removeFavoriteGifs, toggleFavoriteGif, type FavoriteGif } from "@/lib/gifFavorites";
+import { BLANK_IMAGE, mediaKey, useMediaLinks } from "@/lib/mediaLinks";
 import { useExpressions } from "@/stores/expressions";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
@@ -46,7 +47,9 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   /** What is on screen, read where a state updater would run too late to decide anything. */
   const resultsRef = useRef(results);
   resultsRef.current = results;
-  const favSet = useMemo(() => new Set(favs.map((f) => f.url)), [favs]);
+  // by what each points at: a GIF's address changes every time it is signed
+  const favSet = useMemo(() => new Set(favs.map((f) => mediaKey(f.url))), [favs]);
+  const fresh = useMediaLinks();
 
   useEffect(() => {
     if (enabled !== null) return;
@@ -116,10 +119,21 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   const menu = (x: number, y: number, items: ContextMenuItem[]) => openContextMenu({ x, y, items });
 
   const resultTiles = useMemo<ResultTile[]>(() => results.map((g) => ({ key: g.id, src: g.preview, label: g.title || "GIF", w: g.w, h: g.h, gif: g })), [results]);
-  const favoriteTiles = useMemo<FavoriteTile[]>(
-    () => favs.map((f) => ({ key: f.url, src: f.url, label: tr_("pickers.gifPicker.favoriteGif"), w: f.w, h: f.h, dead: dead.has(f.url), fav: f })),
-    [favs, dead],
-  );
+  // A favourite is kept as the link it was saved with, whose signature runs out
+  // after a day: it is shown, and sent, as that link signed again. One this
+  // server will not sign again is gone.
+  const favoriteTiles: FavoriteTile[] = favs.map((f) => {
+    const src = fresh(f.url);
+    return {
+      key: f.url,
+      src: src ?? BLANK_IMAGE,
+      label: tr_("pickers.gifPicker.favoriteGif"),
+      w: f.w,
+      h: f.h,
+      dead: dead.has(f.url) || src === null,
+      fav: typeof src === "string" ? { ...f, url: src } : f,
+    };
+  });
 
   const sendResult = (g: GifResult) => onPick({ url: g.url, w: g.w, h: g.h });
   const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -177,14 +191,14 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           onPick={(t) => sendResult(t.gif)}
           onNearEnd={loadMore}
           onMenu={(t, x, y) => {
-            const fav = favSet.has(t.gif.url);
+            const fav = favSet.has(mediaKey(t.gif.url));
             menu(x, y, [
               { id: "send", label: tr_("pickers.gifPicker.sendGif"), onSelect: () => sendResult(t.gif) },
               { id: "favorite", label: fav ? tr_("pickers.gifPicker.removeFromFavorites") : tr_("pickers.gifPicker.addToFavorites"), onSelect: () => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h }) },
             ]);
           }}
           overlay={(t) => {
-            const fav = favSet.has(t.gif.url);
+            const fav = favSet.has(mediaKey(t.gif.url));
             return (
               <button className={s.gifStar} data-on={fav} aria-label={fav ? tr_("pickers.gifPicker.removeFavorite") : tr_("pickers.gifPicker.addFavorite")} onClick={() => toggleFavoriteGif({ url: t.gif.url, w: t.gif.w, h: t.gif.h })}>
                 <Star size={14} fill={fav ? "currentColor" : "none"} />

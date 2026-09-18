@@ -61,7 +61,7 @@ export default function PrivacyPage() {
       <p className={s.hint}>{t("settings.privacy.everyMessageAndFileYouSend")}</p>
       <h3 className={s.h5}>{t("settings.privacy.linkPreviews")}</h3>
       <Toggle checked={settings.linkPreviews} onChange={(v) => patch({ linkPreviews: v })} label={t("settings.privacy.fetchLinkPreviewsWhenISend")} description={t("settings.privacy.yourDeviceAsksTheServerTo")} />
-      <Toggle checked={settings.imagePreviews} onChange={(v) => patch({ imagePreviews: v })} label={t("settings.privacy.showEmbeddedImagesAndGifsFrom")} description={t("settings.privacy.directImageLinksLoadStraightFrom")} />
+      <Toggle checked={settings.imagePreviews} onChange={(v) => patch({ imagePreviews: v })} label={t("settings.privacy.showEmbeddedImagesAndGifsFrom")} description={t("settings.privacy.picturesGifsAndVideosFromLinks")} />
       <h3 className={s.h5}>{t("settings.privacy.activity")}</h3>
       <Toggle checked={settings.shareActivity !== false} onChange={(v) => patch({ shareActivity: v })} label={t("settings.privacy.shareMyActivity")} description={t("settings.privacy.inTheDesktopAppYourRich")} />
       <h3 className={s.h5}>{t("settings.privacy.yourData")}</h3>

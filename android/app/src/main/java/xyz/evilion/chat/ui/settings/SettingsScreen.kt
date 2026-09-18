@@ -381,7 +381,7 @@ private fun AppearancePage() {
             SettingsStore.put("messageDisplay", if (it) "compact" else "cozy")
         }
         Toggle(t("settings.settingsScreen.showLinkPreviews"), null, SettingsStore.linkPreviews) { SettingsStore.put("linkPreviews", it) }
-        Toggle(t("settings.settingsScreen.showImages"), null, SettingsStore.imagePreviews) { SettingsStore.put("imagePreviews", it) }
+        Toggle(t("settings.settingsScreen.showImages"), t("settings.privacy.picturesGifsAndVideosFromLinks"), SettingsStore.imagePreviews) { SettingsStore.put("imagePreviews", it) }
         Toggle(t("settings.settingsScreen.reduceMotion"), null, SettingsStore.reducedMotion) { SettingsStore.put("reducedMotion", it) }
     }
 }

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.intOrNull
 import xyz.evilion.chat.data.SettingsStore
 import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.StickerPack
+import xyz.evilion.chat.media.MediaLinks
 
 /** What the picker hands back when something is tapped. */
 sealed interface Pick {
@@ -164,13 +165,15 @@ object Expressions {
             GifPick(url, (obj["w"] as? JsonPrimitive)?.intOrNull ?: 0, (obj["h"] as? JsonPrimitive)?.intOrNull ?: 0)
         } ?: emptyList()
 
-    fun isFavorite(doc: JsonObject, url: String): Boolean = favorites(doc).any { it.url == url }
+    // compared by what a link points at: each signing gives a GIF a new address
+    fun isFavorite(doc: JsonObject, url: String): Boolean = favorites(doc).any { MediaLinks.key(it.url) == MediaLinks.key(url) }
 
     /** Adds or removes, newest first, capped where the web caps it. */
     fun toggleFavorite(gif: GifPick) {
         val current = favorites(SettingsStore.doc.value)
-        val next = if (current.any { it.url == gif.url }) {
-            current.filterNot { it.url == gif.url }
+        val key = MediaLinks.key(gif.url)
+        val next = if (current.any { MediaLinks.key(it.url) == key }) {
+            current.filterNot { MediaLinks.key(it.url) == key }
         } else {
             (listOf(gif) + current).take(MAX_FAVORITES)
         }

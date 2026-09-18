@@ -65,6 +65,7 @@ import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.net.ExpressionsApi
 import xyz.evilion.chat.ui.icons.Lucide
 import xyz.evilion.chat.ui.theme.chatColors
+import xyz.evilion.chat.media.MediaLinks
 
 /**
  * Whether this instance has a GIF provider.
@@ -109,7 +110,8 @@ fun GifTab(state: ExpressionState, settings: JsonObject, enabled: Boolean, onPic
     val colors = chatColors
     val favorites = remember(Expressions.favoritesKey(settings)) { Expressions.favorites(settings) }
     // one set, not a fresh parse of the whole array per tile per frame
-    val favoriteUrls = remember(favorites) { favorites.mapTo(mutableSetOf()) { it.url } }
+    // by what each points at: a GIF's address changes every time it is signed
+    val favoriteUrls = remember(favorites) { favorites.mapTo(mutableSetOf()) { MediaLinks.key(it.url) } }
 
     // with no provider there is nothing to search; otherwise open where the web
     // opens — on favourites when there are any, on search when there are none —
@@ -237,7 +239,7 @@ fun GifTab(state: ExpressionState, settings: JsonObject, enabled: Boolean, onPic
                 items(tiles, key = { it.key }, contentType = { "gif" }) { tile ->
                     GifTileView(
                         tile = tile,
-                        favorite = mode == GifMode.FAVORITES || tile.gif.url in favoriteUrls,
+                        favorite = mode == GifMode.FAVORITES || MediaLinks.key(tile.gif.url) in favoriteUrls,
                         dead = tile.gif.url in state.deadGifs,
                         // only a favourite goes "gone": a search result that
                         // failed once is a network hiccup, not a dead provider
@@ -308,7 +310,9 @@ private fun GifTileView(
                 model = model,
                 contentDescription = tile.title.ifEmpty { t("pickers.expressionPicker.gifs") },
                 contentScale = ContentScale.Crop,
-                onError = { onDead() },
+                // a phone that is offline has not lost its favourites; only an
+                // answer (the GIF is gone, or refused) makes one "gone"
+                onError = { failure -> if (failure.result.throwable !is java.io.IOException) onDead() },
                 modifier = Modifier.fillMaxSize(),
             )
         }

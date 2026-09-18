@@ -839,13 +839,93 @@ def security_flow(srv, out, browser):
     return dave
 
 
+def signed_media_link(srv, target, expires=None, legacy=False):
+    """A link to srv's media proxy, signed with srv's own secret the way chatd
+    signs (internal/api/proxy_handlers.go): v2 covers a deadline, v1 was the
+    address alone. Only a throwaway server's secret is ever read here."""
+    import base64, hashlib, hmac
+    secret = (Path(srv.dir) / "data" / "server.secret").read_bytes()
+    encoded = base64.urlsafe_b64encode(target.encode()).rstrip(b"=").decode()
+    if legacy:
+        mac = hmac.new(secret, b"media-proxy/v1" + encoded.encode(), hashlib.sha256).digest()[:16]
+        sig = base64.urlsafe_b64encode(mac).rstrip(b"=").decode()
+    else:
+        mac = hmac.new(secret, b"media-proxy/v2" + str(expires).encode() + b"\0" + encoded.encode(), hashlib.sha256).digest()[:16]
+        sig = f"{expires}-" + base64.urlsafe_b64encode(mac).rstrip(b"=").decode()
+    return f"/media/proxy/{sig}/{encoded}"
+
+
+def media_flow(srv, alice, bob, path):
+    """Link previews in history keep loading, and only through the proxy.
+
+    A preview's links are signed with a deadline and stored inside its
+    message's encryption, where the server cannot renew them: a day later they
+    were dead, and everything signed before deadlines existed was dead at once.
+    Here the sender's previews carry a link whose deadline has passed and one
+    signed the old way; the reader's client has to have both signed again and
+    show them. The card also names another site's icon, which must never be
+    fetched: that request would hand the site the reader's address.
+    """
+    from urllib.parse import parse_qs, urlparse
+    a, b = alice.page, bob.page
+    picture = "https://www.gstatic.com/webp/gallery/1.jpg"
+    stale = signed_media_link(srv, picture, expires=int(time.time()) - 3600)
+    legacy = signed_media_link(srv, picture, legacy=True)
+    card = "https://example.com/card"
+    previews = {
+        picture: {"url": picture, "type": "image", "image": stale, "image_w": 550, "image_h": 368},
+        card: {"url": card, "type": "link", "title": "A card with an old picture", "site_name": "example.com",
+               "icon": "https://example.com/tracker.png", "image": legacy, "image_w": 550, "image_h": 368},
+    }
+
+    def fake_unfurl(route):
+        asked = parse_qs(urlparse(route.request.url).query).get("url", [""])[0]
+        body = previews.get(asked)
+        if body is None:
+            route.fulfill(status=204)
+        else:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+
+    a.route("**/api/v1/unfurl**", fake_unfurl)
+    seen = []
+    b.on("request", lambda r: seen.append((r.method, r.url)))
+    a.goto(srv.base + path, wait_until="networkidle")
+    b.goto(srv.base + path, wait_until="networkidle")
+    alice.send("an old picture " + picture)
+    alice.send("and an old card " + card)
+
+    def shows(page, text):
+        return page.wait_for_function(
+            """(t) => {
+                const row = [...document.querySelectorAll('[data-id]')].reverse().find(e => e.textContent.includes(t));
+                const img = row && row.querySelector('img[data-image-src]');
+                return img && img.complete && img.naturalWidth > 0 ? img.getAttribute('src') : null;
+            }""",
+            arg=text, timeout=45000,
+        ).json_value()
+
+    for page, who in ((b, "reader"), (a, "sender")):
+        for text in ("an old picture", "an old card"):
+            src = shows(page, text)
+            assert src.startswith("/media/proxy/"), f"{who}: {text} loaded from {src}"
+            deadline = int(src.split("/")[3].split("-")[0])
+            assert deadline > time.time() + 3600, f"{who}: {text} was not signed again: {src}"
+    refreshes = [u for m, u in seen if m == "POST" and "/api/v1/proxy/refresh" in u]
+    assert refreshes, "the reader never asked for links to be signed again"
+    elsewhere = [u for _, u in seen if urlparse(u).hostname in ("example.com", "www.gstatic.com")]
+    assert not elsewhere, f"the reader fetched from another site: {elsewhere}"
+    a.unroute("**/api/v1/unfurl**")
+    bob.shot("media")
+    print("  media: both old previews signed again and shown; nothing fetched from another site")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "tools/out"))
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--serve", action="store_true", help="keep the server running afterwards and print its URL")
-    ap.add_argument("--flows", default="all", help="comma-separated subset: server,expressions,voice,polish,groups,security,files (register/friends/dm always run)")
+    ap.add_argument("--flows", default="all", help="comma-separated subset: server,expressions,voice,polish,groups,security,media,files (register/friends/dm always run)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -871,6 +951,7 @@ def main():
             alice.shot("friends-all")
             print("dm + messages")
             alice.open_dm_with("Bob")
+            dm_path = alice.page.url.split(srv.base, 1)[1]
             alice.send("hello **bob** :) here is `code` and a [link](https://example.com)")
             alice.page.wait_for_selector(".md-paragraph strong:text-is('bob')", timeout=20000)
             bob.open_dm_from_sidebar("Alice")
@@ -938,6 +1019,9 @@ def main():
             if want("security"):
                 print("security: authenticator + app lock")
                 dave = security_flow(srv, out, browser)
+            if want("media"):
+                print("media: old link previews, and nothing from another site")
+                media_flow(srv, alice, bob, dm_path)
             plain = None
             if want("files"):
                 print("files: pieces, streamed downloads, media on request")

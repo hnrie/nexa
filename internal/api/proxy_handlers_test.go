@@ -195,3 +195,108 @@ func TestProxyLinksExpire(t *testing.T) {
 		t.Fatalf("a moved deadline should be refused, got %d", res.StatusCode)
 	}
 }
+
+// A link inside a message is end-to-end encrypted, so the server cannot renew
+// it when its deadline passes; a reader who is signed in can have it signed
+// again. Expired links, links from before deadlines existed, and links written
+// out with the public origin in front all come back fresh. Anything this
+// server did not sign does not come back at all.
+func TestMediaRefresh(t *testing.T) {
+	s, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	const target = "https://example.com/a.png"
+	encoded := base64.RawURLEncoding.EncodeToString([]byte(target))
+	past := strconv.FormatInt(time.Now().Add(-48*time.Hour).Unix(), 10)
+	expired := "/media/proxy/" + past + "-" + s.proxySignature(past, encoded) + "/" + encoded
+	legacy := "/media/proxy/" + s.proxySignatureV1(encoded) + "/" + encoded
+	absolute := strings.TrimRight(s.Cfg.PublicURL, "/") + expired
+	forged := "/media/proxy/" + past + "-AAAAAAAAAAAAAAAAAAAAAA/" + encoded
+	otherTarget := "/media/proxy/" + past + "-" + s.proxySignature(past, encoded) + "/" + base64.RawURLEncoding.EncodeToString([]byte("https://example.com/b.png"))
+	notOurs := target
+
+	if res, _ := do(t, ts, "POST", "/api/v1/proxy/refresh", "", map[string]any{"urls": []string{expired}}); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("only for someone signed in: %d", res.StatusCode)
+	}
+	res, body := do(t, ts, "POST", "/api/v1/proxy/refresh", tok, map[string]any{"urls": []string{expired, legacy, absolute, forged, otherTarget, notOurs}})
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("refresh: %d %v", res.StatusCode, body)
+	}
+	urls, _ := body["urls"].(map[string]any)
+	for _, link := range []string{expired, legacy, absolute} {
+		fresh, _ := urls[link].(string)
+		if fresh == "" {
+			t.Errorf("%s was not signed again", link)
+			continue
+		}
+		if got, ok := s.signedTarget(fresh); !ok || got != target {
+			t.Errorf("%s came back as %s, pointing at %q", link, fresh, got)
+		}
+		sig := strings.SplitN(strings.TrimPrefix(fresh, "/media/proxy/"), "/", 2)[0]
+		expires, _, _ := strings.Cut(sig, "-")
+		if at, _ := strconv.ParseInt(expires, 10, 64); at <= time.Now().Unix() {
+			t.Errorf("%s is not fresh: %s", link, fresh)
+		}
+		// Past the signature and the deadline, which is all this checks:
+		// with no fetcher configured the proxy answers 503, not 403.
+		if r, _ := do(t, ts, "GET", fresh, "", nil); r.StatusCode == http.StatusForbidden {
+			t.Errorf("the proxy refuses the fresh link %s", fresh)
+		}
+	}
+	for _, link := range []string{forged, otherTarget, notOurs} {
+		if got, ok := urls[link]; ok {
+			t.Errorf("%s should not have been signed, got %v", link, got)
+		}
+	}
+	// an empty batch and an oversized one are both refused
+	if r, _ := do(t, ts, "POST", "/api/v1/proxy/refresh", tok, map[string]any{"urls": []string{}}); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("empty batch: %d", r.StatusCode)
+	}
+	many := make([]string, 101)
+	for i := range many {
+		many[i] = expired
+	}
+	if r, _ := do(t, ts, "POST", "/api/v1/proxy/refresh", tok, map[string]any{"urls": many}); r.StatusCode != http.StatusBadRequest {
+		t.Errorf("oversized batch: %d", r.StatusCode)
+	}
+}
+
+// Everything a card shows loads through the proxy: its picture, the site's own
+// icon and a video the page offers to play inline. The icon and the video used
+// to go out as the page gave them, so opening a chat with a link card in it
+// told that site the reader's address.
+func TestUnfurlProxiesEverythingOnTheCard(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, `<html><head>
+<title>A page</title>
+<link rel="icon" href="/favicon.png">
+<meta property="og:image" content="/pic.png">
+<meta property="og:video" content="/clip.mp4">
+<meta property="og:video:type" content="video/mp4">
+</head><body></body></html>`)
+	}))
+	defer upstream.Close()
+	tr := &http.Transport{DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, upstream.Listener.Addr().String())
+	}}
+	t.Cleanup(tr.CloseIdleConnections)
+	srv.Unfurl = &unfurl.Service{Fetcher: &unfurl.Fetcher{Timeout: 5 * time.Second, Transport: tr, Resolver: proxyResolver{[]net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}}}}
+
+	res, body := do(t, ts, "GET", "/api/v1/unfurl?url=http://site.test/page", tok, nil)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("unfurl: %d %v", res.StatusCode, body)
+	}
+	for _, field := range []string{"image", "icon", "media"} {
+		v, _ := body[field].(string)
+		if !strings.HasPrefix(v, "/media/proxy/") {
+			t.Errorf("%s should load through the proxy, got %q", field, v)
+			continue
+		}
+		if got, ok := srv.signedTarget(v); !ok || !strings.HasPrefix(got, "http://site.test/") {
+			t.Errorf("%s points at %q", field, got)
+		}
+	}
+}

@@ -11,6 +11,7 @@ import { VideoPlayer } from "./VideoPlayer";
 import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 import { imageNameFromUrl } from "@/lib/imageActions";
+import { mediaKey, useMediaSrc } from "@/lib/mediaLinks";
 
 import { t } from "@/i18n";
 /** A readable name for a linked file: the last part of its address. */
@@ -31,7 +32,7 @@ function fitCard(w: number | undefined, h: number | undefined, maxW = 400, maxH 
 
 /** Saves the proxied URL, so favourites load through this server too. */
 export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: number }) {
-  const on = useSettings((st) => st.settings.favoriteGifs.some((f) => f.url === url));
+  const on = useSettings((st) => st.settings.favoriteGifs.some((f) => mediaKey(f.url) === mediaKey(url)));
   const toast = useUI((u) => u.toast);
   return (
     <button
@@ -50,9 +51,15 @@ export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: num
   );
 }
 
-/** A linked picture or GIF, framed and opened exactly as an uploaded one is. */
+/**
+ * A linked picture or GIF, framed and opened exactly as an uploaded one is.
+ *
+ * Only through the proxy (lib/mediaLinks): the frame keeps its shape while a
+ * stale link is signed again, and a preview naming any other address is not
+ * shown at all.
+ */
 function ImageEmbed({ e }: { e: UnfurlResult }) {
-  const src = e.image ?? e.url;
+  const src = useMediaSrc(e.image ?? e.url);
   const [open, setOpen] = useState(false);
   // without a recorded size, the picture's own tells the frame what shape to be
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
@@ -60,6 +67,10 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
   const name = e.type === "gif" ? "GIF" : fileNameOf(e.url, "Image");
   // what "Download" saves it as; a GIF from the picker arrives through the proxy, whose address says nothing
   const fileName = e.type === "gif" ? "animation.gif" : fileNameOf(e.url, "image");
+  if (src === null) return null;
+  if (src === undefined) {
+    return <div className={[c.imgWrap, s.media].join(" ")} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} aria-busy="true" />;
+  }
   return (
     <>
       <div className={[c.imgWrap, s.media].join(" ")} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} onClick={() => setOpen(true)}>
@@ -112,16 +123,17 @@ function publishedOn(ms: number | undefined): string | null {
 
 /** The line above the title: the site's icon, its name, the author, the date. */
 function CardHead({ e }: { e: UnfurlResult }) {
+  const icon = useMediaSrc(e.icon);
   const when = publishedOn(e.published_at);
   const author = e.author_url ? (
     <a href={e.author_url} target="_blank" rel="noopener noreferrer">{e.author || e.author_url.replace(/^https?:\/\//, "")}</a>
   ) : e.author ? (
     <span>{e.author}</span>
   ) : null;
-  if (!e.site_name && !author && !when && !e.icon) return null;
+  if (!e.site_name && !author && !when && !icon) return null;
   return (
     <div className={s.site}>
-      {e.icon ? <img className={s.favicon} src={e.icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(ev) => (ev.currentTarget.style.display = "none")} /> : null}
+      {icon ? <img className={s.favicon} src={icon} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(ev) => (ev.currentTarget.style.display = "none")} /> : null}
       {e.site_name ? <span>{e.site_name}</span> : null}
       {author ? <><span className={s.dot} aria-hidden="true">·</span>{author}</> : null}
       {when ? <><span className={s.dot} aria-hidden="true">·</span><time dateTime={new Date(e.published_at!).toISOString()}>{when}</time></> : null}
@@ -137,8 +149,10 @@ function CardHead({ e }: { e: UnfurlResult }) {
  */
 function LinkEmbed({ e }: { e: UnfurlResult }) {
   const [play, setPlay] = useState(false);
+  const image = useMediaSrc(e.image);
+  const media = useMediaSrc(e.media);
   const src = playerSrc(e);
-  const big = e.image && (e.image_w ?? 0) >= 400;
+  const big = !!e.image && (e.image_w ?? 0) >= 400;
   const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null;
   if (src) {
     return (
@@ -157,7 +171,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
               referrerPolicy="strict-origin-when-cross-origin"
             />
           ) : (
-            <button className={s.poster} onClick={() => setPlay(true)} aria-label={t("chat.embeds.playVideo")} style={e.image ? { backgroundImage: `url(${e.image})` } : undefined}>
+            <button className={s.poster} onClick={() => setPlay(true)} aria-label={t("chat.embeds.playVideo")} style={image ? { backgroundImage: `url(${image})` } : undefined}>
               <span className={s.playBtn}><Play size={26} fill="currentColor" /></span>
             </button>
           )}
@@ -173,15 +187,15 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
           {title}
           {e.description ? <div className={s.desc}>{e.description}</div> : null}
         </div>
-        {e.image && !big && !e.media ? <img className={s.thumb} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} /> : null}
+        {image && !big && !e.media ? <img className={s.thumb} src={image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={image} data-image-name={imageNameFromUrl(image)} /> : null}
       </div>
       {/* a file this browser plays on its own; the page it came from runs nothing */}
-      {e.media && e.media_kind === "video" ? (
-        <VideoPlayer src={e.media} name={fileNameOf(e.url, "Video")} width={e.media_w} height={e.media_h} />
-      ) : e.media && e.media_kind === "audio" ? (
-        <audio className={s.audio} src={e.media} controls preload="none" />
-      ) : e.image && big ? (
-        <img className={s.large} src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={e.image} data-image-name={imageNameFromUrl(e.image)} />
+      {media && e.media_kind === "video" ? (
+        <VideoPlayer src={media} name={fileNameOf(e.url, "Video")} width={e.media_w} height={e.media_h} />
+      ) : media && e.media_kind === "audio" ? (
+        <audio className={s.audio} src={media} controls preload="none" />
+      ) : image && big ? (
+        <img className={s.large} src={image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={image} data-image-name={imageNameFromUrl(image)} />
       ) : null}
     </div>
   );
@@ -195,7 +209,7 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
         if (!e || typeof e !== "object" || typeof e.url !== "string") return null;
         if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
         // played through this server's proxy, so the host of the file never sees who is watching
-        if (e.type === "video") return imagePreviews ? <VideoPlayer key={i} src={e.image ?? e.url} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
+        if (e.type === "video") return imagePreviews ? <VideoEmbed key={i} e={e} /> : null;
         if (e.type === "youtube") return <LinkEmbed key={i} e={e} />;
         if (e.type === "invite") return <InviteEmbed key={i} e={e} />;
         if (e.title || e.description || e.player || e.media) return <LinkEmbed key={i} e={e} />;
@@ -205,9 +219,16 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
   );
 }
 
+/** A linked video file, played through the proxy like everything else a preview loads. */
+function VideoEmbed({ e }: { e: UnfurlResult }) {
+  const src = useMediaSrc(e.image ?? e.url);
+  return src ? <VideoPlayer src={src} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
+}
+
 /** An invite to somewhere on this instance, with a way in. */
 function InviteEmbed({ e }: { e: UnfurlResult }) {
   const nav = useNavigate();
+  const icon = useMediaSrc(e.image);
   const open = () => {
     try {
       const u = new URL(e.url, window.location.origin);
@@ -224,8 +245,8 @@ function InviteEmbed({ e }: { e: UnfurlResult }) {
     <div className={s.invite} data-testid="invite-embed">
       <div className={s.inviteHead}>{t("chat.embeds.youHaveBeenInvitedToJoin")}</div>
       <div className={s.inviteBody}>
-        {e.image ? (
-          <img className={s.inviteIcon} src={e.image} alt="" loading="lazy" />
+        {icon ? (
+          <img className={s.inviteIcon} src={icon} alt="" loading="lazy" />
         ) : (
           <span className={s.inviteIcon} data-blank="true">{(e.title ?? "?").slice(0, 1).toUpperCase()}</span>
         )}
