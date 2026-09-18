@@ -202,7 +202,23 @@ object SettingsStore {
     fun obj(name: String): JsonObject = _doc.value[name] as? JsonObject ?: JsonObject(emptyMap())
 
     /** "dark", "light", "ash", "onyx" or "system"; the app follows the same names as the web. */
-    val theme: String get() = string("theme", "dark")
+    val theme: String get() = string("theme", lastTheme)
+
+    /**
+     * The theme this device last drew, kept in plain device storage.
+     *
+     * The account's theme is in its encrypted settings, which are only read
+     * once the keys are up: after the first frame, and after the password on a
+     * locked device. Until then the window, the launch screen and the first
+     * frames all had to guess, and the guess was dark everywhere, so someone
+     * who chose light watched a dark screen flash up before every launch.
+     */
+    val lastTheme: String
+        get() = if (::prefs.isInitialized) prefs.getString("lastTheme", null) ?: "dark" else "dark"
+
+    fun rememberTheme(name: String) {
+        if (::prefs.isInitialized && name != lastTheme) prefs.edit().putString("lastTheme", name).apply()
+    }
 
     /** The chosen language, or null to follow the phone. Shared with the web client. */
     val locale: String? get() = string("locale", "").ifEmpty { null }

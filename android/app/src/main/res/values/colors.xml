@@ -1,5 +1,15 @@
 <resources>
-    <!-- The light value; res/values-night/colors.xml holds the dark one. -->
-    <color name="window_background">#F3F3F4</color>
+    <!--
+      The window behind the app until Compose paints, and the launch screen,
+      one per theme. Nexa's theme is its own and not the phone's: a light
+      phone running the default dark theme wants a dark window. MainActivity
+      picks the matching style from the theme this device last drew.
+    -->
+    <color name="window_background">#2C2D32</color>
+    <color name="window_background_light">#F3F3F4</color>
+    <color name="window_background_ash">#1A1A1E</color>
+    <color name="window_background_onyx">#000000</color>
+    <!-- "system" follows the phone; res/values-night holds its dark value -->
+    <color name="window_background_system">#F3F3F4</color>
     <color name="brand">#8000FF</color>
 </resources>

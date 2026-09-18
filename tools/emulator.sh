@@ -27,6 +27,12 @@ AVD="${AVD:-pixel}"
 
 if [ "${1:-}" = "stop" ]; then
   adb emu kill >/dev/null 2>&1 || true
+  # adb goes on listing a dying emulator for a few seconds, and a start in
+  # that window would refuse, thinking one is still running
+  for _ in $(seq 1 30); do
+    adb get-state >/dev/null 2>&1 || exit 0
+    sleep 1
+  done
   exit 0
 fi
 

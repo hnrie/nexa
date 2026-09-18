@@ -1,11 +1,9 @@
 <resources>
     <!--
-      The window behind the app before Compose paints.
-
-      Without a night variant every launch showed a dark slab to someone whose
-      phone, and whose Nexa theme, are light. The system picks this file or the
-      one beside it before the app's own theme is even known, which is the only
-      way to get that first frame right.
+      Only the "system" theme follows the phone's night mode. The others are
+      the account's choice, whatever the phone is set to, so a night variant
+      of window_background made every launch of the default dark theme on a
+      light phone flash light first.
     -->
-    <color name="window_background">#2C2D32</color>
+    <color name="window_background_system">#2C2D32</color>
 </resources>

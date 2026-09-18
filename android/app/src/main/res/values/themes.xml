@@ -5,4 +5,18 @@
         <item name="android:windowBackground">@color/window_background</item>
     </style>
     <style name="Theme.Nexa.Splash" parent="Theme.Nexa" />
+
+    <!-- One window per theme: see SettingsStore.lastTheme and MainActivity. -->
+    <style name="Theme.Nexa.Light">
+        <item name="android:windowBackground">@color/window_background_light</item>
+    </style>
+    <style name="Theme.Nexa.Ash">
+        <item name="android:windowBackground">@color/window_background_ash</item>
+    </style>
+    <style name="Theme.Nexa.Onyx">
+        <item name="android:windowBackground">@color/window_background_onyx</item>
+    </style>
+    <style name="Theme.Nexa.System">
+        <item name="android:windowBackground">@color/window_background_system</item>
+    </style>
 </resources>

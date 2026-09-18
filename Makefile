@@ -47,7 +47,7 @@ test-desktop:
 
 # the Android app's own tests: the crypto against the web client's own output,
 # the markdown parser, invite links and mentions
-test-android: test-android
+test-android:
 	cd android && JAVA_HOME=$(ANDROID_JAVA_HOME) ANDROID_HOME=$(ANDROID_SDK) $(GRADLE) --no-daemon :app:testDebugUnitTest
 
 # the desktop app's installers for every platform, into desktop/dist (runs on macOS)

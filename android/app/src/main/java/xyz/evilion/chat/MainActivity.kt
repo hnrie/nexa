@@ -78,6 +78,8 @@ class MainActivity : ComponentActivity() {
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // The window in the theme this device last drew, before anything paints.
+        setTheme(windowTheme(SettingsStore.lastTheme))
         super.onCreate(savedInstanceState)
         // the words before anything is drawn, so no screen starts in English and changes its mind
         Strings.init(this)
@@ -99,6 +101,17 @@ class MainActivity : ComponentActivity() {
             val palette = xyz.evilion.chat.ui.theme.paletteFor(SettingsStore.theme)
 
             LaunchedEffect(Unit) { Session.bootstrap() }
+            // Remembered for the next launch, whose window and launch screen
+            // are drawn before the account's settings can be read. Android 13
+            // and up let the app choose that launch screen; older ones show
+            // the manifest's, which is the default dark theme.
+            val themeName = SettingsStore.theme
+            LaunchedEffect(themeName) {
+                SettingsStore.rememberTheme(themeName)
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    runCatching { splashScreen.setSplashScreenTheme(windowTheme(themeName)) }
+                }
+            }
             // the account's language, which the web client writes to the same
             // settings field, so one choice follows someone between devices
             LaunchedEffect(settings) {
@@ -304,4 +317,13 @@ private fun IncomingCall() {
     val (channelId, from) = ringing ?: return
     if (call.channelId == channelId) return
     xyz.evilion.chat.ui.voice.IncomingCallScreen(channelId, from)
+}
+
+/** The window style for one of the app's theme names. */
+private fun windowTheme(name: String): Int = when (name) {
+    "light" -> R.style.Theme_Nexa_Light
+    "ash" -> R.style.Theme_Nexa_Ash
+    "onyx" -> R.style.Theme_Nexa_Onyx
+    "system" -> R.style.Theme_Nexa_System
+    else -> R.style.Theme_Nexa_Splash
 }
