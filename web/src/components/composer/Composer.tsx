@@ -8,6 +8,7 @@ import { holdReload } from "@/lib/busy";
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
+import { usePaneScope } from "@/components/shell/paneScope";
 import { useSettings } from "@/stores/settings";
 import { useSelection } from "@/stores/selection";
 import { DropOverlay } from "./DropOverlay";
@@ -33,6 +34,8 @@ import s from "./Composer.module.css";
 
 import { t as tr_ } from "@/i18n";
 const MAX_LEN = 4000;
+/** How many files one message carries. */
+const MAX_FILES = 10;
 const TYPING_INTERVAL = 8000;
 /** How long Send waits for link previews that are still on their way. */
 const PREVIEW_WAIT = 1500;
@@ -59,6 +62,7 @@ function acToken(text: string, caret: number): { kind: "user" | "emoji" | "comma
 }
 
 export function Composer({ channel }: { channel: Channel }) {
+  const { focused: paneFocused } = usePaneScope();
   const me = useAuth((a) => a.me);
   const users = useUsers((u) => u.byId);
   const rels = useRelationships((r) => r.byUser);
@@ -161,7 +165,8 @@ export function Composer({ channel }: { channel: Channel }) {
     setFiles([]);
     setAc(null);
     // On a touch screen a focus right after the tap that opened the conversation raises the keyboard over it.
-    if (window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => taRef.current?.focus(), 0);
+    // In a split, only the pane you are actually in may take the caret.
+    if (paneFocused && window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => taRef.current?.focus(), 0);
     return () => {
       // the last words typed before leaving are still waiting on the save timer
       if (draftTimer.current) {
@@ -171,7 +176,9 @@ export function Composer({ channel }: { channel: Channel }) {
         if (p) saveDraft(p.channelId, p.text);
       }
       pendingDraft.current = null;
-      for (const f of files) if (f.preview) URL.revokeObjectURL(f.preview);
+      // through the ref: this effect only runs on a channel change, so the
+      // cleanup React keeps closes over the empty list this one started with
+      for (const f of filesRef.current) if (f.preview) URL.revokeObjectURL(f.preview);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
@@ -215,7 +222,20 @@ export function Composer({ channel }: { channel: Channel }) {
       if (canEveryone && isServer && "everyone".startsWith(tok.query)) items.unshift({ kind: "command", name: "everyone", desc: tr_("composer.composer.notifyEveryoneWhoCanSeeThis") });
       if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: tr_("composer.composer.notifyEveryoneOnlineInThisChannel") });
     } else if (tok.kind === "emoji") {
-      if (!emojiLoaded()) void loadEmoji().then(() => refreshAc(value, caret));
+      // Re-read from the box rather than reusing the keystroke that started
+      // the load: by the time the set arrives the text may be gone, or belong
+      // to another channel, and picking an entry would splice at the old offset.
+      if (!emojiLoaded()) {
+        const forChannel = channelRef.current;
+        void loadEmoji().then(
+          () => {
+            const ta = taRef.current;
+            if (!ta || channelRef.current !== forChannel) return;
+            refreshAc(ta.value, ta.selectionStart ?? ta.value.length);
+          },
+          () => undefined,
+        );
+      }
       const ex = useExpressions.getState();
       const custom = searchCustomEmoji(ex.emojis, tok.query, 4).map((e) => ({ kind: "customEmoji" as const, emoji: e }));
       const fromPacks = searchPackEmoji(ex.packs, tok.query, 4 - Math.min(custom.length, 4)).map((r) => ({
@@ -228,7 +248,10 @@ export function Composer({ channel }: { channel: Channel }) {
       items = commands().filter((c) => c.name.startsWith(tok.query)).map((c) => ({ kind: "command", name: c.name, desc: c.desc }));
     }
     setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind } : null);
-  }, [users, rels, channel.recipient_ids]);
+    // serverState, canEveryone and isServer are read above and change on their
+    // own: without them a role that just granted @everyone, or members that
+    // arrived after this was built, never showed up in the list.
+  }, [users, rels, channel.recipient_ids, serverState, canEveryone, isServer]);
 
   const onChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -303,7 +326,14 @@ export function Composer({ channel }: { channel: Channel }) {
       }
       staged.push(stage(f));
     }
-    if (staged.length) setFiles((cur) => [...cur, ...staged].slice(0, 10));
+    if (!staged.length) return;
+    // Files past the limit used to be dropped without a word, and their
+    // previews stayed resident for the life of the tab.
+    const room = Math.max(0, MAX_FILES - filesRef.current.length);
+    for (const f of staged.slice(room)) if (f.preview) URL.revokeObjectURL(f.preview);
+    if (staged.length > room) toast(tr_("composer.composer.atMostFilesPerMessage", { count: MAX_FILES }), "error");
+    const kept = staged.slice(0, room);
+    if (kept.length) setFiles((cur) => [...cur, ...kept].slice(0, MAX_FILES));
   };
 
   const send = async () => {
@@ -470,7 +500,7 @@ export function Composer({ channel }: { channel: Channel }) {
               {f.error ? <div className={s.err}>{f.error}</div> : null}
               <div className={s.cardBtns}>
                 <button className={s.cardBtn} data-on={f.spoiler} title={tr_("composer.composer.spoiler")} onClick={() => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, spoiler: !x.spoiler } : x)))}>{f.spoiler ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                <button className={[s.cardBtn, s.del].join(" ")} title={tr_("composer.composer.remove")} onClick={() => { removedFiles.current.add(f.id); setFiles((cur) => cur.filter((x) => x.id !== f.id)); }}><Trash2 size={16} /></button>
+                <button className={[s.cardBtn, s.del].join(" ")} title={tr_("composer.composer.remove")} onClick={() => { removedFiles.current.add(f.id); if (f.preview) URL.revokeObjectURL(f.preview); setFiles((cur) => cur.filter((x) => x.id !== f.id)); }}><Trash2 size={16} /></button>
               </div>
             </div>
           ))}

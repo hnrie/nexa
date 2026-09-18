@@ -1,5 +1,5 @@
 import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
@@ -116,14 +116,17 @@ export function ChatView({ channel }: { channel: Channel }) {
     };
   }, [channel.id]);
   const selecting = useSelection((x) => x.channelId === channel.id);
+  const searchOpenRef = useRef(searchOpen);
+  searchOpenRef.current = searchOpen;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (document.querySelector("[data-modal-layer]")) return;
-      setSearchOpen((open) => {
-        if (open) e.stopPropagation();
-        return false;
-      });
+      // read here rather than inside a setState updater: React runs updaters on
+      // the next render, long after the keydown has finished dispatching, so
+      // stopping it there stopped nothing
+      if (searchOpenRef.current) e.stopPropagation();
+      setSearchOpen(false);
       setPins(false);
       setSubchats(false);
     };
@@ -133,17 +136,28 @@ export function ChatView({ channel }: { channel: Channel }) {
   const priv = isServer && isPrivateChannel(serverId, channel.overwrites);
   // A subchat with a password stays shut until this sign-in has typed it.
   const [unlocked, setUnlocked] = useState(!channel.locked);
+  // A check that failed says nothing about whether this sign-in already opened
+  // the subchat; swallowing it left the password wall standing for good.
+  const [lockFailed, setLockFailed] = useState(false);
+  const [recheck, setRecheck] = useState(0);
   useEffect(() => {
     if (!channel.locked) return setUnlocked(true);
     let alive = true;
     setUnlocked(false);
+    setLockFailed(false);
     lockState(channel.id)
       .then((st) => alive && setUnlocked(!st.locked || st.unlocked))
-      .catch(() => {});
+      .catch(() => alive && setLockFailed(true));
     return () => {
       alive = false;
     };
-  }, [channel.id, channel.locked]);
+  }, [channel.id, channel.locked, recheck]);
+  useEffect(() => {
+    if (!lockFailed) return;
+    const again = () => setRecheck((n) => n + 1);
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, [lockFailed]);
   const locked = !!channel.locked && !unlocked;
   const other = convo.type === "dm" ? convo.recipient_ids.find((id) => id !== me?.id) : undefined;
   const otherStatus = other ? statusOf(presence[other]) : "offline";
@@ -152,7 +166,7 @@ export function ChatView({ channel }: { channel: Channel }) {
 
   return (
     <div className={s.chat}>
-      <header className={s.header}>
+      <header className={s.header} data-chat-header="">
         <PageHeaderButtons />
         {channel.type === "group_dm" ? (
           // a group's icon and name open its settings, as Discord's header does
@@ -293,7 +307,7 @@ export function ChatView({ channel }: { channel: Channel }) {
           {!isServer ? <CallBanner channelId={convo.id} /> : null}
           {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
           {locked ? (
-            <LockedChannel channel={channel} onUnlocked={() => setUnlocked(true)} />
+            <LockedChannel channel={channel} onUnlocked={() => setUnlocked(true)} checkFailed={lockFailed} onRecheck={() => setRecheck((n) => n + 1)} />
           ) : (
             <>
               <MessageList key={channel.id} channel={channel} />

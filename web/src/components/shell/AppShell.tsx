@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type TouchEvent } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
 import { ServerSidebar } from "@/components/sidebar/ServerSidebar";
@@ -9,7 +9,11 @@ import { RpcBanner } from "@/components/shell/RpcBanner";
 import { UpdateBanner } from "@/components/shell/UpdateBanner";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { Shortcuts } from "@/components/shell/Shortcuts";
+import { PaneGrid } from "@/components/shell/PaneGrid";
+import { PaneView } from "@/components/shell/PaneView";
+import { Tabs } from "@/components/shell/Tabs";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { activeTab, paneAddress, panesIn, usePanes } from "@/stores/panes";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import s from "./AppShell.module.css";
@@ -26,19 +30,55 @@ export function AppShell({ children }: { children: ReactNode }) {
   const setRightOpen = useUI((u) => u.setRightOpen);
   const connection = useUI((u) => u.connection);
   const loc = useLocation();
+  const nav = useNavigate();
   const [params, setParams] = useSearchParams();
   const openModal = useUI((u) => u.openModal);
   const touch = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+  /** Which settings page the query has already opened, so one run does it once. */
+  const openedSettings = useRef<string | null>(null);
   const serverId = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
   const sidebar = serverId ? <ServerSidebar serverId={serverId} /> : <DMSidebar />;
+  const tab = usePanes(activeTab);
+  const panes = panesIn(tab.root);
+  const setPaneChannel = usePanes((p) => p.setPaneChannel);
+
+  // The address bar and the focused pane are kept as one thing, and only one
+  // of them is ever in charge at a time.
+  //
+  // Normally it is the address: a click in the sidebar, a link in a message,
+  // the back button and a notification all navigate exactly as they always
+  // did, and the focused pane follows. The one exception is focus itself
+  // moving — to another pane, or to another tab, or because the pane you were
+  // in was closed — where the pane is in charge and the address follows it.
+  // That navigation comes straight back here with focus unchanged, and the
+  // first branch turns it into a no-op.
+  const lastFocus = useRef<string | null>(null);
+  useEffect(() => {
+    const moved = lastFocus.current !== null && lastFocus.current !== tab.focus;
+    lastFocus.current = tab.focus;
+    if (moved) {
+      nav(paneAddress(usePanes.getState().panes[tab.focus]));
+      return;
+    }
+    const at = loc.pathname.match(/^\/channels\/(@me|\d+)(?:\/(\d+))?/);
+    setPaneChannel(tab.focus, at?.[1] === "@me" ? null : (at?.[1] ?? null), at?.[2] ?? null);
+  }, [loc.pathname, tab.focus, setPaneChannel, nav]);
 
   useEffect(() => {
     const page = params.get("settings");
-    if (page) {
-      openModal("settings", { page });
-      params.delete("settings");
-      setParams(params, { replace: true });
+    if (!page) {
+      openedSettings.current = null;
+      return;
     }
+    // Opening was kept to once only by the effect mutating the shared params
+    // object out from under its own next run. The guard says it plainly, and
+    // the copy below leaves the router's object alone.
+    if (openedSettings.current === page) return;
+    openedSettings.current = page;
+    openModal("settings", { page });
+    const next = new URLSearchParams(params);
+    next.delete("settings");
+    setParams(next, { replace: true });
   }, [params, setParams, openModal]);
 
   useEffect(() => {
@@ -57,9 +97,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mobile) return;
+    // put back what was there rather than clearing outright: the drawer is not
+    // the only thing that can want the page behind it to stop scrolling
+    const before = document.body.style.overflow;
     document.body.style.overflow = leftOpen ? "hidden" : "";
     return () => {
-      document.body.style.overflow = "";
+      document.body.style.overflow = before;
     };
   }, [leftOpen, mobile]);
 
@@ -164,8 +207,25 @@ export function AppShell({ children }: { children: ReactNode }) {
         <UpdateBanner />
         <RpcBanner />
         <DownloadBanner />
+        <Tabs />
         {/* the page takes what the banner leaves */}
-        <div className={s.page}>{children}</div>
+        <div className={s.page}>
+          {/* The grid is here even for a single pane, so that pane is measured
+              and the menu knows whether there is room to split it. `split` is
+              what turns on the chrome — the close button and the focus ring —
+              which a lone pane has no use for. On a phone there is only ever
+              the page itself. */}
+          {mobile ? (
+            children
+          ) : (
+            <PaneGrid
+              tile={tab.root}
+              focus={tab.focus}
+              split={panes.length > 1}
+              renderPane={(paneId) => (paneId === tab.focus ? children : <PaneView key={paneId} paneId={paneId} />)}
+            />
+          )}
+        </div>
       </div>
       <ModalHost />
       <Shortcuts />

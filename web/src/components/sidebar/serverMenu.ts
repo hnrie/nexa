@@ -7,6 +7,7 @@ import { useReadStates, isUnread } from "@/stores/readStates";
 import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { openMenuItems } from "./openMenu";
 
 import { t } from "@/i18n";
 export interface MenuCtx {
@@ -95,6 +96,8 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
   const settings = useSettings.getState().settings;
   const muted = settings.notifications.muted.includes(channelId);
   const items: ContextMenuItem[] = [];
+  // a voice channel has no chat to open beside another one
+  if (ch.type !== "voice") items.push(...openMenuItems(ch.server_id, channelId));
   if (ch.type === "text") {
     items.push({
       id: "read",

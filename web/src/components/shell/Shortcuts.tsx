@@ -7,6 +7,7 @@ import { useAuth } from "@/stores/auth";
 import { selectDMs, useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
+import { activeTab, panesIn, usePanes } from "@/stores/panes";
 import { useUI } from "@/stores/ui";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 
@@ -58,6 +59,29 @@ export function Shortcuts() {
         window.dispatchEvent(new CustomEvent("ec:open-emoji"));
         return;
       }
+      // Tabs. Not Ctrl+Tab or Ctrl+W: a browser keeps both for its own tabs and
+      // will not let a page have them, so these are the ones a browser leaves
+      // alone — and they still work in the desktop app, where nothing else
+      // wants them either.
+      if (mod && e.altKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
+        const panes = usePanes.getState();
+        if (panes.tabs.length < 2) return;
+        e.preventDefault();
+        const at = panes.tabs.findIndex((t) => t.id === panes.active);
+        const step = e.key === "ArrowRight" ? 1 : -1;
+        panes.selectTab(panes.tabs[(at + step + panes.tabs.length) % panes.tabs.length]!.id);
+        return;
+      }
+      if (mod && e.altKey && e.code === "KeyW") {
+        const panes = usePanes.getState();
+        e.preventDefault();
+        // Closing the last pane of a split leaves the tab; closing the last tab
+        // would leave nothing, so it is the pane that goes.
+        const tab = activeTab(panes);
+        if (panesIn(tab.root).length > 1) panes.closePane(tab.focus);
+        else if (panes.tabs.length > 1) panes.closeTab(panes.active);
+        return;
+      }
       if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         e.preventDefault();
         const meId = useAuth.getState().me?.id;
@@ -79,7 +103,10 @@ export function Shortcuts() {
         if (!ch) return;
         const st = useMessages.getState().channels[ch];
         const newest = st?.ids[st.ids.length - 1];
-        if (newest) void useReadStates.getState().ack(ch, newest);
+        // A list jumped back into history ends at an old message. Acking that
+        // moves the read mark backwards on the server and clears mentions
+        // nobody has read.
+        if (newest && st && !st.hasNewer) void useReadStates.getState().ack(ch, newest);
         if (ui.replyTo) ui.setReplyTo(null);
         if (ui.editing) ui.setEditing(null);
       }

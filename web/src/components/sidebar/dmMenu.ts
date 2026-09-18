@@ -12,6 +12,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { joinVoice } from "@/voice/session";
+import { openMenuItems } from "./openMenu";
 
 import { t } from "@/i18n";
 function nameOf(ch: Channel): string {
@@ -84,6 +85,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
   const name = nameOf(ch);
   const reads = useReadStates.getState();
   const items: ContextMenuItem[] = [
+    ...openMenuItems(null, channelId),
     {
       id: "read",
       label: t("sidebar.dmMenu.markAsRead"),
