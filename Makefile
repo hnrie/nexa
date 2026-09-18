@@ -16,8 +16,10 @@ export PATH := $(NODE_BIN):$(PATH)
 # failed its own tests, and nobody would find out until it was installed.
 build: test-web test-go web server
 
+# `web/dist` is what chatd serves, so this target *is* the deploy. DEPLOY=1 is
+# how the build says it knows that; see web/scripts/deploy-guard.mjs.
 web:
-	cd web && npm ci --no-audit --no-fund && npm run build
+	cd web && npm ci --no-audit --no-fund && DEPLOY=1 npm run build
 
 server:
 	$(GO) build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o bin/chatd ./cmd/chatd
