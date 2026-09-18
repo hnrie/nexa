@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Everything that has to be true before any of this is published.
+#
+#   tools/check.sh            web, server and desktop
+#   tools/check.sh --android  those, and the Android app as well (slow)
+#
+# Nothing here writes to web/dist, data/ or any live directory: the web build
+# goes to a scratch directory, because web/dist is what chat.evilion.xyz serves
+# and building into it *is* the deploy.
+set -uo pipefail
+cd "$(dirname "$0")/.."
+[ -f "$HOME/.local/toolchain/env.sh" ] && . "$HOME/.local/toolchain/env.sh"
+
+android=0
+[ "${1:-}" = "--android" ] && android=1
+
+fails=()
+run() {
+  local name="$1"; shift
+  printf '\n\033[1m── %s\033[0m\n' "$name"
+  if "$@"; then
+    printf '\033[32m   ok\033[0m\n'
+  else
+    printf '\033[31m   FAILED\033[0m\n'
+    fails+=("$name")
+  fi
+}
+
+run "go build"   go build ./...
+run "go vet"     go vet ./...
+run "go test"    go test ./internal/...
+
+run "web typecheck" bash -c 'cd web && npx tsc --noEmit'
+run "web tests"     bash -c 'cd web && npx vitest run --reporter dot'
+run "web build"     bash -c 'cd web && npx vite build --outDir "${TMPDIR:-/tmp}/dist-check" --emptyOutDir >/dev/null'
+
+run "desktop typecheck" bash -c 'cd desktop && npx tsc --noEmit -p .'
+run "desktop tests"     bash -c 'cd desktop && npx vitest run --reporter dot'
+run "desktop bundle"    bash -c 'cd desktop && node build.mjs >/dev/null'
+
+# Every visible string has to exist in the catalogues, in all eleven languages.
+run "i18n keys" bash -c 'python3 tools/i18n_keys_used.py | tee /dev/stderr | grep -q "0 missing"'
+
+if [ "$android" = 1 ]; then
+  run "android compile" bash -c 'cd android && gradle :app:compileDebugKotlin -q'
+  run "android tests"   bash -c 'cd android && gradle :app:testDebugUnitTest -q'
+fi
+
+printf '\n'
+if [ ${#fails[@]} -eq 0 ]; then
+  printf '\033[32mall checks passed\033[0m\n'
+  exit 0
+fi
+printf '\033[31mfailed: %s\033[0m\n' "${fails[*]}"
+exit 1
