@@ -37,6 +37,17 @@ private val TRIGGER = 64.dp
 private val LIMIT = 92.dp
 
 /**
+ * The strip down the left that belongs to the drawer, not to this.
+ *
+ * Both gestures are a rightward drag, and this one is on every row of the
+ * list, so it took all of them: opening the channel list by swiping in from
+ * the edge — the thing you do far more often than replying, and the only way
+ * to get there one-handed — simply stopped working. A drag that starts in
+ * here is left alone and never consumed, so it reaches the drawer.
+ */
+private val DRAWER_EDGE = 40.dp
+
+/**
  * Drag a message to the right to reply to it, the way every phone chat app
  * does. An arrow follows the row out and fills in as the gesture gets close;
  * at the point it would fire the phone buzzes once, so it can be felt without
@@ -58,6 +69,9 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
     val offset = remember { Animatable(0f) }
     val trigger = with(density) { TRIGGER.toPx() }
     val limit = with(density) { LIMIT.toPx() }
+    val edge = with(density) { DRAWER_EDGE.toPx() }
+    /** This drag began in the drawer's strip, so it is none of our business. */
+    var yielded by remember { mutableStateOf(false) }
     var buzzed by remember { mutableStateOf(false) }
     val progress = (offset.value / trigger).coerceIn(0f, 1f)
 
@@ -77,9 +91,11 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .pointerInput(onReply) {
                     detectHorizontalDragGestures(
+                        onDragStart = { start -> yielded = start.x <= edge },
                         onDragEnd = {
-                            val fire = offset.value >= trigger
+                            val fire = !yielded && offset.value >= trigger
                             buzzed = false
+                            yielded = false
                             scope.launch {
                                 offset.animateTo(0f)
                                 if (fire) onReply()
@@ -87,9 +103,13 @@ fun SwipeToReply(enabled: Boolean, onReply: () -> Unit, content: @Composable () 
                         },
                         onDragCancel = {
                             buzzed = false
+                            yielded = false
                             scope.launch { offset.animateTo(0f) }
                         },
                     ) { change, drag ->
+                        // Not consumed and not acted on: the drawer is watching
+                        // the same pointer and takes it from here.
+                        if (yielded) return@detectHorizontalDragGestures
                         change.consume()
                         // rightwards only, and heavier the further it goes
                         val next = (offset.value + if (offset.value > trigger) drag * 0.35f else drag)

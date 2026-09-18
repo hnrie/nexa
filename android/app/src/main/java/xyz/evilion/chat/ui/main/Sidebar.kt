@@ -1,5 +1,6 @@
 package xyz.evilion.chat.ui.main
 
+import androidx.compose.animation.core.animateDpAsState
 import xyz.evilion.chat.R
 
 import xyz.evilion.chat.i18n.t
@@ -130,15 +131,23 @@ private fun ServerRail(route: Route) {
 @Composable
 private fun RailButton(selected: Boolean, onClick: () -> Unit, content: @Composable () -> Unit) {
     val colors = chatColors
-    Box(contentAlignment = Alignment.Center) {
-        if (selected) {
-            Box(
-                Modifier.align(Alignment.CenterStart).width(4.dp).height(32.dp)
-                    .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)).background(colors.textStrong),
-            )
-        }
+    // The pill belongs in the rail's own gutter, beside the icon.
+    //
+    // It used to be aligned to the start of a box that was exactly the icon's
+    // size, which put it *behind* the 48dp button — so all anyone ever saw of
+    // it was the slivers its rounded corners failed to cover: two white notches
+    // at the top and bottom of whichever server was open. Filling the rail's
+    // width puts the pill at the rail's edge and leaves the button centred,
+    // which is where both were meant to be.
+    val pill by animateDpAsState(if (selected) 32.dp else 0.dp, label = "railPill")
+    val corner by animateDpAsState(if (selected) 16.dp else 24.dp, label = "railCorner")
+    Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) {
         Box(
-            Modifier.size(48.dp).clip(RoundedCornerShape(if (selected) 16.dp else 24.dp))
+            Modifier.align(Alignment.CenterStart).width(4.dp).height(pill)
+                .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)).background(colors.textStrong),
+        )
+        Box(
+            Modifier.size(48.dp).clip(RoundedCornerShape(corner))
                 .background(colors.bgSurface).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) { content() }
