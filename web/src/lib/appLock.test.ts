@@ -16,8 +16,9 @@ import {
   WrongPasscode,
 } from "./appLock";
 
-// The real cost would make this file take half a minute; the code path is the same.
-const FAST: KdfParams = { m: 1024, t: 1, p: 1, v: 1 };
+// LOCK_KDF would make this file take half a minute; the code path is the same.
+// It still has to clear KDF_FLOOR, since nothing derives below that any more.
+const FAST: KdfParams = { m: 32768, t: 2, p: 1, v: 1 };
 const USER = "1234567890";
 
 function memoryStorage() {

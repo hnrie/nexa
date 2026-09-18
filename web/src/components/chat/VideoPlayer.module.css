@@ -10,10 +10,10 @@
 .spoiler { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .spoiler span { padding: 6px 12px; border-radius: 999px; background: var(--spoiler); color: var(--text-strong); font-size: 13px; font-weight: 700; letter-spacing: 0.04em; }
 .failed { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; color: var(--text-muted); font-size: 14px; background: var(--bg-surface); }
-.failedDownload { padding: 8px 14px; border-radius: var(--radius-xs); background: var(--brand); color: #fff; font-weight: 600; }
+.failedDownload { padding: 8px 14px; border-radius: var(--radius-xs); background: var(--brand); color: var(--on-brand); font-weight: 600; }
 .failedDownload:hover { text-decoration: none; filter: brightness(1.08); }
 .bigPlay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); color: #fff; backdrop-filter: blur(2px); }
-.bigPlay:hover { background: var(--brand); }
+.bigPlay:hover { background: var(--brand); color: var(--on-brand); }
 .bar { position: absolute; left: 0; right: 0; bottom: 0; direction: ltr; padding: 18px 8px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.75)); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
 .player[data-full="true"] .bar { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); padding-bottom: max(6px, env(safe-area-inset-bottom)); }
 .player[data-ui="true"] .bar { opacity: 1; pointer-events: auto; }

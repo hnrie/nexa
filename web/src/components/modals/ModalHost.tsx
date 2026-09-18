@@ -30,6 +30,8 @@ const ServerSettingsModal = lazyPage(() => import("@/components/server/ServerSet
 const ChannelSettingsModal = lazyPage(() => import("@/components/server/ChannelSettingsModal"));
 const MemberActionModal = lazyPage(() => import("@/components/server/MemberActionModal"));
 const SubchatModal = lazyPage(() => import("./SubchatModal"));
+const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
+const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
 
 /** Renders every modal on the ui store's stack; later ones overlay earlier ones. */
 export function ModalHost() {
@@ -93,6 +95,8 @@ function ModalEntry({ modal }: { modal: ModalState }) {
         {modal?.kind === "serverSettings" ? <ServerSettingsModal onClose={close} serverId={String(modal.props?.["serverId"])} page={modal.props?.["page"] as string | undefined} /> : null}
         {modal?.kind === "channelSettings" ? <ChannelSettingsModal onClose={close} channelId={String(modal.props?.["channelId"])} page={modal.props?.["page"] as string | undefined} /> : null}
         {modal?.kind === "memberAction" ? <MemberActionModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={String(modal.props?.["userId"])} action={modal.props?.["action"] as "kick" | "ban" | "timeout" | "roles"} /> : null}
+        {modal?.kind === "verifyKey" ? <VerifyKeyModal onClose={close} userId={String(modal.props?.["userId"])} /> : null}
+        {modal?.kind === "keyChange" ? <KeyChangeModal onClose={close} /> : null}
       </Suspense>
     </>
   );

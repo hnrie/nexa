@@ -1,12 +1,12 @@
 import { Pencil, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { Emoji } from "@/api/types";
 import { emojiUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { P } from "@/lib/perms";
 import { useExpressions } from "@/stores/expressions";
+import { describeError } from "@/lib/errors";
 import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
@@ -58,11 +58,16 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
           await expressionsApi.uploadEmoji(serverId, name, f);
           added++;
         } catch (err) {
-          toast(err instanceof ApiError ? `${f.name}: ${err.message}` : t("server.emoji.uploadFailedFor", { name: f.name }), "error");
+          toast(`${f.name}: ${describeError(err, t("server.emoji.uploadFailedFor", { name: f.name }))}`, "error");
         }
       }
       setEmojis(serverId, await expressionsApi.emojis(serverId));
       if (added) toast(t("server.emoji.emojiAddedCount", { count: added }), "success");
+    } catch (err) {
+      // Re-reading the list after an upload can fail on its own, and with only
+      // a `finally` here that became an unhandled rejection: the spinner
+      // stopped and the grid stayed as it was.
+      toast(describeError(err, t("server.emoji.theEmojiListCouldNotBe")), "error");
     } finally {
       setBusy(false);
     }
@@ -74,7 +79,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
       await expressionsApi.renameEmoji(serverId, e.id, next.trim());
       setEmojis(serverId, await expressionsApi.emojis(serverId));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotRename"), "error");
+      toast(describeError(err, t("server.packEditor.couldNotRename")), "error");
     }
   };
   const remove = (e: Emoji) =>

@@ -1,7 +1,9 @@
 import { Volume2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
+import { Button } from "@/components/common/Button";
 import { ChatView } from "@/components/chat/ChatView";
 import { VoiceView } from "@/components/voice/VoiceView";
 import { FullScreenSpinner } from "@/components/common/Spinner";
@@ -24,7 +26,12 @@ export default function ServerPage() {
   const upsertUsers = useUsers((u) => u.upsert);
   const setActiveChannel = useUI((u) => u.setActiveChannel);
   const setJumpTo = useUI((u) => u.setJumpTo);
+  // "Gone" and "the request failed" are different things: being kicked belongs
+  // at home, a 500 belongs on a page with a Try again on it. Sending the reader
+  // home either way made a network blip indistinguishable from being removed.
   const [missing, setMissing] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const seen = useRef<string | null>(null);
   const channel = channelId ? channels[channelId] : undefined;
 
@@ -46,6 +53,7 @@ export default function ServerPage() {
       return;
     }
     setMissing(false);
+    setFailed(false);
     let alive = true;
     serversApi
       .get(serverId)
@@ -55,11 +63,19 @@ export default function ServerPage() {
         upsert(res.server.channels);
         setFromView(res.server);
       })
-      .catch(() => alive && setMissing(true));
+      .catch((err: unknown) => {
+        if (!alive) return;
+        if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+          useUI.getState().toast(err.status === 403 ? tr_("server.youAreNoLongerInThatServer") : tr_("server.thatServerIsGone"), "error");
+          setMissing(true);
+          return;
+        }
+        setFailed(true);
+      });
     return () => {
       alive = false;
     };
-  }, [st, serverId, setFromView, upsert, upsertUsers]);
+  }, [st, serverId, setFromView, upsert, upsertUsers, attempt]);
 
   const firstText = useMemo(() => {
     const tree = channelTree(channels, serverId);
@@ -94,6 +110,18 @@ export default function ServerPage() {
     if (missing) nav("/channels/@me", { replace: true });
   }, [missing, nav]);
 
+  if (!st && failed) {
+    return (
+      <div className={s.empty}>
+        <header className={s.header}><PageHeaderButtons /></header>
+        <div className={s.emptyBody}>
+          <h2>{tr_("server.thatServerCouldNotBeOpened")}</h2>
+          <p>{tr_("server.theRequestDidNotGetThrough")}</p>
+          <Button variant="secondary" onClick={() => setAttempt((n) => n + 1)}>{tr_("chat.messageList.tryAgain")}</Button>
+        </div>
+      </div>
+    );
+  }
   if (!st) return <FullScreenSpinner text={tr_("server.openingServer")} />;
   if (!channelId || (channelId && !channel && firstText)) {
     if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace />;

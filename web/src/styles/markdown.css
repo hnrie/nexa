@@ -1,13 +1,18 @@
 /* Rendered markdown (classes emitted by src/markdown/render.tsx). */
 .md-paragraph { white-space: pre-wrap; overflow-wrap: anywhere; }
-.md-inline-code { padding: 0.2em 0.35em; border-radius: 4px; background: var(--code-bg); border: 1px solid var(--code-border); font-size: 0.875em; white-space: pre-wrap; }
-.md-codeblock { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--code-bg); border: 1px solid var(--code-border); font-size: 0.875em; line-height: 1.35; overflow-x: auto; white-space: pre; max-width: 90%; }
+/* Code is written left to right whatever language the message around it is in.
+   Without this an Arabic conversation reorders the operators inside a snippet
+   and prints something that is no longer the program that was pasted. The
+   isolation keeps the inline case a single neutral run, so it still lands where
+   the Arabic sentence puts it. */
+.md-inline-code { padding: 0.2em 0.35em; border-radius: 4px; background: var(--code-bg); border: 1px solid var(--code-border); font-size: 0.875em; white-space: pre-wrap; direction: ltr; unicode-bidi: isolate; }
+.md-codeblock { margin: 6px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--code-bg); border: 1px solid var(--code-border); font-size: 0.875em; line-height: 1.35; overflow-x: auto; white-space: pre; max-width: 90%; direction: ltr; text-align: start; }
 .md-codeblock code { font-family: var(--font-mono); }
 .md-spoiler { border-radius: 4px; background: var(--spoiler); color: transparent; cursor: pointer; padding: 0 2px; transition: color var(--transition), background-color var(--transition); }
 .md-spoiler[data-revealed="true"] { background: var(--spoiler-revealed); color: inherit; cursor: text; }
 .md-spoiler[data-revealed="false"] * { visibility: hidden; }
 .md-spoiler[data-revealed="false"] img { visibility: hidden; }
-.md-quote { margin: 2px 0; padding: 0 8px 0 12px; border-inline-start: 4px solid var(--border-strong); border-radius: 2px; color: var(--text); }
+.md-quote { margin: 2px 0; padding-block: 0; padding-inline: 12px 8px; border-inline-start: 4px solid var(--border-strong); border-radius: 2px; color: var(--text); }
 .md-h1 { font-size: 1.5em; font-weight: 700; margin: 16px 0 8px; line-height: 1.25; }
 .md-h2 { font-size: 1.25em; font-weight: 700; margin: 16px 0 8px; line-height: 1.25; }
 .md-h3 { font-size: 1em; font-weight: 700; margin: 16px 0 4px; line-height: 1.25; }
@@ -17,7 +22,7 @@
 .md-link:hover { text-decoration: underline; }
 [data-underline-links="true"] .md-link { text-decoration: underline; }
 .md-mention { display: inline; padding: 0 2px; border-radius: 3px; background: var(--mention-bg); color: var(--mention-fg); font-weight: 500; cursor: pointer; unicode-bidi: plaintext; }
-.md-mention:hover { background: var(--mention-bg-hover); color: #fff; }
+.md-mention:hover { background: var(--mention-bg-hover); color: var(--mention-fg); }
 .md-emoji { display: inline-block; width: 1.375em; height: 1.375em; vertical-align: bottom; object-fit: contain; margin: 0 0.05em; }
 .md-emoji-unicode { font-size: 1.15em; line-height: 1; vertical-align: -0.1em; }
 .md-emoji-jumbo, .md-emoji-unicode.md-emoji-jumbo { font-size: var(--jumbo-size, 48px); line-height: 1.15; width: auto; height: auto; vertical-align: middle; }
@@ -25,14 +30,16 @@ img.md-emoji-jumbo { width: var(--jumbo-size, 48px); height: var(--jumbo-size, 4
 .md-timestamp { padding: 0 2px; border-radius: 3px; background: var(--bg-active); }
 .md-list { margin: 4px 0; padding-inline-start: 24px; }
 .md-list-item { margin: 2px 0; }
-/* highlight.js theme, kept minimal and tied to the palette */
-.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-name { color: #c678dd; }
-.hljs-string, .hljs-attr, .hljs-symbol, .hljs-addition { color: #98c379; }
-.hljs-number, .hljs-regexp, .hljs-link { color: #d19a66; }
-.hljs-comment, .hljs-quote, .hljs-meta { color: #7f848e; font-style: italic; }
-.hljs-title, .hljs-section, .hljs-function { color: #61afef; }
-.hljs-type, .hljs-built_in, .hljs-class .hljs-title { color: #e5c07b; }
-.hljs-variable, .hljs-template-variable, .hljs-attribute { color: #e06c75; }
-.hljs-deletion { color: #e06c75; }
+/* highlight.js theme, kept minimal and tied to the palette: the eight roles are
+   named in tokens.css so the light theme repaints them rather than leaving a
+   dark-background palette on a near-white block. */
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-name { color: var(--code-keyword); }
+.hljs-string, .hljs-attr, .hljs-symbol, .hljs-addition { color: var(--code-string); }
+.hljs-number, .hljs-regexp, .hljs-link { color: var(--code-number); }
+.hljs-comment, .hljs-quote, .hljs-meta { color: var(--code-comment); font-style: italic; }
+.hljs-title, .hljs-section, .hljs-function { color: var(--code-title); }
+.hljs-type, .hljs-built_in, .hljs-class .hljs-title { color: var(--code-type); }
+.hljs-variable, .hljs-template-variable, .hljs-attribute { color: var(--code-variable); }
+.hljs-deletion { color: var(--code-variable); }
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 700; }

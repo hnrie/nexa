@@ -13,6 +13,10 @@ describe("crypto module surface", () => {
       "readU32be",
       // kdf
       "DEFAULT_KDF",
+      "KDF_FLOOR",
+      "KDF_CEILING",
+      "WeakKdfError",
+      "kdfParamsAcceptable",
       "deriveMaster",
       "deriveAuthKey",
       "deriveEncKey",
@@ -20,6 +24,9 @@ describe("crypto module surface", () => {
       "newRecoveryKey",
       "recoveryKeyToBytes",
       "recoveryToKeys",
+      // fingerprint
+      "fingerprint",
+      "fingerprintOfB64",
       // keys
       "generateIdentity",
       "publicKeyOf",
@@ -89,7 +96,7 @@ describe("crypto module surface", () => {
 
   it("wraps and unwraps an identity with a password-derived key", async () => {
     const id = crypto.generateIdentity();
-    const master = await crypto.deriveMaster("hunter2", crypto.randomBytes(16), { m: 1024, t: 1, p: 1, v: 1 });
+    const master = await crypto.deriveMaster("hunter2", crypto.randomBytes(16), crypto.KDF_FLOOR);
     const encKey = crypto.deriveEncKey(master);
     const wrapped = await crypto.wrapPrivateKey(id.privateKey, encKey);
     const priv = await crypto.unwrapPrivateKey(wrapped, encKey);

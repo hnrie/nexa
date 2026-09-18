@@ -1,10 +1,11 @@
 import { KeyRound, RefreshCw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import type { ServerKeyInfo } from "@/api/types";
 import { Button } from "@/components/common/Button";
+import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
+import { describeError } from "@/lib/errors";
 import { formatFull } from "@/lib/time";
 import { ring } from "@/lib/keyring";
 import { useKeys } from "@/stores/keys";
@@ -20,13 +21,22 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
   const rotate = useKeys((k) => k.rotate);
   const reconcile = useKeys((k) => k.reconcile);
   const [info, setInfo] = useState<ServerKeyInfo[] | null>(null);
+  // Without this a failed fetch rendered no rows and no message at all: a page
+  // about encryption keys that quietly says there are none.
+  const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = () =>
     serversApi
       .keys(serverId)
-      .then(setInfo)
-      .catch(() => setInfo([]));
+      .then((list) => {
+        setInfo(list);
+        setFailed(false);
+      })
+      .catch(() => {
+        setInfo(null);
+        setFailed(true);
+      });
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,7 +49,7 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
       toast(t("server.encryption.aNewKeyWasCreatedAnd"), "success");
       await load();
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.encryption.couldNotRotateTheKey"), "error");
+      toast(describeError(err, t("server.encryption.couldNotRotateTheKey")), "error");
     } finally {
       setBusy(null);
     }
@@ -49,6 +59,10 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
     try {
       await reconcile();
       toast(t("server.encryption.checkedEveryoneSKeys"), "success");
+    } catch (err) {
+      // Its sibling above catches; this one only had `finally`, so a rejected
+      // reconcile cleared the spinner and said nothing whatsoever.
+      toast(describeError(err, t("server.encryption.couldNotCheckEveryoneSKeys")), "error");
     } finally {
       setBusy(null);
     }
@@ -66,7 +80,8 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
           Someone left or was removed and the keys they held have not been rotated yet. Rotating happens automatically when a key holder is online; you can also do it now.
         </div>
       ) : null}
-      {info === null ? <Spinner /> : null}
+      {info === null && !failed ? <Spinner label={t("server.encryption.loadingKeys")} /> : null}
+      {failed ? <LoadError message={t("server.encryption.theKeysForThisServerCould")} onRetry={() => void load()} /> : null}
       {info?.map((c) => {
         const latest = c.epochs.length ? c.epochs[c.epochs.length - 1]! : null;
         const held = ring.latest(c.conv_id);

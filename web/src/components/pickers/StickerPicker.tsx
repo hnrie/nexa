@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import type { Sticker, StickerPack } from "@/api/types";
+import { moveFocusInGrid } from "@/lib/gridKeys";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
 import { useAuth } from "@/stores/auth";
 import { groupPacks, packImageUrl, searchStickers, useExpressions } from "@/stores/expressions";
@@ -41,7 +42,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
 
   // a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows
   const cell = (sticker: Sticker, pack: StickerPack) => (
-    <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} onClick={() => onPick({ sticker, pack })}>
+    <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} tabIndex={-1} onClick={() => onPick({ sticker, pack })}>
       <img src={packImageUrl(pack, sticker, 100)} alt={sticker.name} loading="lazy" decoding="async" draggable={false} />
     </button>
   );
@@ -56,16 +57,27 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
           {all.map((p) => {
             const cover = p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
             return (
-              <button key={p.id} className={s.cat} title={p.name} onClick={() => jump(p.id)} onContextMenu={packMenu(p)}>
+              <button key={p.id} className={s.cat} title={p.name} aria-label={p.name} onClick={() => jump(p.id)} onContextMenu={packMenu(p)}>
                 {cover ? <img className={s.catImg} src={packImageUrl(p, cover, 24)} alt="" decoding="async" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
               </button>
             );
           })}
         </div>
-        <div className={s.grid} ref={gridRef}>
+        {/* One tab stop for the whole grid, with the arrows inside it: every
+            cell was a stop of its own, which is hundreds in a full picker. */}
+        <div
+          className={s.grid}
+          ref={gridRef}
+          tabIndex={0}
+          role="group"
+          aria-label={t("pickers.stickerPicker.searchStickers")}
+          onKeyDown={(e) => {
+            if (gridRef.current && moveFocusInGrid(gridRef.current, "[data-sticker]", e.key)) e.preventDefault();
+          }}
+        >
           {all.length === 0 ? (
             <div className={s.empty}>
-              No sticker packs yet.
+              {t("pickers.stickerPicker.noStickerPacksYet")}
               <br />
               <button className={s.sectionLink} onClick={() => openModal("settings", { page: "stickers" })}>{t("pickers.stickerPicker.createOrInstallAPack")}</button>
             </div>
@@ -81,7 +93,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
                     <div className={[s.section, s.sectionRow].join(" ")} onContextMenu={packMenu(p)}>
                       <span className={s.sectionName}>{p.name}</span>
                       {p.owner_user_id === meId ? <button className={s.sectionLink} onClick={() => edit(p)}>{t("pickers.stickerPicker.edit")}</button> : null}
-                      {canRemovePack(p, meId) ? <button className={s.sectionLink} data-danger="true" onClick={() => confirmRemovePack(p)} aria-label={`Remove ${p.name}`}>{t("composer.composer.remove")}</button> : null}
+                      {canRemovePack(p, meId) ? <button className={s.sectionLink} data-danger="true" onClick={() => confirmRemovePack(p)} aria-label={t("pickers.stickerPicker.removeName", { name: p.name })}>{t("composer.composer.remove")}</button> : null}
                     </div>
                     {p.stickers.length === 0 ? <div className={s.gifNote}>{t("pickers.stickerPicker.thisPackIsEmpty")}</div> : <div className={s.stickerGrid}>{p.stickers.map((st) => cell(st, p))}</div>}
                   </div>

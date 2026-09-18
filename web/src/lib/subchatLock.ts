@@ -9,6 +9,7 @@
  */
 import { b64, randomBytes } from "@/crypto/bytes";
 import { deriveAuthKey, deriveMaster, DEFAULT_KDF, type KdfParams } from "@/crypto/kdf";
+import { acceptServerKdf } from "./serverKdf";
 import { api } from "@/api/client";
 import type { Snowflake } from "@/api/types";
 
@@ -52,6 +53,10 @@ export function lockState(channelId: Snowflake): Promise<LockParams> {
 export async function unlockSubchat(channelId: Snowflake, password: string): Promise<void> {
   const info = await lockState(channelId);
   if (!info.locked || !info.salt || !info.params) return;
-  const master = await deriveMaster(password, b64.dec(info.salt), info.params);
+  // The parameters come from the server, and what goes back is derived from the
+  // password with them, so weak ones would hand the password over the same way
+  // a weak sign-in would. The server's own rule for what it accepts when a lock
+  // is *created* (`validKDF`) is the rule applied to what it hands back.
+  const master = await deriveMaster(password, b64.dec(info.salt), acceptServerKdf(info.params));
   await api.request<{ unlocked: boolean }>("POST", `/channels/${channelId}/unlock`, { password_key: b64.enc(deriveAuthKey(master)) });
 }

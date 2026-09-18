@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { describeError } from "@/lib/errors";
+import { WeakKdfError } from "@/crypto/kdf";
 import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -32,10 +34,14 @@ export default function LoginPage() {
   }, [step, useBackup]);
 
   const describe = (err: unknown, fallback: string) => {
+    // The password was never stretched and never sent: the server asked for
+    // parameters that would have handed it over. Saying "wrong password" here
+    // would send someone to reset a password that is perfectly good.
+    if (err instanceof WeakKdfError) return err.message;
     if (err instanceof ApiError) {
       if (err.code === "invalid_credentials") return t("login.usernameOrPasswordIsWrong");
       if (err.code === "rate_limited") return t("login.tooManyAttempts");
-      return err.message;
+      return describeError(err, fallback);
     }
     // fetch rejects with a TypeError when the request never got an answer
     // ("Failed to fetch", "Load failed"), which says nothing about the password.
@@ -79,7 +85,7 @@ export default function LoginPage() {
         cancelMfa();
         setStep("password");
         setPassword("");
-        setError(err.message);
+        setError(describeError(err, t("login.thatCodeDidNotWork")));
       } else {
         setError(describe(err, t("login.thatCodeDidNotWork")));
       }

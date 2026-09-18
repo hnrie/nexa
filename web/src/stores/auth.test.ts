@@ -2,6 +2,7 @@
 import { api, ApiError } from "@/api/client";
 import type { RequestOptions } from "@/api/client";
 import { b64, randomBytes } from "@/crypto/bytes";
+import { WeakKdfError } from "@/crypto/kdf";
 import { generateIdentity } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
 import { hasLock } from "@/lib/appLock";
@@ -89,6 +90,22 @@ describe("auth store", () => {
     expect(again.token).toBe("tok-2");
   }, 60_000);
 
+  it("will not stretch a password with the parameters a hostile server chose", async () => {
+    // A server that answers with something free to compute gets the plaintext
+    // password back out of the auth key it is then handed, and with it the
+    // wrapped identity key it already stores. Nothing must be derived, and
+    // nothing must reach /auth/login.
+    stored = { kdf_salt: b64.enc(randomBytes(16)), kdf_params: { m: 8, t: 1, p: 1, v: 1 } };
+    await expect(useAuth.getState().login("mara", "correct horse battery")).rejects.toBeInstanceOf(WeakKdfError);
+    expect(calls.some((c) => c.path === "/auth/login")).toBe(false);
+  });
+
+  it("will not stretch a password with parameters heavy enough to wedge the device", async () => {
+    stored = { kdf_salt: b64.enc(randomBytes(16)), kdf_params: { m: 1 << 22, t: 20, p: 1, v: 1 } };
+    await expect(useAuth.getState().login("mara", "correct horse battery")).rejects.toBeInstanceOf(WeakKdfError);
+    expect(calls.some((c) => c.path === "/auth/login")).toBe(false);
+  });
+
   it("bootstraps into locked when the identity is not in the keystore", async () => {
     localStorage.setItem("ec.token", "tok-x");
     await useAuth.getState().bootstrap();
@@ -97,8 +114,9 @@ describe("auth store", () => {
   });
 
   describe("passcode", () => {
-    // The real cost only slows the test down; the code path is the same.
-    const fast = { kdf: { m: 1024, t: 1, p: 1, v: 1 } } as never;
+    // LOCK_KDF only slows the test down; the code path is the same. It still
+    // clears KDF_FLOOR, which is now the least the client will derive with.
+    const fast = { kdf: { m: 32768, t: 2, p: 1, v: 1 } } as never;
     let settingsSaves = 0;
     let failSettings = false;
 

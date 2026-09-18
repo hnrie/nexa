@@ -16,8 +16,10 @@
 .page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .page > * { flex: 1; min-height: 0; }
 .backdrop { display: none; }
-.connection { position: absolute; top: 0; left: 0; right: 0; z-index: 30; padding: 6px 12px; text-align: center; font-size: 13px; font-weight: 600; color: #fff; background: var(--warning); color: #111; }
-.connection[data-state="closed"] { background: var(--danger); color: #fff; }
+.connection { position: absolute; top: 0; left: 0; right: 0; z-index: 30; padding: 6px 12px; text-align: center; font-size: 13px; font-weight: 600; background: var(--warning); color: #111; }
+/* white on --danger is 4.4:1; the darker shade the palette already carries
+   takes the same white to 5.6:1, and a disconnection may as well look graver */
+.connection[data-state="closed"] { background: var(--danger-hover); color: #fff; }
 
 @media (max-width: 767px) {
   .app { display: block; position: relative; }

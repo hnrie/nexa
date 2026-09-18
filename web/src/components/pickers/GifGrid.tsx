@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { moveFocusInGrid } from "@/lib/gridKeys";
 import { gifHeight, masonry, tilesWithin } from "@/lib/masonry";
 import s from "./Picker.module.css";
 
@@ -106,7 +107,19 @@ export function GifGrid<T extends GifTileData>({ tiles, onPick, onMenu, onDead, 
   };
 
   return (
-    <div ref={scroller} className={s.gifScroll}>
+    // One tab stop for the grid, with the arrows moving inside it. The tiles
+    // are absolutely placed by the masonry, so where a cell *is* is the only
+    // description of the grid there is.
+    <div
+      ref={scroller}
+      className={s.gifScroll}
+      tabIndex={0}
+      role="group"
+      aria-label={tr_("pickers.gifPicker.searchGifs")}
+      onKeyDown={(e) => {
+        if (scroller.current && moveFocusInGrid(scroller.current, "[data-gif-pick]", e.key)) e.preventDefault();
+      }}
+    >
       <div className={s.gifGrid} style={{ height: layout.height }}>
         {shown.map((i) => {
           const tile = tiles[i]!;
@@ -129,7 +142,7 @@ export function GifGrid<T extends GifTileData>({ tiles, onPick, onMenu, onDead, 
               {tile.dead ? (
                 <span className={s.gifDead}>{tr_("pickers.gifGrid.thisOneIsGone")}</span>
               ) : (
-                <button type="button" className={s.gifPick} aria-label={tile.label} onClick={() => onPick(tile)}>
+                <button type="button" className={s.gifPick} aria-label={tile.label} data-gif-pick tabIndex={-1} onClick={() => onPick(tile)}>
                   <img
                     src={tile.src}
                     alt=""

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { describeError } from "@/lib/errors";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { StickerPack } from "@/api/types";
 
@@ -60,7 +61,7 @@ export default function StickerPackPage() {
         setPack(res);
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotChangeThePack"), "error");
+      toast(describeError(err, t("server.packEditor.couldNotChangeThePack")), "error");
     } finally {
       setBusy(false);
     }

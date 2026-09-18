@@ -10,6 +10,7 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
 import { VoiceView } from "@/components/voice/VoiceView";
 import type { GatewayEvent } from "@/gateway/events";
+import { describeError } from "@/lib/errors";
 import { startGuestSession, stopGuestSession } from "@/gateway/session";
 import { guarded } from "@/lib/captcha";
 import { parseInviteFragment } from "@/lib/inviteLink";
@@ -221,7 +222,7 @@ export default function GuestCallPage() {
       saveSession(code, res);
       begin(res.token, res.guest, true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("guestCall.couldNotJoinTheCall"));
+      setError(describeError(err, t("guestCall.couldNotJoinTheCall")));
       setPhase(err instanceof ApiError && err.code === "invalid_guest_link" ? "invalid" : "form");
     }
   };

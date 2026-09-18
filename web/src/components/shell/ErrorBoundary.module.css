@@ -4,7 +4,7 @@
 .body { margin: 0 0 16px; font-size: 15px; color: var(--text); line-height: 1.45; }
 .detail { margin: 0 0 16px; padding: 12px; max-height: 180px; overflow: auto; border-radius: var(--radius-xs); background: var(--code-bg); border: 1px solid var(--code-border); color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.primary { height: 38px; padding: 0 18px; border-radius: var(--radius-xs); background: var(--brand); color: #fff; font-size: 14px; font-weight: 600; }
+.primary { height: 38px; padding: 0 18px; border-radius: var(--radius-xs); background: var(--brand); color: var(--on-brand); font-size: 14px; font-weight: 600; }
 .primary:hover { background: var(--brand-hover); }
 .secondary { height: 38px; padding: 0 18px; border-radius: var(--radius-xs); background: var(--bg-surface); color: var(--text); font-size: 14px; font-weight: 600; }
 .secondary:hover { background: var(--bg-hover); }

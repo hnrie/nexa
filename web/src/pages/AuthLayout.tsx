@@ -7,11 +7,13 @@ export function AuthLayout({ title, subtitle, children, width = 480 }: { title: 
   return (
     <div className={s.page}>
       <div className={s.brand}><NexaWordmark height={38} /></div>
-      <div className={s.card} style={{ width }}>
+      {/* One landmark, so a screen reader has somewhere to skip to rather than
+          reading the page from the top every time. */}
+      <main className={s.card} style={{ width }}>
         <h1 className={s.title}>{title}</h1>
         {subtitle ? <p className={s.subtitle}>{subtitle}</p> : null}
         {children}
-      </div>
+      </main>
     </div>
   );
 }

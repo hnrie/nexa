@@ -13,6 +13,7 @@ import { playSound, startCalling, startRinging, stopCalling, stopRinging } from 
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
+import { describeError } from "@/lib/errors";
 import { useUI } from "@/stores/ui";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
@@ -376,8 +377,14 @@ export async function joinVoice(channelId: string): Promise<void> {
   let mic: MediaStream | null = null;
   try {
     mic = await getMic(useSettings.getState().settings.voice);
-  } catch {
-    if (session === s) useUI.getState().toast(tr_("session.microphoneAccessWasDeniedYouCan"), "error");
+    useVoice.getState().setMicBlocked(false);
+  } catch (err) {
+    // The toast is gone in five seconds and the call then looked entirely
+    // normal, so the fact is held in the store for as long as it is true.
+    if (session === s) {
+      useUI.getState().toast(describeError(err, tr_("session.microphoneAccessWasDeniedYouCan")), "error");
+      useVoice.getState().setMicBlocked(true);
+    }
   }
   if (session !== s || seq !== joinSeq) {
     // left while asking for the mic: leaving already closed the transport, but

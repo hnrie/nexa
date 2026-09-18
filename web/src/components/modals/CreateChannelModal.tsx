@@ -73,9 +73,12 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
   return (
     <Modal open onClose={onClose} title={t("modals.createChannel.createChannel")} width={460} footer={<><Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button><Button onClick={() => void create()} loading={busy} disabled={!name.trim()}>{t("modals.createChannel.createChannel")}</Button></>}>
       <div className={s.form}>
-        {parent ? <p className={s.hint}>in {parent.name}</p> : null}
-        <Field label={t("modals.createChannel.channelType")}>
-          <div className={s.types}>
+        {parent ? <p className={s.hint}>{t("modals.createChannel.inCategory", { name: parent.name })}</p> : null}
+        {/* `as="div"`: the doc comment on Field says it in as many words — a
+            label wrapping a group of radios passes a stray tap on its caption,
+            or on any gap between the options, to the first radio. */}
+        <Field as="div" label={t("modals.createChannel.channelType")}>
+          <div className={s.types} role="radiogroup" aria-label={t("modals.createChannel.channelType")}>
             <label className={s.type} data-on={type === "text"}>
               <span className={s.typeIcon}><Hash size={22} /></span>
               <span className={s.typeText}><span className={s.typeLabel}>{t("modals.createChannel.text")}</span><span className={s.typeDesc}>{t("modals.createChannel.sendMessagesImagesGifsEmojiOpinions")}</span></span>

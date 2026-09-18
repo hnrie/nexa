@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
+import { KeyStatusChip } from "@/components/profile/KeyVerify";
 import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
@@ -205,6 +206,12 @@ export function ChatView({ channel }: { channel: Channel }) {
         ) : (
           <span className={s.hSub}>{channel.recipient_ids.length} members</span>
         )}
+        {channel.type === "dm" && other ? (
+          // Whether this device has seen this person's encryption key before,
+          // and the way to the digits that let two people check it out of band.
+          // A DM is where that matters most and where there is room to say it.
+          <span className={s.hKey}><KeyStatusChip userId={other} onClick={() => openModal("verifyKey", { userId: other })} /></span>
+        ) : null}
         <span className={s.hSpacer} />
         {!isServer && !mobile ? (
           <Tooltip text={tr_("chat.chat.subchats")} side="bottom">

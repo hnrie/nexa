@@ -61,8 +61,8 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   return (
     <Modal open onClose={onClose} title={t("modals.createDM.selectFriends")} width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={picked.length === 0}>{group ? t("modals.createDM.addToGroup") : picked.length > 1 ? t("modals.createDM.createGroupDm") : t("modals.createDM.createDm")}</Button>}>
       <p className={s.hint}>{group ? t("modals.createDM.addAnyoneYouAreFriendsWith") : picked.length >= MAX ? t("modals.createDM.addTheRestWithAnInvite") : t("modals.createDM.pickFriendsToStartAGroup")}</p>
-      <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("modals.createDM.typeTheUsernameOfAFriend")} autoFocus />
-      {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
+      <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("modals.createDM.typeTheUsernameOfAFriend")} aria-label={t("modals.createDM.typeTheUsernameOfAFriend")} autoFocus />
+      {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} aria-label={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
       <div className={s.list}>
         {shown.length === 0 ? <div className={s.empty}>{friends.length === 0 ? t("modals.createDM.addSomeFriendsFirst") : t("modals.createDM.noFriendsMatch")}</div> : null}
         {shown.map((r) => (

@@ -77,6 +77,21 @@ function parseRetryAfter(raw: string | null): number | undefined {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
+/**
+ * What an error with no envelope behind it says.
+ *
+ * Thirteen call sites show `err.message` when they have nothing better, so this
+ * string is read by people, not only by logs. "Request failed with status 500."
+ * is a status line, not a sentence, and it is untranslated in an app that ships
+ * eleven catalogues; these say the same thing in words someone wrote.
+ */
+export function genericMessage(status: number): string {
+  if (status === 429) return t("errors.youAreDoingThatTooQuickly");
+  if (status >= 500) return t("errors.theServerRanIntoAProblem");
+  if (status >= 400) return t("errors.theServerTurnedThatDownAnd");
+  return t("modals.confirm.somethingWentWrong");
+}
+
 /** Builds an ApiError from a response body, falling back to `http_<status>`. */
 export function errorFrom(status: number, body: string, retryAfterHeader: string | null): ApiError {
   const retryAfter = parseRetryAfter(retryAfterHeader);
@@ -89,7 +104,7 @@ export function errorFrom(status: number, body: string, retryAfterHeader: string
   if (isErrorEnvelope(parsed)) {
     return new ApiError(status, parsed.error.code, parsed.error.message, retryAfter);
   }
-  return new ApiError(status, `http_${status}`, `Request failed with status ${status}.`, retryAfter);
+  return new ApiError(status, `http_${status}`, genericMessage(status), retryAfter);
 }
 
 /** Builds an ApiError from a fetch Response that was not ok. */
@@ -287,10 +302,10 @@ export const api = {
         });
 
       xhr.onerror = (): void =>
-        finish(() => reject(new ApiError(0, "network", "The upload could not reach the server.")));
+        finish(() => reject(new ApiError(0, "network", t("offline.couldNotReachTheServer"))));
 
       xhr.onabort = (): void =>
-        finish(() => reject(new ApiError(0, "aborted", "The upload was cancelled.")));
+        finish(() => reject(new ApiError(0, "aborted", t("errors.thatWasCancelledBeforeItFinished"))));
 
       const signal = opts?.signal;
       if (signal) {

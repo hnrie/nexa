@@ -8,6 +8,8 @@ import { Button } from "@/components/common/Button";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
+import { useReorder } from "@/hooks/useReorder";
+import { describeError } from "@/lib/errors";
 import { useAuth } from "@/stores/auth";
 import { useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
@@ -85,6 +87,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   const removePack = useExpressions((x) => x.removePack);
   const toast = useUI((u) => u.toast);
   const openModal = useUI((u) => u.openModal);
+  const openContextMenu = useUI((u) => u.openContextMenu);
   const [name, setName] = useState(pack.name);
   const [description, setDescription] = useState(pack.description);
   const [busy, setBusy] = useState(false);
@@ -202,6 +205,33 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotSetTheCover"), "error");
     }
   };
+  /** Sends a whole new order, which is what the endpoint takes. */
+  const applyOrder = async (list: Sticker[]): Promise<boolean> => {
+    try {
+      upsertPack(await expressionsApi.setStickerPositions(pack.id, list.map((x, i) => ({ id: x.id, position: i }))));
+      return true;
+    } catch (err) {
+      toast(describeError(err, t("server.packEditor.couldNotReorder")), "error");
+      return false;
+    }
+  };
+  // Stickers are a grid, so "earlier" and "later" rather than up and down.
+  const reorder = useReorder({
+    ids: pack.stickers.map((x) => x.id),
+    axis: "grid",
+    name: (id) => pack.stickers.find((x) => x.id === id)?.name ?? "",
+    canMove: () => manage,
+    move: (id, delta) => {
+      const at = pack.stickers.findIndex((x) => x.id === id);
+      const to = at + delta;
+      if (at < 0 || to < 0 || to >= pack.stickers.length) return false;
+      const list = [...pack.stickers];
+      const [moving] = list.splice(at, 1);
+      list.splice(to, 0, moving!);
+      return applyOrder(list);
+    },
+  });
+
   const onDrop = async (e: DragEvent) => {
     e.preventDefault();
     const d = drag;
@@ -214,11 +244,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     if (!moving) return;
     const idx = list.findIndex((x) => x.id === at.id) + (at.after ? 1 : 0);
     list.splice(idx, 0, moving);
-    try {
-      upsertPack(await expressionsApi.setStickerPositions(pack.id, list.map((x, i) => ({ id: x.id, position: i }))));
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.packEditor.couldNotReorder"), "error");
-    }
+    await applyOrder(list);
   };
   const copyLink = () => {
     void navigator.clipboard?.writeText(packUrl(pack.id)).then(() => {
@@ -278,8 +304,15 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
               <Button size="sm" variant={copied ? "positive" : "secondary"} onClick={copyLink}>{copied ? <><Check size={14} /> {t("modals.groupInvite.copied")}</> : <><Copy size={14} /> {t("server.packEditor.copyLink")}</>}</Button>
             </div>
           ) : null}
-          <div
+          {/* A real button, not a div with an onClick: the file input inside is
+              `hidden`, so neither it nor the box around it could be reached
+              without a pointer, and the Upload button below only appears once
+              something has already been staged. */}
+          <button
+            type="button"
             className={s.dropzone}
+            // a button shrink-wraps where the div it replaced filled the column
+            style={{ display: "block", width: "100%" }}
             data-over={over}
             onClick={() => fileRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setOver(true); }}
@@ -287,9 +320,9 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) stage(e.dataTransfer.files); }}
             data-drop-zone
           >
-            <Upload size={20} /> Drop PNG, APNG, GIF or WebP files here or click to choose ({Math.round(maxBytes / (1024 * 1024))} MB each, no limit on how many).{isEmoji ? t("server.packEditor.emojiNamesAreLettersNumbersAnd") : ""}
-            <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
-          </div>
+            <Upload size={20} /> {t("server.packEditor.dropFilesHereOrClickTo", { size: Math.round(maxBytes / (1024 * 1024)) })}{isEmoji ? ` ${t("server.packEditor.emojiNamesAreLettersNumbersAnd")}` : ""}
+          </button>
+          <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
           {pending.map((p) => (
             <div key={p.preview} className={s.pending}>
               <img src={p.preview} alt="" />
@@ -301,6 +334,8 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
           {pending.length ? <div style={{ marginTop: 8 }}><Button size="sm" loading={busy} onClick={() => void uploadAll()} data-testid="upload-stickers">{isEmoji ? t("server.packEditor.uploadEmojiCount", { count: pending.length }) : t("server.packEditor.uploadStickerCount", { count: pending.length })}</Button></div> : null}
         </>
       ) : pack.description ? <p className={s.sub}>{pack.description}</p> : null}
+      {manage && pack.stickers.length > 1 ? <p className={s.sub} style={{ margin: "8px 0 0" }}>{reorder.hint}</p> : null}
+      {reorder.live}
       <div className={s.grid}>
         {pack.stickers.map((st) => (
           <div
@@ -314,6 +349,15 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDragOver={(e) => { if (!drag || drag === st.id) return; e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setDrop({ id: st.id, after: e.clientX > r.left + r.width / 2 }); }}
             onDrop={(e) => void onDrop(e)}
             onDragEnd={() => { setDrag(null); setDrop(null); }}
+            onKeyDown={reorder.onKeyDown(st.id)}
+            onContextMenu={(e) => {
+              const items = reorder.menuItems(st.id);
+              if (items.length === 0) return;
+              e.preventDefault();
+              openContextMenu({ x: e.clientX, y: e.clientY, label: st.name, items });
+            }}
+            data-reorder-id={st.id}
+            tabIndex={manage ? -1 : undefined}
           >
             {pack.cover_sticker_id === st.id ? <span className={s.coverBadge}>{t("server.packEditor.cover")}</span> : null}
             <img className={s.cellImg} src={packImageUrl(pack, st)} alt={st.name} loading="lazy" draggable={false} />

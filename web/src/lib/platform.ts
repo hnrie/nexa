@@ -3,6 +3,7 @@
  * Phones, tablets (an iPad asks for the desktop site but has a touch screen)
  * and Chromebooks get none.
  */
+import { builds, type AndroidFile, type AndroidRelease } from "@/api/android";
 import type { DesktopFile, DesktopRelease } from "@/api/desktop";
 
 export interface DesktopTarget {
@@ -24,6 +25,8 @@ export interface PlatformHints {
   touchPoints?: number | undefined;
   /** navigator.userAgentData.platform, e.g. "Android" */
   platform?: string | undefined;
+  /** navigator.userAgentData high-entropy bitness: "64" | "32" */
+  bitness?: string | undefined;
 }
 
 /**
@@ -35,6 +38,32 @@ export function detectAndroid(h: PlatformHints): boolean {
   if (/CrOS/i.test(h.ua)) return false;
   if (h.platform && /android/i.test(h.platform)) return true;
   return /Android/i.test(h.ua) && !/Windows|Macintosh|X11; Linux x86/i.test(h.ua);
+}
+
+/**
+ * Which per-processor APK this phone wants, or null when the browser will not
+ * say. Chromium reports `architecture: "arm" | "x86"` with `bitness: "64" |
+ * "32"`; Firefox and Safari offer no high-entropy hints at all, and "I don't
+ * know" is the ordinary case rather than an error — it means the universal
+ * build, which runs anywhere.
+ */
+export function detectAndroidAbi(h: PlatformHints): string | null {
+  if (!detectAndroid(h)) return null;
+  const arch = h.architecture?.toLowerCase();
+  const bits = h.bitness;
+  if (arch === "arm") return bits === "32" ? "armeabi-v7a" : bits === "64" ? "arm64-v8a" : null;
+  if (arch === "x86") return bits === "32" ? "x86" : bits === "64" ? "x86_64" : null;
+  return null;
+}
+
+/**
+ * The build to offer first: the one for this processor when it is published
+ * and this browser said which it is, and the universal one otherwise.
+ */
+export function pickAndroid(rel: AndroidRelease, abi: string | null): AndroidFile {
+  const list = builds(rel);
+  const mine = abi ? list.find((f) => f.abi === abi) : undefined;
+  return mine ?? list.find((f) => f.abi === "universal") ?? list[0]!;
 }
 
 export function detectDesktop(h: PlatformHints): DesktopTarget {
@@ -83,6 +112,24 @@ export async function currentPlatform(): Promise<DesktopTarget> {
   }
   const webgl = !architecture && /Macintosh/.test(navigator.userAgent) ? webglHints() : {};
   return detectDesktop({ ua: navigator.userAgent, mobile: nav.userAgentData?.mobile, architecture, gpu: webgl.gpu, astc: webgl.astc, touchPoints: navigator.maxTouchPoints });
+}
+
+/**
+ * What this browser says about its processor, for picking an APK. Asking costs
+ * a promise and most browsers answer nothing, so the caller starts on the
+ * universal build and improves on it if an answer arrives.
+ */
+export async function currentAndroidAbi(): Promise<string | null> {
+  const nav = navigator as Navigator & {
+    userAgentData?: { platform?: string; getHighEntropyValues?: (h: string[]) => Promise<{ architecture?: string; bitness?: string }> };
+  };
+  let hints: { architecture?: string; bitness?: string } = {};
+  try {
+    hints = (await nav.userAgentData?.getHighEntropyValues?.(["architecture", "bitness"])) ?? {};
+  } catch {
+    /* not offered */
+  }
+  return detectAndroidAbi({ ua: navigator.userAgent, platform: nav.userAgentData?.platform, architecture: hints.architecture, bitness: hints.bitness });
 }
 
 function webglHints(): { gpu?: string | undefined; astc?: boolean | undefined } {

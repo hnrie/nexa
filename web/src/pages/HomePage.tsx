@@ -16,10 +16,25 @@ import {
 import { NexaWordmark } from "@/components/common/Brand";
 import { FloatingPlane } from "@/components/common/FloatingPlane";
 import { useAuth } from "@/stores/auth";
+import { useSettings } from "@/stores/settings";
 import { useReveal } from "@/hooks/useReveal";
 import { currentPlatform } from "@/lib/platform";
 import { t } from "@/i18n";
 import s from "./Home.module.css";
+
+/** Whether this visitor has asked for less movement, by either route. */
+function useStillness(): boolean {
+  const setting = useSettings((x) => x.settings.reducedMotion);
+  const [system, setSystem] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (!mq) return;
+    const onChange = () => setSystem(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return setting || system;
+}
 
 /** One block that fades up the first time it is seen. */
 function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
@@ -31,13 +46,20 @@ function Reveal({ children, delay = 0, className }: { children: ReactNode; delay
   );
 }
 
-/** A picture of the app, in a frame that reads as a window. */
-function Shot({ src, alt }: { src: string; alt: string }) {
+/**
+ * A picture of the app, in a frame that reads as a window.
+ *
+ * Its own size is given even though the CSS scales it to the column: without
+ * one the browser has nothing to reserve, and four large pictures arriving one
+ * by one each shove the page down under whoever is reading it — and under the
+ * observer that decides when a block has been scrolled to.
+ */
+function Shot({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
   return (
     <FloatingPlane>
       <figure className={s.shot}>
         <div className={s.chrome}><i /><i /><i /></div>
-        <img src={src} alt={alt} loading="lazy" decoding="async" />
+        <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
       </figure>
     </FloatingPlane>
   );
@@ -46,16 +68,23 @@ function Shot({ src, alt }: { src: string; alt: string }) {
 /**
  * A short loop of the app in use. The video is a fraction of the size of the
  * same thing as a GIF, and the GIF is there for anything that cannot play it.
+ * It plays on its own and never ends, so for anyone who asked for less movement
+ * the still it would have started from is shown on its own instead.
  */
-function Loop({ name, alt }: { name: string; alt: string }) {
+function Loop({ name, alt, width, height }: { name: string; alt: string; width: number; height: number }) {
+  const still = useStillness();
   return (
     <FloatingPlane>
       <figure className={s.shot}>
         <div className={s.chrome}><i /><i /><i /></div>
-        <video autoPlay muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt}>
-          <source src={`/home/${name}.webm`} type="video/webm" />
-          <img src={`/home/${name}.gif`} alt={alt} loading="lazy" />
-        </video>
+        {still ? (
+          <img src={`/home/${name}.png`} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+        ) : (
+          <video autoPlay muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt} width={width} height={height}>
+            <source src={`/home/${name}.webm`} type="video/webm" />
+            <img src={`/home/${name}.gif`} alt={alt} width={width} height={height} loading="lazy" />
+          </video>
+        )}
       </figure>
     </FloatingPlane>
   );
@@ -100,7 +129,7 @@ export default function HomePage() {
       <header className={s.top}>
         <Link to="/" className={s.logo} aria-label="Nexa"><NexaWordmark height={26} /></Link>
         <nav className={s.nav}>
-          <Link className={s.quiet} to="/download">{t("home.nav.download")}</Link>
+          <Link className={[s.quiet, s.navDownload].join(" ")} to="/download">{t("home.nav.download")}</Link>
           {me ? (
             <Link className={s.cta} to="/channels/@me">{t("home.nav.open")}</Link>
           ) : (
@@ -124,7 +153,7 @@ export default function HomePage() {
           <p className={s.fine}>{t("home.hero.fine")}</p>
         </Reveal>
         <Reveal delay={90} className={s.heroShot}>
-          <Shot src="/home/app.png" alt={t("home.shot.app")} />
+          <Shot src="/home/app.png" alt={t("home.shot.app")} width={1440} height={900} />
         </Reveal>
       </section>
 
@@ -138,7 +167,7 @@ export default function HomePage() {
             <li>{t("home.calls.c")}</li>
           </ul>
         </Reveal>
-        <Reveal delay={80}><Loop name="call-loop" alt={t("home.shot.call")} /></Reveal>
+        <Reveal delay={80}><Loop name="call-loop" alt={t("home.shot.call")} width={900} height={563} /></Reveal>
       </section>
 
       <section className={s.strip} data-flip="">
@@ -154,7 +183,7 @@ export default function HomePage() {
             ))}
           </div>
         </Reveal>
-        <Reveal delay={80}><Loop name="speed" alt={t("home.shot.speed")} /></Reveal>
+        <Reveal delay={80}><Loop name="speed" alt={t("home.shot.speed")} width={900} height={563} /></Reveal>
       </section>
 
       <section className={s.strip}>
@@ -162,7 +191,7 @@ export default function HomePage() {
           <h2 className={s.h2}>{t("home.express.title")}</h2>
           <p className={s.body}>{t("home.express.body")}</p>
         </Reveal>
-        <Reveal delay={80}><Shot src="/home/express.png" alt={t("home.shot.express")} /></Reveal>
+        <Reveal delay={80}><Shot src="/home/express.png" alt={t("home.shot.express")} width={554} height={554} /></Reveal>
       </section>
 
       <section className={s.points}>

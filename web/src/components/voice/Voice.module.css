@@ -47,7 +47,7 @@
 /* a screen share someone has not chosen to watch */
 .offer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px 12px 40px; text-align: center; background: radial-gradient(circle at 50% 40%, var(--bg-active), var(--bg-surface) 70%); }
 .offerText { font-size: 14px; color: var(--text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.watchBtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: var(--radius-xs); background: var(--brand); color: #fff; font-size: 14px; font-weight: 600; }
+.watchBtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: var(--radius-xs); background: var(--brand); color: var(--on-brand); font-size: 14px; font-weight: 600; }
 .watchBtn:hover { background: var(--brand-hover, var(--brand)); filter: brightness(1.08); }
 .tile[data-place="strip"] .offer { gap: 4px; padding: 4px 4px 22px; }
 .tile[data-place="strip"] .watchBtn { height: 24px; padding: 0 8px; font-size: 12px; }
@@ -64,7 +64,7 @@
 .tileBtns { position: absolute; top: 8px; inset-inline-end: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; }
 .tile:hover .tileBtns, .tile:focus-within .tileBtns { opacity: 1; }
 .tileBtn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; }
-.tileBtn:hover { background: var(--brand); }
+.tileBtn:hover { background: var(--brand); color: var(--on-brand); }
 
 /* the control bar */
 .controls { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); }
@@ -112,8 +112,8 @@
   .resizer::before { width: 48px; }
 }
 /* a stream full screen on its own keeps its label and buttons clear of a notch */
-.tile:fullscreen .tileBar { left: max(8px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom)); }
-.tile:fullscreen .tileBtns { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); opacity: 1; }
+.tile:fullscreen .tileBar { inset-inline-start: max(8px, env(safe-area-inset-left)); bottom: max(8px, env(safe-area-inset-bottom)); }
+.tile:fullscreen .tileBtns { top: max(8px, env(safe-area-inset-top)); inset-inline-end: max(8px, env(safe-area-inset-right)); opacity: 1; }
 
 /* voice status block above the user panel */
 .status { flex: none; margin: 0 8px; padding: 8px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 6px; }
@@ -134,7 +134,7 @@
 .statusWide[data-on="true"] { background: var(--bg-active); color: var(--text-strong); }
 
 /* participants under a voice channel in the sidebar */
-.participants { display: flex; flex-direction: column; padding: 0 0 4px 22px; }
+.participants { display: flex; flex-direction: column; padding-block: 0 4px; padding-inline-start: 22px; }
 .participant { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); font-size: 14px; width: 100%; text-align: start; }
 .participant:hover { background: var(--bg-hover); color: var(--text); }
 .pAvatar { border-radius: 50%; flex: none; box-shadow: 0 0 0 2px transparent; transition: box-shadow 240ms ease-out; }
@@ -160,6 +160,21 @@
 .ring { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 8px 0; }
 .ringAvatar { animation: pulse 1.2s ease-in-out infinite; border-radius: 50%; }
 @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(61, 158, 96, 0.6); } 50% { box-shadow: 0 0 0 14px rgba(61, 158, 96, 0); } }
+/*
+ * Reduced motion keeps every one of these signals and takes away only the
+ * movement in them. The speaking ring keeps its slow fade — that fade is what
+ * stops the pauses between words flashing, so deleting it does the opposite of
+ * what someone asking for calm wanted, and opacity is not motion. The ringing
+ * avatar keeps a ring; it just stops growing one.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .tile::after, .pAvatar { transition-duration: 240ms !important; }
+  .tile[data-speaking="true"]::after, .participant[data-speaking="true"] .pAvatar { transition-duration: 80ms !important; }
+  .ringAvatar { animation: none; box-shadow: 0 0 0 5px rgba(61, 158, 96, 0.5); }
+}
+[data-reduced-motion="true"] .tile::after, [data-reduced-motion="true"] .pAvatar { transition-duration: 240ms !important; }
+[data-reduced-motion="true"] .tile[data-speaking="true"]::after, [data-reduced-motion="true"] .participant[data-speaking="true"] .pAvatar { transition-duration: 80ms !important; }
+[data-reduced-motion="true"] .ringAvatar { animation: none; box-shadow: 0 0 0 5px rgba(61, 158, 96, 0.5); }
 .ringName { font-size: 20px; font-weight: 600; color: var(--text-strong); }
 .ringSub { font-size: 14px; color: var(--text-muted); }
 .ringBtns { display: flex; gap: 16px; margin-top: 8px; }

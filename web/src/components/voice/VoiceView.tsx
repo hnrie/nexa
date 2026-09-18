@@ -110,7 +110,8 @@ function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): 
 function ControlButton({ label, onClick, children, on, off, danger, testId, className, menu }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string; menu?: { label: string; open: (anchor: DOMRect) => void; testId?: string } }) {
   const button = (
     <Tooltip text={label} side="top">
-      <button className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")} data-on={on || undefined} data-off={off || undefined} aria-label={label} aria-pressed={on || off ? true : undefined} onClick={onClick} data-testid={testId}>
+      {/* The label flips between "Mute" and "Unmute", which is the whole state; adding aria-pressed on top of it announced "Unmute, pressed" for a muted mic and no state at all for a live one. */}
+      <button className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")} data-on={on || undefined} data-off={off || undefined} aria-label={label} onClick={onClick} data-testid={testId}>
         {children}
       </button>
     </Tooltip>
@@ -260,6 +261,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const streamVolumes = useVoice((v) => v.streamVolumes);
   const streamMutes = useVoice((v) => v.streamMutes);
   const localMutes = useVoice((v) => v.localMutes);
+  const micBlocked = useVoice((v) => v.micBlocked);
+  const [micNoteDismissed, setMicNoteDismissed] = useState(false);
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
   const toggleMute = useVoiceLocal((v) => v.toggleMute);
@@ -652,10 +655,10 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
             {t.kind === "screen" ? (t.me ? tr_("voice.voice.yourScreen") : tr_("voice.voice.theirScreen", { name: nameOf(t.userId) })) : nameOf(t.userId)}
           </span>
           {t.kind !== "screen" && isGuest(users[t.userId]) ? <span className={s.guestTag}>{tr_("voice.voiceParticipants.guest")}</span> : null}
-          {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
+          {t.kind !== "screen" && (vs?.self_mute || vs?.server_mute || (t.me && micBlocked)) ? <MicOff size={14} className={s.tileIcon} data-server={!!vs?.server_mute} /> : null}
           {t.kind !== "screen" && (vs?.self_deaf || vs?.server_deaf) ? <HeadphoneOff size={14} className={s.tileIcon} data-server={!!vs?.server_deaf} /> : null}
           {(t.kind === "screen" ? streamMutes[t.userId] : localMutes[t.userId]) ? <VolumeX size={14} className={s.tileIcon} /> : null}
-          {!t.me && peerState !== "connected" && t.kind !== "screen" ? <span className={s.tileState}>{peerState === "failed" ? "reconnecting…" : "connecting…"}</span> : null}
+          {!t.me && peerState !== "connected" && t.kind !== "screen" ? <span className={s.tileState}>{peerState === "failed" ? tr_("voice.voice.reconnecting") : tr_("voice.voice.connectingEllipsis")}</span> : null}
         </div>
         {place !== "strip" && (playing || (t.me && t.kind === "screen")) ? (
           <div className={s.tileBtns} onClick={(e) => e.stopPropagation()}>
@@ -670,8 +673,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
               </Tooltip>
             ) : null}
             {playing && !full ? (
-              <Tooltip text={place === "focus" ? "Unfocus" : "Focus"} side="bottom">
-                <button className={s.tileBtn} aria-label={place === "focus" ? "Unfocus" : "Focus"} onClick={() => setFocused(place === "focus" ? null : t.key)}>
+              <Tooltip text={place === "focus" ? tr_("voice.voice.unfocus") : tr_("voice.voice.focus")} side="bottom">
+                <button className={s.tileBtn} aria-label={place === "focus" ? tr_("voice.voice.unfocus") : tr_("voice.voice.focus")} onClick={() => setFocused(place === "focus" ? null : t.key)}>
                   {place === "focus" ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
               </Tooltip>
@@ -726,6 +729,12 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
         }}
         onClick={onStageClick}
       >
+        {micBlocked && !micNoteDismissed ? (
+          <div className={s.stageNote} role="alert" data-testid="mic-blocked">
+            {tr_("voice.voice.yourMicrophoneIsBlockedSoNo")}{" "}
+            <button onClick={() => setMicNoteDismissed(true)} style={{ textDecoration: "underline" }}>{tr_("voice.voice.hideThis")}</button>
+          </div>
+        ) : null}
         {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>{tr_("voice.voice.largeRoomsStrainPeerToPeer")}</div> : null}
         {focusedTile ? (
           <>
@@ -746,8 +755,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           </span>
         </div>
         <div className={s.controlsMain}>
-          <ControlButton label={muted ? "Unmute" : "Mute"} off={muted} onClick={toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
-          <ControlButton label={deafened ? "Undeafen" : "Deafen"} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
+          <ControlButton label={micBlocked ? tr_("voice.voice.microphoneBlocked") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} off={muted || micBlocked} onClick={toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
+          <ControlButton label={deafened ? tr_("voice.voice.undeafen") : tr_("voice.voice.deafen")} off={deafened} onClick={toggleDeafen}>{deafened ? <HeadphoneOff size={22} /> : <Headphones size={22} />}</ControlButton>
           <ControlButton label={localVideo ? tr_("voice.voice.turnOffCamera") : tr_("voice.voice.turnOnCamera")} on={!!localVideo} onClick={() => void toggleCamera()} menu={{ label: tr_("voice.voice.cameraOptions"), open: (r) => void openDeviceMenu("camera", r), testId: "camera-menu" }}>{localVideo ? <Video size={22} /> : <VideoOff size={22} />}</ControlButton>
           {localVideo && canFlip ? (
             <ControlButton label={tr_("voice.voice.switchCamera")} onClick={() => void flipCamera()} testId="flip-camera"><SwitchCamera size={22} /></ControlButton>

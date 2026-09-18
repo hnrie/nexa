@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Spinner } from "@/components/common/Spinner";
 import { lazyPage } from "@/lib/lazyChunk";
 import { isTopLayer } from "@/components/common/Modal";
 import { useAuth } from "@/stores/auth";
@@ -57,12 +58,12 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label={t("settings.settings.userSettings")} data-modal-layer="">
       <div className={s.navWrap}>
-        <nav className={s.nav}>
+        <nav className={s.nav} aria-label={t("settings.settings.userSettings")}>
           {nav.map((g) => (
             <div key={g.id}>
               <div className={s.navHead}>{g.head}</div>
               {g.items.map((it) => (
-                <button key={it.id} className={s.navItem} data-selected={page === it.id} data-nav={it.id} onClick={() => setPage(it.id)}>{it.label}</button>
+                <button key={it.id} className={s.navItem} data-selected={page === it.id} aria-current={page === it.id ? "page" : undefined} data-nav={it.id} onClick={() => setPage(it.id)}>{it.label}</button>
               ))}
             </div>
           ))}
@@ -75,7 +76,8 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
       </div>
       <div className={s.contentWrap}>
         <div className={s.content}>
-          <Suspense fallback={null}>{body}</Suspense>
+          {/* A blank content column on a slow link is indistinguishable from a crash. */}
+          <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{body}</Suspense>
         </div>
         <div className={s.closeCol}>
           <button className={s.close} aria-label={t("server.settingsLayer.closeSettings")} onClick={onClose}><X size={20} /></button>

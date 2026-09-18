@@ -1,6 +1,10 @@
 import { equal, utf8 } from "./bytes";
 import {
   DEFAULT_KDF,
+  KDF_CEILING,
+  KDF_FLOOR,
+  WeakKdfError,
+  kdfParamsAcceptable,
   deriveAuthKey,
   deriveEncKey,
   deriveMaster,
@@ -11,13 +15,58 @@ import {
   type KdfParams,
 } from "./kdf";
 
-// Deliberately tiny so the suite stays fast; production uses DEFAULT_KDF.
-const FAST: KdfParams = { m: 1024, t: 1, p: 1, v: 1 };
+// The cheapest parameters the client will derive with at all (KDF_FLOOR), so
+// the suite stays as fast as it can while still going through the real guard;
+// production uses DEFAULT_KDF, which is heavier again.
+const FAST: KdfParams = { m: 32768, t: 2, p: 1, v: 1 };
 const SALT = utf8.enc("0123456789abcdef");
 
 describe("DEFAULT_KDF", () => {
   it("pins the production parameters", () => {
     expect(DEFAULT_KDF).toEqual({ m: 65536, t: 3, p: 1, v: 1 });
+  });
+});
+
+describe("the argon2id floor", () => {
+  it("matches the server's own rule for what a client may register with", () => {
+    // internal/api/auth_handlers.go, validKDF: m 32768..1<<20, t 2..20, p 1..4,
+    // v == 1. The two must agree, or an account the server accepted could not
+    // sign in on a client that refuses its parameters.
+    expect(KDF_FLOOR).toEqual({ m: 32768, t: 2, p: 1, v: 1 });
+    expect(KDF_CEILING).toEqual({ m: 1 << 20, t: 20, p: 4 });
+  });
+
+  it("accepts what every real account was registered with", () => {
+    expect(kdfParamsAcceptable(DEFAULT_KDF)).toBe(true);
+    expect(kdfParamsAcceptable(KDF_FLOOR)).toBe(true);
+    expect(kdfParamsAcceptable({ m: 1 << 20, t: 20, p: 4, v: 1 })).toBe(true);
+    // The params version may be absent on the wire; only a version this build
+    // does not know is refused.
+    expect(kdfParamsAcceptable({ m: 65536, t: 3, p: 1 })).toBe(true);
+    expect(kdfParamsAcceptable({ m: 65536, t: 3, p: 1, v: 2 })).toBe(false);
+  });
+
+  it("refuses parameters that would make the stretching free", () => {
+    expect(kdfParamsAcceptable({ m: 8, t: 1, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({ m: 32767, t: 2, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({ m: 65536, t: 1, p: 1, v: 1 })).toBe(false);
+  });
+
+  it("refuses parameters that would wedge the device instead", () => {
+    expect(kdfParamsAcceptable({ m: 1 << 22, t: 3, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({ m: 65536, t: 100, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({ m: 65536, t: 3, p: 64, v: 1 })).toBe(false);
+  });
+
+  it("refuses anything that is not three whole numbers", () => {
+    expect(kdfParamsAcceptable({ m: "65536", t: 3, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({ m: 65536.5, t: 3, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({ m: Number.NaN, t: 3, p: 1, v: 1 })).toBe(false);
+    expect(kdfParamsAcceptable({})).toBe(false);
+  });
+
+  it("derives nothing at all below the floor, wherever the call came from", async () => {
+    await expect(deriveMaster("pw", SALT, { m: 8, t: 1, p: 1, v: 1 })).rejects.toBeInstanceOf(WeakKdfError);
   });
 });
 
@@ -43,7 +92,7 @@ describe("deriveMaster", () => {
 
   it("depends on the parameters", async () => {
     const a = await deriveMaster("pw", SALT, FAST);
-    const b = await deriveMaster("pw", SALT, { ...FAST, t: 2 });
+    const b = await deriveMaster("pw", SALT, { ...FAST, t: 3 });
     expect(equal(a, b)).toBe(false);
   });
 
@@ -60,7 +109,7 @@ describe("deriveMaster", () => {
   });
 
   it("accepts the default parameter shape at a larger memory size", async () => {
-    const params: KdfParams = { ...DEFAULT_KDF, m: 8192 };
+    const params: KdfParams = { ...DEFAULT_KDF };
     const a = await deriveMaster("pw", SALT, params);
     const b = await deriveMaster("pw", SALT, params);
     expect(a.length).toBe(32);

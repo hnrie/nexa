@@ -132,12 +132,24 @@ export function QuickSwitcher() {
     useUI.getState().setJumpTo({ channelId, messageId });
   };
   const count = mode === "messages" ? hits.length : items.length;
+  // The arrow-key selection used to live only in `data-selected`, which is a
+  // background colour and nothing else: a screen reader following Ctrl+K heard
+  // a text box and silence. The input is the combobox, the rows are its
+  // options, and `aria-activedescendant` names the one the arrows are on
+  // without ever moving focus out of the box being typed into.
+  const listId = "qs-list";
+  const optionId = (i: number) => `qs-opt-${i}`;
+  const switchMode = (next: "go" | "messages") => {
+    setMode(next);
+    setSel(0);
+    inputRef.current?.focus();
+  };
   return (
-    <Modal open onClose={() => setOpen(false)} width={560} bare className={s.top}>
+    <Modal open onClose={() => setOpen(false)} width={560} bare className={s.top} ariaLabel={t("modals.quickSwitcher.quickSwitcher")}>
       <div className={s.box}>
-        <div className={s.tabs} role="tablist">
-          <button role="tab" aria-selected={mode === "go"} data-on={mode === "go"} onClick={() => { setMode("go"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-go">{t("modals.quickSwitcher.jumpTo")}</button>
-          <button role="tab" aria-selected={mode === "messages"} data-on={mode === "messages"} onClick={() => { setMode("messages"); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-mode-messages">{t("modals.quickSwitcher.messages")}</button>
+        <div className={s.tabs} role="tablist" aria-label={t("modals.quickSwitcher.quickSwitcher")}>
+          <button role="tab" aria-selected={mode === "go"} {...(count > 0 ? { "aria-controls": listId } : {})} tabIndex={mode === "go" ? 0 : -1} data-on={mode === "go"} onClick={() => switchMode("go")} onKeyDown={(e) => { if (e.key === "ArrowRight") { e.preventDefault(); switchMode("messages"); } }} data-testid="switcher-mode-go">{t("modals.quickSwitcher.jumpTo")}</button>
+          <button role="tab" aria-selected={mode === "messages"} {...(count > 0 ? { "aria-controls": listId } : {})} tabIndex={mode === "messages" ? 0 : -1} data-on={mode === "messages"} onClick={() => switchMode("messages")} onKeyDown={(e) => { if (e.key === "ArrowLeft") { e.preventDefault(); switchMode("go"); } }} data-testid="switcher-mode-messages">{t("modals.quickSwitcher.messages")}</button>
         </div>
         <div className={s.inputRow}>
           <input
@@ -146,11 +158,21 @@ export function QuickSwitcher() {
             value={q}
             placeholder={mode === "messages" ? t("modals.quickSwitcher.searchEverythingYouCanRead") : t("modals.quickSwitcher.whereWouldYouLikeToGo")}
             data-testid="switcher-input"
+            role="combobox"
+            aria-expanded={count > 0}
+            {...(count > 0 ? { "aria-controls": listId } : {})}
+            aria-autocomplete="list"
+            aria-activedescendant={count > 0 ? optionId(sel) : undefined}
+            aria-label={mode === "messages" ? t("modals.quickSwitcher.searchEverythingYouCanRead") : t("modals.quickSwitcher.whereWouldYouLikeToGo")}
             onChange={(e) => { setQ(e.target.value); setSel(0); }}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") { e.preventDefault(); setSel((v) => Math.min(count - 1, v + 1)); }
               else if (e.key === "ArrowUp") { e.preventDefault(); setSel((v) => Math.max(0, v - 1)); }
-              else if (e.key === "Tab") { e.preventDefault(); setMode((m) => (m === "go" ? "messages" : "go")); setSel(0); }
+              // Tab used to be the mode switch, which left the two tabs, the
+              // clear button and every result row permanently out of reach:
+              // Tab only ever toggled the mode. Ctrl+Tab and the Left/Right
+              // arrows on the tabs do that job now, and Tab does its own.
+              else if (e.key === "Tab" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setMode((m) => (m === "go" ? "messages" : "go")); setSel(0); }
               else if (e.key === "Enter") {
                 e.preventDefault();
                 if (mode === "messages") { const m = hits[sel]; if (m) openMessage(m.channel_id, m.id); }
@@ -161,12 +183,14 @@ export function QuickSwitcher() {
           {q ? <button className={s.clear} aria-label={t("modals.quickSwitcher.clear")} onClick={() => { setQ(""); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-clear">×</button> : null}
         </div>
         {mode === "messages" ? <SearchSuggestions query={q} users={users} channels={searchable} onPick={(next) => { setQ(next); setSel(0); inputRef.current?.focus(); }} /> : null}
-        <div className={s.list}>
+        {/* Only a list with something in it is a listbox; an empty one with a
+            sentence inside would be a listbox whose children are not options. */}
+        <div className={s.list} {...(count > 0 ? { id: listId, role: "listbox", "aria-label": mode === "messages" ? t("modals.quickSwitcher.messages") : t("modals.quickSwitcher.jumpTo") } : {})}>
           {mode === "go" ? (
             <>
               {items.length === 0 ? <div className={s.empty}>{t("modals.quickSwitcher.noMatches")}</div> : null}
               {items.map((it, i) => (
-                <button key={it.id} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
+                <button key={it.id} id={optionId(i)} role="option" aria-selected={i === sel} tabIndex={-1} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
                   {it.kind === "channel" ? <span className={s.hash}>#</span> : <Avatar id={it.userId} avatarId={it.avatarId} name={it.label.replace(/^#/, "")} size={24} />}
                   <span className={s.label}>{it.kind === "channel" ? it.label.slice(1) : it.label}</span>
                   <span className={s.sub}>{it.sub}</span>
@@ -175,13 +199,13 @@ export function QuickSwitcher() {
             </>
           ) : (
             <>
-              {isEmptyQuery(parsed) ? <div className={s.empty}>Type to search everything this device has decrypted. <b>from:me</b> {t("modals.quickSwitcher.findsWhatYouSent")}</div> : null}
+              {isEmptyQuery(parsed) ? <div className={s.empty}>{t("modals.quickSwitcher.typeToSearchEverythingThisDevice")} <b>from:me</b> {t("modals.quickSwitcher.findsWhatYouSent")}</div> : null}
               {!isEmptyQuery(parsed) && hits.length === 0 ? <div className={s.empty}>{t("modals.quickSwitcher.nothingMatchedOpenAConversationAnd")}</div> : null}
               {hits.map((m, i) => {
                 const ch = channels[m.channel_id];
                 const author = users[m.author_id];
                 return (
-                  <button key={m.id} className={s.hit} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => openMessage(m.channel_id, m.id)} data-testid="switcher-hit">
+                  <button key={m.id} id={optionId(i)} role="option" aria-selected={i === sel} tabIndex={-1} className={s.hit} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => openMessage(m.channel_id, m.id)} data-testid="switcher-hit">
                     <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={author?.display_name ?? "?"} size={24} />
                     <span className={s.hitBody}>
                       <span className={s.hitHead}>
@@ -198,7 +222,7 @@ export function QuickSwitcher() {
             </>
           )}
         </div>
-        <div className={s.foot}><b>↑↓</b> navigate <b>↵</b> select <b>tab</b> switch mode <b>esc</b> dismiss</div>
+        <div className={s.foot}>{t("modals.quickSwitcher.keyHints")}</div>
       </div>
     </Modal>
   );

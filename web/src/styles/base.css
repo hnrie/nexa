@@ -20,7 +20,7 @@ a { color: var(--link); text-decoration: none; }
 a:hover { text-decoration: underline; }
 img, video { max-width: 100%; display: block; }
 code, pre, kbd { font-family: var(--font-mono); }
-:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: var(--radius-xs); }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-xs); }
 ::selection { background: rgba(128, 0, 255, 0.45); }
 
 /* Thin overlay scrollbars everywhere, Discord-style. */
@@ -51,5 +51,28 @@ code, pre, kbd { font-family: var(--font-mono); }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; } }
-[data-reduced-motion="true"] *, [data-reduced-motion="true"] *::before, [data-reduced-motion="true"] *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+/*
+ * Reduced motion is a request to stop things moving, not a request to be told
+ * less. Everything decorative — a panel sliding in, a card lifting, a row
+ * easing its colour — is cut to nothing. An endless animation is also held to
+ * one pass, because a 0.001ms loop does not stop: it runs as fast as the screen
+ * can draw, which turned the marquee, the typing dots and the call's speaking
+ * ring into a flicker aimed at exactly the people who asked for calm. Held to
+ * one pass they settle on their unanimated selves instead.
+ *
+ * What is kept is the short list of animations that are the only thing saying
+ * something is happening, each given a still or a slow cross-fade in place of
+ * its movement — a cross-fade carries no motion and is the usual stand-in. The
+ * two rows of dots are here rather than beside their own rules because
+ * Spinner and Button are CSS modules, which scope their keyframe names away;
+ * they are reached through the markup that makes them instead. The rest live
+ * next to what they replace: the jumped-to flash in Chat.module.css and the
+ * speaking ring and the ringer in Voice.module.css.
+ */
+@keyframes breathe { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  [role="status"] > i, button > [aria-hidden="true"] > i { animation: breathe 1.6s ease-in-out infinite !important; transform: none !important; }
+}
+[data-reduced-motion="true"] *, [data-reduced-motion="true"] *::before, [data-reduced-motion="true"] *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+[data-reduced-motion="true"] [role="status"] > i, [data-reduced-motion="true"] button > [aria-hidden="true"] > i { animation: breathe 1.6s ease-in-out infinite !important; transform: none !important; }

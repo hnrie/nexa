@@ -41,6 +41,7 @@ export function UserPanel() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -49,11 +50,26 @@ export function UserPanel() {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    // Opening never moved focus in and Escape never gave it back, so the menu
+    // could be opened from the keyboard and then never reached.
+    pop.current?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      trigger.current?.focus({ preventScroll: true });
     };
   }, [open]);
+  const pop = useRef<HTMLDivElement>(null);
+
+  // Up and down through the choices, as a menu moves.
+  const onPopKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : e.key === "Home" ? -99 : e.key === "End" ? 99 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const items = [...(pop.current?.querySelectorAll<HTMLElement>("button") ?? [])];
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    items[Math.min(items.length - 1, Math.max(0, (at < 0 ? 0 : at) + step))]?.focus();
+  };
 
   if (!me) return null;
   const status: StatusKind = statusOf(presence);
@@ -66,9 +82,12 @@ export function UserPanel() {
     setOpen(false);
   };
 
+  const openMicMenu = (at: { x: number; y: number }) =>
+    void micMenuItems(openModal).then((items) => openContextMenu({ ...at, above: true, label: t("voice.voice.microphoneOptions"), items }));
+
   return (
     <div className={s.panel} ref={ref}>
-      <button className={s.me} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
+      <button ref={trigger} className={s.me} onClick={() => setOpen((v) => !v)} aria-haspopup="menu" aria-expanded={open}>
         <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={32} status={status} className={s.avatar} data-speaking={speaking} />
         <span className={s.text}>
           <span className={s.name}>{me.display_name}</span>
@@ -85,18 +104,26 @@ export function UserPanel() {
             className={s.icon}
             data-on={!muted}
             onClick={toggleMute}
-            aria-label={muted ? "Unmute" : "Mute"}
+            aria-label={muted ? t("voice.voice.unmute") : t("voice.voice.mute")}
             onContextMenu={(e) => {
               // a right click chooses the microphone, as the arrow on the call's mute button does
               e.preventDefault();
-              const at = { x: e.clientX, y: e.clientY };
-              void micMenuItems(openModal).then((items) => openContextMenu({ ...at, above: true, items }));
+              openMicMenu({ x: e.clientX, y: e.clientY });
+            }}
+            onKeyDown={(e) => {
+              // Shift+F10 and the Menu key are how a keyboard opens a context
+              // menu; without them the microphone could not be changed from
+              // here at all without a mouse.
+              if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              openMicMenu({ x: r.left, y: r.top });
             }}
           >
             {muted ? <MicOff size={20} /> : <Mic size={20} />}
           </button>
         </Tooltip>
-        <Tooltip text={deafened ? "Undeafen" : "Deafen"}>
+        <Tooltip text={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
           <button className={s.icon} data-on={!deafened} onClick={toggleDeafen} aria-label={deafened ? t("shell.user.undeafen") : t("shell.user.deafen")}>
             {deafened ? <HeadphoneOff size={20} /> : <Headphones size={20} />}
           </button>
@@ -115,20 +142,21 @@ export function UserPanel() {
         </Tooltip>
       </div>
       {open ? (
-        <div className={s.pop} role="menu">
-          <div className={s.popHead}>
+        <div className={s.pop} ref={pop} role="menu" aria-label={me.display_name} onKeyDown={onPopKey}>
+          {/* Not a menu item: it is who the menu is about. */}
+          <div className={s.popHead} role="presentation">
             <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={40} status={status} />
             <div>
               <div className={s.popName}>{me.display_name}</div>
               <div className={s.popUser}>@{me.username}</div>
             </div>
           </div>
-          <div className={s.sep} />
-          <button className={s.opt} onClick={() => { setOpen(false); openModal("customStatus"); }}>
+          <div className={s.sep} role="separator" />
+          <button className={s.opt} role="menuitem" onClick={() => { setOpen(false); openModal("customStatus"); }}>
             <Pencil size={16} />
             <span className={s.optText}><span>{custom ? t("shell.user.editCustomStatus") : t("modals.customStatus.setACustomStatus")}</span></span>
           </button>
-          <div className={s.sep} />
+          <div className={s.sep} role="separator" />
           {statusOptions().map((o) => (
             <button key={o.value} className={s.opt} onClick={() => choose(o.value)} role="menuitemradio" aria-checked={status === o.value}>
               <StatusDot status={o.value} size={12} />
@@ -138,8 +166,8 @@ export function UserPanel() {
               </span>
             </button>
           ))}
-          <div className={s.sep} />
-          <button className={[s.opt, s.danger].join(" ")} onClick={() => void logout()}>
+          <div className={s.sep} role="separator" />
+          <button className={[s.opt, s.danger].join(" ")} role="menuitem" onClick={() => void logout()}>
             <LogOut size={16} />
             <span>{t("settings.settings.logOut")}</span>
           </button>

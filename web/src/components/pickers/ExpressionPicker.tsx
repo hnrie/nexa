@@ -19,6 +19,9 @@ interface Props {
   serverId?: string | null | undefined;
 }
 
+/** What Tab can reach inside the popover, for the trap. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 const W = 498;
 const H = 498;
 
@@ -51,15 +54,46 @@ function openedOver(picker: HTMLElement, el: Element | null): boolean {
 
 /** Tabbed popover above the composer (or anchored anywhere); closes on outside click or Escape. */
 export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId }: Props) {
-  const [active, setActive] = useState<PickerTab>(tab);
+  const [active, setActive] = useState<PickerTab>(tab === "gif" && !gifs ? "emoji" : tab === "sticker" && !stickers ? "emoji" : tab);
   const ref = useRef<HTMLDivElement>(null);
+  // Where focus came from. Escape used to drop it on `<body>` — and on touch
+  // the composer is deliberately blurred first, so there was nothing focused
+  // at all — which meant a keyboard user restarted tabbing from the top of the
+  // document every time they closed the emoji picker.
+  const opener = useRef<HTMLElement | null>(null);
   const mobile = typeof window !== "undefined" && window.matchMedia?.("(max-width: 767px)").matches;
   useEffect(() => {
     // On a touch screen the keyboard of the field the picker was opened from
     // would cover the picker, so it goes down.
     const field = document.activeElement;
+    opener.current = document.querySelector<HTMLElement>(TOGGLE) ?? (field instanceof HTMLElement ? field : null);
     if (!focusSearchOnOpen() && field instanceof HTMLElement && (field.matches("input, textarea") || field.isContentEditable) && !ref.current?.contains(field)) field.blur();
+    return () => {
+      const back = opener.current;
+      opener.current = null;
+      if (back && document.contains(back)) back.focus({ preventScroll: true });
+    };
   }, []);
+
+  // Tab stays inside the popover while it is open, the way it does in a dialog.
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab" || !ref.current) return;
+    const stops = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+    if (stops.length === 0) return;
+    const first = stops[0]!;
+    const last = stops[stops.length - 1]!;
+    const at = document.activeElement;
+    if (!ref.current.contains(at)) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+    } else if (e.shiftKey && at === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && at === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!ref.current || ref.current.contains(e.target as Node)) return;
@@ -82,12 +116,30 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
       document.removeEventListener("keydown", onKey, true);
     };
   }, [onClose]);
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const strip = e.currentTarget.parentElement;
+    const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
+    const at = buttons.indexOf(e.currentTarget);
+    buttons[Math.min(buttons.length - 1, Math.max(0, at + step))]?.click();
+  };
+
   const body = (
-    <div className={s.pop} ref={ref} role="dialog" aria-label={t("pickers.expressionPicker.expressionPicker")} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor}>
+    <div className={s.pop} ref={ref} role="dialog" aria-modal="true" aria-label={t("pickers.expressionPicker.expressionPicker")} onKeyDown={onKeyDown} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor}>
+      {/* A tab with nothing behind it was rendered `disabled` forever with no
+          reason given — two dead controls on the most-opened popover in the
+          app, implying a feature that is not coming. Where the caller has no
+          GIFs or stickers to offer, there is no tab. */}
       <div className={s.tabs}>
-        <button className={s.tab} data-selected={active === "gif"} disabled={!gifs} onClick={() => setActive("gif")}>{t("pickers.expressionPicker.gifs")}</button>
-        <button className={s.tab} data-selected={active === "sticker"} disabled={!stickers} onClick={() => setActive("sticker")}>{t("pickers.expressionPicker.stickers")}</button>
-        <button className={s.tab} data-selected={active === "emoji"} onClick={() => setActive("emoji")}>{t("modals.customStatus.emoji")}</button>
+        {/* The close button is not a tab, so the tablist is only the tabs. */}
+        <div style={{ display: "flex", gap: 4 }} role="tablist" aria-label={t("pickers.expressionPicker.expressionPicker")}>
+        {gifs ? <button className={s.tab} role="tab" aria-selected={active === "gif"} tabIndex={active === "gif" ? 0 : -1} onKeyDown={onTabKey} data-selected={active === "gif"} onClick={() => setActive("gif")}>{t("pickers.expressionPicker.gifs")}</button> : null}
+        {stickers ? <button className={s.tab} role="tab" aria-selected={active === "sticker"} tabIndex={active === "sticker" ? 0 : -1} onKeyDown={onTabKey} data-selected={active === "sticker"} onClick={() => setActive("sticker")}>{t("pickers.expressionPicker.stickers")}</button> : null}
+        <button className={s.tab} role="tab" aria-selected={active === "emoji"} tabIndex={active === "emoji" ? 0 : -1} onKeyDown={onTabKey} data-selected={active === "emoji"} onClick={() => setActive("emoji")}>{t("modals.customStatus.emoji")}</button>
+        </div>
         <button className={s.close} aria-label={t("pickers.expressionPicker.closePicker")} onClick={onClose}><X size={18} /></button>
       </div>
       {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} /> : active === "gif" ? gifs : stickers}

@@ -26,13 +26,16 @@ export function ActivityIcon({ type, size = 12, more = 0 }: { type: number; size
   const label = labels()[type] ?? t("settings.privacy.activity");
   if (more > 0) {
     return (
+      // `aria-label` on a plain span is prohibited and is not announced; the
+      // words go in a hidden one, which is read wherever text is read.
       <span className={s.kindStack} title={t("activity.statusLine.andMore", { what: label, count: more })}>
         <Icon size={size} className={s.kindIcon} aria-hidden="true" />
-        <span className={s.kindMore} aria-label={t("activity.statusLine.moreCount", { count: more })}>+{more}</span>
+        <span className={s.kindMore} aria-hidden="true">+{more}</span>
+        <span className="visually-hidden">{t("activity.statusLine.andMore", { what: label, count: more })}</span>
       </span>
     );
   }
-  return <Icon size={size} className={s.kindIcon} aria-label={label} />;
+  return <Icon size={size} className={s.kindIcon} role="img" aria-label={label} />;
 }
 
 export function StatusLine({

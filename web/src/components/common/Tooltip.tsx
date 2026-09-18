@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { portalRoot } from "@/hooks/usePortalRoot";
 import s from "./Tooltip.module.css";
@@ -59,6 +59,7 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ left: number; top: number; side: Side; arrow: number } | null>(null);
+  const tipId = useId();
 
   const clear = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -79,11 +80,37 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
     clear();
     timer.current = setTimeout(() => setOpen(true), delay);
   };
-  const hide = () => {
-    clear();
+  const hide = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     setOpen(false);
     setAt(null);
-  };
+  }, []);
+
+  // WCAG 1.4.13: content that appears on hover or focus has to be dismissable
+  // without moving either. Every other handler here is a pointer or focus one.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") hide();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, hide]);
+
+  // The bubble is an orphan in a portal unless something points at it. Where
+  // the trigger has no name of its own the tooltip *is* its name; where it
+  // already says the same thing, saying it twice is worse than not linking it.
+  const only = isValidElement(children) ? (children as ReactElement<Record<string, unknown>>) : null;
+  const named = typeof only?.props["aria-label"] === "string" || typeof only?.props["title"] === "string";
+  const sameText = typeof only?.props["aria-label"] === "string" && (only.props["aria-label"] as string).trim() === text.trim();
+  const child = !only
+    ? children
+    : !named
+      ? cloneElement(only, { "aria-label": text, "aria-describedby": open ? tipId : undefined })
+      : sameText
+        ? only
+        : cloneElement(only, { "aria-describedby": open ? [only.props["aria-describedby"], tipId].filter(Boolean).join(" ") : only.props["aria-describedby"] });
 
   return (
     <span
@@ -96,11 +123,12 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
       onPointerDown={hide}
       onClick={hide}
     >
-      {children}
+      {child}
       {open
         ? createPortal(
             <span
               ref={bubble}
+              id={tipId}
               className={s.tip}
               role="tooltip"
               data-side={at?.side ?? side}

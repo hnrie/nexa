@@ -9,6 +9,7 @@ import { generateIdentity, unwrapPrivateKey, wrapPrivateKey, type Identity } fro
 import { keystore } from "@/crypto/keystore";
 import { guarded } from "@/lib/captcha";
 import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, saveLock, unlockIdentity, type LockConfig } from "@/lib/appLock";
+import { acceptServerKdf } from "@/lib/serverKdf";
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { storage } from "@/lib/storage";
 
@@ -85,8 +86,22 @@ async function deriveAll(password: string, salt: Uint8Array, params: KdfParams) 
   return { authKey: deriveAuthKey(master), encKey: deriveEncKey(master) };
 }
 
+/**
+ * The argon2id parameters to stretch a password with, as the server gave them.
+ *
+ * They have to come from the server — an account may have been registered with
+ * others, and only the server knows which — but they cannot be taken on trust.
+ * The password is stretched with whatever arrives here and the result is then
+ * *handed to the server* as proof of knowledge, so a server that answers with
+ * something free to compute gets the plaintext password back out of that proof
+ * in seconds, and with it the wrapped identity key it already stores.
+ *
+ * Nothing is derived below the floor. It is the server's own rule for what a
+ * client may register with, so no account it ever accepted can be refused here:
+ * every account on the live instance is at DEFAULT_KDF, well inside it.
+ */
 function toParams(p: KdfParamsJson): KdfParams {
-  return { m: p.m, t: p.t, p: p.p, v: 1 };
+  return acceptServerKdf(p);
 }
 
 async function finishLogin(set: (s: Partial<AuthState>) => void, me: MeUser, token: string, identity: Identity): Promise<void> {

@@ -1,4 +1,4 @@
-.panel { flex: none; margin: 0 8px 8px; padding: 0 8px 0 4px; height: var(--panel-h); display: flex; align-items: center; gap: 8px; background: var(--bg-surface); border-radius: var(--radius-sm); position: relative; }
+.panel { flex: none; margin: 0 8px 8px; padding-block: 0; padding-inline: 4px 8px; height: var(--panel-h); display: flex; align-items: center; gap: 8px; background: var(--bg-surface); border-radius: var(--radius-sm); position: relative; }
 .me { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; height: 40px; padding: 0 4px; border-radius: var(--radius-xs); text-align: start; }
 .me:hover { background: var(--bg-hover); }
 /* the speaking ring, drawn as the call's is: on quickly, fading out gently between words */
@@ -17,7 +17,7 @@
 .popUser { font-size: 13px; color: var(--text-muted); }
 .sep { height: 1px; background: var(--border); margin: 6px 4px; }
 .opt { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px; border-radius: var(--radius-xs); color: var(--text-subtle); font-size: 14px; font-weight: 500; text-align: start; }
-.opt:hover { background: var(--brand); color: #fff; }
+.opt:hover { background: var(--brand); color: var(--on-brand); }
 .opt:hover .optSub { color: inherit; }
 .optText { display: flex; flex-direction: column; }
 .optSub { font-size: 12px; color: var(--text-muted); font-weight: 400; }

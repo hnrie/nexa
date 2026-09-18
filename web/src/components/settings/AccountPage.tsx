@@ -145,8 +145,9 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
         <Modal open onClose={close} title={t("settings.account.deleteAccount")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button variant="danger" loading={busy} disabled={!value} onClick={() => void run(async () => {
           const { deriveAuthKey, deriveMaster } = await import("@/crypto/kdf");
           const { b64 } = await import("@/crypto/bytes");
+          const { acceptServerKdf } = await import("@/lib/serverKdf");
           const bundle = await usersApi.myKeys();
-          const master = await deriveMaster(value, b64.dec(bundle.kdf_salt), { m: bundle.kdf_params.m, t: bundle.kdf_params.t, p: bundle.kdf_params.p, v: 1 });
+          const master = await deriveMaster(value, b64.dec(bundle.kdf_salt), acceptServerKdf(bundle.kdf_params));
           await usersApi.deleteMe(b64.enc(deriveAuthKey(master)));
           await logout();
         })}>{t("settings.account.deleteAccount")}</Button></>}>

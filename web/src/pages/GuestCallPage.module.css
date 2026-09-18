@@ -14,7 +14,7 @@
 
 /* in the call: a thin bar over the call, which takes the rest of the screen */
 .call { position: fixed; inset: 0; display: flex; flex-direction: column; background: #000; padding-top: env(safe-area-inset-top); }
-.bar { flex: none; height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; background: var(--bg-raised); border-bottom: 1px solid var(--border-subtle); color: var(--text); }
+.bar { flex: none; height: 48px; display: flex; align-items: center; gap: 10px; padding-block: 0; padding-inline: 16px 12px; background: var(--bg-raised); border-bottom: 1px solid var(--border-subtle); color: var(--text); }
 .barIcon { flex: none; color: var(--positive); }
 .barTitle { font-size: 15px; font-weight: 700; color: var(--text-strong); }
 .barWho { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 14px; color: var(--text-muted); }

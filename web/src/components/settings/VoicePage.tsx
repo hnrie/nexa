@@ -3,6 +3,7 @@ import { Button } from "@/components/common/Button";
 import { Select } from "@/components/common/Select";
 import { Field } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
+import { describeError } from "@/lib/errors";
 import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
 import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, holdAudio, lastInputChoice, listDevices, realDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
@@ -21,6 +22,9 @@ export default function VoicePage() {
   const [testLevel, setTestLevel] = useState(0);
   const [sentLevel, setSentLevel] = useState(0);
   const [diag, setDiag] = useState("");
+  // Kept apart from `diag`: that block is a device dump for someone reading it
+  // closely, and a refused permission belongs in a sentence above it.
+  const [micError, setMicError] = useState<string | null>(null);
   const [wrongDevice, setWrongDevice] = useState(false);
   const [capturing, setCapturing] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -63,6 +67,7 @@ export default function VoicePage() {
     if (startingRef.current || testRef.current) return;
     startingRef.current = true;
     setStarting(true);
+    setMicError(null);
     let stream: MediaStream | null = null;
     try {
       stream = await getMic(settings);
@@ -91,7 +96,12 @@ export default function VoicePage() {
       listDevices().then(setDevices).catch(() => {});
     } catch (err) {
       if (stream && testRef.current?.stream !== stream) stream.getTracks().forEach((x) => x.stop());
-      setDiag(tr_("settings.voice.theMicrophoneCouldNotBeOpened", { error: err instanceof Error ? `${err.name}: ${err.message}` : String(err) }));
+      // The commonest failure here is the reader declining the browser's own
+      // prompt, and `NotAllowedError: Permission denied` at 11px in a monospace
+      // block is a stack trace, not an answer. `.diag` keeps the device dump
+      // for the successful case; this says what happened in words.
+      console.error("microphone test failed", err);
+      setMicError(describeError(err, tr_("settings.voice.theMicrophoneCouldNotBeOpened2")));
     } finally {
       startingRef.current = false;
       setStarting(false);
@@ -162,13 +172,13 @@ export default function VoicePage() {
         <Field label={tr_("settings.voice.micTest")} hint={tr_("settings.voice.speakAndWatchBothMetersThe")}>
           <div>
             <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? tr_("settings.voice.stopTest") : tr_("settings.voice.letSCheck")}</Button>
-            <div className={v.meter} aria-label={tr_("settings.voice.inputLevel")} data-testid="mic-level">
+            <div className={v.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)} aria-label={tr_("settings.voice.inputLevel")} data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
               {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}
             </div>
             {testing ? (
               <>
-                <div className={v.meter} aria-label={tr_("settings.voice.levelOthersWouldHear")} data-testid="sent-level" style={{ marginTop: 6 }}>
+                <div className={v.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(sentLevel * 100)} aria-label={tr_("settings.voice.levelOthersWouldHear")} data-testid="sent-level" style={{ marginTop: 6 }}>
                   <div className={v.meterFill} data-sent="true" style={{ width: `${Math.round(sentLevel * 100)}%` }} />
                 </div>
                 <p className={st.hint} style={{ marginTop: 6 }}>{tr_("settings.voice.topYourMicrophoneBottomWhatThe")}</p>
@@ -176,13 +186,14 @@ export default function VoicePage() {
             ) : null}
             {wrongDevice ? (
               <div className={st.dangerBox} style={{ marginTop: 8 }} data-testid="wrong-device">
-                The microphone you picked is not available right now, so this is the system default. Pick it again above if it is plugged in.
+                {tr_("settings.voice.theMicrophoneYouPickedIsNot")}
               </div>
             ) : null}
+            {micError ? <div className={st.dangerBox} style={{ marginTop: 8 }} role="alert" data-testid="mic-error">{micError}</div> : null}
             {diag ? <pre className={v.diag} data-testid="mic-diagnostics">{diag}</pre> : null}
           </div>
         </Field>
-        <h5 className={st.h5}>{tr_("settings.voice.inputMode")}</h5>
+        <h3 className={st.h5}>{tr_("settings.voice.inputMode")}</h3>
         <label className={st.radio} data-on={settings.mode === "vad"}>
           <input type="radio" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
           <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.voiceActivity")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitWheneverYouTalk")}</span></span>
@@ -208,7 +219,7 @@ export default function VoicePage() {
             ) : null}
           </>
         )}
-        <h5 className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h5>
+        <h3 className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h3>
         <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label={tr_("settings.voice.noiseSuppression")} description={tr_("settings.voice.filtersKeyboardClatterAndFansWith")} />
         <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label={tr_("settings.voice.echoCancellation")} />
         <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label={tr_("settings.voice.automaticGainControl")} />

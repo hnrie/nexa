@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { describeError } from "@/lib/errors";
 import { Button } from "@/components/common/Button";
 import { FullScreenSpinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -45,7 +46,7 @@ export default function RecoverPage() {
       if (err instanceof ApiError) {
         if (err.code === "invalid_credentials") setError(t("recover.usernameOrRecoveryKeyIsWrong"));
         else if (err.code === "no_recovery_key") setError(t("recover.thisAccountHasNoRecoveryKey"));
-        else setError(err.message);
+        else setError(describeError(err, t("recover.recoveryFailedCheckTheKeyAnd")));
       } else if (err instanceof Error && /invalid recovery key/i.test(err.message)) {
         setError(t("recover.thatDoesNotLookLikeARecoveryKey"));
       } else {

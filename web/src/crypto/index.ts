@@ -8,6 +8,7 @@
 
 export * from "./bytes";
 export * from "./kdf";
+export * from "./fingerprint";
 export * from "./keys";
 export * from "./conv";
 export * from "./message";

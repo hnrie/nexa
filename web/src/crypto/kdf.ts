@@ -24,6 +24,57 @@ export interface KdfParams {
 
 export const DEFAULT_KDF: KdfParams = { m: 65536, t: 3, p: 1, v: 1 };
 
+/**
+ * The weakest and the heaviest argon2id parameters this client will stretch a
+ * password with.
+ *
+ * Registration picks DEFAULT_KDF, but every later sign-in asks the *server*
+ * which parameters to use, because the account may have been registered with
+ * others. A server that answers `{m: 8, t: 1}` makes the stretching free, and
+ * since the client then hands over `HKDF(argon2id(password, …), auth)` as proof
+ * of knowledge, the server can grind that back to the plaintext password in
+ * seconds — and with the password it unwraps the identity private key it
+ * already stores. So the answer is checked before it is used.
+ *
+ * The numbers are the server's own, from `validKDF` in
+ * `internal/api/auth_handlers.go`, which is what it accepts when a client
+ * *submits* parameters. Mirroring them exactly means no account that the server
+ * ever allowed to register can be refused by its own client: every account on
+ * the live instance is at DEFAULT_KDF, which is comfortably inside this range.
+ *
+ * The ceiling matters as much as the floor in practice. Without it a hostile
+ * server wedges a device by asking for a gibibyte of memory and twenty passes,
+ * which on a phone is indistinguishable from the app hanging.
+ */
+export const KDF_FLOOR: Readonly<KdfParams> = { m: 32768, t: 2, p: 1, v: 1 };
+export const KDF_CEILING: Readonly<Omit<KdfParams, "v">> = { m: 1 << 20, t: 20, p: 4 };
+
+/**
+ * Thrown instead of deriving anything when the parameters a server handed over
+ * are outside the range above. It is a distinct type so the screens that ask
+ * for a password can say what happened rather than blaming the password.
+ */
+export class WeakKdfError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "WeakKdfError";
+  }
+}
+
+/**
+ * Whether parameters are ones this client is willing to use. Anything that is
+ * not a whole number in range fails, including the shapes a hostile or broken
+ * server might send instead of numbers.
+ */
+export function kdfParamsAcceptable(p: { m?: unknown; t?: unknown; p?: unknown; v?: unknown }): boolean {
+  const whole = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n);
+  if (!whole(p.m) || !whole(p.t) || !whole(p.p)) return false;
+  // `v` is the params version. Registration has only ever written 1, and a
+  // version this build does not know is not something to guess at.
+  if (p.v !== undefined && p.v !== 1) return false;
+  return p.m >= KDF_FLOOR.m && p.m <= KDF_CEILING.m && p.t >= KDF_FLOOR.t && p.t <= KDF_CEILING.t && p.p >= KDF_FLOOR.p && p.p <= KDF_CEILING.p;
+}
+
 const KEY_LEN = 32;
 const NO_SALT = new Uint8Array(0);
 
@@ -42,8 +93,15 @@ function expand(ikm: Uint8Array, info: Uint8Array): Uint8Array {
   return hkdf(sha256, ikm, NO_SALT, info, KEY_LEN);
 }
 
-/** Stretch a password into a 32-byte master key with argon2id. */
+/**
+ * Stretch a password into a 32-byte master key with argon2id.
+ *
+ * The parameter check is here, at the one place every argon2id derivation in
+ * the client passes through, rather than only where the parameters arrive:
+ * a path added later that forgets to check is then still safe.
+ */
 export async function deriveMaster(password: string, salt: Uint8Array, p: KdfParams): Promise<Uint8Array> {
+  if (!kdfParamsAcceptable(p)) throw new WeakKdfError(`argon2id parameters outside the accepted range: m=${p.m} t=${p.t} p=${p.p} v=${p.v}`);
   return argon2id({
     password: password.normalize("NFKC"),
     salt,

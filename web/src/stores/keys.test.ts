@@ -4,19 +4,24 @@ import type { RequestOptions } from "@/api/client";
 import type { KeyGrant, Message } from "@/api/types";
 import { b64 } from "@/crypto/bytes";
 import { channelKey, newRootKey } from "@/crypto/conv";
-import { generateIdentity } from "@/crypto/keys";
+import { generateIdentity, unwrapGrant } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
 import { encryptMessage } from "@/crypto/message";
 import { decryptForStore } from "@/lib/decrypt";
 import { ring } from "@/lib/keyring";
 import { applyEvent } from "@/gateway/dispatch";
 import { useAuth } from "./auth";
+import { useChannels } from "./channels";
+import { closePins } from "@/lib/keyPins";
+import { useKeyAlerts } from "./keyAlerts";
 import { useKeys } from "./keys";
 import { useMessages } from "./messages";
 import { useUsers } from "./users";
 
 const alice = generateIdentity();
 const bob = generateIdentity();
+/** The key a hostile server would like this client to seal a conversation to. */
+const mallory = generateIdentity();
 
 function user(id: string, pub: Uint8Array) {
   return {
@@ -37,14 +42,66 @@ function user(id: string, pub: Uint8Array) {
   };
 }
 
+/** A DM channel as the client holds it, which is where its membership comes from. */
+function dm(id: string, recipients: string[]) {
+  return {
+    id,
+    server_id: null,
+    type: "dm" as const,
+    name: "",
+    topic: "",
+    position: 0,
+    parent_id: null,
+    nsfw: false,
+    slowmode_seconds: 0,
+    user_limit: 0,
+    owner_id: null,
+    icon_id: null,
+    last_message_id: null,
+    created_at: 0,
+    recipient_ids: recipients,
+    key_conv_id: id,
+  };
+}
+
+/**
+ * The keys_needed handler starts the grant beside the event queue rather than
+ * in it, so the event returning says nothing about the upload. One macrotask
+ * turn is past every microtask the grant path takes.
+ */
 describe("key manager", () => {
   const putGrants: { conv_id: string; epoch: number; user_id: string; wrapped_key: string }[] = [];
+
+  /**
+   * Waits for the grant path to go quiet, rather than for a fixed number of
+   * ticks.
+   *
+   * This was one `setTimeout(0)` — a single macrotask — and the path it waits
+   * on does real WebCrypto, which takes more than one. On a loaded machine the
+   * assertion ran first and the grant landed during the *next* test, so one
+   * test saw no grants and the one after it saw a duplicate. Both passed when
+   * run on their own, which is the least useful way for a test to be wrong.
+   */
+  const settled = async (): Promise<void> => {
+    let seen = -1;
+    for (let i = 0; i < 200 && seen !== putGrants.length; i++) {
+      seen = putGrants.length;
+      await new Promise((r) => setTimeout(r, 5));
+    }
+  };
+
   beforeEach(async () => {
+    // Anything still in flight from the last test belongs to the last test.
+    await settled();
     putGrants.length = 0;
+    useKeyAlerts.getState().reset();
+    closePins();
     await keystore.clear("A");
     await keystore.clear("B");
     useKeys.getState().reset();
     useMessages.getState().clearAll();
+    useChannels.getState().clear();
+    useUsers.getState().clear();
     useUsers.getState().upsert([user("A", alice.publicKey), user("B", bob.publicKey)]);
     api.request = <T>(method: string, path: string, body?: unknown, _opts?: RequestOptions): Promise<T> => {
       if (method === "POST" && path === "/keys/epochs") return Promise.resolve({ conv_id: "conv1", epoch: 0, user_ids: ["A", "B"] } as T);
@@ -158,6 +215,56 @@ describe("key manager", () => {
     const got = await useKeys.getState().ensureConvKey("conv1");
     expect(got?.epoch).toBe(1);
     expect(putGrants.filter((g) => g.epoch === 1).map((g) => g.user_id).sort()).toEqual(["A", "B"]);
+  });
+
+  it("refuses to wrap the conversation key for an account that is not in it", async () => {
+    // The conversation is a DM between A and B, which is what this client draws.
+    useChannels.setState({ byId: { conv1: dm("conv1", ["A", "B"]) } });
+    useUsers.getState().upsert(user("Z", mallory.publicKey));
+    await useKeys.getState().init("A", alice);
+    await useKeys.getState().ensureConvKey("conv1");
+    putGrants.length = 0;
+
+    // A fabricated keys_needed naming an account outside the conversation.
+    await applyEvent({ t: "keys_needed", d: { conv_id: "conv1", epoch: 0, user_ids: ["B", "Z"] } });
+    await settled();
+    expect(putGrants.map((g) => g.user_id)).toEqual(["B"]);
+    expect(useKeyAlerts.getState().events.some((e) => e.kind === "outsider_refused")).toBe(true);
+  });
+
+  it("still grants when the membership cannot be checked, and says it could not", async () => {
+    // Nothing in the channels or servers store answers to "conv1": a client
+    // that refused here would strand real members, so it grants and records it.
+    useChannels.setState({ byId: {} });
+    await useKeys.getState().init("A", alice);
+    await useKeys.getState().ensureConvKey("conv1");
+    expect(putGrants.map((g) => g.user_id).sort()).toEqual(["A", "B"]);
+    expect(useKeyAlerts.getState().events.some((e) => e.kind === "unchecked")).toBe(true);
+  });
+
+  it("withholds the key when a member's identity key changed, and hands it over once accepted", async () => {
+    useChannels.setState({ byId: { conv1: dm("conv1", ["A", "B"]) } });
+    await useKeys.getState().init("A", alice);
+    // B's real key is pinned by the first sight of their user object.
+    useUsers.getState().upsert(user("B", bob.publicKey));
+    await useKeys.getState().ensureConvKey("conv1");
+    expect(putGrants.map((g) => g.user_id).sort()).toEqual(["A", "B"]);
+
+    // The server now serves someone else's key under B's id.
+    putGrants.length = 0;
+    useUsers.getState().upsert(user("B", mallory.publicKey));
+    await applyEvent({ t: "keys_needed", d: { conv_id: "conv1", epoch: 0, user_ids: ["B"] } });
+    await settled();
+    expect(putGrants).toEqual([]);
+    expect(useKeyAlerts.getState().pending["B"]?.offered).toBe(b64.enc(mallory.publicKey));
+
+    // Only a deliberate acceptance lets the key through, and then it is sealed
+    // to the new key rather than the old one.
+    useKeyAlerts.getState().acceptKeyChange("B");
+    await useKeys.getState().grantTo("conv1", 0, ["B"]);
+    expect(putGrants.map((g) => g.user_id)).toEqual(["B"]);
+    const wrapped = b64.dec(putGrants[0]!.wrapped_key);
+    expect(b64.enc(await unwrapGrant(mallory.privateKey, mallory.publicKey, wrapped))).toBe(b64.enc(ring.get("conv1", 0)!));
   });
 
   it("keeps roots off the disk behind a passcode", async () => {

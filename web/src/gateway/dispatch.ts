@@ -316,6 +316,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     // Key upkeep can mean hundreds of requests. It runs beside the event queue
     // rather than in it, so messages, typing and calls do not wait behind it.
+    //
+    // `user_ids` is the server's answer to a question only the server was ever
+    // asked, and one fabricated event naming an attacker's account used to be
+    // enough to make this device seal the conversation root for it. The list is
+    // held against the membership this client knows in `putGrantsFor`, which
+    // every grant — this event, /keys/needs and a new epoch — goes through.
     case "keys_needed":
       if (ring.get(e.d.conv_id, e.d.epoch)) void useKeys.getState().grantTo(e.d.conv_id, e.d.epoch, e.d.user_ids).catch(() => undefined);
       return;

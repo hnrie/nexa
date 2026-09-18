@@ -16,8 +16,12 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({ variant = "primary", size = "md", loading = false, block = false, className, children, disabled, ...rest }: Props) {
   const cls = [s.btn, s[variant], s[size], block ? s.block : "", loading ? s.loading : "", className ?? ""].filter(Boolean).join(" ");
   return (
-    <button className={cls} disabled={disabled || loading} {...rest}>
+    <button className={cls} disabled={disabled || loading} aria-busy={loading || undefined} {...rest}>
       {loading ? <span className={s.dots} aria-hidden="true"><i /><i /><i /></span> : null}
+      {/* The label is hidden while the dots animate, so without this the button
+          keeps its name and says nothing about being busy: press Create, hear
+          nothing, find a disabled button. */}
+      {loading ? <span className="visually-hidden">{t("common.working")}</span> : null}
       <span className={s.label}>{children}</span>
     </button>
   );

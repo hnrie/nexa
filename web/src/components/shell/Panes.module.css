@@ -23,7 +23,8 @@
   gap: 6px;
   min-width: 96px;
   max-width: 220px;
-  padding: 0 6px 0 10px;
+  padding-block: 0;
+  padding-inline: 10px 6px;
   border-start-start-radius: var(--radius-sm);
   border-start-end-radius: var(--radius-sm);
   color: var(--text-muted);
@@ -35,8 +36,10 @@
 .tab:hover { background: var(--bg-hover); color: var(--text); }
 .tab[data-selected="true"] { background: var(--bg-raised); color: var(--text-strong); }
 .tab:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-/* where a dragged tab would land */
+/* where a dragged tab would land; a shadow has no logical form, so the
+   mirrored case is spelled out rather than landing on the wrong edge */
 .tab[data-drop] { box-shadow: inset 2px 0 0 var(--brand); }
+[dir="rtl"] .tab[data-drop] { box-shadow: inset -2px 0 0 var(--brand); }
 
 .tabName {
   display: flex;

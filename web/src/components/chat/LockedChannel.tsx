@@ -4,10 +4,10 @@
  */
 import { Lock } from "lucide-react";
 import { useState } from "react";
-import { ApiError } from "@/api/client";
 import type { Channel } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
+import { describeError } from "@/lib/errors";
 import { unlockSubchat } from "@/lib/subchatLock";
 import s from "./Chat.module.css";
 
@@ -25,7 +25,7 @@ export function LockedChannel({ channel, onUnlocked, checkFailed, onRecheck }: {
       setPassword("");
       onUnlocked();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t("chat.lockedChannel.thatCouldNotBeCheckedTry"));
+      setError(describeError(err, t("chat.lockedChannel.thatCouldNotBeCheckedTry")));
     } finally {
       setBusy(false);
     }

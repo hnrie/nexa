@@ -5,6 +5,7 @@ import { iconUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { NexaMark } from "@/components/common/Brand";
 import { Tooltip } from "@/components/common/Tooltip";
+import { useReorder } from "@/hooks/useReorder";
 import { initials } from "@/lib/avatarColor";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { badgeText, conversationCount, serverUnread, unreadConversations } from "@/lib/unread";
@@ -90,9 +91,27 @@ export function Rail() {
     [nav, channels],
   );
 
+  // The same move for a keyboard and for a finger. HTML5 drag events never
+  // fire on a touch screen, so until now the rail's order could only be
+  // changed with a mouse.
+  const reorder = useReorder({
+    ids,
+    name: (id) => servers[id]?.server.name ?? "",
+    move: (id, delta) => {
+      const at = ids.indexOf(id);
+      const to = at + delta;
+      if (at < 0 || to < 0 || to >= ids.length) return false;
+      const next = [...ids];
+      next.splice(at, 1);
+      next.splice(to, 0, id);
+      patch({ serverPositions: next });
+      return true;
+    },
+  });
+
   const onContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
-    openContextMenu({ x: e.clientX, y: e.clientY, items: serverMenuItems(id, { nav, openModal }) });
+    openContextMenu({ x: e.clientX, y: e.clientY, label: servers[id]?.server.name ?? "", items: [...reorder.menuItems(id), ...serverMenuItems(id, { nav, openModal })] });
   };
 
   const onDragStart = (e: DragEvent, id: string) => {
@@ -118,8 +137,10 @@ export function Rail() {
     setOver(null);
   };
 
+
   return (
     <nav className={s.rail} aria-label={t("rail.rail.servers")} ref={railRef} onDragEnd={() => { setDragId(null); setOver(null); }}>
+      {reorder.live}
       <div className={s.item} data-selected={home} data-unread={(unread || friendRequests > 0) && !home} data-testid="home">
         <span className={s.pill} />
         <Tooltip text={t("sidebar.dMSidebar.directMessages")} side="right">
@@ -184,15 +205,25 @@ export function Rail() {
             onDragOver={(e) => onDragOver(e, id)}
             onDrop={onDrop}
             onContextMenu={(e) => onContext(e, id)}
+            onKeyDown={reorder.onKeyDown(id)}
             data-server={id}
+            data-reorder-id={id}
           >
             <span className={s.pill} />
             <Tooltip text={st.server.name} side="right">
-              <button className={[s.btn, url ? s.hasIcon : ""].join(" ")} aria-label={st.server.name} onClick={() => openServer(id)}>
+              <button
+                className={[s.btn, url ? s.hasIcon : ""].join(" ")}
+                // Home and Waiting already fold their count into the name and
+                // hide the badge; the servers did neither, so a badge announced
+                // itself as a loose "3".
+                aria-label={u.mentions > 0 ? t("rail.rail.serverWithMentions", { name: st.server.name, count: u.mentions }) : st.server.name}
+                aria-current={selected ? "page" : undefined}
+                onClick={() => openServer(id)}
+              >
                 {url ? <img src={url} alt="" draggable={false} /> : <span className={s.initials}>{initials(st.server.name)}</span>}
               </button>
             </Tooltip>
-            {u.mentions > 0 ? <span className={s.badge}>{u.mentions > 99 ? "99+" : u.mentions}</span> : null}
+            {u.mentions > 0 ? <span className={s.badge} aria-hidden="true">{u.mentions > 99 ? "99+" : u.mentions}</span> : null}
           </div>
         );
       })}

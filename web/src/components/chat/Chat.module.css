@@ -1,5 +1,5 @@
 .chat { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-.header { flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.header { flex: none; height: var(--header-h); display: flex; align-items: center; gap: 8px; padding-block: 0; padding-inline: 16px 8px; border-bottom: 1px solid var(--border-subtle); }
 .hIcon { color: var(--text-muted); display: flex; flex: none; }
 .hName { font-size: 16px; font-weight: 600; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hNameBtn { min-width: 0; }
@@ -15,6 +15,9 @@
 .lockHash { position: relative; display: flex; }
 .lock { position: absolute; inset-inline-end: -5px; bottom: -3px; background: var(--bg-raised); border-radius: 2px; }
 .authorNick { font-weight: 500; }
+/* The encryption-key badge sits with the name, not with the action buttons:
+   it describes the conversation rather than doing anything to it. */
+.hKey { display: inline-flex; margin-inline-start: 10px; flex: 0 0 auto; }
 .hSpacer { flex: 1; }
 .hGroup { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 4px 6px; margin-inline-start: -6px; border-radius: var(--radius-xs); }
 .hGroup:hover { background: var(--bg-hover); }
@@ -44,20 +47,27 @@
 .dateDivider span { padding: 0 8px; }
 .unreadDivider { display: flex; align-items: center; margin: 8px 16px 0 16px; height: 0; border-top: 1px solid var(--danger); position: relative; }
 .unreadDivider span { position: absolute; inset-inline-end: 0; top: -9px; padding: 0 4px; height: 16px; line-height: 16px; font-size: 10px; font-weight: 700; color: #fff; background: var(--danger); border-radius: 0 0 2px 2px; text-transform: uppercase; }
-.msg { position: relative; padding: 2px 48px 2px 72px; margin-top: 0; min-height: 22px; }
+/* The 72px reserved at the start is the gutter the avatar, the gutter clock and
+   the reply spine all hang in, so it has to mirror with them in Arabic. */
+.msg { position: relative; padding-block: 2px; padding-inline: 72px 48px; margin-top: 0; min-height: 22px; }
 .msg:hover, .msg[data-menu="true"] { background: var(--bg-message-hover); }
 .msg[data-group-start="true"] { margin-top: 17px; padding-top: 2px; }
 .msg[data-mentioned="true"] { background: var(--mention-bg); }
 .msg[data-mentioned="true"]::before { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 2px; background: var(--warning); }
 .msg[data-highlight="true"] { animation: flash 2s ease-out; }
-@keyframes flash { 0% { background: rgba(128, 0, 255, 0.4); } 100% { background: transparent; } }
+@keyframes flash { 0% { background: color-mix(in srgb, var(--brand) 40%, transparent); } 100% { background: transparent; } }
+/* Which row you landed on is the whole point of jumping to it, so when motion
+   is reduced the highlight simply sits there for the two seconds the fade would
+   have taken — the same two seconds MessageList waits before clearing it. */
+@media (prefers-reduced-motion: reduce) { .msg[data-highlight="true"] { animation: none; background: var(--mention-bg); } }
+[data-reduced-motion="true"] .msg[data-highlight="true"] { animation: none; background: var(--mention-bg); }
 .msg[data-pending="true"] { opacity: 0.55; }
 .msg[data-failed="true"] .content { color: var(--danger); }
 .avatar { position: absolute; inset-inline-start: 16px; top: 2px; cursor: pointer; }
 /* a reply preview occupies the first line, so the avatar drops to the author row */
 .msg[data-reply="true"] .avatar { top: 26px; }
 .msg[data-reply="true"] .replyLine::before { bottom: auto; height: 15px; }
-.gutterTime { position: absolute; left: 0; width: 72px; top: 4px; font-size: 11px; color: var(--text-muted); text-align: center; opacity: 0; user-select: none; }
+.gutterTime { position: absolute; inset-inline-start: 0; width: 72px; top: 4px; font-size: 11px; color: var(--text-muted); text-align: center; opacity: 0; user-select: none; }
 .headerRow { display: flex; align-items: baseline; gap: 6px; line-height: 22px; min-height: 22px; }
 .author { font-size: 16px; font-weight: 500; color: var(--text-strong); cursor: pointer; }
 .author:hover { text-decoration: underline; }
@@ -102,7 +112,7 @@
 .pill img { width: 16px; height: 16px; object-fit: contain; }
 .pillEmoji { font-size: 16px; line-height: 1; }
 .addReact { width: 28px; height: 24px; display: none; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg-surface); color: var(--text-muted); }
-.system { display: flex; align-items: center; gap: 12px; padding: 4px 16px 4px 72px; position: relative; min-height: 26px; margin-top: 17px; color: var(--text-muted); font-size: 16px; line-height: 22px; }
+.system { display: flex; align-items: center; gap: 12px; padding-block: 4px; padding-inline: 72px 16px; position: relative; min-height: 26px; margin-top: 17px; color: var(--text-muted); font-size: 16px; line-height: 22px; }
 .system:hover { background: var(--bg-message-hover); }
 .sysIcon { position: absolute; inset-inline-start: 24px; top: 4px; color: var(--text-muted); display: flex; }
 .system b { color: var(--text-strong); font-weight: 500; cursor: pointer; }
@@ -141,11 +151,16 @@
 .dots i:nth-child(2) { animation-delay: 0.2s; }
 .dots i:nth-child(3) { animation-delay: 0.4s; }
 @keyframes tdot { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-3px); opacity: 1; } }
-.newPill { position: absolute; inset-inline: 16px; top: 0; z-index: 3; display: flex; justify-content: space-between; padding: 4px 12px; background: var(--brand); color: #fff; font-size: 14px; font-weight: 500; border-radius: 0 0 var(--radius-sm) var(--radius-sm); cursor: pointer; box-shadow: var(--shadow-medium); }
-.jumpBtn { position: absolute; right: 24px; bottom: 8px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-medium); display: flex; align-items: center; justify-content: center; }
+/* Someone typing is news, not decoration, so the dots keep saying it — they
+   stop hopping and breathe instead, slowly enough that nothing flickers. */
+@keyframes tdotCalm { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dots i { animation: tdotCalm 1.6s ease-in-out infinite !important; transform: none !important; } }
+[data-reduced-motion="true"] .dots i { animation: tdotCalm 1.6s ease-in-out infinite !important; transform: none !important; }
+.newPill { position: absolute; inset-inline: 16px; top: 0; z-index: 3; display: flex; justify-content: space-between; padding: 4px 12px; background: var(--brand); color: var(--on-brand); font-size: 14px; font-weight: 500; border-radius: 0 0 var(--radius-sm) var(--radius-sm); cursor: pointer; box-shadow: var(--shadow-medium); }
+.jumpBtn { position: absolute; inset-inline-end: 24px; bottom: 8px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-medium); display: flex; align-items: center; justify-content: center; }
 /* placed inside .body, which already starts below the header, call banner and voice view */
 .pinsPop { position: absolute; top: 4px; inset-inline-end: 8px; z-index: 40; width: 420px; max-width: calc(100vw - 16px); max-height: min(70vh, calc(100% - 8px)); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); overflow: hidden; }
-.pinsHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 8px 8px 16px; font-size: 16px; font-weight: 600; color: var(--text-strong); border-bottom: 1px solid var(--border-subtle); }
+.pinsHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-block: 8px; padding-inline: 16px 8px; font-size: 16px; font-weight: 600; color: var(--text-strong); border-bottom: 1px solid var(--border-subtle); }
 .popClose { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-xs); color: var(--icon); }
 .popClose:hover { background: var(--bg-hover); color: var(--text); }
 .pinsList { overflow-y: auto; overscroll-behavior: contain; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
@@ -191,7 +206,7 @@
 .msg[data-reply="true"] .pick { top: 35px; }
 .msg[data-pickable="true"]:not([data-picked="true"]):hover .pick { border-color: var(--text-muted); }
 .msg[data-picked="true"] .pick { background: var(--brand); border-color: var(--brand); }
-.selectBar { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px 0 4px; background: var(--bg-composer); border-radius: var(--radius-sm); }
+.selectBar { display: flex; align-items: center; gap: 8px; min-height: 44px; padding-block: 0; padding-inline: 4px 6px; background: var(--bg-composer); border-radius: var(--radius-sm); }
 .selectCancel { flex: none; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--icon); }
 .selectCancel:hover { color: var(--text); background: var(--bg-hover); }
 .selectCount { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -204,7 +219,7 @@
 .compact .gutterTime { opacity: 1; top: 4px; }
 .membersBackdrop { position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.5); }
 @media (max-width: 767px) {
-  .msg { padding: 2px 16px 2px 64px; }
+  .msg { padding-block: 2px; padding-inline: 64px 16px; }
   /* the gutter time is hidden on phones, so compact rows need no gutter for it */
   .compact .msg { padding-inline-start: 16px; }
   .avatar { inset-inline-start: 12px; }
@@ -221,19 +236,19 @@
   .pinsPop { inset-inline: 8px; width: auto; max-width: none; }
 }
 .sticker { display: block; margin-top: 4px; max-width: 160px; max-height: 160px; object-fit: contain; cursor: pointer; border-radius: var(--radius-xs); }
-.sticker:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sticker:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .videoPending { display: flex; max-width: 100%; align-items: center; justify-content: center; margin-top: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-muted); font-size: 14px; text-align: center; padding: 12px; }
 .videoLoading { display: inline-flex; align-items: center; gap: 8px; }
 .videoLoad { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 14px; font-weight: 600; }
-.videoLoad:hover { background: var(--brand); color: #fff; }
+.videoLoad:hover { background: var(--brand); color: var(--on-brand); }
 .failedRow { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 13px; color: var(--danger); }
 .retry { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 12px; font-weight: 600; }
-.retry:hover { background: var(--brand); color: #fff; }
+.retry:hover { background: var(--brand); color: var(--on-brand); }
 .retry[data-danger="true"]:hover { background: var(--danger); color: #fff; }
 .pillImg { width: 16px; height: 16px; object-fit: contain; display: block; }
 
 /* subchats: side conversations inside a DM */
-.subPanel { position: absolute; top: 52px; right: 12px; z-index: 40; width: 300px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); overflow: hidden; }
+.subPanel { position: absolute; top: calc(var(--header-h) + 3px); inset-inline-end: 12px; z-index: 40; width: 300px; max-width: calc(100vw - 24px); display: flex; flex-direction: column; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); overflow: hidden; }
 .subHead { display: flex; align-items: center; gap: 8px; padding: 12px 12px 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted); }
 .subClose { margin-inline-start: auto; display: flex; color: var(--text-muted); border-radius: var(--radius-xs); }
 .subClose:hover { color: var(--text); background: var(--bg-active); }
@@ -251,7 +266,7 @@
 .subNew { display: flex; gap: 6px; padding: 8px 10px 10px; border-top: 1px solid var(--border-subtle); }
 .subNew input { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); font-size: 14px; border: 1px solid transparent; }
 .subNew input:focus { border-color: var(--brand); outline: none; }
-.subNew button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: none; border-radius: var(--radius-xs); background: var(--brand); color: #fff; }
+.subNew button { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; flex: none; border-radius: var(--radius-xs); background: var(--brand); color: var(--on-brand); }
 .subNew button:disabled { background: var(--bg-active); color: var(--text-muted); }
 /* a long parent name gives way first and shortens, so the subchat's own name stays readable */
 .hParent { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; color: var(--text-muted); margin-inline-start: 8px; min-width: 0; max-width: 40%; flex: 0 4 auto; overflow: hidden; }

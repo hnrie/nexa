@@ -3,6 +3,7 @@ import { servers as serversApi } from "@/api/servers";
 import type { AuditEntry } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { formatFull } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
@@ -55,17 +56,22 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  // A first page that failed used to read "Nothing has happened yet", which for
+  // a moderation record is the most misleading sentence in the app. A later
+  // page that failed keeps what is already on screen and says the rest is
+  // missing.
+  const [failed, setFailed] = useState(false);
 
   const load = async (before?: string) => {
     setBusy(true);
+    setFailed(false);
     try {
       const res = await serversApi.auditLog(serverId, { limit: 50, ...(before ? { before } : {}) });
       upsertUsers(res.users);
       setEntries((cur) => [...(before ? (cur ?? []) : []), ...res.entries]);
-      if (res.entries.length < 50) setDone(true);
+      setDone(res.entries.length < 50);
     } catch {
-      setEntries((cur) => cur ?? []);
-      setDone(true);
+      setFailed(true);
     } finally {
       setBusy(false);
     }
@@ -115,8 +121,8 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       <h2 className={st.title}>{t("server.auditLog.auditLog")}</h2>
       <p className={st.hint}>{t("server.auditLog.everyModerationAndConfigurationChangeIn")}</p>
       <div style={{ height: 16 }} />
-      {entries === null ? <Spinner /> : null}
-      {entries && entries.length === 0 ? <p className={st.hint}>{t("server.auditLog.nothingHasHappenedYet")}</p> : null}
+      {entries === null && !failed ? <Spinner label={t("server.auditLog.loadingTheAuditLog")} /> : null}
+      {entries && entries.length === 0 && !failed ? <p className={st.hint}>{t("server.auditLog.nothingHasHappenedYet")}</p> : null}
       {entries?.map((e) => (
         <div key={e.id} className={s.auditRow}>
           <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
@@ -127,7 +133,14 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
           </div>
         </div>
       ))}
-      {entries && entries.length > 0 && !done ? (
+      {failed ? (
+        <LoadError
+          message={entries && entries.length > 0 ? t("server.auditLog.theRestOfTheLogCould") : t("server.auditLog.theAuditLogCouldNotBe")}
+          busy={busy}
+          onRetry={() => void load(entries && entries.length > 0 ? entries[entries.length - 1]?.id : undefined)}
+        />
+      ) : null}
+      {entries && entries.length > 0 && !done && !failed ? (
         <div className={s.loadMore}>
           <Button variant="secondary" size="sm" loading={busy} onClick={() => void load(entries[entries.length - 1]?.id)}>{t("server.auditLog.loadMore")}</Button>
         </div>

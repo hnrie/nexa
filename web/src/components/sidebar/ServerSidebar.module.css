@@ -7,7 +7,7 @@
 .category { margin-top: 16px; }
 .catHead { position: relative; display: flex; align-items: center; justify-content: space-between; height: 24px; padding-inline-end: 4px; color: var(--text-channel); }
 .catHead:hover { color: var(--text); }
-.catToggle { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; height: 100%; padding: 0 0 0 2px; color: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; text-align: start; }
+.catToggle { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; height: 100%; padding-inline-start: 2px; color: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; text-align: start; }
 .catName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .catAdd { display: flex; padding: 2px; color: inherit; border-radius: var(--radius-xs); opacity: 0; }
 .catAdd:hover { color: var(--text-strong); }

@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import type { Ban } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { TextInput } from "@/components/common/TextInput";
 import { dispatchHooks } from "@/gateway/dispatch";
 import type { GatewayEvent } from "@/gateway/events";
+import { describeError } from "@/lib/errors";
 import { formatFull } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
@@ -20,6 +21,11 @@ export default function BansPage({ serverId }: { serverId: string }) {
   const upsertUsers = useUsers((u) => u.upsert);
   const toast = useUI((u) => u.toast);
   const [bans, setBans] = useState<Ban[] | null>(null);
+  // A request that failed used to end up as "No one is banned, keep it that
+  // way", which a moderator has no reason to doubt. Held apart from the empty
+  // list so the two can never be drawn the same.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -32,8 +38,13 @@ export default function BansPage({ serverId }: { serverId: string }) {
           if (!alive) return;
           upsertUsers(res.users);
           setBans(res.bans);
+          setFailed(false);
         })
-        .catch(() => alive && setBans([]));
+        .catch(() => {
+          if (!alive) return;
+          setBans(null);
+          setFailed(true);
+        });
     void load();
     const hook = (e: GatewayEvent) => {
       if ((e.t === "ban_add" || e.t === "ban_remove") && (e.d as { server_id?: string }).server_id === serverId) void load();
@@ -43,7 +54,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
       alive = false;
       dispatchHooks.onUnhandled.splice(dispatchHooks.onUnhandled.indexOf(hook), 1);
     };
-  }, [serverId, upsertUsers]);
+  }, [serverId, upsertUsers, attempt]);
 
   const revoke = async (userId: string) => {
     setBusy(userId);
@@ -51,7 +62,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
       await serversApi.unban(serverId, userId);
       setBans((cur) => cur?.filter((b) => b.user_id !== userId) ?? null);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.bans.couldNotRevokeTheBan"), "error");
+      toast(describeError(err, t("server.bans.couldNotRevokeTheBan")), "error");
     } finally {
       setBusy(null);
     }
@@ -65,7 +76,8 @@ export default function BansPage({ serverId }: { serverId: string }) {
       <div className={s.searchRow}>
         <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("server.bans.searchBans")} />
       </div>
-      {bans === null ? <Spinner /> : null}
+      {bans === null && !failed ? <Spinner label={t("server.bans.loadingBans")} /> : null}
+      {failed ? <LoadError message={t("server.bans.theBanListCouldNotBe")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
       {bans && bans.length === 0 ? <p className={st.hint}>{t("server.bans.noOneIsBannedKeepIt")}</p> : null}
       {shown.map((b) => (
         <div key={b.user_id} className={s.memberRow}>

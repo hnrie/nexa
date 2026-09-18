@@ -1,5 +1,5 @@
 .embeds { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; align-items: flex-start; }
-.card { max-width: 516px; padding: 8px 16px 12px 12px; border-radius: var(--radius-xs); background: var(--embed-bg); border-inline-start: 4px solid var(--brand); display: flex; flex-direction: column; gap: 6px; }
+.card { max-width: 516px; padding-block: 8px 12px; padding-inline: 12px 16px; border-radius: var(--radius-xs); background: var(--embed-bg); border-inline-start: 4px solid var(--brand); display: flex; flex-direction: column; gap: 6px; }
 .cardRow { display: flex; gap: 16px; align-items: flex-start; }
 .cardText { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .site { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
@@ -24,7 +24,7 @@
 .video iframe { width: 100%; height: 100%; border: 0; }
 .poster { width: 100%; height: 100%; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
 .playBtn { width: 56px; height: 56px; border-radius: 50%; background: rgba(0, 0, 0, 0.7); color: #fff; display: flex; align-items: center; justify-content: center; }
-.poster:hover .playBtn { background: var(--brand); }
+.poster:hover .playBtn { background: var(--brand); color: var(--on-brand); }
 .invite { margin-top: 4px; padding: 12px; max-width: 432px; border-radius: var(--radius-sm); background: var(--bg-surface); }
 .inviteHead { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
 .inviteBody { display: flex; align-items: center; gap: 12px; }

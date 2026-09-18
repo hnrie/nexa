@@ -28,6 +28,8 @@ export interface ContextMenuState {
   x: number;
   y: number;
   items: ContextMenuItem[];
+  /** What the menu is called, for anyone who cannot see what it opened from. */
+  label?: string;
   /** Opens upwards, its bottom edge at y: for a button along the bottom of the screen. */
   above?: boolean;
 }
@@ -86,7 +88,7 @@ interface UIState {
 
 let toastSeq = 0;
 /** Modals that replace themselves rather than stacking. */
-const ONE_AT_A_TIME = new Set(["profile", "serverProfile", "memberAction"]);
+const ONE_AT_A_TIME = new Set(["profile", "serverProfile", "memberAction", "verifyKey", "keyChange"]);
 
 let modalSeq = 0;
 

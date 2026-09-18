@@ -1,0 +1,4 @@
+.block { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-raised); border-inline-start: 3px solid var(--danger); }
+.text { margin: 0; font-size: 14px; color: var(--text-muted); }
+/* centred instead, for the middle of an otherwise empty panel */
+.center { align-items: center; text-align: center; }

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
+import { describeError } from "@/lib/errors";
 import { iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
@@ -53,7 +53,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       setNotif(srv.default_notifications);
       toast(t("server.serverOverview.serverSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.serverOverview.couldNotSaveTheServer"), "error");
+      toast(describeError(err, t("server.serverOverview.couldNotSaveTheServer")), "error");
     } finally {
       setBusy(false);
     }
@@ -63,7 +63,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     try {
       updateServer(await serversApi.uploadIcon(serverId, file));
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.serverOverview.couldNotUploadTheIcon"), "error");
+      toast(describeError(err, t("server.serverOverview.couldNotUploadTheIcon")), "error");
     } finally {
       setBusy(false);
     }
@@ -73,6 +73,11 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     try {
       await serversApi.deleteIcon(serverId);
       updateServer({ ...server, icon_id: null });
+    } catch (err) {
+      // Its two siblings above catch; this one only had `finally`, so a
+      // rejected delete stopped the spinner, left the icon where it was, and
+      // said nothing.
+      toast(describeError(err, t("server.serverOverview.couldNotRemoveTheIcon")), "error");
     } finally {
       setBusy(false);
     }
@@ -107,8 +112,8 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
         </Field>
         <Field as="div" label={t("server.serverOverview.defaultNotificationSettings")} hint={t("server.serverOverview.whatNewMembersGetUntilThey")}>
           <div className={st.form} style={{ gap: 8 }} role="radiogroup" aria-label={t("server.serverOverview.defaultNotificationSettings")}>
-            <label className={st.radio} data-on={notif === 0}><input type="radio" checked={notif === 0} onChange={() => setNotif(0)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.allMessages")}</span></span></label>
-            <label className={st.radio} data-on={notif === 1}><input type="radio" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.onlyMentions")}</span></span></label>
+            <label className={st.radio} data-on={notif === 0}><input type="radio" name="server-default-notifications" checked={notif === 0} onChange={() => setNotif(0)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.allMessages")}</span></span></label>
+            <label className={st.radio} data-on={notif === 1}><input type="radio" name="server-default-notifications" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.onlyMentions")}</span></span></label>
           </div>
         </Field>
       </div>

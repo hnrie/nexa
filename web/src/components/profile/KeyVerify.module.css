@@ -1,0 +1,71 @@
+/*
+ * The safety-number surfaces: a chip that says what this device thinks of
+ * someone's key, and the panel that shows the digits themselves.
+ *
+ * The digits are set in the interface's monospace face at a size that survives
+ * being read aloud down a phone line, which is the whole point of them.
+ */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--bg-active);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background var(--transition);
+}
+button.chip:hover { background: color-mix(in srgb, var(--bg-active), var(--text) 14%); }
+.chip[data-state="changed"] { background: color-mix(in srgb, var(--danger), transparent 80%); color: var(--danger); }
+.chip[data-state="new"] { color: var(--text-muted); }
+
+.panel { display: flex; flex-direction: column; gap: 14px; }
+
+.digits {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  color: var(--text-strong);
+  font-family: var(--font-mono);
+  font-size: 17px;
+  line-height: 26px;
+  letter-spacing: 0.06em;
+  /* Six groups wrap to two rows of three on a phone rather than one long run. */
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: center;
+  gap: 2px 18px;
+  text-align: center;
+  user-select: all;
+}
+.digits[data-old] { font-size: 15px; opacity: 0.75; }
+
+.qrWrap { display: flex; justify-content: center; }
+
+.note { margin: 0; font-size: 13px; line-height: 18px; color: var(--text-muted); }
+.note strong { color: var(--text-strong); font-weight: 600; }
+
+.compare { margin: 0; font-size: 14px; line-height: 20px; color: var(--text); }
+
+.pair { display: flex; flex-direction: column; gap: 10px; }
+.pairLabel { margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-strong); }
+
+.warn {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger), transparent 88%);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.log { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.logRow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 14px; line-height: 20px; color: var(--text); }
+.logWhen { font-size: 12px; color: var(--text-muted); }

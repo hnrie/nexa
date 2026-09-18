@@ -3,6 +3,7 @@ import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { hasLock, loadLock, MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
+import { describeError } from "@/lib/errors";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
 
@@ -40,7 +41,12 @@ export default function PasscodePage() {
         if (err.left !== null) setLeft(err.left);
         setError(err.left === null || err.left > 0 ? err.message : t("passcode.tooManyWrongTriesLogIn"));
       } else {
-        setError(err instanceof Error ? err.message : t("passcode.thatDidNotWork"));
+        // Anything that is not a wrong passcode is a WebCrypto OperationError
+        // or an IndexedDB InvalidStateError, whose message is written for
+        // whoever wrote the browser. This is the app-lock screen; it gets a
+        // sentence, and the console gets the exception.
+        console.error("unlock failed", err);
+        setError(describeError(err, t("passcode.thatDidNotWork")));
       }
     } finally {
       setBusy(false);
@@ -49,7 +55,7 @@ export default function PasscodePage() {
 
   return (
     <AuthLayout
-      title={adopting ? t("passcode.thisAccountHasAPasscode") : "Locked"}
+      title={adopting ? t("passcode.thisAccountHasAPasscode") : t("passcode.locked")}
       subtitle={
         adopting
           ? t("passcode.enterItToFinishSettingThis")

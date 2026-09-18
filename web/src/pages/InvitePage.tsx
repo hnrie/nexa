@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { describeError } from "@/lib/errors";
 import { servers as serversApi } from "@/api/servers";
 import type { InvitePreview } from "@/api/types";
 import { iconUrl } from "@/api/users";
@@ -121,7 +122,7 @@ export default function InvitePage() {
       nav(first ? `/channels/${res.server.id}/${first.id}` : `/channels/${res.server.id}`, { replace: true });
     } catch (err) {
       // the invite itself is still fine, so this sits by the button rather than replacing the card
-      setAcceptError(err instanceof ApiError ? err.message : t("invite.couldNotAcceptTheInvite"));
+      setAcceptError(describeError(err, t("invite.couldNotAcceptTheInvite")));
     } finally {
       setBusy(false);
     }

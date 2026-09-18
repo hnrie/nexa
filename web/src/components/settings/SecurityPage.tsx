@@ -1,18 +1,21 @@
 import { Check, Copy, Download, Lock, ShieldCheck, Smartphone } from "lucide-react";
 import { useEffect, useState } from "react";
-import { ApiError } from "@/api/client";
 import { auth as authApi } from "@/api/auth";
 import type { MfaStatus, TotpSetup } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
+import { Spinner } from "@/components/common/Spinner";
 import { QrCode } from "@/components/common/QrCode";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { b64 } from "@/crypto/bytes";
 import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
+import { acceptServerKdf } from "@/lib/serverKdf";
 import { users as usersApi } from "@/api/users";
 import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
+import { EncryptionSection } from "./EncryptionSection";
+import { describeError } from "@/lib/errors";
 import { formatDateDivider } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
@@ -23,7 +26,9 @@ import { t } from "@/i18n";
 /** Turns the account password into the proof the server expects. */
 async function authKeyFor(password: string): Promise<string> {
   const bundle = await usersApi.myKeys();
-  const master = await deriveMaster(password, b64.dec(bundle.kdf_salt), { m: bundle.kdf_params.m, t: bundle.kdf_params.t, p: bundle.kdf_params.p, v: 1 });
+  // The stretch parameters are the server's answer, and the proof below goes
+  // straight back to it, so they are checked against the floor first.
+  const master = await deriveMaster(password, b64.dec(bundle.kdf_salt), acceptServerKdf(bundle.kdf_params));
   return b64.enc(deriveAuthKey(master));
 }
 
@@ -37,7 +42,10 @@ export default function SecurityPage() {
   const lockApp = useAuth((a) => a.lockApp);
   const toast = useUI((u) => u.toast);
 
-  const [status, setStatus] = useState<MfaStatus | null>(null);
+  // `undefined` is "still asking", `null` is "the check failed". Collapsing the
+  // two into a falsy value reported two-factor as *off* for an account that has
+  // it on, and offered a Set up button that was always going to fail.
+  const [status, setStatus] = useState<MfaStatus | null | undefined>(undefined);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +61,13 @@ export default function SecurityPage() {
   // The account's own policy: it may have been set on another device.
   const policy = useSettings((st) => st.settings.appLock);
 
+  const loadStatus = () => {
+    setStatus(undefined);
+    authApi.mfaStatus().then(setStatus, () => setStatus(null));
+  };
   useEffect(() => {
-    authApi.mfaStatus().then(setStatus).catch(() => setStatus(null));
+    loadStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!me) return null;
@@ -78,7 +91,7 @@ export default function SecurityPage() {
     try {
       await fn();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : t("modals.confirm.somethingWentWrong"));
+      setError(describeError(err, t("modals.confirm.somethingWentWrong")));
     } finally {
       setBusy(false);
     }
@@ -174,23 +187,37 @@ export default function SecurityPage() {
 
   const on = status?.enabled ?? false;
   const left = status?.backup_codes_left ?? 0;
+  const checking = status === undefined;
+  const unknown = status === null;
 
   return (
     <>
       <h2 className={s.title}>{t("settings.security.security")}</h2>
 
-      <h3 className={s.h}><ShieldCheck size={16} /> {t("settings.security.twoFactorAuthentication")}</h3>
+      <h3 className={s.h5}><ShieldCheck size={16} /> {t("settings.security.twoFactorAuthentication")}</h3>
       <p className={s.hint}>
         {t("settings.security.anAuthenticatorAppAdds")}
       </p>
       <div className={s.device} data-testid="mfa-row">
         <div>
-          <div className={s.deviceName}>{on ? t("settings.security.authenticatorAppIsOn") : t("settings.security.authenticatorAppIsOff")}</div>
+          <div className={s.deviceName}>
+            {checking ? t("settings.security.checkingYourTwoFactorStatus") : unknown ? t("settings.security.twoFactorStatusUnknown") : on ? t("settings.security.authenticatorAppIsOn") : t("settings.security.authenticatorAppIsOff")}
+          </div>
           <div className={s.deviceSub}>
-            {on ? `${t("settings.security.backupCodesLeftCount", { count: left })}${status?.enabled_at ? t("settings.security.onSince", { when: formatDateDivider(status.enabled_at) }) : ""}` : t("settings.security.worksWithAnyTotpApp")}
+            {checking
+              ? t("settings.security.oneMoment")
+              : unknown
+                ? t("settings.security.weCouldNotAskTheServer")
+                : on
+                  ? `${t("settings.security.backupCodesLeftCount", { count: left })}${status?.enabled_at ? t("settings.security.onSince", { when: formatDateDivider(status.enabled_at) }) : ""}`
+                  : t("settings.security.worksWithAnyTotpApp")}
           </div>
         </div>
-        {on ? (
+        {checking ? (
+          <Spinner size={24} label={t("settings.security.checkingYourTwoFactorStatus")} />
+        ) : unknown ? (
+          <Button size="sm" variant="secondary" onClick={loadStatus} data-testid="mfa-retry">{t("chat.messageList.tryAgain")}</Button>
+        ) : on ? (
           <div style={{ display: "flex", gap: 8 }}>
             <Button size="sm" variant="secondary" onClick={() => setDialog("codes")}>{t("settings.security.backupCodes")}</Button>
             <Button size="sm" variant="danger" onClick={() => setDialog("disable")} data-testid="mfa-disable">{t("settings.security.turnOff")}</Button>
@@ -199,7 +226,7 @@ export default function SecurityPage() {
           <Button size="sm" onClick={() => setDialog("enable")} data-testid="mfa-enable">{t("settings.security.setUp")}</Button>
         )}
       </div>
-      {on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>{t("settings.security.youHaveNoBackupCodesLeft")}</div> : null}
+      {!checking && !unknown && on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>{t("settings.security.youHaveNoBackupCodesLeft")}</div> : null}
 
       <h3 className={s.h} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
       <p className={s.hint}>
@@ -224,7 +251,7 @@ export default function SecurityPage() {
         <div className={s.rows} style={{ marginTop: 12 }}>
           <div className={s.row}>
             <div className={s.rowLabel}>
-              Lock after inactivity
+              {t("settings.security.lockAfterInactivity")}
               <div className={s.deviceSub}>{t("settings.security.nothingTypedClickedOrScrolledFor")}</div>
             </div>
             <div className={s.rowValue}>
@@ -254,6 +281,8 @@ export default function SecurityPage() {
           </div>
         </div>
       ) : null}
+
+      <EncryptionSection />
 
       {dialog === "enable" ? (
         <Modal title={codes ? t("settings.security.saveYourBackupCodes") : setup ? t("settings.security.scanThisWithYourAuthenticator") : t("settings.security.setUpTwoFactorAuthentication")} open onClose={close} closeOnOverlay={!codes} width={460}>

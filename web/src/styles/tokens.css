@@ -23,6 +23,12 @@
   --brand-hover: #6a00d6;
   --brand-active: #5600ac;
   --on-brand: #ffffff;
+  /* The accent at full strength is 1.8:1 against the palest panel it is drawn
+     on, which is fine for a fill that carries its own text but not for a 2px
+     ring around something — WCAG 1.4.11 asks a focus indicator for 3:1 — so the
+     ring carries a lighter one, at 3.5:1. lib/theme.ts works the same value out
+     for a chosen accent, against the same panel. */
+  --focus-ring: #b06bff;
   --link: #76aff6;
   --text-brand: #c3a0ff;
   --mention-bg: rgba(128, 0, 255, 0.26);
@@ -47,6 +53,17 @@
   --spoiler-revealed: #242429;
   --code-bg: #242429;
   --code-border: rgba(151, 151, 159, 0.12);
+  /* Syntax highlighting is part of the palette rather than a theme bolted on
+     top of it: the same eight roles are redefined per theme below, so a code
+     block is never painted in colours meant for the other background. Every
+     one of these reads at 4.5:1 or better on its own --code-bg. */
+  --code-keyword: #c678dd;
+  --code-string: #98c379;
+  --code-number: #d19a66;
+  --code-comment: #8d939e;
+  --code-title: #61afef;
+  --code-type: #e5c07b;
+  --code-variable: #e06c75;
   --embed-bg: #393a41;
   --radius-xs: 4px;
   --radius-sm: 8px;
@@ -99,13 +116,27 @@
   --icon: #4e5058;
   --link: #006dd4;
   --text-brand: #6a00d6;
+  --focus-ring: #8000ff;
+  /* A tint of the accent, not the accent itself: over white the dark theme's
+     0.26 and 0.42 leave a lavender that only very pale text sits on, and the
+     text a light page wants is the dark --mention-fg below. */
+  --mention-bg: rgba(128, 0, 255, 0.16);
+  --mention-bg-hover: rgba(128, 0, 255, 0.32);
   --mention-fg: #4a1a8f;
   --positive: #269153;
   --positive-hover: #1f7a45;
   --warning: #bb7300;
   --danger: #d6363f;
   --danger-hover: #b52d35;
-  --status-offline: #8f9097;
+  /* The presence colours are the one part of the dark palette the light theme
+     forgot. They are not only dots: the header under a DM's name prints the
+     status in them, and #f0b232 on this page is 1.7:1. Darkened until the
+     words read, which also lifts the dots past the 3:1 a shape-bearing mark
+     needs. The call stage puts the bright ones back below. */
+  --status-online: #307d4c;
+  --status-idle: #93660b;
+  --status-dnd: #d42b35;
+  --status-offline: #696a71;
   --border-subtle: rgba(151, 151, 159, 0.28);
   --border: rgba(151, 151, 159, 0.4);
   --border-strong: rgba(151, 151, 159, 0.52);
@@ -115,6 +146,13 @@
   --spoiler-revealed: #ebeced;
   --code-bg: #f3f3f4;
   --code-border: rgba(151, 151, 159, 0.28);
+  --code-keyword: #cf222e;
+  --code-string: #0a3069;
+  --code-number: #0550ae;
+  --code-comment: #636b75;
+  --code-title: #7a3fd4;
+  --code-type: #116329;
+  --code-variable: #953800;
   --embed-bg: #f3f3f4;
   --shadow-low: 0 1px 4px rgba(0, 0, 0, 0.08);
   --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.08);
@@ -149,12 +187,18 @@
   --text-channel: #999aa1;
   --text-placeholder: #6c6d76;
   --icon: #b5bac1;
+  --focus-ring: #b06bff;
+  --mention-bg: rgba(128, 0, 255, 0.26);
+  --mention-bg-hover: rgba(128, 0, 255, 0.42);
   --mention-fg: #ddc9ff;
   --positive: #3d9e60;
   --positive-hover: #2f7f4c;
   --warning: #fdb833;
   --danger: #da3e44;
   --danger-hover: #b5343a;
+  --status-online: #3d9e60;
+  --status-idle: #f0b232;
+  --status-dnd: #da3e44;
   --status-offline: #82838b;
   --border-subtle: rgba(151, 151, 159, 0.12);
   --border: rgba(151, 151, 159, 0.2);

@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Spinner } from "@/components/common/Spinner";
 import { lazyPage } from "@/lib/lazyChunk";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
@@ -59,7 +60,8 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     <EncryptionPage serverId={serverId} />;
   return (
     <SettingsLayer label={t("server.serverSettings.serverSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose}>
-      <Suspense fallback={null}>{body}</Suspense>
+      {/* A blank panel on a slow link is indistinguishable from a crash. */}
+      <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{body}</Suspense>
     </SettingsLayer>
   );
 }

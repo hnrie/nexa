@@ -2,8 +2,12 @@
 .head { height: 40px; padding: 18px 8px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-channel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row { display: flex; align-items: center; gap: 12px; height: 42px; margin: 1px 0; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); width: 100%; text-align: start; }
 .row:hover { background: var(--bg-hover); color: var(--text); }
-.row[data-offline="true"] { opacity: 0.4; }
-.row[data-offline="true"]:hover { opacity: 1; }
+/* Offline is said by the avatar: a hollow ring instead of a filled dot, and a
+   dimmer picture. The name keeps its own colour, because --text-channel at 40%
+   composites to 1.9:1 and half the member list of a busy server is offline. */
+.row[data-offline="true"] > :first-child { opacity: 0.5; }
+.row[data-offline="true"]:hover > :first-child { opacity: 1; }
+.row[data-offline="true"] .sub { color: var(--text-channel); }
 .text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
 .name { display: flex; align-items: center; gap: 4px; font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

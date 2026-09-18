@@ -27,12 +27,13 @@ export function SettingsLayer({ label, groups, page, setPage, onClose, children,
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label={label} data-modal-layer="">
       <div className={s.navWrap}>
-        <nav className={s.nav}>
+        {/* Selection lived only in `data-selected`, which is a CSS hook: ten identically-stated buttons, with no way to hear which page is open. */}
+        <nav className={s.nav} aria-label={label}>
           {groups.map((g, i) => (
             <div key={g.head + i}>
               {g.head ? <div className={s.navHead}>{g.head}</div> : <div className={s.navSep} />}
               {g.items.map((it) => (
-                <button key={it.id} className={[s.navItem, it.danger ? s.danger : ""].join(" ")} data-selected={page === it.id} data-nav={it.id} onClick={() => setPage(it.id)}>
+                <button key={it.id} className={[s.navItem, it.danger ? s.danger : ""].join(" ")} data-selected={page === it.id} aria-current={page === it.id ? "page" : undefined} data-nav={it.id} onClick={() => setPage(it.id)}>
                   {it.label}
                 </button>
               ))}

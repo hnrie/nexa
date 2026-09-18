@@ -14,7 +14,7 @@
 .tone { width: 32px; height: 32px; border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; }
 .tone:hover, .tone[aria-expanded="true"] { background: var(--bg-hover); }
 .toneHand { width: 22px; height: 22px; font-size: 20px; line-height: 22px; text-align: center; object-fit: contain; display: block; }
-.toneMenu { position: absolute; top: -4px; right: -4px; z-index: 10; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: pop 100ms ease-out; }
+.toneMenu { position: absolute; top: -4px; inset-inline-end: -4px; z-index: 10; display: flex; flex-direction: column; gap: 2px; padding: 4px; background: var(--bg-floating); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: pop 100ms ease-out; }
 .toneOption { width: 32px; height: 32px; border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; }
 .toneOption:hover, .toneOption:focus-visible { background: var(--bg-hover); }
 .toneOption[aria-checked="true"] { background: var(--bg-selected); box-shadow: inset 0 0 0 2px var(--brand); }

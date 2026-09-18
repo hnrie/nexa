@@ -34,7 +34,10 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   const [shownFor, setShownFor] = useState<string | null>(null);
   const [next, setNext] = useState("");
   const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // Which load failed matters: a first page that failed used to fall through to
+  // "No GIFs match", so a dead provider and an unlucky search word read exactly
+  // the same. A later page that failed keeps what is on screen.
+  const [failed, setFailed] = useState<null | "first" | "more">(null);
   // Favourites saved from a provider that is no longer used stop loading;
   // rather than a row of broken boxes, say so and offer the cross.
   const [dead, setDead] = useState<Set<string>>(new Set());
@@ -60,7 +63,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   const load = async (query: string, pos?: string) => {
     const mine = ++seq.current;
     setLoading(true);
-    setFailed(false);
+    setFailed(null);
     try {
       const page = query.trim() ? await expressionsApi.gifSearch(query, pos) : await expressionsApi.gifTrending(pos);
       if (mine !== seq.current) return;
@@ -82,11 +85,12 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     } catch {
       if (mine !== seq.current) return;
       if (pos) {
-        setFailed(true);
+        setFailed("more");
       } else {
         setResults([]);
         setShownFor(query);
         setNext("");
+        setFailed("first");
       }
     } finally {
       if (mine === seq.current) setLoading(false);
@@ -104,7 +108,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   }, [q, enabled, tab]);
 
   const loadMore = useCallback(() => {
-    if (loading || failed || !next || shownFor === null) return;
+    if (loading || failed !== null || !next || shownFor === null) return;
     void load(shownFor, next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, failed, next, shownFor]);
@@ -118,6 +122,16 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   );
 
   const sendResult = (g: GifResult) => onPick({ url: g.url, w: g.w, h: g.h });
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const strip = e.currentTarget.parentElement;
+    const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
+    const at = buttons.indexOf(e.currentTarget);
+    buttons[Math.min(buttons.length - 1, Math.max(0, at + step))]?.click();
+  };
 
   return (
     <div className={s.body} style={{ flexDirection: "column" }}>
@@ -125,9 +139,9 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
         {enabled ? (
           <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder={tr_("pickers.gifPicker.searchKlipy")} aria-label={tr_("pickers.gifPicker.searchGifs")} autoFocus={focusSearchOnOpen()} />
         ) : null}
-        <div className={s.gifTabs}>
-          <button className={s.gifTab} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>{tr_("pickers.gifPicker.favorites")}</button>
-          {enabled ? <button className={s.gifTab} data-on={tab === "search"} onClick={() => setTab("search")}>{q.trim() ? "Results" : "Trending"}</button> : null}
+        <div className={s.gifTabs} role="tablist" aria-label={tr_("pickers.expressionPicker.gifs")}>
+          <button className={s.gifTab} role="tab" aria-selected={tab === "favorites"} tabIndex={tab === "favorites" ? 0 : -1} onKeyDown={onTabKey} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>{tr_("pickers.gifPicker.favorites")}</button>
+          {enabled ? <button className={s.gifTab} role="tab" aria-selected={tab === "search"} tabIndex={tab === "search" ? 0 : -1} onKeyDown={onTabKey} data-on={tab === "search"} onClick={() => setTab("search")}>{q.trim() ? tr_("pickers.gifPicker.results") : tr_("pickers.gifPicker.trending")}</button> : null}
         </div>
       </div>
       {tab === "favorites" ? (
@@ -149,7 +163,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
             footer={
               dead.size > 0 ? (
                 <div className={s.gifNote}>
-                  {dead.size} favourite{dead.size === 1 ? "" : "s"} no longer load.{" "}
+                  {tr_("pickers.gifPicker.favouritesNoLongerLoad", { count: dead.size })}{" "}
                   <button className={s.gifTab} onClick={() => removeFavoriteGifs(dead)}>{tr_("pickers.gifPicker.removeThem")}</button>
                 </div>
               ) : null
@@ -180,11 +194,11 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           footer={
             <>
               {loading ? <div className={s.gifNote}>{tr_("chat.pins.loading")}</div> : null}
-              {!loading && results.length === 0 && shownFor !== null ? <div className={s.empty}>{shownFor.trim() ? tr_("pickers.gifPicker.noGifsMatch") : tr_("pickers.gifPicker.nothingTrendingRightNow")}</div> : null}
+              {!loading && !failed && results.length === 0 && shownFor !== null ? <div className={s.empty}>{shownFor.trim() ? tr_("pickers.gifPicker.noGifsMatch") : tr_("pickers.gifPicker.nothingTrendingRightNow")}</div> : null}
               {failed ? (
-                <div className={s.gifNote}>
-                  {tr_("pickers.gifPicker.moreGifsCouldNotBeLoaded")}{" "}
-                  <button className={s.gifTab} onClick={() => { setFailed(false); if (shownFor !== null && next) void load(shownFor, next); }}>{tr_("chat.messageList.tryAgain")}</button>
+                <div className={s.gifNote} role="alert">
+                  {failed === "first" ? tr_("pickers.gifPicker.gifsCouldNotBeLoaded") : tr_("pickers.gifPicker.moreGifsCouldNotBeLoaded")}{" "}
+                  <button className={s.gifTab} onClick={() => { const at = failed === "more" ? next : undefined; setFailed(null); if (shownFor !== null) void load(shownFor, at); }}>{tr_("chat.messageList.tryAgain")}</button>
                 </div>
               ) : null}
               {results.length > 0 ? <div className={s.gifNote}>{tr_("pickers.gifPicker.searchPoweredByKlipyThisServer")}</div> : null}

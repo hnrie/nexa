@@ -1,5 +1,5 @@
 .panel { width: 420px; max-width: 45vw; flex: none; display: flex; flex-direction: column; border-inline-start: 1px solid var(--border-subtle); background: var(--bg-raised); min-height: 0; }
-.head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border-subtle); }
+.head { flex: none; display: flex; align-items: center; justify-content: space-between; height: 48px; padding-block: 0; padding-inline: 16px 12px; border-bottom: 1px solid var(--border-subtle); }
 .headText { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .close { display: flex; padding: 4px; border-radius: var(--radius-xs); color: var(--text-muted); }
 .close:hover { color: var(--text); background: var(--bg-hover); }
@@ -20,7 +20,7 @@
 .resultChan { color: var(--text-muted); }
 .resultTime { margin-inline-start: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .resultText { font-size: 14px; line-height: 1.375; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.resultText mark { background: rgba(128, 0, 255, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
+.resultText mark { background: var(--mention-bg-hover); color: var(--mention-fg); border-radius: 2px; padding: 0 1px; }
 .empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-muted); }
 /* A long count must not push the cancel button off the end of the panel. */
@@ -47,7 +47,7 @@
 .suggestSub { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggestHash { width: 20px; text-align: center; color: var(--text-muted); font-weight: 700; }
 .suggestDate { display: flex; align-items: center; gap: 8px; padding: 8px 10px; color: var(--text); font-size: 14px; }
-.suggestDate input { flex: 1; min-width: 0; padding: 4px 6px; border-radius: var(--radius-xs); border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font: inherit; color-scheme: dark light; }
+.suggestDate input { flex: 1; min-width: 0; padding: 4px 6px; border-radius: var(--radius-xs); border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font: inherit; }
 /* the little x that empties a search box */
 .clear { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: 50%; color: var(--text-muted); }
 .clear:hover { background: var(--bg-active); color: var(--text-strong); }

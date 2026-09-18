@@ -1,11 +1,11 @@
 import { Check, MessageSquare, MoreVertical, Phone, Search, UserPlus, Users, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
 import type { Relationship } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
+import { ApiError } from "@/api/client";
 import { Button } from "@/components/common/Button";
 import { Tooltip } from "@/components/common/Tooltip";
 import { audioContext } from "@/voice/media";
@@ -20,6 +20,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "@/components/friends/Friends.module.css";
 import { guarded } from "@/lib/captcha";
+import { describeError } from "@/lib/errors";
 
 import { t as tr_ } from "@/i18n";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
@@ -49,22 +50,45 @@ export default function FriendsPage() {
   }, [rels, tab, query, presence]);
   const pendingCount = Object.values(rels).filter((r) => r.type === "incoming").length;
 
-  const tabs: { id: Tab; label: string }[] = [
+  // The count used to be glued onto the label in English and then stripped off
+  // again below with an English-shaped regex; it travels beside the label now,
+  // so neither half has to survive a round trip through the other's grammar.
+  const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "online", label: tr_("shell.user.online") },
     { id: "all", label: tr_("friends.all") },
-    { id: "pending", label: pendingCount ? `Pending (${pendingCount})` : "Pending" },
+    { id: "pending", label: tr_("friends.pending"), ...(pendingCount ? { count: pendingCount } : {}) },
     { id: "blocked", label: tr_("friends.blocked") },
   ];
+  const activeTab = tabs.find((x) => x.id === tab);
+
+  // Left/Right across the strip, as a tablist is expected to move; the buttons
+  // themselves carry tabIndex -1 so Tab passes over the set rather than through it.
+  const order: Tab[] = [...tabs.map((x) => x.id), "add"];
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : e.key === "Home" ? -order.length : e.key === "End" ? order.length : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = order.indexOf(tab);
+    const next = order[Math.min(order.length - 1, Math.max(0, at + step))]!;
+    setTab(next);
+    const strip = e.currentTarget.parentElement;
+    const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
+    buttons[order.indexOf(next)]?.focus();
+  };
 
   return (
     <div className={s.page}>
       <header className={s.header}>
         <PageHeaderButtons />
         <div className={s.title}><Users size={22} /> {tr_("sidebar.dMSidebar.friends")}</div>
-        {tabs.map((t) => (
-          <button key={t.id} className={s.tab} data-selected={tab === t.id} onClick={() => setTab(t.id)}>{t.label}</button>
-        ))}
-        <button className={s.addTab} data-selected={tab === "add"} onClick={() => setTab("add")}>{tr_("profile.profileCard.addFriend")}</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }} role="tablist" aria-label={tr_("sidebar.dMSidebar.friends")}>
+          {tabs.map((x) => (
+            <button key={x.id} className={s.tab} role="tab" aria-selected={tab === x.id} tabIndex={tab === x.id ? 0 : -1} onKeyDown={onTabKey} data-selected={tab === x.id} onClick={() => setTab(x.id)}>
+              {x.count ? `${x.label} (${x.count})` : x.label}
+            </button>
+          ))}
+          <button className={s.addTab} role="tab" aria-selected={tab === "add"} tabIndex={tab === "add" ? 0 : -1} onKeyDown={onTabKey} data-selected={tab === "add"} onClick={() => setTab("add")}>{tr_("profile.profileCard.addFriend")}</button>
+        </div>
       </header>
       <div className={s.body}>
         {tab === "add" ? (
@@ -75,8 +99,8 @@ export default function FriendsPage() {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("chat.chat.search")} aria-label={tr_("friends.searchFriends")} />
               <Search size={20} />
             </div>
-            <h3 className={s.section}>{tabs.find((t) => t.id === tab)?.label.replace(/ \(\d+\)$/, "")} — {list.length}</h3>
-            {list.length === 0 ? <Empty tab={tab} /> : list.map((r) => <FriendRow key={r.user.id} rel={r} presenceUser={users[r.user.id] ?? r.user} />)}
+            <h3 className={s.section}>{activeTab?.label} — <span role="status">{list.length}</span></h3>
+            {list.length === 0 ? <Empty tab={tab} query={query} onClear={() => setQuery("")} /> : list.map((r) => <FriendRow key={r.user.id} rel={r} presenceUser={users[r.user.id] ?? r.user} />)}
           </>
         )}
       </div>
@@ -84,7 +108,12 @@ export default function FriendsPage() {
   );
 }
 
-function Empty({ tab }: { tab: Tab }) {
+/**
+ * Nothing to show. The list is filtered by the tab *and* by the search box, so
+ * a typo in the box used to be answered with "You have no friends yet" — which
+ * is a statement about the account, not about the search.
+ */
+function Empty({ tab, query, onClear }: { tab: Tab; query: string; onClear: () => void }) {
   const text: Record<Tab, string> = {
     online: tr_("friends.nobodyIsOnlineRightNow"),
     all: tr_("friends.noFriendsYet"),
@@ -92,10 +121,12 @@ function Empty({ tab }: { tab: Tab }) {
     blocked: tr_("friends.youHaveNotBlockedAnyone"),
     add: "",
   };
+  const searching = query.trim().length > 0;
   return (
     <div className={s.empty}>
       <Users size={48} />
-      <p>{text[tab]}</p>
+      <p>{searching ? tr_("friends.nobodyHereMatches", { query: query.trim() }) : text[tab]}</p>
+      {searching ? <Button size="sm" variant="secondary" onClick={onClear}>{tr_("friends.clearTheSearch")}</Button> : null}
     </div>
   );
 }
@@ -122,7 +153,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       nav(`/channels/@me/${ch.id}`);
       return ch.id;
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : tr_("profile.profileCard.couldNotOpenAConversation"), "error");
+      toast(describeError(err, tr_("profile.profileCard.couldNotOpenAConversation")), "error");
       return null;
     }
   };
@@ -134,7 +165,14 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
     // audio has to start inside the tap (iOS), before waiting on the conversation
     audioContext();
     const id = await openDM();
-    if (id) await joinVoice(id);
+    if (!id) return;
+    try {
+      await joinVoice(id);
+    } catch (err) {
+      // A refused microphone rejects here, and this page said nothing at all:
+      // the conversation opened, no call started, and no reason was given.
+      toast(describeError(err, tr_("friends.thatCallCouldNotBeStarted")), "error");
+    }
   };
   const accept = async () => {
     try {
@@ -146,7 +184,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         nav(`/channels/@me/${res.channel.id}`);
       }
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : tr_("profile.profileCard.couldNotAccept"), "error");
+      toast(describeError(err, tr_("profile.profileCard.couldNotAccept")), "error");
     }
   };
   const remove = async (label: string) => {
@@ -156,9 +194,35 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       removeRel(rel.user.id);
       toast(label, "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : tr_("friends.couldNotUpdate"), "error");
+      toast(describeError(err, tr_("friends.couldNotUpdate")), "error");
     }
   };
+  const block = async () => {
+    try {
+      await relApi.block(rel.user.id);
+      setRel({ ...rel, type: "blocked" });
+    } catch (err) {
+      toast(describeError(err, tr_("friends.couldNotUpdate")), "error");
+    }
+  };
+  // Both sit in a menu beside "Copy user ID" and both used to fire on the way
+  // past. Blocking in particular is socially hard to undo.
+  const confirmBlock = () =>
+    useUI.getState().openModal("confirm", {
+      title: tr_("profile.profileCard.block"),
+      body: tr_("friends.blockNameTheyWillNotBe", { name: rel.user.display_name }),
+      confirmLabel: tr_("profile.profileCard.block"),
+      danger: true,
+      onConfirm: () => block(),
+    });
+  const confirmRemove = () =>
+    useUI.getState().openModal("confirm", {
+      title: tr_("profile.profileCard.removeFriend"),
+      body: tr_("friends.removeNameFromYourFriends", { name: rel.user.display_name }),
+      confirmLabel: tr_("profile.profileCard.removeFriend"),
+      danger: true,
+      onConfirm: () => remove(tr_("friends.friendRemoved")),
+    });
   const more = (e: React.MouseEvent) => {
     e.preventDefault();
     openContextMenu({
@@ -168,11 +232,11 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         { id: "profile", label: tr_("profile.profile.profile"), onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
         { id: "msg", label: tr_("profile.profileCard.message"), onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
         ...(rel.type === "friend" ? [{ id: "call", label: tr_("chat.chat.startVoiceCall"), onSelect: () => void call(), separatorAfter: true }] : []),
-        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => void remove(tr_("friends.friendRemoved")) }] : []),
+        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: confirmRemove }] : []),
         ...(rel.type !== "blocked"
-          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" }), (err: unknown) => toast(err instanceof ApiError ? err.message : tr_("friends.couldNotUpdate"), "error")) }]
+          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: confirmBlock }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
-        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(rel.user.id) },
+        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(rel.user.id).then(() => toast(tr_("friends.userIdCopied"), "success"), () => toast(tr_("friends.theUserIdCouldNotBe"), "error")) },
       ],
     });
   };
@@ -234,7 +298,7 @@ function AddFriend() {
         already_friends: tr_("friends.youReAlreadyFriendsWithThat"),
         already_sent: tr_("friends.youAlreadySentARequestTo"),
       };
-      setMsg({ ok: false, text: err instanceof ApiError ? (map[err.code] ?? err.message) : tr_("modals.confirm.somethingWentWrong") });
+      setMsg({ ok: false, text: err instanceof ApiError && map[err.code] ? map[err.code]! : describeError(err, tr_("friends.thatFriendRequestCouldNotBe")) });
     } finally {
       setBusy(false);
     }
@@ -248,7 +312,7 @@ function AddFriend() {
         <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr_("friends.youCanAddFriendsWithTheir")} aria-label={tr_("settings.account.username")} autoCapitalize="none" spellCheck={false} />
         <Button type="submit" size="sm" loading={busy} disabled={!value.trim()}>{tr_("friends.sendFriendRequest")}</Button>
       </form>
-      {msg ? <div className={[s.addMsg, msg.ok ? s.ok : s.err].join(" ")}>{msg.text}</div> : null}
+      {msg ? <div className={[s.addMsg, msg.ok ? s.ok : s.err].join(" ")} role={msg.ok ? "status" : "alert"}>{msg.text}</div> : null}
     </div>
   );
 }

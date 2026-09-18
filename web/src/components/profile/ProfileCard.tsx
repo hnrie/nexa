@@ -11,6 +11,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { Tooltip } from "@/components/common/Tooltip";
 import { Twemoji } from "@/components/common/Twemoji";
 import { promptFields } from "@/components/modals/PromptModal";
+import { KeyStatusChip } from "./KeyVerify";
 import { profileTheme, profileThemeOf } from "@/lib/avatarColor";
 import { guarded } from "@/lib/captcha";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -341,6 +342,13 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
             {panel && bioClamped && interactive ? (
               <button className={s.moreLink} onClick={viewFull} data-testid="view-full-bio">{t("profile.profileCard.viewFullBio")}</button>
             ) : null}
+          </div>
+        ) : null}
+
+        {user.public_key && interactive ? (
+          <div className={s.section} data-testid="profile-key">
+            <h3>{t("encryption.encryptionKey")}</h3>
+            <p><KeyStatusChip userId={userId} onClick={() => openModal("verifyKey", { userId })} /></p>
           </div>
         ) : null}
 

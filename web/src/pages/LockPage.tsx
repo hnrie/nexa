@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
+import { describeError } from "@/lib/errors";
 import { useAuth } from "@/stores/auth";
 import { AuthLayout } from "./AuthLayout";
 import s from "./Auth.module.css";
@@ -21,8 +22,8 @@ export default function LockPage() {
     setError(null);
     try {
       await unlock(password);
-    } catch {
-      setError(t("lock.thatPasswordCouldNotUnlockYour"));
+    } catch (err) {
+      setError(describeError(err, t("lock.thatPasswordCouldNotUnlockYour")));
     } finally {
       setBusy(false);
     }

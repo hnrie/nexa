@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useId, useMemo, useState, type DragEvent } from "react";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import type { Role } from "@/api/types";
@@ -7,6 +7,8 @@ import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
+import { useReorder } from "@/hooks/useReorder";
+import { describeError } from "@/lib/errors";
 import { memberName } from "@/lib/names";
 import { canManageRole, parsePerm, permString } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
@@ -33,6 +35,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
   const removeRole = useServers((x) => x.removeRole);
   const meId = useAuth((a) => a.me?.id);
   const toast = useUI((u) => u.toast);
+  const openContextMenu = useUI((u) => u.openContextMenu);
   const roles = useMemo(() => rolesByPosition(server), [server]);
   const [selected, setSelected] = useState<string>(roles[0]?.id ?? serverId);
   const [tab, setTab] = useState<"display" | "permissions" | "members">("display");
@@ -47,6 +50,48 @@ export default function RolesPage({ serverId }: { serverId: string }) {
     if (server && !server.roles[selected]) setSelected(serverId);
   }, [server, selected, serverId]);
 
+  // @everyone is always at the bottom and never moves, so it is not in the
+  // list the reordering works on.
+  const movable = roles.filter((r) => r.id !== serverId);
+
+  const apply = async (positions: { id: string; position: number }[] | null): Promise<boolean> => {
+    if (!positions) return false;
+    try {
+      upsertRoles(serverId, await serversApi.setRolePositions(serverId, positions));
+      return true;
+    } catch (err) {
+      toast(describeError(err, t("server.roles.couldNotReorderRoles")), "error");
+      return false;
+    }
+  };
+
+  // The same move, without a pointer: the list is drawn top-first, so "up" is
+  // one place earlier in it.
+  const reorder = useReorder({
+    ids: movable.map((r) => r.id),
+    name: (id) => server?.roles[id]?.name ?? "",
+    canMove: (id) => id !== serverId && canManageRole(mine.highest, mine.isOwner, server?.roles[id]?.position ?? 0),
+    move: (id, delta) => {
+      const at = movable.findIndex((r) => r.id === id);
+      const target = movable[at + delta];
+      if (!target) return false;
+      return apply(rolePositionsAfterDrop(movable, id, target.id, delta > 0, mine.highest, mine.isOwner));
+    },
+  });
+
+  // Left and Right across the three tabs, with the selected one the only tab
+  // stop: what a tablist does everywhere else.
+  const panelId = "role-tab-panel";
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const strip = e.currentTarget.parentElement;
+    const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
+    const at = buttons.indexOf(e.currentTarget);
+    buttons[Math.min(buttons.length - 1, Math.max(0, at + step))]?.click();
+  };
+
   if (!server || !role) return null;
   // @everyone has no member list to manage, however it got selected
   const view = tab === "members" && role.id === serverId ? "display" : tab;
@@ -60,7 +105,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
       setSelected(r.id);
       setTab("display");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.roles.couldNotCreateTheRole"), "error");
+      toast(describeError(err, t("server.roles.couldNotCreateTheRole")), "error");
     } finally {
       setBusy(false);
     }
@@ -73,13 +118,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
     setDrag(null);
     setDrop(null);
     if (!d || !at) return;
-    const positions = rolePositionsAfterDrop(roles.filter((r) => r.id !== serverId), d, at.id, at.after, mine.highest, mine.isOwner);
-    if (!positions) return;
-    try {
-      upsertRoles(serverId, await serversApi.setRolePositions(serverId, positions));
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.roles.couldNotReorderRoles"), "error");
-    }
+    await apply(rolePositionsAfterDrop(movable, d, at.id, at.after, mine.highest, mine.isOwner));
   };
 
   return (
@@ -89,6 +128,8 @@ export default function RolesPage({ serverId }: { serverId: string }) {
       <div className={s.rolesLayout}>
         <div className={s.roleList}>
           <Button size="sm" variant="secondary" onClick={() => void create()} loading={busy} style={{ marginBottom: 8 }} data-testid="create-role"><Plus size={14} /> {t("server.roles.createRole")}</Button>
+          {movable.length > 1 ? <p className={st.hint} style={{ margin: "0 0 8px" }}>{reorder.hint}</p> : null}
+          {reorder.live}
           {roles.map((r) => {
             const canDrag = r.id !== serverId && canManageRole(mine.highest, mine.isOwner, r.position);
             return (
@@ -104,6 +145,15 @@ export default function RolesPage({ serverId }: { serverId: string }) {
                 onDragOver={(e) => { if (!drag || drag === r.id || !canDrag) return; e.preventDefault(); const b = e.currentTarget.getBoundingClientRect(); setDrop({ id: r.id, after: e.clientY > b.top + b.height / 2 }); }}
                 onDrop={(e) => void onDrop(e)}
                 onDragEnd={() => { setDrag(null); setDrop(null); }}
+                onKeyDown={reorder.onKeyDown(r.id)}
+                onContextMenu={(e) => {
+                  const items = reorder.menuItems(r.id);
+                  if (items.length === 0) return;
+                  e.preventDefault();
+                  openContextMenu({ x: e.clientX, y: e.clientY, label: r.name, items });
+                }}
+                data-reorder-id={r.id}
+                aria-current={r.id === role.id}
                 onClick={() => { setSelected(r.id); if (r.id === serverId && tab === "members") setTab("display"); }}
               >
                 <span className={s.dot} style={{ background: r.color ? hex(r.color) : "var(--text-muted)" }} />
@@ -114,14 +164,16 @@ export default function RolesPage({ serverId }: { serverId: string }) {
           })}
         </div>
         <div>
-          <div className={s.tabs}>
-            <button className={s.tab} data-on={view === "display"} onClick={() => setTab("display")}>{t("server.roles.display")}</button>
-            <button className={s.tab} data-on={view === "permissions"} onClick={() => setTab("permissions")}>{t("server.channelSettings.permissions")}</button>
-            {role.id !== serverId ? <button className={s.tab} data-on={tab === "members"} onClick={() => setTab("members")}>{t("server.roles.manageMembers")}</button> : null}
+          <div className={s.tabs} role="tablist" aria-label={role.name}>
+            <button className={s.tab} role="tab" aria-selected={view === "display"} aria-controls={panelId} tabIndex={view === "display" ? 0 : -1} onKeyDown={onTabKey} data-on={view === "display"} onClick={() => setTab("display")}>{t("server.roles.display")}</button>
+            <button className={s.tab} role="tab" aria-selected={view === "permissions"} aria-controls={panelId} tabIndex={view === "permissions" ? 0 : -1} onKeyDown={onTabKey} data-on={view === "permissions"} onClick={() => setTab("permissions")}>{t("server.channelSettings.permissions")}</button>
+            {role.id !== serverId ? <button className={s.tab} role="tab" aria-selected={tab === "members"} aria-controls={panelId} tabIndex={tab === "members" ? 0 : -1} onKeyDown={onTabKey} data-on={tab === "members"} onClick={() => setTab("members")}>{t("server.roles.manageMembers")}</button> : null}
           </div>
+          <div id={panelId} role="tabpanel" tabIndex={-1}>
           {view === "display" ? <DisplayTab key={role.id} role={role} editable={editable} everyone={role.id === serverId} onSaved={upsertRole} onDeleted={() => { removeRole(serverId, role.id); setSelected(serverId); }} /> : null}
           {view === "permissions" ? <PermissionsTab key={role.id} role={role} editable={editable} actorPerms={server.myPermissions} onSaved={upsertRole} /> : null}
           {view === "members" ? <MembersTab key={role.id} role={role} serverId={serverId} editable={editable} /> : null}
+          </div>
         </div>
       </div>
     </>
@@ -136,6 +188,9 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
   const [hoist, setHoist] = useState(role.hoist);
   const [mentionable, setMentionable] = useState(role.mentionable);
   const [busy, setBusy] = useState(false);
+  // One group per role, so switching roles does not leave the browser thinking
+  // two sets of swatches are the same set.
+  const swatchName = `role-colour-${useId()}`;
   const dirty = name !== role.name || color !== role.color || hoist !== role.hoist || mentionable !== role.mentionable;
   const save = async () => {
     setBusy(true);
@@ -154,7 +209,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       setMentionable(saved.mentionable);
       toast(t("server.roles.roleSaved"), "success");
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("server.roles.couldNotSaveTheRole"), "error");
+      toast(describeError(err, t("server.roles.couldNotSaveTheRole")), "error");
     } finally {
       setBusy(false);
     }
@@ -171,9 +226,13 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       <Field as="div" label={t("server.roles.roleColour")} hint={t("server.roles.membersUseTheColourOfTheir")}>
         <div className={s.swatches} role="radiogroup" aria-label={t("server.roles.roleColour")}>
           <span className={s.preview}><span className={s.dot} style={{ background: color ? hex(color) : "var(--text-muted)" }} />{name || "@everyone"}</span>
-          <label className={s.swatch} data-on={color === 0} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")}><input type="radio" checked={color === 0} disabled={!editable} onChange={() => setColor(0)} /></label>
-          {SWATCHES.map((c) => (
-            <label key={c} className={s.swatch} data-on={color === c} style={{ background: hex(c) }} title={hex(c)}><input type="radio" checked={color === c} disabled={!editable} onChange={() => setColor(c)} /></label>
+          {/* Without a shared `name` the browser treats twenty-one swatches as
+              twenty-one unrelated radios: no arrow keys between them, and one
+              tab stop each. Their only name was `title={hex(c)}`, which a
+              screen reader reads as "#1abc9c, radio button". */}
+          <label className={s.swatch} data-on={color === 0} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")}><input type="radio" name={swatchName} checked={color === 0} disabled={!editable} onChange={() => setColor(0)} aria-label={t("server.roles.default")} /></label>
+          {SWATCHES.map((c, i) => (
+            <label key={c} className={s.swatch} data-on={color === c} style={{ background: hex(c) }} title={hex(c)}><input type="radio" name={swatchName} checked={color === c} disabled={!editable} onChange={() => setColor(c)} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: SWATCHES.length })} /></label>
           ))}
           <label className={s.swatch} style={{ background: color && !SWATCHES.includes(color) ? hex(color) : "var(--bg-surface)", border: "2px dashed var(--border-strong)" }} title={t("server.roles.customColour")}><input type="color" value={hex(color || 0x99aab5)} disabled={!editable} onChange={(e) => setColor(parseInt(e.target.value.slice(1), 16))} /></label>
         </div>

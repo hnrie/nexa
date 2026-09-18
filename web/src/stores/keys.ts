@@ -8,8 +8,11 @@ import { newRootKey } from "@/crypto/conv";
 import { keystore } from "@/crypto/keystore";
 import { unwrapGrant, wrapGrant, type Identity } from "@/crypto/keys";
 import { hasLock } from "@/lib/appLock";
+import { checkRecipients } from "@/lib/convMembers";
 import { clearSearchIndex } from "@/lib/fullSearch";
+import { closePins, openPins } from "@/lib/keyPins";
 import { clearKeyring, ring } from "@/lib/keyring";
+import { judgeKey, useKeyAlerts } from "./keyAlerts";
 import { useMessages } from "./messages";
 import { useUsers } from "./users";
 
@@ -29,11 +32,15 @@ interface KeysState {
 
 const pendingEnsure = new Map<string, Promise<{ epoch: number; root: Uint8Array } | null>>();
 
-async function publicKeyOf(userId: string): Promise<Uint8Array> {
+/**
+ * The key to seal to, as base64 — the shape the pin file keeps, so the two can
+ * be compared without decoding either.
+ */
+async function publicKeyOf(userId: string): Promise<string> {
   const cached = useUsers.getState().byId[userId]?.public_key;
-  if (cached) return b64.dec(cached);
+  if (cached) return cached;
   const res = await usersApi.publicKey(userId);
-  return b64.dec(res.public_key);
+  return res.public_key;
 }
 
 /**
@@ -46,13 +53,56 @@ async function persistRoot(userId: string, conv: string, epoch: number, root: Ui
   await keystore.saveRoot(userId, conv, epoch, root);
 }
 
+/**
+ * Narrows a server-supplied recipient list to the accounts this device is
+ * willing to hand a conversation key to.
+ *
+ * Nothing about who gets a key was ever the client's decision before: the
+ * `user_ids` in a `keys_needed` event, in `/keys/needs` and in the answer to
+ * creating an epoch went straight into the wrapping. Here they are held against
+ * the membership this device already knows and draws, and anything outside it
+ * is dropped and written down where it can be seen.
+ */
+function recipientsFor(conv: string, epoch: number, userIds: string[]): string[] {
+  const seen = checkRecipients(conv, userIds);
+  // Never this account. A membership list that has not caught up with a join
+  // would otherwise leave a device holding a root with no grant of its own,
+  // which is the one way this check could lock somebody out of their own
+  // conversation.
+  const me = useKeys.getState().userId;
+  const outsiders = me ? seen.outsiders.filter((id) => id !== me) : seen.outsiders;
+  const allowed = me && userIds.includes(me) && !seen.allowed.includes(me) ? [...seen.allowed, me] : seen.allowed;
+  if (outsiders.length > 0) {
+    console.warn(`keys: refusing to wrap ${conv} epoch ${epoch} for ${outsiders.join(", ")} — not in this conversation`);
+    useKeyAlerts.getState().report({ kind: "outsider_refused", conv, epoch, count: outsiders.length, ...(outsiders.length === 1 ? { userId: outsiders[0]! } : {}) });
+  }
+  // Fail open, and say so. A large server's members arrive a page at a time, so
+  // an id missing from the list in hand may simply not have been fetched yet;
+  // refusing there would leave real members unable to read messages they are
+  // entitled to, which is the worse of the two failures.
+  if (!seen.checked && userIds.length > 0) useKeyAlerts.getState().report({ kind: "unchecked", conv, epoch, count: userIds.length });
+  return allowed;
+}
+
 /** Wraps a root for each user and uploads the grants; users without a public key are skipped. */
-async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, userIds: string[]): Promise<void> {
+async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, wanted: string[]): Promise<void> {
+  // The one place every grant this client ever makes passes through, so the
+  // recipient check cannot be forgotten by a path added later: createEpoch,
+  // /keys/needs and the keys_needed event all end up here.
+  const userIds = recipientsFor(conv, epoch, wanted);
   const uploads: { conv_id: string; epoch: number; user_id: string; wrapped_key: string }[] = [];
   const wrap = async (uid: string): Promise<boolean> => {
     try {
       const pub = await publicKeyOf(uid);
-      uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(pub, root)) });
+      // A key that is not the one this device pinned for that person does not
+      // get a copy of the conversation until a human has looked at it. The
+      // question is raised by judgeKey; this path just declines quietly, and
+      // the grant is made on the next reconcile once it is answered.
+      if (judgeKey(uid, pub) === "changed") {
+        useKeyAlerts.getState().report({ kind: "grant_withheld", conv, epoch, userId: uid });
+        return true;
+      }
+      uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(b64.dec(pub), root)) });
       return true;
     } catch (err) {
       // An account that is genuinely gone is skipped for good; anything else —
@@ -104,6 +154,10 @@ export const useKeys = create<KeysState>()((set, get) => ({
   waiting: {},
   init: async (userId, identity) => {
     set({ userId, identity, waiting: {} });
+    // Before anything else, and before the gateway connects: the first ready
+    // upserts every user the account can see, and each of those keys has to be
+    // judged against what this device remembers rather than pinned late.
+    openPins(userId);
     if (hasLock(userId)) {
       // Roots cached before the passcode was set would read messages without it.
       await keystore.forgetRoots(userId);
@@ -216,6 +270,10 @@ export const useKeys = create<KeysState>()((set, get) => ({
     // grant for by typing a word into search.
     clearSearchIndex();
     pendingEnsure.clear();
+    // The pins themselves stay on the device — that is the point of them — but
+    // this session's unanswered questions and its log go with the session.
+    closePins();
+    useKeyAlerts.getState().reset();
     set({ userId: null, identity: null, waiting: {} });
   },
 }));

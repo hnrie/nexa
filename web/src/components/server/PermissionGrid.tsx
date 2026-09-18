@@ -72,6 +72,18 @@ export function OverwriteGrid({
     if (v === "deny") d |= bit;
     onChange(a, d);
   };
+  // Left and Right across the three, as a radiogroup moves. The chosen one is
+  // the only tab stop, so the whole row is one stop rather than three.
+  const ORDER: Tri[] = ["deny", "neutral", "allow"];
+  const triKeys = (e: React.KeyboardEvent<HTMLDivElement>, bit: bigint, cur: Tri) => {
+    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!step || !editable) return;
+    e.preventDefault();
+    const next = ORDER[(ORDER.indexOf(cur) + step + ORDER.length) % ORDER.length]!;
+    set(bit, next);
+    const group = e.currentTarget;
+    requestAnimationFrame(() => group.querySelector<HTMLElement>(`[data-kind="${next}"]`)?.focus());
+  };
   return (
     <div className={s.grid}>
       {permGroups().map((g) => {
@@ -89,10 +101,14 @@ export function OverwriteGrid({
                     <span className={s.label}>{it.label}</span>
                     <span className={s.desc}>{it.description}</span>
                   </div>
-                  <div className={s.tri} role="radiogroup" aria-label={it.label}>
-                    <button type="button" className={s.triBtn} data-kind="deny" data-on={cur === "deny"} disabled={!editable} aria-label={t("server.permissionGrid.deny")} aria-pressed={cur === "deny"} onClick={() => set(bit, "deny")}><X size={16} /></button>
-                    <button type="button" className={s.triBtn} data-kind="neutral" data-on={cur === "neutral"} disabled={!editable} aria-label={t("server.permissionGrid.inherit")} aria-pressed={cur === "neutral"} onClick={() => set(bit, "neutral")}><Minus size={16} /></button>
-                    <button type="button" className={s.triBtn} data-kind="allow" data-on={cur === "allow"} disabled={!editable} aria-label={t("server.permissionGrid.allow")} aria-pressed={cur === "allow"} onClick={() => set(bit, "allow")}><Check size={16} /></button>
+                  {/* A radiogroup's children have to be radios: `aria-pressed`
+                      buttons announce as three unrelated toggles, and without a
+                      roving tabIndex every one of forty rows cost three Tab
+                      presses on the way to Save. */}
+                  <div className={s.tri} role="radiogroup" aria-label={it.label} onKeyDown={(e) => triKeys(e, bit, cur)}>
+                    <button type="button" className={s.triBtn} data-kind="deny" data-on={cur === "deny"} disabled={!editable} role="radio" aria-checked={cur === "deny"} tabIndex={cur === "deny" ? 0 : -1} aria-label={t("server.permissionGrid.deny")} onClick={() => set(bit, "deny")}><X size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="neutral" data-on={cur === "neutral"} disabled={!editable} role="radio" aria-checked={cur === "neutral"} tabIndex={cur === "neutral" ? 0 : -1} aria-label={t("server.permissionGrid.inherit")} onClick={() => set(bit, "neutral")}><Minus size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="allow" data-on={cur === "allow"} disabled={!editable} role="radio" aria-checked={cur === "allow"} tabIndex={cur === "allow" ? 0 : -1} aria-label={t("server.permissionGrid.allow")} onClick={() => set(bit, "allow")}><Check size={16} /></button>
                   </div>
                 </div>
               );

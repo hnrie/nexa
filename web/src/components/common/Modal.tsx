@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
@@ -22,13 +22,20 @@ interface Props {
   closeOnOverlay?: boolean;
   className?: string;
   bare?: boolean;
+  /**
+   * What the dialog is called, for anyone who cannot see it. A titled dialog
+   * takes its name from its own heading; a `bare` one has no heading to take it
+   * from, so it has to be told, or it is announced as "dialog" and nothing else.
+   */
+  ariaLabel?: string;
 }
 
 /** What Tab can reach, for the trap below. */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false }: Props) {
+export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const portalRoot = usePortalRoot();
   // This dialog's own container, kept for its whole life and moved between the
   // body and the fullscreen element rather than swapped. Handing createPortal a
@@ -66,7 +73,13 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
       if (e.key !== "Tab") return;
       const card = ref.current;
       if (!card) return;
-      const stops = [...card.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0);
+      const all = [...card.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      // Laid-out stops only, so a hidden tab's contents are not in the cycle —
+      // but if nothing at all reports a box, the environment is not doing
+      // layout (jsdom, a print preview) rather than the dialog being empty,
+      // and letting focus escape would be the worse answer.
+      const shown = all.filter((el) => el.getClientRects().length > 0);
+      const stops = shown.length > 0 ? shown : all;
       if (stops.length === 0) return;
       const first = stops[0]!;
       const last = stops[stops.length - 1]!;
@@ -95,10 +108,19 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
   if (!open || !host) return null;
   return createPortal(
     <div className={s.overlay} data-modal-overlay="" onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
-      <div ref={ref} className={[s.card, bare ? s.bare : "", className ?? ""].join(" ")} style={{ width }} role="dialog" aria-modal="true" tabIndex={-1} data-modal-layer="">
+      <div
+        ref={ref}
+        className={[s.card, bare ? s.bare : "", className ?? ""].join(" ")}
+        style={{ width }}
+        role="dialog"
+        aria-modal="true"
+        {...(!bare && title !== undefined ? { "aria-labelledby": titleId } : { "aria-label": ariaLabel ?? (typeof title === "string" ? title : undefined) })}
+        tabIndex={-1}
+        data-modal-layer=""
+      >
         {!bare && title !== undefined ? (
           <div className={s.header}>
-            <h2 className={s.title}>{title}</h2>
+            <h2 className={s.title} id={titleId}>{title}</h2>
             <button className={s.close} onClick={onClose} aria-label={t("chat.attachments.close")}>
               <X size={20} />
             </button>

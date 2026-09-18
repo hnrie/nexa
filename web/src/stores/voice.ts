@@ -50,6 +50,14 @@ interface VoiceStore {
    */
   watching: Record<string, boolean>;
   error: string | null;
+  /**
+   * The call started, but the microphone never opened: refused, or in use by
+   * something else. Joining used to carry on with `mic = null` and draw a
+   * completely ordinary call — a mute button reading "Mute", no MicOff on your
+   * own tile — so you could sit talking to nobody with every signal saying you
+   * were live.
+   */
+  micBlocked: boolean;
   applyState: (vs: VoiceState) => void;
   setAll: (list: VoiceState[]) => void;
   setMine: (vs: VoiceState | null) => void;
@@ -71,6 +79,7 @@ interface VoiceStore {
   /** Starts or stops watching someone's screen share; watching one brings it to the front. */
   setWatching: (userId: string, on: boolean) => void;
   setError: (e: string | null) => void;
+  setMicBlocked: (v: boolean) => void;
   resetSession: () => void;
   clear: () => void;
 }
@@ -103,6 +112,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   focused: null,
   watching: {},
   error: null,
+  micBlocked: false,
   applyState: (vs) =>
     set((s) => {
       const byChannel = { ...s.byChannel };
@@ -190,10 +200,11 @@ export const useVoice = create<VoiceStore>()((set) => ({
       return { watching, focused: s.focused === key ? null : s.focused };
     }),
   setError: (error) => set({ error }),
+  setMicBlocked: (micBlocked) => set({ micBlocked }),
   // error goes with the rest: a refusal from a call that is over has nothing
   // to say about the next one, and it was shown again in its lobby
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null }),
-  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null }),
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false }),
+  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false }),
 }));
 
 /** A channel's participants in join order. */

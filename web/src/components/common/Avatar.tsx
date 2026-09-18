@@ -50,7 +50,16 @@ export function Avatar({ id, avatarId, name, size = 32, status = null, className
           {initials(name)}
         </span>
       )}
-      {status ? <span className={[s.status, s[status]].join(" ")} title={statusLabel(status)} data-status={status} /> : null}
+      {status ? (
+        <>
+          <span className={[s.status, s[status]].join(" ")} title={statusLabel(status)} data-status={status} aria-hidden="true" />
+          {/* The shapes are distinct enough to read without colour, but `title`
+              on a role-less span is not reliably announced and a touch screen
+              never shows it at all. Online or offline is one of the most
+              consulted facts in the app; it gets words. */}
+          <span className="visually-hidden">{statusLabel(status)}</span>
+        </>
+      ) : null}
     </span>
   );
 }

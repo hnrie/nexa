@@ -29,7 +29,7 @@ export function IncomingCallHost() {
     await joinVoice(channelId);
   };
   return (
-    <Modal open onClose={() => void declineCall(channelId)} width={360} closeOnOverlay={false} bare>
+    <Modal open onClose={() => void declineCall(channelId)} width={360} closeOnOverlay={false} bare ariaLabel={t("voice.incomingCall.incomingCall")}>
       <div className={s.ring} style={{ background: "var(--bg-surface)", borderRadius: "var(--radius-md)", padding: 24 }} data-testid="incoming-call">
         <div className={s.ringAvatar}>
           <Avatar id={from} avatarId={caller?.avatar_id ?? null} name={displayName(caller)} size={80} />

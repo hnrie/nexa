@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { describeError } from "@/lib/errors";
 import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -53,7 +54,7 @@ export default function RegisterPage() {
           invite_required: t("register.youNeedAnInviteOrRegistration"),
           rate_limited: t("register.tooManySignUpsFromYour"),
         };
-        setError(map[err.code] ?? err.message);
+        setError(map[err.code] ?? describeError(err, t("register.somethingWentWrongPleaseTryAgain")));
       } else {
         setError(t("register.somethingWentWrongPleaseTryAgain"));
       }

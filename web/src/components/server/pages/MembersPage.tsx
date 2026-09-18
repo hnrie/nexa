@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { LoadError } from "@/components/common/LoadError";
 import { TextInput } from "@/components/common/TextInput";
 import { memberName } from "@/lib/names";
 import { P } from "@/lib/perms";
@@ -28,11 +29,17 @@ export default function MembersPage({ serverId }: { serverId: string }) {
   const openModal = useUI((u) => u.openModal);
   const [q, setQ] = useState("");
   const [shown, setShown] = useState(PAGE);
+  // Up to twenty sequential requests run behind this list. If one of them
+  // fails the list simply stops growing, and a moderator searching for someone
+  // who is not in the part that arrived concludes they are not a member.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const complete = server?.membersComplete ?? true;
 
   useEffect(() => {
     if (complete) return;
     let alive = true;
+    setFailed(false);
     (async () => {
       let after: string | undefined;
       for (let i = 0; i < 20 && alive; i++) {
@@ -43,11 +50,13 @@ export default function MembersPage({ serverId }: { serverId: string }) {
         if (res.members.length < 1000) break;
         after = res.members[res.members.length - 1]?.user_id;
       }
-    })().catch(() => {});
+    })().catch(() => {
+      if (alive) setFailed(true);
+    });
     return () => {
       alive = false;
     };
-  }, [complete, serverId, upsertMembers, upsertUsers]);
+  }, [complete, serverId, upsertMembers, upsertUsers, attempt]);
 
   const rows = useMemo(() => {
     if (!server) return [];
@@ -67,8 +76,10 @@ export default function MembersPage({ serverId }: { serverId: string }) {
     <>
       <h2 className={st.title}>{t("server.members.membersCount", { count: server.memberCount })}</h2>
       <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder={t("server.channelSettings.searchMembers")} />
+        <TextInput value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder={t("server.channelSettings.searchMembers")} aria-label={t("server.channelSettings.searchMembers")} />
       </div>
+      {failed ? <LoadError message={t("server.members.notEveryMemberCouldBeLoaded")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
+      {!complete && !failed ? <p className={st.hint} role="status">{t("server.members.stillLoadingTheRestOfThe")}</p> : null}
       {rows.slice(0, shown).map(({ m, name, username }) => {
         const above = m.user_id !== meId && outranks(serverId, m.user_id);
         const timedOut = !!m.timeout_until && m.timeout_until > Date.now();

@@ -1,5 +1,5 @@
 import { ExternalLink, Monitor, MonitorUp, RotateCw, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import type { DisplaySourceRequest } from "@/lib/desktopBridge";
@@ -72,6 +72,16 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
   const windows = request.sources.filter((x) => x.kind === "window");
   const [tab, setTab] = useState<"screen" | "window">(screens.length ? "screen" : "window");
   const [picked, setPicked] = useState<string | null>(screens.length === 1 ? screens[0]!.id : null);
+  const gridId = useId();
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const strip = e.currentTarget.parentElement;
+    const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
+    const at = buttons.indexOf(e.currentTarget);
+    buttons[Math.min(buttons.length - 1, Math.max(0, at + step))]?.click();
+  };
   // an older app offers sound whether or not the share asked for it
   const audio = request.audio && shareAudioRequested();
   const shown = tab === "screen" ? screens : windows;
@@ -89,23 +99,36 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
         </>
       }
     >
-      <div className={s.tabs} role="tablist">
-        <button type="button" role="tab" aria-selected={tab === "screen"} className={s.tab} data-on={tab === "screen"} onClick={() => setTab("screen")}>{t("desktop.displayPicker.screensCount", { count: screens.length })}</button>
-        <button type="button" role="tab" aria-selected={tab === "window"} className={s.tab} data-on={tab === "window"} onClick={() => setTab("window")}>{t("desktop.displayPicker.windowsCount", { count: windows.length })}</button>
+      {/* Tabs with no panels and no arrow movement were only ever a look. The
+          sibling Choices in ShareScreenModal already does this properly. */}
+      <div className={s.tabs} role="tablist" aria-label={t("desktop.displayPicker.share")}>
+        <button type="button" role="tab" aria-selected={tab === "screen"} aria-controls={gridId} tabIndex={tab === "screen" ? 0 : -1} onKeyDown={onTabKey} className={s.tab} data-on={tab === "screen"} onClick={() => setTab("screen")}>{t("desktop.displayPicker.screensCount", { count: screens.length })}</button>
+        <button type="button" role="tab" aria-selected={tab === "window"} aria-controls={gridId} tabIndex={tab === "window" ? 0 : -1} onKeyDown={onTabKey} className={s.tab} data-on={tab === "window"} onClick={() => setTab("window")}>{t("desktop.displayPicker.windowsCount", { count: windows.length })}</button>
       </div>
       {shown.length === 0 ? (
-        <div className={s.empty}>{t("desktop.displayPicker.nothingToShareHere")}</div>
+        <div className={s.empty} id={gridId} role="tabpanel">{t("desktop.displayPicker.nothingToShareHere")}</div>
       ) : (
-        <div className={s.grid}>
+        <div id={gridId} role="tabpanel" aria-label={tab === "screen" ? t("desktop.displayPicker.screensCount", { count: screens.length }) : t("desktop.displayPicker.windowsCount", { count: windows.length })}>
+        <div className={s.grid} role="radiogroup" aria-label={t("desktop.displayPicker.share")}>
           {shown.map((src) => (
             <button
               key={src.id}
               type="button"
               className={s.source}
               data-on={picked === src.id}
-              aria-pressed={picked === src.id}
+              role="radio"
+              aria-checked={picked === src.id}
+              tabIndex={picked === src.id || (!picked && shown[0]?.id === src.id) ? 0 : -1}
               onClick={() => setPicked(src.id)}
               onDoubleClick={() => onChoose(src.id, audio)}
+              onKeyDown={(e) => {
+                // Enter on a source shares it: a double click was the only
+                // one-gesture path to sharing.
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onChoose(src.id, audio);
+                }
+              }}
               data-testid="display-source"
             >
               {src.thumbnail ? <img className={s.thumb} src={src.thumbnail} alt="" draggable={false} /> : <span className={s.thumb} />}
@@ -115,6 +138,7 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
               </span>
             </button>
           ))}
+        </div>
         </div>
       )}
     </Modal>
