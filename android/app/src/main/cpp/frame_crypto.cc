@@ -205,8 +205,12 @@ JNIEXPORT void JNICALL Java_xyz_evilion_chat_voice_FrameCryptoNative_nativeSetKe
   if (handle == nullptr) return;
 
   std::map<int, std::array<uint8_t, 32>> keys;
-  const jsize count = env->GetArrayLength(j_indices);
+  // The two arrays are built from one list today, but a mismatch would index
+  // past the end of one of them: JNI would leave an exception pending and
+  // every call after that is undefined rather than a Java throw.
+  const jsize count = std::min(env->GetArrayLength(j_indices), env->GetArrayLength(j_keys));
   jint* indices = env->GetIntArrayElements(j_indices, nullptr);
+  if (indices == nullptr) return;
   for (jsize i = 0; i < count; i++) {
     auto raw = reinterpret_cast<jbyteArray>(env->GetObjectArrayElement(j_keys, i));
     if (raw == nullptr) continue;
@@ -254,6 +258,7 @@ JNIEXPORT jlongArray JNICALL Java_xyz_evilion_chat_voice_FrameCryptoNative_nativ
     out[2] = handle->keys->dropped.load(std::memory_order_relaxed);
   }
   jlongArray arr = env->NewLongArray(3);
+  if (arr == nullptr) return nullptr;
   env->SetLongArrayRegion(arr, 0, 3, out);
   return arr;
 }
