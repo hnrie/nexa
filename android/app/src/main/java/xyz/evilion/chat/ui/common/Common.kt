@@ -37,17 +37,25 @@ import xyz.evilion.chat.data.AppState
 import xyz.evilion.chat.media.Media
 import xyz.evilion.chat.net.PublicUser
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.compose.ui.platform.LocalDensity
 
 private val PALETTE = listOf(
     Color(0xFF5865F2), Color(0xFF3D9E60), Color(0xFFFDB833),
     Color(0xFFDA3E44), Color(0xFFEB459F), Color(0xFF82838B),
 )
 
-/** The same colour the web client picks for someone with no avatar. */
+/**
+ * The same colour the web client picks for someone with no avatar.
+ *
+ * The web takes the hash unsigned (`>>> 0`) before the remainder. Reading the
+ * same bits as a signed Int and folding the negative remainder back is a
+ * different number, so the two clients disagreed on about half of all ids —
+ * the same person was red in the browser and grey on the phone.
+ */
 fun avatarColor(id: String): Color {
     var h = 0
-    for (c in id) h = (h * 31 + c.code)
-    return PALETTE[((h % PALETTE.size) + PALETTE.size) % PALETTE.size]
+    for (c in id) h = h * 31 + c.code
+    return PALETTE[((h.toLong() and 0xFFFFFFFFL) % PALETTE.size).toInt()]
 }
 
 fun initial(name: String): String = name.trim().firstOrNull()?.uppercase() ?: "?"
@@ -61,6 +69,15 @@ fun Avatar(
     modifier: Modifier = Modifier,
     status: String? = null,
     ringColor: Color? = null,
+    /**
+     * What the presence dot cuts its ring out of.
+     *
+     * The web bites the ring out of the picture itself, so it reads on any
+     * background. Here it is a filled disc, and it was hardcoded to `bgBase` —
+     * which is right in the message list and wrong everywhere else, so every
+     * avatar in the drawer, the member list and every sheet wore a grey donut.
+     */
+    ringBackground: Color? = null,
 ) {
     val colors = chatColors
     Box(modifier.size(size)) {
@@ -82,7 +99,9 @@ fun Avatar(
                 Text(
                     initial(name),
                     color = Color.White,
-                    fontSize = (size.value * 0.42f).sp,
+                    // density-scaled but not font-scaled: `sp` inside a fixed
+                    // circle clipped the initial to a stub at 200 % system font
+                    fontSize = with(LocalDensity.current) { (size * 0.42f).toSp() },
                     fontWeight = FontWeight.SemiBold,
                 )
             }
@@ -90,7 +109,8 @@ fun Avatar(
         if (status != null) {
             val dot = (size.value * 0.34f).coerceAtLeast(10f).dp
             Box(
-                Modifier.align(Alignment.BottomEnd).size(dot + 4.dp).clip(CircleShape).background(colors.bgBase),
+                Modifier.align(Alignment.BottomEnd).size(dot + 4.dp).clip(CircleShape)
+                    .background(ringBackground ?: colors.bgBase),
                 contentAlignment = Alignment.Center,
             ) {
                 StatusDot(status, dot)
@@ -136,7 +156,7 @@ fun ServerIcon(
             Text(
                 name.split(" ").take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase().ifEmpty { "?" },
                 color = colors.text,
-                fontSize = (size.value * 0.34f).sp,
+                fontSize = with(LocalDensity.current) { (size * 0.34f).toSp() },
                 fontWeight = FontWeight.SemiBold,
             )
         }

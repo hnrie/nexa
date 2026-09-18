@@ -53,7 +53,17 @@ object P {
     /** The names, labels and help the role and channel editors show. */
     data class Item(val bit: ULong, val label: String, val description: String, val channels: Set<String> = emptySet())
 
-    val GROUPS: List<Pair<String, List<Item>>> = listOf(
+    /**
+     * Built on every read, not once per process.
+     *
+     * As a `val` in an object it was initialised the first time anything
+     * touched `P`, in whatever language the app was in then. Switching to
+     * Arabic in Settings rebuilds the whole tree, but a `val` does not: every
+     * permission name and description in the role editor stayed English until
+     * the app was force-stopped.
+     */
+    val GROUPS: List<Pair<String, List<Item>>>
+        get() = listOf(
         t("perms.generalServerPermissions") to listOf(
             Item(VIEW_CHANNEL, t("perms.viewChannels"), t("perms.allowsMembersToViewChannelsBy"), setOf("text", "voice")),
             Item(MANAGE_CHANNELS, t("perms.manageChannels"), t("perms.allowsMembersToCreateEditOr"), setOf("text", "voice")),

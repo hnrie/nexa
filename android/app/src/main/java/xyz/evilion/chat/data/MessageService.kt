@@ -274,17 +274,24 @@ object MessageService {
             val envelope = MessageCrypto.encrypt(
                 channelKey, Aad(conv, key.first, channelId, me.id), payload,
             )
-            var mentionList = mentions
-            if (replyTo != null && ping) {
-                val author = AppState.messages(channelId).value.firstOrNull { it.raw.id == replyTo }?.raw?.authorId
-                if (author != null && author != me.id && author !in mentionList) mentionList = mentionList + author
+            // Turning the reply ping off silences the person being answered,
+            // not everyone the message names: dropping the whole list meant an
+            // "@alice look at this" reply reached nobody, which the web client
+            // does not do (web/src/components/composer/send.ts).
+            val replyAuthor = replyTo?.let { id ->
+                AppState.messages(channelId).value.firstOrNull { it.raw.id == id }?.raw?.authorId
             }
+            var mentionList = mentions
+            if (ping && replyAuthor != null && replyAuthor != me.id && replyAuthor !in mentionList) {
+                mentionList = mentionList + replyAuthor
+            }
+            if (!ping && replyAuthor != null) mentionList = mentionList.filterNot { it == replyAuthor }
             val sent = MessagesApi.send(channelId, SendMessageRequest(
                 ciphertext = envelope,
                 keyConvId = conv,
                 keyEpoch = key.first,
                 replyToId = replyTo,
-                mentions = if (ping) mentionList else emptyList(),
+                mentions = mentionList,
                 mentionEveryone = if (everyone) true else null,
                 attachments = attachmentRefs.ifEmpty { null },
                 nonce = nonce,

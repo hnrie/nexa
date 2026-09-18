@@ -65,6 +65,19 @@ object KeyPins {
     /** Insertion order, so the eviction above has something to go on. */
     private val order = mutableListOf<String>()
 
+    /**
+     * The people whose key this device first learned during *this* session.
+     *
+     * The security decision never uses this — a pin is a pin. It exists so the
+     * interface can tell the truth: a second device pins everybody it has never
+     * met within a second of connecting, and a badge reading "same key as
+     * before" a moment later would claim a check that never happened.
+     */
+    private val fresh = mutableSetOf<String>()
+
+    /** Whether this device knew nothing at all when the session began. */
+    private var startedBlank = true
+
     private fun keyFor(userId: String) = "keypins.$userId"
 
     /** Starts keeping pins for a signed-in account. Called when the keys come up. */
@@ -78,6 +91,8 @@ object KeyPins {
             ?: PinFile(since = System.currentTimeMillis())
         order.clear()
         order += file!!.keys.keys
+        fresh.clear()
+        startedBlank = order.isEmpty()
     }
 
     /** Stops, on sign-out. The pins themselves stay on the device on purpose. */
@@ -86,6 +101,8 @@ object KeyPins {
         account = null
         file = null
         order.clear()
+        fresh.clear()
+        startedBlank = true
     }
 
     /** Whether this device has any memory at all — false on a second device's first run. */
@@ -95,6 +112,17 @@ object KeyPins {
     /** When this device started remembering, so the interface can be honest about how much it knows. */
     @Synchronized
     fun since(): Long? = file?.since
+
+    /**
+     * Whether this device only learned this person's key during this session, so
+     * nothing about it has been checked against anything.
+     */
+    @Synchronized
+    fun learnedThisSession(userId: String): Boolean = userId in fresh
+
+    /** Whether the device began this session knowing nobody's key. */
+    @Synchronized
+    fun startedWithNoPins(): Boolean = startedBlank
 
     @Synchronized
     fun pinned(userId: String): String? = file?.keys?.get(userId)
@@ -117,11 +145,19 @@ object KeyPins {
         val current = file ?: return
         if (publicKeyB64.isEmpty()) return
         val keys = current.keys.toMutableMap()
-        if (!keys.containsKey(userId)) {
+        if (keys.containsKey(userId)) {
+            // Overwriting an existing pin only happens when a human accepted a
+            // change, which is a stronger statement than "seen before".
+            fresh.remove(userId)
+        } else {
+            fresh += userId
             order += userId
             while (order.size > MAX_PINS) {
                 val drop = order.removeAt(0)
-                if (drop != userId) keys.remove(drop)
+                if (drop != userId) {
+                    keys.remove(drop)
+                    fresh.remove(drop)
+                }
             }
         }
         keys[userId] = publicKeyB64
@@ -140,6 +176,7 @@ object KeyPins {
         val keys = current.keys.toMutableMap()
         keys.remove(userId)
         order.remove(userId)
+        fresh.remove(userId)
         val next = current.copy(keys = keys)
         file = next
         val id = account ?: return

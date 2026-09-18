@@ -1,5 +1,6 @@
 package xyz.evilion.chat.data
 
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -90,6 +91,7 @@ object AppState {
         relationships.value = emptyMap()
         presences.value = emptyMap()
         readStates.value = emptyMap()
+        unreadMarks.clear()
         voiceStates.value = emptyMap()
         typing.value = emptyMap()
         emojis.value = emptyMap()
@@ -109,7 +111,12 @@ object AppState {
         // member joining, a profile opened, a user_update. Judging the key here
         // means a swapped one is caught when it is offered, not when it is next
         // used to seal a conversation key.
-        for (u in list) judgeKey(u.id, u.publicKey)
+        //
+        // Guarded, because this is the path that draws every name in the app: a
+        // device whose storage throws must end up less watchful, not unable to
+        // show who is in the room.
+        runCatching { for (u in list) judgeKey(u.id, u.publicKey) }
+            .onFailure { Log.w(LOG_TAG, "could not check the identity keys the server sent", it) }
         users.update { current -> current + list.associateBy { it.id } }
     }
 
@@ -154,7 +161,37 @@ object AppState {
 
     fun putPresence(p: Presence) = presences.update { it + (p.userId to p) }
 
-    fun putReadState(rs: ReadState) = readStates.update { it + (rs.channelId to rs) }
+    /**
+     * Where each conversation's unread rule goes.
+     *
+     * The read mark moves as soon as the newest message is on screen, so by the
+     * time anything could draw a line at it, it is already at the bottom. This
+     * keeps the mark as it stood the first time the app learned it — from the
+     * ready payload, before any ack — and `refreshUnreadMark` moves it on when
+     * the conversation is left, so coming back starts from there.
+     */
+    private val unreadMarks = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    fun unreadMark(channelId: String): Long = unreadMarks[channelId] ?: Long.MAX_VALUE
+
+    fun refreshUnreadMark(channelId: String) {
+        unreadMarks[channelId] = readStates.value[channelId]?.lastReadMessageId?.toLongOrNull() ?: 0L
+    }
+
+    private fun noteUnreadMark(rs: ReadState) {
+        unreadMarks.putIfAbsent(rs.channelId, rs.lastReadMessageId?.toLongOrNull() ?: 0L)
+    }
+
+    fun putReadState(rs: ReadState) {
+        noteUnreadMark(rs)
+        readStates.update { it + (rs.channelId to rs) }
+    }
+
+    /** The whole set, as the ready payload carries it. */
+    fun setReadStates(states: List<ReadState>) {
+        for (rs in states) noteUnreadMark(rs)
+        readStates.value = states.associateBy { it.channelId }
+    }
 
     fun putVoiceState(v: VoiceState) {
         voiceStates.update { current ->

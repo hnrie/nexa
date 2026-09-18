@@ -77,6 +77,9 @@ import xyz.evilion.chat.ui.Route
 import xyz.evilion.chat.ui.chat.formatSize
 import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.semantics.Role
 
 /** Everything about this account and this device. */
 @Composable
@@ -85,18 +88,19 @@ fun SettingsScreen(startPage: String) {
     var page by remember { mutableStateOf(startPage) }
     val me by AppState.me.collectAsState()
 
+    // the arrow and the system's own back did different things from the same
+    // place: the arrow went up one level, back threw you out to the chat
+    BackHandler(enabled = page != "root") { page = "root" }
+
     Column(Modifier.fillMaxSize().background(colors.bgBase)) {
         Row(
-            Modifier.fillMaxWidth().background(colors.bgRaised).statusBarsPadding().height(52.dp).padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().background(colors.bgRaised).statusBarsPadding().height(52.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon,
-                modifier = Modifier.size(24.dp).clickable {
-                    if (page == "root") Nav.go(Route.Chat(null, null)) else page = "root"
-                },
-            )
-            Spacer(Modifier.width(16.dp))
+            IconButton(onClick = { if (page == "root") Nav.go(Route.Chat(null, null)) else page = "root" }) {
+                Icon(Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(8.dp))
             Text(
                 when (page) {
                     "root" -> t("main.sidebar.settings")
@@ -280,13 +284,13 @@ private fun AccountPage() {
             Column {
                 Text(
                     t("settings.settingsScreen.changeAvatar"), color = colors.textBrand, fontSize = 14.sp,
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.clickable(role = Role.Button) {
                         pickAvatar.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }.padding(vertical = 4.dp),
                 )
                 Text(
                     t("settings.settingsScreen.changeBanner"), color = colors.textBrand, fontSize = 14.sp,
-                    modifier = Modifier.clickable {
+                    modifier = Modifier.clickable(role = Role.Button) {
                         pickBanner.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }.padding(vertical = 4.dp),
                 )
@@ -393,9 +397,10 @@ private fun NotificationsPage() {
         Toggle(t("settings.notifications.sounds"), null, SettingsStore.soundsOn) { SettingsStore.putIn("notifications", "sounds", JsonPrimitive(it)) }
     }
     if (muted.isNotEmpty()) {
+        val channels by AppState.channels.collectAsState()
         Section(t("settings.settingsScreen.mutedConversations")) {
             for (id in muted) {
-                val channel = AppState.channels.value[id]
+                val channel = channels[id]
                 Text(
                     channel?.let { AppState.channelName(it) } ?: id,
                     color = chatColors.textMuted, fontSize = 14.sp,
@@ -455,8 +460,11 @@ private fun PrivacyPage() {
             }
         }
     }
+    // Observed rather than read once, or the row someone just unblocked stays
+    // on screen until something else happens to redraw the page.
+    val relationships by AppState.relationships.collectAsState()
     Section(t("friends.blocked")) {
-        val blocked = AppState.relationships.value.values.filter { it.type == "blocked" }
+        val blocked = relationships.values.filter { it.type == "blocked" }
         if (blocked.isEmpty()) {
             Text(t("settings.settingsScreen.nobodyIsBlocked"), color = colors.textMuted, fontSize = 14.sp)
         } else {
@@ -465,7 +473,7 @@ private fun PrivacyPage() {
                     Text(relationship.user.name, color = colors.text, fontSize = 14.sp, modifier = Modifier.weight(1f))
                     Text(
                         t("friends.unblock"), color = colors.textBrand, fontSize = 13.sp,
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.clickable(role = Role.Button) {
                             scope.launch { runCatching { xyz.evilion.chat.net.RelationshipsApi.unblock(relationship.user.id) } }
                         },
                     )
@@ -551,20 +559,20 @@ private fun SecurityPage() {
             Text(
                 setup!!.formatted.ifEmpty { setup!!.secret },
                 color = colors.textStrong, fontFamily = FontFamily.Monospace, fontSize = 15.sp,
-                modifier = Modifier.clickable { clipboard.setText(AnnotatedString(setup!!.secret)) },
+                modifier = Modifier.clickable(role = Role.Button) { clipboard.setText(AnnotatedString(setup!!.secret)) },
             )
             Spacer(Modifier.height(6.dp))
             Text(
                 t("settings.settingsScreen.openInYourAuthenticatorApp"),
                 color = colors.textBrand, fontSize = 13.sp,
-                modifier = Modifier.clickable {
+                modifier = Modifier.clickable(role = Role.Button) {
                     runCatching {
                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(setup!!.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }
                 },
             )
             Spacer(Modifier.height(10.dp))
-            Field(code, { code = it }, "6-digit code")
+            Field(code, { code = it }, t("settings.security.enterTheSixDigitCodeIt"))
             Spacer(Modifier.height(10.dp))
             Action(t("settings.security.turnOn"), enabled = !busy && code.length >= 6) {
                 busy = true
@@ -592,7 +600,7 @@ private fun SecurityPage() {
             }
             Text(
                 t("settings.settingsScreen.copyThese"), color = colors.textBrand, fontSize = 13.sp,
-                modifier = Modifier.clickable { clipboard.setText(AnnotatedString(backupCodes.joinToString("\n"))) }.padding(top = 4.dp),
+                modifier = Modifier.clickable(role = Role.Button) { clipboard.setText(AnnotatedString(backupCodes.joinToString("\n"))) }.padding(top = 4.dp),
             )
         }
     }
@@ -645,7 +653,7 @@ private fun SessionsPage() {
                     if (!session.current) {
                         Text(
                             t("settings.settingsScreen.signOut"), color = colors.danger, fontSize = 13.sp,
-                            modifier = Modifier.clickable {
+                            modifier = Modifier.clickable(role = Role.Button) {
                                 scope.launch {
                                     runCatching { AuthApi.deleteSession(session.id) }
                                     sessions = runCatching { AuthApi.sessions() }.getOrNull()

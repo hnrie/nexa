@@ -712,6 +712,7 @@
   "mediaCache.thatFileIsTooLargeTo": "वह फ़ाइल यहाँ खोलने के लिए बहुत बड़ी है। इसके बजाय डाउनलोड करें।",
   "messageActions.copyText": "टेक्स्ट कॉपी करें",
   "messageActions.markUnread": "बिना पढ़ा चिह्नित करें",
+  "messageActions.messageActions": "संदेश क्रियाएँ",
   "messageActions.pin": "पिन करें",
   "messageActions.thatMessageCouldNotBeDeleted": "वह संदेश मिटाया नहीं जा सका।",
   "messageRow.addAReaction": "प्रतिक्रिया जोड़ें",
@@ -2045,6 +2046,7 @@
   "sfu.videoIsPausedUntilNextMonth": "कॉल मुफ़्त बनी रहें, इसलिए वीडियो अगले महीने तक रुका हुआ है।",
   "shareQuality.source": "मूल",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "इस लिंक वाला कोई भी जुड़ सकता है। यह एक हफ़्ते चलता है।",
+  "sheets.channelSheets.goToTheMessage": "संदेश पर जाएँ",
   "sheets.channelSheets.invitePeople": "लोगों को बुलाएँ",
   "sheets.channelSheets.longPressAMessageToPin": "पिन करने के लिए संदेश को दबाकर रखें।",
   "sheets.channelSheets.membersCount": {

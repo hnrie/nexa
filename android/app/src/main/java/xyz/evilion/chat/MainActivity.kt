@@ -55,6 +55,22 @@ import xyz.evilion.chat.ui.main.MainScreen
 import xyz.evilion.chat.ui.theme.NexaTheme
 import xyz.evilion.chat.ui.theme.chatColors
 import xyz.evilion.chat.voice.VoiceSession
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val captchaRequest = MutableStateFlow<CaptchaRequest?>(null)
@@ -145,7 +161,6 @@ class MainActivity : ComponentActivity() {
             val parts = data.pathSegments
             when {
                 parts.size >= 2 && parts[0] == "invite" -> Nav.go(Route.Invite(parts[1], data.fragment))
-                parts.size >= 2 && parts[0] == "guest" -> Nav.go(Route.GuestCall(parts[1]))
                 parts.size >= 2 && parts[0] == "stickers" -> Nav.go(Route.StickerPack(parts[1]))
                 parts.size >= 3 && parts[0] == "channels" -> {
                     val serverId = parts[1].takeIf { it != "@me" }
@@ -196,35 +211,85 @@ private fun CaptchaDialog(request: CaptchaRequest) {
     }
 }
 
+/**
+ * No server. It says so, shows that it is still trying, and offers to try now.
+ *
+ * A silent line of grey text over a five-second loop gave no sign the app was
+ * doing anything, and no way to force a retry after switching to another
+ * network — which is the moment someone is most likely to be looking at it.
+ */
 @Composable
 private fun OfflineScreen() {
     val colors = chatColors
+    var attempt by remember { mutableStateOf(0) }
     Box(Modifier.fillMaxSize().background(colors.bgBase), Alignment.Center) {
-        Text(t("mainActivity.couldNotReachTheServerTrying"), color = colors.textMuted, fontSize = 15.sp)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator(Modifier.size(24.dp), color = colors.brand, strokeWidth = 2.dp)
+            Spacer(Modifier.height(16.dp))
+            Text(t("mainActivity.couldNotReachTheServerTrying"), color = colors.textMuted, fontSize = 15.sp)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                t("desktop.native.offlineRetry"),
+                color = colors.textBrand,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClickLabel = t("desktop.native.offlineRetry"), role = Role.Button) { attempt++ }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        }
     }
-    LaunchedEffect(Unit) {
+    // backs off 2s -> 30s rather than hammering a server that is down, and
+    // starts again from the short wait whenever the button is pressed
+    LaunchedEffect(attempt) {
+        var wait = 2000L
         while (true) {
-            delay(5000)
             Session.bootstrap()
+            delay(wait)
+            wait = (wait * 2).coerceAtMost(30_000L)
         }
     }
 }
 
-/** The short notices the rest of the app raises. */
+/**
+ * The short notices the rest of the app raises.
+ *
+ * They queue rather than overwrite: the collector used to hold the coroutine
+ * for the four seconds a message was on screen, and `toasts` buffers eight, so
+ * three upload rejections in a row showed one. It also sits above the keyboard,
+ * because the commonest notice of all — a message that would not send — is
+ * raised while someone is typing.
+ */
 @Composable
 private fun Toasts() {
     val colors = chatColors
-    var message by remember { mutableStateOf<String?>(null) }
+    val queue = remember { mutableStateListOf<String>() }
     LaunchedEffect(Unit) {
-        Session.toasts.collect {
-            message = it
+        launch { Session.toasts.collect { queue.add(it) } }
+        while (true) {
+            if (queue.isEmpty()) {
+                delay(100)
+                continue
+            }
             delay(4000)
-            message = null
+            queue.removeAt(0)
         }
     }
-    message?.let {
-        Box(Modifier.fillMaxSize().navigationBarsPadding().padding(16.dp), Alignment.BottomCenter) {
-            Box(Modifier.clip(RoundedCornerShape(10.dp)).background(colors.bgFloating).padding(horizontal = 16.dp, vertical = 12.dp)) {
+    queue.firstOrNull()?.let {
+        Box(
+            Modifier.fillMaxSize()
+                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                .padding(16.dp),
+            Alignment.BottomCenter,
+        ) {
+            val shape = RoundedCornerShape(10.dp)
+            Box(
+                // In the light theme bgFloating is white on a near-white page,
+                // so without an edge a toast is an unreadable blank rectangle.
+                Modifier.clip(shape).background(colors.bgFloating).border(1.dp, colors.borderSubtle, shape)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
                 Text(it, color = colors.text, fontSize = 14.sp)
             }
         }

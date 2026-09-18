@@ -66,13 +66,19 @@
                 <data android:scheme="evilionchat" android:host="captcha" />
             </intent-filter>
 
-            <!-- Invite, guest and sticker links open in the app. -->
+            <!--
+              Invite, sticker and channel links open in the app.
+
+              A guest call link is for someone who has no account, and the app
+              had no screen for one: it fell through to the invite preview,
+              which can only ever answer "this invite is not valid any more".
+              Left to the browser, the link works.
+            -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="chat.evilion.xyz" android:pathPrefix="/invite/" />
-                <data android:scheme="https" android:host="chat.evilion.xyz" android:pathPrefix="/guest/" />
                 <data android:scheme="https" android:host="chat.evilion.xyz" android:pathPrefix="/stickers/" />
                 <data android:scheme="https" android:host="chat.evilion.xyz" android:pathPrefix="/channels/" />
             </intent-filter>

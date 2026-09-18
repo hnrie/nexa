@@ -46,7 +46,7 @@ import xyz.evilion.chat.ui.theme.chatColors
 
 /** What an invite link leads to, and the way in. */
 @Composable
-fun InviteScreen(code: String, guest: Boolean = false, fragment: String? = null) {
+fun InviteScreen(code: String, fragment: String? = null) {
     val colors = chatColors
     val scope = rememberCoroutineScope()
     var preview by remember(code) { mutableStateOf<InvitePreview?>(null) }

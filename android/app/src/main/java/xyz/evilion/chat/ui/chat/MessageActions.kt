@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -50,6 +49,7 @@ import xyz.evilion.chat.ui.pickers.Expressions
 import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.pickers.Pick
 import xyz.evilion.chat.ui.theme.chatColors
+import xyz.evilion.chat.ui.sheets.rememberSheetDismiss
 
 /** What a long press on a message offers. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +67,7 @@ fun MessageActions(
     val colors = chatColors
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val clipboard = LocalClipboardManager.current
     val me by AppState.me.collectAsState()
     val settings by SettingsStore.doc.collectAsState()
@@ -80,7 +81,7 @@ fun MessageActions(
 
     fun react(key: String) {
         detached { runCatching { MessageService.react(channelId, message.raw.id, key, true) } }
-        onDismiss()
+        dismiss()
     }
 
     /**
@@ -99,8 +100,8 @@ fun MessageActions(
         return
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 8.dp)) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
             if (canReact) {
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -136,7 +137,7 @@ fun MessageActions(
             if (!message.payload?.text.isNullOrEmpty()) {
                 ActionRow(Lucide.Copy, t("messageActions.copyText")) {
                     clipboard.setText(AnnotatedString(message.payload?.text.orEmpty()))
-                    onDismiss()
+                    dismiss()
                 }
             }
             ActionRow(Lucide.Link2, t("server.packEditor.copyLink")) {
@@ -144,7 +145,7 @@ fun MessageActions(
                 val path = if (serverId != null) "$base/channels/$serverId/$channelId/${message.raw.id}"
                 else "$base/channels/@me/$channelId/${message.raw.id}"
                 clipboard.setText(AnnotatedString(path))
-                onDismiss()
+                dismiss()
             }
             ActionRow(Lucide.MessageCircleMore, t("messageActions.markUnread")) {
                 detached {
@@ -162,7 +163,7 @@ fun MessageActions(
                         xyz.evilion.chat.net.MessagesApi.ack(channelId, upTo, manual = true)
                     }
                 }
-                onDismiss()
+                dismiss()
             }
             if (canManage || mine) {
                 ActionRow(Lucide.Pin, if (pinned) t("chat.pins.unpin") else t("messageActions.pin")) {
@@ -172,7 +173,7 @@ fun MessageActions(
                             else ChannelsApi.pin(channelId, message.raw.id)
                         }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
-                    onDismiss()
+                    dismiss()
                 }
             }
             if (mine || canManage) {
@@ -181,7 +182,7 @@ fun MessageActions(
                         runCatching { MessageService.delete(channelId, message.raw.id) }
                             .onFailure { Session.toasts.emit(it.message ?: t("messageActions.thatMessageCouldNotBeDeleted")) }
                     }
-                    onDismiss()
+                    dismiss()
                 }
             }
         }

@@ -712,6 +712,7 @@
   "mediaCache.thatFileIsTooLargeTo": "That file is too large to open here. Download it instead.",
   "messageActions.copyText": "Copy text",
   "messageActions.markUnread": "Mark unread",
+  "messageActions.messageActions": "Message actions",
   "messageActions.pin": "Pin",
   "messageActions.thatMessageCouldNotBeDeleted": "That message could not be deleted.",
   "messageRow.addAReaction": "Add a reaction",
@@ -2045,6 +2046,7 @@
   "sfu.videoIsPausedUntilNextMonth": "Video is paused until next month to keep calls free.",
   "shareQuality.source": "Source",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "Anyone with this link can join. It lasts a week.",
+  "sheets.channelSheets.goToTheMessage": "Go to the message",
   "sheets.channelSheets.invitePeople": "Invite people",
   "sheets.channelSheets.longPressAMessageToPin": "Long press a message to pin it.",
   "sheets.channelSheets.membersCount": {

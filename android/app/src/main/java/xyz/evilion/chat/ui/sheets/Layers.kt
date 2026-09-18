@@ -22,4 +22,8 @@ fun AppLayers(layers: List<Layer>) {
             is Layer.NewMessage -> NewMessageSheet { Nav.popTo(layer) }
         }
     }
+    // Not a layer anybody pushes: it appears by itself the moment the server
+    // offers an identity key that is not the one this device pinned, because
+    // nothing is sealed to that key until it is answered.
+    KeyChangeDialog()
 }

@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,7 +71,17 @@ import xyz.evilion.chat.net.ChannelsApi
 import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.pickers.EmojiIndex
 import xyz.evilion.chat.ui.pickers.ExpressionSheet
+import xyz.evilion.chat.ui.theme.Radius
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 
 /** A file waiting to be sent with the next message. */
 /**
@@ -112,6 +123,8 @@ fun Composer(
     var staged by remember(channelId) { mutableStateOf(listOf<Staged>()) }
     var sending by remember(channelId) { mutableStateOf(false) }
     var picker by remember { mutableStateOf(false) }
+    /** Whether a reply notifies the person being answered; the web offers the same switch. */
+    var ping by remember(replyTo?.raw?.id) { mutableStateOf(true) }
     var lastTyping by remember(channelId) { mutableStateOf(0L) }
     var slowModeUntil by remember(channelId) { mutableStateOf(0L) }
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -146,7 +159,11 @@ fun Composer(
             }
             val described = runCatching { Uploads.describe(context, uri) }.getOrNull() ?: return@mapNotNull null
             if (!Uploads.fits(described.size, limit)) {
-                scope.launch { Session.toasts.emit("${described.name} is larger than this server accepts.") }
+                scope.launch {
+                    Session.toasts.emit(
+                        t("server.packEditor.isLargerThan", "name" to described.name, "megabytes" to limit / (1024 * 1024)),
+                    )
+                }
                 null
             } else {
                 Staged(described)
@@ -192,6 +209,7 @@ fun Composer(
                 MessageService.send(
                     channelId, text,
                     replyTo = replyId,
+                    ping = ping,
                     attachments = metas,
                     attachmentRefs = refs,
                 )
@@ -216,41 +234,67 @@ fun Composer(
         }
     }
 
-    Column(modifier.fillMaxWidth().background(colors.bgBase)) {
+    Column(modifier.fillMaxWidth().background(colors.bgBase).padding(horizontal = 8.dp, vertical = 6.dp)) {
+        // The web's `.replyBar`: a 36px strip that sits on top of the input and
+        // shares its rounding, with the reply ping beside the close button. The
+        // ping toggle had no equivalent here at all, so a reply from the phone
+        // always notified the person being answered with no way to say "no need".
         if (replyTo != null) {
             Row(
-                Modifier.fillMaxWidth().background(colors.bgSurface).padding(horizontal = 12.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = Radius.sm, topEnd = Radius.sm))
+                    .background(colors.bgSurface).height(36.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     t("composer.replyingTo", "name" to AppState.nameFor(replyTo.raw.authorId, serverId)),
-                    color = colors.textMuted, fontSize = 12.sp, modifier = Modifier.weight(1f),
+                    color = colors.textMuted, fontSize = 14.sp, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
+                if (replyTo.raw.authorId != me?.id) {
+                    Text(
+                        if (ping) t("composer.composer.pingOn") else t("composer.composer.pingOff"),
+                        color = if (ping) colors.textBrand else colors.textMuted,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable(
+                            onClickLabel = t("composer.composer.replyPing"),
+                            role = Role.Switch,
+                        ) { ping = !ping }.padding(horizontal = 6.dp, vertical = 8.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
                 Icon(
-                    Lucide.X, t("composer.composer.cancelReply"), tint = colors.icon,
-                    modifier = Modifier.size(16.dp).clickable(onClick = onClearReply),
+                    Lucide.X, t("composer.composer.cancelReply"), tint = colors.textMuted,
+                    modifier = Modifier.clickable(onClick = onClearReply).padding(8.dp).size(16.dp),
                 )
             }
         }
         if (editing != null) {
             Row(
-                Modifier.fillMaxWidth().background(colors.bgSurface).padding(horizontal = 12.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = Radius.sm, topEnd = Radius.sm))
+                    .background(colors.bgSurface).height(36.dp).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(t("composer.editingMessage"), color = colors.warning, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(t("composer.editingMessage"), color = colors.warning, fontSize = 14.sp, modifier = Modifier.weight(1f))
                 Icon(
-                    Lucide.X, t("composer.cancelEdit"), tint = colors.icon,
-                    modifier = Modifier.size(16.dp).clickable {
+                    Lucide.X, t("composer.cancelEdit"), tint = colors.textMuted,
+                    modifier = Modifier.clickable {
                         onClearEdit()
                         value = TextFieldValue("")
-                    },
+                    }.padding(8.dp).size(16.dp),
                 )
             }
         }
 
+        // the tray is the top of the same box, the way `.tray + .box` is on the web
         if (staged.isNotEmpty()) {
             LazyRow(
-                Modifier.fillMaxWidth().padding(8.dp),
+                Modifier.fillMaxWidth()
+                    .clip(
+                        if (replyTo != null || editing != null) RoundedCornerShape(0.dp)
+                        else RoundedCornerShape(topStart = Radius.sm, topEnd = Radius.sm),
+                    )
+                    .background(colors.bgComposer).padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(staged.size, key = { staged[it].id }) { index ->
@@ -293,21 +337,39 @@ fun Composer(
             }
         }
 
-        MentionSuggestions(value, serverId) { replacement -> value = replacement }
+        // anchored here, but drawn in a popup over the conversation: as a child
+        // of this column it pushed the whole message list up by eight rows the
+        // moment anyone typed "@", and dropped it again on the next keystroke
+        Box(Modifier.fillMaxWidth()) {
+            MentionSuggestions(value, serverId) { replacement -> value = replacement }
+        }
 
+        // One box holding the attach button, the text and the two trailing
+        // buttons, as `.box` does on the web. They used to sit outside a pill,
+        // which made the phone's composer a different shape from the browser's
+        // and left the text box narrower than it needed to be.
+        val stacked = replyTo != null || editing != null || staged.isNotEmpty()
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.fillMaxWidth()
+                .clip(
+                    if (stacked) RoundedCornerShape(bottomStart = Radius.sm, bottomEnd = Radius.sm)
+                    else RoundedCornerShape(Radius.sm),
+                )
+                .background(colors.bgComposer),
             verticalAlignment = Alignment.Bottom,
         ) {
+            // A channel you cannot attach to keeps the gap, so the box is the
+            // same shape and the text starts in the same place everywhere.
             if (canAttach) {
                 IconButton(onClick = { pickFiles.launch(arrayOf("*/*")) }, enabled = !sending) {
                     Icon(Lucide.CirclePlus, t("composer.attach"), tint = colors.icon)
                 }
+            } else {
+                Spacer(Modifier.width(48.dp))
             }
             Box(
                 Modifier.weight(1f).heightIn(min = 44.dp, max = 160.dp)
-                    .clip(RoundedCornerShape(22.dp)).background(colors.bgComposer)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(end = 8.dp, top = 11.dp, bottom = 11.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 val waiting = ((slowModeUntil - now) / 1000).toInt()
@@ -319,7 +381,7 @@ fun Composer(
                             editing != null -> t("composer.editYourMessage")
                             else -> t("composer.composer.messageGroup", "name" to (channel?.let { AppState.channelName(it, me?.id) } ?: ""))
                         },
-                        color = colors.textPlaceholder, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = colors.textPlaceholder, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
                 BasicTextField(
@@ -334,7 +396,7 @@ fun Composer(
                         }
                     },
                     enabled = canSend && slowModeUntil <= now,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = colors.text, fontSize = 15.sp),
+                    textStyle = androidx.compose.ui.text.TextStyle(color = colors.text, fontSize = 16.sp, lineHeight = 22.sp),
                     cursorBrush = SolidColor(colors.brand),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -410,7 +472,16 @@ private fun MentionSuggestions(value: TextFieldValue, serverId: String?, onPick:
     }
     if (candidates.isEmpty()) return
 
-    Column(Modifier.fillMaxWidth().background(colors.bgFloating).padding(vertical = 4.dp)) {
+    val shape = RoundedCornerShape(Radius.sm)
+    Popup(popupPositionProvider = AboveAnchor, properties = PopupProperties(focusable = false)) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+                .shadow(6.dp, shape)
+                .clip(shape)
+                .background(colors.bgFloating)
+                .border(1.dp, colors.borderSubtle, shape)
+                .padding(vertical = 4.dp),
+        ) {
         for (user in candidates) {
             Row(
                 Modifier.fillMaxWidth().clickable {
@@ -427,5 +498,16 @@ private fun MentionSuggestions(value: TextFieldValue, serverId: String?, onPick:
                 Text("@${user.username}", color = colors.textMuted, fontSize = 12.sp)
             }
         }
+        }
     }
+}
+
+/** Puts a popup directly above whatever it is anchored to. */
+private object AboveAnchor : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset = IntOffset(0, (anchorBounds.top - popupContentSize.height).coerceAtLeast(0))
 }

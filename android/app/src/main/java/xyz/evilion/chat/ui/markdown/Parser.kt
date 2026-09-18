@@ -19,6 +19,7 @@ object Markdown {
     private val RE_MASKED = Regex("^\\[([^\\]\\n]{0,512})\\]\\(\\s*(<[^>\\s]{1,2048}>|[^()\\s]{1,2048})\\s*\\)")
     private val RE_HEADING = Regex("^(#{1,3}) (.*)$")
     private val RE_SUBTEXT = Regex("^-# (.*)$")
+    private val RE_FENCE_LANG = Regex("^[a-zA-Z0-9_+-]*")
     private val RE_LIST = Regex("^( *)(?:([-*])|(\\d{1,9})\\.) +(.*)$")
     /**
      * One emoji: a flag pair, a keycap, or a pictograph with its modifiers and
@@ -56,27 +57,35 @@ object Markdown {
         while (i < lines.size) {
             val line = lines[i]
 
-            // ```lang … ``` — only a fence that is closed makes a code block
-            if (line.trimStart().startsWith("```")) {
-                val lang = line.trimStart().removePrefix("```").trim()
-                    .takeIf { it.isNotEmpty() && it.all { c -> c.isLetterOrDigit() || c in "+-_#" } }
-                var j = i + 1
-                val body = mutableListOf<String>()
-                var closed = false
-                while (j < lines.size) {
-                    if (lines[j].trim() == "```") {
-                        closed = true
-                        break
-                    }
-                    body += lines[j]
-                    j++
+            // ```lang … ``` — read the way `readFence` in parse.ts reads it: a
+            // fence that is never closed still runs to the end of the message,
+            // and the closing ``` does not have to be alone on its line. This
+            // used to insist on a closed fence on a line of its own, so the
+            // commonest half-typed block was a wall of literal backticks in one
+            // client and a code panel in the other.
+            if (line.startsWith("```")) {
+                flush()
+                val rest = lines.drop(i).joinToString("\n")
+                val lineEnd = rest.indexOf('\n').takeIf { it >= 0 } ?: rest.length
+                val langRaw = RE_FENCE_LANG.find(rest.substring(3, lineEnd))?.value.orEmpty()
+                val lang: String?
+                val from: Int
+                if (rest.substring(3 + langRaw.length, lineEnd).isBlank()) {
+                    lang = langRaw.ifEmpty { null }
+                    from = if (lineEnd >= rest.length) rest.length else lineEnd + 1
+                } else {
+                    // ```code``` on one line: none of it is a language name
+                    lang = null
+                    from = 3
                 }
-                if (closed) {
-                    flush()
-                    out += Node.CodeBlock(lang, body.joinToString("\n").trim('\n'))
-                    i = j + 1
-                    continue
+                val close = rest.indexOf("```", from)
+                val body = if (close < 0) rest.substring(from) else rest.substring(from, close)
+                out += Node.CodeBlock(lang, body.removeSuffix("\n"))
+                if (close >= 0) {
+                    val tail = rest.substring(close + 3).removePrefix("\n")
+                    if (tail.isNotEmpty()) out += blocks(tail)
                 }
+                return out
             }
 
             val heading = RE_HEADING.find(line)
@@ -150,7 +159,25 @@ object Markdown {
 
     // --- inline ------------------------------------------------------------
 
+    /**
+     * A run of inline markdown, one line at a time.
+     *
+     * Every marker is closed on the line that opened it, which is what
+     * `parseInline` in parse.ts does and is not a detail: scanning the whole
+     * message meant a stray ``` on one line found the closing fence three lines
+     * down and painted everything between them as one monospace run, which is
+     * what a fenced block looked like when the fence did not start its line.
+     */
     private fun inline(source: String): List<Node> {
+        val out = mutableListOf<Node>()
+        for ((index, line) in source.split("\n").withIndex()) {
+            if (index > 0) out += Node.Break
+            out += inlineLine(line)
+        }
+        return out
+    }
+
+    private fun inlineLine(source: String): List<Node> {
         val out = mutableListOf<Node>()
         val buf = StringBuilder()
         var i = 0
@@ -172,11 +199,6 @@ object Markdown {
             val c = source[i]
             val rest = source.substring(i)
 
-            if (c == '\n') {
-                take(Node.Break, 1)
-                continue
-            }
-
             // a backslash takes the punctuation after it literally
             if (c == '\\' && i + 1 < source.length && !source[i + 1].isLetterOrDigit()) {
                 buf.append(source[i + 1])
@@ -188,7 +210,9 @@ object Markdown {
                 val run = runOf(source, i, '`')
                 val close = source.indexOf("`".repeat(run), i + run)
                 if (close > 0) {
-                    take(Node.Code(source.substring(i + run, close).trim()), close + run - i)
+                    // not trimmed: the chip's padding is drawn, not typed, and
+                    // parse.ts keeps whatever is between the backticks
+                    take(Node.Code(source.substring(i + run, close)), close + run - i)
                     continue
                 }
             }

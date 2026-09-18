@@ -43,6 +43,8 @@ object Lucide {
 
     val ArrowDown: ImageVector by lazy { icon("M12 5v14", "m19 12-7 7-7-7") }
     val ArrowLeft: ImageVector by lazy { icon("m12 19-7-7 7-7", "M19 12H5") }
+    val ArrowLeftFromLine: ImageVector by lazy { icon("m9 6-6 6 6 6", "M3 12h14", "M21 19V5") }
+    val ArrowRightToLine: ImageVector by lazy { icon("M17 12H3", "m11 18 6-6-6-6", "M21 5v14") }
     val ArrowUp: ImageVector by lazy { icon("m5 12 7-7 7 7", "M12 19V5") }
     val AtSign: ImageVector by lazy { icon("M8.0 12.0A4.0 4.0 0 1 0 16.0 12.0A4.0 4.0 0 1 0 8.0 12.0", "M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8") }
     val Ban: ImageVector by lazy { icon("M2.0 12.0A10.0 10.0 0 1 0 22.0 12.0A10.0 10.0 0 1 0 2.0 12.0", "M4.929 4.929 19.07 19.071") }
@@ -80,6 +82,7 @@ object Lucide {
     val LoaderCircle: ImageVector by lazy { icon("M21 12a9 9 0 1 1-6.219-8.56") }
     val Lock: ImageVector by lazy { icon("M5.0 11.0h14.0a2.0 2.0 0 0 1 2.0 2.0v7.0a2.0 2.0 0 0 1 -2.0 2.0h-14.0a2.0 2.0 0 0 1 -2.0 -2.0v-7.0a2.0 2.0 0 0 1 2.0 -2.0z", "M7 11V7a5 5 0 0 1 10 0v4") }
     val LogOut: ImageVector by lazy { icon("m16 17 5-5-5-5", "M21 12H9", "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4") }
+    val MailOpen: ImageVector by lazy { icon("M21.2 8.4c.5.38.8.97.8 1.6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V10a2 2 0 0 1 .8-1.6l8-6a2 2 0 0 1 2.4 0l8 6Z", "m22 10-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 10") }
     val Maximize: ImageVector by lazy { icon("M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3") }
     val Maximize2: ImageVector by lazy { icon("M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6") }
     val Menu: ImageVector by lazy { icon("M4 5h16", "M4 12h16", "M4 19h16") }
@@ -113,6 +116,7 @@ object Lucide {
     val ShieldAlert: ImageVector by lazy { icon("M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", "M12 8v4", "M12 16h.01") }
     val ShieldCheck: ImageVector by lazy { icon("M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", "m9 12 2 2 4-4") }
     val Smile: ImageVector by lazy { icon("M15 10V9", "M16.472 15a6 6 0 01-8.943 0", "M9 10V9", "M2.0 12.0A10.0 10.0 0 1 0 22.0 12.0A10.0 10.0 0 1 0 2.0 12.0") }
+    val SmilePlus: ImageVector by lazy { icon("M13.267 2.08a10 10 0 108.653 8.653", "M15 10V9", "M16 5h6", "M16.472 15a6 6 0 01-8.943 0", "M19 2v6", "M9 10V9") }
     val Star: ImageVector by lazy { icon("M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z") }
     val Sticker: ImageVector by lazy { icon("M21 9a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 15 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z", "M15 3v5a1 1 0 0 0 1 1h5", "M8 13h.01", "M16 13h.01", "M10 16s.8 1 2 1c1.3 0 2-1 2-1") }
     val SwitchCamera: ImageVector by lazy { icon("M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5", "M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5", "M9.0 12.0A3.0 3.0 0 1 0 15.0 12.0A3.0 3.0 0 1 0 9.0 12.0", "m18 22-3-3 3-3", "m6 2 3 3-3 3") }

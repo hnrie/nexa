@@ -52,6 +52,8 @@ import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.common.Badge
 import xyz.evilion.chat.ui.common.ServerIcon
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.material3.IconButton
 
 /** The rail of servers and, beside it, the channels of the one that is open. */
 @Composable
@@ -80,7 +82,7 @@ private fun ServerRail(route: Route) {
     val activeServer = (route as? Route.Chat)?.serverId
 
     Column(
-        Modifier.width(72.dp).fillMaxHeight().background(colors.bgBase).statusBarsPadding(),
+        Modifier.width(72.dp).fillMaxHeight().background(colors.bgBase).statusBarsPadding().navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         LazyColumn(
@@ -112,7 +114,9 @@ private fun ServerRail(route: Route) {
                     }
                     if (unread && mentions == 0) {
                         Box(
-                            Modifier.align(Alignment.CenterStart).offset(x = (-14).dp)
+                            // the rail is 72 dp around a 48 dp button, so 14 dp
+                            // put the dot outside it, where the list clips it away
+                            Modifier.align(Alignment.CenterStart).offset(x = (-8).dp)
                                 .size(8.dp).clip(CircleShape).background(colors.textStrong),
                         )
                     }
@@ -314,11 +318,9 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(t("settings.privacy.directMessages"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Icon(
-                Lucide.Plus, t("notify.newMessage"),
-                tint = colors.icon,
-                modifier = Modifier.size(20.dp).clickable { Nav.push(Layer.NewMessage) },
-            )
+            IconButton(onClick = { Nav.push(Layer.NewMessage) }) {
+                Icon(Lucide.Plus, t("notify.newMessage"), tint = colors.icon, modifier = Modifier.size(20.dp))
+            }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(colors.borderSubtle))
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp)) {
@@ -349,7 +351,7 @@ private fun DirectMessages(activeChannel: String?, onPick: () -> Unit) {
                         xyz.evilion.chat.ui.common.ServerIcon(channel.id, channel.name.ifEmpty { "G" }, channel.iconId, 32.dp)
                     } else {
                         val user = other?.let { AppState.user(it) }
-                        Avatar(other ?: channel.id, user?.name ?: "?", user?.avatarId, 32.dp, status = other?.let {
+                        Avatar(other ?: channel.id, user?.name ?: "?", user?.avatarId, 32.dp, ringBackground = colors.bgRaised, status = other?.let {
                             AppState.presences.value[it]?.status ?: "offline"
                         })
                     }
@@ -379,10 +381,13 @@ private fun SelfPanel() {
     val me by AppState.me.collectAsState()
     val presence = me?.let { AppState.presences.value[it.id]?.status } ?: "online"
     Row(
-        Modifier.fillMaxWidth().background(colors.bgSurface).padding(horizontal = 10.dp, vertical = 8.dp),
+        // the settings gear used to sit inside the system gesture strip, so
+        // opening settings mostly triggered the system's back gesture instead
+        Modifier.fillMaxWidth().background(colors.bgSurface).navigationBarsPadding()
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Avatar(me?.id ?: "0", me?.name ?: "?", me?.avatarId, 32.dp, status = presence)
+        Avatar(me?.id ?: "0", me?.name ?: "?", me?.avatarId, 32.dp, status = presence, ringBackground = colors.bgSurface)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(me?.name ?: "", color = colors.textStrong, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
@@ -391,10 +396,8 @@ private fun SelfPanel() {
                 color = colors.textMuted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(
-            Lucide.Settings, t("main.sidebar.settings"),
-            tint = colors.icon,
-            modifier = Modifier.size(22.dp).clickable { Nav.go(Route.Settings()) },
-        )
+        IconButton(onClick = { Nav.go(Route.Settings()) }) {
+            Icon(Lucide.Settings, t("main.sidebar.settings"), tint = colors.icon, modifier = Modifier.size(22.dp))
+        }
     }
 }

@@ -48,6 +48,12 @@ import xyz.evilion.chat.ui.Nav
 import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.common.EmptyState
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.semantics.Role
 
 /** Friends, the people waiting on an answer, and the ones you blocked. */
 @Composable
@@ -77,7 +83,11 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
             Text(t("sidebar.dMSidebar.friends"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
         }
         Row(
-            Modifier.fillMaxWidth().background(colors.bgRaised).padding(horizontal = 8.dp, vertical = 6.dp),
+            // four tabs do not fit a narrow phone in German or Russian, and the
+            // last one — Blocked — was simply clipped away with no way to reach it
+            Modifier.fillMaxWidth().background(colors.bgRaised)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             for ((id, label) in listOf("online" to t("chat.memberList.online"), "all" to t("friends.all"), "pending" to t("friends.friendsScreen.pending"), "blocked" to t("friends.blocked"))) {
@@ -118,7 +128,11 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
                 t("composer.send"),
                 color = if (adding.isBlank()) colors.textMuted else colors.brand,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable(enabled = adding.isNotBlank()) {
+                modifier = Modifier.clickable(
+                    enabled = adding.isNotBlank(),
+                    onClickLabel = t("composer.send"),
+                    role = Role.Button,
+                ) {
                     scope.launch {
                         runCatching {
                             Session.guarded("friend_request") { captcha -> RelationshipsApi.request(adding.trim(), captcha) }
@@ -137,7 +151,12 @@ fun FriendsScreen(onOpenDrawer: () -> Unit) {
         if (list.isEmpty()) {
             EmptyState(Lucide.Users, t("friends.friendsScreen.nobodyHereYet"), t("friends.friendsScreen.addSomeoneByTheirUsernameTo"))
         } else {
-            LazyColumn(Modifier.weight(1f)) {
+            LazyColumn(
+                Modifier.weight(1f),
+                // the last friend's accept and decline buttons used to sit under
+                // the gesture bar, where the taps go to the system
+                contentPadding = WindowInsets.navigationBars.asPaddingValues(),
+            ) {
                 items(list.size, key = { list[it].user.id }) { index ->
                     val relationship = list[index]
                     val user = relationship.user

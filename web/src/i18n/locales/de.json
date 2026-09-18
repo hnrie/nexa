@@ -712,6 +712,7 @@
   "mediaCache.thatFileIsTooLargeTo": "Diese Datei ist zu groß, um sie hier zu öffnen. Lade sie stattdessen herunter.",
   "messageActions.copyText": "Text kopieren",
   "messageActions.markUnread": "Als ungelesen markieren",
+  "messageActions.messageActions": "Nachrichtenaktionen",
   "messageActions.pin": "Anpinnen",
   "messageActions.thatMessageCouldNotBeDeleted": "Diese Nachricht konnte nicht gelöscht werden.",
   "messageRow.addAReaction": "Reaktion hinzufügen",
@@ -2045,6 +2046,7 @@
   "sfu.videoIsPausedUntilNextMonth": "Video pausiert bis nächsten Monat, damit Anrufe kostenlos bleiben.",
   "shareQuality.source": "Original",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "Jeder mit diesem Link kommt hinein. Er gilt eine Woche.",
+  "sheets.channelSheets.goToTheMessage": "Zur Nachricht springen",
   "sheets.channelSheets.invitePeople": "Leute einladen",
   "sheets.channelSheets.longPressAMessageToPin": "Halte eine Nachricht gedrückt, um sie anzupinnen.",
   "sheets.channelSheets.membersCount": {

@@ -67,6 +67,16 @@ data class ChatColors(
     val spoiler: Color,
     val spoilerRevealed: Color,
     val codeBg: Color,
+    val codeBorder: Color,
+    // The syntax roles are part of the palette rather than a theme bolted on
+    // top of it, so a code block is never painted in colours meant for the
+    // other background. `--code-variable` has no producer on this side yet.
+    val codeKeyword: Color,
+    val codeString: Color,
+    val codeNumber: Color,
+    val codeComment: Color,
+    val codeTitle: Color,
+    val codeType: Color,
     val embedBg: Color,
     val isDark: Boolean,
 )
@@ -114,6 +124,13 @@ val DarkColors = ChatColors(
     spoiler = Color(0xFF7D7E87),
     spoilerRevealed = Color(0xFF242429),
     codeBg = Color(0xFF242429),
+    codeBorder = Color(0x1F97979F),
+    codeKeyword = Color(0xFFC678DD),
+    codeString = Color(0xFF98C379),
+    codeNumber = Color(0xFFD19A66),
+    codeComment = Color(0xFF8D939E),
+    codeTitle = Color(0xFF61AFEF),
+    codeType = Color(0xFFE5C07B),
     embedBg = Color(0xFF393A41),
     isDark = true,
 )
@@ -207,6 +224,13 @@ val LightColors = ChatColors(
     // not bgBase: a code block or an embed drawn the same colour as the page
     // behind it loses every edge it has
     codeBg = Color(0xFFFFFFFF),
+    codeBorder = Color(0x4797979F),
+    codeKeyword = Color(0xFFCF222E),
+    codeString = Color(0xFF0A3069),
+    codeNumber = Color(0xFF0550AE),
+    codeComment = Color(0xFF636B75),
+    codeTitle = Color(0xFF7A3FD4),
+    codeType = Color(0xFF116329),
     embedBg = Color(0xFFFFFFFF),
     isDark = false,
 )
@@ -277,7 +301,12 @@ fun NexaTheme(colors: ChatColors, content: @Composable () -> Unit) {
     val context = LocalContext.current
     SideEffect {
         context.findActivity()?.window?.let { window ->
-            WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !dark
+            val bars = WindowCompat.getInsetsController(window, window.decorView)
+            bars.isAppearanceLightStatusBars = !dark
+            // Only the status bar was ever told. On a three-button phone in the
+            // light theme that left white back/home/recents glyphs on a
+            // near-white bar: the navigation buttons simply were not there.
+            bars.isAppearanceLightNavigationBars = !dark
         }
     }
     androidx.compose.runtime.CompositionLocalProvider(LocalChatColors provides colors) {

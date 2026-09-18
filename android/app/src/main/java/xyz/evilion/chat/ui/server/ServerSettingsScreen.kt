@@ -65,6 +65,8 @@ import xyz.evilion.chat.ui.Route
 import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.common.ServerIcon
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.IconButton
 
 /** A server's settings: what it is, who is in it, and who may do what. */
 @Composable
@@ -78,19 +80,22 @@ fun ServerSettingsScreen(serverId: String, startPage: String) {
     }
     val perms = state.myPermissions
 
+    BackHandler(enabled = page != "overview") { page = "overview" }
+
     Column(Modifier.fillMaxSize().background(colors.bgBase)) {
         Row(
-            Modifier.fillMaxWidth().background(colors.bgRaised).statusBarsPadding().height(52.dp).padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().background(colors.bgRaised).statusBarsPadding().height(52.dp).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon,
-                modifier = Modifier.size(24.dp).clickable {
+            IconButton(
+                onClick = {
                     if (page == "overview") Nav.openChannel(serverId, AppState.channelsOf(serverId).firstOrNull { it.isText }?.id)
                     else page = "overview"
                 },
-            )
-            Spacer(Modifier.width(16.dp))
+            ) {
+                Icon(Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(8.dp))
             Text(state.server.name, color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
 
@@ -258,7 +263,7 @@ private fun MembersPage(serverId: String) {
                 if (canAct && state.myPermissions.has(P.KICK_MEMBERS)) {
                     Text(
                         t("server.members.kick"), color = colors.danger, fontSize = 13.sp,
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) {
                             scope.launch { runCatching { ServersApi.kick(serverId, member.userId) } }
                         }.padding(8.dp),
                     )
@@ -410,7 +415,7 @@ private fun InvitesPage(serverId: String) {
                     }
                     Text(
                         t("server.invites.revoke"), color = colors.danger, fontSize = 13.sp,
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) {
                             scope.launch {
                                 runCatching { ServersApi.deleteInvite(invite.code) }
                                 invites = runCatching { ServersApi.invites(serverId) }.getOrNull()
@@ -442,7 +447,7 @@ private fun BansPage(serverId: String) {
                     }
                     Text(
                         t("server.serverSettingsScreen.unban"), color = colors.textBrand, fontSize = 13.sp,
-                        modifier = Modifier.clickable {
+                        modifier = Modifier.clickable(role = androidx.compose.ui.semantics.Role.Button) {
                             scope.launch {
                                 runCatching { ServersApi.unban(serverId, ban.userId) }
                                 bans = runCatching { ServersApi.bans(serverId) }.getOrNull()

@@ -727,6 +727,7 @@
   "mediaCache.thatFileIsTooLargeTo": "Этот файл слишком велик, чтобы открыть его здесь. Скачайте его.",
   "messageActions.copyText": "Копировать текст",
   "messageActions.markUnread": "Отметить непрочитанным",
+  "messageActions.messageActions": "Действия с сообщением",
   "messageActions.pin": "Закрепить",
   "messageActions.thatMessageCouldNotBeDeleted": "Это сообщение не удалось удалить.",
   "messageRow.addAReaction": "Добавить реакцию",
@@ -2117,6 +2118,7 @@
   "sfu.videoIsPausedUntilNextMonth": "Видео на паузе до следующего месяца, чтобы звонки оставались бесплатными.",
   "shareQuality.source": "Исходное",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "Любой с этой ссылкой может войти. Она действует неделю.",
+  "sheets.channelSheets.goToTheMessage": "Перейти к сообщению",
   "sheets.channelSheets.invitePeople": "Пригласить людей",
   "sheets.channelSheets.longPressAMessageToPin": "Задержите палец на сообщении, чтобы закрепить его.",
   "sheets.channelSheets.membersCount": {

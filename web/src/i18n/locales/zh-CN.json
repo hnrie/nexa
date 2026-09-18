@@ -694,6 +694,7 @@
   "mediaCache.thatFileIsTooLargeTo": "这个文件太大，无法在这里打开。请改为下载。",
   "messageActions.copyText": "复制文字",
   "messageActions.markUnread": "标为未读",
+  "messageActions.messageActions": "消息操作",
   "messageActions.pin": "置顶",
   "messageActions.thatMessageCouldNotBeDeleted": "那条消息无法删除。",
   "messageRow.addAReaction": "添加表情回应",
@@ -1994,6 +1995,7 @@
   "sfu.videoIsPausedUntilNextMonth": "为了让通话保持免费，视频已暂停到下个月。",
   "shareQuality.source": "原始",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "有这个链接的人都能加入。有效期一周。",
+  "sheets.channelSheets.goToTheMessage": "跳转到该消息",
   "sheets.channelSheets.invitePeople": "邀请他人",
   "sheets.channelSheets.longPressAMessageToPin": "长按一条消息即可置顶。",
   "sheets.channelSheets.membersCount": {

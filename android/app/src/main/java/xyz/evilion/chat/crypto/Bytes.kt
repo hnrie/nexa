@@ -1,5 +1,6 @@
 package xyz.evilion.chat.crypto
 
+import java.io.InputStream
 import java.security.SecureRandom
 import java.util.Base64
 
@@ -17,6 +18,25 @@ object Bytes {
     /** Null instead of throwing, for anything that came off the wire. */
     fun unb64OrNull(text: String?): ByteArray? =
         if (text == null) null else runCatching { Base64.getDecoder().decode(text) }.getOrNull()
+
+    /**
+     * Up to [n] bytes from [input]: fewer only where the stream ends.
+     *
+     * `InputStream.readNBytes` does exactly this, but Android only has it from
+     * 13 (API 33). On the 8 to 12 this app also installs on, every call was a
+     * `NoSuchMethodError`, so not one encrypted attachment could be opened —
+     * which no test caught, because the JVM they run on has had it since 11.
+     */
+    fun readUpTo(input: InputStream, n: Int): ByteArray {
+        val out = ByteArray(n)
+        var at = 0
+        while (at < n) {
+            val got = input.read(out, at, n - at)
+            if (got < 0) break
+            at += got
+        }
+        return if (at == n) out else out.copyOf(at)
+    }
 
     fun concat(vararg parts: ByteArray): ByteArray {
         val out = ByteArray(parts.sumOf { it.size })

@@ -13,13 +13,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -44,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -113,8 +119,46 @@ fun AuthScreen(locked: Boolean = false) {
         }
     }
 
+    fun signIn() = run {
+        val outcome = Session.login(username.trim(), password)
+        if (outcome.mfaRequired) {
+            code = ""
+            mode = Mode.MFA
+        }
+    }
+
+    fun createAccount() {
+        if (password != confirm) {
+            error = t("auth.authScreen.thosePasswordsDoNotMatch")
+            return
+        }
+        if (password.length < 8) {
+            error = t("auth.authScreen.useAtLeast8Characters")
+            return
+        }
+        run {
+            Session.register(
+                username.trim(), displayName.trim().ifEmpty { username.trim() }, password,
+                inviteCode.trim().ifEmpty { null }, registrationKey.trim().ifEmpty { null },
+            )
+        }
+    }
+
+    fun recoverAccount() = run { Session.recover(username.trim(), recoveryKey.trim(), password) }
+
+    fun submitMfa() = run {
+        if (useBackupCode) Session.completeMfa(null, code.trim()) else Session.completeMfa(code.trim(), null)
+    }
+
+    fun unlockDevice() = run { Session.unlock(password) }
+
+    // One inset for the keyboard and the navigation bar together: padding for
+    // both leaves a nav bar's worth of empty screen above an open keyboard,
+    // which on a short form is the difference between reaching the button and
+    // not.
     Box(
-        Modifier.fillMaxSize().background(colors.bgBase).systemBarsPadding().imePadding(),
+        Modifier.fillMaxSize().background(colors.bgBase).statusBarsPadding()
+            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -165,16 +209,12 @@ fun AuthScreen(locked: Boolean = false) {
                     Field(
                         value = code,
                         onChange = { code = it },
-                        label = if (useBackupCode) t("login.backupCode") else "6-digit code",
+                        label = if (useBackupCode) t("login.backupCode") else t("settings.security.enterTheSixDigitCodeIt"),
                         keyboardType = if (useBackupCode) KeyboardType.Text else KeyboardType.NumberPassword,
+                        onSubmit = { submitMfa() },
                     )
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton(t("settings.security.continue"), busy) {
-                        run {
-                            if (useBackupCode) Session.completeMfa(null, code.trim())
-                            else Session.completeMfa(code.trim(), null)
-                        }
-                    }
+                    PrimaryButton(t("settings.security.continue"), busy) { submitMfa() }
                     TextButton(onClick = { useBackupCode = !useBackupCode; code = "" }) {
                         Text(if (useBackupCode) t("auth.authScreen.useYourAuthenticatorApp") else t("login.useABackupCode"), color = colors.textBrand)
                     }
@@ -189,6 +229,7 @@ fun AuthScreen(locked: Boolean = false) {
                         onChange = { password = it },
                         label = t("chat.lockedChannel.password"),
                         password = !showPassword,
+                        onSubmit = { unlockDevice() },
                         trailing = {
                             IconButton(onClick = { showPassword = !showPassword }) {
                                 Icon(
@@ -199,7 +240,7 @@ fun AuthScreen(locked: Boolean = false) {
                         },
                     )
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton(t("lock.unlock"), busy) { run { Session.unlock(password) } }
+                    PrimaryButton(t("lock.unlock"), busy) { unlockDevice() }
                     TextButton(onClick = { run { Session.logout() } }) {
                         Text(t("auth.authScreen.signOutInstead"), color = colors.textMuted)
                     }
@@ -210,11 +251,9 @@ fun AuthScreen(locked: Boolean = false) {
                     Spacer(Modifier.height(10.dp))
                     Field(recoveryKey, { recoveryKey = it }, t("settings.account.recoveryKey"), mono = true)
                     Spacer(Modifier.height(10.dp))
-                    Field(password, { password = it }, t("settings.account.newPassword"), password = true)
+                    Field(password, { password = it }, t("settings.account.newPassword"), password = true, onSubmit = { recoverAccount() })
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton(t("auth.authScreen.setANewPassword"), busy) {
-                        run { Session.recover(username.trim(), recoveryKey.trim(), password) }
-                    }
+                    PrimaryButton(t("auth.authScreen.setANewPassword"), busy) { recoverAccount() }
                     TextButton(onClick = { mode = Mode.SIGN_IN }) { Text(t("auth.authScreen.backToSignIn"), color = colors.textMuted) }
                 }
 
@@ -232,39 +271,29 @@ fun AuthScreen(locked: Boolean = false) {
                         }
                     })
                     Spacer(Modifier.height(10.dp))
-                    Field(confirm, { confirm = it }, t("register.confirmPassword"), password = true)
-                    if (instance?.registration == "invite") {
+                    val wantsInvite = instance?.registration == "invite"
+                    val wantsKey = instance?.needsKey == true
+                    Field(
+                        confirm, { confirm = it }, t("register.confirmPassword"), password = true,
+                        onSubmit = if (wantsInvite || wantsKey) null else ({ createAccount() }),
+                    )
+                    if (wantsInvite) {
                         Spacer(Modifier.height(10.dp))
-                        Field(inviteCode, { inviteCode = it }, t("auth.authScreen.inviteCode"))
+                        Field(inviteCode, { inviteCode = it }, t("auth.authScreen.inviteCode"), onSubmit = if (wantsKey) null else ({ createAccount() }))
                     }
-                    if (instance?.needsKey == true) {
+                    if (wantsKey) {
                         Spacer(Modifier.height(10.dp))
-                        Field(registrationKey, { registrationKey = it }, t("auth.authScreen.registrationKey"))
+                        Field(registrationKey, { registrationKey = it }, t("auth.authScreen.registrationKey"), onSubmit = { createAccount() })
                     }
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton(t("auth.authScreen.createAccount"), busy) {
-                        if (password != confirm) {
-                            error = t("auth.authScreen.thosePasswordsDoNotMatch")
-                            return@PrimaryButton
-                        }
-                        if (password.length < 8) {
-                            error = t("auth.authScreen.useAtLeast8Characters")
-                            return@PrimaryButton
-                        }
-                        run {
-                            Session.register(
-                                username.trim(), displayName.trim().ifEmpty { username.trim() }, password,
-                                inviteCode.trim().ifEmpty { null }, registrationKey.trim().ifEmpty { null },
-                            )
-                        }
-                    }
+                    PrimaryButton(t("auth.authScreen.createAccount"), busy) { createAccount() }
                     TextButton(onClick = { mode = Mode.SIGN_IN }) { Text(t("auth.authScreen.iAlreadyHaveAnAccount"), color = colors.textBrand) }
                 }
 
                 Mode.SIGN_IN -> {
                     Field(username, { username = it }, t("settings.account.username"))
                     Spacer(Modifier.height(10.dp))
-                    Field(password, { password = it }, t("chat.lockedChannel.password"), password = !showPassword, imeAction = ImeAction.Done, trailing = {
+                    Field(password, { password = it }, t("chat.lockedChannel.password"), password = !showPassword, onSubmit = { signIn() }, trailing = {
                         IconButton(onClick = { showPassword = !showPassword }) {
                             Icon(
                                 if (showPassword) Lucide.EyeOff else Lucide.Eye,
@@ -273,15 +302,7 @@ fun AuthScreen(locked: Boolean = false) {
                         }
                     })
                     Spacer(Modifier.height(16.dp))
-                    PrimaryButton(t("login.signIn"), busy) {
-                        run {
-                            val outcome = Session.login(username.trim(), password)
-                            if (outcome.mfaRequired) {
-                                code = ""
-                                mode = Mode.MFA
-                            }
-                        }
-                    }
+                    PrimaryButton(t("login.signIn"), busy) { signIn() }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                         TextButton(onClick = { mode = Mode.RECOVER }) { Text(t("auth.authScreen.forgotPassword"), color = colors.textMuted) }
                         if (instance?.registration != "closed") {
@@ -334,9 +355,19 @@ private fun Field(
     hint: String? = null,
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
+    /**
+     * What the keyboard's own confirm key does.
+     *
+     * Without it the last field of every form was a dead end: the keyboard
+     * covers the button that finishes the form, so signing in or creating an
+     * account meant dismissing the keyboard or scrolling past it first, with
+     * nothing on screen to say that either would work.
+     */
+    onSubmit: (() -> Unit)? = null,
     trailing: @Composable (() -> Unit)? = null,
 ) {
     val colors = chatColors
+    val keyboard = LocalSoftwareKeyboardController.current
     Column(Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = value,
@@ -346,7 +377,13 @@ private fun Field(
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (password) KeyboardType.Password else keyboardType,
-                imeAction = imeAction,
+                imeAction = if (onSubmit != null) ImeAction.Done else imeAction,
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = {
+                    keyboard?.hide()
+                    onSubmit?.invoke()
+                },
             ),
             trailingIcon = trailing,
             textStyle = if (mono) MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace)

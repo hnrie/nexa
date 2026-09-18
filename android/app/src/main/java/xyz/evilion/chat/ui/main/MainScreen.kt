@@ -67,11 +67,16 @@ fun MainScreen() {
         if (route !is Route.Chat) drawer.close()
     }
 
-    BackHandler(enabled = layers.isNotEmpty() || route !is Route.Chat || drawer.isOpen) {
+    // On the empty chat screen with the drawer shut, back used to fall through
+    // to the system and quit the app, which is not what "back" means when there
+    // is somewhere to go: the list.
+    val emptyChat = (route as? Route.Chat)?.channelId == null && route is Route.Chat
+    BackHandler(enabled = layers.isNotEmpty() || route !is Route.Chat || drawer.isOpen || emptyChat) {
         when {
             layers.isNotEmpty() -> Nav.pop()
             drawer.isOpen -> scope.launch { drawer.close() }
             route !is Route.Chat -> Nav.go(Route.Chat(null, null))
+            else -> scope.launch { drawer.open() }
         }
     }
 
@@ -123,7 +128,6 @@ fun MainScreen() {
                 is Route.Settings -> SettingsScreen(current.page)
                 is Route.ServerSettings -> ServerSettingsScreen(current.serverId, current.page)
                 is Route.Invite -> InviteScreen(current.code, fragment = current.fragment)
-                is Route.GuestCall -> InviteScreen(current.code, guest = true)
                 is Route.StickerPack -> xyz.evilion.chat.ui.sheets.StickerPackScreen(current.id)
             }
         }

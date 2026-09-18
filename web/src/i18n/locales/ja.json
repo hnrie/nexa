@@ -694,6 +694,7 @@
   "mediaCache.thatFileIsTooLargeTo": "このファイルは大きすぎてここでは開けません。ダウンロードしてください。",
   "messageActions.copyText": "テキストをコピー",
   "messageActions.markUnread": "未読にする",
+  "messageActions.messageActions": "メッセージの操作",
   "messageActions.pin": "ピン留め",
   "messageActions.thatMessageCouldNotBeDeleted": "そのメッセージは削除できませんでした。",
   "messageRow.addAReaction": "リアクションを追加",
@@ -1994,6 +1995,7 @@
   "sfu.videoIsPausedUntilNextMonth": "通話を無料に保つため、映像は来月まで一時停止しています。",
   "shareQuality.source": "元のまま",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "このリンクを知っている人は誰でも参加できます。1 週間有効です。",
+  "sheets.channelSheets.goToTheMessage": "メッセージへ移動",
   "sheets.channelSheets.invitePeople": "人を招待",
   "sheets.channelSheets.longPressAMessageToPin": "メッセージを長押しするとピン留めできます。",
   "sheets.channelSheets.membersCount": {

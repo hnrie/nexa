@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -62,6 +61,9 @@ import xyz.evilion.chat.ui.markdown.Markdown
 import xyz.evilion.chat.ui.chat.rememberMdContext
 import xyz.evilion.chat.ui.theme.chatColors
 import java.util.Date
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.ui.semantics.Role
 
 /** Someone's profile: the banner, what they wrote about themselves, and what you can do. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +72,7 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
     val colors = chatColors
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val users by AppState.users.collectAsState()
     val me by AppState.me.collectAsState()
     val relationships by AppState.relationships.collectAsState()
@@ -77,15 +80,16 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     val user = users[userId] ?: me?.takeIf { it.id == userId }?.toPublic()
     val relationship = relationships[userId]
-    val presence = AppState.presences.value[userId]
+    val presences by AppState.presences.collectAsState()
+    val presence = presences[userId]
     val ctx = rememberMdContext(serverId)
 
     LaunchedEffect(userId) {
         if (users[userId] == null) runCatching { AppState.putUser(UsersApi.user(userId)) }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding()) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             val accent = user?.accentColor?.let { Color(0xFF000000.toInt() or it) } ?: avatarColor(userId)
             val accent2 = user?.accentColor2?.let { Color(0xFF000000.toInt() or it) }
             Box(Modifier.fillMaxWidth().height(110.dp).background(
@@ -129,9 +133,9 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                 val member = serverId?.let { servers[it]?.members?.get(userId) }
                 if (member != null) {
                     Spacer(Modifier.height(12.dp))
-                    Text("ROLES", color = colors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(t("server.members.roles").uppercase(), color = colors.textMuted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (roleId in member.roleIds.take(6)) {
                             val role = servers[serverId]?.roles?.get(roleId) ?: continue
                             Row(
@@ -157,6 +161,8 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                     )
                 }
 
+                KeyVerifyRow(userId, user?.name ?: t("modals.quickSwitcher.unknown"))
+
                 if (userId != me?.id) {
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -168,7 +174,7 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                                         val channel = ChannelsApi.createDm(listOf(userId))
                                         AppState.putChannel(channel)
                                         Nav.openChannel(null, channel.id)
-                                        onDismiss()
+                                        dismiss()
                                     }
                                     busy = false
                                 }
@@ -216,7 +222,7 @@ private fun OutlineAction(label: String, icon: androidx.compose.ui.graphics.vect
     val colors = chatColors
     Row(
         Modifier.clip(RoundedCornerShape(8.dp)).background(colors.bgSurface)
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

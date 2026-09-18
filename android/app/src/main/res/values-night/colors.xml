@@ -1,0 +1,11 @@
+<resources>
+    <!--
+      The window behind the app before Compose paints.
+
+      Without a night variant every launch showed a dark slab to someone whose
+      phone, and whose Nexa theme, are light. The system picks this file or the
+      one beside it before the app's own theme is even known, which is the only
+      way to get that first frame right.
+    -->
+    <color name="window_background">#2C2D32</color>
+</resources>

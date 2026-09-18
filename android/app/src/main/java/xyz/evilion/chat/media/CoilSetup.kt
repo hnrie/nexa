@@ -1,6 +1,7 @@
 package xyz.evilion.chat.media
 
 import android.content.Context
+import android.os.Build
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -11,6 +12,7 @@ import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
 import coil3.gif.AnimatedImageDecoder
+import coil3.gif.GifDecoder
 import coil3.key.Keyer
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
@@ -42,7 +44,9 @@ object Images {
                 add(OkHttpNetworkFetcherFactory(callFactory = { Api.http }))
                 add(AttachmentFetcher.Factory())
                 add(Keyer<AttachmentMeta> { data, _ -> "attachment:${data.blobId}" })
-                add(AnimatedImageDecoder.Factory())
+                // AnimatedImageDecoder is ImageDecoder, which arrived in Android 9;
+                // on 8 every GIF failed to load. Coil's own decoder covers those.
+                if (Build.VERSION.SDK_INT >= 28) add(AnimatedImageDecoder.Factory()) else add(GifDecoder.Factory())
                 // Twemoji is drawn from SVG, so it stays sharp at any size
                 add(SvgDecoder.Factory())
             }
@@ -57,7 +61,9 @@ object Images {
                     .maxSizeBytes(192L * 1024 * 1024)
                     .build()
             }
-            .crossfade(true)
+            // Honours the account's "reduce motion": a picture fading in is
+            // motion, and this loader draws every avatar, emoji and attachment.
+            .crossfade(!xyz.evilion.chat.data.SettingsStore.reducedMotion)
             .build()
 }
 

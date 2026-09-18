@@ -693,7 +693,7 @@ object Session {
         AppState.channels.value = channels.associateBy { it.id }
         AppState.relationships.value = ready.relationships.associateBy { it.user.id }
         AppState.putUsers(ready.relationships.map { it.user })
-        AppState.readStates.value = ready.readStates.associateBy { it.channelId }
+        AppState.setReadStates(ready.readStates)
         AppState.presences.value = ready.presences.associateBy { it.userId }
         AppState.servers.value = emptyMap()
         for (view in ready.servers) AppState.putServerView(view, me.id)

@@ -82,7 +82,7 @@ object FileCrypto {
      * out in part.
      */
     fun decryptStream(input: InputStream, key: ByteArray, dest: OutputStream, onProgress: ((Long) -> Unit)? = null): Long {
-        val header = input.readNBytes(HEADER_LEN)
+        val header = Bytes.readUpTo(input, HEADER_LEN)
         if (header.size < HEADER_LEN) throw DecryptError("file: truncated header")
         if (!Bytes.equal(header.copyOf(MAGIC.size), MAGIC)) throw DecryptError("file: bad magic")
         val baseIv = header.copyOfRange(MAGIC.size, HEADER_LEN)
@@ -90,12 +90,12 @@ object FileCrypto {
         var index = 0
         var written = 0L
         while (true) {
-            val lenBytes = input.readNBytes(LEN_PREFIX)
+            val lenBytes = Bytes.readUpTo(input, LEN_PREFIX)
             if (lenBytes.isEmpty()) break
             if (lenBytes.size < LEN_PREFIX) throw DecryptError("file: truncated chunk header")
             val len = Bytes.readU32be(lenBytes, 0)
             if (len < Aes.TAG_LEN || len > CHUNK + Aes.TAG_LEN) throw DecryptError("file: bad chunk length")
-            val ct = input.readNBytes(len)
+            val ct = Bytes.readUpTo(input, len)
             if (ct.size < len) throw DecryptError("file: truncated chunk")
             val plaintext = try {
                 Aes.decrypt(key, chunkIv(baseIv, index), ct, FILE_AAD)

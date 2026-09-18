@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -60,6 +63,9 @@ import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.common.EmptyState
 import xyz.evilion.chat.ui.theme.chatColors
 
+/** How far a jump will walk back through history looking for its message. */
+private const val MAX_JUMP_PAGES = 6
+
 /**
  * One conversation: what has been said, and the box to say something.
  *
@@ -86,7 +92,12 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
 
     DisposableEffect(channelId) {
         Session.Focus.activeChannel = channelId
-        onDispose { if (Session.Focus.activeChannel == channelId) Session.Focus.activeChannel = null }
+        onDispose {
+            if (Session.Focus.activeChannel == channelId) Session.Focus.activeChannel = null
+            // leaving the conversation is what marks it read, so the rule for
+            // next time starts from where it is now
+            AppState.refreshUnreadMark(channelId)
+        }
     }
 
     LaunchedEffect(channelId) {
@@ -97,13 +108,45 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
         }
     }
 
-    // mark as read once the newest message is on screen
-    LaunchedEffect(channelId, messages.lastOrNull()?.id, listState.firstVisibleItemIndex) {
+    // mark as read once the newest message is on screen. The raw scroll
+    // position used to be the effect's key, so every item boundary crossed
+    // while scrolling recomposed the whole screen and restarted this; a
+    // boolean changes twice a conversation instead of a hundred times.
+    val atTail by remember { derivedStateOf { listState.firstVisibleItemIndex <= 2 } }
+    LaunchedEffect(channelId, messages.lastOrNull()?.id, atTail) {
         val newest = messages.lastOrNull { !it.pending } ?: return@LaunchedEffect
-        if (listState.firstVisibleItemIndex <= 2) {
+        if (atTail) {
             delay(250)
             MessageService.ack(channelId, newest.raw.id)
         }
+    }
+
+    /**
+     * Going to a message: a reply line, a search result or a pinned message.
+     *
+     * If it is not in memory the history is walked back a page at a time until
+     * it is, then the list scrolls to it and it flashes for two seconds, which
+     * is what the web client does when you follow one of the same three links.
+     */
+    val jump by Nav.jump.collectAsState()
+    var highlight by remember(channelId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(jump) {
+        val target = jump ?: return@LaunchedEffect
+        if (target.channelId != channelId) return@LaunchedEffect
+        repeat(MAX_JUMP_PAGES) {
+            val at = AppState.messages(channelId).value.asReversed().indexOfFirst { it.raw.id == target.messageId }
+            if (at >= 0) {
+                Nav.jump.value = null
+                runCatching { listState.animateScrollToItem(at) }
+                highlight = target.messageId
+                delay(2000)
+                highlight = null
+                return@LaunchedEffect
+            }
+            if (AppState.loadedChannels.value[channelId] == true) return@repeat
+            runCatching { MessageService.loadOlder(channelId) }.onFailure { return@LaunchedEffect }
+        }
+        Nav.jump.value = null
     }
 
     // older pages as the reader goes up
@@ -117,7 +160,7 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(colors.bgBase).imePadding()) {
+    Column(Modifier.fillMaxSize().background(colors.bgBase)) {
         ChatHeader(serverId, channelId, onOpenDrawer)
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -131,7 +174,11 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
                     t("chatScreen.thisIsTheBeginningOf", "name" to AppState.channelName(channel, me?.id)),
                     t("chatScreen.saySomethingToStartItOff"),
                 )
-                else -> LazyColumn(
+                else -> {
+                    // Frozen when the conversation opens: the rule marks where
+                    // you stopped reading, and reading on must not move it.
+                    val boundary = AppState.unreadMark(channelId)
+                    LazyColumn(
                     state = listState,
                     reverseLayout = true,
                     contentPadding = PaddingValues(vertical = 8.dp),
@@ -140,10 +187,16 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
                     val ordered = messages.asReversed()
                     items(count = ordered.size, key = { ordered[it].id }) { index ->
                         val message = ordered[index]
+                        val previous = ordered.getOrNull(index + 1)
                         MessageRow(
                             message = message,
-                            previous = ordered.getOrNull(index + 1),
+                            previous = previous,
                             serverId = serverId,
+                            highlight = message.raw.id == highlight,
+                            firstUnread = boundary != Long.MAX_VALUE &&
+                                message.raw.authorId != me?.id &&
+                                (message.raw.id.toLongOrNull() ?: 0) > boundary &&
+                                (previous?.raw?.id?.toLongOrNull() ?: 0) <= boundary,
                             onLongPress = { actionsFor = message; actionsReacting = false },
                             onReact = { actionsFor = message; actionsReacting = true },
                             onReply = { replyTo = message },
@@ -157,9 +210,13 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
                         }
                     }
                 }
+                }
             }
 
-            if (listState.firstVisibleItemIndex > 4) {
+            // read through `derivedStateOf`, so scrolling does not recompose
+            // the header, the list and the composer on every item boundary
+            val showJump by remember { derivedStateOf { listState.firstVisibleItemIndex > 4 } }
+            if (showJump) {
                 Box(
                     Modifier.align(Alignment.BottomEnd).padding(12.dp)
                         .size(40.dp).clip(CircleShape).background(colors.bgFloating)
@@ -180,7 +237,13 @@ fun ChatScreen(serverId: String?, channelId: String, onOpenDrawer: () -> Unit) {
             editing = editing,
             onClearReply = { replyTo = null },
             onClearEdit = { editing = null },
-            modifier = Modifier.navigationBarsPadding(),
+            // One padding for the keyboard and the navigation bar together.
+            // `windowInsetsPadding` only consumes the inset it applies, so
+            // padding the column for the keyboard and the composer for the
+            // navigation bar left a nav bar's worth of empty strip between the
+            // input and the top of the keyboard — on the most-looked-at part
+            // of the app, on every message anyone types.
+            modifier = Modifier.windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)),
         )
     }
 
@@ -216,7 +279,7 @@ private fun ChatHeader(serverId: String?, channelId: String, onOpenDrawer: () ->
             }
             if (other != null) {
                 val user = AppState.user(other)
-                Avatar(other, user?.name ?: "?", user?.avatarId, 26.dp, status = AppState.presences.value[other]?.status ?: "offline")
+                Avatar(other, user?.name ?: "?", user?.avatarId, 26.dp, status = AppState.presences.value[other]?.status ?: "offline", ringBackground = colors.bgRaised)
                 Spacer(Modifier.width(8.dp))
             } else if (channel.serverId != null) {
                 Icon(
@@ -305,9 +368,12 @@ private fun TypingBar(channelId: String, serverId: String?) {
     val users = typing[channelId].orEmpty().filterValues { it > now.value }.keys.toList()
     if (users.isEmpty()) return
     val names = users.take(3).map { AppState.nameFor(it, serverId) }
+    // the same three shapes the web client builds, out of the same catalogue —
+    // these were English sentences assembled by hand under translated chrome
     val text = when {
-        users.size == 1 -> "${names[0]} is typing…"
-        users.size <= 3 -> "${names.dropLast(1).joinToString(", ")} and ${names.last()} are typing…"
+        users.size == 1 -> "${names[0]} " + t("chat.typingBar.isTyping")
+        users.size <= 3 -> // a comma is punctuation, not prose; the web hardcodes its "and" the same way
+            names.joinToString(", ") + " " + t("chat.typingBar.areTyping")
         else -> t("chat.typingBar.severalPeopleAreTyping")
     }
     Row(

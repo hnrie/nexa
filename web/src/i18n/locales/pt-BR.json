@@ -714,6 +714,7 @@
   "mediaCache.thatFileIsTooLargeTo": "Esse arquivo é grande demais para abrir aqui. Baixe em vez disso.",
   "messageActions.copyText": "Copiar o texto",
   "messageActions.markUnread": "Marcar como não lida",
+  "messageActions.messageActions": "Ações da mensagem",
   "messageActions.pin": "Fixar",
   "messageActions.thatMessageCouldNotBeDeleted": "Não foi possível excluir essa mensagem.",
   "messageRow.addAReaction": "Adicionar uma reação",
@@ -2047,6 +2048,7 @@
   "sfu.videoIsPausedUntilNextMonth": "O vídeo está pausado até o mês que vem para manter as chamadas gratuitas.",
   "shareQuality.source": "Original",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "Qualquer um com este link pode entrar. Ele dura uma semana.",
+  "sheets.channelSheets.goToTheMessage": "Ir para a mensagem",
   "sheets.channelSheets.invitePeople": "Convidar pessoas",
   "sheets.channelSheets.longPressAMessageToPin": "Toque e segure uma mensagem para fixá-la.",
   "sheets.channelSheets.membersCount": {

@@ -122,7 +122,13 @@ object Api {
                 for ((k, v) in headers) header(k, v)
             }
             .build()
-        return http.await(request).use { res -> readOrThrow(res) }
+        // Reading the body is a blocking socket read, so it belongs on IO with
+        // the call itself. `await` only wrapped the request: a chunked answer
+        // that had not finished arriving was then drained on whichever thread
+        // resumed the coroutine, which for anything a `LaunchedEffect` starts
+        // is the main one — and the first page of a conversation came back as
+        // "Could not load messages (NetworkOnMainThreadException)".
+        return withContext(Dispatchers.IO) { http.await(request).use { res -> readOrThrow(res) } }
     }
 
     /** A request whose answer is parsed; pass [Unit] for one that has none. */
@@ -171,7 +177,7 @@ object Api {
             .apply { token?.let { header("Authorization", "Bearer $it") } }
             .apply { for ((k, v) in headers) header(k, v) }
             .build()
-        return uploadHttp.await(request).use { res -> readOrThrow(res) }
+        return withContext(Dispatchers.IO) { uploadHttp.await(request).use { res -> readOrThrow(res) } }
     }
 
     /** An open response body: the bytes, how many there are, and the handle to close. */
@@ -186,14 +192,16 @@ object Api {
             .get()
             .apply { if (authorized) token?.let { header("Authorization", "Bearer $it") } }
             .build()
-        val res = http.await(request)
-        if (!res.isSuccessful) {
-            val err = errorFrom(res.code, res.body.string(), res.header("Retry-After"))
-            res.close()
-            throw err
+        return withContext(Dispatchers.IO) {
+            val res = http.await(request)
+            if (!res.isSuccessful) {
+                val err = errorFrom(res.code, res.body.string(), res.header("Retry-After"))
+                res.close()
+                throw err
+            }
+            val body: ResponseBody = res.body
+            Stream(body.byteStream(), body.contentLength(), res)
         }
-        val body: ResponseBody = res.body
-        return Stream(body.byteStream(), body.contentLength(), res)
     }
 
     private fun emptyBodyFor(method: String): RequestBody? =

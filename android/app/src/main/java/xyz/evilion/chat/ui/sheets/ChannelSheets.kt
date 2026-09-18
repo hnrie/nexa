@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -80,6 +79,7 @@ import xyz.evilion.chat.ui.theme.chatColors
 fun MembersSheet(channelId: String, onDismiss: () -> Unit) {
     val colors = chatColors
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val channels by AppState.channels.collectAsState()
     val servers by AppState.servers.collectAsState()
     val presences by AppState.presences.collectAsState()
@@ -104,8 +104,8 @@ fun MembersSheet(channelId: String, onDismiss: () -> Unit) {
             .thenBy { AppState.nameFor(it, serverId).lowercase() },
     )
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().height(sheetHeight())) {
             Text(
                 t("sheets.channelSheets.membersCount", "count" to (servers[serverId]?.memberCount ?: sorted.size)),
                 color = colors.textStrong, fontWeight = FontWeight.SemiBold,
@@ -121,7 +121,7 @@ fun MembersSheet(channelId: String, onDismiss: () -> Unit) {
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Avatar(id, user?.name ?: "?", user?.avatarId, 32.dp, status = status)
+                        Avatar(id, user?.name ?: "?", user?.avatarId, 32.dp, status = status, ringBackground = colors.bgFloating)
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
@@ -146,6 +146,7 @@ fun MembersSheet(channelId: String, onDismiss: () -> Unit) {
 fun PinsSheet(channelId: String, onDismiss: () -> Unit) {
     val colors = chatColors
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     var pins by remember { mutableStateOf<List<UiMessage>?>(null) }
     val ctx = rememberMdContext(AppState.channels.value[channelId]?.serverId)
 
@@ -153,8 +154,8 @@ fun PinsSheet(channelId: String, onDismiss: () -> Unit) {
         pins = runCatching { ChannelsApi.pins(channelId).map { MessageService.decrypt(it) } }.getOrDefault(emptyList())
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().height(sheetHeight())) {
             Text(
                 t("chatScreen.pinnedMessages"),
                 color = colors.textStrong, fontWeight = FontWeight.SemiBold,
@@ -166,7 +167,17 @@ fun PinsSheet(channelId: String, onDismiss: () -> Unit) {
                 else -> LazyColumn(Modifier.weight(1f)) {
                     items(pins!!.size, key = { pins!![it].raw.id }) { index ->
                         val message = pins!![index]
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        // Finding a pinned message and not being able to go to
+                        // it is most of the point of the list; the row had no
+                        // gesture on it at all.
+                        Column(
+                            Modifier.fillMaxWidth()
+                                .clickable(onClickLabel = t("sheets.channelSheets.goToTheMessage")) {
+                                    dismiss()
+                                    Nav.jumpTo(channelId, message.raw.id)
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Avatar(
                                     message.raw.authorId,
@@ -199,6 +210,7 @@ fun PinsSheet(channelId: String, onDismiss: () -> Unit) {
 fun SearchSheet(channelId: String, onDismiss: () -> Unit) {
     val colors = chatColors
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val messages by AppState.messages(channelId).collectAsState()
     var query by remember { mutableStateOf("") }
     val ctx = rememberMdContext(AppState.channels.value[channelId]?.serverId)
@@ -207,8 +219,8 @@ fun SearchSheet(channelId: String, onDismiss: () -> Unit) {
         else messages.filter { it.payload?.text?.contains(query, true) == true }.asReversed().take(60)
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().height(sheetHeight())) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -234,7 +246,12 @@ fun SearchSheet(channelId: String, onDismiss: () -> Unit) {
                     items(results.size, key = { results[it].raw.id }) { index ->
                         val message = results[index]
                         Column(
-                            Modifier.fillMaxWidth().clickable { onDismiss() }.padding(horizontal = 16.dp, vertical = 8.dp),
+                            Modifier.fillMaxWidth()
+                                .clickable(onClickLabel = t("sheets.channelSheets.goToTheMessage")) {
+                                    dismiss()
+                                    Nav.jumpTo(channelId, message.raw.id)
+                                }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(AppState.nameFor(message.raw.authorId), color = colors.textStrong, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -261,6 +278,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
     val colors = chatColors
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val channels by AppState.channels.collectAsState()
     val channel = channels[channelId] ?: return
     val canManage = channel.serverId == null || AppState.permissionsIn(channelId).has(P.MANAGE_CHANNELS)
@@ -269,8 +287,8 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
     var saving by remember { mutableStateOf(false) }
     val muted = SettingsStore.mutedChannels.contains(channelId)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp)) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text(t("server.invites.channel"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
             if (canManage) {
@@ -302,7 +320,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
                                     put("topic", topic)
                                 })
                                 AppState.putChannel(updated)
-                                onDismiss()
+                                dismiss()
                             }.onFailure { Session.toasts.emit(it.message ?: t("server.serverSettingsScreen.thatDidNotSave")) }
                             saving = false
                         }
@@ -350,6 +368,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
 fun InviteSheet(channelId: String, onDismiss: () -> Unit) {
     val colors = chatColors
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val clipboard = LocalClipboardManager.current
     var code by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -368,8 +387,8 @@ fun InviteSheet(channelId: String, onDismiss: () -> Unit) {
             .onFailure { error = it.readable("ChannelSheets") }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
             Text(t("sheets.channelSheets.invitePeople"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
             when {

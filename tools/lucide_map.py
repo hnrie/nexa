@@ -35,4 +35,8 @@ MAP = {
     "CalendarDays": "calendar-days", "ZoomIn": "zoom-in", "ZoomOut": "zoom-out",
     "NotebookPen": "notebook-pen", "Settings2": "settings-2", "LoaderCircle": "loader-circle",
     "ArrowDown": "arrow-down", "ArrowUp": "arrow-up", "Ban": "ban", "Check2": "check",
+    # the chat list's own icons: the two system-message arrows the web uses,
+    # and the two the message actions want
+    "ArrowRightToLine": "arrow-right-to-line", "ArrowLeftFromLine": "arrow-left-from-line",
+    "MailOpen": "mail-open", "SmilePlus": "smile-plus",
 }

@@ -55,10 +55,12 @@ import xyz.evilion.chat.media.Media
 import xyz.evilion.chat.ui.Layer
 import xyz.evilion.chat.ui.Nav
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.compose.runtime.mutableFloatStateOf
+import xyz.evilion.chat.data.SettingsStore
 
 /** What a message carries besides words: pictures, video, sound and files. */
 @Composable
-fun AttachmentList(attachments: List<AttachmentMeta>, channelId: String) {
+fun AttachmentList(attachments: List<AttachmentMeta>) {
     Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         for (attachment in attachments) {
             when {
@@ -94,7 +96,10 @@ private fun ImageAttachment(meta: AttachmentMeta) {
             modifier = Modifier.fillMaxWidth().then(if (revealed) Modifier else Modifier.blur(28.dp)),
         )
         if (!revealed) {
-            Box(Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+            // A fixed 200 dp inside a box sized by the picture's own aspect
+            // ratio put the pill near the top of a tall image and below a short
+            // one, over the next message.
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) {
                 Row(
                     Modifier.clip(RoundedCornerShape(20.dp)).background(colors.bgOverlay).padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -115,6 +120,7 @@ private fun VideoAttachment(meta: AttachmentMeta) {
     val scope = rememberCoroutineScope()
     var playing by remember(meta.blobId) { mutableStateOf(false) }
     var busy by remember(meta.blobId) { mutableStateOf(false) }
+    var fetched by remember(meta.blobId) { mutableFloatStateOf(0f) }
     val ratio = if (meta.width != null && meta.height != null && meta.height > 0) {
         (meta.width.toFloat() / meta.height).coerceIn(0.5f, 2.2f)
     } else {
@@ -140,14 +146,23 @@ private fun VideoAttachment(meta: AttachmentMeta) {
                     .clickable {
                         busy = true
                         scope.launch {
-                            runCatching { AttachmentStore.file(meta) }
+                            // the store has taken a progress callback all along;
+                            // a 200 MB video was a spinner that looked frozen
+                            runCatching { AttachmentStore.file(meta) { done, total -> fetched = if (total > 0) done.toFloat() / total else 0f } }
                             busy = false
                             playing = true
                         }
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                if (busy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
+                if (busy && fetched > 0f) {
+                    CircularProgressIndicator(
+                        progress = { fetched },
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                } else if (busy) CircularProgressIndicator(Modifier.size(24.dp), color = Color.White, strokeWidth = 2.dp)
                 else Icon(Lucide.Play, t("chat.videoPlayer.play"), tint = Color.White, modifier = Modifier.size(30.dp))
             }
         }
@@ -246,7 +261,9 @@ fun EmbedList(embeds: List<Embed>) {
                     embed.description?.let {
                         Text(it, color = colors.textSubtle, fontSize = 13.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
-                    val image = embed.image
+                    // "Show embedded images and GIFs from links" — the toggle
+                    // was in Settings on both clients and read by neither here.
+                    val image = embed.image?.takeIf { SettingsStore.imagePreviews }
                     if (image != null) {
                         Spacer(Modifier.height(6.dp))
                         val ratio = if (embed.imageW != null && embed.imageH != null && embed.imageH > 0) {

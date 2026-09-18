@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -69,6 +68,9 @@ import xyz.evilion.chat.net.UsersApi
 import xyz.evilion.chat.ui.Nav
 import xyz.evilion.chat.ui.common.Avatar
 import xyz.evilion.chat.ui.theme.chatColors
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.material3.IconButton
+import kotlinx.coroutines.delay
 
 /** A picture on its own, pinch to zoom. */
 @Composable
@@ -88,27 +90,42 @@ fun ImageViewerLayer(blobId: String, name: String, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxSize()
                     .graphicsLayer(scaleX = scale, scaleY = scale, translationX = offsetX, translationY = offsetY)
                     .pointerInput(Unit) {
+                        // A pan with no bounds took the picture off the screen
+                        // entirely — a black rectangle, with no clue that
+                        // pinching blind was the only way back. The limit is how
+                        // far the scaled picture actually overhangs the viewport.
                         detectTransformGestures { _, pan, zoom, _ ->
                             scale = (scale * zoom).coerceIn(1f, 6f)
                             if (scale > 1f) {
-                                offsetX += pan.x
-                                offsetY += pan.y
+                                val slackX = size.width * (scale - 1f) / 2f
+                                val slackY = size.height * (scale - 1f) / 2f
+                                offsetX = (offsetX + pan.x).coerceIn(-slackX, slackX)
+                                offsetY = (offsetY + pan.y).coerceIn(-slackY, slackY)
                             } else {
                                 offsetX = 0f
                                 offsetY = 0f
                             }
                         }
+                    }
+                    // and a way out that does not need a steady pinch
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                scale = if (scale > 1f) 1f else 2.5f
+                                offsetX = 0f
+                                offsetY = 0f
+                            },
+                        )
                     },
             )
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    Lucide.X, t("chat.attachments.close"), tint = Color.White,
-                    modifier = Modifier.size(26.dp).clickable(onClick = onDismiss),
-                )
-                Spacer(Modifier.width(12.dp))
+                IconButton(onClick = onDismiss) {
+                    Icon(Lucide.X, t("chat.attachments.close"), tint = Color.White, modifier = Modifier.size(26.dp))
+                }
+                Spacer(Modifier.width(4.dp))
                 Text(name, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f), maxLines = 1)
                 val context = LocalContext.current
                 val scope = rememberCoroutineScope()
@@ -143,6 +160,7 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
     val colors = chatColors
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     val relationships by AppState.relationships.collectAsState()
     var query by remember { mutableStateOf("") }
     var found by remember { mutableStateOf<List<xyz.evilion.chat.net.PublicUser>>(emptyList()) }
@@ -150,6 +168,9 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
 
     LaunchedEffect(query) {
         if (query.length >= 2) {
+            // one request per character hit the user directory on every
+            // keystroke and flickered between stale and fresh answers
+            delay(250)
             runCatching { found = UsersApi.search(query) }
         } else {
             found = emptyList()
@@ -159,8 +180,8 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
     val friends = relationships.values.filter { it.type == "friend" }.map { it.user }
     val list = (if (query.isBlank()) friends else (found + friends.filter { it.username.contains(query, true) }).distinctBy { it.id })
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().height(520.dp).navigationBarsPadding()) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().height(sheetHeight())) {
             Text(t("notify.newMessage"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(16.dp))
             OutlinedTextField(
                 value = query, onValueChange = { query = it },
@@ -200,7 +221,7 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
                             val channel = ChannelsApi.createDm(picked.toList())
                             AppState.putChannel(channel)
                             Nav.openChannel(null, channel.id)
-                            onDismiss()
+                            dismiss()
                         }.onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }
                 },
@@ -219,13 +240,14 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
     val colors = chatColors
     val scope = rememberCoroutineScope()
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val dismiss = rememberSheetDismiss(sheet, onDismiss)
     var name by remember { mutableStateOf("") }
     var invite by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet, containerColor = colors.bgFloating) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheet, containerColor = colors.bgFloating) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
             Text(t("main.sidebar.createAServer"), color = colors.textStrong, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
@@ -246,7 +268,7 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
                             val view = Session.guarded("create_server") { captcha -> ServersApi.create(name.trim(), captcha) }
                             AppState.putServerView(view, AppState.me.value?.id)
                             Nav.openChannel(view.id, view.channels.firstOrNull { it.isText }?.id)
-                            onDismiss()
+                            dismiss()
                         }.onFailure { error = it.readable("Misc") }
                         busy = false
                     }
@@ -272,7 +294,7 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
             Button(
                 onClick = {
                     val (code, key) = xyz.evilion.chat.data.InviteLink.parse(invite)
-                    onDismiss()
+                    dismiss()
                     Nav.go(xyz.evilion.chat.ui.Route.Invite(code, key?.let { xyz.evilion.chat.data.InviteLink.encodeFragment(it) }))
                 },
                 enabled = invite.isNotBlank(),
@@ -303,11 +325,13 @@ fun StickerPackScreen(packId: String) {
 
     Column(Modifier.fillMaxSize().background(colors.bgBase).statusBarsPadding().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                Lucide.X, t("modals.createServer.back"), tint = colors.icon,
-                modifier = Modifier.size(24.dp).clickable { Nav.go(xyz.evilion.chat.ui.Route.Chat(null, null)) },
-            )
-            Spacer(Modifier.width(12.dp))
+            // An X that drops you on the empty chat screen is not a way back
+            // from a pack somebody linked in a conversation; this returns to
+            // wherever the link was opened from.
+            IconButton(onClick = { Nav.back() }) {
+                Icon(Lucide.ArrowLeft, t("modals.createServer.back"), tint = colors.icon, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(4.dp))
             Text(pack?.name ?: t("stickerPack.stickerPack"), color = colors.textStrong, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         }
         Spacer(Modifier.height(12.dp))
@@ -344,7 +368,7 @@ fun StickerPackScreen(packId: String) {
                     },
                     enabled = !busy,
                     colors = ButtonDefaults.buttonColors(containerColor = colors.brand, contentColor = colors.onBrand),
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+                    modifier = Modifier.fillMaxWidth(),
                 ) { Text(if (pack?.installed == true) t("sheets.misc.removeFromYourPacks") else t("sheets.misc.addToYourPacks")) }
             }
         }

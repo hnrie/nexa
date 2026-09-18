@@ -140,6 +140,36 @@ class CryptoTest {
     }
 
     @Test
+    fun `a file that arrives a few bytes at a time still decrypts`() {
+        // what a slow download looks like to the decryptor: short reads, which
+        // the reading has to loop over rather than take as the end
+        val plain = ByteArray(70_000) { (it % 253).toByte() }
+        val (key, sealed) = FileCrypto.encryptBytes(plain)
+        val trickle = object : java.io.InputStream() {
+            var at = 0
+            override fun read(): Int = if (at < sealed.size) sealed[at++].toInt() and 0xff else -1
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (at >= sealed.size) return -1
+                val n = minOf(len, 3, sealed.size - at)
+                sealed.copyInto(b, off, at, at + n)
+                at += n
+                return n
+            }
+        }
+        val out = ByteArrayOutputStream()
+        FileCrypto.decryptStream(trickle, key, out)
+        assertArrayEquals(plain, out.toByteArray())
+    }
+
+    @Test
+    fun `reading up to n bytes stops only at the end`() {
+        val data = ByteArrayInputStream(byteArrayOf(1, 2, 3, 4, 5))
+        assertArrayEquals(byteArrayOf(1, 2, 3), Bytes.readUpTo(data, 3))
+        assertArrayEquals(byteArrayOf(4, 5), Bytes.readUpTo(data, 3))
+        assertEquals(0, Bytes.readUpTo(data, 3).size)
+    }
+
+    @Test
     fun `files round-trip through the chunked format`() {
         val plain = ByteArray(9_000) { (it % 251).toByte() }
         val (key, sealed) = FileCrypto.encryptBytes(plain)
@@ -195,6 +225,46 @@ class MarkdownTest {
     fun `counts a message that is only emoji`() {
         assertEquals(2, Markdown.onlyEmoji(Markdown.parse("😀 <:wave:789>")))
         assertEquals(0, Markdown.onlyEmoji(Markdown.parse("hi 😀")))
+    }
+
+    /**
+     * The renderer draws a code run in monospace on a panel, so a run that
+     * quietly swallowed three lines because a stray fence found a later one
+     * looked like a torn code block in the middle of a sentence.
+     */
+    @Test
+    fun `an inline code run cannot cross a line`() {
+        val blocks = Markdown.parse("a ```js and then\nconst x = 1;\n``` and more")
+        val code = blocks.flatMap { (it as? Node.Styled)?.children.orEmpty() }.filterIsInstance<Node.Code>()
+        assertTrue("an unclosed run on its own line is literal text", code.isEmpty())
+    }
+
+    @Test
+    fun `a fence that is never closed still runs to the end`() {
+        val code = Markdown.parse("```go\nfmt.Println(1)\nfmt.Println(2)").filterIsInstance<Node.CodeBlock>().single()
+        assertEquals("go", code.lang)
+        assertEquals("fmt.Println(1)\nfmt.Println(2)", code.text)
+    }
+
+    @Test
+    fun `a one-line fence is content, not a language`() {
+        val code = Markdown.parse("```not a lang```").filterIsInstance<Node.CodeBlock>().single()
+        assertEquals(null, code.lang)
+        assertEquals("not a lang", code.text)
+    }
+
+    @Test
+    fun `what follows a closing fence is read as blocks again`() {
+        val blocks = Markdown.parse("```\nx\n```\n# after")
+        assertEquals("x", blocks.filterIsInstance<Node.CodeBlock>().single().text)
+        assertEquals(1, blocks.filterIsInstance<Node.Heading>().single().level)
+    }
+
+    /** The chip's padding is drawn; it used to be spaces inside the text. */
+    @Test
+    fun `inline code keeps what is between the backticks`() {
+        val code = Markdown.parseInline("say `  x  ` now").filterIsInstance<Node.Code>().single()
+        assertEquals("  x  ", code.text)
     }
 }
 

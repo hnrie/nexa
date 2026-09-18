@@ -739,6 +739,7 @@
   "mediaCache.thatFileIsTooLargeTo": "هذا الملف أكبر من أن يُفتح هنا. نزّله بدلًا من ذلك.",
   "messageActions.copyText": "نسخ النص",
   "messageActions.markUnread": "تحديد كغير مقروءة",
+  "messageActions.messageActions": "إجراءات الرسالة",
   "messageActions.pin": "تثبيت",
   "messageActions.thatMessageCouldNotBeDeleted": "تعذّر حذف تلك الرسالة.",
   "messageRow.addAReaction": "إضافة تفاعل",
@@ -2154,6 +2155,7 @@
   "sfu.videoIsPausedUntilNextMonth": "الفيديو متوقّف حتى الشهر القادم لتبقى المكالمات مجانية.",
   "shareQuality.source": "الأصل",
   "sheets.channelSheets.anyoneWithThisLinkCanJoin": "أي شخص لديه هذا الرابط يمكنه الانضمام. مدته أسبوع.",
+  "sheets.channelSheets.goToTheMessage": "الانتقال إلى الرسالة",
   "sheets.channelSheets.invitePeople": "دعوة أشخاص",
   "sheets.channelSheets.longPressAMessageToPin": "اضغط مطوّلًا على رسالة لتثبيتها.",
   "sheets.channelSheets.membersCount": {

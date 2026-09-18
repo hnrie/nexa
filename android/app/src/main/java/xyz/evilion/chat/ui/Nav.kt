@@ -9,7 +9,6 @@ sealed interface Route {
     data class Settings(val page: String = "root") : Route
     data class ServerSettings(val serverId: String, val page: String = "overview") : Route
     data class Invite(val code: String, val fragment: String? = null) : Route
-    data class GuestCall(val code: String) : Route
     data class StickerPack(val id: String) : Route
 }
 
@@ -28,12 +27,36 @@ sealed interface Layer {
     data object NewMessage : Layer
 }
 
+/**
+ * A message the app has been asked to go to.
+ *
+ * `at` is only there to make two requests for the same message different
+ * values, so asking twice scrolls twice instead of doing nothing the second
+ * time.
+ */
+data class Jump(val channelId: String, val messageId: String, val at: Long = System.currentTimeMillis())
+
 object Nav {
     val route = MutableStateFlow<Route>(Route.Chat(null, null))
     val layers = MutableStateFlow<List<Layer>>(emptyList())
+    val jump = MutableStateFlow<Jump?>(null)
+
+    /** Where `back` returns to; one deep, which is all any screen here needs. */
+    private var previous: Route = Route.Chat(null, null)
 
     fun go(next: Route) {
+        if (next != route.value) previous = route.value
         route.value = next
+    }
+
+    /**
+     * Back to whatever was open before this route.
+     *
+     * A sticker-pack link opened from a conversation used to close onto the
+     * empty "No conversation open" screen, which is not where anybody was.
+     */
+    fun back() {
+        route.value = previous
     }
 
     fun openChannel(serverId: String?, channelId: String?) {
@@ -58,6 +81,16 @@ object Nav {
     private fun Layer.sameKind(other: Layer): Boolean = when {
         this is Layer.Call && other is Layer.Call -> channelId == other.channelId
         else -> this == other
+    }
+
+    /**
+     * Goes to a message: the reply line above a message, a search result and a
+     * pinned message all point at one, and all three used to be inert.
+     * `ChatScreen` picks this up, fetches back to it if it is not in memory,
+     * scrolls to it and flashes it, which is what the web client does.
+     */
+    fun jumpTo(channelId: String, messageId: String) {
+        jump.value = Jump(channelId, messageId)
     }
 
     fun pop() {
