@@ -25,3 +25,6 @@
 /tools/.venv/
 /tools/out/
 __pycache__/
+
+# audit round 2 screenshots (large, regenerable)
+/audit/r2/shots/
