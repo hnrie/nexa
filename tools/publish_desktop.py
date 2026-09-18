@@ -29,10 +29,48 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def version_key(v: str) -> tuple:
+    """Newest first, with a pre-release sorting below the release it precedes."""
+    core, _, pre = v.partition("-")
+    return tuple(int(n) for n in core.split(".")), (1, "") if not pre else (0, pre)
+
+
+def prune(dest: Path, keep: int) -> None:
+    """
+    Leaves the newest `keep` releases and removes the rest.
+
+    The previous release is kept deliberately — an update already downloading
+    names a file by version and has to be able to finish — but nothing ever
+    removed the ones before it, and at roughly 750 MB a release, on the same
+    volume as the database and the media blobs, that is a full disk a handful
+    of releases away rather than a tidiness question.
+    """
+    if keep <= 0:
+        return
+    by_version: dict[str, list[Path]] = {}
+    for p in dest.iterdir():
+        if not p.is_file():
+            continue
+        m = PATTERN.match(p.name[: -len(".blockmap")] if p.name.endswith(".blockmap") else p.name)
+        if m:
+            by_version.setdefault(m["version"], []).append(p)
+    old = sorted(by_version, key=version_key, reverse=True)[keep:]
+    if not old:
+        return
+    freed = 0
+    for v in old:
+        for p in by_version[v]:
+            freed += p.stat().st_size
+            p.unlink()
+    print(f"removed {', '.join(sorted(old, key=version_key))} ({freed / (1 << 30):.1f} GB); kept the newest {keep}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("dist", nargs="?", default=str(ROOT / "desktop/dist"))
     ap.add_argument("--to", default=os.environ.get("DESKTOP_DIR") or str(ROOT / "data/desktop"))
+    ap.add_argument("--keep", type=int, default=2, help="how many releases to leave in place, newest first (0 keeps everything)")
+    ap.add_argument("--republish", action="store_true", help="overwrite a version that is already published")
     args = ap.parse_args()
     dist, dest = Path(args.dist), Path(args.to)
     if not dist.is_dir():
@@ -55,6 +93,14 @@ def main() -> int:
     manifests = [p for p in dist.glob("latest*.yml")]
     if not manifests:
         print("no latest*.yml update manifests: was electron-builder run with the publish config?", file=sys.stderr)
+        return 1
+
+    # Publishing over a version that is already out is a silent trap: the files
+    # are replaced in place while every client's version comparison sees no
+    # change, so nobody updates and the build that is live is not the build
+    # anyone thinks is live.
+    if not args.republish and any(PATTERN.match(p.name) and PATTERN.match(p.name)["version"] == version for p in dest.glob("*") if p.is_file()):
+        print(f"{version} is already published in {dest}. Bump desktop/package.json, or pass --republish.", file=sys.stderr)
         return 1
 
     dest.mkdir(parents=True, exist_ok=True)
@@ -94,6 +140,7 @@ def main() -> int:
     tmp.write_text(json.dumps(manifest, indent=2))
     tmp.replace(dest / "manifest.json")
     print(f"published {version} to {dest}")
+    prune(dest, keep=args.keep)
     return 0
 
 

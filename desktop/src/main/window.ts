@@ -15,7 +15,12 @@ import type { SettingsStore } from "./settings";
 export function openExternal(url: string): void {
   try {
     const u = new URL(url);
-    if (u.protocol === "https:" || u.protocol === "http:" || u.protocol === "mailto:") void shell.openExternal(u.toString());
+    // Web schemes only. `mailto:` was here too and nothing in the app ever
+    // produces one, so all it offered was a compromised page composing mail
+    // with an attacker's recipient, subject and body in the person's own
+    // client. Every locally-handled scheme — file:, smb:, ms-msdt:, search-ms:
+    // — has always been refused, which is the part that matters.
+    if (u.protocol === "https:" || u.protocol === "http:") void shell.openExternal(u.toString());
   } catch {
     /* not a URL */
   }
@@ -97,10 +102,17 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
     return { action: "deny" };
   });
   wc.on("will-navigate", (event, url) => {
-    // the offline page is built from the words in use, so match what it is rather than its exact text
-    if (isAppUrl(url) || url.startsWith("data:text/html")) return;
+    if (isAppUrl(url)) return;
     event.preventDefault();
     openExternal(url);
+  });
+  // `will-navigate` is the main frame's alone. Without this an iframe on the
+  // page could go anywhere, and the only thing stopping it was the server's
+  // own frame-src — a control that lives on the other side of the wire from
+  // the one being defended.
+  wc.on("will-frame-navigate", (event) => {
+    if (event.isMainFrame || isAppUrl(event.url)) return;
+    event.preventDefault();
   });
   wc.on("will-redirect", (event, url) => {
     if (!isAppUrl(url)) event.preventDefault();

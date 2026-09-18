@@ -32,7 +32,10 @@ function link(v: unknown, max: number): string | undefined {
   if (typeof v !== "string" || v.length > max) return undefined;
   try {
     const u = new URL(v.trim());
-    return (u.protocol === "https:" || u.protocol === "http:") && u.hostname && !u.username ? u.toString() : undefined;
+    // `https://:pw@evil.example` has an empty username and a password, so a
+    // check on the username alone let it through; the server's copy of this
+    // rule tests the whole userinfo, and these two should not disagree.
+    return (u.protocol === "https:" || u.protocol === "http:") && u.hostname && !u.username && !u.password ? u.toString() : undefined;
   } catch {
     return undefined;
   }

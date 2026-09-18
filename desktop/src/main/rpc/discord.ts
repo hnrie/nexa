@@ -103,9 +103,24 @@ function run(file: string, args: string[]): Promise<string> {
   });
 }
 
+/**
+ * Windows' own tools, by their full path.
+ *
+ * `execFile("tasklist")` goes through CreateProcess's search order, which
+ * includes the current directory — so a `tasklist.exe` sitting wherever the
+ * app happened to be launched from would run instead. Same user, so no
+ * privilege boundary is crossed, but it costs one line to close.
+ */
+const system32 = (tool: string): string => {
+  const full = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", `${tool}.exe`);
+  // If Windows is not where it says it is, the bare name is what worked
+  // before this change and is better than a feature that silently stops.
+  return fs.existsSync(full) ? full : tool;
+};
+
 /** Which Discord builds are running on Windows. */
 export async function runningDiscordBuilds(): Promise<string[]> {
-  const out = await run("tasklist", ["/FO", "CSV", "/NH"]);
+  const out = await run(system32("tasklist"), ["/FO", "CSV", "/NH"]);
   return DISCORD_BUILDS.filter((b) => new RegExp(`^"${b}\\.exe"`, "im").test(out));
 }
 
@@ -116,7 +131,7 @@ export async function runningDiscordBuilds(): Promise<string[]> {
 export async function restartDiscordWindows(takeFirst: () => Promise<void>): Promise<boolean> {
   const builds = await runningDiscordBuilds();
   if (builds.length === 0) return false;
-  for (const b of builds) await run("taskkill", ["/IM", `${b}.exe`, "/T", "/F"]);
+  for (const b of builds) await run(system32("taskkill"), ["/IM", `${b}.exe`, "/T", "/F"]);
   // the pipe goes when the process does
   for (let i = 0; i < 40 && (await probe(endpoint(0, "win32"))) === "listening"; i++) await new Promise((r) => setTimeout(r, 250));
   await takeFirst();

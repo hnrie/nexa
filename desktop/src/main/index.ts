@@ -165,7 +165,15 @@ function registerIpc(): void {
   });
   handle(IPC.rpcRestartDiscord, () => rpc!.restartDiscord());
   on(IPC.setIdentity, (user: Identity | null) => {
-    identity = user && typeof user.id === "string" ? user : null;
+    // This is the one piece of the signed-in person that crosses outward: it
+    // goes verbatim into the READY payload every local RPC program receives.
+    // Nothing capped it, and a truthy non-object came through as the literal
+    // id "undefined", which passed the type check.
+    const text = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : "");
+    identity =
+      user && typeof user === "object" && typeof user.id === "string" && user.id.length > 0 && user.id.length <= 32
+        ? { id: user.id, username: text(user.username, 64), global_name: text(user.global_name, 64), avatar: typeof user.avatar === "string" ? user.avatar.slice(0, 256) : null }
+        : null;
   });
   on(IPC.setStrings, (strings: unknown) => {
     const before = nativeStrings();
