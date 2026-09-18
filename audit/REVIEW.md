@@ -173,25 +173,44 @@ was.
   down.
 - The media proxy's signature had no expiry.
 
-## In flight
+## Landed since
 
-Five agents, on the findings that are large enough to need their own pass:
+All five of the agent passes finished, and the results are deployed.
 
-- **The CRITICAL and the argon2id HIGH.** Pinning identity keys on first use,
-  refusing a silently changed one, showing a fingerprint people can compare, and
-  cross-checking the grant recipients the server names against the membership
-  the client already knows. Plus flooring the argon2id parameters client-side —
-  the server refuses weak parameters a client *submits* and accepts no floor on
-  what it *returns*, so a server can make stretching free for one login and
-  recover the password from the auth key it is handed.
-- **Android calls.** The nine CRASH findings, reproduced on a device rather than
-  reasoned about.
-- **The gateway connection cap and the server's correctness findings.**
-- **RTL, themes and reduced motion.** Including the accent colour, which
-  recolours `--brand` without recomputing `--on-brand`, so four of the ten
-  shipped presets give white text on a light fill for every primary button.
-- **Keyboard, screen reader, and failure drawn as success.** Eight surfaces
-  render a fetch rejection as a cheerful empty state.
+**The CRITICAL is fixed.** Identity keys are pinned on first sight and a
+changed one is never sealed to without a blocking confirmation that shows both
+safety numbers side by side. The grant recipient list the server hands over is
+cross-checked against the membership the client already draws, and an outsider
+is dropped, logged and toasted — it fails open and says so only when membership
+genuinely cannot be settled, because refusing there would strand real members.
+The safety number is six groups of five digits over 5200 rounds of SHA-256,
+identical on web and Android, pinned by the same test vector in both suites, and
+shown with a QR code and an honest note that matching digits prove you hold the
+same key but not that it belongs to the right person. I checked that one on
+screen myself rather than from the report.
+
+**The argon2id HIGH** is floored client-side at exactly the server's own
+`validKDF`, in `deriveMaster` on both platforms — the one place every derivation
+passes through — with a ceiling too, since a hostile server could otherwise wedge
+a phone with 1 GiB and twenty passes. Every real account on this instance was
+registered at 65536/3/1, comfortably inside, verified against the live database
+and all eight backups.
+
+**The gateway cap** is 32 per account, 256 per address, 4096 in total, with a
+connect rate limiter beside it, refusing at the door rather than evicting — the
+cost being bounded is the thirty-to-a-hundred queries that build a `ready`, and
+an evicted client just reconnects and builds another.
+
+**Android calls were crashing on every release build**, which the audit did not
+catch and neither did I before publishing 1.0.2. R8 removed `org.jni_zero`,
+which WebRTC's native library looks up by name, so the first thing a call does
+aborted the process. Debug builds are clean, which is exactly why it shipped.
+
+The rest: RTL fixed in 38 places with the accent colour now computing its own
+readable foreground for any colour a person picks; reduced motion that removes
+motion rather than information; a keyboard and screen-reader pass that ends at
+zero axe violations; and thirteen surfaces that used to draw a failed request as
+a cheerful empty state.
 
 ## Not doing, and why
 
