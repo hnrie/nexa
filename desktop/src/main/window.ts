@@ -5,7 +5,7 @@
  */
 import { app, BrowserWindow, Menu, clipboard, screen, shell, type ContextMenuParams, type WebContents } from "electron";
 import path from "node:path";
-import { BASE, ORIGIN, START_URL, isAppUrl } from "./config";
+import { BASE, ORIGIN, START_URL, isAppUrl, isFrameableUrl } from "./config";
 import { windowAudioSupported } from "./appAudio";
 import { shareAudioMode } from "./permissions";
 import { nativeStrings } from "./strings";
@@ -109,9 +109,11 @@ export function createMainWindow(settings: SettingsStore, opts: { preload: strin
   // `will-navigate` is the main frame's alone. Without this an iframe on the
   // page could go anywhere, and the only thing stopping it was the server's
   // own frame-src — a control that lives on the other side of the wire from
-  // the one being defended.
+  // the one being defended. It allows what that policy allows and nothing
+  // more: being stricter than it here breaks the captcha and every embed
+  // without making anything safer.
   wc.on("will-frame-navigate", (event) => {
-    if (event.isMainFrame || isAppUrl(event.url)) return;
+    if (event.isMainFrame || isFrameableUrl(event.url)) return;
     event.preventDefault();
   });
   wc.on("will-redirect", (event, url) => {
