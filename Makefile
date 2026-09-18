@@ -7,7 +7,7 @@ ANDROID_SDK ?= /usr/local/share/android-commandlinetools
 GRADLE ?= $(HOME)/.local/toolchain/gradle-9.7.1/bin/gradle
 export PATH := $(NODE_BIN):$(PATH)
 
-.PHONY: build web server test test-go test-web test-desktop test-android desktop publish-desktop android publish-android run clean
+.PHONY: build web server test test-go test-web test-desktop test-android desktop publish-desktop android publish-android licenses run clean
 
 build: web server
 
@@ -48,6 +48,11 @@ android:
 # copies the APK into ANDROID_DIR, where chatd serves it to the download page
 publish-android:
 	ANDROID_HOME=$(ANDROID_SDK) python3 tools/publish_android.py
+
+# what Settings → Licenses shows, read back out of the lockfiles. Run it after any
+# dependency changes, in any of the four builds.
+licenses:
+	JAVA_HOME=$(ANDROID_JAVA_HOME) ANDROID_HOME=$(ANDROID_SDK) PATH="$(dir $(GRADLE)):$$PATH" python3 tools/licenses.py
 
 run: server
 	./bin/chatd

@@ -1,0 +1,41 @@
+.search { margin: 16px 0 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+/* the same selectable-option look the language picker uses, one size down */
+.filter { padding: 6px 12px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; color: var(--text-muted); background: var(--bg-surface); border: 1px solid transparent; }
+.filter:hover { background: var(--bg-active); color: var(--text); }
+.filter[data-on="true"] { border-color: var(--brand); color: var(--text-strong); background: var(--bg-active); }
+/* the number beside a heading is a count, not another word in it */
+.count { font-weight: 500; color: var(--text-muted); }
+
+.list { display: flex; flex-direction: column; gap: 2px; }
+.item { background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
+/* the border is inset so an open row does not grow into the two pixels between them */
+.item[data-open="true"] { background: var(--bg-raised); box-shadow: inset 0 0 0 1px var(--border-subtle); }
+/* Name takes the room that is left, so the version and the licence stay together at
+   the inline end where they can be read down the column. */
+.row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; text-align: start; }
+.row:hover { background: var(--bg-hover); }
+.name { flex: 1 1 auto; min-width: 0; font-size: 15px; color: var(--text); overflow-wrap: anywhere; }
+.version { flex: none; font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); }
+.spdx { flex: none; font-size: 12px; font-weight: 600; color: var(--text-subtle); padding: 2px 8px; border-radius: var(--radius-xs); background: var(--bg-input); white-space: nowrap; }
+.chevron { flex: none; color: var(--text-muted); transition: transform var(--transition); }
+/* down when closed, up when open, whichever way the page reads */
+.item[data-open="true"] .chevron { transform: rotate(180deg); }
+
+.detail { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+.copyright { margin: 0; font-size: 13px; color: var(--text-subtle); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A licence is a document with its own line breaks; wrapping is fine, reflowing is
+   not, and a long one scrolls rather than pushing the page wider. */
+.text { margin: 0; max-height: 320px; overflow: auto; padding: 12px; background: var(--bg-input); border-radius: var(--radius-xs); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; }
+.link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 13px; color: var(--link); }
+.link:hover { text-decoration: underline; }
+
+@media (max-width: 767px) {
+  /* A phone has no room for a name, a version and an SPDX id on one line, so the
+     name keeps the line to itself and the rest drops under it, chevron last. */
+  .row { flex-wrap: wrap; row-gap: 4px; padding: 10px 12px; }
+  .name { flex: 1 1 100%; }
+  .version, .spdx { order: 1; }
+  .chevron { order: 2; margin-inline-start: auto; }
+  .text { max-height: 260px; }
+}
