@@ -25,21 +25,27 @@ export default function ServerPage() {
   const setActiveChannel = useUI((u) => u.setActiveChannel);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const [missing, setMissing] = useState(false);
-  const seen = useRef(false);
+  const seen = useRef<string | null>(null);
   const channel = channelId ? channels[channelId] : undefined;
 
   // an unknown server (deep link before ready, or one we were just added to) is fetched once;
   // one that vanishes after being seen was left, deleted or kicked from: go home without asking
   useEffect(() => {
     if (st) {
-      seen.current = true;
+      seen.current = serverId;
+      setMissing(false);
       return;
     }
     if (!serverId) return;
-    if (seen.current) {
+    // Which server was seen, not merely that one was: all three server routes
+    // render this same element, so following a link from one server to another
+    // never remounts, and a plain flag would take the second for one that went
+    // away and send the reader home without ever asking for it.
+    if (seen.current === serverId) {
       setMissing(true);
       return;
     }
+    setMissing(false);
     let alive = true;
     serversApi
       .get(serverId)

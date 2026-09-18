@@ -88,6 +88,10 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
   useEffect(() => {
     if (preview) return;
     let alive = true;
+    // The panel beside a DM is one card that changes person rather than a new
+    // one, so without this it goes on showing the last person's mutual friends
+    // and servers under the new name — forever if the request fails.
+    setMutual({ friends: [], servers: [] });
     usersApi
       .profile(userId)
       .then((p) => {

@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
@@ -89,7 +90,7 @@ export default function RegisterPage() {
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
           <span>{t("register.iHaveSavedMyRecoveryKey")}</span>
         </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true })}>{t("register.continueToNexa")}</Button>
+        <Button size="lg" block disabled={!saved} onClick={() => nav(safeNext(next), { replace: true })}>{t("register.continueToNexa")}</Button>
       </AuthLayout>
     );
   }

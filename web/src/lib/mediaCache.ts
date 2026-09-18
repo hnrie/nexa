@@ -21,8 +21,17 @@ const BUDGET = 200 * 1024 * 1024;
  */
 export const INLINE_MAX = 256 * 1024 * 1024;
 
+/** One download several viewers may be waiting on. */
+interface Job {
+  promise: Promise<string>;
+  /** Wired into the request; fired only once every viewer has given up. */
+  ctrl: AbortController;
+  waiting: number;
+  done: boolean;
+}
+
 const cache = new Map<string, Entry>();
-const inflight = new Map<string, Promise<string>>();
+const inflight = new Map<string, Job>();
 let total = 0;
 
 function evict(keep: string): void {
@@ -73,10 +82,12 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
   }
   if (att.size > INLINE_MAX) return Promise.reject(new Error(t("mediaCache.thatFileIsTooLargeTo")));
   const pending = inflight.get(att.blob_id);
-  if (pending) return pending;
-  const job = (async () => {
+  if (pending) return join(pending, signal);
+  const ctrl = new AbortController();
+  const job: Job = { promise: undefined as unknown as Promise<string>, ctrl, waiting: 0, done: false };
+  job.promise = (async () => {
     try {
-      const cipher = await channelsApi.downloadAttachment(att.blob_id, signal, encryptedSize(att.size));
+      const cipher = await channelsApi.downloadAttachment(att.blob_id, ctrl.signal, encryptedSize(att.size));
       const plain = await decryptFile(cipher, b64.dec(att.key));
       const typed = new Blob([plain], { type: playableType(att.type) });
       const url = URL.createObjectURL(typed);
@@ -85,11 +96,57 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
       evict(att.blob_id);
       return url;
     } finally {
+      job.done = true;
       inflight.delete(att.blob_id);
     }
   })();
   inflight.set(att.blob_id, job);
-  return job;
+  return join(job, signal);
+}
+
+/**
+ * Adds a viewer to a download already under way.
+ *
+ * The request used to carry the first caller's signal, so a row scrolling out
+ * of view aborted the download the lightbox opened from it was waiting on. A
+ * viewer that gives up now only takes itself out; the request goes only when
+ * the last one has.
+ */
+function join(job: Job, signal?: AbortSignal): Promise<string> {
+  job.waiting += 1;
+  let left = false;
+  const leave = (): void => {
+    if (left) return;
+    left = true;
+    signal?.removeEventListener("abort", onAbort);
+    job.waiting -= 1;
+    if (!job.done && job.waiting <= 0) job.ctrl.abort();
+  };
+  const onAbort = (): void => {
+    leave();
+    cancel?.(new DOMException("Aborted", "AbortError"));
+  };
+  const settled = job.promise.then(
+    (url) => {
+      leave();
+      return url;
+    },
+    (err: unknown) => {
+      leave();
+      throw err;
+    },
+  );
+  if (!signal) return settled;
+  let cancel: ((err: unknown) => void) | undefined;
+  const cancelled = new Promise<string>((_resolve, reject) => {
+    cancel = reject;
+  });
+  if (signal.aborted) {
+    onAbort();
+    return cancelled;
+  }
+  signal.addEventListener("abort", onAbort, { once: true });
+  return Promise.race([settled, cancelled]);
 }
 
 export function cachedURL(blobId: string): string | undefined {

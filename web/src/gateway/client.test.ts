@@ -197,8 +197,32 @@ describe("GatewayClient", () => {
     // backoff starts over, and the pending retry is not doubled up
     vi.advanceTimersByTime(1000);
     expect(FakeWS.instances).toHaveLength(5);
-    vi.advanceTimersByTime(60_000);
+    vi.advanceTimersByTime(10_000);
     expect(FakeWS.instances).toHaveLength(5);
+  });
+
+  it("gives up on a handshake that never finishes and tries again", () => {
+    const { client } = make();
+    client.connect();
+    expect(client.status).toBe("connecting");
+    // nothing opens and nothing closes, which is what a suspended phone leaves behind
+    vi.advanceTimersByTime(15_000);
+    expect(client.status).toBe("closed");
+    vi.advanceTimersByTime(1000);
+    expect(FakeWS.instances).toHaveLength(2);
+  });
+
+  it("wake() abandons a handshake a frozen tab left in flight", () => {
+    vi.setSystemTime(0);
+    const { client } = make();
+    client.connect();
+    expect(FakeWS.instances).toHaveLength(1);
+    // the clock moved while the tab was frozen; its timers did not
+    vi.setSystemTime(60_000);
+    client.wake();
+    expect(client.status).toBe("closed");
+    vi.advanceTimersByTime(1000);
+    expect(FakeWS.instances).toHaveLength(2);
   });
 
   it("wake() leaves a closed client alone", () => {

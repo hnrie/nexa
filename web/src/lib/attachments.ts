@@ -93,6 +93,13 @@ export const sendInPage: PieceSender = async (job, onProgress) => api.upload(job
 let workers = typeof Worker !== "undefined";
 
 /**
+ * How long the page waits on a worker that has gone quiet. Longer than the
+ * worker's own stall timeout, so a request that dies is reported by the worker
+ * rather than guessed at here; this is only for a worker that stops answering.
+ */
+const WORKER_STALL_MS = 90_000;
+
+/**
  * Encrypts a stretch here, then hands the bytes to a worker of its own that
  * sends them and is ended once they have landed, so no finished request's
  * body outlives it (see upload.worker.ts).
@@ -113,13 +120,28 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
       return;
     }
     let heard = false;
+    let stall: ReturnType<typeof setTimeout> | undefined;
+    const settled = (): void => clearTimeout(stall);
+    // A worker can be taken away outright — a backgrounded tab on a phone short
+    // of memory — and then neither a message nor an error ever comes. The
+    // upload would show a frozen bar for good, and the reload hold it took
+    // would keep a newly deployed version from ever applying to this tab.
+    const watch = (): void => {
+      clearTimeout(stall);
+      stall = setTimeout(() => {
+        worker.terminate();
+        reject(new ApiError(0, "worker", t("attachments.theUploadStoppedUnexpectedly")));
+      }, WORKER_STALL_MS);
+    };
     worker.onmessage = (e: MessageEvent<PieceReply>) => {
       heard = true;
       const reply = e.data;
       if (reply.type === "progress") {
+        watch();
         onProgress(reply.loaded);
         return;
       }
+      settled();
       worker.terminate();
       if (reply.type === "failed") {
         reject(new ApiError(0, "network", t("attachments.theUploadCouldNotReachThe")));
@@ -137,6 +159,7 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
       reject(errorFrom(reply.status, reply.text, reply.retryAfter));
     };
     worker.onerror = (e) => {
+      settled();
       worker.terminate();
       if (heard) {
         reject(new ApiError(0, "worker", t("attachments.theUploadStoppedUnexpectedly")));
@@ -149,6 +172,7 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
       sendInPage(job, onProgress).then(resolve, reject);
     };
     const request: PieceRequest = { url: new URL(api.url(job.path), location.href).href, method: job.method, headers, body: body.buffer };
+    watch();
     worker.postMessage(request, [body.buffer]);
   });
 };

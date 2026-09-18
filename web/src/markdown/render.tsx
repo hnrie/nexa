@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { ensureShortcodes, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
+import { formatStamp, type StampStyle } from "@/lib/time";
 import type { Node, RenderCtx } from "./ast";
 import { parse } from "./parse";
 
@@ -36,13 +37,64 @@ function useShortcodes(source: string): number {
   return version;
 }
 
+/**
+ * A key that follows what the node holds rather than where it sits.
+ *
+ * Most nodes are stateless, but a spoiler remembers being revealed and a code
+ * block its highlighting. Keyed by index, an edit that removes a node hands
+ * that state to whichever node moves into its place — the second spoiler in a
+ * message shows itself because the first one was opened.
+ */
+function signature(node: Node, max: number): string {
+  if (max <= 0) return "";
+  switch (node.type) {
+    case "text":
+    case "code":
+    case "codeblock":
+    case "unicodeEmoji":
+      return node.text.slice(0, max);
+    case "emoji":
+      return node.id;
+    case "mention":
+      return "id" in node ? `${node.kind}:${node.id}` : node.kind;
+    case "link":
+      return node.url.slice(0, max);
+    case "timestamp":
+      return `${node.unix}:${node.style}`;
+    case "br":
+      return "";
+    case "list": {
+      let out = "";
+      for (const item of node.items) {
+        for (const child of item) {
+          out += signature(child, max - out.length);
+          if (out.length >= max) return out.slice(0, max);
+        }
+      }
+      return out;
+    }
+    default: {
+      let out = "";
+      for (const child of node.children) {
+        out += signature(child, max - out.length);
+        if (out.length >= max) return out.slice(0, max);
+      }
+      return out;
+    }
+  }
+}
+
+function nodeKey(node: Node, n: number): string {
+  return `${n}:${node.type}:${signature(node, 48)}`;
+}
+
 /** Renders an already parsed list of nodes. */
 export function RenderNodes(props: { nodes: Node[]; ctx: RenderCtx; jumbo?: boolean }): JSX.Element {
   const { nodes, ctx, jumbo } = props;
   return (
     <>
       {nodes.map((node, i) => (
-        <Fragment key={i}>{renderNode(node, ctx, jumbo === true)}</Fragment>
+        <Fragment key={nodeKey(node, i)}>{renderNode(node, ctx, jumbo === true)}</Fragment>
       ))}
     </>
   );
@@ -268,51 +320,14 @@ function rgbaColor(color: number, alpha: number): string {
 // timestamps
 // ---------------------------------------------------------------------------
 
-type TimestampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R";
-
-const DATE_FORMATS: Record<Exclude<TimestampStyle, "R">, Intl.DateTimeFormatOptions> = {
-  t: { hour: "numeric", minute: "2-digit" },
-  T: { hour: "numeric", minute: "2-digit", second: "2-digit" },
-  d: { year: "numeric", month: "2-digit", day: "2-digit" },
-  D: { year: "numeric", month: "long", day: "numeric" },
-  f: { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
-  F: { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
-};
-
-const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
-  ["year", 31557600],
-  ["month", 2629800],
-  ["week", 604800],
-  ["day", 86400],
-  ["hour", 3600],
-  ["minute", 60],
-  ["second", 1],
-];
-
-function formatRelative(unix: number): string {
-  const delta = unix - Date.now() / 1000;
-  const abs = Math.abs(delta);
-  for (const [unit, seconds] of RELATIVE_UNITS) {
-    if (abs >= seconds || unit === "second") {
-      return new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(Math.round(delta / seconds), unit);
-    }
-  }
-  return "";
-}
-
-function formatStyle(date: Date, style: TimestampStyle): string {
-  if (style === "R") return formatRelative(date.getTime() / 1000);
-  return new Intl.DateTimeFormat(undefined, DATE_FORMATS[style]).format(date);
-}
-
-function Timestamp(props: { unix: number; style: TimestampStyle }): JSX.Element {
+function Timestamp(props: { unix: number; style: StampStyle }): JSX.Element {
   const date = new Date(props.unix * 1000);
   if (Number.isNaN(date.getTime())) {
     return <time className="md-timestamp">{String(props.unix)}</time>;
   }
   return (
-    <time className="md-timestamp" dateTime={date.toISOString()} title={formatStyle(date, "F")}>
-      {formatStyle(date, props.style)}
+    <time className="md-timestamp" dateTime={date.toISOString()} title={formatStamp(date, "F")}>
+      {formatStamp(date, props.style)}
     </time>
   );
 }

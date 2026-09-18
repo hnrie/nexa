@@ -66,11 +66,13 @@ export function GifGrid<T extends GifTileData>({ tiles, onPick, onMenu, onDead, 
       frame ||= requestAnimationFrame(read);
     };
     read();
-    const resize = new ResizeObserver(() => read());
-    resize.observe(el);
     el.addEventListener("scroll", onScroll, { passive: true });
+    // the same guard its two sibling call sites have: where the API is missing
+    // this threw during layout and took the whole picker down with it
+    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => read());
+    resize?.observe(el);
     return () => {
-      resize.disconnect();
+      resize?.disconnect();
       el.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
     };

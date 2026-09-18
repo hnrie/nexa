@@ -38,6 +38,14 @@ function endings(): Record<string, { text: string; again: boolean }> {
 };
 }
 
+/**
+ * How long "Joining the call…" may last. This page draws its own tree, so the
+ * app shell's connection banner never shows here, and the way back out is
+ * hidden while joining: a socket that never comes up left a spinner and
+ * nothing to click.
+ */
+const JOIN_TIMEOUT_MS = 20_000;
+
 /** Where this tab keeps its guest session, so a reload goes straight back in. Never localStorage: it would outlive the tab. */
 const storeName = (code: string) => `ec.guest.${code}`;
 
@@ -89,6 +97,7 @@ export default function GuestCallPage() {
   const closeModal = useUI((u) => u.closeModal);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  const joinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // someone with an account on this browser (who opened a link from a chat, say) has a way back to the app
   const [signedIn] = useState(() => !!storage.get("ec.token"));
 
@@ -110,12 +119,25 @@ export default function GuestCallPage() {
     useChannels.setState({ byId: { [ch.id]: ch } });
     setChannel(ch);
     let ready = false;
+    if (joinTimer.current) clearTimeout(joinTimer.current);
+    joinTimer.current = setTimeout(() => {
+      joinTimer.current = null;
+      if (ready || phaseRef.current !== "joining") return;
+      stopGuestSession();
+      api.setToken(null);
+      setError(t("guestCall.couldNotJoinTheCall"));
+      setPhase("form");
+    }, JOIN_TIMEOUT_MS);
     startGuestSession(token, (e: GatewayEvent) => {
       switch (e.t) {
         case "ready":
           onReadyVoice(e.d.voice_states ?? [], e.d.session_id);
           if (!ready) {
             ready = true;
+            if (joinTimer.current) {
+              clearTimeout(joinTimer.current);
+              joinTimer.current = null;
+            }
             setPhase("call");
             if (join) void joinVoice(guest.channel_id);
           }
@@ -178,6 +200,8 @@ export default function GuestCallPage() {
         });
     }
     return () => {
+      if (joinTimer.current) clearTimeout(joinTimer.current);
+      joinTimer.current = null;
       void leaveVoice(true);
       stopGuestSession();
     };

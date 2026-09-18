@@ -134,7 +134,13 @@ export const useServers = create<ServersState>()((set) => ({
       if (!cur) return s;
       const members = { ...cur.members };
       for (const m of list) members[m.user_id] = m;
-      return { byId: { ...s.byId, [serverId]: { ...cur, members, membersComplete: complete ?? cur.membersComplete } } };
+      // This device's own row comes down in a bulk load like any other, and a
+      // member_update missed across a reconnect arrives only here. Every other
+      // member mutation recomputes these; leaving them stale showed the new
+      // role's colour beside buttons the old permissions still hid.
+      const me = members[cur.me.user_id] ?? cur.me;
+      const next = { ...cur, members, me, membersComplete: complete ?? cur.membersComplete };
+      return { byId: { ...s.byId, [serverId]: { ...next, myPermissions: recomputeMine(next) } } };
     }),
   removeMember: (serverId, userId, left = false) =>
     set((s) => {
@@ -213,8 +219,14 @@ export function permRolesOf(st: ServerState): PermRole[] {
 
 export function canI(st: ServerState | undefined, need: bigint, channelId?: string): boolean {
   if (!st) return false;
-  const p = channelId ? channelPerms(st, channelId, st.me.user_id) : st.myPermissions;
-  return has(p, need);
+  if (channelId) return has(channelPerms(st, channelId, st.me.user_id), need);
+  // `myPermissions` was worked out once, with the timeout of that moment folded
+  // into it, and a timeout that simply lapses gives the server no reason to
+  // send anything. Channel checks recompute and quietly came back to life while
+  // every server-wide one stayed off until a reload.
+  const until = st.me.timeout_until;
+  const lapsed = !!until && until <= Date.now();
+  return has(lapsed ? serverPerms(st, st.me.user_id) : st.myPermissions, need);
 }
 
 export { P };

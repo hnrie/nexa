@@ -193,13 +193,18 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
 
 function VideoAttachment({ att }: { att: AttachmentMeta }) {
   // the whole file has to come down and be decrypted before it can play at all
+  const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
-  const { url, error, wanted, load, retry } = useDecrypted(att, auto);
+  // Waiting for the row to near the screen, as pictures do. Starting on mount
+  // downloaded and decrypted every clip in the loaded history at once, each of
+  // them held in memory from that moment on.
+  const { url, error, wanted, load, retry } = useDecrypted(att, false);
+  useInView(ref, load, auto);
   // the same frame the player will have, so nothing jumps when it arrives
   const dims = fitVideo(att.w ?? 640, att.h ?? 360);
   if (url) return <VideoPlayer src={url} name={att.name} width={att.w} height={att.h} spoiler={att.spoiler ?? false} />;
   return (
-    <div className={s.videoPending} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }}>
+    <div ref={ref} className={s.videoPending} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }}>
       {error ? (
         <LoadFailed error={error} what="video" onRetry={retry} />
       ) : wanted || auto ? (
@@ -214,10 +219,12 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
 }
 
 function AudioAttachment({ att }: { att: AttachmentMeta }) {
+  const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
-  const { url, error, wanted, load, retry } = useDecrypted(att, auto);
+  const { url, error, wanted, load, retry } = useDecrypted(att, false);
+  useInView(ref, load, auto);
   return (
-    <div className={s.audio}>
+    <div ref={ref} className={s.audio}>
       {url ? (
         <AudioPlayer src={url} name={att.name} size={att.size} duration={att.duration} />
       ) : error ? (

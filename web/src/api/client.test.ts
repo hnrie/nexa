@@ -201,11 +201,66 @@ describe("api.request", () => {
     expect(only(calls).url).toBe("/api/v1/channels/7/messages");
   });
 
-  it("passes the abort signal through", async () => {
+  it("passes the caller's abort through to the request", async () => {
     const ctrl = new AbortController();
-    const calls = useFetch(() => json({}));
-    await api.request("GET", "/users/@me", undefined, { signal: ctrl.signal });
-    expect(only(calls).init.signal).toBe(ctrl.signal);
+    let sent: AbortSignal | null = null;
+    // the signal fetch gets is the caller's and the deadline's together, so it
+    // is a different object that still has to abort with the caller's
+    const calls = useFetch(
+      (_url, init) =>
+        new Promise<Response>((resolve, reject) => {
+          sent = init.signal ?? null;
+          init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+          setTimeout(() => resolve(json({})), 50);
+        }),
+    );
+    const p = api.request("GET", "/users/@me", undefined, { signal: ctrl.signal }).catch((e: unknown) => e);
+    expect(only(calls).init.signal).toBeDefined();
+    expect((sent as unknown as AbortSignal).aborted).toBe(false);
+    ctrl.abort();
+    expect((sent as unknown as AbortSignal).aborted).toBe(true);
+    await p;
+  });
+
+  it("gives up on a request that is never answered", async () => {
+    vi.useFakeTimers();
+    try {
+      useFetch(
+        (_url, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+          }),
+      );
+      const p = api.request("GET", "/users/@me").catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(30_000);
+      const err = (await p) as ApiError;
+      expect(err).toBeInstanceOf(ApiError);
+      expect(err.code).toBe("timeout");
+      expect(err.status).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("turns a transport failure into a network ApiError rather than a TypeError", async () => {
+    useFetch(() => {
+      throw new TypeError("Failed to fetch");
+    });
+    const err = (await api.request("GET", "/users/@me").catch((e: unknown) => e)) as ApiError;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("network");
+    expect(err.status).toBe(0);
+  });
+
+  it("leaves onUnauthorized alone for a 401 that means a password was wrong", async () => {
+    api.setToken("tok");
+    let hits = 0;
+    api.onUnauthorized = () => {
+      hits += 1;
+    };
+    useFetch(() => json({ error: { code: "invalid_credentials", message: "The current password is wrong." } }, 401));
+    await api.request("POST", "/auth/password", {}).catch(() => undefined);
+    expect(hits).toBe(0);
   });
 
   it("returns undefined for 204", async () => {
@@ -359,6 +414,26 @@ describe("api.upload", () => {
     lastXHR().respond(401, JSON.stringify({ error: { code: "unauthorized", message: "Log in." } }));
     await p.catch(() => undefined);
     expect(hits).toBe(1);
+  });
+
+  it("rejects rather than hanging when a 2xx body is not JSON", async () => {
+    useXHR();
+    const p = api.upload("/users/@me/avatar", new Uint8Array([1]), { method: "PUT" });
+    lastXHR().respond(200, "<html>captive portal</html>");
+    const err = (await p.catch((e: unknown) => e)) as ApiError;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("bad_response");
+  });
+
+  it("stops listening to the signal once the upload has settled", async () => {
+    useXHR();
+    const ctrl = new AbortController();
+    const p = api.upload("/channels/7/attachments", new Uint8Array([1]), { signal: ctrl.signal });
+    const xhr = lastXHR();
+    xhr.respond(200, "{}");
+    await p;
+    ctrl.abort();
+    expect(xhr.aborted).toBe(false);
   });
 
   it("rejects when the transport fails", async () => {

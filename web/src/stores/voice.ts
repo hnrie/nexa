@@ -190,7 +190,9 @@ export const useVoice = create<VoiceStore>()((set) => ({
       return { watching, focused: s.focused === key ? null : s.focused };
     }),
   setError: (error) => set({ error }),
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {} }),
+  // error goes with the rest: a refusal from a call that is over has nothing
+  // to say about the next one, and it was shown again in its lobby
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null }),
   clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null }),
 }));
 

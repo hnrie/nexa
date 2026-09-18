@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Hash, Lock, Plus, Settings, UserPlus, Volume2, X } from "lucide-react";
-import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { ApiError } from "@/api/client";
@@ -44,6 +44,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const headRef = useRef<HTMLButtonElement>(null);
   // whether the menu was open when the header was pressed: pressing closes it, and the click that follows must not open it again
   const wasOpen = useRef(false);
+  const menuWatch = useRef<(() => void) | null>(null);
   const active = loc.pathname.match(/^\/channels\/\d+\/(\d+)/)?.[1];
   const tree = useMemo(() => channelTree(channels, serverId), [channels, serverId]);
   const canManage = canI(st, P.MANAGE_CHANNELS);
@@ -63,13 +64,24 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     const r = headRef.current.getBoundingClientRect();
     setMenuOpen(true);
     openContextMenu({ x: r.left + 8, y: r.bottom + 4, items: serverMenuItems(serverId, { nav, openModal }) });
-    const unsub = useUI.subscribe((state) => {
+    menuWatch.current?.();
+    menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {
         setMenuOpen(false);
-        unsub();
+        menuWatch.current?.();
+        menuWatch.current = null;
       }
     });
   };
+  // the quick switcher can take this sidebar away with the menu still open,
+  // and the store would keep the subscriber and its closure for good
+  useEffect(
+    () => () => {
+      menuWatch.current?.();
+      menuWatch.current = null;
+    },
+    [],
+  );
 
   const onChannelContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
@@ -87,16 +99,19 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", d.id);
   };
+  // dragover fires some sixty times a second; a fresh object each time re-rendered
+  // the whole channel tree, every tooltip and every call's participant rows
+  const dropAt = (id: string, where: Drop["where"]) => setDrop((d) => (d && d.id === id && d.where === where ? d : { id, where }));
   const onDragOver = (e: DragEvent, target: Channel) => {
     if (!drag || drag.id === target.id) return;
     if (drag.kind === "category" && target.type !== "category" && !target.parent_id) return;
     e.preventDefault();
     const r = e.currentTarget.getBoundingClientRect();
     if (drag.kind === "channel" && target.type === "category") {
-      setDrop({ id: target.id, where: e.clientY < r.top + r.height * 0.35 ? "before" : "into" });
+      dropAt(target.id, e.clientY < r.top + r.height * 0.35 ? "before" : "into");
       return;
     }
-    setDrop({ id: target.id, where: e.clientY > r.top + r.height / 2 ? "after" : "before" });
+    dropAt(target.id, e.clientY > r.top + r.height / 2 ? "after" : "before");
   };
   const finish = async (list: ChannelPositionPatch[]) => {
     applyPositions(list.map((p) => ({ id: p.id, position: p.position, parent_id: p.parent_id === undefined ? (channels[p.id]?.parent_id ?? null) : p.parent_id })));

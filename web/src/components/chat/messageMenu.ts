@@ -121,9 +121,25 @@ export function markUnread(msg: DecryptedMessage): void {
   const ids = ch?.ids ?? [];
   const idx = ids.indexOf(msg.id);
   const prev = idx > 0 ? ids[idx - 1]! : "0";
-  useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: 0 });
-  void messagesApi.ack(msg.channel_id, prev === "0" ? msg.id : prev);
-  void fetchForcedAck(msg.channel_id, prev);
+  // What is being made unread may hold mentions; zeroing the count left the
+  // channel unread with no badge to say the reader is wanted in it.
+  const meId = useAuth.getState().me?.id;
+  let mentions = 0;
+  if (meId && idx >= 0) {
+    for (const id of ids.slice(idx)) {
+      const m = ch?.byId[id];
+      if (m && m.author_id !== meId && (m.mention_everyone || m.mentions.includes(meId))) mentions += 1;
+    }
+  }
+  useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: mentions });
+  void (async () => {
+    // The two acks say opposite things, and nothing used to sequence them: the
+    // forced one is what Mark Unread means, so it lands last. At the top of a
+    // loaded page there is no earlier message to read up to, and the plain ack
+    // there would have marked this very message read.
+    if (prev !== "0") await messagesApi.ack(msg.channel_id, prev).catch(() => undefined);
+    await fetchForcedAck(msg.channel_id, prev);
+  })();
 }
 
 /** Copies a permalink that opens the message in its channel. */

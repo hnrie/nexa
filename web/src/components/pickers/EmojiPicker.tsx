@@ -225,6 +225,8 @@ function firstRowBelow(rows: Row[], y: number): number {
 
 export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => void; serverId?: string | null | undefined }) {
   const [ready, setReady] = useState(emojiLoaded());
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState("");
   const hover = useMemo(createHover, []);
   const customByServer = useExpressions((x) => x.emojis);
@@ -239,11 +241,23 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
   const [box, setBox] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
-    if (!emojiLoaded()) void loadEmoji().then(() => setReady(true));
     setTimeout(() => {
       if (focusSearchOnOpen()) inputRef.current?.focus();
     }, 0);
   }, []);
+
+  useEffect(() => {
+    if (emojiLoaded()) return;
+    let alive = true;
+    setLoadFailed(false);
+    void loadEmoji().then(
+      () => alive && setReady(true),
+      () => alive && setLoadFailed(true),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [attempt]);
 
   useLayoutEffect(() => {
     const el = gridRef.current;
@@ -385,7 +399,18 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
             : null}
         </div>
         <div className={s.grid} ref={gridRef} onScroll={onScroll} onMouseLeave={() => hover.set(null)} data-testid="emoji-grid">
-          {!ready && !q.trim() ? <div className={s.empty}>{t("pickers.emojiPicker.loadingEmoji")}</div> : null}
+          {!ready && !q.trim() ? (
+            <div className={s.empty}>
+              {loadFailed ? (
+                <>
+                  {t("pickers.emojiPicker.emojiCouldNotBeLoaded")}{" "}
+                  <button className={s.sectionLink} onClick={() => setAttempt((n) => n + 1)} data-testid="emoji-retry">{t("chat.messageList.tryAgain")}</button>
+                </>
+              ) : (
+                t("pickers.emojiPicker.loadingEmoji")
+              )}
+            </div>
+          ) : null}
           {noResults ? <div className={s.empty}>{t("pickers.emojiPicker.noEmojiMatch")}</div> : null}
           {current ? <div className={[s.section, s.stickyHead].join(" ")} aria-hidden="true">{current}</div> : null}
           <div className={s.virtual} style={{ height }}>

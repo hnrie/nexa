@@ -69,9 +69,10 @@ export const DEFAULT_LOCK = { autoLockMs: 5 * 60_000, lockOnBlur: false, blurDel
 
 /** Thrown for a wrong passcode; `left` is how many tries remain. */
 export class WrongPasscode extends Error {
-  readonly left: number;
-  constructor(left: number) {
-    super(left > 0 ? t("appLock.wrongPasscodeTriesLeft", { count: left }) : t("appLock.tooManyWrongPasscodes"));
+  /** Tries before the wrapped key is destroyed, or null where there is none to destroy and nothing is counted. */
+  readonly left: number | null;
+  constructor(left: number | null) {
+    super(left === null ? t("appLock.wrongPasscode") : left > 0 ? t("appLock.wrongPasscodeTriesLeft", { count: left }) : t("appLock.tooManyWrongPasscodes"));
     this.name = "WrongPasscode";
     this.left = left;
   }
@@ -203,11 +204,11 @@ export async function policyFor(cfg: LockConfig, passcode: string): Promise<AppL
  */
 export async function adoptPolicy(userId: string, identity: Identity, passcode: string, policy: AppLockPolicy): Promise<LockConfig> {
   const key = await passcodeKey(passcode, b64.dec(policy.salt), policy.params);
-  if (verifierOf(key) !== policy.verifier) {
-    const cfg = loadLock(userId);
-    const failures = (cfg?.failures ?? 0) + 1;
-    throw new WrongPasscode(Math.max(0, MAX_FAILURES - failures));
-  }
+  // No count here, because there is nothing to count against: this is the
+  // branch for a device that has no wrapped key yet, so there is none to throw
+  // away and the tries the message used to promise were never enforced. It
+  // read "9 tries left" however many times the passcode was got wrong.
+  if (verifierOf(key) !== policy.verifier) throw new WrongPasscode(null);
   const wrapped = await wrapPrivateKey(identity.privateKey, key);
   const next: LockConfig = {
     v: 1,

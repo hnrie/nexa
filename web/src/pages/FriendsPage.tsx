@@ -170,7 +170,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         ...(rel.type === "friend" ? [{ id: "call", label: tr_("chat.chat.startVoiceCall"), onSelect: () => void call(), separatorAfter: true }] : []),
         ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => void remove(tr_("friends.friendRemoved")) }] : []),
         ...(rel.type !== "blocked"
-          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" })) }]
+          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(rel.user.id).then(() => setRel({ ...rel, type: "blocked" }), (err: unknown) => toast(err instanceof ApiError ? err.message : tr_("friends.couldNotUpdate"), "error")) }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
         { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(rel.user.id) },
       ],

@@ -35,6 +35,7 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
   const [animated, setAnimated] = useState(() => animatedByType(file.type));
   const [keepOriginal, setKeepOriginal] = useState(animated);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const boxW = VIEW;
   const boxH = Math.round(VIEW / aspect);
@@ -43,6 +44,9 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
     const url = URL.createObjectURL(file);
     const el = new Image();
     el.onload = () => setImg(el);
+    // Without this a file the browser cannot decode leaves an empty frame and
+    // an Apply that is disabled for good, with nothing saying why.
+    el.onerror = () => setError(t("common.imageCrop.thatPictureCouldNotBeOpened"));
     el.src = url;
     return () => URL.revokeObjectURL(url);
   }, [file]);
@@ -99,6 +103,7 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
     }
     if (!img) return;
     setBusy(true);
+    setError(null);
     try {
       const outW = Math.min(maxSize, Math.round(boxW * (img.naturalWidth * scale >= boxW ? 4 : 1)));
       const w = Math.min(maxSize, Math.max(128, outW));
@@ -107,7 +112,12 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      // A canvas the browser refuses, or one it runs out of memory drawing, used
+      // to leave Apply doing nothing at all and no word of why.
+      if (!ctx) {
+        setError(t("common.imageCrop.thatPictureCouldNotBeCropped"));
+        return;
+      }
       ctx.imageSmoothingQuality = "high";
       const k = w / boxW; // view pixels to output pixels
       const dw = img.naturalWidth * scale * k;
@@ -115,6 +125,9 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
       ctx.drawImage(img, (w - dw) / 2 + offset.x * k, (h - dh) / 2 + offset.y * k, dw, dh);
       const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
       if (blob) onDone({ blob, original: false });
+      else setError(t("common.imageCrop.thatPictureCouldNotBeCropped"));
+    } catch {
+      setError(t("common.imageCrop.thatPictureCouldNotBeCropped"));
     } finally {
       setBusy(false);
     }
@@ -168,6 +181,7 @@ export function ImageCropModal({ file, aspect, round = false, title = t("common.
             <span>{t("common.imageCrop.uploadTheOriginalSoItKeeps")}</span>
           </label>
         ) : null}
+        {error ? <p className={s.error} data-testid="crop-error">{error}</p> : null}
         <p className={s.hint}>{t("common.imageCrop.dragToMoveScrollOrUse")}</p>
       </div>
     </Modal>

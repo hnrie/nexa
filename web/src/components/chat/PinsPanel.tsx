@@ -13,6 +13,8 @@ import s from "./Chat.module.css";
 import { t } from "@/i18n";
 export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: () => void }) {
   const [pins, setPins] = useState<DecryptedMessage[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [unpinning, setUnpinning] = useState<string | null>(null);
   const users = useUsers((u) => u.byId);
   const setJumpTo = useUI((u) => u.setJumpTo);
@@ -23,17 +25,20 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
   closeRef.current = onClose;
   useEffect(() => {
     let alive = true;
+    setFailed(false);
     channelsApi
       .pins(channelId)
       .then(async (list) => {
         const dec = await Promise.all(list.map(decryptForStore));
         if (alive) setPins(dec);
       })
-      .catch(() => alive && setPins([]));
+      // A failure is not an empty channel: the two used to render the same
+      // line, which said confidently that there were no pins.
+      .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
     };
-  }, [channelId]);
+  }, [channelId, attempt]);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       const target = e.target as Element;
@@ -51,7 +56,12 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
         <button className={s.popClose} aria-label={t("chat.pins.closePinnedMessages")} onClick={onClose}><X size={18} /></button>
       </div>
       <div className={s.pinsList}>
-        {pins === null ? <div className={s.pinEmpty}>{t("chat.pins.loading")}</div> : pins.length === 0 ? <div className={s.pinEmpty}>{t("chat.pins.thisChannelDoesnTHaveAny")}</div> : null}
+        {failed ? (
+          <div className={s.pinEmpty}>
+            {t("chat.pins.couldNotLoadPinnedMessages")}{" "}
+            <button className={s.loadRetry} onClick={() => setAttempt((n) => n + 1)} data-testid="pins-retry">{t("chat.messageList.tryAgain")}</button>
+          </div>
+        ) : pins === null ? <div className={s.pinEmpty}>{t("chat.pins.loading")}</div> : pins.length === 0 ? <div className={s.pinEmpty}>{t("chat.pins.thisChannelDoesnTHaveAny")}</div> : null}
         {pins?.map((m) => (
           <div key={m.id} className={s.pinItem} onClick={() => { setJumpTo({ channelId, messageId: m.id }); onClose(); }}>
             <div className={s.pinHead}>

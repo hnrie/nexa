@@ -89,14 +89,17 @@ export default function InvitePage() {
     setBusy(true);
     setAcceptError(null);
     try {
-      if (preview.group) {
-        const res = (await guarded("join", (captcha) => serversApi.join(code, captcha))) as unknown as { channel: { id: string; recipient_ids: string[] }; users?: { id: string }[] };
-        if (res.users) useUsers.getState().upsert(res.users as never);
-        useChannels.getState().upsert(res.channel as never);
+      const res = await guarded("join", (captcha) => serversApi.join(code, captcha));
+      // What came back decides, rather than what the preview said and a cast
+      // through `unknown`: a field that is absent or renamed used to navigate
+      // to /channels/@me/undefined and bounce home with no explanation.
+      if ("channel" in res) {
+        if (res.users) useUsers.getState().upsert(res.users);
+        useChannels.getState().upsert(res.channel);
         nav(`/channels/@me/${res.channel.id}`, { replace: true });
         return;
       }
-      const res = await guarded("join", (captcha) => serversApi.join(code, captcha));
+      if (!("server" in res)) throw new Error(t("invite.couldNotAcceptTheInvite"));
       useUsers.getState().upsert(res.users);
       useChannels.getState().upsert(res.server.channels);
       useServers.getState().setFromView(res.server);

@@ -29,6 +29,13 @@ const MAX_BACKOFF_MS = 12_000;
  * is gone, and nothing but silence ever says so.
  */
 const ACK_TIMEOUT_MS = 8_000;
+/**
+ * How long a handshake may take. Only the heartbeat had a deadline, and it
+ * starts in `onopen`: a phone suspended while the socket was still connecting
+ * can come back with it stuck in CONNECTING and no close event ever, which
+ * neither `connect()` nor `wake()` would touch again.
+ */
+const CONNECT_TIMEOUT_MS = 15_000;
 
 export class GatewayClient {
   private readonly opts: GatewayOptions;
@@ -39,6 +46,9 @@ export class GatewayClient {
   private heartbeat: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private ackTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the handshake under way started, so a frozen tab can tell how long it has really been. */
+  private connectingSince = 0;
   /**
    * How many frames the socket has delivered. A heartbeat counts as answered
    * once this moves; comparing times failed when the answer came back within
@@ -95,8 +105,14 @@ export class GatewayClient {
       return;
     }
     this.ws = ws;
+    this.connectingSince = Date.now();
+    this.connectTimer = this.timers().set(() => {
+      this.connectTimer = null;
+      this.abandonHandshake(ws);
+    }, CONNECT_TIMEOUT_MS);
     ws.onopen = () => {
       if (this.ws !== ws) return;
+      this.clearConnectTimer();
       ws.send(JSON.stringify({ op: "identify", d: { token } }));
       this.setStatus("open");
       this.flush();
@@ -121,6 +137,7 @@ export class GatewayClient {
     ws.onclose = (ev: CloseEvent) => {
       if (this.ws !== ws) return;
       this.ws = null;
+      this.clearConnectTimer();
       this.stopHeartbeat();
       this.ready = false;
       if (ev.code === 4001) {
@@ -139,7 +156,29 @@ export class GatewayClient {
     };
   }
 
+  private clearConnectTimer(): void {
+    if (this.connectTimer === null) return;
+    this.timers().clear(this.connectTimer);
+    this.connectTimer = null;
+  }
+
+  /** Gives up on a handshake that never finished and starts a fresh one. */
+  private abandonHandshake(ws: WebSocket): void {
+    if (this.ws !== ws || this._status !== "connecting") return;
+    this.ws = null;
+    this.clearConnectTimer();
+    this.stopHeartbeat();
+    this.ready = false;
+    try {
+      ws.close(4000, "connect timeout");
+    } catch {
+      /* already closing */
+    }
+    this.scheduleReconnect(1006, "connect timeout");
+  }
+
   private scheduleReconnect(code?: number, reason?: string): void {
+    this.clearConnectTimer();
     this.setStatus("closed", { code, reason });
     const rnd = this.opts.random ?? Math.random;
     const delay = Math.min(MAX_BACKOFF_MS, 1000 * Math.pow(1.7, this.attempt)) + rnd() * 500;
@@ -161,6 +200,16 @@ export class GatewayClient {
     if (this.closedByUser) return;
     if (this._status === "open") {
       this.ping();
+      return;
+    }
+    // A handshake that never finished is the third state, and neither branch
+    // here nor connect() would ever touch it. The clock is read rather than
+    // trusted to the timer, because a frozen tab's timers do not run either.
+    if (this._status === "connecting") {
+      const ws = this.ws;
+      if (!ws || Date.now() - this.connectingSince < CONNECT_TIMEOUT_MS) return;
+      this.attempt = 0;
+      this.abandonHandshake(ws);
       return;
     }
     if (this._status !== "closed" || this.reconnectTimer === null) return;
@@ -201,10 +250,14 @@ export class GatewayClient {
       clear(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.clearConnectTimer();
     this.stopHeartbeat();
     const ws = this.ws;
     this.ws = null;
     this.ready = false;
+    // presence, activity and voice frames belong to the session that queued
+    // them; a later connect() flushes whatever is here in its onopen
+    this.queue = [];
     if (ws) ws.close(1000, "client closed");
     this.setStatus("closed", { code: 1000, reason: "client closed" });
   }

@@ -88,28 +88,33 @@ export function DMSidebar() {
           const subs = activeConvo === ch.id ? selectSubchats(channels, ch.id) : [];
           return (
             <div key={ch.id}>
-            <button
+            {/* A row of two buttons rather than one button with a role="button"
+                span inside it: nested interactive content is invalid, and the
+                close control it advertised could not be reached by Tab at all,
+                so no keyboard could ever close a conversation from here. */}
+            <div
               className={s.item}
               data-selected={active === ch.id}
               data-parent-selected={activeConvo === ch.id && active !== ch.id}
               data-unread={unread && active !== ch.id}
               data-channel={ch.id}
-              onClick={() => go(`/channels/@me/${ch.id}`)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
               }}
             >
-              {avatar}
-              <span className={s.text}>
-                <span className={s.name}>{name}</span>
-                {sub}
-              </span>
+              <button type="button" className={s.itemMain} onClick={() => go(`/channels/@me/${ch.id}`)}>
+                {avatar}
+                <span className={s.text}>
+                  <span className={s.name}>{name}</span>
+                  {sub}
+                </span>
+              </button>
               {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-label={`${count > 99 ? "more than 99" : count} unread`}>{badgeText(count)}</span> : null}
-              <span
+              <button
+                type="button"
                 className={s.close}
-                role="button"
-                aria-label={t("sidebar.dMSidebar.closeDm")}
+                aria-label={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
                 title={ch.type === "group_dm" ? t("sidebar.dMSidebar.leaveGroup") : t("sidebar.dMSidebar.closeDm")}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -118,8 +123,8 @@ export function DMSidebar() {
                 }}
               >
                 <X size={16} />
-              </span>
-            </button>
+              </button>
+            </div>
             {subs.map((sub) => {
               const srs = reads[sub.id];
               return (

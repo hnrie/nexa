@@ -40,6 +40,9 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   const [dead, setDead] = useState<Set<string>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seq = useRef(0);
+  /** What is on screen, read where a state updater would run too late to decide anything. */
+  const resultsRef = useRef(results);
+  resultsRef.current = results;
   const favSet = useMemo(() => new Set(favs.map((f) => f.url)), [favs]);
 
   useEffect(() => {
@@ -61,18 +64,21 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     try {
       const page = query.trim() ? await expressionsApi.gifSearch(query, pos) : await expressionsApi.gifTrending(pos);
       if (mine !== seq.current) return;
+      let added = page.results.length;
       if (pos) {
         // pages can overlap as trending shifts; a GIF shown twice would share a key
-        setResults((cur) => {
-          const have = new Set(cur.map((g) => g.id));
-          return [...cur, ...page.results.filter((g) => !have.has(g.id))];
-        });
+        const have = new Set(resultsRef.current.map((g) => g.id));
+        const fresh = page.results.filter((g) => !have.has(g.id));
+        added = fresh.length;
+        if (fresh.length) setResults((cur) => [...cur, ...fresh]);
       } else {
         setResults(page.results);
         setShownFor(query);
       }
-      // an empty page ends it, even if the provider offers another
-      setNext(page.results.length ? page.next : "");
+      // A page that adds nothing ends it, even if the provider offers another:
+      // one that repeats itself on a cursor that does not move would otherwise
+      // be asked for again for as long as the picker stayed open.
+      setNext(added ? page.next : "");
     } catch {
       if (mine !== seq.current) return;
       if (pos) {

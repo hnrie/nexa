@@ -65,7 +65,19 @@ function loadTurnstile(): Promise<Turnstile> {
     const script = document.createElement("script");
     script.src = SCRIPT;
     script.async = true;
-    script.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(captchaError("captcha_unavailable", t("captcha.theCaptchaCouldNotStart"))));
+    script.onload = () => {
+      if (window.turnstile) {
+        resolve(window.turnstile);
+        return;
+      }
+      // A blocker that stubs the script still fires load. Without letting the
+      // memo go, every later captcha awaits this same rejected promise, and
+      // signing in, recovering an account and joining a server stay broken
+      // until the page is reloaded.
+      loading = null;
+      script.remove();
+      reject(captchaError("captcha_unavailable", t("captcha.theCaptchaCouldNotStart")));
+    };
     script.onerror = () => {
       loading = null;
       script.remove();

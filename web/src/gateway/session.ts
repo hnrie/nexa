@@ -1,6 +1,6 @@
 import { GatewayClient } from "./client";
 import type { GatewayEvent } from "./events";
-import { applyEvent, resetAll } from "./dispatch";
+import { applyEvent, dispatchGeneration, endDispatchSession, resetAll } from "./dispatch";
 import { logoutHooks, useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
@@ -17,6 +17,8 @@ import { workerClearTimeout, workerSetTimeout } from "@/lib/workerTimers";
 
 let client: GatewayClient | null = null;
 let queue: Promise<void> = Promise.resolve();
+/** Set for the whole of startSession, including its awaits, so two overlapping calls build one client. */
+let starting = false;
 
 export function gatewayUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -27,34 +29,44 @@ export function gatewayUrl(): string {
 export async function startSession(): Promise<void> {
   const { me, identity, settingsKey } = useAuth.getState();
   if (!me || !identity) return;
-  useSettings.getState().setKey(settingsKey);
-  void loadUploadLimits();
+  // The key store is read before the client is built, and two callers that
+  // overlap on that await would both find `client` null: the second socket is
+  // never referenced again but keeps applying every event a second time.
+  if (starting) return;
+  starting = true;
   try {
-    await useKeys.getState().init(me.id, identity);
-  } catch (err) {
-    // The cached keys are only a head start: ready brings every grant again,
-    // so a key store that fails (WebKit drops it after a long background stay)
-    // must not leave the app without a connection.
-    console.warn("keystore: could not load cached keys", err);
-    useKeys.setState({ userId: me.id, identity, waiting: {} });
+    useSettings.getState().setKey(settingsKey);
+    void loadUploadLimits();
+    try {
+      await useKeys.getState().init(me.id, identity);
+    } catch (err) {
+      // The cached keys are only a head start: ready brings every grant again,
+      // so a key store that fails (WebKit drops it after a long background stay)
+      // must not leave the app without a connection.
+      console.warn("keystore: could not load cached keys", err);
+      useKeys.setState({ userId: me.id, identity, waiting: {} });
+    }
+    if (client) return;
+    client = new GatewayClient({
+      url: gatewayUrl,
+      token: () => useAuth.getState().token,
+      onEvent: (e) => {
+        // events are applied strictly in order; a slow decrypt never reorders later frames
+        const gen = dispatchGeneration();
+        queue = queue.then(() => (gen === dispatchGeneration() ? applyEvent(e) : undefined)).catch(() => undefined);
+      },
+      onStatus: (s) => useUI.getState().setConnection(s),
+      // heartbeats keep their pace in a hidden window, where the page's own timers slow to once a minute
+      setTimeoutImpl: workerSetTimeout,
+      clearTimeoutImpl: workerClearTimeout,
+    });
+    client.connect();
+    window.addEventListener("online", wakeGateway);
+    window.addEventListener("pageshow", wakeGateway);
+    document.addEventListener("visibilitychange", wakeGatewayIfShown);
+  } finally {
+    starting = false;
   }
-  if (client) return;
-  client = new GatewayClient({
-    url: gatewayUrl,
-    token: () => useAuth.getState().token,
-    onEvent: (e) => {
-      // events are applied strictly in order; a slow decrypt never reorders later frames
-      queue = queue.then(() => applyEvent(e)).catch(() => undefined);
-    },
-    onStatus: (s) => useUI.getState().setConnection(s),
-    // heartbeats keep their pace in a hidden window, where the page's own timers slow to once a minute
-    setTimeoutImpl: workerSetTimeout,
-    clearTimeoutImpl: workerClearTimeout,
-  });
-  client.connect();
-  window.addEventListener("online", wakeGateway);
-  window.addEventListener("pageshow", wakeGateway);
-  document.addEventListener("visibilitychange", wakeGatewayIfShown);
 }
 
 /**
@@ -98,6 +110,9 @@ export function stopSession(): void {
   window.removeEventListener("online", wakeGateway);
   window.removeEventListener("pageshow", wakeGateway);
   document.removeEventListener("visibilitychange", wakeGatewayIfShown);
+  // Events already partway through applying stop here rather than finishing
+  // into stores that have just been cleared.
+  endDispatchSession();
   client?.close();
   client = null;
   useKeys.getState().reset();

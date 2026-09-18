@@ -141,6 +141,27 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
   };
 }
 
+/**
+ * This device's unsaved changes, laid over the copy that just arrived.
+ *
+ * `perChannel` is a map and `muted` a list, and both live inside the one
+ * `notifications` object, so a plain merge lets whichever side carries that
+ * object throw away everything the other side put in them — and this device
+ * then saves the result. They are merged entry by entry instead: what was
+ * changed here wins, what was never touched here is kept.
+ */
+export function layerUnsaved(base: Settings, unsaved: Partial<Settings>): Settings {
+  const merged = mergeSettings(base, unsaved);
+  const mine = unsaved.notifications;
+  if (!mine) return merged;
+  merged.notifications = {
+    ...merged.notifications,
+    perChannel: { ...base.notifications.perChannel, ...mine.perChannel },
+    muted: [...new Set([...base.notifications.muted, ...mine.muted])],
+  };
+  return merged;
+}
+
 const isAlias = (id: string | null | undefined) => id === "default" || id === "communications";
 
 /** Merges voice settings, turning the one "stream quality" older versions saved into a size and frame rate. */
@@ -264,7 +285,7 @@ export const useSettings = create<SettingsState>()((set, get) => {
       if (get().loaded && version < get().version) return;
       const base = doc ? mergeSettings(DEFAULT_SETTINGS, doc) : DEFAULT_SETTINGS;
       const unsaved = mergeChanges(sending, dirty);
-      set({ settings: unsaved ? mergeSettings(base, unsaved) : base, version, loaded: true });
+      set({ settings: unsaved ? layerUnsaved(base, unsaved) : base, version, loaded: true });
       if (dirty) void get().flush();
     },
     reload: async () => {

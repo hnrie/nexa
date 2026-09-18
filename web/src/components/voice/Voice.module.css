@@ -215,3 +215,4 @@
   .ctl svg { width: 20px; height: 20px; }
   .controlsMain { gap: 10px; }
 }
+.lobbyError { max-width: 320px; font-size: 13px; color: var(--danger); text-align: center; }

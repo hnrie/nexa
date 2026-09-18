@@ -388,6 +388,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   if (mic) {
     s.micRaw = mic;
     s.mic = withInputGain(s, mic);
+    watchMic(s);
     if (lastInputChoice() === "missing") {
       // Better to say so than to carry a microphone nobody is talking into.
       useUI.getState().toast(tr_("session.theMicrophoneYouPickedIsNot"), "error");
@@ -455,6 +456,22 @@ function withInputGain(s: Session, raw: MediaStream): MediaStream {
   return stream;
 }
 
+/**
+ * Watches the microphone itself rather than the copy the peers get.
+ *
+ * Pulling a headset out ends the device's track. The level meter then reads
+ * silence, voice activity closes the gate, and nobody hears you again for the
+ * rest of the call while the button still says "Mute". The gain-staged copy is
+ * a destination node's track and never ends, so it cannot say so.
+ */
+function watchMic(s: Session): void {
+  for (const t of s.micRaw?.getAudioTracks() ?? []) {
+    t.onended = () => {
+      if (session === s) void refreshMic();
+    };
+  }
+}
+
 /** Lets go of the slider's audio graph, which would otherwise stay wired to the live microphone. */
 function disconnectInput(s: Session): void {
   try {
@@ -520,9 +537,13 @@ export async function refreshMic(): Promise<void> {
     stopMeter(s);
     disconnectInput(s);
     s.mic?.getTracks().forEach((t) => t.stop());
-    s.micRaw?.getTracks().forEach((t) => t.stop());
+    s.micRaw?.getTracks().forEach((t) => {
+      t.onended = null;
+      t.stop();
+    });
     s.micRaw = next;
     s.mic = withInputGain(s, next);
+    watchMic(s);
     s.transport.setLocalAudio(s.mic.getAudioTracks()[0] ?? null);
     startMeter(s);
     applyTransmit();
@@ -551,12 +572,13 @@ function chosenCamera(): { id: string | null; label: string | null } {
 async function switchCamera(): Promise<void> {
   const s = session;
   if (!s?.camera || s.cameraPending) return;
-  // some devices cannot open a second camera while the first is live
-  for (const t of s.camera.getTracks()) {
-    t.onended = null;
-    t.stop();
-  }
+  const old = s.camera;
   s.cameraPending = true;
+  // The replacement is opened before the working camera is let go. Stopping
+  // first froze this tile and everyone else's on the last frame for as long as
+  // the browser took, and left the camera off altogether when the new one was
+  // busy. flipCamera keeps the stop-first order, for the phones its own
+  // comment describes.
   const stream = await getCamera(cameraFacing, chosenCamera()).catch(() => null);
   s.cameraPending = false;
   if (session !== s) {
@@ -564,12 +586,12 @@ async function switchCamera(): Promise<void> {
     return;
   }
   if (!stream) {
-    s.camera = null;
-    s.transport.setLocalVideo(null);
-    useVoice.getState().setLocalVideo(null);
-    sendState(s.channelId);
     useUI.getState().toast(tr_("session.couldNotSwitchTheCamera"), "error");
     return;
+  }
+  for (const t of old.getTracks()) {
+    t.onended = null;
+    t.stop();
   }
   s.camera = stream;
   const track = stream.getVideoTracks()[0] ?? null;
@@ -806,8 +828,18 @@ export function handleVoiceEvent(e: GatewayEvent): void {
             for (const id of session.transport.peerIds()) session.transport.removePeer(id), store.removePeer(id);
             session.channelId = vs.channel_id;
             session.transport.moveTo(vs.channel_id);
-            // an encrypted call needs the new room's key here; the transport picks it up once it arrives
-            void useKeys.getState().ensureConvKey(convForChannel(vs.channel_id)).catch(() => {});
+            // An encrypted call needs the new room's key here. Until it lands
+            // the transport has none, and every frame it sends is dropped, so
+            // it is told the moment the fetch resolves rather than on its own
+            // four-second check.
+            const moved = session;
+            void useKeys
+              .getState()
+              .ensureConvKey(convForChannel(vs.channel_id))
+              .then(() => {
+                if (session === moved) moved.transport.keysArrived?.();
+              })
+              .catch(() => {});
           }
           const everyone = participantsOf(useVoice.getState().byChannel, vs.channel_id);
           for (const p of everyone) {
@@ -878,7 +910,12 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       store.setJoining(null);
       store.setError(e.d.message);
       useUI.getState().toast(e.d.message, "error");
-      if (session && !useVoice.getState().mine) void leaveVoice(false);
+      // `mine` is null for the whole window between announcing the join and the
+      // server's own voice_state coming back, so this fires on a call the
+      // server does think we are in. Telling it costs one redundant frame; not
+      // telling it leaves a tile nobody can get rid of and a channel that
+      // refuses to let us back in.
+      if (session && !useVoice.getState().mine) void leaveVoice(true);
       return;
     case "call_ring": {
       if (e.d.from === myId || session?.channelId === e.d.channel_id) return;
@@ -1010,6 +1047,12 @@ export function installVoice(): void {
   });
   // a call whose connection dropped with the network tries again the moment the network is back
   window.addEventListener("online", () => session?.transport.nudge?.());
+  // The device in use going away is not a settings change, and the only other
+  // devicechange listener in the app is on a settings page no call mounts.
+  navigator.mediaDevices?.addEventListener?.("devicechange", () => {
+    const s = session;
+    if (s?.micRaw?.getAudioTracks().some((t) => t.readyState === "ended")) void refreshMic();
+  });
   // a channel that disappears takes its call with it
   useChannels.subscribe((st, prev) => {
     const s = session;

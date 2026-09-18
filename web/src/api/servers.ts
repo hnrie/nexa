@@ -2,6 +2,13 @@ import { api, captchaOptions } from "./client";
 import { t } from "@/i18n";
 import type { AuditEntry, Ban, Channel, Invite, InvitePreview, Member, PermString, PublicUser, Role, Server, ServerKeyInfo, ServerView, Snowflake } from "./types";
 
+/**
+ * What accepting an invite gives back. A server invite answers with the server
+ * view; a group invite answers with the group's channel instead, and the two
+ * were told apart by casting one to the other through `unknown`.
+ */
+export type JoinedInvite = { server: ServerView; users: PublicUser[] } | { channel: Channel; users?: PublicUser[] };
+
 type Progress = (loaded: number, total: number) => void;
 
 export interface ServerPatch {
@@ -164,7 +171,7 @@ export const servers = {
     return api.request<InvitePreview>("GET", `/invites/${encodeURIComponent(code)}`);
   },
   /** Accepts a server or group invite; the payload says which came back. */
-  join(code: string, captcha?: string | null): Promise<{ server: ServerView; users: PublicUser[] }> {
+  join(code: string, captcha?: string | null): Promise<JoinedInvite> {
     return api.request("POST", `/invites/${encodeURIComponent(code)}`, undefined, captchaOptions(captcha));
   },
   deleteInvite(code: string): Promise<void> {

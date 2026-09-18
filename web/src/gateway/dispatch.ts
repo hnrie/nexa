@@ -14,7 +14,9 @@ import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
 import { applyLockPolicy } from "./session";
 import { useUsers } from "@/stores/users";
-import { decryptForStore } from "@/lib/decrypt";
+import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
+import { appOnScreen } from "@/lib/notify";
+import { readingPresent } from "@/lib/readPosition";
 import { users as usersApi } from "@/api/users";
 import { channels as channelsApi } from "@/api/channels";
 import { ring } from "@/lib/keyring";
@@ -22,12 +24,32 @@ import type { Message, PublicUser, Relationship, ServerView } from "@/api/types"
 
 /** Hooks other layers register: notifications, voice, servers (later phases). */
 export const dispatchHooks: {
-  onMessage: ((m: Message, mine: boolean) => void)[];
+  onMessage: ((m: Message, mine: boolean, decrypted: DecryptedMessage) => void)[];
   onUnhandled: ((e: GatewayEvent) => void)[];
   onReady: (() => void)[];
   /** Someone new asked to be friends (not a request already known before). */
   onFriendRequest: ((r: Relationship) => void)[];
 } = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [] };
+
+/**
+ * Which session the stores belong to.
+ *
+ * An event already past its first await — a decrypt, a grant ingest, a
+ * settings load — resumes after sign-out and writes the account that has just
+ * gone into the stores the next one will use. Bumping this makes that work
+ * stop where it stands, the way the messages store's own generations do.
+ */
+let sessionGen = 0;
+
+/** Called when a session ends, so nothing still in flight writes into the next one. */
+export function endDispatchSession(): void {
+  sessionGen += 1;
+}
+
+/** The session events are being applied for, so one queued before it ended can be dropped. */
+export function dispatchGeneration(): number {
+  return sessionGen;
+}
 
 // Channels are not cleared here: ready replaces them in one step, because a
 // call whose channel vanished from the store even for a moment is ended.
@@ -82,12 +104,19 @@ async function ensureChannel(id: string): Promise<void> {
   }
 }
 
+const userFetches = new Set<string>();
+
 async function ensureUser(id: string): Promise<void> {
-  if (useUsers.getState().byId[id]) return;
+  // the same guard ensureChannel above has: a burst of ten messages from
+  // somebody nobody has loaded was ten identical requests
+  if (useUsers.getState().byId[id] || userFetches.has(id)) return;
+  userFetches.add(id);
   try {
     useUsers.getState().upsert(await usersApi.get(id));
   } catch {
     /* unknown users render as placeholders */
+  } finally {
+    userFetches.delete(id);
   }
 }
 
@@ -95,8 +124,17 @@ function mentionsMe(m: Message, meId: string): boolean {
   return m.mention_everyone || m.mentions.includes(meId);
 }
 
+/** Whether a loaded message was one this account's mention count was bumped for. */
+function mentionedMe(channelId: string, messageId: string, meId: string | undefined): boolean {
+  if (!meId) return false;
+  const m = useMessages.getState().channels[channelId]?.byId[messageId];
+  return !!m && m.author_id !== meId && mentionsMe(m, meId);
+}
+
 export async function applyEvent(e: GatewayEvent): Promise<void> {
   const meId = useAuth.getState().me?.id;
+  const gen = sessionGen;
+  const gone = (): boolean => gen !== sessionGen;
   switch (e.t) {
     case "ready": {
       const d = e.d;
@@ -119,10 +157,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       onReadyVoice(d.voice_states ?? [], d.session_id);
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
+      if (gone()) return;
       // The account's passcode policy only arrives with the settings, so this
       // is the first moment a fresh device can know it needs to ask for one.
       applyLockPolicy();
       await useKeys.getState().ingestGrants(d.key_grants);
+      if (gone()) return;
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();
       if (active) void useMessages.getState().syncGap(active);
@@ -131,6 +171,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "message_create": {
       const m = e.d;
       const decrypted = await decryptForStore(m);
+      if (gone()) return;
       const messages = useMessages.getState();
       if (m.nonce && meId === m.author_id) messages.settle(m.channel_id, [decrypted], { nonce: m.nonce });
       else messages.insert(m.channel_id, [decrypted]);
@@ -141,7 +182,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       void ensureChannel(m.channel_id);
       const mine = meId === m.author_id;
       const ui = useUI.getState();
-      const visible = ui.activeChannelId === m.channel_id && ui.focused && typeof document !== "undefined" && document.visibilityState === "visible";
+      // Seen means seen: the channel open, the app in front of the person, and
+      // the list showing the present at the bottom of it. Without the last two
+      // this marked read a message five hundred messages below where the
+      // reader was — and `ui.focused` has two writers, one of which the
+      // desktop app is documented to lie to.
+      const visible = ui.activeChannelId === m.channel_id && appOnScreen() && readingPresent(m.channel_id);
       if (mine || visible) {
         void useReadStates.getState().ack(m.channel_id, m.id);
       } else {
@@ -150,22 +196,32 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         const type = useChannels.getState().byId[m.channel_id]?.type;
         if (!type || type === "dm" || type === "group_dm") useReadStates.getState().bumpUnread(m.channel_id);
       }
-      for (const h of dispatchHooks.onMessage) h(m, mine);
+      for (const h of dispatchHooks.onMessage) h(m, mine, decrypted);
       return;
     }
     case "message_update": {
       const decrypted = await decryptForStore(e.d);
+      if (gone()) return;
       useMessages.getState().update(e.d.channel_id, decrypted);
       return;
     }
-    case "message_delete":
+    case "message_delete": {
+      // Read before it goes: only the message itself says whether it was
+      // counted as a mention, and a mention taken back as unread but not as a
+      // mention leaves a red pill on a channel with nothing left to read.
+      const counted = mentionedMe(e.d.channel_id, e.d.id, meId);
       useMessages.getState().remove(e.d.channel_id, e.d.id);
       useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
+      if (counted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
       return;
-    case "message_delete_bulk":
+    }
+    case "message_delete_bulk": {
+      const counted = e.d.ids.filter((id) => mentionedMe(e.d.channel_id, id, meId));
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
       for (const id of e.d.ids) useReadStates.getState().dropUnread(e.d.channel_id, id);
+      for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);
       return;
+    }
     case "reaction_add":
     case "reaction_remove":
       useMessages.getState().setReaction(e.d.channel_id, e.d.message_id, e.d.emoji, e.d.user_id, e.t === "reaction_add", e.d.user_id === meId);

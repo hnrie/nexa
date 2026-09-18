@@ -47,6 +47,8 @@ export interface VoiceTransport {
   reconnected(): void;
   /** A moderator moved this device's call to another channel. */
   moveTo(channelId: string): void;
+  /** The conversation's keys may have arrived: read them now rather than on the next check. */
+  keysArrived?(): void;
   /** The network looks back: whatever is down tries again now. */
   nudge?(): void;
   /** The SFU session of this device's call, which a reconnect can resume; null peer to peer. */

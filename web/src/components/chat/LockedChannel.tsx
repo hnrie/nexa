@@ -12,7 +12,7 @@ import { unlockSubchat } from "@/lib/subchatLock";
 import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
-export function LockedChannel({ channel, onUnlocked }: { channel: Channel; onUnlocked: () => void }) {
+export function LockedChannel({ channel, onUnlocked, checkFailed, onRecheck }: { channel: Channel; onUnlocked: () => void; checkFailed?: boolean; onRecheck?: () => void }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +30,20 @@ export function LockedChannel({ channel, onUnlocked }: { channel: Channel; onUnl
       setBusy(false);
     }
   };
+  // A check that never got an answer is not a password anyone can type: asking
+  // for one would hide a subchat this sign-in may already have opened.
+  if (checkFailed) {
+    return (
+      <div className={s.lockedWrap} data-testid="locked-subchat">
+        <div className={s.lockedCard}>
+          <span className={s.lockedIcon}><Lock size={28} /></span>
+          <h2 className={s.lockedTitle}>{channel.name}</h2>
+          <p className={s.lockedText}>{t("chat.lockedChannel.thatCouldNotBeCheckedTry")}</p>
+          <Button block onClick={onRecheck} data-testid="subchat-recheck">{t("chat.messageList.tryAgain")}</Button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={s.lockedWrap} data-testid="locked-subchat">
       <form

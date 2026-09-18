@@ -25,6 +25,22 @@ export interface VoiceKeys {
  * device holds; frames are sealed with the newest. Null when there is none.
  * A guest has no conversation keys, only the call keys its link brought.
  */
+/**
+ * The version `voiceKeysFor` would report, without deriving anything.
+ *
+ * The check for "nothing changed" runs every few seconds for a whole call, and
+ * building the answer first meant an HKDF per epoch the conversation has ever
+ * had, thrown away every time.
+ */
+export function voiceKeysVersion(channelId: string): string | null {
+  const guest = guestVoiceKeys(channelId);
+  if (guest) return guest.version;
+  const conv = convForChannel(channelId);
+  const epochs = ring.epochs(conv);
+  if (epochs.length === 0) return null;
+  return `${conv}:${epochs.join(",")}`;
+}
+
 export function voiceKeysFor(channelId: string): VoiceKeys | null {
   const guest = guestVoiceKeys(channelId);
   if (guest) return guest;

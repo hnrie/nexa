@@ -82,7 +82,11 @@ export class MeshTransport implements VoiceTransport {
 
   setLocalAudio(track: MediaStreamTrack | null): void {
     this.audioTrack = track;
-    this.audioStream = new MediaStream(track ? [track] : []);
+    // The stream keeps its id, for the reason setLocalVideo spells out below:
+    // the sender is reused and keeps the msid it was added with, so a fresh
+    // stream here only told peers an id no incoming track carries.
+    for (const t of this.audioStream.getTracks()) this.audioStream.removeTrack(t);
+    if (track) this.audioStream.addTrack(track);
     for (const p of this.peers.values()) this.syncSenders(p);
   }
 

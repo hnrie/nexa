@@ -48,8 +48,16 @@ export function ZoomPan({
   const gesture = useRef<{ start: View; from: { x: number; y: number }; spread: number } | null>(null);
   const moved = useRef(false);
   const lastTap = useRef(0);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const report = useRef(onZoom);
   report.current = onZoom;
+
+  const cancelIdle = useCallback(() => {
+    if (idleTimer.current === null) return;
+    clearTimeout(idleTimer.current);
+    idleTimer.current = null;
+  }, []);
+  useEffect(() => cancelIdle, [cancelIdle]);
 
   const apply = useCallback(() => {
     const el = ref.current;
@@ -143,6 +151,7 @@ export function ZoomPan({
       onPointerUp={lift}
       onPointerCancel={lift}
       onDoubleClick={(e) => {
+        cancelIdle();
         e.stopPropagation();
         toggle(at(e));
       }}
@@ -160,13 +169,24 @@ export function ZoomPan({
         const now = performance.now();
         if (e.detail === 0 && now - lastTap.current < DOUBLE_TAP_MS) {
           lastTap.current = 0;
+          cancelIdle();
           e.stopPropagation();
           toggle(at(e));
           return;
         }
         lastTap.current = now;
-        onIdleClick?.();
         e.stopPropagation();
+        // The first half of a double click looks exactly like a single one, so
+        // the idle click waits the window out. Acting at once closed the
+        // viewer on click one and the dblclick that zooms never arrived.
+        cancelIdle();
+        const idle = onIdleClick;
+        if (idle) {
+          idleTimer.current = setTimeout(() => {
+            idleTimer.current = null;
+            idle();
+          }, DOUBLE_TAP_MS);
+        }
       }}
     >
       {children}

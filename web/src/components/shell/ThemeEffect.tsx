@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { applyTheme } from "@/lib/theme";
+import { useDesktop } from "@/stores/desktop";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 
@@ -11,6 +12,7 @@ export function ThemeEffect() {
   const reducedMotion = useSettings((s) => s.settings.reducedMotion);
   const underlineLinks = useSettings((s) => s.settings.underlineLinks);
   const setFocused = useUI((s) => s.setFocused);
+  const inDesktopWindow = useDesktop((d) => d.window !== null);
 
   useEffect(() => {
     applyTheme({ theme, accent, fontScale, reducedMotion, underlineLinks });
@@ -22,6 +24,11 @@ export function ThemeEffect() {
   }, [theme, accent, fontScale, reducedMotion, underlineLinks]);
 
   useEffect(() => {
+    // Inside the desktop app these readings are the ones that lie: the page
+    // there never counts as hidden and its focus was seen to stay true with
+    // another app in front, which is why DesktopEffects sets the flag from the
+    // window system instead. Two writers, and whichever fired last won.
+    if (inDesktopWindow) return;
     const on = () => setFocused(true);
     const off = () => setFocused(false);
     window.addEventListener("focus", on);
@@ -33,6 +40,6 @@ export function ThemeEffect() {
       window.removeEventListener("blur", off);
       document.removeEventListener("visibilitychange", vis);
     };
-  }, [setFocused]);
+  }, [setFocused, inDesktopWindow]);
   return null;
 }

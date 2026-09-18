@@ -51,22 +51,34 @@ export default function ChannelSettingsModal({ onClose, channelId, page: initial
   );
 }
 
+/** What this reader typed, and only that: everything else is read from the channel. */
+interface ChannelEdits {
+  name?: string;
+  topic?: string;
+  slow?: number;
+  nsfw?: boolean;
+  limit?: number;
+}
+
 function OverviewPage({ channel }: { channel: Channel }) {
   const upsert = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
-  const [name, setName] = useState(channel.name);
-  const [topic, setTopic] = useState(channel.topic);
-  const [slow, setSlow] = useState(channel.slowmode_seconds);
-  const [nsfw, setNsfw] = useState(channel.nsfw);
-  const [limit, setLimit] = useState(channel.user_limit);
+  // Seeding the fields once would leave the form holding values from before
+  // somebody else's change, and saving would send those stale values back over
+  // their edit. What was not typed here follows the channel instead.
+  const [edits, setEdits] = useState<ChannelEdits>({});
   const [busy, setBusy] = useState(false);
-  const reset = () => {
-    setName(channel.name);
-    setTopic(channel.topic);
-    setSlow(channel.slowmode_seconds);
-    setNsfw(channel.nsfw);
-    setLimit(channel.user_limit);
-  };
+  const name = edits.name ?? channel.name;
+  const topic = edits.topic ?? channel.topic;
+  const slow = edits.slow ?? channel.slowmode_seconds;
+  const nsfw = edits.nsfw ?? channel.nsfw;
+  const limit = edits.limit ?? channel.user_limit;
+  const setName = (v: string) => setEdits((e) => ({ ...e, name: v }));
+  const setTopic = (v: string) => setEdits((e) => ({ ...e, topic: v }));
+  const setSlow = (v: number) => setEdits((e) => ({ ...e, slow: v }));
+  const setNsfw = (v: boolean) => setEdits((e) => ({ ...e, nsfw: v }));
+  const setLimit = (v: number) => setEdits((e) => ({ ...e, limit: v }));
+  const reset = () => setEdits({});
   const dirty = name !== channel.name || topic !== channel.topic || slow !== channel.slowmode_seconds || nsfw !== channel.nsfw || limit !== channel.user_limit;
   const save = async () => {
     setBusy(true);
@@ -80,11 +92,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
       const ch = await serversApi.patchChannel(channel.id, body);
       upsert(ch);
       // the server tidies names and topics (text channel names become lowercase-with-dashes), so show what it kept
-      setName(ch.name);
-      setTopic(ch.topic);
-      setSlow(ch.slowmode_seconds);
-      setNsfw(ch.nsfw);
-      setLimit(ch.user_limit);
+      setEdits({});
       toast(tr_("server.channelSettings.channelSaved"), "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : tr_("server.channelSettings.couldNotSaveTheChannel"), "error");

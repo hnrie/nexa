@@ -379,3 +379,25 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   setMe: (me) => set({ me }),
 }));
+
+/**
+ * A token the server no longer accepts ends the session here.
+ *
+ * Nothing used to act on a 401: the only route out was the gateway's 4001
+ * close, which needs a live socket the server chooses to close, so a tab that
+ * is offline or mid-backoff kept showing its cached conversation and toasting
+ * on every write. Only a signed-in account is signed out — a guest page runs
+ * its own token beside an idle store — and a burst of 401s signs out once.
+ */
+let signingOut = false;
+api.onUnauthorized = () => {
+  if (signingOut || useAuth.getState().status !== "ready") return;
+  signingOut = true;
+  void useAuth
+    .getState()
+    .logout()
+    .catch(() => undefined)
+    .finally(() => {
+      signingOut = false;
+    });
+};

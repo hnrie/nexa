@@ -49,7 +49,11 @@ export function ensureTwemojiIndex(): void {
   loading = fetch(`${TWEMOJI_BASE}/available.json`)
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error("no index"))))
     .then((names: unknown) => {
-      if (!Array.isArray(names)) return;
+      // A body that is not the list is a failure like any other. Returning here
+      // left a resolved promise behind, so nothing asked again, nothing waiting
+      // was ever told, and every emoji in the app fell back to the system glyph
+      // for the life of the tab — taking the picker down with it.
+      if (!Array.isArray(names)) throw new Error("bad index");
       available = new Set(names.filter((n): n is string => typeof n === "string"));
       for (const fn of waiting) fn();
     })

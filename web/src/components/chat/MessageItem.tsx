@@ -1,5 +1,5 @@
 import { Check, Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -89,6 +89,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const color = serverState ? memberColor(serverState, msg.author_id) : undefined;
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuWatch = useRef<(() => void) | null>(null);
   const friendNickname = useRelationships((r) => r.byUser[msg.author_id]?.nickname);
   const shift = useShiftHeld();
   const selecting = useSelection((x) => x.channelId === msg.channel_id);
@@ -113,13 +114,24 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null) => {
     setMenuOpen(true);
     openContextMenu({ x, y, items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
-    const unsub = useUI.subscribe((state) => {
+    menuWatch.current?.();
+    menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {
         setMenuOpen(false);
-        unsub();
+        menuWatch.current?.();
+        menuWatch.current = null;
       }
     });
   }, [msg, openContextMenu]);
+  // Switching channels unmounts every row, menu open or not, and the store
+  // would keep this subscriber and the closure behind it for good.
+  useEffect(
+    () => () => {
+      menuWatch.current?.();
+      menuWatch.current = null;
+    },
+    [],
+  );
 
   /** While picking, a tap anywhere on the row ticks it; Shift ticks everything from the last one. */
   const pick = (e: React.MouseEvent) => {

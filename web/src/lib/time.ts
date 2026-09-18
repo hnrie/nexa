@@ -9,13 +9,22 @@
  */
 import { t, translator } from "@/i18n";
 
-type Kind = "time" | "date" | "longDate" | "full";
+/** The styles a `<t:…>` timestamp in a message can ask for, beside the app's own. */
+export type StampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R";
+
+type Kind = "time" | "date" | "longDate" | "full" | `stamp:${Exclude<StampStyle, "R">}`;
 
 const OPTIONS: Record<Kind, Intl.DateTimeFormatOptions> = {
   time: { hour: "numeric", minute: "2-digit" },
   date: { month: "2-digit", day: "2-digit", year: "numeric" },
   longDate: { month: "long", day: "numeric", year: "numeric" },
   full: { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" },
+  "stamp:t": { hour: "numeric", minute: "2-digit" },
+  "stamp:T": { hour: "numeric", minute: "2-digit", second: "2-digit" },
+  "stamp:d": { year: "numeric", month: "2-digit", day: "2-digit" },
+  "stamp:D": { year: "numeric", month: "long", day: "numeric" },
+  "stamp:f": { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
+  "stamp:F": { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
 };
 
 const cache = new Map<string, Intl.DateTimeFormat>();
@@ -77,6 +86,50 @@ export function formatDuration(seconds: number): string {
   const mm = String(m % 60).padStart(h > 0 ? 2 : 1, "0");
   const ss = String(s % 60).padStart(2, "0");
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 31557600],
+  ["month", 2629800],
+  ["week", 604800],
+  ["day", 86400],
+  ["hour", 3600],
+  ["minute", 60],
+  ["second", 1],
+];
+
+const relCache = new Map<string, Intl.RelativeTimeFormat>();
+
+function relFmt(): Intl.RelativeTimeFormat {
+  const locale = translator().locale;
+  let f = relCache.get(locale);
+  if (!f) {
+    try {
+      f = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+    } catch {
+      f = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+    }
+    relCache.set(locale, f);
+  }
+  return f;
+}
+
+/**
+ * A `<t:…>` timestamp written in a message, in the app's language.
+ *
+ * These used to build two Intl formatters per timestamp per render and pass
+ * `undefined` for the locale, which means the browser's: Arabic words with an
+ * English date in the middle of them, which is the exact thing this file
+ * exists to avoid.
+ */
+export function formatStamp(date: Date, style: StampStyle): string {
+  if (style !== "R") return fmt(`stamp:${style}`).format(date);
+  const delta = date.getTime() / 1000 - Date.now() / 1000;
+  const abs = Math.abs(delta);
+  for (const [unit, seconds] of RELATIVE_UNITS) {
+    if (abs >= seconds || unit === "second") return relFmt().format(Math.round(delta / seconds), unit);
+  }
+  return "";
 }
 
 /** "just now", "5 minutes ago", "2 hours ago", or the date for anything older than a day. */

@@ -9,7 +9,7 @@
 import { ApiError } from "@/api/client";
 import { voice as voiceApi, type SfuDescription } from "@/api/voice";
 import type { VoiceState } from "@/api/types";
-import { FrameCrypto, voiceKeysFor } from "./e2ee";
+import { FrameCrypto, voiceKeysFor, voiceKeysVersion } from "./e2ee";
 import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
 import { Playback } from "./playback";
 import { PlayoutDelay } from "./playoutDelay";
@@ -98,6 +98,8 @@ const RETRY_BASE_MS = 1_000;
 const PULL_RETRY_BASE_MS = 400;
 /** In a call a long wait is a long silence: retries never wait more than this. */
 const RETRY_MAX_MS = 8_000;
+/** And a refused pull is someone waiting to be heard at all, so it waits far less. */
+const PULL_RETRY_MAX_MS = 1_600;
 /** A failure this long after the last one starts the wait from the beginning again. */
 const FAILURES_FORGOTTEN_MS = 60_000;
 /**
@@ -221,6 +223,8 @@ export class SfuTransport implements VoiceTransport {
   private readonly playout = new PlayoutDelay();
   /** How often each person's track of each kind has been pulled again for skipping decryption. */
   private repulls = new Map<string, number>();
+  /** Refused pulls in a row, kept apart from `failures`: a publisher still connecting is expected, not a fault. */
+  private pullRetries = 0;
   private recoverTimer: ReturnType<typeof setTimeout> | null = null;
   private iceRestarts = 0;
   /** When this connection, having been up, went down; null while it is up (or never was). */
@@ -298,19 +302,28 @@ export class SfuTransport implements VoiceTransport {
     this.retryLater(!(err instanceof SyncLater));
   }
 
-  /** Tries again after a wait that grows while failures keep coming. A rebuild replaces a waiting sync. */
-  private retryLater(rebuild: boolean, baseMs = RETRY_BASE_MS): void {
+  /**
+   * Tries again after a wait that grows while failures keep coming. A rebuild
+   * replaces a waiting sync. `expected` marks a pull the SFU simply could not
+   * serve yet, which keeps its own count: sharing one made every join in a
+   * busy channel stretch the next person's first sound, and genuine reconnects
+   * with it.
+   */
+  private retryLater(rebuild: boolean, baseMs = RETRY_BASE_MS, expected = false): void {
     if (this.closed) return;
     if (this.retry) {
       if (!rebuild || this.retry.rebuild) return;
       clearTimeout(this.retry.timer);
+    } else if (expected) {
+      this.pullRetries++;
     } else {
       const now = Date.now();
       if (now - this.lastFailure > FAILURES_FORGOTTEN_MS) this.failures = 0;
       this.lastFailure = now;
       this.failures++;
     }
-    const delay = Math.min(RETRY_MAX_MS, baseMs * 2 ** (this.failures - 1));
+    const tries = expected ? this.pullRetries : this.failures;
+    const delay = Math.min(expected ? PULL_RETRY_MAX_MS : RETRY_MAX_MS, baseMs * 2 ** Math.max(0, tries - 1));
     const timer = setTimeout(() => {
       this.retry = null;
       if (rebuild) this.rebuild();
@@ -320,6 +333,7 @@ export class SfuTransport implements VoiceTransport {
   }
 
   private refreshKeys(): void {
+    if ((voiceKeysVersion(this.channelId) ?? `none:${this.channelId}`) === this.keyVersion) return;
     // without a key for the channel nothing is sent at all, never in the clear or under another channel's key
     const k = voiceKeysFor(this.channelId) ?? { keys: [], send: 0, version: `none:${this.channelId}` };
     if (k.version === this.keyVersion) return;
@@ -335,6 +349,15 @@ export class SfuTransport implements VoiceTransport {
   /** A reconnect ended the server's copy of this call and closed its session; the next acknowledgement opens a new one. */
   reconnected(): void {
     this.reset();
+  }
+
+  /**
+   * A key for the channel may have arrived. `moveTo` runs while the new room's
+   * key is still being fetched, and without this the four-second check is what
+   * decides how long nothing this device sends can be opened.
+   */
+  keysArrived(): void {
+    this.refreshKeys();
   }
 
   /** Moved by a moderator: the old channel's session is gone and the key belongs to the new channel. */
@@ -393,6 +416,15 @@ export class SfuTransport implements VoiceTransport {
     this.published.clear();
     this.pulled.clear();
     this.byMid.clear();
+    // All of this belongs to the connection that has just gone. A new one
+    // hands out mids from 0 again, so keeping any of it means the fresh
+    // receiver on a recycled mid is judged by the dead one's history: three
+    // repulls already spent, a jitter buffer left at the old one's setting.
+    this.repulls.clear();
+    this.lossSeen.clear();
+    this.lossTold.clear();
+    this.pullRetries = 0;
+    this.playout.clear();
     this.present();
     for (const id of this.peers) this.events.onPeerState(id, this.pc.connectionState);
   }
@@ -629,6 +661,7 @@ export class SfuTransport implements VoiceTransport {
 
   removePeer(userId: string): void {
     if (!this.peers.delete(userId)) return;
+    this.lossTold.delete(userId);
     // silent at once; the next exchange tells the SFU to stop sending their tracks
     this.present();
     this.scheduleSync();
@@ -827,7 +860,8 @@ export class SfuTransport implements VoiceTransport {
     }
     if (paused && !this.videoPaused()) this.pauseVideo(tr_("sfu.videoIsPausedUntilNextMonth"));
     // a track not there yet (its publisher still connecting) is asked for again shortly; what is no longer wanted by then is not
-    if (refused) this.retryLater(false, PULL_RETRY_BASE_MS);
+    if (refused) this.retryLater(false, PULL_RETRY_BASE_MS, true);
+    else this.pullRetries = 0;
   }
 
   private async unsubscribe(list: Pulled[]): Promise<void> {
@@ -836,6 +870,9 @@ export class SfuTransport implements VoiceTransport {
     for (const p of list) {
       if (this.pulled.get(slot(p.userId, p.kind)) === p) this.pulled.delete(slot(p.userId, p.kind));
       this.byMid.delete(p.mid);
+      // the mid is handed back and can be used again, so nothing keyed on it may outlive this track
+      this.playout.forget(p.mid);
+      this.lossSeen.delete(p.mid);
       pc.getTransceivers().find((t) => t.mid === p.mid)?.stop();
     }
     this.present();

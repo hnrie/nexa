@@ -247,6 +247,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const mine = useVoice((v) => v.mine);
   const joining = useVoice((v) => v.joining);
   const remote = useVoice((v) => v.remote);
+  const error = useVoice((v) => v.error);
   const localVideo = useVoice((v) => v.localVideo);
   const localScreen = useVoice((v) => v.localScreen);
   const speaking = useVoice((v) => v.speaking);
@@ -279,6 +280,19 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const gridRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef<HTMLDivElement>(null);
   const tileRefs = useRef(new Map<string, HTMLDivElement>());
+  /** The one off-screen player picture-in-picture uses, made on the first request. */
+  const pipEl = useRef<HTMLVideoElement | null>(null);
+  useEffect(
+    () => () => {
+      const el = pipEl.current;
+      pipEl.current = null;
+      if (!el) return;
+      el.pause();
+      el.srcObject = null;
+      el.remove();
+    },
+    [],
+  );
   const lastTap = useRef<{ key: string; at: number } | null>(null);
   const lastPointer = useRef("mouse");
   /** A click on the focused tile waits out the double-click window before it sends the tile back. */
@@ -287,7 +301,15 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const participants = useMemo(() => participantsOf(byChannel, channel.id), [byChannel, channel.id]);
 
   useEffect(() => {
-    void hasSeveralCameras().then(setCanFlip);
+    let alive = true;
+    const look = () => void hasSeveralCameras().then((yes) => alive && setCanFlip(yes));
+    look();
+    // a camera plugged in mid-call, with this one already on, never showed the flip button
+    navigator.mediaDevices?.addEventListener?.("devicechange", look);
+    return () => {
+      alive = false;
+      navigator.mediaDevices?.removeEventListener?.("devicechange", look);
+    };
   }, [localVideo]);
 
   const tiles = useMemo<Tile[]>(() => {
@@ -302,7 +324,10 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     for (const p of participants) {
       const isMe = p.user_id === meId;
       const video = isMe ? localVideo : (remote[p.user_id]?.video ?? null);
-      out.push({ key: `${p.user_id}:${video ? "video" : "avatar"}`, userId: p.user_id, kind: video ? "video" : "avatar", stream: video, me: isMe });
+      // The key names the slot, not what is in it: carrying "video" or
+      // "avatar" in it meant a camera turned off and on again was a different
+      // tile, and the focus on it was dropped both times.
+      out.push({ key: `${p.user_id}:camera`, userId: p.user_id, kind: video ? "video" : "avatar", stream: video, me: isMe });
     }
     return out;
   }, [participants, remote, localVideo, localScreen, meId]);
@@ -421,15 +446,32 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       return;
     }
     if (!t.stream) return;
-    // elsewhere a video of its own keeps floating after this page moves on
-    const el = document.createElement("video");
-    el.srcObject = t.stream;
-    el.muted = true;
-    void el
+    // elsewhere a video of its own keeps floating after this page moves on.
+    // One element, reused and in the document: a fresh detached one per click
+    // held a decode pipeline and the remote stream for the life of the page,
+    // and browsers that will only float an element that is on the page did
+    // nothing at all while still leaking it.
+    let el = pipEl.current;
+    if (!el) {
+      el = document.createElement("video");
+      el.muted = true;
+      el.playsInline = true;
+      el.style.cssText = "position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none";
+      el.addEventListener("leavepictureinpicture", () => {
+        el?.pause();
+        if (el) el.srcObject = null;
+      });
+      document.body.append(el);
+      pipEl.current = el;
+    }
+    const target = el;
+    target.srcObject = t.stream;
+    void target
       .play()
-      .then(() => el.requestPictureInPicture())
+      .then(() => target.requestPictureInPicture())
       .catch(() => {
-        /* not supported */
+        target.srcObject = null;
+        useUI.getState().toast(tr_("voice.voiceView.pictureInPictureCouldNotStart"), "error");
       });
   };
 
@@ -509,7 +551,9 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     }
     lastTap.current = { key: t.key, at: now };
     if (el?.dataset.place !== "focus") {
-      setFocused(t.key);
+      // the menu offers Focus only where there is a picture; a click used to
+      // fill the stage with an avatar that had no way back
+      if (showsStream(t)) setFocused(t.key);
       return;
     }
     // Clicking what is already focused sends it back to the grid — but a
@@ -664,6 +708,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           <button className={s.joinBtn} onClick={() => void joinVoice(channel.id)} disabled={joining === channel.id} data-testid="join-voice">
             {joining === channel.id ? tr_("voice.voice.connecting") : channel.type === "voice" ? tr_("voice.voice.joinVoice") : tr_("voice.callBanner.joinCall")}
           </button>
+          {/* the toast that carried this is long gone by the time anyone comes back to the lobby */}
+          {error ? <div className={s.lobbyError} data-testid="voice-error">{error}</div> : null}
         </div>
       </div>
     );

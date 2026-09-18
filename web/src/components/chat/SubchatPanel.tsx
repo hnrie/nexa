@@ -90,16 +90,19 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
       if (box.current && !box.current.contains(e.target as Node)) onClose();
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-      }
+      if (e.key !== "Escape") return;
+      // A dialog opened from this panel is on top of it and Escape belongs to
+      // that dialog; taking it in the capture phase closed the panel behind it
+      // and left the dialog standing.
+      if (document.querySelector("[data-modal-layer]")) return;
+      e.stopPropagation();
+      onClose();
     };
     document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
 

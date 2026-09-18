@@ -10,7 +10,7 @@
  * Nothing moves when it fits, and nothing moves for anyone who asked for less
  * motion — they get the ellipsis, which is the honest fallback.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import s from "./ScrollingText.module.css";
 
 /** How long the text rests at each end before it travels back. */
@@ -22,24 +22,43 @@ export function ScrollingText({ children, className }: { children: ReactNode; cl
   const box = useRef<HTMLSpanElement>(null);
   const inner = useRef<HTMLSpanElement>(null);
   const [over, setOver] = useState(0);
+  /** The text last measured; callers pass JSX, so `children` is a new object every render. */
+  const measured = useRef<string | null>(null);
+
+  const measure = useCallback(() => {
+    const outer = box.current;
+    const text = inner.current;
+    if (!outer || !text) return;
+    // a fraction of a pixel is rounding, not overflow
+    const diff = Math.round(text.scrollWidth - outer.clientWidth);
+    setOver(diff > 1 ? diff : 0);
+  }, []);
 
   useEffect(() => {
     const outer = box.current;
     const text = inner.current;
     if (!outer || !text) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const measure = () => {
-      // a fraction of a pixel is rounding, not overflow
-      const diff = Math.round(text.scrollWidth - outer.clientWidth);
-      setOver(diff > 1 ? diff : 0);
-    };
-    measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(outer);
     ro.observe(text);
     return () => ro.disconnect();
-  }, [children]);
+  }, [measure]);
+
+  // No dependency list, and the rendered text rather than `children`: keying on
+  // the JSX rebuilt the observer and forced a synchronous layout read on every
+  // render of the row above — twenty of them per presence packet in a sidebar.
+  // The box changing size is the observer's job; this is only for new words.
+  useEffect(() => {
+    const text = inner.current;
+    if (!text) return;
+    const now = text.textContent ?? "";
+    if (now === measured.current) return;
+    measured.current = now;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    measure();
+  });
 
   const travel = over > 0 ? (over / SPEED) * 1000 : 0;
   return (

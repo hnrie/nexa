@@ -106,6 +106,14 @@ async function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
     return await fn(await handle);
   } catch (err) {
     if (dbHandle === handle) dbHandle = null;
+    // Dropping the handle is not the same as closing it. Every abandoned
+    // connection stays open, and an open connection blocks a version change,
+    // so a later DB_VERSION bump would be refused for the life of the tab.
+    try {
+      (await handle).close();
+    } catch {
+      /* it never opened, or is already closed */
+    }
     throw err;
   }
 }

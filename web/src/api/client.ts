@@ -7,8 +7,18 @@
  * `XHRImpl` are injectable so tests never touch the network.
  */
 
+import { t } from "@/i18n";
+
 /** The base path every API route hangs off. */
 const API_PREFIX = "/api/v1";
+
+/**
+ * How long a request waits for an answer. A proxy that accepts the connection
+ * and never replies — a half-open socket after a network change — otherwise
+ * leaves the promise pending forever, and with it every button that set `busy`
+ * in a `try`/`finally`. The gateway has its heartbeat; HTTP had nothing.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 /** An error the server reported, or a transport failure dressed up as one. */
 export class ApiError extends Error {
@@ -98,6 +108,29 @@ function hasHeader(headers: Record<string, string>, name: string): boolean {
   return Object.keys(headers).some((k) => k.toLowerCase() === want);
 }
 
+/** A caller's signal and a deadline as one signal, with a way to take both down again. */
+function deadline(signal: AbortSignal | undefined, ms: number) {
+  const ctrl = new AbortController();
+  let expired = false;
+  const timer = setTimeout(() => {
+    expired = true;
+    ctrl.abort();
+  }, ms);
+  const relay = (): void => ctrl.abort();
+  if (signal) {
+    if (signal.aborted) ctrl.abort();
+    else signal.addEventListener("abort", relay, { once: true });
+  }
+  return {
+    signal: ctrl.signal,
+    expired: () => expired,
+    done: (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", relay);
+    },
+  };
+}
+
 let token: string | null = null;
 
 const defaultFetch: typeof fetch =
@@ -155,14 +188,33 @@ export const api = {
 
     const init: RequestInit = { method, headers };
     if (payload !== undefined) init.body = payload;
-    if (opts?.signal) init.signal = opts.signal;
+    const limit = deadline(opts?.signal, REQUEST_TIMEOUT_MS);
+    init.signal = limit.signal;
 
-    const res = await this.fetchImpl(this.url(path, opts?.query), init);
-    const raw = res.status === 204 || res.status === 205 ? "" : await res.text();
+    let res: Response;
+    let raw: string;
+    try {
+      res = await this.fetchImpl(this.url(path, opts?.query), init);
+      raw = res.status === 204 || res.status === 205 ? "" : await res.text();
+    } catch (err) {
+      // fetch rejects with a bare TypeError for anything below HTTP, and the
+      // callers that branch on ApiError fall through to showing the browser's
+      // own untranslated "Failed to fetch".
+      if (limit.expired()) throw new ApiError(0, "timeout", t("offline.couldNotReachTheServer"));
+      if (err instanceof ApiError) throw err;
+      if (err instanceof DOMException && err.name === "AbortError") throw err;
+      throw new ApiError(0, "network", t("offline.couldNotReachTheServer"));
+    } finally {
+      limit.done();
+    }
 
     if (!res.ok) {
-      if (res.status === 401 && auth) this.onUnauthorized?.();
-      throw errorFrom(res.status, raw, res.headers.get("Retry-After"));
+      const err = errorFrom(res.status, raw, res.headers.get("Retry-After"));
+      // Only the token being refused. Changing a password, adding a second
+      // factor and deleting an account all answer 401 for a password typed
+      // wrong, and signing out over a typo would be worse than the bug.
+      if (res.status === 401 && auth && err.code === "unauthorized") this.onUnauthorized?.();
+      throw err;
     }
     if (!raw) return undefined as T;
     return JSON.parse(raw) as T;
@@ -187,9 +239,14 @@ export const api = {
     return new Promise<T>((resolve, reject) => {
       const xhr = new XHR();
       let settled = false;
+      // A signal shared across uploads would otherwise keep one listener, and
+      // through it one finished XMLHttpRequest, per upload it ever saw.
+      let offAbort: (() => void) | null = null;
       const finish = (fn: () => void): void => {
         if (settled) return;
         settled = true;
+        offAbort?.();
+        offAbort = null;
         fn();
       };
 
@@ -213,11 +270,20 @@ export const api = {
               resolve(undefined as T);
               return;
             }
-            resolve(JSON.parse(text) as T);
+            // A parse that throws here throws inside an event handler, where
+            // nothing rejects the promise and `settled` stops anything later
+            // from settling it: a captive portal answering 200 with HTML would
+            // leave the upload spinning for the life of the page.
+            try {
+              resolve(JSON.parse(text) as T);
+            } catch {
+              reject(new ApiError(xhr.status, "bad_response", t("attachments.theServerSAnswerCouldNot")));
+            }
             return;
           }
-          if (xhr.status === 401 && auth) onUnauthorized();
-          reject(errorFrom(xhr.status, text, xhr.getResponseHeader("Retry-After")));
+          const err = errorFrom(xhr.status, text, xhr.getResponseHeader("Retry-After"));
+          if (xhr.status === 401 && auth && err.code === "unauthorized") onUnauthorized();
+          reject(err);
         });
 
       xhr.onerror = (): void =>
@@ -232,7 +298,9 @@ export const api = {
           xhr.abort();
           return;
         }
-        signal.addEventListener("abort", () => xhr.abort(), { once: true });
+        const onAbort = (): void => xhr.abort();
+        signal.addEventListener("abort", onAbort, { once: true });
+        offAbort = () => signal.removeEventListener("abort", onAbort);
       }
 
       xhr.send(body as XMLHttpRequestBodyInit);

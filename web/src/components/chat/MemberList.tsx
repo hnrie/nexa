@@ -40,6 +40,8 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
   const ref = useRef<HTMLElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [height, setHeight] = useState(600);
+  const [pagingFailed, setPagingFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const complete = st?.membersComplete ?? true;
 
   // large servers ship without members in ready; page them in once
@@ -56,11 +58,29 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
         if (res.members.length < 1000) break;
         after = res.members[res.members.length - 1]?.user_id;
       }
-    })().catch(() => {});
+      // nothing left to page: the loop either finished the list or ran its 20 rounds
+      if (alive) setPagingFailed(false);
+    })().catch(() => {
+      // A page that fails leaves the list short with no spinner, no error and
+      // nothing to change the effect's deps, so it never tried again.
+      if (alive) setPagingFailed(true);
+    });
     return () => {
       alive = false;
     };
-  }, [complete, serverId, upsertMembers, upsertUsers]);
+  }, [complete, serverId, upsertMembers, upsertUsers, attempt]);
+
+  // try again when the connection comes back
+  useEffect(() => {
+    if (!pagingFailed) return;
+    const again = () => setAttempt((n) => n + 1);
+    window.addEventListener("online", again);
+    const timer = setTimeout(again, 15_000);
+    return () => {
+      window.removeEventListener("online", again);
+      clearTimeout(timer);
+    };
+  }, [pagingFailed]);
 
   useEffect(() => {
     const el = ref.current;

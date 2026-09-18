@@ -123,6 +123,13 @@ export function loadEmoji(): Promise<EmojiEntry[]> {
       for (const s of e.shortcodes) if (!byShortcode.has(s)) byShortcode.set(s, e);
     }
     return all;
+  }).catch((err: unknown) => {
+    // The memo is taken before the imports settle, so one failed chunk — a
+    // deploy while this tab stayed open, and the old hashes 404 — would
+    // otherwise be cached as a rejected promise and handed to every later
+    // caller for the life of the tab.
+    loaded = null;
+    throw err;
   });
   return loaded;
 }
@@ -146,7 +153,7 @@ export function emojiGroups(): { id: number; name: string; items: EmojiEntry[] }
  */
 export function preloadEmoji(): void {
   if (loaded || typeof window === "undefined") return;
-  const start = () => void loadEmoji();
+  const start = () => void loadEmoji().catch(() => undefined);
   const idle = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
   if (idle) idle(start, { timeout: 5000 });
   else setTimeout(start, 2000);

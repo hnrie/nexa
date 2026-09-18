@@ -6,7 +6,7 @@ import { parse, plainText } from "@/markdown";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useDesktop } from "@/stores/desktop";
-import { useMessages } from "@/stores/messages";
+import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { usePresence } from "@/stores/presence";
 import { useSettings, type Settings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -93,8 +93,11 @@ export function messageAlert(onScreen: boolean, viewingChannel: boolean): { soun
   return { sound: true, popup: !onScreen };
 }
 
-function previewOf(m: Message): string {
-  const stored = useMessages.getState().channels[m.channel_id]?.byId[m.id];
+function previewOf(m: Message, decrypted?: DecryptedMessage): string {
+  // The decrypted copy is handed in because the store may not have it: a list
+  // jumped back into history refuses messages past its end, and reading it
+  // back gave every one of them a notification saying only "New message".
+  const stored = decrypted ?? useMessages.getState().channels[m.channel_id]?.byId[m.id];
   const p = stored?.payload;
   if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
   if (p.t) return plainText(parse(p.t, { inline: true })).slice(0, 140);
@@ -103,7 +106,7 @@ function previewOf(m: Message): string {
   return t("notify.newMessage");
 }
 
-function onMessage(m: Message, mine: boolean): void {
+function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): void {
   if (mine || m.type.startsWith("system_")) return;
   const me = useAuth.getState().me;
   if (!me) return;
@@ -126,7 +129,7 @@ function onMessage(m: Message, mine: boolean): void {
   const author = displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (#${ch.name})` : author;
   const path = ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`;
-  void showNotification(title, { body: previewOf(m), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
+  void showNotification(title, { body: previewOf(m, decrypted), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
 }
 
 /** A new friend request plays its own sound, and notifies while the app is not being looked at. */

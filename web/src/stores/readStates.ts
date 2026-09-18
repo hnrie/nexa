@@ -21,6 +21,8 @@ interface ReadStatesState {
   bumpUnread: (channelId: string) => void;
   /** Takes back the count of an unread message that was deleted. */
   dropUnread: (channelId: string, messageId: string) => void;
+  /** The same for a mention: the two are counted together, so they have to be taken back together. */
+  dropMention: (channelId: string, messageId: string) => void;
   markRead: (channelId: string, messageId: string) => void;
   ack: (channelId: string, messageId: string) => Promise<void>;
   clear: () => void;
@@ -99,6 +101,12 @@ export const useReadStates = create<ReadStatesState>()((set, get) => ({
       // only a message after the read marker was counted; anything this account sent it had read
       if (!cur || cur.unread === 0 || (cur.lastReadId && compareIds(messageId, cur.lastReadId) <= 0)) return s;
       return { byChannel: { ...s.byChannel, [channelId]: { ...cur, unread: cur.unread - 1 } } };
+    }),
+  dropMention: (channelId, messageId) =>
+    set((s) => {
+      const cur = s.byChannel[channelId];
+      if (!cur || cur.mentions === 0 || (cur.lastReadId && compareIds(messageId, cur.lastReadId) <= 0)) return s;
+      return { byChannel: { ...s.byChannel, [channelId]: { ...cur, mentions: cur.mentions - 1 } } };
     }),
   markRead: (channelId, messageId) =>
     set((s) => {

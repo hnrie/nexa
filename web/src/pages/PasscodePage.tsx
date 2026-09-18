@@ -36,8 +36,9 @@ export default function PasscodePage() {
       setPasscode("");
       input.current?.focus();
       if (err instanceof WrongPasscode) {
-        setLeft(err.left);
-        setError(err.left > 0 ? err.message : t("passcode.tooManyWrongTriesLogIn"));
+        // null means this device counts nothing, so the warning below stays away
+        if (err.left !== null) setLeft(err.left);
+        setError(err.left === null || err.left > 0 ? err.message : t("passcode.tooManyWrongTriesLogIn"));
       } else {
         setError(err instanceof Error ? err.message : t("passcode.thatDidNotWork"));
       }

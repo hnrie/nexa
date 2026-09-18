@@ -43,7 +43,10 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       await editMessage(msg.channel_id, msg.id, body);
       endEdit(msg.channel_id, msg.id);
     } catch (err) {
-      toast(err instanceof Error ? err.message : t("chat.editMessage.couldNotSaveTheEdit"), "error");
+      // editMessage throws the bare code, which sending maps to a sentence and
+      // this path showed to the reader as `waiting_for_key`
+      if (err instanceof Error && err.message === "waiting_for_key") toast(t("composer.send.waitingForTheEncryptionKeyFor"), "error");
+      else toast(err instanceof Error ? err.message : t("chat.editMessage.couldNotSaveTheEdit"), "error");
     } finally {
       setBusy(false);
     }

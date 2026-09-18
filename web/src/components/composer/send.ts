@@ -23,6 +23,8 @@ export interface SendOptions {
   embeds?: unknown[];
   sticker?: MessagePayload["sticker"];
   flags?: number;
+  /** A failed message this send replaces, dropped only once its own copy is in the store. */
+  replaces?: string;
 }
 
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
@@ -48,6 +50,9 @@ export async function sendMessage(channelId: string, rawText: string, opts: Send
   const tmp = tmpId();
   const messages = useMessages.getState();
   messages.addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload, createdAt: Date.now(), status: "sending", ...(opts.replyTo ? { replyToId: opts.replyTo } : {}), ...(opts.ping !== undefined ? { ping: opts.ping } : {}), ...(opts.flags ? { flags: opts.flags } : {}) });
+  // Only now, past the two returns above that leave nothing behind: the failed
+  // copy is the only place a retried message still exists.
+  if (opts.replaces) messages.removePending(channelId, opts.replaces);
   try {
     const conv = convForChannel(channelId);
     const key = await useKeys.getState().ensureConvKey(conv);
@@ -130,8 +135,7 @@ export async function retryPending(channelId: string, tmpId: string): Promise<vo
   const store = useMessages.getState();
   const p = store.channels[channelId]?.pending.find((x) => x.tmpId === tmpId);
   if (!p) return;
-  store.removePending(channelId, tmpId);
-  const opts: SendOptions = {};
+  const opts: SendOptions = { replaces: tmpId };
   if (p.replyToId) opts.replyTo = p.replyToId;
   if (p.ping !== undefined) opts.ping = p.ping;
   if (p.flags) opts.flags = p.flags;

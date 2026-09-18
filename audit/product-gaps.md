@@ -89,7 +89,8 @@ is the web cell. Rows where the shell genuinely changes things say so.
 | Delete a server | full | full | partial | web makes you type the server's name (`DeleteServerPage.tsx:41`); Android deletes on one tap with **no confirmation at all** (`ServerSettingsScreen.kt:172-184`) — see [Q22](#q22) |
 | Transfer ownership | missing | missing | missing | `POST /servers/{id}/transfer` exists and audits as `server_transfer` (`AuditLogPage.tsx:20`); `servers.transfer` in `web/src/api/servers.ts` has no caller |
 | Reorder the server rail | full | full | missing | web drags (`rail/Rail.tsx:104-114`); `SettingsStore.setServerOrder` (`android/.../data/SettingsStore.kt:194`) is never called — Android only reads the order web wrote |
-| Server icon / banner | full | full | missing | no icon or banner endpoint in `android/.../net/Endpoints.kt` |
+| Server icon | full | full | missing | `web/.../server/pages/ServerOverviewPage.tsx:64,74`; no icon endpoint in `android/.../net/Endpoints.kt` |
+| **Server banner** | missing | missing | missing | `PUT`/`DELETE /api/v1/servers/{id}/banner` are implemented, `banner_id` is on the model (`web/src/api/types.ts:95`) and on the invite preview (`:153`), and `serversApi.uploadBanner`/`deleteBanner` (`api/servers.ts:78,81`) have zero callers. Nothing sets it and nothing draws it — grep for `banner` in `InvitePage.tsx`, `components/server/` and `components/rail/` returns nothing |
 | Server name, description, system channel, default notification level | full | full | partial | Android edits name + description only (`ServerSettingsScreen.kt:132-160`) |
 | Server folders | missing | missing | missing | spec P2 (`docs/superpowers/specs/2026-09-11-chat-design.md:215`); no code anywhere |
 | Server discovery / public directory | missing | missing | missing | no reference in any client |
@@ -162,7 +163,8 @@ is the web cell. Rows where the shell genuinely changes things say so.
 | Feature | Web | Desktop | Android | Evidence / note |
 |---|---|---|---|---|
 | Create an invite | full | full | partial | web picks channel, max age and max uses (`InviteModal.tsx:101-108`); Android hardcodes 7 days / unlimited (`ChannelSheets.kt:358`) |
-| List and revoke invites | full | full | full | |
+| List and revoke server invites | full | full | full | `web/.../server/pages/InvitesPage.tsx` |
+| List and revoke **group DM** invites | missing | missing | missing | `GroupInviteModal.tsx` creates a link with age and uses but never lists one; `channels.groupInvites` (`api/channels.ts:65`) wraps `GET /channels/{id}/invites` and has no caller. Once made, a link into a private group conversation can never be seen again or revoked |
 | Invite carries the conversation key in the URL fragment | full | full | full | |
 | Vanity / custom invite URL | missing | missing | missing | no code |
 | Guest links for a voice call | full | full | missing | `web/.../voice/GuestLinkModal.tsx`; the whole Android `GuestsApi` (`Endpoints.kt:403-425`) has no callers, **and** `/guest/<code>` is registered in the manifest but routed to a screen that ignores the guest flag (`InviteScreen.kt:49,57`), so the link dead-ends |
@@ -483,7 +485,7 @@ a large surface; I would do channels and invite options first and leave the
 tri-state overwrite grid last, since that one is genuinely hard on a phone.
 *Depends on:* an Android equivalent of `PermissionGrid`.
 
-### G14. Server ownership cannot be transferred
+### <a id="g14"></a>G14. Server ownership cannot be transferred
 **Value: medium. Cost: small.** `POST /api/v1/servers/{id}/transfer` exists and the
 audit log has a verb for it (`AuditLogPage.tsx:20`), but `servers.transfer` in
 `web/src/api/servers.ts` has no caller. A group DM can change hands
@@ -492,7 +494,7 @@ account or walks away, the server is frozen — nobody else can ever hold
 `MANAGE_SERVER` at the top of the hierarchy. One row in the members page.
 *Depends on:* nothing.
 
-### G15. There is no way to find a person
+### <a id="g15"></a>G15. There is no way to find a person
 **Value: medium. Cost: small.** `GET /api/v1/users/search` is implemented and
 `users.search` (`web/src/api/users.ts:46`) has no caller: adding a friend means
 typing an exact username (`FriendsPage.tsx:225`). On a private instance that is
@@ -600,7 +602,37 @@ give a token to, which holds keys like any other member" — which is buildable,
 an incoming webhook, which fundamentally cannot be E2EE. Decide which one the product
 wants before anyone asks.
 
-### G26. First run has no onboarding
+### <a id="g26"></a>G26. The rest of the unreachable backend
+**Value: medium overall. Cost: small each.** Matching every route in `internal/api/`
+against its call sites in `web/src/api/` and `android/.../net/Endpoints.kt` turns up
+twelve routes that no client calls. Three have their own entry above because they are
+features people ask for — server mute/deafen/move ([G3](#g3)), ownership transfer
+([G14](#g14)) and user search ([G15](#g15)). The rest, for completeness:
+
+- **`PUT`/`DELETE /servers/{id}/banner` — server banners can never be set or seen.**
+  The routes, the `banner_id` field and the typed bindings (`api/servers.ts:78,81`)
+  all exist; no UI writes it and no component renders it. Server icons have a full
+  editor two lines away (`ServerOverviewPage.tsx:64,74`).
+- **`GET /channels/{id}/invites` — group DM invites cannot be listed or revoked.**
+  You can mint a link into a private group conversation with a chosen lifetime
+  (`GroupInviteModal.tsx`) and then never see it again. Server invites have the whole
+  page (`InvitesPage.tsx`).
+- `DELETE /channels/{id}/guest-links/{code}` — revoking *one* guest link; only
+  revoke-all is exposed (`GuestLinkModal.tsx:80`).
+- `GET /channels/{id}/messages/{mid}`, `GET /servers/{id}/members/{uid}`,
+  `GET /keys/epochs`, `GET /stickers/packs`, `GET /channels/{id}/voice` — all
+  superseded by a list call, the gateway `ready` payload or the in-memory keyring.
+  Harmless, but they are surface to maintain and to keep secure for no one.
+
+Two protocol-level dead ends turned up alongside them: the `subscribe_members`
+gateway op is defined (`internal/gateway/protocol.go:33`) and falls through the
+switch that should handle it (`internal/api/voice_glue.go:222,339`), and the Redis
+presence and pub-sub layer (`internal/cache/redis.go`) is never wired up in
+`cmd/chatd/main.go:88-100`. Neither is product-facing; both belong to whoever is
+reviewing the server, but they are the same smell as the rest of this section —
+capability built, never connected.
+
+### G27. First run has no onboarding
 **Value: medium. Cost: small.** After registration and the recovery-key screen
 (`web/src/pages/RegisterPage.tsx:70-90`) a new account lands on Friends with "No
 conversations yet. Add a friend." (`sidebar/DMSidebar.tsx:67`). There is no nudge to

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
@@ -24,7 +25,7 @@ export default function LoginPage() {
   const [codesLeft, setCodesLeft] = useState(0);
   const codeInput = useRef<HTMLInputElement>(null);
   const next = new URLSearchParams(loc.search).get("next") || "/channels/@me";
-  const go = () => nav(next.startsWith("/") ? next : "/channels/@me", { replace: true });
+  const go = () => nav(safeNext(next), { replace: true });
 
   useEffect(() => {
     if (step === "code") codeInput.current?.focus();
