@@ -9,10 +9,12 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+let nextContentsId = 1;
+
 /** One fake window, standing in for the modal the picker opens. */
 class FakeWindow extends EventEmitter {
   webContents = {
-    id: FakeWindow.next++,
+    id: nextContentsId++,
     send: vi.fn(),
     setWindowOpenHandler: vi.fn(),
     on: vi.fn(),
@@ -20,7 +22,6 @@ class FakeWindow extends EventEmitter {
   destroyed = false;
   shown = false;
   loaded: string | null = null;
-  static next = 1;
   static last: FakeWindow | null = null;
   constructor() {
     super();
