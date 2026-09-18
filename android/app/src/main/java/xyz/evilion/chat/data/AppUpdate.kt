@@ -100,10 +100,11 @@ object AppUpdate {
      *
      * SUPPORTED_ABIS is in order of preference, so a 64-bit phone that can also
      * run 32-bit code is offered the 64-bit build first, which is what it
-     * should have.
+     * should have. It is a parameter so that a test can be a test: the real
+     * one is null on a plain JVM.
      */
-    fun variantFor(release: Release): Variant {
-        for (abi in android.os.Build.SUPPORTED_ABIS) {
+    fun variantFor(release: Release, abis: Array<String> = android.os.Build.SUPPORTED_ABIS): Variant {
+        for (abi in abis) {
             release.files.firstOrNull { it.abi == abi }?.let { return it }
         }
         return release.files.firstOrNull { it.abi == "universal" }
