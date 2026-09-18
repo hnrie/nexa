@@ -47,6 +47,7 @@ import xyz.evilion.chat.media.Media
 import xyz.evilion.chat.net.ExpressionsApi
 import xyz.evilion.chat.net.Sticker
 import xyz.evilion.chat.net.StickerPack
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.theme.chatColors
 
 /** A pack in the rail, and where its header sits in the grid's items. */
@@ -209,7 +210,7 @@ private fun PackRailButton(pack: StickerPack, selected: Boolean, onJump: () -> U
                 text = { Text(t("pickers.stickerPicker.removeFromYourPacks"), color = colors.danger, fontSize = 14.sp) },
                 onClick = {
                     menu = false
-                    scope.launch {
+                    detached {
                         runCatching { ExpressionsApi.install(pack.id, false) }
                             .onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }
                     }

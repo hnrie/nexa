@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import xyz.evilion.chat.i18n.t
+import xyz.evilion.chat.ui.detached
+import xyz.evilion.chat.ui.detachedAsync
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -161,36 +163,47 @@ fun Composer(
         val files = staged
         if (text.isEmpty() && files.isEmpty()) return
         sending = true
+        val editId = editing?.raw?.id
+        val replyId = replyTo?.raw?.id
+        // The send outlives this composer. On `rememberCoroutineScope` it was
+        // racing the composition: leaving the channel, opening the drawer or
+        // rotating the phone cancelled it, and a message carrying an attachment
+        // — the slowest kind, and the one you would least like to lose — was
+        // the likeliest to be halfway through when that happened. Only the
+        // tidying up afterwards belongs to the composition, and skipping that
+        // because you walked away costs nothing.
+        val work = detachedAsync {
+            if (editId != null) {
+                MessageService.edit(channelId, editId, text)
+            } else {
+                val metas = mutableListOf<AttachmentMeta>()
+                val refs = mutableListOf<AttachmentRef>()
+                for (item in files) {
+                    val (meta, ref) = Uploads.send(
+                        context, channelId, item.file,
+                        singleLimit = AppState.instance.value?.uploadSingleBytes?.takeIf { it > 0 } ?: (90L * 1024 * 1024),
+                        chunkLimit = AppState.instance.value?.uploadChunkBytes?.takeIf { it > 0 } ?: (32L * 1024 * 1024),
+                    ) { done ->
+                        staged = staged.map { if (it === item) it.copy(progress = done) else it }
+                    }
+                    metas += meta
+                    refs += ref
+                }
+                MessageService.send(
+                    channelId, text,
+                    replyTo = replyId,
+                    attachments = metas,
+                    attachmentRefs = refs,
+                )
+            }
+            SettingsStore.setDraft(channelId, "")
+        }
         scope.launch {
             try {
-                if (editing != null) {
-                    MessageService.edit(channelId, editing.raw.id, text)
-                    onClearEdit()
-                } else {
-                    val metas = mutableListOf<AttachmentMeta>()
-                    val refs = mutableListOf<AttachmentRef>()
-                    for (item in files) {
-                        val (meta, ref) = Uploads.send(
-                            context, channelId, item.file,
-                            singleLimit = AppState.instance.value?.uploadSingleBytes?.takeIf { it > 0 } ?: (90L * 1024 * 1024),
-                            chunkLimit = AppState.instance.value?.uploadChunkBytes?.takeIf { it > 0 } ?: (32L * 1024 * 1024),
-                        ) { done ->
-                            staged = staged.map { if (it === item) it.copy(progress = done) else it }
-                        }
-                        metas += meta
-                        refs += ref
-                    }
-                    MessageService.send(
-                        channelId, text,
-                        replyTo = replyTo?.raw?.id,
-                        attachments = metas,
-                        attachmentRefs = refs,
-                    )
-                    onClearReply()
-                }
+                work.await()
+                if (editId != null) onClearEdit() else onClearReply()
                 value = TextFieldValue("")
                 staged = emptyList()
-                SettingsStore.setDraft(channelId, "")
                 val slow = channel?.slowmodeSeconds ?: 0
                 if (slow > 0 && !AppState.permissionsIn(channelId).has(P.MANAGE_MESSAGES)) {
                     slowModeUntil = System.currentTimeMillis() + slow * 1000L
@@ -351,7 +364,7 @@ fun Composer(
                 // the sheet stays open, so several emoji can go in at once
             },
             onGif = { gif ->
-                scope.launch {
+                detached {
                     runCatching {
                         MessageService.send(
                             channelId, gif.url,
@@ -361,7 +374,7 @@ fun Composer(
                 }
             },
             onSticker = { sticker ->
-                scope.launch {
+                detached {
                     runCatching {
                         MessageService.send(
                             channelId, "",

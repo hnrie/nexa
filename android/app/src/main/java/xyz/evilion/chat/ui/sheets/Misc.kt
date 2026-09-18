@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.sheets
 
 import xyz.evilion.chat.data.readable
 import xyz.evilion.chat.i18n.t
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -194,7 +195,7 @@ fun NewMessageSheet(onDismiss: () -> Unit) {
             }
             Button(
                 onClick = {
-                    scope.launch {
+                    detached {
                         runCatching {
                             val channel = ChannelsApi.createDm(picked.toList())
                             AppState.putChannel(channel)
@@ -240,7 +241,7 @@ fun CreateServerSheet(onDismiss: () -> Unit) {
                 onClick = {
                     busy = true
                     error = null
-                    scope.launch {
+                    detached {
                         runCatching {
                             val view = Session.guarded("create_server") { captcha -> ServersApi.create(name.trim(), captcha) }
                             AppState.putServerView(view, AppState.me.value?.id)
@@ -334,7 +335,7 @@ fun StickerPackScreen(packId: String) {
                 Button(
                     onClick = {
                         busy = true
-                        scope.launch {
+                        detached {
                             runCatching { ExpressionsApi.install(packId, !(pack?.installed ?: false)) }
                                 .onSuccess { pack = pack?.copy(installed = !(pack?.installed ?: false)) }
                                 .onFailure { Session.toasts.emit(it.message ?: t("passcode.thatDidNotWork")) }

@@ -12,7 +12,7 @@ signing certificate) are read from the file itself with the SDK's tools, so
 nothing here can claim something a build does not say. Older builds are left
 in place, so a download already running can finish.
 """
-import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, time, zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -69,6 +69,25 @@ def signing_cert(apk: Path) -> str:
     return ":".join(raw[i : i + 2] for i in range(0, len(raw), 2))
 
 
+def baked_server(apk: Path) -> str:
+    """The server BuildConfig.DEFAULT_SERVER points at, read out of the dex."""
+    with zipfile.ZipFile(apk) as z:
+        names = [n for n in z.namelist() if n.startswith("classes") and n.endswith(".dex")]
+        for name in names:
+            found = re.findall(rb"https?://[A-Za-z0-9.:/_-]{4,}", z.read(name))
+            for url in found:
+                text = url.decode("ascii", "replace")
+                if "/" not in text.split("://", 1)[1].rstrip("/"):
+                    return text
+    return ""
+
+
+def looks_local(url: str) -> bool:
+    """A build pointed at a machine on this desk rather than at the internet."""
+    host = url.split("://", 1)[-1].split("/")[0].split(":")[0]
+    return host in ("localhost", "10.0.2.2", "10.0.3.2", "127.0.0.1", "::1") or host.endswith(".local")
+
+
 def apk_kind(apk: Path, info: dict) -> str:
     """Which processor a build is for, or "universal" when it carries them all."""
     abis = info.get("abis") or []
@@ -101,6 +120,14 @@ def main() -> int:
         version = args.version or info.get("version")
         if not version:
             print("could not read the version: pass --version, or install the SDK build-tools", file=sys.stderr)
+            return 1
+        # `gradle assembleRelease -PserverUrl=…` leaves a perfectly ordinary,
+        # release-signed APK in the usual place, pointed at whatever server was
+        # being tested against. One of those was one command away from being
+        # published, so it is checked here rather than remembered.
+        server = baked_server(apk)
+        if looks_local(server):
+            print(f"{apk.name} is built against {server}, not the real server. Rebuild with: make android", file=sys.stderr)
             return 1
         builds.append((apk, info, version, apk_kind(apk, info)))
 

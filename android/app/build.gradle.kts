@@ -53,8 +53,8 @@ android {
         applicationId = "xyz.evilion.chat"
         minSdk = 26
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         // -PserverUrl=http://10.0.2.2:1234 points a build at a local chatd
         val defaultServer = (findProperty("serverUrl") as String?)?.trim().takeUnless { it.isNullOrEmpty() }

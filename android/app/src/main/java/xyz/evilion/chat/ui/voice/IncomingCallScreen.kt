@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.voice
 
 import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.common.HangUpIcon
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -65,7 +66,7 @@ fun IncomingCallScreen(channelId: String, fromUserId: String) {
                     Modifier.size(68.dp).clip(CircleShape).background(colors.danger).clickable {
                         Session.ringing.value = null
                         Notifications.clearRing(context, channelId)
-                        scope.launch { runCatching { VoiceApi.decline(channelId) } }
+                        detached { runCatching { VoiceApi.decline(channelId) } }
                     },
                     contentAlignment = Alignment.Center,
                 ) {

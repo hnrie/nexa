@@ -7,6 +7,7 @@ import android.media.projection.MediaProjectionManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import xyz.evilion.chat.i18n.t
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -271,7 +272,7 @@ fun CallScreen(channelId: String, startWithVideo: Boolean = false, onClose: () -
                     active = call.screen,
                 ) {
                     if (call.screen) {
-                        scope.launch { VoiceSession.stopScreenShare() }
+                        detached { VoiceSession.stopScreenShare() }
                     } else {
                         val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                         screenCapture.launch(manager.createScreenCaptureIntent())

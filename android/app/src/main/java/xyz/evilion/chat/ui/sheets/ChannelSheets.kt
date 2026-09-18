@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.sheets
 
 import xyz.evilion.chat.data.readable
 import xyz.evilion.chat.i18n.t
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -294,7 +295,7 @@ fun ChannelSettingsSheet(channelId: String, onDismiss: () -> Unit) {
                 Button(
                     onClick = {
                         saving = true
-                        scope.launch {
+                        detached {
                             runCatching {
                                 val updated = ChannelsApi.patch(channelId, buildJsonObject {
                                     put("name", name)

@@ -47,6 +47,7 @@ import xyz.evilion.chat.net.ChannelsApi
 import xyz.evilion.chat.ui.pickers.ExpressionMode
 import xyz.evilion.chat.ui.pickers.ExpressionSheet
 import xyz.evilion.chat.ui.pickers.Expressions
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.pickers.Pick
 import xyz.evilion.chat.ui.theme.chatColors
 
@@ -76,7 +77,7 @@ fun MessageActions(
     val pinned = message.raw.flags and 1 != 0
 
     fun react(key: String) {
-        scope.launch { runCatching { MessageService.react(channelId, message.raw.id, key, true) } }
+        detached { runCatching { MessageService.react(channelId, message.raw.id, key, true) } }
         onDismiss()
     }
 
@@ -144,7 +145,7 @@ fun MessageActions(
                 onDismiss()
             }
             ActionRow(Lucide.MessageCircleMore, t("messageActions.markUnread")) {
-                scope.launch {
+                detached {
                     val previous = AppState.messages(channelId).value
                         .filter { (it.raw.id.toLongOrNull() ?: 0) < (message.raw.id.toLongOrNull() ?: 0) }
                         .maxByOrNull { it.raw.id.toLongOrNull() ?: 0 }
@@ -163,7 +164,7 @@ fun MessageActions(
             }
             if (canManage || mine) {
                 ActionRow(Lucide.Pin, if (pinned) t("chat.pins.unpin") else t("messageActions.pin")) {
-                    scope.launch {
+                    detached {
                         runCatching {
                             if (pinned) ChannelsApi.unpin(channelId, message.raw.id)
                             else ChannelsApi.pin(channelId, message.raw.id)
@@ -174,7 +175,7 @@ fun MessageActions(
             }
             if (mine || canManage) {
                 ActionRow(Lucide.Trash2, t("chat.messageItem.delete"), colors.danger) {
-                    scope.launch {
+                    detached {
                         runCatching { MessageService.delete(channelId, message.raw.id) }
                             .onFailure { Session.toasts.emit(it.message ?: t("messageActions.thatMessageCouldNotBeDeleted")) }
                     }

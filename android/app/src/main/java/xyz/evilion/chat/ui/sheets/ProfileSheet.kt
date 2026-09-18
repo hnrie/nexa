@@ -2,6 +2,7 @@ package xyz.evilion.chat.ui.sheets
 
 import xyz.evilion.chat.i18n.t
 import xyz.evilion.chat.ui.chat.longDate
+import xyz.evilion.chat.ui.detached
 import xyz.evilion.chat.ui.icons.Lucide
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -162,7 +163,7 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                         Button(
                             onClick = {
                                 busy = true
-                                scope.launch {
+                                detached {
                                     runCatching {
                                         val channel = ChannelsApi.createDm(listOf(userId))
                                         AppState.putChannel(channel)
@@ -181,19 +182,19 @@ fun ProfileSheet(userId: String, serverId: String?, onDismiss: () -> Unit) {
                         }
                         when (relationship?.type) {
                             "friend" -> OutlineAction(t("sheets.profileSheet.removeFriend"), Lucide.UserMinus, colors.danger) {
-                                scope.launch { runCatching { RelationshipsApi.remove(userId) } }
+                                detached { runCatching { RelationshipsApi.remove(userId) } }
                             }
                             "incoming" -> OutlineAction(t("voice.incomingCall.accept"), Lucide.UserPlus, colors.positive) {
-                                scope.launch { runCatching { RelationshipsApi.accept(userId) } }
+                                detached { runCatching { RelationshipsApi.accept(userId) } }
                             }
                             "outgoing" -> OutlineAction(t("sheets.profileSheet.cancelRequest"), Lucide.UserMinus, colors.textMuted) {
                                 scope.launch { runCatching { RelationshipsApi.remove(userId) } }
                             }
                             "blocked" -> OutlineAction(t("friends.unblock"), Lucide.Ban, colors.textMuted) {
-                                scope.launch { runCatching { RelationshipsApi.unblock(userId) } }
+                                detached { runCatching { RelationshipsApi.unblock(userId) } }
                             }
                             else -> OutlineAction(t("sheets.profileSheet.addFriend"), Lucide.UserPlus, colors.positive) {
-                                scope.launch {
+                                detached {
                                     runCatching {
                                         Session.guarded("friend_request") { captcha ->
                                             RelationshipsApi.request(user?.username.orEmpty(), captcha)
