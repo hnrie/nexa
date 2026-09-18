@@ -72,7 +72,11 @@ def main() -> int:
     ap.add_argument("--keep", type=int, default=2, help="how many releases to leave in place, newest first (0 keeps everything)")
     ap.add_argument("--republish", action="store_true", help="overwrite a version that is already published")
     args = ap.parse_args()
-    dist, dest = Path(args.dist), Path(args.to)
+    # Absolute, because the signer runs with its own working directory
+    # (desktop/) and a relative "desktop/dist" resolved against that became
+    # "desktop/desktop/dist" — so signing failed and, correctly, nothing was
+    # published. The Makefile passes exactly that relative path.
+    dist, dest = Path(args.dist).resolve(), Path(args.to).resolve()
     if not dist.is_dir():
         print(f"no build at {dist}", file=sys.stderr)
         return 1
@@ -103,15 +107,10 @@ def main() -> int:
         print(f"{version} is already published in {dest}. Bump desktop/package.json, or pass --republish.", file=sys.stderr)
         return 1
 
-    dest.mkdir(parents=True, exist_ok=True)
-    files = []
-    for p, m in found:
-        shutil.copy2(p, dest / p.name)
-        blockmap = p.with_name(p.name + ".blockmap")
-        if blockmap.exists():
-            shutil.copy2(blockmap, dest / blockmap.name)
-        files.append({"os": OS[m["os"]], "arch": ARCH[m["arch"]], "kind": KIND[m["ext"]], "name": p.name, "size": p.stat().st_size, "sha256": sha256(p)})
-        print(f"  {p.name} ({p.stat().st_size / 1048576:.1f} MB)")
+    # Signed first, and only then copied. "Nothing was published" has to mean
+    # nothing: signing after the copy left a directory full of a version whose
+    # manifest never landed, which the guard above then read as "already
+    # published" and refused to retry.
     # Sign the manifests before they are published. Without a signature the
     # only thing an app can check is a hash that came from the same host as
     # the file, which catches a bad download and nothing else.
@@ -125,6 +124,15 @@ def main() -> int:
         return 1
     print(sign.stdout.rstrip())
 
+    dest.mkdir(parents=True, exist_ok=True)
+    files = []
+    for p, m in found:
+        shutil.copy2(p, dest / p.name)
+        blockmap = p.with_name(p.name + ".blockmap")
+        if blockmap.exists():
+            shutil.copy2(blockmap, dest / blockmap.name)
+        files.append({"os": OS[m["os"]], "arch": ARCH[m["arch"]], "kind": KIND[m["ext"]], "name": p.name, "size": p.stat().st_size, "sha256": sha256(p)})
+        print(f"  {p.name} ({p.stat().st_size / 1048576:.1f} MB)")
     # the update manifests and their signatures go last, once everything they
     # name is in place
     for y in manifests:

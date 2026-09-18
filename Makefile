@@ -33,8 +33,11 @@ server:
 
 test: test-go test-web test-desktop
 
+# -race makes the api package take about three minutes on an idle machine and
+# rather more on a busy one; Go's default is ten per package, which this has
+# hit while other things were building.
 test-go:
-	$(GO) vet ./... && $(GO) test -race ./...
+	$(GO) vet ./... && $(GO) test -race -timeout 20m ./...
 
 test-web:
 	cd web && npm run typecheck && npm test -- --run
