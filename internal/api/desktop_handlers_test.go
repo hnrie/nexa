@@ -21,8 +21,8 @@ func TestDesktopReleasesAreServed(t *testing.T) {
 
 	manifest := `{"version":"1.2.3","released_at":1800000000000,"files":[{"os":"windows","arch":"x64","kind":"installer","name":"nexa-Setup-1.2.3-x64.exe","size":11,"sha256":"ab"},{"os":"mac","arch":"arm64","kind":"installer","name":"nexa-1.2.3-arm64.dmg","size":5,"sha256":"cd"}],"junk":"dropped"}`
 	for name, body := range map[string]string{
-		"manifest.json":                    manifest,
-		"latest.yml":                       "version: 1.2.3\n",
+		"manifest.json":            manifest,
+		"latest.yml":               "version: 1.2.3\n",
 		"nexa-Setup-1.2.3-x64.exe": "hello world",
 		"nexa-1.2.3-arm64.dmg":     "12345",
 	} {

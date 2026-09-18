@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"evilion.xyz/chat/internal/db"
+	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 )
 
 // srcPath is where a test database lives, so run() can open it by name.
