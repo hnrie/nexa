@@ -194,7 +194,13 @@ func (s *Server) handleMFAStatus(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	left, _ := s.Store.BackupCodesLeft(r.Context(), u.ID)
+	// A failed read used to report zero, and someone told they have no backup
+	// codes left makes new ones — which throws away the ten they are holding.
+	left, err := s.Store.BackupCodesLeft(r.Context(), u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	enabled := m != nil && m.Enabled
 	resp := map[string]any{"enabled": enabled, "backup_codes_left": left}
 	if enabled {
@@ -339,7 +345,16 @@ func (s *Server) handleBackupCodes(w http.ResponseWriter, r *http.Request) {
 // mfaChallenge is the reply to a password that was right but is not enough.
 func (s *Server) mfaChallenge(w http.ResponseWriter, u *store.User, start time.Time) {
 	tk := s.signTicket(ticket{Purpose: "login-mfa", User: u.ID.String(), Exp: time.Now().Add(mfaLoginTTL).Unix()})
-	left, _ := s.Store.BackupCodesLeft(context.Background(), u.ID)
+	// This has no request to hang off — the caller does not pass one — so it
+	// gets a deadline of its own rather than none at all. The count is only
+	// shown beside the code box, so a failure leaves it unsaid rather than
+	// failing the sign-in.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	left, err := s.Store.BackupCodesLeft(ctx, u.ID)
+	cancel()
+	if err != nil {
+		s.Log.Warn("backup codes left", "user", u.ID.String(), "err", err)
+	}
 	if d := time.Since(start); d < minLoginTime {
 		time.Sleep(minLoginTime - d)
 	}

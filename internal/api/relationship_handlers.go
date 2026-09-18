@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -54,6 +55,14 @@ func (s *Server) emitRelationship(r *http.Request, a, b *store.User) {
 	for _, pair := range [][2]*store.User{{a, b}, {b, a}} {
 		rel, err := s.Store.Relationship(r.Context(), pair[0].ID, pair[1].ID)
 		if err != nil {
+			// Only "there is no row" means the relationship went. A read that
+			// merely failed used to send the same relationship_remove, so a
+			// transient error after two people became friends dropped one of
+			// them from the other's list while the database still said friend.
+			if !errors.Is(err, store.ErrNotFound) {
+				s.Log.Warn("relationship read-back", "user", pair[0].ID.String(), "other", pair[1].ID.String(), "err", err)
+				continue
+			}
 			s.Bcast.EmitUsers([]ids.ID{pair[0].ID}, "relationship_remove", map[string]any{"user_id": pair[1].ID})
 			continue
 		}
@@ -189,11 +198,7 @@ func (s *Server) handleBlock(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	if err := s.Store.DeleteRelationship(r.Context(), id, me.ID); err != nil {
-		WriteError(w, err)
-		return
-	}
-	if err := s.Store.SetRelationship(r.Context(), me.ID, id, "blocked"); err != nil {
+	if err := s.Store.Block(r.Context(), me.ID, id); err != nil {
 		WriteError(w, err)
 		return
 	}

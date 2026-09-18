@@ -36,10 +36,10 @@ func TestDMAndGroupDM(t *testing.T) {
 	if _, err := s.AddParticipant(ctx, g.ID, c.ID, a.ID); !errors.Is(err, ErrAlreadyExists) {
 		t.Error("re-adding should be ErrAlreadyExists")
 	}
-	if _, err := s.RemoveParticipant(ctx, g.ID, c.ID); err != nil {
+	if _, _, err := s.RemoveParticipant(ctx, g.ID, c.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.RemoveParticipant(ctx, g.ID, c.ID); !errors.Is(err, ErrNotFound) {
+	if _, _, err := s.RemoveParticipant(ctx, g.ID, c.ID); !errors.Is(err, ErrNotFound) {
 		t.Error("removing twice")
 	}
 	d := mkUser(t, s, "d")
@@ -117,7 +117,7 @@ func TestSubchatMembersFollowTheGroup(t *testing.T) {
 	ctx := context.Background()
 	a, b, c := mkUser(t, s, "a"), mkUser(t, s, "b"), mkUser(t, s, "c")
 	g, _ := s.CreateGroupDM(ctx, a.ID, []ids.ID{b.ID}, "g")
-	sub, err := s.CreateSubchat(ctx, g, a.ID, "plans")
+	sub, err := s.CreateSubchat(ctx, g, a.ID, "plans", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -128,9 +128,14 @@ func TestSubchatMembersFollowTheGroup(t *testing.T) {
 	if ok, _ := s.IsParticipant(ctx, sub.ID, c.ID); !ok {
 		t.Error("a new group member should be in its subchats")
 	}
-	left, err := s.RemoveParticipant(ctx, g.ID, b.ID)
+	left, stillThere, err := s.RemoveParticipant(ctx, g.ID, b.ID)
 	if err != nil || len(left) != 1 || left[0] != sub.ID {
 		t.Fatalf("leave: %v %v", left, err)
+	}
+	// who is left has to come from the same transaction, so two people leaving
+	// at once cannot each be told the other is still there
+	if len(stillThere) != 2 || !hasBoth(stillThere, a.ID, c.ID) {
+		t.Errorf("remaining after b left = %v, want a and c", stillThere)
 	}
 	if ok, _ := s.IsParticipant(ctx, sub.ID, b.ID); ok {
 		t.Error("someone who left the group should leave its subchats")
@@ -140,5 +145,44 @@ func TestSubchatMembersFollowTheGroup(t *testing.T) {
 	}
 	if _, err := s.ChannelByID(ctx, sub.ID); !errors.Is(err, ErrNotFound) {
 		t.Error("deleting a group should delete its subchats")
+	}
+}
+
+func hasBoth(list []ids.ID, want ...ids.ID) bool {
+	for _, w := range want {
+		found := false
+		for _, got := range list {
+			if got == w {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// A DM is its own key conversation. Unset, the field marshalled as "0" and any
+// client that read it without a guard against that string encrypted the first
+// message of a new conversation for the wrong one.
+func TestCreateDMCarriesItsKeyConversation(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b := mkUser(t, s, "kca"), mkUser(t, s, "kcb")
+	ch, created, err := s.CreateDM(ctx, a.ID, b.ID)
+	if err != nil || !created {
+		t.Fatalf("create: %v %v", created, err)
+	}
+	if ch.KeyConvID != ch.ID {
+		t.Errorf("key_conv_id = %v on a freshly created DM, want %v", ch.KeyConvID, ch.ID)
+	}
+	// and the second call, which re-reads, agrees with it
+	again, created, err := s.CreateDM(ctx, b.ID, a.ID)
+	if err != nil || created {
+		t.Fatalf("second create: %v %v", created, err)
+	}
+	if again.KeyConvID != ch.ID {
+		t.Errorf("key_conv_id = %v on re-read, want %v", again.KeyConvID, ch.ID)
 	}
 }

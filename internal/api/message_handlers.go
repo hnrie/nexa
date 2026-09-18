@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -296,7 +297,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		m.Attachments = append(m.Attachments, store.Attachment{BlobID: a.BlobID, Size: b.Size})
 	}
 	if err := s.Store.InsertMessage(ctx, m); err != nil {
-		if err == store.ErrAlreadyExists {
+		if errors.Is(err, store.ErrAlreadyExists) {
 			if existing, err := s.Store.MessageByNonce(ctx, ch.ID, me.ID, body.Nonce, me.ID); err == nil {
 				WriteJSON(w, http.StatusOK, existing)
 				return
@@ -544,7 +545,7 @@ func (s *Server) handleReactionAdd(w http.ResponseWriter, r *http.Request) {
 	}
 	added, err := s.Store.AddReaction(r.Context(), m.ID, me.ID, emoji)
 	if err != nil {
-		if err == store.ErrLimit {
+		if errors.Is(err, store.ErrLimit) {
 			WriteError(w, E(http.StatusBadRequest, "too_many_reactions", "A message can have at most 20 different reactions."))
 			return
 		}

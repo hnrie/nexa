@@ -23,19 +23,23 @@ func (s *Server) crashRoutes(mux *http.ServeMux) {
 }
 
 // clip trims a field to a length the log can hold, without splitting a rune.
+//
+// The cut is by bytes, so it can land in the middle of one. Dropping the
+// trailing continuation bytes is not enough: the lead byte of the rune that
+// was cut stays behind, and a lone lead byte is not valid UTF-8. SQLite stores
+// the mangled byte and shows U+FFFD, but Postgres refuses a text value that is
+// not valid UTF-8 at all, so the insert failed and the one endpoint whose job
+// is to record that something went wrong answered 500. Anything the value
+// carried that is not valid UTF-8 goes the same way, which the User-Agent
+// header needs too — unlike the JSON fields, it is not decoded by anything
+// that would already have made it valid.
 func clip(v string, n int) string {
 	v = strings.TrimSpace(v)
-	if len(v) <= n {
-		return v
+	if len(v) > n {
+		v = v[:n]
 	}
-	cut := v[:n]
-	for len(cut) > 0 && !utf8Start(cut[len(cut)-1]) {
-		cut = cut[:len(cut)-1]
-	}
-	return cut
+	return strings.ToValidUTF8(v, "")
 }
-
-func utf8Start(b byte) bool { return b&0xC0 != 0x80 }
 
 func (s *Server) handleCrashReport(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
@@ -62,10 +66,7 @@ func (s *Server) handleCrashReport(w http.ResponseWriter, r *http.Request) {
 	default:
 		kind = "error"
 	}
-	ua := r.UserAgent()
-	if len(ua) > maxUserAgent {
-		ua = ua[:maxUserAgent]
-	}
+	ua := clip(r.UserAgent(), maxUserAgent)
 	e := &store.ClientError{
 		UserID:    &me.ID,
 		Kind:      kind,

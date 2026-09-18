@@ -215,10 +215,6 @@ func (s *Server) handleUploadFinish(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if err := s.Store.FinishUpload(r.Context(), up.ID, b.ID); err != nil {
-		WriteError(w, err)
-		return
-	}
 	WriteJSON(w, http.StatusCreated, map[string]any{"blob_id": b.ID, "size": b.Size})
 }
 

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
@@ -63,7 +64,7 @@ func (s *Store) ServerPerms(ctx context.Context, serverID, uid ids.ID) (perms.Pe
 	}
 	m, err := s.Member(ctx, serverID, uid)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			return 0, nil
 		}
 		return 0, err
@@ -124,7 +125,7 @@ func (s *Store) ChannelPerms(ctx context.Context, channelID, uid ids.ID) (perms.
 	}
 	m, err := s.Member(ctx, *ch.ServerID, uid)
 	if err != nil {
-		if err == ErrNotFound {
+		if errors.Is(err, ErrNotFound) {
 			return 0, ch, nil
 		}
 		return 0, ch, err

@@ -62,7 +62,7 @@ func (s *Store) AddBlobRef(ctx context.Context, id ids.ID, delta int) error {
 
 // UnreferencedBlobs lists blobs with no references created before olderThan.
 func (s *Store) UnreferencedBlobs(ctx context.Context, olderThan int64) ([]*Blob, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+blobCols+` FROM blobs WHERE ref_count <= 0 AND created_at < ? LIMIT 500`, olderThan)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+blobCols+` FROM blobs WHERE ref_count <= 0 AND created_at < ? ORDER BY id LIMIT 500`, olderThan)
 	if err != nil {
 		return nil, err
 	}

@@ -114,19 +114,21 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "self", "You cannot disable or demote yourself."))
 		return
 	}
-	flags := u.Flags
+	// Only the bits this request names are touched, so a second admin changing
+	// a different bit at the same moment does not have their change undone.
+	var set, clear int64
 	if req.Disabled != nil {
 		if *req.Disabled {
-			flags |= store.FlagDisabled
+			set |= store.FlagDisabled
 		} else {
-			flags &^= store.FlagDisabled
+			clear |= store.FlagDisabled
 		}
 	}
 	if req.Admin != nil {
 		if *req.Admin {
-			flags |= store.FlagAdmin
+			set |= store.FlagAdmin
 		} else {
-			flags &^= store.FlagAdmin
+			clear |= store.FlagAdmin
 		}
 	}
 	// instance admins see every private channel of the servers they are in,
@@ -134,14 +136,25 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 	isAdmin := func(f int64) bool { return f&store.FlagAdmin != 0 && f&(store.FlagDisabled|store.FlagDeleted) == 0 }
 	var servers []*store.Server
 	var before []visibility
-	if isAdmin(u.Flags) != isAdmin(flags) {
-		servers, _ = s.Store.ServersForUser(r.Context(), id)
+	if isAdmin(u.Flags) != isAdmin((u.Flags|set)&^clear) {
+		// The snapshots come first: taken after the write they would show the
+		// new view as though it had always been there, and a failed one would
+		// make every channel look newly visible to every member.
+		if servers, err = s.Store.ServersForUser(r.Context(), id); err != nil {
+			WriteError(w, err)
+			return
+		}
 		for _, srv := range servers {
-			vis, _ := s.snapshotVisibility(r.Context(), srv.ID)
+			vis, err := s.snapshotVisibility(r.Context(), srv.ID)
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
 			before = append(before, vis)
 		}
 	}
-	if err := s.Store.SetUserFlags(r.Context(), id, flags); err != nil {
+	flags, err := s.Store.ChangeUserFlags(r.Context(), id, set, clear)
+	if err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -150,7 +163,11 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Disabled != nil && *req.Disabled {
 		// a disabled account loses every session immediately
-		_ = s.Store.DeleteUserSessions(r.Context(), id, 0)
+		if err := s.Store.DeleteUserSessions(r.Context(), id, 0); err != nil {
+			// the account is already disabled — the middleware re-checks the
+			// flag per request — but the rows should have gone with it
+			s.Log.Warn("disable: session sweep", "user", id.String(), "err", err)
+		}
 		s.Bcast.EmitUsers([]ids.ID{id}, "session_expired", map[string]any{"reason": "disabled"})
 		s.Bcast.CloseUserSessions(id, 0)
 	}
@@ -304,16 +321,18 @@ func (s *Server) handleAdminSettingsPatch(w http.ResponseWriter, r *http.Request
 		WriteError(w, err)
 		return
 	}
+	// Every field is checked before any of them is written. Validating and
+	// writing one at a time meant a request rejected for its second field had
+	// already applied its first: an admin who read "registration_key is too
+	// long" and concluded nothing had changed had in fact closed registration.
+	var pending [][2]string
 	if v, ok := raw["registration"]; ok {
 		var mode string
 		if json.Unmarshal(v, &mode) != nil || !OneOf(mode, "open", "invite", "closed", "") {
 			WriteError(w, E(http.StatusBadRequest, "invalid_value", "registration must be open, invite or closed."))
 			return
 		}
-		if err := s.Store.SetInstanceSetting(r.Context(), "registration", mode); err != nil {
-			WriteError(w, err)
-			return
-		}
+		pending = append(pending, [2]string{"registration", mode})
 	}
 	if v, ok := raw["registration_key"]; ok {
 		var key string
@@ -326,10 +345,11 @@ func (s *Server) handleAdminSettingsPatch(w http.ResponseWriter, r *http.Request
 			WriteError(w, E(http.StatusBadRequest, "invalid_value", "registration_key is too long."))
 			return
 		}
-		if err := s.Store.SetInstanceSetting(r.Context(), "registration_key", key); err != nil {
-			WriteError(w, err)
-			return
-		}
+		pending = append(pending, [2]string{"registration_key", key})
+	}
+	if err := s.Store.SetInstanceSettings(r.Context(), pending); err != nil {
+		WriteError(w, err)
+		return
 	}
 	WriteJSON(w, http.StatusOK, s.adminSettingsView(r))
 }

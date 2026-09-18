@@ -55,6 +55,12 @@ func main() {
 		os.Exit(2)
 	}
 	log := setupLogging(cfg.LogLevel)
+	// Before anything can generate one: the node id is part of every id, and
+	// two processes sharing a database with the same one collide.
+	if err := ids.SetNode(cfg.NodeID); err != nil {
+		log.Error("node id", "err", err)
+		os.Exit(2)
+	}
 
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
 		log.Error("data dir", "err", err)
@@ -148,6 +154,12 @@ func main() {
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		log.Warn("http shutdown", "err", err)
 	}
+	// Shutdown returns as soon as the ordinary requests are done; it does not
+	// wait for hijacked connections, and every gateway socket is one. Each of
+	// them runs a tail of queries as it closes — voice cleanup, presence,
+	// disconnect hooks — so closing the database first meant a handful of
+	// "database is closed" errors on every restart and no WAL checkpoint.
+	hub.Wait(shutdownCtx)
 	if err := database.Close(); err != nil {
 		log.Warn("database close", "err", err)
 	}
@@ -279,6 +291,16 @@ func loadOrCreateSecret(path string) ([]byte, error) {
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		return nil, err
+	}
+	// The rename itself has to reach the disk too. Without this the file's
+	// contents are safe but its name may not be, so a power cut in the
+	// writeback window leaves no secret at all — and the next start would
+	// generate a different one, which is exactly what the comment above says
+	// this is guarding against: every TOTP seed sealed under the old secret
+	// becomes undecryptable.
+	if dir, err := os.Open(filepath.Dir(path)); err == nil {
+		_ = dir.Sync()
+		dir.Close()
 	}
 	return b, nil
 }

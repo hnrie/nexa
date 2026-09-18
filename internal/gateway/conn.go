@@ -13,6 +13,7 @@ import (
 	"github.com/coder/websocket"
 	"golang.org/x/time/rate"
 
+	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/textutil"
@@ -65,6 +66,10 @@ const (
 	CloseSessionRevoked websocket.StatusCode = 4001
 	// CloseRateLimited tells the client it sent too much; it reconnects.
 	CloseRateLimited websocket.StatusCode = 4008
+	// CloseTooManyConnections says this socket was one too many for the
+	// account, the address or the instance. Reconnecting at once only gets the
+	// same answer; the client should close a tab or wait.
+	CloseTooManyConnections websocket.StatusCode = 4009
 )
 
 // Conn is the exported view of a connection for hook implementers.
@@ -73,7 +78,7 @@ type Conn struct {
 }
 
 // User returns the connection's user.
-func (x *Conn) User() *store.User { return x.c.user }
+func (x *Conn) User() *store.User { return x.c.currentUser() }
 
 // SessionID returns the session id.
 func (x *Conn) SessionID() ids.ID { return x.c.session.ID }
@@ -89,10 +94,17 @@ func (x *Conn) Guest() *store.Guest { return x.c.guest }
 func (x *Conn) Send(t string, d any) { x.c.enqueue(ServerFrame{T: t, S: x.c.hub.nextSeq(), D: d}) }
 
 type conn struct {
-	id      ids.ID
-	hub     *Hub
-	ws      *websocket.Conn
-	user    *store.User
+	id  ids.ID
+	hub *Hub
+	ws  *websocket.Conn
+	// userID and ip never change, so the read loop, the presence timer and the
+	// hub's sweeps can all read them without agreeing on a lock.
+	userID ids.ID
+	ip     string
+	// user is replaced whenever a presence change re-reads the profile, and
+	// that can happen on the timer goroutine while the read loop and
+	// sweepSessions are looking at it.
+	user    atomic.Pointer[store.User]
 	session *store.Session
 	// guest is set on a connection from a guest link: its user is a stand-in,
 	// and all it may do is heartbeat and be in its one call
@@ -134,6 +146,9 @@ type conn struct {
 
 func (c *conn) lastBeat() time.Time { return time.UnixMilli(c.beat.Load()) }
 
+// currentUser is the profile as this connection last saw it.
+func (c *conn) currentUser() *store.User { return c.user.Load() }
+
 func (c *conn) enqueue(f ServerFrame) {
 	if !c.live.Load() {
 		c.pendMu.Lock()
@@ -167,11 +182,36 @@ func (c *conn) goLive(ready ServerFrame) {
 		c.close(CloseSessionRevoked, "session revoked")
 		return
 	}
-	// Nothing reached the buffer before this, and pending holds fewer frames
-	// than it has room for, so none of these sends block.
-	c.send <- ready
+	// Nothing reached the buffer before this and nothing is draining it yet —
+	// writeLoop starts after this returns — while enqueue refuses to hold more
+	// than cap-1 pending frames and ready takes the last slot, so the
+	// arithmetic says these sends cannot block.
+	//
+	// They are written not to block anyway. A caller here holds pendMu, which
+	// Hub.EmitUsers reaches while holding h.mu.RLock; one blocked reader of an
+	// RWMutex queues every waiting writer behind it, so register, unregister
+	// and every later emitter on the whole instance would stop with it. A
+	// dropped connection is a price worth paying to keep that impossible
+	// rather than merely unlikely.
+	send := func(f ServerFrame) bool {
+		select {
+		case c.send <- f:
+			return true
+		default:
+			return false
+		}
+	}
+	if !send(ready) {
+		c.pending = nil
+		c.close(websocket.StatusPolicyViolation, "slow consumer")
+		return
+	}
 	for _, f := range c.pending {
-		c.send <- f
+		if !send(f) {
+			c.pending = nil
+			c.close(websocket.StatusPolicyViolation, "slow consumer")
+			return
+		}
 	}
 	c.pending = nil
 	c.live.Store(true)
@@ -202,15 +242,37 @@ const frameRevoked = "\x00revoked"
 func (c *conn) revoke() {
 	c.revoked.Store(true)
 	c.enqueue(ServerFrame{T: frameRevoked})
-	time.AfterFunc(writeTimeout, func() { c.close(CloseSessionRevoked, "session revoked") })
+	time.AfterFunc(writeTimeout, func() {
+		defer c.hub.recoverTimer("revoke")
+		c.close(CloseSessionRevoked, "session revoked")
+	})
 }
 
 // ServeHTTP upgrades the request and runs the connection until it ends.
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ip := auth.ClientIP(r)
+	// A socket that has not identified still costs a goroutine and a file
+	// descriptor for as long as identifyTimeout allows, and it needs no
+	// account at all, so the room for it is taken before the upgrade — a
+	// refusal is then an ordinary HTTP status the client can read.
+	if err := h.admitWaiting(ip); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	waiting := true
+	defer func() {
+		if waiting {
+			h.releaseWaiting(ip)
+		}
+	}()
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: h.originPatterns, CompressionMode: websocket.CompressionNoContextTakeover})
 	if err != nil {
 		return
 	}
+	// From here on this connection is one the shutdown has to wait for: the
+	// socket is hijacked, so http.Server.Shutdown will not.
+	h.live.Add(1)
+	defer h.live.Done()
 	ws.SetReadLimit(readLimit)
 	ctx := r.Context()
 
@@ -238,14 +300,23 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = ws.Close(4001, "authentication failed")
 		return
 	}
-	c := &conn{id: ids.New(), hub: h, ws: ws, user: user, session: session, guest: guest, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
+	c := &conn{id: ids.New(), hub: h, ws: ws, userID: user.ID, ip: ip, session: session, guest: guest, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
 		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst),
 		actLimit: rate.NewLimiter(rate.Every(activityEvery), activityBurst)}
+	c.user.Store(user)
 	c.beat.Store(time.Now().UnixMilli())
 
 	// Register before building ready, so events fired meanwhile are held for
-	// this connection instead of reaching nobody.
-	first := h.register(c)
+	// this connection instead of reaching nobody. A refusal happens here, one
+	// step before the ready build this is mostly here to bound.
+	first, err := h.register(c)
+	if err != nil {
+		_ = ws.Close(CloseTooManyConnections, err.Error())
+		return
+	}
+	// The socket has a place of its own now; it stops holding a waiting one.
+	waiting = false
+	h.releaseWaiting(ip)
 	var ready *ReadyPayload
 	if guest != nil {
 		ready, err = h.buildGuestReady(ctx, guest, session)
@@ -264,21 +335,36 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.broadcastPresence(ctx, user)
 	}
 
-	go c.writeLoop()
-	go c.pingLoop()
+	// A write or ping loop that has stopped leaves a socket nobody is draining
+	// or watching, so a panic in either ends the connection rather than
+	// stranding it; close is once-only, so the ordinary exit paths are
+	// unaffected.
+	h.safely("write loop", func() {
+		defer c.close(websocket.StatusInternalError, "internal error")
+		c.writeLoop()
+	})
+	h.safely("ping loop", func() {
+		defer c.close(websocket.StatusInternalError, "internal error")
+		c.pingLoop()
+	})
 	c.readLoop(ctx)
 
 	last := h.unregister(c)
 	c.close(websocket.StatusNormalClosure, "bye")
+	// The request's own context has ended by now, so this work carries a
+	// deadline of its own rather than none at all — on shutdown in particular,
+	// every connection runs this tail at once against a database that is about
+	// to be closed underneath it.
+	bg, cancelBg := background()
+	defer cancelBg()
 	if h.OnConnClose != nil {
-		h.OnConnClose(context.Background(), user.ID, c.id)
+		h.OnConnClose(bg, user.ID, c.id)
 	}
 	// what this connection was doing ends with it; the user's other devices may still say something
 	if c.dropActivities() && !last && guest == nil {
-		h.broadcastUser(context.Background(), user.ID)
+		h.broadcastUser(bg, user.ID)
 	}
 	if last && guest == nil {
-		bg := context.Background()
 		if u, err := h.st.UserByID(bg, user.ID); err == nil {
 			h.broadcastPresence(bg, u)
 		}
@@ -385,7 +471,10 @@ func (c *conn) queuePresence(ctx context.Context, raw json.RawMessage) {
 		return
 	}
 	if delay := r.Delay(); delay > 0 {
-		c.presTimer = time.AfterFunc(delay, c.flushPresence)
+		c.presTimer = time.AfterFunc(delay, func() {
+			defer c.hub.recoverTimer("presence flush")
+			c.flushPresence()
+		})
 		c.presMu.Unlock()
 		return
 	}
@@ -408,7 +497,9 @@ func (c *conn) flushPresence() {
 		return
 	default:
 	}
-	c.applyPresence(context.Background(), raw)
+	ctx, cancel := background()
+	defer cancel()
+	c.applyPresence(ctx, raw)
 }
 
 func (c *conn) applyPresence(ctx context.Context, raw json.RawMessage) {
@@ -455,14 +546,14 @@ func (c *conn) applyPresence(ctx context.Context, raw json.RawMessage) {
 			p.StatusExpiresAt = &exp
 		}
 	}
-	if err := h.st.UpdateProfile(ctx, c.user.ID, p); err != nil {
+	if err := h.st.UpdateProfile(ctx, c.userID, p); err != nil {
 		return
 	}
-	u, err := h.st.UserByID(ctx, c.user.ID)
+	u, err := h.st.UserByID(ctx, c.userID)
 	if err != nil {
 		return
 	}
-	c.user = u
+	c.user.Store(u)
 	h.broadcastPresence(ctx, u)
 }
 
@@ -503,7 +594,7 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 			delete(c.typing, d.ChannelID)
 			c.typMu.Unlock()
 			if seen {
-				h.TypingStop(ctx, c.user.ID, d.ChannelID)
+				h.TypingStop(ctx, c.userID, d.ChannelID)
 			}
 			return
 		}
@@ -515,7 +606,7 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		// Access is checked before the channel is remembered, so made-up ids
 		// cannot grow the map.
-		others, ok := h.typingAudience(ctx, c.user.ID, d.ChannelID)
+		others, ok := h.typingAudience(ctx, c.userID, d.ChannelID)
 		if !ok {
 			return
 		}
@@ -530,7 +621,7 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		c.typing[d.ChannelID] = now
 		c.typMu.Unlock()
-		h.EmitUsers(others, EvTyping, map[string]any{"channel_id": d.ChannelID, "user_id": c.user.ID, "ts": now.UnixMilli()})
+		h.EmitUsers(others, EvTyping, map[string]any{"channel_id": d.ChannelID, "user_id": c.userID, "ts": now.UnixMilli()})
 	case OpVoiceSignal:
 		if !c.signalBytes.AllowN(time.Now(), len(f.D)) {
 			return
@@ -581,7 +672,7 @@ func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.
 		return nil, false
 	}
 	var viewers []ids.ID
-	if ch.Type == "dm" || ch.Type == "group_dm" {
+	if store.IsDMLike(ch.Type) {
 		if ok, err := h.st.IsParticipant(ctx, channelID, uid); err != nil || !ok {
 			return nil, false
 		}

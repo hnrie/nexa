@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"evilion.xyz/chat/internal/ids"
 )
 
 // Config is the complete runtime configuration of chatd.
@@ -27,10 +29,10 @@ type Config struct {
 	RedisURL string
 	// DesktopDir holds published desktop app installers and update manifests,
 	// served at /desktop/. It defaults to "desktop" inside DataDir.
-	DesktopDir      string
+	DesktopDir string
 	// AndroidDir holds the published Android app (the APK and manifest.json),
 	// written by tools/publish_android.py and served from /android.
-	AndroidDir string
+	AndroidDir      string
 	MaxUploadBytes  int64
 	MaxAvatarBytes  int64
 	MaxEmojiBytes   int64
@@ -73,6 +75,11 @@ type Config struct {
 	GuestLinksP2P bool
 	LogLevel      string
 	SessionTTL    time.Duration
+	// NodeID tells this process apart from the others when several of them
+	// share one database. The ids they hand out carry it, so two processes
+	// cannot mint the same one; each needs a number of its own, 0–1023. One
+	// process can leave it at 0.
+	NodeID int
 }
 
 // Load builds a Config from getenv, applying defaults and validating values.
@@ -148,6 +155,13 @@ func Load(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("%s: expected a positive integer, got %q", kv.k, v)
 		}
 		*kv.dst = n
+	}
+	if v := strings.TrimSpace(getenv("NODE_ID")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 || n > ids.MaxNode {
+			return c, fmt.Errorf("NODE_ID: expected 0..%d, got %q", ids.MaxNode, v)
+		}
+		c.NodeID = n
 	}
 	if v := strings.TrimSpace(getenv("SESSION_TTL_DAYS")); v != "" {
 		n, err := strconv.Atoi(v)

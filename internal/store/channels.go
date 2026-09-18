@@ -65,10 +65,20 @@ func (s *Store) CreateDM(ctx context.Context, a, b ids.ID) (*Channel, bool, erro
 	c := &Channel{Type: "dm"}
 	var existing int64
 	now := nowMs()
-	// The lookup runs inside the write transaction: writes go through one
-	// connection, so two people tapping Message at once cannot both miss the
-	// pair and open two conversations.
+	// The lookup runs inside the write transaction, holding the pair. Without
+	// that, two people tapping Message on each other at the same moment both
+	// read "no DM here" and both insert one: two conversations for one pair,
+	// messages landing in whichever the client happened to open, and neither
+	// side seeing the other's. SQLite's single writer connection made this
+	// safe on its own; Postgres runs sixteen.
+	lo, hi := a, b
+	if lo > hi {
+		lo, hi = hi, lo
+	}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
+		if err := tx.Serialise(ctx, "dm-pair", int64(lo), int64(hi)); err != nil {
+			return err
+		}
 		err := tx.QueryRowContext(ctx, `SELECT c.id FROM channels c
 			JOIN dm_participants p1 ON p1.channel_id = c.id AND p1.user_id = ?
 			JOIN dm_participants p2 ON p2.channel_id = c.id AND p2.user_id = ?
@@ -94,6 +104,10 @@ func (s *Store) CreateDM(ctx context.Context, a, b ids.ID) (*Channel, bool, erro
 		return c, false, err
 	}
 	c.Recipients = []ids.ID{a, b}
+	// A DM is its own key conversation. Left unset this marshalled as "0", and
+	// every client that read key_conv_id without a guard against that string
+	// encrypted the first message of a new DM for the wrong conversation.
+	c.KeyConvID = c.ID
 	return c, true, nil
 }
 
@@ -216,10 +230,20 @@ func (s *Store) DMChannelsForUser(ctx context.Context, uid ids.ID) ([]*Channel, 
 // CreateSubchat opens a side conversation inside a DM or group, with the same
 // people in it. It gets its own key conversation, so its messages are sealed
 // separately from the parent's.
-func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID, name string) (*Channel, error) {
+//
+// A password, when there is one, goes on inside the same transaction: setting
+// it afterwards meant a failure left an *unlocked* subchat with the requested
+// name in the conversation, visible and readable to everyone in it, behind a
+// 500 the caller reasonably read as "nothing happened".
+func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID, name string, lock *ChannelLock) (*Channel, error) {
 	ch := &Channel{Type: "subchat", Name: name, ParentID: &parent.ID, OwnerID: &owner}
 	var members []ids.ID
 	err := s.Tx(ctx, func(tx *db.Tx) error {
+		// counting and then inserting against that count is only safe while
+		// this conversation is nobody else's to add to
+		if err := tx.Serialise(ctx, "subchats", int64(parent.ID)); err != nil {
+			return err
+		}
 		var n int
 		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM channels WHERE parent_id = ? AND type = 'subchat'`, int64(parent.ID)).Scan(&n); err != nil {
 			return err
@@ -246,6 +270,13 @@ func (s *Store) CreateSubchat(ctx context.Context, parent *Channel, owner ids.ID
 				return err
 			}
 		}
+		if lock != nil && lock.Locked() {
+			if _, err := tx.ExecContext(ctx, `UPDATE channels SET lock_salt = ?, lock_params = ?, lock_hash = ?, updated_at = ? WHERE id = ?`,
+				nullBytes(lock.Salt), lock.Params, lock.Hash, now, int64(ch.ID)); err != nil {
+				return err
+			}
+			ch.Locked = true
+		}
 		return nil
 	})
 	if err != nil {
@@ -262,20 +293,32 @@ func (s *Store) SubchatsFor(ctx context.Context, parentID ids.ID) ([]*Channel, e
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	out := []*Channel{}
 	for rows.Next() {
 		c, err := scanChannel(rows)
 		if err != nil {
+			rows.Close()
 			return nil, err
 		}
 		c.KeyConvID = c.ID
+		out = append(out, c)
+	}
+	// The cursor is closed before the participants are fetched. Asking for a
+	// second connection while this one holds an open result set meant eight
+	// concurrent calls could take all eight readers with their cursors and
+	// then all wait for a ninth — a deadlock that only ends when each client
+	// gives up, with every other read on the instance queued behind it.
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, c := range out {
+		var err error
 		if c.Recipients, err = s.Participants(ctx, c.ID); err != nil {
 			return nil, err
 		}
-		out = append(out, c)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // IsParticipant reports whether uid is in the DM channel.
@@ -333,9 +376,8 @@ func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) (
 
 // RemoveParticipant removes uid from a group DM and from every subchat inside
 // it, returning the subchats uid was taken out of.
-func (s *Store) RemoveParticipant(ctx context.Context, chID, uid ids.ID) ([]ids.ID, error) {
-	var subs []ids.ID
-	err := s.Tx(ctx, func(tx *db.Tx) error {
+func (s *Store) RemoveParticipant(ctx context.Context, chID, uid ids.ID) (subs, remaining []ids.ID, err error) {
+	err = s.Tx(ctx, func(tx *db.Tx) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM dm_participants WHERE channel_id = ? AND user_id = ?`, int64(chID), int64(uid))
 		if err != nil {
 			return err
@@ -352,9 +394,18 @@ func (s *Store) RemoveParticipant(ctx context.Context, chID, uid ids.ID) ([]ids.
 				return err
 			}
 		}
-		return nil
+		// Who is left is read here rather than worked out from whatever the
+		// caller loaded earlier. The last two members of a group leaving at the
+		// same moment each held a snapshot naming the other, so neither saw an
+		// empty group and the row survived with an owner who was not in it,
+		// along with every message, subchat and key epoch it held.
+		remaining, err = idsTx(ctx, tx, `SELECT user_id FROM dm_participants WHERE channel_id = ? ORDER BY added_at, user_id`, int64(chID))
+		return err
 	})
-	return subs, err
+	if err != nil {
+		return nil, nil, err
+	}
+	return subs, remaining, nil
 }
 
 // idsTx runs a query returning one id column inside a transaction.

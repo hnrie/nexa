@@ -307,11 +307,17 @@ func (s *Store) PublicPacks(ctx context.Context, uid ids.ID, q string, limit int
 	}
 	var packs []*StickerPack
 	var err error
-	if strings.TrimSpace(q) == "" {
+	if q = strings.TrimSpace(q); q == "" {
 		packs, err = s.packsQuery(ctx, `WHERE p.public = 1 ORDER BY p.updated_at DESC LIMIT ?`, limit)
 	} else {
-		like := "%" + strings.ToLower(strings.TrimSpace(q)) + "%"
-		packs, err = s.packsQuery(ctx, `WHERE p.public = 1 AND (lower(p.name) LIKE ? OR lower(p.description) LIKE ?) ORDER BY p.updated_at DESC LIMIT ?`, like, like, limit)
+		if len(q) > maxSearchQuery {
+			q = q[:maxSearchQuery]
+		}
+		// as SearchUsers does: the wildcards in the query are escaped, and the
+		// folding is the dialect's so it works past ASCII on SQLite too
+		like := "%" + escapeLike(strings.ToLower(q)) + "%"
+		lower := s.db.Dialect.Lower
+		packs, err = s.packsQuery(ctx, `WHERE p.public = 1 AND (`+lower("p.name")+` LIKE ? ESCAPE '\' OR `+lower("p.description")+` LIKE ? ESCAPE '\') ORDER BY p.updated_at DESC LIMIT ?`, like, like, limit)
 	}
 	if err != nil {
 		return nil, err
@@ -356,6 +362,17 @@ func (s *Store) UninstallPack(ctx context.Context, uid, packID ids.ID) error {
 }
 
 // Installers lists users who installed a pack (for change notifications).
+// Installed reports whether one person has one pack installed.
+//
+// Answering that from Installers meant reading every install row of the pack —
+// and the packs this is asked about are by definition the popular public ones,
+// so the most-installed pack cost the most rows to answer a boolean about.
+func (s *Store) Installed(ctx context.Context, uid, packID ids.ID) (bool, error) {
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM sticker_installs WHERE user_id = ? AND pack_id = ?`, int64(uid), int64(packID)).Scan(&n)
+	return n > 0, err
+}
+
 func (s *Store) Installers(ctx context.Context, packID ids.ID) ([]ids.ID, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM sticker_installs WHERE pack_id = ?`, int64(packID))
 	if err != nil {

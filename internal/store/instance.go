@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -19,14 +20,28 @@ func (s *Store) InstanceSetting(ctx context.Context, key string) (string, error)
 	return v, err
 }
 
-// SetInstanceSetting writes (or clears, when value is empty) a runtime setting.
-func (s *Store) SetInstanceSetting(ctx context.Context, key, value string) error {
-	if value == "" {
-		_, err := s.db.W.ExecContext(ctx, `DELETE FROM instance_settings WHERE key = ?`, key)
-		return err
+// SetInstanceSettings writes runtime settings (an empty value clears one) as
+// one change, so a failure partway cannot leave the instance holding half of
+// what was asked for — half of a registration policy is a policy nobody chose.
+func (s *Store) SetInstanceSettings(ctx context.Context, pairs [][2]string) error {
+	if len(pairs) == 0 {
+		return nil
 	}
-	_, err := s.db.W.ExecContext(ctx, `INSERT INTO instance_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value)
-	return err
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		for _, kv := range pairs {
+			key, value := kv[0], kv[1]
+			if value == "" {
+				if _, err := tx.ExecContext(ctx, `DELETE FROM instance_settings WHERE key = ?`, key); err != nil {
+					return err
+				}
+				continue
+			}
+			if _, err := tx.ExecContext(ctx, `INSERT INTO instance_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`, key, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // InstanceSettings returns every runtime setting.
@@ -84,9 +99,16 @@ func (s *Store) AdminUsers(ctx context.Context, q string, before ids.ID, limit i
 	}
 	where := `WHERE flags & ? = 0`
 	args := []any{FlagDeleted}
-	if strings.TrimSpace(q) != "" {
-		where += ` AND (username LIKE ? OR lower(display_name) LIKE ?)`
-		like := "%" + strings.ToLower(strings.TrimSpace(q)) + "%"
+	if q = strings.TrimSpace(q); q != "" {
+		if len(q) > maxSearchQuery {
+			q = q[:maxSearchQuery]
+		}
+		// Unescaped, a query of "%" matched everything and a long run of
+		// "%_%_%_" was a pattern SQLite's LIKE backtracks on. Folding goes
+		// through the dialect for the same reason SearchUsers does: SQLite's
+		// own lower() only folds ASCII, so "łukasz" never found "Łukasz".
+		where += ` AND (username LIKE ? ESCAPE '\' OR ` + s.db.Dialect.Lower("display_name") + ` LIKE ? ESCAPE '\')`
+		like := "%" + escapeLike(strings.ToLower(q)) + "%"
 		args = append(args, like, like)
 	}
 	if !before.IsZero() {

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
 )
@@ -146,7 +147,23 @@ func (m *Store) PutPublic(ctx context.Context, kind string, r io.Reader, lim Lim
 	ow := owner
 	b := &store.Blob{SHA256: sha, Size: size, Mime: mime, Kind: kind, Encrypted: false, RefCount: 1, OwnerID: &ow, Width: &w, Height: &h, Animated: animated}
 	if err := m.st.InsertBlob(ctx, b); err != nil {
-		return nil, err
+		// Two people setting the same picture within the same moment both miss
+		// the lookup above and both insert; there is a unique index on
+		// (sha256, kind), so the second one lost and the person saw a 500 for
+		// an upload that had in fact already arrived. The row the other
+		// transaction wrote is the same bytes, so take a reference on it.
+		if !db.IsUniqueViolation(err) {
+			return nil, err
+		}
+		existing, reErr := m.st.BlobBySHA(ctx, sha, kind)
+		if reErr != nil {
+			return nil, err
+		}
+		if err := m.st.AddBlobRef(ctx, existing.ID, 1); err != nil {
+			return nil, err
+		}
+		existing.RefCount++
+		return existing, nil
 	}
 	return b, nil
 }
@@ -252,28 +269,37 @@ func (m *Store) DiscardSpool(id ids.ID) {
 // FinishSpool turns a completed upload of `size` bytes into a blob. The bytes
 // are already encrypted by the sender, so they are stored under a name of their
 // own rather than hashed for sharing: the same file uploaded twice is two blobs.
+//
+// Finishing is idempotent. The name comes from the upload's id alone, and the
+// blob row and the upload's pointer to it are written together, so every way
+// this can stop halfway leaves a state a retry can carry on from. It used to
+// carry a random suffix and write the two rows separately, which meant a
+// database error after the bytes were committed was unrecoverable: the spool
+// had been renamed away, so every retry answered 404 and the person had to
+// send the whole file again.
 func (m *Store) FinishSpool(ctx context.Context, id ids.ID, owner ids.ID, size int64) (*store.Blob, error) {
-	path := m.SpoolPath(id)
-	info, err := os.Stat(path)
-	if err != nil {
+	name := hex.EncodeToString([]byte(id.String()))
+	if info, err := os.Stat(m.SpoolPath(id)); err == nil {
+		if info.Size() == 0 {
+			m.DiscardSpool(id)
+			return nil, ErrUnsupported
+		}
+		if info.Size() != size {
+			// the file on disk is not what the database counted; it would not decrypt
+			m.DiscardSpool(id)
+			return nil, ErrBadOffset
+		}
+		if err := m.commit(m.SpoolPath(id), name); err != nil {
+			return nil, err
+		}
+	} else if committed, err := os.Stat(m.Path(name)); err != nil || committed.Size() != size {
+		// no spool and nothing committed under this upload's name: there is
+		// nothing here to finish
 		return nil, ErrNotFound
 	}
-	if info.Size() == 0 {
-		m.DiscardSpool(id)
-		return nil, ErrUnsupported
-	}
-	if info.Size() != size {
-		// the file on disk is not what the database counted; it would not decrypt
-		m.DiscardSpool(id)
-		return nil, ErrBadOffset
-	}
-	name := hex.EncodeToString([]byte(id.String())) + ids.New().String()
-	if err := m.commit(path, name); err != nil {
-		return nil, err
-	}
 	ow := owner
-	b := &store.Blob{SHA256: name, Size: info.Size(), Mime: "application/octet-stream", Kind: "attachment", Encrypted: true, RefCount: 0, OwnerID: &ow}
-	if err := m.st.InsertBlob(ctx, b); err != nil {
+	b := &store.Blob{SHA256: name, Size: size, Mime: "application/octet-stream", Kind: "attachment", Encrypted: true, RefCount: 0, OwnerID: &ow}
+	if err := m.st.FinishUploadWithBlob(ctx, id, b); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -290,6 +316,13 @@ func (m *Store) commit(tmp, sha string) error {
 	}
 	if err := os.Rename(tmp, dst); err != nil {
 		return fmt.Errorf("commit blob: %w", err)
+	}
+	// The directory entry has to reach the disk as well as the bytes: a blob
+	// row pointing at a file whose name never landed is an attachment that
+	// cannot be downloaded and that the collector will not clean up.
+	if dir, err := os.Open(filepath.Dir(dst)); err == nil {
+		_ = dir.Sync()
+		dir.Close()
 	}
 	return nil
 }

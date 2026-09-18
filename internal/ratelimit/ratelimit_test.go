@@ -59,3 +59,32 @@ func (f *fakeShared) Allow(_ context.Context, key string, n int, window time.Dur
 	}
 	return true, 0, nil
 }
+
+func (f *fakeShared) ResetRate(_ context.Context, key string) error {
+	if f.fail {
+		return errors.New("unreachable")
+	}
+	delete(f.n, key)
+	return nil
+}
+
+// Reset has to mean the same thing whether or not the allowance is shared.
+// Clearing only this process's map left someone who mistyped their password
+// four times and then got it right throttled for the rest of the window.
+func TestResetClearsTheSharedCounter(t *testing.T) {
+	shared := &fakeShared{n: map[string]int{}}
+	l := New(Every(3, time.Minute), 3, time.Hour)
+	l.Share(shared)
+	for i := 0; i < 3; i++ {
+		if ok, _ := l.Allow("login:alice"); !ok {
+			t.Fatalf("attempt %d should be allowed", i)
+		}
+	}
+	if ok, _ := l.Allow("login:alice"); ok {
+		t.Fatal("the fourth should be refused")
+	}
+	l.Reset("login:alice")
+	if ok, _ := l.Allow("login:alice"); !ok {
+		t.Error("after a successful sign-in the next attempt must be allowed again")
+	}
+}

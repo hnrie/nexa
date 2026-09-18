@@ -201,7 +201,7 @@ func (s *Server) handleSubchatCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	sub, err := s.Store.CreateSubchat(r.Context(), ch, me.ID, name)
+	sub, err := s.Store.CreateSubchat(r.Context(), ch, me.ID, name, lock)
 	if errors.Is(err, store.ErrTooMany) {
 		WriteError(w, E(http.StatusBadRequest, "too_many_subchats", "This conversation already has the most subchats it can hold."))
 		return
@@ -210,15 +210,12 @@ func (s *Server) handleSubchatCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if lock != nil && lock.Locked() {
-		if err := s.Store.SetLock(r.Context(), sub.ID, *lock); err != nil {
-			WriteError(w, err)
-			return
-		}
-		sub.Locked = true
+	if sub.Locked {
 		// whoever set it does not have to type it straight back
 		if sess := auth.SessionFrom(r.Context()); sess != nil {
-			_ = s.Store.MarkUnlocked(r.Context(), sub.ID, sess.ID)
+			if err := s.Store.MarkUnlocked(r.Context(), sub.ID, sess.ID); err != nil {
+				s.Log.Warn("subchat create: mark unlocked", "channel", sub.ID.String(), "err", err)
+			}
 		}
 	}
 	s.Bcast.EmitUsers(sub.Recipients, "channel_create", sub)

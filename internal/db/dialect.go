@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
+	"hash/fnv"
 	"strings"
 	"sync"
 )
@@ -51,16 +53,6 @@ func (d Dialect) Lower(expr string) string {
 		return "lower(" + expr + ")"
 	}
 	return "ulower(" + expr + ")"
-}
-
-// Excluded names a column of the row that was being inserted, inside an
-// ON CONFLICT ... DO UPDATE. Postgres needs the target column qualified with
-// the table when the name appears on both sides; SQLite does not mind.
-func (d Dialect) Bump(table, column, expr string) string {
-	if d == Postgres {
-		return column + " = " + strings.ReplaceAll(expr, column+",", table+"."+column+",")
-	}
-	return column + " = " + expr
 }
 
 // IsUniqueViolation reports whether err is a broken unique constraint.
@@ -199,6 +191,35 @@ func (t *Tx) QueryContext(ctx context.Context, query string, args ...any) (*sql.
 
 func (t *Tx) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	return t.tx.QueryRowContext(ctx, t.bind(query), args...)
+}
+
+// Serialise makes this transaction the only one working on what parts name,
+// until it commits or rolls back.
+//
+// It exists for the check-then-insert sequences — is there already a DM
+// between these two, how many subchats does this conversation have, how many
+// distinct emoji are on this message. Those are safe on SQLite only because
+// every write goes through one connection; Postgres runs sixteen at READ
+// COMMITTED, so two transactions read the same "no" and both write. An
+// advisory lock is the cheapest way to give them back the property the code
+// was written against, and it needs no new index or column.
+//
+// The parts are hashed together, so an accidental collision costs two
+// unrelated transactions a moment of waiting and nothing else.
+func (t *Tx) Serialise(ctx context.Context, kind string, parts ...int64) error {
+	if t.dialect != Postgres {
+		// the single writer connection has already done this
+		return nil
+	}
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(kind))
+	var b [8]byte
+	for _, p := range parts {
+		binary.BigEndian.PutUint64(b[:], uint64(p))
+		_, _ = h.Write(b[:])
+	}
+	_, err := t.tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, int64(h.Sum64()))
+	return err
 }
 
 func (t *Tx) Exec(query string, args ...any) (sql.Result, error) {

@@ -42,7 +42,12 @@ func (s *Server) systemMessage(r *http.Request, ch *store.Channel, actor ids.ID,
 		s.Log.Warn("system message", "err", err)
 		return
 	}
+	// The REST paths give these empty slices (scanMessage fills them in), so
+	// the gateway has to as well: nil marshals as null, and the clients declare
+	// both fields as always present.
 	m.MentionRoles = []ids.ID{}
+	m.Attachments = []store.Attachment{}
+	m.Reactions = []store.ReactionSummary{}
 	s.Bcast.EmitChannel(ch.ID, "message_create", m)
 }
 
@@ -252,10 +257,18 @@ func (s *Server) handleChannelIcon(w http.ResponseWriter, r *http.Request) {
 	}
 	bid := b.ID
 	if err := s.Store.SwapImage(r.Context(), "channels", "icon_id", ch.ID, &bid); err != nil {
+		s.releaseBlob(r.Context(), b.ID)
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
+	// The icon has already been swapped. A discarded error here left updated
+	// nil, so the next line read Recipients off nothing and panicked after the
+	// change had landed.
+	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
 	WriteJSON(w, http.StatusOK, updated)
 }
@@ -273,7 +286,11 @@ func (s *Server) handleChannelIconDelete(w http.ResponseWriter, r *http.Request)
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
+	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -306,7 +323,11 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
+	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.Bcast.EmitUsers([]ids.ID{uid}, "channel_create", updated)
 	s.Bcast.EmitUsers(ch.Recipients, "channel_update", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_add", []ids.ID{uid}, nil)
@@ -340,20 +361,15 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "is_owner", "The group's owner cannot be removed. Transfer ownership first."))
 		return
 	}
-	subs, err := s.Store.RemoveParticipant(r.Context(), ch.ID, uid)
+	// Who is left comes back from the same transaction as the removal: a read
+	// of its own could fail, and a failed read looks exactly like an empty
+	// group — the next branch deletes the conversation and every message in it.
+	subs, remaining, err := s.Store.RemoveParticipant(r.Context(), ch.ID, uid)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
 	s.subchatsLeft(r.Context(), ch.ID, subs, uid)
-	// A failed read here used to look exactly like an empty group, and the
-	// next line deletes the conversation and every message in it. Whoever is
-	// left keeps their group; the caller can try again.
-	remaining, err := s.Store.Participants(r.Context(), ch.ID)
-	if err != nil {
-		WriteError(w, err)
-		return
-	}
 	if len(remaining) == 0 {
 		_ = s.deleteConversation(r.Context(), ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
@@ -369,7 +385,11 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 		newOwner := remaining[0]
 		_ = s.Store.UpdateChannel(r.Context(), ch.ID, store.ChannelPatch{OwnerID: &newOwner})
 	}
-	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
+	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 	s.Bcast.EmitUsers(remaining, "channel_update", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_remove", []ids.ID{uid}, nil)

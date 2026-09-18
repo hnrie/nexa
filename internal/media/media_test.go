@@ -9,7 +9,9 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"evilion.xyz/chat/internal/db"
@@ -215,5 +217,110 @@ func TestRemoveKeepsABlobReferencedAgain(t *testing.T) {
 		t.Error("the picture must survive:", err)
 	} else {
 		f.Close()
+	}
+}
+
+// Two people setting the same picture at the same moment both miss the lookup
+// that dedupes by hash, and the unique index on (sha256, kind) refuses the
+// second insert. Both should still come away with the blob.
+func TestConcurrentIdenticalUploadsBothSucceed(t *testing.T) {
+	m, st := newMedia(t)
+	ctx := context.Background()
+	lim := Limits{MaxBytes: 10 << 20, MaxW: 64, MaxH: 64}
+	img := pngBytes(12, 12)
+
+	const n = 4
+	var wg sync.WaitGroup
+	got := make([]*store.Blob, n)
+	errs := make([]error, n)
+	start := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			<-start
+			got[i], errs[i] = m.PutPublic(ctx, "avatar", bytes.NewReader(img), lim, ids.New())
+		}(i)
+	}
+	close(start)
+	wg.Wait()
+	for i := range got {
+		if errs[i] != nil {
+			t.Fatalf("upload %d: %v", i, errs[i])
+		}
+		if got[i].ID != got[0].ID {
+			t.Errorf("upload %d got blob %v, want the shared %v", i, got[i].ID, got[0].ID)
+		}
+	}
+	// every one of them holds a reference, so none can collect the others' bytes
+	b, err := st.BlobByID(ctx, got[0].ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.RefCount != n {
+		t.Errorf("ref_count = %d after %d uploads of the same image", b.RefCount, n)
+	}
+}
+
+// Finishing an upload must be safe to repeat. The bytes are renamed into place
+// before the rows that record them are written, so a database error in between
+// used to leave an upload whose spool had gone: every retry answered 404 and
+// the person had to send the whole file again, however large it was.
+func TestFinishSpoolIsIdempotent(t *testing.T) {
+	m, st := newMedia(t)
+	ctx := context.Background()
+	u := &store.User{Username: "uploader", DisplayName: "uploader", AuthHash: "h", KDFSalt: []byte{1}, KDFParams: "{}", PublicKey: []byte{1}, EncPrivateKey: []byte{1}}
+	if err := st.CreateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	owner := u.ID
+	up, err := st.CreateUpload(ctx, owner, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	piece, n, err := m.StagePiece(bytes.NewReader([]byte("hello")), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(piece)
+	if _, err := m.AppendSpool(up.ID, 0, piece); err != nil {
+		t.Fatal(err)
+	}
+	if n != 5 {
+		t.Fatalf("staged %d bytes", n)
+	}
+
+	b, err := m.FinishSpool(ctx, up.ID, owner, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the spool is gone now, which is the state the failed retry used to see
+	if _, err := os.Stat(m.SpoolPath(up.ID)); err == nil {
+		t.Fatal("the spool should have been renamed away")
+	}
+	// so simulate the database write having failed: drop the rows it wrote and
+	// finish again, exactly as the retried request does
+	if _, err := st.DeleteBlob(ctx, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	again, err := m.FinishSpool(ctx, up.ID, owner, 5)
+	if err != nil {
+		t.Fatalf("a repeated finish must pick up the committed bytes: %v", err)
+	}
+	if again.SHA256 != b.SHA256 {
+		t.Errorf("the second finish named the blob %q, want %q", again.SHA256, b.SHA256)
+	}
+	f, got, err := m.Open(ctx, again.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if got.Size != 5 {
+		t.Errorf("size %d", got.Size)
+	}
+
+	// and an upload with neither a spool nor committed bytes is simply not there
+	if _, err := m.FinishSpool(ctx, ids.New(), owner, 5); !errors.Is(err, ErrNotFound) {
+		t.Errorf("finishing nothing = %v, want ErrNotFound", err)
 	}
 }

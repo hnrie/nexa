@@ -392,6 +392,11 @@ func fixLastMessageTx(ctx context.Context, tx *db.Tx, chID ids.ID) error {
 // AddReaction records a reaction; added is false when it already existed.
 func (s *Store) AddReaction(ctx context.Context, msgID, uid ids.ID, emoji string) (added bool, err error) {
 	err = s.Tx(ctx, func(tx *db.Tx) error {
+		// the distinct-emoji count is read and then written against, so this
+		// message belongs to this transaction until it commits
+		if err := tx.Serialise(ctx, "reactions", int64(msgID)); err != nil {
+			return err
+		}
 		var distinct, present int
 		if err := tx.QueryRowContext(ctx, `SELECT count(DISTINCT emoji), coalesce(sum(CASE WHEN emoji = ? THEN 1 ELSE 0 END), 0) FROM reactions WHERE message_id = ?`, emoji, int64(msgID)).Scan(&distinct, &present); err != nil {
 			return err
@@ -496,7 +501,9 @@ func (s *Store) CountPins(ctx context.Context, chID ids.ID) (int, error) {
 // AttachmentByBlob finds the attachment row that owns a blob, if any.
 func (s *Store) AttachmentByBlob(ctx context.Context, blobID ids.ID) (*Attachment, error) {
 	var a Attachment
-	err := s.db.R.QueryRowContext(ctx, `SELECT id, message_id, channel_id, uploader_id, blob_id, size, created_at FROM attachments WHERE blob_id = ? LIMIT 1`, int64(blobID)).Scan(&a.ID, &a.MessageID, &a.ChannelID, &a.UploaderID, &a.BlobID, &a.Size, &a.CreatedAt)
+	// The channel this names is what the download handler checks access
+	// against, so which row comes back must not be up to the query planner.
+	err := s.db.R.QueryRowContext(ctx, `SELECT id, message_id, channel_id, uploader_id, blob_id, size, created_at FROM attachments WHERE blob_id = ? ORDER BY id LIMIT 1`, int64(blobID)).Scan(&a.ID, &a.MessageID, &a.ChannelID, &a.UploaderID, &a.BlobID, &a.Size, &a.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -506,32 +513,61 @@ func (s *Store) AttachmentByBlob(ctx context.Context, blobID ids.ID) (*Attachmen
 	return &a, nil
 }
 
+// MaxPurgeMessages is how many of a banned member's messages one purge takes.
+// The whole purge is a single transaction, so this is also how long it can
+// hold the writer; a ban that would go over takes the newest that many and
+// leaves the rest, which a repeat of the same ban picks up.
+const MaxPurgeMessages = 5000
+
 // DeleteMessagesByUserSince removes a user's recent messages in a server
 // (ban with message purge). Returns the deleted ids per channel.
+//
+// It is one transaction rather than one per message. Deleting them one at a
+// time meant a failure halfway left hundreds of messages already gone from the
+// database with the error swallowing the whole result, so no message_delete_bulk
+// was sent for any of them and every connected client went on showing messages
+// that no longer existed. All or none, and what comes back is what went.
 func (s *Store) DeleteMessagesByUserSince(ctx context.Context, serverID, uid ids.ID, since int64) (map[ids.ID][]ids.ID, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT m.id, m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id WHERE c.server_id = ? AND m.author_id = ? AND m.created_at >= ?`, int64(serverID), int64(uid), since)
-	if err != nil {
-		return nil, err
-	}
 	out := map[ids.ID][]ids.ID{}
-	for rows.Next() {
-		var id, ch int64
-		if err := rows.Scan(&id, &ch); err != nil {
-			rows.Close()
-			return nil, err
+	err := s.Tx(ctx, func(tx *db.Tx) error {
+		clear(out)
+		rows, err := tx.QueryContext(ctx, `SELECT m.id, m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id
+			WHERE c.server_id = ? AND m.author_id = ? AND m.created_at >= ? ORDER BY m.id DESC LIMIT ?`,
+			int64(serverID), int64(uid), since, MaxPurgeMessages)
+		if err != nil {
+			return err
 		}
-		out[ids.ID(ch)] = append(out[ids.ID(ch)], ids.ID(id))
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for _, list := range out {
-		for _, id := range list {
-			if err := s.DeleteMessage(ctx, id); err != nil && err != ErrNotFound {
-				return nil, err
+		// The cursor is drained before anything else runs, so the delete
+		// statements are not asking the pool for a second connection while
+		// this one is still holding a result set open.
+		var order []ids.ID
+		for rows.Next() {
+			var id, ch int64
+			if err := rows.Scan(&id, &ch); err != nil {
+				rows.Close()
+				return err
+			}
+			out[ids.ID(ch)] = append(out[ids.ID(ch)], ids.ID(id))
+			order = append(order, ids.ID(id))
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		for _, id := range order {
+			if err := deleteMessageTx(ctx, tx, id); err != nil {
+				return err
 			}
 		}
+		for ch := range out {
+			if err := fixLastMessageTx(ctx, tx, ch); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }

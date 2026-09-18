@@ -34,6 +34,9 @@ type Cache interface {
 
 	// Allow is a token bucket shared by every process: n per window for key.
 	Allow(ctx context.Context, key string, n int, window time.Duration) (bool, time.Duration, error)
+	// ResetRate forgets a key's count, so a successful login clears the
+	// failures before it wherever the counting happens.
+	ResetRate(ctx context.Context, key string) error
 
 	// Publish hands an event to every process, including this one.
 	Publish(ctx context.Context, channel string, payload []byte) error

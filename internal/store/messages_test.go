@@ -352,3 +352,71 @@ func TestDeleteMessagesInOneChannel(t *testing.T) {
 		t.Errorf("deleting again: %v %v", err, deleted)
 	}
 }
+
+// The purge is one transaction and reports exactly what it removed, so the
+// caller can emit the delete events for them. Doing it one message at a time
+// meant a failure halfway left hundreds already gone with the whole result
+// discarded, and every connected client went on showing them.
+func TestPurgeReturnsWhatItDeleted(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	owner, culprit := mkUser(t, s, "purgeowner"), mkUser(t, s, "purgeculprit")
+	srv, err := s.CreateServer(ctx, owner.ID, "purge", DefaultNames{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddMember(ctx, srv.ID, culprit.ID); err != nil {
+		t.Fatal(err)
+	}
+	chans, err := s.ServerChannels(ctx, srv.ID)
+	if err != nil || len(chans) == 0 {
+		t.Fatalf("channels: %v %v", chans, err)
+	}
+	ch := chans[0]
+
+	var mine []ids.ID
+	for i := 0; i < 5; i++ {
+		m := &Message{ChannelID: ch.ID, AuthorID: culprit.ID, Type: "default", Ciphertext: []byte(`{"v":1}`)}
+		if err := s.InsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+		mine = append(mine, m.ID)
+	}
+	keep := &Message{ChannelID: ch.ID, AuthorID: owner.ID, Type: "default", Ciphertext: []byte(`{"v":1}`)}
+	if err := s.InsertMessage(ctx, keep); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted, err := s.DeleteMessagesByUserSince(ctx, srv.ID, culprit.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[ids.ID]bool{}
+	for _, list := range deleted {
+		for _, id := range list {
+			got[id] = true
+		}
+	}
+	if len(got) != len(mine) {
+		t.Fatalf("reported %d deletions, made %d", len(got), len(mine))
+	}
+	for _, id := range mine {
+		if !got[id] {
+			t.Errorf("message %v was deleted but not reported", id)
+		}
+		if _, err := s.MessageByID(ctx, id, owner.ID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("message %v is still there", id)
+		}
+	}
+	if _, err := s.MessageByID(ctx, keep.ID, owner.ID); err != nil {
+		t.Errorf("someone else's message went with it: %v", err)
+	}
+	// the channel's last message points at what is actually left
+	fresh, err := s.ChannelByID(ctx, ch.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.LastMessageID == nil || *fresh.LastMessageID != keep.ID {
+		t.Errorf("last_message_id = %v, want %v", fresh.LastMessageID, keep.ID)
+	}
+}

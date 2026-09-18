@@ -1,7 +1,13 @@
 // Package ids generates snowflake identifiers: 41 bits of milliseconds since
-// Epoch, 10 bits of node id (always 0 for this single-process server) and a
-// 12-bit per-millisecond sequence. They sort by creation time and serialise as
-// decimal strings in JSON so JavaScript never loses precision.
+// Epoch, 10 bits of node id and a 12-bit per-millisecond sequence. They sort by
+// creation time and serialise as decimal strings in JSON so JavaScript never
+// loses precision.
+//
+// The node id is 0 unless SetNode says otherwise, which is right for one
+// process. Two chatd processes sharing a Postgres both issue
+// (ms-Epoch)<<22 | 0 for the first id of a millisecond — the same value — and
+// whichever insert lands second fails on the primary key, so each process
+// behind a shared database needs a node id of its own.
 package ids
 
 import (
@@ -26,12 +32,36 @@ const (
 // ID is a snowflake identifier.
 type ID int64
 
+// MaxNode is the largest node id the ten bits hold.
+const MaxNode = (1 << nodeBits) - 1
+
 var (
 	mu     sync.Mutex
 	lastMs int64
 	seq    int64
-	now    = func() int64 { return time.Now().UnixMilli() }
+	node   int64
+	// started pins the wall clock to a monotonic reading taken once. Asking
+	// time.Now().UnixMilli() each time meant a wall clock that stepped
+	// backwards — an NTP correction after a suspend, someone running date —
+	// could leave the loop below spinning at full speed, holding this mutex,
+	// until the clock caught up: an hour's jump is an hour in which nothing on
+	// the instance can create anything at all.
+	started   = time.Now()
+	startedNs = started.UnixNano()
+	now       = func() int64 { return (startedNs + int64(time.Since(started))) / int64(time.Millisecond) }
 )
+
+// SetNode fixes which of several chatd processes this one is, so their ids
+// cannot collide. It must be called before any id is generated.
+func SetNode(n int) error {
+	if n < 0 || n > MaxNode {
+		return fmt.Errorf("node id %d is outside 0–%d", n, MaxNode)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	node = int64(n)
+	return nil
+}
 
 // New returns a fresh, strictly increasing ID.
 func New() ID {
@@ -43,8 +73,16 @@ func New() ID {
 	}
 	if ms == lastMs {
 		seq = (seq + 1) & seqMask
-		if seq == 0 { // sequence exhausted for this millisecond: wait for the next one
-			for ms <= lastMs {
+		if seq == 0 {
+			// The sequence is spent for this millisecond, so wait for the next
+			// one. The wait is bounded: with a monotonic reading this is at
+			// most a millisecond, and if it somehow is not, issuing from the
+			// next millisecond is better than never returning.
+			for i := 0; ms <= lastMs; i++ {
+				if i > spinLimit {
+					ms = lastMs + 1
+					break
+				}
 				ms = now()
 			}
 		}
@@ -52,8 +90,12 @@ func New() ID {
 		seq = 0
 	}
 	lastMs = ms
-	return ID((ms-Epoch)<<timeShift | seq)
+	return ID((ms-Epoch)<<timeShift | node<<seqBits | seq)
 }
+
+// spinLimit is how many times New re-reads the clock before deciding it is not
+// going to move and stepping the millisecond itself.
+const spinLimit = 1 << 20
 
 // FromTime returns the lowest ID that could have been generated at t.
 func FromTime(t time.Time) ID {

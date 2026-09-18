@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"evilion.xyz/chat/internal/auth"
-	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/unfurl"
 )
 
@@ -112,21 +111,14 @@ func (s *Server) inviteUnfurl(r *http.Request, raw string) *unfurl.Result {
 	if err != nil {
 		return nil
 	}
-	count, _ := s.Store.MemberCount(ctx, srv.ID)
+	count, online := s.counts(ctx, srv.ID)
 	out.Title = srv.Name
 	out.Description = srv.Description
 	if out.Description == "" {
 		out.Description = "You have been invited to join this server."
 	}
 	out.MemberCount = count
-	if h, ok := s.Bcast.(interface{ Online(ids.ID) bool }); ok {
-		members, _ := s.Store.MemberIDs(ctx, srv.ID)
-		for _, id := range members {
-			if h.Online(id) {
-				out.OnlineCount++
-			}
-		}
-	}
+	out.OnlineCount = online
 	if srv.IconID != nil {
 		out.Image = s.Cfg.PublicURL + "/media/icon/" + srv.IconID.String()
 	}

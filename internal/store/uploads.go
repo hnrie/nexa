@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -40,8 +41,13 @@ func (s *Store) UploadByID(ctx context.Context, id ids.ID) (*Upload, error) {
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
+	if err != nil {
+		// a half-scanned row is not an upload; returning one alongside the
+		// error invites a caller to read it
+		return nil, err
+	}
 	u.BlobID = idPtr(blob)
-	return &u, err
+	return &u, nil
 }
 
 // AdvanceUpload records more bytes, but only from the offset we expect: two
@@ -55,11 +61,30 @@ func (s *Store) AdvanceUpload(ctx context.Context, id ids.ID, from, to int64) (b
 	return n > 0, err
 }
 
-// FinishUpload records the blob a transfer became. The row stays until the
-// stale sweep, so a repeated finish can answer with the same blob.
-func (s *Store) FinishUpload(ctx context.Context, id, blobID ids.ID) error {
-	_, err := s.db.W.ExecContext(ctx, `UPDATE uploads SET blob_id = ?, updated_at = ? WHERE id = ?`, int64(blobID), nowMs(), int64(id))
-	return err
+// FinishUploadWithBlob records the blob an upload became and points the upload
+// row at it, as one change. The upload row stays until the stale sweep, so a
+// repeated finish can answer with the same blob.
+//
+// Two statements meant the bytes could be committed and the blob row written
+// while the upload row still said unfinished. The retry then ran the whole
+// finish again, found the spool file renamed away, and answered 404 — every
+// time, forever, for a transfer that had in fact arrived. The person had to
+// send the file again from the start.
+func (s *Store) FinishUploadWithBlob(ctx context.Context, id ids.ID, b *Blob) error {
+	if b.ID.IsZero() {
+		b.ID = ids.New()
+	}
+	if b.CreatedAt == 0 {
+		b.CreatedAt = nowMs()
+	}
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO blobs (`+blobCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			int64(b.ID), b.SHA256, b.Size, b.Mime, b.Kind, boolInt(b.Encrypted), b.RefCount, nullID(b.OwnerID), nullInt(b.Width), nullInt(b.Height), boolInt(b.Animated), b.CreatedAt); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE uploads SET blob_id = ?, updated_at = ? WHERE id = ?`, int64(b.ID), nowMs(), int64(id))
+		return err
+	})
 }
 
 // DeleteUpload forgets a transfer.

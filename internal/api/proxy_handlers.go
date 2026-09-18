@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -177,6 +178,11 @@ func narrowRange(h string, max int64) string {
 	startS, endS, ok := strings.Cut(spec, "-")
 	start, err := strconv.ParseInt(strings.TrimSpace(startS), 10, 64)
 	if !ok || err != nil || start < 0 {
+		return h
+	}
+	if start > math.MaxInt64-max {
+		// start + max would wrap negative and the malformed range would be
+		// forwarded upstream as written
 		return h
 	}
 	last := start + max - 1

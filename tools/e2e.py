@@ -40,7 +40,7 @@ class Server:
         web_dist = os.environ.get("E2E_WEB_DIST") or str(ROOT / "web/dist")
         chatd = os.environ.get("E2E_CHATD") or str(ROOT / "bin/chatd")
         # GUEST_LINKS_P2P: calls here go peer to peer, where guest links are off unless asked for
-        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS="none", MAX_UPLOAD_BYTES=str(1 << 30), GUEST_LINKS_P2P="1")
+        env = dict(os.environ, LISTEN=f"127.0.0.1:{self.port}", DATA_DIR=str(self.dir / "data"), WEB_DIST=web_dist, PUBLIC_URL=self.base, LOG_LEVEL="warn", STUN_URLS=os.environ.get("STUN_URLS", "none"), MAX_UPLOAD_BYTES=str(1 << 30), GUEST_LINKS_P2P="1")
         self.log = open(self.dir / "chatd.log", "w")
         self.proc = subprocess.Popen([chatd], env=env, stdout=self.log, stderr=subprocess.STDOUT, cwd=str(self.dir))
         for _ in range(50):
@@ -483,12 +483,14 @@ def guest_call(alice, bob):
         for path in ("/users/@me", "/users/@me/channels", "/users/@me/relationships"):
             st = g.evaluate("async ([p, t]) => (await fetch('/api/v1' + p, { headers: { Authorization: 'Bearer ' + t } })).status", [path, stay["token"]])
             assert st == 401, f"a guest reached {path}: {st}"
-        b.wait_for_selector(f"[data-tile='{gid}:avatar'] >> text=Guest", timeout=20000)
+        # The key names the slot rather than what is in it, so a guest with a
+        # camera on is still `:camera` (VoiceView.tsx:330).
+        b.wait_for_selector(f"[data-tile='{gid}:camera'] >> text=Guest", timeout=20000)
         alice.shot("dm-call-guest")
-        a.locator(f"[data-tile='{gid}:avatar']").click(button="right")
+        a.locator(f"[data-tile='{gid}:camera']").click(button="right")
         a.click("text=Remove From Call")
         g.wait_for_selector("text=You were removed from the call.", timeout=15000)
-        b.wait_for_selector(f"[data-tile='{gid}:avatar']", state="detached", timeout=15000)
+        b.wait_for_selector(f"[data-tile='{gid}:camera']", state="detached", timeout=15000)
     finally:
         gctx.close()
 

@@ -45,6 +45,13 @@ func WriteError(w http.ResponseWriter, err error) {
 		apiErr = E(http.StatusConflict, "conflict", "The resource changed underneath you; reload and retry.")
 	case errors.Is(err, store.ErrAlreadyExists):
 		apiErr = E(http.StatusConflict, "already_exists", "That already exists.")
+	// These three are caught at each of their call sites today, so nothing is
+	// broken; mapped here, a new caller of CreateSubchat or AddMember produces
+	// the ordinary answer rather than "something went wrong on the server".
+	case errors.Is(err, store.ErrTooMany), errors.Is(err, store.ErrLimit):
+		apiErr = E(http.StatusBadRequest, "limit_reached", "That is as many as this can hold.")
+	case errors.Is(err, store.ErrBanned):
+		apiErr = E(http.StatusForbidden, "banned", "You are banned from this server.")
 	case errors.Is(err, media.ErrTooLarge):
 		apiErr = E(http.StatusRequestEntityTooLarge, "too_large", "That file is too large.")
 	case errors.Is(err, media.ErrUnsupported):

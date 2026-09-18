@@ -45,14 +45,20 @@ func Open(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, fmt.Errorf("create data dir: %w", err)
 	}
-	dsn := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=synchronous(NORMAL)&_pragma=temp_store(MEMORY)"
-	w, err := sql.Open("sqlite", dsn)
+	base := "file:" + path + "?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)"
+	// The writer fsyncs on commit. With synchronous=NORMAL and WAL a committed
+	// transaction is durable only after the next checkpoint, so a power cut
+	// could take back a message the sender already had a 201 for and everyone
+	// else had already been sent — and since the message is end to end
+	// encrypted there is no reconciling that afterwards. Readers never write,
+	// so they keep the cheaper setting.
+	w, err := sql.Open("sqlite", base+"&_pragma=synchronous(FULL)")
 	if err != nil {
 		return nil, err
 	}
 	w.SetMaxOpenConns(1)
 	w.SetMaxIdleConns(1)
-	r, err := sql.Open("sqlite", dsn)
+	r, err := sql.Open("sqlite", base+"&_pragma=synchronous(NORMAL)")
 	if err != nil {
 		w.Close()
 		return nil, err
@@ -139,12 +145,37 @@ func (d *DB) Version(ctx context.Context) (int, error) {
 	return current, err
 }
 
+// migrateLockKey identifies the advisory lock migrations take on Postgres. Any
+// constant will do; it only has to be the same in every chatd process.
+const migrateLockKey = 0x63686174 // "chat"
+
 // Migrate applies every migration newer than the schema version, each in its
 // own transaction together with the version bump.
+//
+// On Postgres it runs under an advisory lock. Without one, two processes
+// starting together against a fresh database both read version 0 and both
+// apply the same file: one commits, the other dies on "relation already
+// exists", and with migrations added in pairs the loser could commit a version
+// bump for statements the winner had already run, leaving the recorded version
+// ahead of the actual schema. SQLite needs no lock — its single writer
+// connection already serialises this.
 func (d *DB) Migrate(ctx context.Context) error {
 	dir, set := "migrations", migrations
 	if d.Dialect == Postgres {
 		dir, set = "migrations-postgres", pgMigrations
+		conn, err := d.W.sqlDB.Conn(ctx)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrateLockKey); err != nil {
+			return fmt.Errorf("take migration lock: %w", err)
+		}
+		defer func() {
+			// the lock is session-scoped, and the session goes back to the
+			// pool rather than ending, so it has to be given back by hand
+			_, _ = conn.ExecContext(context.WithoutCancel(ctx), `SELECT pg_advisory_unlock($1)`, migrateLockKey)
+		}()
 	}
 	entries, err := fs.ReadDir(set, dir)
 	if err != nil {

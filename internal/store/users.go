@@ -151,6 +151,10 @@ func (s *Store) SearchUsers(ctx context.Context, q string, limit int) ([]*User, 
 	return out, rows.Err()
 }
 
+// maxSearchQuery bounds how much text a search pattern is built from, so a
+// very long one cannot become a very expensive LIKE.
+const maxSearchQuery = 100
+
 func escapeLike(s string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return r.Replace(s)
@@ -282,6 +286,35 @@ func (s *Store) SetUserFlags(ctx context.Context, id ids.ID, flags int64) error 
 		return ErrNotFound
 	}
 	return nil
+}
+
+// ChangeUserFlags turns the set bits on and the clear bits off, leaving every
+// other bit as it was, and returns the whole field afterwards.
+//
+// Two admins acting on the same account at the same moment used to read the
+// same flags, each compute a new whole value in Go, and each write it: whoever
+// landed second silently undid the other's change, and both were shown the
+// change they made. Doing it in one statement means neither can lose the
+// other's bit, and the value that comes back is what is stored.
+func (s *Store) ChangeUserFlags(ctx context.Context, id ids.ID, set, clear int64) (int64, error) {
+	var flags int64
+	err := s.Tx(ctx, func(tx *db.Tx) error {
+		// The complement is worked out here rather than with a ~ in the SQL:
+		// Postgres reads ~ on an untyped parameter as the regular-expression
+		// operator and refuses the statement as ambiguous.
+		res, err := tx.ExecContext(ctx, `UPDATE users SET flags = (flags | ?) & ?, updated_at = ? WHERE id = ?`, set, ^clear, nowMs(), int64(id))
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		return tx.QueryRowContext(ctx, `SELECT flags FROM users WHERE id = ?`, int64(id)).Scan(&flags)
+	})
+	if err != nil {
+		return 0, err
+	}
+	return flags, nil
 }
 
 // DeleteAccount anonymises the account (messages are kept) and drops sessions.

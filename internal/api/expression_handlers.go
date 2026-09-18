@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -92,8 +93,8 @@ func (s *Server) handleEmojiCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	e := &store.Emoji{ServerID: srv.ID, Name: name, BlobID: b.ID, Animated: b.Animated, CreatorID: me.ID}
 	if err := s.Store.CreateEmoji(r.Context(), e); err != nil {
-		_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)
-		if err == store.ErrAlreadyExists {
+		s.releaseBlob(r.Context(), b.ID)
+		if errors.Is(err, store.ErrAlreadyExists) {
 			WriteError(w, E(http.StatusConflict, "name_taken", "An emoji with that name already exists here."))
 			return
 		}
@@ -141,7 +142,7 @@ func (s *Server) handleEmojiPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.Store.RenameEmoji(r.Context(), e.ID, name); err != nil {
-		if err == store.ErrAlreadyExists {
+		if errors.Is(err, store.ErrAlreadyExists) {
 			WriteError(w, E(http.StatusConflict, "name_taken", "An emoji with that name already exists here."))
 			return
 		}
@@ -171,26 +172,33 @@ func (s *Server) handleEmojiDelete(w http.ResponseWriter, r *http.Request) {
 // --- sticker packs -------------------------------------------------------
 
 // packRights resolves what the caller may do with a pack.
-func (s *Server) packRights(ctx context.Context, p *store.StickerPack, me ids.ID) (view, manage bool) {
+//
+// The error is kept apart from the answer. Dropping it meant a read that
+// merely failed came back as "you cannot see this pack", which packTarget
+// answers with a 404 — and a client told a pack does not exist has every
+// reason to drop it from its collection for good. A 500 is honest and the
+// client tries again.
+func (s *Server) packRights(ctx context.Context, p *store.StickerPack, me ids.ID) (view, manage bool, err error) {
 	if p.OwnerUserID != nil && *p.OwnerUserID == me {
-		return true, true
+		return true, true, nil
 	}
 	if p.ServerID != nil {
 		perm, err := s.Store.ServerPerms(ctx, *p.ServerID, me)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return false, false, err
+		}
 		if err == nil && perm != 0 {
-			return true, perm.Has(perms.ManageEmojis)
+			return true, perm.Has(perms.ManageEmojis), nil
 		}
 	}
 	if p.Public {
-		return true, false
+		return true, false, nil
 	}
-	installed, _ := s.Store.Installers(ctx, p.ID)
-	for _, id := range installed {
-		if id == me {
-			return true, false
-		}
+	installed, err := s.Store.Installed(ctx, me, p.ID)
+	if err != nil {
+		return false, false, err
 	}
-	return false, false
+	return installed, false, nil
 }
 
 // notifyPack tells everyone who can see a pack that it changed.
@@ -324,7 +332,11 @@ func (s *Server) packTarget(w http.ResponseWriter, r *http.Request, needManage b
 		WriteError(w, ErrNotFound)
 		return nil, nil
 	}
-	view, manage := s.packRights(r.Context(), p, me.ID)
+	view, manage, err := s.packRights(r.Context(), p, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return nil, nil
+	}
 	if !view {
 		WriteError(w, ErrNotFound)
 		return nil, nil
@@ -341,12 +353,12 @@ func (s *Server) handlePackGet(w http.ResponseWriter, r *http.Request) {
 	if p == nil {
 		return
 	}
-	installed, _ := s.Store.Installers(r.Context(), p.ID)
-	for _, id := range installed {
-		if id == me.ID {
-			p.Installed = true
-		}
+	installed, err := s.Store.Installed(r.Context(), me.ID, p.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
 	}
+	p.Installed = installed
 	WriteJSON(w, http.StatusOK, p)
 }
 
@@ -371,12 +383,12 @@ func (s *Server) handleStickerInfo(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	installed, _ := s.Store.Installers(r.Context(), p.ID)
-	for _, id := range installed {
-		if id == me.ID {
-			p.Installed = true
-		}
+	installed, err := s.Store.Installed(r.Context(), me.ID, p.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
 	}
+	p.Installed = installed
 	want := map[ids.ID]bool{st.CreatorID: true}
 	if p.OwnerUserID != nil {
 		want[*p.OwnerUserID] = true
@@ -546,12 +558,12 @@ func (s *Server) handleStickerCreate(w http.ResponseWriter, r *http.Request) {
 		format = "jpeg"
 	}
 	if format == "" {
-		_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)
+		s.releaseBlob(r.Context(), b.ID)
 		WriteError(w, E(http.StatusBadRequest, "unsupported_format", "Images must be PNG, APNG, GIF or WebP."))
 		return
 	}
 	if kind == "emoji" && !reEmojiName.MatchString(strings.ReplaceAll(name, " ", "_")) {
-		_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)
+		s.releaseBlob(r.Context(), b.ID)
 		WriteError(w, E(http.StatusBadRequest, "invalid_name", "Emoji names are 2–32 letters, numbers or underscores."))
 		return
 	}
@@ -560,7 +572,7 @@ func (s *Server) handleStickerCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	st := &store.Sticker{PackID: p.ID, Name: name, Tags: tags, BlobID: b.ID, Format: format, CreatorID: me.ID, Width: b.Width, Height: b.Height, Animated: b.Animated}
 	if err := s.Store.AddSticker(r.Context(), st); err != nil {
-		_ = s.Store.AddBlobRef(r.Context(), b.ID, -1)
+		s.releaseBlob(r.Context(), b.ID)
 		WriteError(w, err)
 		return
 	}
@@ -700,7 +712,11 @@ func (s *Server) handlePackInstall(install bool) http.HandlerFunc {
 			return
 		}
 		if install {
-			view, _ := s.packRights(r.Context(), p, me.ID)
+			view, _, err := s.packRights(r.Context(), p, me.ID)
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
 			if !view || !p.Public {
 				WriteError(w, E(http.StatusForbidden, "not_public", "Only public packs can be installed."))
 				return

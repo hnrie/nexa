@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -53,6 +54,11 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 	}
 	var p store.ProfilePatch
 	bad := func(code, msg string) { WriteError(w, E(http.StatusBadRequest, code, msg)) }
+	// A value of the wrong type is its own answer, not the same as null. They
+	// used to be one: for the fields where null means "clear it", a
+	// {"about_me": 42} from a mis-typed client silently emptied the person's
+	// bio and returned 200.
+	badType := ""
 	getString := func(key string) (string, bool, bool) { // value, present, isNull
 		v, ok := raw[key]
 		if !ok {
@@ -63,6 +69,9 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		}
 		var s string
 		if err := json.Unmarshal(v, &s); err != nil {
+			if badType == "" {
+				badType = key
+			}
 			return "", true, true
 		}
 		return s, true, false
@@ -126,6 +135,10 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.StatusEmoji = &clean
+	}
+	if badType != "" {
+		bad("invalid_"+badType, "The value for "+badType+" must be a string or null.")
+		return
 	}
 	if v, ok := raw["status_expires_at"]; ok {
 		if string(v) == "null" {
@@ -256,7 +269,7 @@ func (s *Server) handleSettingsPut(w http.ResponseWriter, r *http.Request) {
 	}
 	v, err := s.Store.PutSettings(r.Context(), u.ID, req.Blob, req.Version)
 	if err != nil {
-		if err == store.ErrConflict {
+		if errors.Is(err, store.ErrConflict) {
 			WriteError(w, E(http.StatusConflict, "settings_conflict", "Settings were changed on another device; reload them first."))
 			return
 		}

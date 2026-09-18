@@ -162,6 +162,12 @@ func (r *Redis) Allow(ctx context.Context, key string, n int, window time.Durati
 	return allowed == 1, time.Duration(ms) * time.Millisecond, nil
 }
 
+// ResetRate forgets a key's count, for the successful login that clears the
+// failures before it.
+func (r *Redis) ResetRate(ctx context.Context, key string) error {
+	return r.client.Del(ctx, r.key("rate", key)).Err()
+}
+
 func (r *Redis) Publish(ctx context.Context, channel string, payload []byte) error {
 	return r.client.Publish(ctx, r.key("ev", channel), payload).Err()
 }

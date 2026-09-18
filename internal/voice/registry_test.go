@@ -1,6 +1,8 @@
 package voice
 
 import (
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"evilion.xyz/chat/internal/ids"
@@ -10,7 +12,7 @@ func TestRegistry(t *testing.T) {
 	r := New()
 	a, b := ids.ID(1), ids.ID(2)
 	ch1, ch2 := ids.ID(10), ids.ID(20)
-	if old := r.Join(State{UserID: a, ChannelID: ch1, SessionID: 100, ConnID: 1000}, false); old != nil {
+	if old, _ := r.Join(State{UserID: a, ChannelID: ch1, SessionID: 100, ConnID: 1000}, false); old != nil {
 		t.Fatal("first join returns no previous state")
 	}
 	r.Join(State{UserID: b, ChannelID: ch1, SessionID: 200, ConnID: 2000, SelfMute: true}, false)
@@ -21,7 +23,7 @@ func TestRegistry(t *testing.T) {
 	if _, ok := r.Update(a, func(s *State) { s.ServerMute = true }); !ok {
 		t.Fatal("update")
 	}
-	old := r.Join(State{UserID: a, ChannelID: ch2, SessionID: 100, ConnID: 1000, Video: true}, true)
+	old, _ := r.Join(State{UserID: a, ChannelID: ch2, SessionID: 100, ConnID: 1000, Video: true}, true)
 	if old == nil || old.ChannelID != ch1 {
 		t.Fatalf("move returns old state: %+v", old)
 	}
@@ -127,13 +129,13 @@ func TestSFUSessionFollowsTheCall(t *testing.T) {
 		t.Errorf("a toggle keeps the session: %+v", got)
 	}
 	// another device picking up the call starts without it
-	old := r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 2000}, false)
+	old, _ := r.Join(State{UserID: u, ChannelID: ch, SessionID: 100, ConnID: 2000}, false)
 	if got, _ := r.Get(u); got.SFUSession != "" || old == nil || old.SFUSession != "s1" {
 		t.Errorf("another device: %+v, old %+v", got, old)
 	}
 	// and so does a move
 	r.SetSFU(u, ch, 2000, "s2")
-	old = r.Join(State{UserID: u, ChannelID: other, SessionID: 100, ConnID: 2000}, true)
+	old, _ = r.Join(State{UserID: u, ChannelID: other, SessionID: 100, ConnID: 2000}, true)
 	if got, _ := r.Get(u); got.SFUSession != "" || old.SFUSession != "s2" {
 		t.Errorf("a move: %+v, old %+v", got, old)
 	}
@@ -181,5 +183,56 @@ func TestDetachAndResume(t *testing.T) {
 	}
 	if st, ok := r.LeaveDetached(u, "s1"); !ok || st.UserID != u || r.Count(ch) != 0 {
 		t.Errorf("grace over: %+v %v", st, ok)
+	}
+}
+
+// Whether a join started the call is decided under the registry's own lock.
+// Read from separate snapshots, two connections of the same person entering an
+// empty DM within a few milliseconds both concluded they were first: the other
+// party's phone rang twice and the transcript showed the call starting twice.
+func TestOnlyOneJoinStartsACall(t *testing.T) {
+	r := New()
+	const ch ids.ID = 900
+	me, them, g := ids.ID(1), ids.ID(2), ids.ID(3)
+
+	if _, started := r.Join(State{UserID: me, ChannelID: ch, ConnID: 1}, false); !started {
+		t.Error("the first account into an empty channel starts the call")
+	}
+	if _, started := r.Join(State{UserID: me, ChannelID: ch, ConnID: 2}, false); started {
+		t.Error("a second connection of the same person must not start it again")
+	}
+	if _, started := r.Join(State{UserID: them, ChannelID: ch, ConnID: 3}, false); started {
+		t.Error("the person answering must not start it either")
+	}
+
+	// a guest waiting alone does not make it a call; the first account still does
+	r2 := New()
+	if _, started := r2.Join(State{UserID: g, ChannelID: ch, ConnID: 4, Guest: true}, false); started {
+		t.Error("a guest must never start a call")
+	}
+	if _, started := r2.Join(State{UserID: me, ChannelID: ch, ConnID: 5}, false); !started {
+		t.Error("the first account to join a channel holding only guests starts the call")
+	}
+}
+
+// Two connections racing into the same empty channel: exactly one of them is
+// told it started the call, whichever wins.
+func TestConcurrentJoinsStartTheCallOnce(t *testing.T) {
+	r := New()
+	const ch ids.ID = 901
+	var wg sync.WaitGroup
+	var starts atomic.Int32
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			if _, started := r.Join(State{UserID: ids.ID(1), ChannelID: ch, ConnID: ids.ID(100 + i)}, false); started {
+				starts.Add(1)
+			}
+		}(i)
+	}
+	wg.Wait()
+	if n := starts.Load(); n != 1 {
+		t.Errorf("%d of the racing joins said they started the call, want exactly 1", n)
 	}
 }

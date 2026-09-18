@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
@@ -10,11 +12,34 @@ import (
 )
 
 func (s *Server) mediaRoutes(mux *http.ServeMux) {
+	// Deliberately not metered per address. One page of a large member list is
+	// hundreds of these, and behind a NAT a whole building shares one bucket,
+	// so a limiter here would refuse ordinary page loads long before it
+	// refused anything else. What it would have protected — the rescale of an
+	// image at a size nobody has asked for yet — is already bounded by
+	// media.variantWork, which decodes two at a time whatever arrives.
 	mux.HandleFunc("GET /media/{kind}/{id}", s.handleMediaPublic)
 	mux.Handle("PUT /api/v1/users/@me/avatar", s.authed(s.handleAvatarPut("avatar")))
 	mux.Handle("DELETE /api/v1/users/@me/avatar", s.authed(s.handleAvatarDelete("avatar")))
 	mux.Handle("PUT /api/v1/users/@me/banner", s.authed(s.handleAvatarPut("banner")))
 	mux.Handle("DELETE /api/v1/users/@me/banner", s.authed(s.handleAvatarDelete("banner")))
+}
+
+// releaseBlob gives back the reference an upload took when whatever was meant
+// to point at it did not happen.
+//
+// It deliberately does not use the request's context. The failure being
+// compensated for is often the request being cancelled — the person closed the
+// tab — and releasing on that same context fails too, silently, leaving bytes
+// on disk with a reference count of one that nothing points at. The GC only
+// collects blobs at zero, so those are there forever, and uploading the same
+// image again finds the orphan by hash and raises it to two.
+func (s *Server) releaseBlob(ctx context.Context, id ids.ID) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := s.Store.AddBlobRef(ctx, id, -1); err != nil {
+		s.Log.Warn("release blob", "blob", id.String(), "err", err)
+	}
 }
 
 // limitsFor returns the upload bounds for a public image kind.
@@ -61,6 +86,9 @@ func (s *Server) handleAvatarPut(kind string) http.HandlerFunc {
 		}
 		bid := b.ID
 		if err := s.Store.SwapImage(r.Context(), "users", kind+"_id", u.ID, &bid); err != nil {
+			// nothing points at the image now, so its reference goes back and
+			// the collector can take it; every other upload path does this
+			s.releaseBlob(r.Context(), b.ID)
 			WriteError(w, err)
 			return
 		}

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"log/slog"
 	"net/http"
+	"sync"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
@@ -73,6 +74,7 @@ type Server struct {
 	limProxy   *ratelimit.Limiter
 	limVoice   *ratelimit.Limiter
 	limGuest   *ratelimit.Limiter
+	limRotate  *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -90,6 +92,14 @@ type Server struct {
 	// Meter keeps them inside its free allowance (both nil otherwise).
 	Realtime *realtime.Client
 	Meter    *realtime.Meter
+	// turnCreds holds each account's minted relay credential until it is old
+	// enough to be worth minting another.
+	turnMu    sync.Mutex
+	turnCreds map[ids.ID]turnCred
+	// serverCounts holds the member and online counts the public invite pages
+	// show, so replaying a shared code cannot drive the work behind them.
+	countsMu     sync.Mutex
+	serverCounts map[ids.ID]serverCounts
 
 	// ChannelAccess decides server-channel access (Phase 2). DM access is built in.
 	ChannelAccess func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error)
@@ -129,12 +139,17 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limVoice: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
 		// joining a call as a guest, per address: a household or a meeting room, not a crowd of bots
 		limGuest: ratelimit.New(ratelimit.Every(30, time.Hour), 10, 2*time.Hour),
+		// New key epochs, per conversation. Every one of them costs every
+		// online key-holder a re-wrap for every entitled member, so the rate
+		// is held to well above real membership churn and far below what one
+		// account posting in a loop would manage.
+		limRotate: ratelimit.New(ratelimit.Every(60, time.Hour), 30, 2*time.Hour),
 	}
 }
 
 // limiters is every rate limiter this server keeps.
 func (s *Server) limiters() []*ratelimit.Limiter {
-	return []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limProxy, s.limVoice, s.limGuest}
+	return []*ratelimit.Limiter{s.limGeneric, s.limAuthIP, s.limAuthUsr, s.limReg, s.limMsg, s.limUpload, s.limUnfurl, s.limProxy, s.limVoice, s.limGuest, s.limRotate}
 }
 
 // StartLimiters runs the rate limiters' idle-key sweepers until ctx is done.

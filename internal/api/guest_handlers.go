@@ -209,7 +209,15 @@ func (s *Server) handleGuestLinksRevoke(w http.ResponseWriter, r *http.Request) 
 		if l.CreatorID != me.ID && !managesGuests(ch, p) {
 			continue
 		}
-		guests, _ := s.Store.GuestsForLink(ctx, l.Code)
+		// Who came in through the link has to be read before the link goes,
+		// and the read has to have worked: deleting the link and then not
+		// dropping them leaves people in the call that the operator believes
+		// they have just shut out.
+		guests, err := s.Store.GuestsForLink(ctx, l.Code)
+		if err != nil {
+			s.Log.Warn("revoke all guest links", "code", l.Code, "err", err)
+			continue
+		}
 		if err := s.Store.DeleteGuestLink(ctx, l.Code); err != nil {
 			continue
 		}
@@ -236,8 +244,14 @@ func (s *Server) handleGuestLinkRevoke(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You can only revoke your own guest links here."))
 		return
 	}
-	// who came in through it is read first: the rows go with the link
-	guests, _ := s.Store.GuestsForLink(ctx, link.Code)
+	// Who came in through it is read first: the rows go with the link, and a
+	// read that failed would leave them in the call after the operator was
+	// told the link was revoked.
+	guests, err := s.Store.GuestsForLink(ctx, link.Code)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.DeleteGuestLink(ctx, link.Code); err != nil {
 		WriteError(w, err)
 		return

@@ -7,8 +7,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
+
+	"evilion.xyz/chat/internal/auth"
 )
 
 // CSP is the content security policy for the web app. hash-wasm needs
@@ -28,6 +31,23 @@ func init() {
 
 func (s *Server) staticRoutes(mux *http.ServeMux) {
 	mux.Handle("/", s.staticHandler())
+}
+
+// allowPublicPage meters the pages the static handler renders for a shared
+// link. It answers false having already written the refusal.
+func (s *Server) allowPublicPage(w http.ResponseWriter, r *http.Request) bool {
+	ok, retry := s.limGeneric.Allow("page:" + auth.ClientIP(r))
+	if ok {
+		return true
+	}
+	secs := int(retry.Seconds() + 0.999)
+	if secs < 1 {
+		secs = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	w.Header().Set("Cache-Control", "no-store")
+	WriteError(w, ErrRateLimited)
+	return false
 }
 
 // staticHandler serves the built SPA: real files from WebDist (hashed assets
@@ -82,14 +102,23 @@ func (s *Server) staticHandler() http.Handler {
 			return
 		}
 		// An invite link gets its own page head, so pasting it anywhere else
-		// shows what it leads to rather than a bare address.
+		// shows what it leads to rather than a bare address. These two pages do
+		// real work per hit — they read the invite and the server behind it —
+		// and both are public, so they are metered per address while the rest
+		// of the SPA's assets stay unmetered.
 		if code, ok := strings.CutPrefix(p, "/invite/"); ok && code != "" && !strings.Contains(code, "/") {
+			if !s.allowPublicPage(w, r) {
+				return
+			}
 			if s.serveInvitePage(w, r, dist, code) {
 				return
 			}
 		}
 		// A guest link says what it is when pasted elsewhere, and nothing about whose call it is.
 		if code, ok := strings.CutPrefix(p, "/call/"); ok && code != "" && !strings.Contains(code, "/") {
+			if !s.allowPublicPage(w, r) {
+				return
+			}
 			if s.serveGuestCallPage(w, r, dist) {
 				return
 			}

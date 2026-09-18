@@ -64,6 +64,27 @@ func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typ
 	})
 }
 
+// Block records uid blocking target and removes target's row, as one change.
+//
+// Done as two statements with the delete first, a failure between them left
+// the blocker's own row untouched — their list still said "friend" while the
+// other side had nothing, and nothing would restore it, because retrying the
+// block only rewrites the blocker's row. It also left a window in which the
+// other side's concurrent friend request passed the block check and wrote a
+// pair, leaving them with a request pending forever to someone who had blocked
+// them and no row of their own to cancel it from.
+func (s *Store) Block(ctx context.Context, uid, target ids.ID) error {
+	now := nowMs()
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO relationships (user_id, target_id, type, nickname, created_at) VALUES (?,?,'blocked','',?)
+			ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, created_at = excluded.created_at`, int64(uid), int64(target), now); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM relationships WHERE user_id = ? AND target_id = ?`, int64(target), int64(uid))
+		return err
+	})
+}
+
 // DeleteRelationship removes uid → target.
 func (s *Store) DeleteRelationship(ctx context.Context, uid, target ids.ID) error {
 	_, err := s.db.W.ExecContext(ctx, `DELETE FROM relationships WHERE user_id = ? AND target_id = ?`, int64(uid), int64(target))

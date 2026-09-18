@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"evilion.xyz/chat/internal/ids"
@@ -181,5 +182,45 @@ func TestSwapImageReleasesTheOldPictureOnce(t *testing.T) {
 	}
 	if err := s.SwapImage(ctx, "users", "flags", u.ID, nil); err == nil {
 		t.Error("only image columns can be swapped")
+	}
+}
+
+// Two admins acting on the same account at the same moment must not undo each
+// other. Each used to read the whole bitfield, compute a new one in Go and
+// write it back, so whoever landed second silently dropped the other's change
+// — and both were shown the change they had made.
+func TestChangeUserFlagsKeepsTheOtherChange(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	u := mkUser(t, s, "contested")
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	errs := make([]error, 2)
+	go func() { defer wg.Done(); _, errs[0] = s.ChangeUserFlags(ctx, u.ID, FlagDisabled, 0) }()
+	go func() { defer wg.Done(); _, errs[1] = s.ChangeUserFlags(ctx, u.ID, FlagAdmin, 0) }()
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("change %d: %v", i, err)
+		}
+	}
+	got, err := s.UserByID(ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Flags&FlagDisabled == 0 || got.Flags&FlagAdmin == 0 {
+		t.Errorf("flags = %d, want both disabled and admin set", got.Flags)
+	}
+	// and clearing one bit leaves the other alone
+	flags, err := s.ChangeUserFlags(ctx, u.ID, 0, FlagDisabled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags&FlagDisabled != 0 || flags&FlagAdmin == 0 {
+		t.Errorf("flags = %d after clearing disabled, want admin still set", flags)
+	}
+	if _, err := s.ChangeUserFlags(ctx, ids.New(), FlagAdmin, 0); !errors.Is(err, ErrNotFound) {
+		t.Errorf("changing flags on a missing account = %v, want ErrNotFound", err)
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	urlpkg "net/url"
-	"sync"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
@@ -152,7 +151,16 @@ func (s *Server) voiceAudience(ctx context.Context, ch *store.Channel) []ids.ID 
 	if s.isDM(ch) {
 		out = append(out, ch.Recipients...)
 	} else {
-		out, _ = s.Store.ChannelViewers(ctx, ch.ID)
+		viewers, err := s.Store.ChannelViewers(ctx, ch.ID)
+		if err != nil {
+			// EmitUsers on an empty list returns at once, so a swallowed error
+			// here means nobody is told someone joined or left and every live
+			// client shows a stale roster until it reconnects. There is no
+			// periodic reconcile to put it right, so say so instead.
+			s.Log.Warn("voice audience", "channel", ch.ID.String(), "err", err)
+			return nil
+		}
+		out = viewers
 	}
 	for _, st := range s.Voice.Participants(ch.ID) {
 		if st.Guest {
@@ -272,9 +280,15 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		if req.Resume && req.SFUSession != "" {
 			if inSame {
 				if st, ok := s.Voice.Resume(me.ID, c.SessionID(), req.SFUSession, c.ID()); ok {
-					st, _ = s.Voice.Update(me.ID, func(x *voice.State) {
+					// Update answers a zero State when the person has already
+					// hung up, and broadcasting that puts a participant with
+					// id "0" in every viewer's roster that nothing ever
+					// removes. What Resume gave us is the last real thing.
+					if fresh, ok := s.Voice.Update(me.ID, func(x *voice.State) {
 						x.SelfMute, x.SelfDeaf, x.Video, x.Streaming = req.SelfMute, req.SelfDeaf, req.Video, req.Streaming
-					})
+					}); ok {
+						st = fresh
+					}
 					c.Send(gateway.EvVoiceResumed, map[string]any{"channel_id": ch.ID, "kept": true})
 					s.sfuSyncLive(st)
 					s.Bcast.EmitUsers(s.voiceAudience(ctx, ch), "voice_state", statePayload(st))
@@ -295,7 +309,7 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		if guest != nil {
 			next.Guest, next.GuestEpoch = true, guest.Epoch
 		}
-		old := s.Voice.Join(next, keep)
+		old, started := s.Voice.Join(next, keep)
 		if old != nil && old.ChannelID != ch.ID {
 			s.broadcastVoiceLeave(ctx, *old)
 		} else if old != nil && old.ConnID != c.ID() {
@@ -304,7 +318,12 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			s.closeSFUSession(old.SFUSession)
 			s.emitConn(me.ID, old.ConnID, "voice_state", leavePayload(*old))
 		}
-		st, _ := s.Voice.Get(me.ID)
+		st, ok := s.Voice.Get(me.ID)
+		if !ok {
+			// they hung up between the join and this read; the leave that
+			// overtook us has already told everyone
+			return
+		}
 		s.sfuSyncLive(st)
 		audience := s.voiceAudience(ctx, ch)
 		s.Bcast.EmitUsers(audience, "voice_state", statePayload(st))
@@ -312,8 +331,11 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			// answering: this user's other devices stop ringing
 			s.Bcast.EmitUsers([]ids.ID{me.ID}, "call_end", map[string]any{"channel_id": ch.ID, "user_id": me.ID, "reason": "answered"})
 		}
-		// a guest never rings anyone: the link lets them wait in the call, not call people
-		if guest == nil && s.isDM(ch) && wasEmpty && !inSame {
+		// a guest never rings anyone: the link lets them wait in the call, not
+		// call people. Whether this join started the call comes from Join
+		// itself, so two tabs of one person racing into an empty DM cannot
+		// both decide they were the first.
+		if s.isDM(ch) && started {
 			// joining an empty DM starts a call: ring the others, except
 			// anyone who blocked the caller
 			others := []ids.ID{}
@@ -332,6 +354,8 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 				m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "system_call", Mentions: []ids.ID{}}
 				if err := s.Store.InsertMessage(ctx, m); err == nil {
 					m.MentionRoles = []ids.ID{}
+					m.Attachments = []store.Attachment{}
+					m.Reactions = []store.ReactionSummary{}
 					s.Bcast.EmitChannel(ch.ID, "message_create", m)
 				}
 			}
@@ -449,16 +473,41 @@ const (
 	turnReuse = 3 * time.Hour
 )
 
-var turnCache = struct {
-	sync.Mutex
-	m map[ids.ID]struct {
-		at      time.Time
-		servers []map[string]any
-	}
-}{m: map[ids.ID]struct {
+// turnCred is one account's minted relay credential and when it was minted.
+type turnCred struct {
 	at      time.Time
 	servers []map[string]any
-}{}}
+}
+
+// rememberTURN keeps a credential for reuse and forgets the ones that have
+// gone stale. It used to be a package-level map that was never swept, so every
+// account that had ever fetched an ICE config kept an entry for the life of
+// the process, deleted accounts included — and two Servers in one process, as
+// the tests make, handed each other's credentials out.
+func (s *Server) rememberTURN(uid ids.ID, servers []map[string]any) {
+	now := time.Now()
+	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
+	if s.turnCreds == nil {
+		s.turnCreds = map[ids.ID]turnCred{}
+	}
+	for id, hit := range s.turnCreds {
+		if now.Sub(hit.at) >= turnReuse {
+			delete(s.turnCreds, id)
+		}
+	}
+	s.turnCreds[uid] = turnCred{now, servers}
+}
+
+// reuseTURN returns a credential minted recently enough to hand out again.
+func (s *Server) reuseTURN(uid ids.ID) []map[string]any {
+	s.turnMu.Lock()
+	defer s.turnMu.Unlock()
+	if hit, ok := s.turnCreds[uid]; ok && time.Since(hit.at) < turnReuse {
+		return hit.servers
+	}
+	return nil
+}
 
 var turnClient = &http.Client{Timeout: 6 * time.Second}
 
@@ -485,14 +534,8 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 		if ttl < time.Minute {
 			return nil
 		}
-	} else {
-		turnCache.Lock()
-		if hit, ok := turnCache.m[me.ID]; ok && time.Since(hit.at) < turnReuse {
-			servers := hit.servers
-			turnCache.Unlock()
-			return servers
-		}
-		turnCache.Unlock()
+	} else if servers := s.reuseTURN(me.ID); servers != nil {
+		return servers
 	}
 
 	body, _ := json.Marshal(map[string]any{"ttl": int(ttl.Seconds()), "customIdentifier": me.ID.String()})
@@ -530,12 +573,7 @@ func (s *Server) cloudflareTURN(r *http.Request) []map[string]any {
 		list = []map[string]any{one}
 	}
 	if guest == nil {
-		turnCache.Lock()
-		turnCache.m[me.ID] = struct {
-			at      time.Time
-			servers []map[string]any
-		}{time.Now(), list}
-		turnCache.Unlock()
+		s.rememberTURN(me.ID, list)
 	}
 	return list
 }
@@ -577,6 +615,24 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
+	var raw map[string]json.RawMessage
+	if err := ReadJSON(w, r, &raw, 4<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	// A body naming none of the three does nothing, and the route needs only
+	// membership. Left to run, it answered the target's full voice state — the
+	// channel they are in, whether their camera is on — to any member of the
+	// server, including for a channel the caller cannot view, and wrote an
+	// audit entry for the privilege. Nothing to do is not a request.
+	if _, hasMute := raw["mute"]; !hasMute {
+		if _, hasDeaf := raw["deaf"]; !hasDeaf {
+			if _, hasChannel := raw["channel_id"]; !hasChannel {
+				WriteError(w, E(http.StatusBadRequest, "nothing_to_do", "Say what to change: mute, deaf or channel_id."))
+				return
+			}
+		}
+	}
 	st, ok := s.Voice.Get(uid)
 	if !ok {
 		WriteError(w, E(http.StatusBadRequest, "not_in_voice", "That member is not in a voice channel."))
@@ -587,9 +643,10 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "not_in_voice", "That member is not in a voice channel of this server."))
 		return
 	}
-	var raw map[string]json.RawMessage
-	if err := ReadJSON(w, r, &raw, 4<<10); err != nil {
-		WriteError(w, err)
+	// Moderating someone in a channel you cannot see would also tell you they
+	// are in it, which is the one thing a private voice channel hides.
+	if callerPerms, _, err := s.Store.ChannelPerms(r.Context(), cur.ID, me.ID); err != nil || !callerPerms.Has(perms.ViewChannel) {
+		WriteError(w, E(http.StatusBadRequest, "not_in_voice", "That member is not in a voice channel of this server."))
 		return
 	}
 	// a guest holds no roles, so anyone with the permission may act on one
@@ -657,15 +714,20 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if mute != nil || deaf != nil {
-		updated, _ := s.Voice.Update(uid, func(x *voice.State) {
+		// The target can hang up while the request body is being read. Update
+		// then answers a zero State, whose payload names user "0" in channel
+		// "0"; clients add that participant and nothing ever removes it,
+		// because no leave for id 0 will arrive.
+		if updated, ok := s.Voice.Update(uid, func(x *voice.State) {
 			if mute != nil {
 				x.ServerMute = *mute
 			}
 			if deaf != nil {
 				x.ServerDeaf = *deaf
 			}
-		})
-		s.Bcast.EmitUsers(s.voiceAudience(r.Context(), cur), "voice_state", statePayload(updated))
+		}); ok {
+			s.Bcast.EmitUsers(s.voiceAudience(r.Context(), cur), "voice_state", statePayload(updated))
+		}
 	}
 	if disconnect {
 		if g, err := s.Store.GuestByID(r.Context(), uid); st.Guest && err == nil {
@@ -676,7 +738,7 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if dest != nil && dest.ID != cur.ID {
 		if latest, ok := s.Voice.Get(uid); ok && latest.ChannelID == cur.ID {
-			old := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Name: latest.Name, AvatarID: latest.AvatarID}, true)
+			old, _ := s.Voice.Join(voice.State{UserID: uid, ChannelID: dest.ID, SessionID: latest.SessionID, ConnID: latest.ConnID, SelfMute: latest.SelfMute, SelfDeaf: latest.SelfDeaf, Video: latest.Video, Streaming: latest.Streaming, JoinedAt: latest.JoinedAt, Suppress: !destPerms.Has(perms.Speak), Name: latest.Name, AvatarID: latest.AvatarID}, true)
 			if old != nil {
 				// what they pulled in the old channel stops; their client makes a new session
 				s.closeSFUSession(old.SFUSession)
@@ -685,8 +747,9 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 				// The join below moves them instead.
 				s.Bcast.EmitUsers(withoutID(s.voiceAudience(r.Context(), cur), uid), "voice_state", leavePayload(*old))
 			}
-			moved, _ := s.Voice.Get(uid)
-			s.Bcast.EmitUsers(append(withoutID(s.voiceAudience(r.Context(), dest), uid), uid), "voice_state", statePayload(moved))
+			if moved, ok := s.Voice.Get(uid); ok {
+				s.Bcast.EmitUsers(append(withoutID(s.voiceAudience(r.Context(), dest), uid), uid), "voice_state", statePayload(moved))
+			}
 		}
 	}
 	s.audit(r, srv.ID, me.ID, "member_voice", "user", &uid, changes, "")

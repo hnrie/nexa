@@ -18,6 +18,9 @@ type entry struct {
 // each process has its own allowance, so two of them let twice as much through.
 type Shared interface {
 	Allow(ctx context.Context, key string, n int, window time.Duration) (bool, time.Duration, error)
+	// ResetRate forgets a key, so Reset means the same thing whether or not
+	// the allowance is shared.
+	ResetRate(ctx context.Context, key string) error
 }
 
 // Limiter holds one token bucket per key.
@@ -102,10 +105,24 @@ func (l *Limiter) Allow(key string) (bool, time.Duration) {
 }
 
 // Reset forgets a key (used after a successful login to clear failures).
+//
+// It clears the shared counter as well as this process's own. Clearing only
+// the local map meant that with a Redis behind it Reset did nothing at all:
+// someone who mistyped their password four times and then got it right stayed
+// throttled, and a correct password answered 429 for the rest of the window.
 func (l *Limiter) Reset(key string) {
 	l.mu.Lock()
+	shared := l.shared
 	delete(l.entries, key)
 	l.mu.Unlock()
+	if shared == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	// Nothing to do about a failure here but leave the count standing; the
+	// window runs out on its own.
+	_ = shared.ResetRate(ctx, key)
 }
 
 // Start runs the idle-key sweeper until ctx is done.

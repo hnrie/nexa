@@ -1,6 +1,7 @@
 package api
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -57,7 +58,9 @@ func (s *Server) serverRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/servers/{id}/bans/{uid}", s.authed(s.handleBanDelete))
 	mux.Handle("GET /api/v1/servers/{id}/invites", s.authed(s.handleServerInvites))
 	mux.Handle("POST /api/v1/channels/{id}/invites", s.authed(s.handleInviteCreate))
-	mux.HandleFunc("GET /api/v1/invites/{code}", s.handleInvitePreview)
+	// An invite code is meant to be shared, so anyone who has one can replay
+	// this; it is metered per address like every other public route.
+	mux.Handle("GET /api/v1/invites/{code}", ipLimited(s.limGeneric, s.handleInvitePreview))
 	mux.Handle("POST /api/v1/invites/{code}", s.authed(s.handleInviteJoin))
 	mux.Handle("DELETE /api/v1/invites/{code}", s.authed(s.handleInviteDelete))
 	mux.Handle("GET /api/v1/servers/{id}/audit-log", s.authed(s.handleAuditLog))
@@ -161,12 +164,22 @@ func (s *Server) snapshotVisibility(ctx context.Context, serverID ids.ID) (visib
 // the server changed, and channel_update for a changed channel to those who
 // still see it. It also flags conversations whose viewer set shrank.
 func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before visibility, changed *ids.ID) {
+	// A snapshot that failed comes back nil, which is not the same as a server
+	// nobody can see anything in. Diffing against nil makes every channel look
+	// newly visible to every member, which is one channel_create per pair —
+	// on a large server, a hundred thousand events nobody asked for.
+	if before == nil {
+		s.Log.Warn("visibility sync skipped: no snapshot to compare against", "server", serverID.String())
+		return
+	}
 	after, err := s.snapshotVisibility(ctx, serverID)
 	if err != nil {
+		s.Log.Warn("visibility sync", "server", serverID.String(), "err", err)
 		return
 	}
 	chans, err := s.Store.ServerChannels(ctx, serverID)
 	if err != nil {
+		s.Log.Warn("visibility sync: channels", "server", serverID.String(), "err", err)
 		return
 	}
 	byID := map[ids.ID]*store.Channel{}
@@ -346,7 +359,15 @@ func (s *Server) handleServerPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.ServerByID(r.Context(), srv.ID)
+	// A discarded error here used to marshal as null: every member received
+	// {"t":"server_update","d":null} and the caller a 200 with a body of
+	// null. The write has landed, so saying so and letting the caller repeat
+	// the request is better than telling everyone nothing at all.
+	updated, err := s.Store.ServerByID(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, changes, "")
 	s.emitServer(r.Context(), srv.ID, "server_update", updated)
 	WriteJSON(w, http.StatusOK, updated)
@@ -368,10 +389,15 @@ func (s *Server) handleServerImage(kind string) http.HandlerFunc {
 		bid := b.ID
 		col := map[bool]string{true: "banner_id", false: "icon_id"}[kind == "banner"]
 		if err := s.Store.SwapImage(r.Context(), "servers", col, srv.ID, &bid); err != nil {
+			s.releaseBlob(r.Context(), b.ID)
 			WriteError(w, err)
 			return
 		}
-		updated, _ := s.Store.ServerByID(r.Context(), srv.ID)
+		updated, err := s.Store.ServerByID(r.Context(), srv.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
 		s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, map[string]any{kind: b.ID}, "")
 		s.emitServer(r.Context(), srv.ID, "server_update", updated)
 		WriteJSON(w, http.StatusOK, updated)
@@ -389,7 +415,11 @@ func (s *Server) handleServerImageDelete(kind string) http.HandlerFunc {
 			WriteError(w, err)
 			return
 		}
-		updated, _ := s.Store.ServerByID(r.Context(), srv.ID)
+		updated, err := s.Store.ServerByID(r.Context(), srv.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
 		s.audit(r, srv.ID, me.ID, "server_update", "server", &srv.ID, map[string]any{kind: nil}, "")
 		s.emitServer(r.Context(), srv.ID, "server_update", updated)
 		w.WriteHeader(http.StatusNoContent)
@@ -405,8 +435,19 @@ func (s *Server) handleServerDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "not_owner", "Only the owner can delete a server."))
 		return
 	}
-	members, _ := s.Store.MemberIDs(r.Context(), srv.ID)
-	chans, _ := s.Store.ServerChannels(r.Context(), srv.ID)
+	// Both reads happen before the delete, and both are who to tell about it:
+	// once the rows are gone there is no second chance to find out, and a
+	// member who was never told keeps a dead server in their sidebar.
+	members, err := s.Store.MemberIDs(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	chans, err := s.Store.ServerChannels(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.DeleteServer(r.Context(), srv.ID); err != nil {
 		WriteError(w, err)
 		return
@@ -419,12 +460,21 @@ func (s *Server) handleServerDelete(w http.ResponseWriter, r *http.Request) {
 // removeMember drops a membership, tells everyone, and flags keys for rotation.
 func (s *Server) removeMember(r *http.Request, srv *store.Server, uid ids.ID, event string, extra map[string]any) error {
 	ctx := r.Context()
-	visible, _ := s.Store.ViewableServerChannels(ctx, srv.ID, uid)
+	// What they could read decides which private channels get a new key. A
+	// failed read used to leave this empty and only the server root was
+	// flagged, so everyone in a private channel went on encrypting under a key
+	// the person just kicked still holds — silently, behind a 204. Read it
+	// before anything is written, so refusing costs nothing.
+	visible, err := s.Store.ViewableServerChannels(ctx, srv.ID, uid)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	// out of the server's calls first, while everyone in them can still be told
 	s.dropVoice(ctx, uid, func(ch *store.Channel) bool { return ch.ServerID != nil && *ch.ServerID == srv.ID })
 	if err := s.Store.RemoveMember(ctx, srv.ID, uid); err != nil {
 		return err
 	}
+	s.forgetCounts(srv.ID)
 	payload := map[string]any{"server_id": srv.ID, "user_id": uid}
 	for k, v := range extra {
 		payload[k] = v
@@ -433,23 +483,39 @@ func (s *Server) removeMember(r *http.Request, srv *store.Server, uid ids.ID, ev
 	s.Bcast.EmitUsers([]ids.ID{uid}, "server_delete", map[string]any{"id": srv.ID})
 	// rotate the server root and every private channel the user could read
 	convs := []ids.ID{srv.ID}
-	chans, _ := s.Store.ServerChannels(ctx, srv.ID)
+	chans, err := s.Store.ServerChannels(ctx, srv.ID)
+	if err != nil {
+		return err
+	}
 	for _, c := range chans {
 		if _, ok := visible[c.ID]; ok && c.KeyConvID == c.ID {
 			convs = append(convs, c.ID)
 		}
 	}
 	tr := true
-	remaining, _ := s.Store.MemberIDs(ctx, srv.ID)
+	remaining, err := s.Store.MemberIDs(ctx, srv.ID)
+	if err != nil {
+		return err
+	}
+	// Every conversation is attempted even after one of them fails, so a
+	// single bad read cannot leave the rest of them unflagged; the first
+	// failure is what the caller hears about.
+	var failed error
 	for _, conv := range convs {
-		_ = s.Store.SetKeyFlags(ctx, conv, &tr, nil)
+		if err := s.Store.SetKeyFlags(ctx, conv, &tr, nil); err != nil {
+			failed = cmp.Or(failed, err)
+			continue
+		}
 		targets := remaining
 		if conv != srv.ID {
-			targets, _ = s.Store.ChannelViewers(ctx, conv)
+			if targets, err = s.Store.ChannelViewers(ctx, conv); err != nil {
+				failed = cmp.Or(failed, err)
+				continue
+			}
 		}
 		s.Bcast.EmitUsers(targets, "key_rotation_needed", map[string]any{"conv_id": conv})
 	}
-	return nil
+	return failed
 }
 
 func (s *Server) handleServerLeave(w http.ResponseWriter, r *http.Request) {
@@ -492,7 +558,11 @@ func (s *Server) handleServerTransfer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.ServerByID(r.Context(), srv.ID)
+	updated, err := s.Store.ServerByID(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.audit(r, srv.ID, me.ID, "server_transfer", "user", &req.UserID, nil, "")
 	s.emitServer(r.Context(), srv.ID, "server_update", updated)
 	WriteJSON(w, http.StatusOK, updated)
@@ -572,12 +642,24 @@ func (s *Server) handleServerChannelCreate(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
-	existing, _ := s.Store.ServerChannels(r.Context(), srv.ID)
+	// A failed read here used to count as zero channels, which passes the cap
+	// no matter how many there really are.
+	existing, err := s.Store.ServerChannels(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if len(existing) >= maxServerChans {
 		WriteError(w, E(http.StatusBadRequest, "too_many_channels", "This server has reached the channel limit."))
 		return
 	}
-	before, _ := s.snapshotVisibility(r.Context(), srv.ID)
+	// This runs before the write, so a failure here costs nothing but the
+	// request; carrying on would flood every member with channel_create.
+	before, err := s.snapshotVisibility(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	ch, err := s.Store.CreateServerChannel(r.Context(), srv.ID, req.Type, name, req.ParentID)
 	if err != nil {
 		WriteError(w, err)
@@ -602,7 +684,13 @@ func (s *Server) handleServerChannelPositions(w http.ResponseWriter, r *http.Req
 		WriteError(w, err)
 		return
 	}
-	chans, _ := s.Store.ServerChannels(r.Context(), srv.ID)
+	// Every requested channel is looked up in this; empty, none of them is in
+	// the server and the request is refused for the wrong reason.
+	chans, err := s.Store.ServerChannels(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	byID := map[ids.ID]*store.Channel{}
 	for _, c := range chans {
 		byID[c.ID] = c
@@ -638,9 +726,17 @@ func (s *Server) handleServerChannelPositions(w http.ResponseWriter, r *http.Req
 		return
 	}
 	s.audit(r, srv.ID, me.ID, "channel_positions", "server", &srv.ID, req, "")
-	updated, _ := s.Store.ServerChannels(r.Context(), srv.ID)
+	updated, err := s.Store.ServerChannels(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	// every member receives the new order for the channels they can see
-	members, _ := s.Store.MemberIDs(r.Context(), srv.ID)
+	members, err := s.Store.MemberIDs(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	for _, uid := range members {
 		vis, err := s.Store.ViewableServerChannels(r.Context(), srv.ID, uid)
 		if err != nil {
@@ -719,7 +815,11 @@ func (s *Server) handleServerChannelPatch(w http.ResponseWriter, r *http.Request
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.ChannelByID(r.Context(), ch.ID)
+	updated, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.audit(r, *ch.ServerID, me.ID, "channel_update", "channel", &ch.ID, changes, "")
 	s.Bcast.EmitChannel(ch.ID, "channel_update", updated)
 	WriteJSON(w, http.StatusOK, updated)
@@ -763,7 +863,13 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You need Manage Channels to delete this channel."))
 		return
 	}
-	viewers, _ := s.Store.ChannelViewers(r.Context(), ch.ID)
+	// Read before the channel goes: afterwards there is nobody to ask who
+	// could see it, and whoever is not told keeps it in their sidebar.
+	viewers, err := s.Store.ChannelViewers(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.voiceChannelDeleted(r.Context(), ch)
 	if err := s.Store.DeleteChannel(r.Context(), ch.ID); err != nil {
 		WriteError(w, err)
@@ -832,14 +938,12 @@ func (s *Server) handleOverwritePut(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_type", "type must be role or member."))
 		return
 	}
-	if req.Type == "role" {
-		role, err := s.Store.RoleByID(r.Context(), target)
-		if err != nil || role.ServerID != *ch.ServerID {
-			WriteError(w, E(http.StatusBadRequest, "invalid_target", "That role is not in this server."))
-			return
-		}
-	} else if ok, _ := s.Store.IsMember(r.Context(), *ch.ServerID, target); !ok {
-		WriteError(w, E(http.StatusBadRequest, "invalid_target", "That user is not a member."))
+	srv, err := s.Store.ServerByID(r.Context(), *ch.ServerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if !s.canOverwrite(w, r, srv, me.ID, req.Type, target) {
 		return
 	}
 	// one can only grant or deny permissions one holds (owners/admins hold all)
@@ -847,7 +951,11 @@ func (s *Server) handleOverwritePut(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot manage permissions you do not have."))
 		return
 	}
-	before, _ := s.snapshotVisibility(r.Context(), *ch.ServerID)
+	before, err := s.snapshotVisibility(r.Context(), *ch.ServerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	ow := store.Overwrite{ChannelID: ch.ID, TargetID: target, TargetType: req.Type, Allow: req.Allow &^ req.Deny, Deny: req.Deny}
 	if err := s.Store.SetOverwrite(r.Context(), ow); err != nil {
 		WriteError(w, err)
@@ -862,6 +970,40 @@ func (s *Server) handleOverwritePut(w http.ResponseWriter, r *http.Request) {
 	}
 	s.syncVisibility(r.Context(), *ch.ServerID, before, &ch.ID)
 	WriteJSON(w, http.StatusOK, resp)
+}
+
+// canOverwrite checks that the actor outranks whoever the overwrite is about.
+//
+// Every other role-touching handler applies the hierarchy; this one only ever
+// checked that the target belonged to the server. Somebody given Manage Roles
+// in one channel could therefore write an overwrite denying View Channel to a
+// moderator role far above their own, or to a specific higher-ranked member,
+// and lock them out of it — which also emits channel_delete to them and flags
+// the conversation for a key rotation. It answers false having written the
+// refusal.
+func (s *Server) canOverwrite(w http.ResponseWriter, r *http.Request, srv *store.Server, actor ids.ID, kind string, target ids.ID) bool {
+	if kind == "role" {
+		role, err := s.Store.RoleByID(r.Context(), target)
+		if err != nil || role.ServerID != srv.ID {
+			WriteError(w, E(http.StatusBadRequest, "invalid_target", "That role is not in this server."))
+			return false
+		}
+		highest, isOwner := s.actorHighest(r.Context(), srv, actor)
+		if !perms.CanManageRole(highest, isOwner, perms.Role{ID: role.ID, Position: role.Position}) {
+			WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You can only set permissions for roles below your highest role."))
+			return false
+		}
+		return true
+	}
+	if ok, _ := s.Store.IsMember(r.Context(), srv.ID, target); !ok {
+		WriteError(w, E(http.StatusBadRequest, "invalid_target", "That user is not a member."))
+		return false
+	}
+	if !s.canActOn(r.Context(), srv, actor, target) {
+		WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You cannot set permissions for this member."))
+		return false
+	}
+	return true
 }
 
 // channelBecamePrivate reports whether @everyone can no longer view a channel
@@ -896,7 +1038,35 @@ func (s *Server) handleOverwriteDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	before, _ := s.snapshotVisibility(r.Context(), *ch.ServerID)
+	srv, err := s.Store.ServerByID(r.Context(), *ch.ServerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	// Removing an overwrite changes who can see the channel just as writing
+	// one does, so it answers to the same hierarchy. Which kind of target it
+	// is comes from the overwrite that is there.
+	kind := "member"
+	fresh, err := s.Store.ChannelByID(r.Context(), ch.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	found := false
+	for _, ow := range fresh.Overwrites {
+		if ow.TargetID == target {
+			kind, found = ow.TargetType, true
+			break
+		}
+	}
+	if found && !s.canOverwrite(w, r, srv, me.ID, kind, target) {
+		return
+	}
+	before, err := s.snapshotVisibility(r.Context(), *ch.ServerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.DeleteOverwrite(r.Context(), ch.ID, target); err != nil {
 		WriteError(w, err)
 		return
@@ -991,8 +1161,19 @@ func (s *Server) handleRoleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if (req.Hoist != nil && *req.Hoist) || (req.Mentionable != nil && *req.Mentionable) {
-		_ = s.Store.UpdateRole(r.Context(), role.ID, store.RolePatch{Hoist: req.Hoist, Mentionable: req.Mentionable})
-		role, _ = s.Store.RoleByID(r.Context(), role.ID)
+		if err := s.Store.UpdateRole(r.Context(), role.ID, store.RolePatch{Hoist: req.Hoist, Mentionable: req.Mentionable}); err != nil {
+			WriteError(w, err)
+			return
+		}
+		// The role exists either way. A failed re-read used to leave role nil
+		// and the next line took its address, so the panic came after the row
+		// was written and the client never learned the id.
+		if fresh, err := s.Store.RoleByID(r.Context(), role.ID); err == nil {
+			role = fresh
+		} else {
+			role.Hoist, role.Mentionable = req.Hoist != nil && *req.Hoist, req.Mentionable != nil && *req.Mentionable
+			s.Log.Warn("role create: re-read", "role", role.ID.String(), "err", err)
+		}
 	}
 	s.audit(r, srv.ID, me.ID, "role_create", "role", &role.ID, map[string]any{"name": name}, "")
 	// the new role went in at the bottom and pushed every other role up one
@@ -1081,13 +1262,21 @@ func (s *Server) handleRolePatch(w http.ResponseWriter, r *http.Request) {
 	// only a permission change can alter who sees what
 	var before visibility
 	if req.Permissions != nil {
-		before, _ = s.snapshotVisibility(r.Context(), srv.ID)
+		var err error
+		if before, err = s.snapshotVisibility(r.Context(), srv.ID); err != nil {
+			WriteError(w, err)
+			return
+		}
 	}
 	if err := s.Store.UpdateRole(r.Context(), role.ID, p); err != nil {
 		WriteError(w, err)
 		return
 	}
-	updated, _ := s.Store.RoleByID(r.Context(), role.ID)
+	updated, err := s.Store.RoleByID(r.Context(), role.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.audit(r, srv.ID, me.ID, "role_update", "role", &role.ID, changes, "")
 	s.emitServer(r.Context(), srv.ID, "role_update", updated)
 	if req.Permissions != nil {
@@ -1105,7 +1294,11 @@ func (s *Server) handleRoleDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "everyone_role", "@everyone cannot be deleted."))
 		return
 	}
-	before, _ := s.snapshotVisibility(r.Context(), srv.ID)
+	before, err := s.snapshotVisibility(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.DeleteRole(r.Context(), role.ID); err != nil {
 		WriteError(w, err)
 		return
@@ -1155,10 +1348,19 @@ func (s *Server) handleRolePositions(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	roles, _ := s.Store.Roles(r.Context(), srv.ID)
+	roles, err := s.Store.Roles(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.audit(r, srv.ID, me.ID, "role_positions", "server", &srv.ID, req, "")
-	for _, ro := range roles {
-		s.emitServer(r.Context(), srv.ID, "role_update", ro)
+	// The membership is read once rather than once per role: emitServer starts
+	// with MemberIDs, so dragging roles in a server at the role cap used to
+	// read the whole member list 250 times over to send 250 events.
+	if members, err := s.Store.MemberIDs(r.Context(), srv.ID); err == nil {
+		for _, ro := range roles {
+			s.Bcast.EmitUsers(members, "role_update", ro)
+		}
 	}
 	WriteJSON(w, http.StatusOK, roles)
 }
@@ -1343,7 +1545,11 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 	// a nickname alone changes nobody's view; skip the per-member snapshot
 	var before visibility
 	if rolesSet || patch.TimeoutUntil != nil {
-		before, _ = s.snapshotVisibility(r.Context(), srv.ID)
+		var err error
+		if before, err = s.snapshotVisibility(r.Context(), srv.ID); err != nil {
+			WriteError(w, err)
+			return
+		}
 	}
 	if patch.Nickname != nil || patch.TimeoutUntil != nil {
 		if err := s.Store.UpdateMember(r.Context(), srv.ID, m.UserID, patch); err != nil {
@@ -1361,7 +1567,11 @@ func (s *Server) handleMemberPatch(w http.ResponseWriter, r *http.Request) {
 		// a timed-out member cannot connect or speak, so they leave the call too
 		s.dropVoice(r.Context(), m.UserID, func(ch *store.Channel) bool { return ch.ServerID != nil && *ch.ServerID == srv.ID })
 	}
-	updated, _ := s.Store.Member(r.Context(), srv.ID, m.UserID)
+	updated, err := s.Store.Member(r.Context(), srv.ID, m.UserID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	s.audit(r, srv.ID, me.ID, "member_update", "user", &m.UserID, changes, "")
 	s.emitServer(r.Context(), srv.ID, "member_update", updated)
 	if rolesSet || patch.TimeoutUntil != nil {
@@ -1406,7 +1616,11 @@ func (s *Server) handleMemberRole(add bool) http.HandlerFunc {
 			WriteError(w, E(http.StatusForbidden, "role_hierarchy", "You can only assign roles below your highest role."))
 			return
 		}
-		before, _ := s.snapshotVisibility(r.Context(), srv.ID)
+		before, err := s.snapshotVisibility(r.Context(), srv.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
 		if add {
 			err = s.Store.AddMemberRole(r.Context(), srv.ID, m.UserID, rid)
 		} else {
@@ -1416,7 +1630,11 @@ func (s *Server) handleMemberRole(add bool) http.HandlerFunc {
 			WriteError(w, err)
 			return
 		}
-		updated, _ := s.Store.Member(r.Context(), srv.ID, m.UserID)
+		updated, err := s.Store.Member(r.Context(), srv.ID, m.UserID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
 		s.audit(r, srv.ID, me.ID, map[bool]string{true: "member_role_add", false: "member_role_remove"}[add], "user", &m.UserID, map[string]any{"role": rid}, "")
 		s.emitServer(r.Context(), srv.ID, "member_update", updated)
 		s.syncVisibility(r.Context(), srv.ID, before, nil)
@@ -1466,7 +1684,11 @@ func (s *Server) handleBans(w http.ResponseWriter, r *http.Request) {
 	for _, b := range bans {
 		list = append(list, b.UserID)
 	}
-	byID, _ := s.Store.UsersByIDs(r.Context(), list)
+	byID, err := s.Store.UsersByIDs(r.Context(), list)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	users := []store.PublicUser{}
 	for _, id := range list {
 		if u := byID[id]; u != nil {
@@ -1516,19 +1738,28 @@ func (s *Server) handleBanPut(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// The ban is recorded before the purge, so a purge that fails does not also
+	// cost the log entry and the notice for a ban that did land.
+	s.audit(r, srv.ID, me.ID, "member_ban", "user", &uid, map[string]any{"delete_message_days": req.DeleteMessageDays}, reason)
+	s.emitServerWithPerm(r.Context(), srv.ID, perms.BanMembers, "ban_add", map[string]any{"server_id": srv.ID, "user_id": uid, "reason": reason})
 	if req.DeleteMessageDays > 0 {
 		if req.DeleteMessageDays > 7 {
 			req.DeleteMessageDays = 7
 		}
 		since := time.Now().Add(-time.Duration(req.DeleteMessageDays) * 24 * time.Hour).UnixMilli()
-		if deleted, err := s.Store.DeleteMessagesByUserSince(r.Context(), srv.ID, uid, since); err == nil {
-			for ch, list := range deleted {
-				s.Bcast.EmitChannel(ch, "message_delete_bulk", map[string]any{"channel_id": ch, "ids": list})
-			}
+		deleted, err := s.Store.DeleteMessagesByUserSince(r.Context(), srv.ID, uid, since)
+		if err != nil {
+			// Nothing was deleted: the purge is one transaction. Saying so lets
+			// the moderator try again rather than believe messages are gone
+			// that are still there. Repeating the ban is the retry.
+			s.Log.Warn("ban purge", "server", srv.ID.String(), "user", uid.String(), "err", err)
+			WriteError(w, err)
+			return
+		}
+		for ch, list := range deleted {
+			s.Bcast.EmitChannel(ch, "message_delete_bulk", map[string]any{"channel_id": ch, "ids": list})
 		}
 	}
-	s.audit(r, srv.ID, me.ID, "member_ban", "user", &uid, map[string]any{"delete_message_days": req.DeleteMessageDays}, reason)
-	s.emitServerWithPerm(r.Context(), srv.ID, perms.BanMembers, "ban_add", map[string]any{"server_id": srv.ID, "user_id": uid, "reason": reason})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1552,6 +1783,71 @@ func (s *Server) handleBanDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 // --- invites -------------------------------------------------------------
+
+// serverCountsTTL is how long a server's member and online counts are reused.
+// Both routes that show them are public — an invite code is meant to be shared
+// — so the work behind them has to be bounded whatever the request rate is.
+const serverCountsTTL = 30 * time.Second
+
+type serverCounts struct {
+	at             time.Time
+	members, onlin int
+}
+
+// counts answers "how many people are in this server, and how many of them are
+// here now" cheaply enough to put behind a public URL.
+//
+// It used to read every member id and then ask the hub about each one, taking
+// the hub's read lock once per member. On a large server that is tens of
+// thousands of lock acquisitions per request, contending directly with the
+// register and unregister that need the write lock — so a handful of
+// concurrent invite previews stalled every new WebSocket on the instance. Now
+// it takes one snapshot of who is online, intersects it with the membership,
+// and keeps the answer for a moment.
+// forgetCounts drops a server's cached counts, so a change this instance made
+// itself is visible on the invite page at once rather than up to the TTL later.
+func (s *Server) forgetCounts(serverID ids.ID) {
+	s.countsMu.Lock()
+	delete(s.serverCounts, serverID)
+	s.countsMu.Unlock()
+}
+
+func (s *Server) counts(ctx context.Context, serverID ids.ID) (members, online int) {
+	s.countsMu.Lock()
+	if hit, ok := s.serverCounts[serverID]; ok && time.Since(hit.at) < serverCountsTTL {
+		s.countsMu.Unlock()
+		return hit.members, hit.onlin
+	}
+	s.countsMu.Unlock()
+
+	members, _ = s.Store.MemberCount(ctx, serverID)
+	if h, ok := s.Bcast.(interface{ OnlineUsers() []ids.ID }); ok {
+		if ids_, err := s.Store.MemberIDs(ctx, serverID); err == nil {
+			isMember := make(map[ids.ID]bool, len(ids_))
+			for _, id := range ids_ {
+				isMember[id] = true
+			}
+			for _, id := range h.OnlineUsers() {
+				if isMember[id] {
+					online++
+				}
+			}
+		}
+	}
+	now := time.Now()
+	s.countsMu.Lock()
+	defer s.countsMu.Unlock()
+	if s.serverCounts == nil {
+		s.serverCounts = map[ids.ID]serverCounts{}
+	}
+	for id, hit := range s.serverCounts {
+		if now.Sub(hit.at) >= serverCountsTTL {
+			delete(s.serverCounts, id)
+		}
+	}
+	s.serverCounts[serverID] = serverCounts{now, members, online}
+	return members, online
+}
 
 func (s *Server) handleServerInvites(w http.ResponseWriter, r *http.Request) {
 	srv, _, _ := s.serverCtx(w, r, perms.ManageServer)
@@ -1641,16 +1937,7 @@ func (s *Server) handleInvitePreview(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	}
-	count, _ := s.Store.MemberCount(r.Context(), srv.ID)
-	online := 0
-	if h, ok := s.Bcast.(interface{ Online(ids.ID) bool }); ok {
-		members, _ := s.Store.MemberIDs(r.Context(), srv.ID)
-		for _, id := range members {
-			if h.Online(id) {
-				online++
-			}
-		}
-	}
+	count, online := s.counts(r.Context(), srv.ID)
 	resp := map[string]any{"code": in.Code, "server": map[string]any{"id": srv.ID, "name": srv.Name, "icon_id": srv.IconID, "banner_id": srv.BannerID, "description": srv.Description, "member_count": count, "online_count": online}, "expires_at": in.ExpiresAt}
 	if in.ChannelID != nil {
 		if ch, err := s.Store.ChannelByID(r.Context(), *in.ChannelID); err == nil {
@@ -1684,6 +1971,7 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 	}
 	// the ban check and the invite use happen with the insert, so neither a
 	// ban written a moment ago nor a used-up invite can be slipped past
+	s.forgetCounts(srv.ID)
 	member, err := s.Store.JoinByInvite(r.Context(), srv.ID, me.ID, in.Code)
 	switch {
 	case errors.Is(err, store.ErrBanned):
@@ -1806,7 +2094,11 @@ func (s *Server) handleAuditLog(w http.ResponseWriter, r *http.Request) {
 			list = append(list, *e.TargetID)
 		}
 	}
-	byID, _ := s.Store.UsersByIDs(r.Context(), list)
+	byID, err := s.Store.UsersByIDs(r.Context(), list)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	users := []store.PublicUser{}
 	for _, id := range list {
 		if u := byID[id]; u != nil {
@@ -1828,17 +2120,45 @@ func (s *Server) handleServerKeys(w http.ResponseWriter, r *http.Request) {
 		Flags  *store.KeyFlags   `json:"flags"`
 	}
 	out := []convInfo{}
-	eps, _ := s.Store.Epochs(r.Context(), srv.ID)
-	flags, _ := s.Store.KeyFlags(r.Context(), srv.ID)
+	// This page is what an owner reads to decide whether their keys are in
+	// order. A read that failed and came back empty would tell them there are
+	// no epochs and nothing needs rotating, which is the opposite of what a
+	// page like this is for.
+	eps, err := s.Store.Epochs(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	flags, err := s.Store.KeyFlags(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	out = append(out, convInfo{ConvID: srv.ID, Name: srv.Name, Epochs: eps, Flags: flags})
-	visible, _ := s.Store.ViewableServerChannels(r.Context(), srv.ID, me.ID)
-	chans, _ := s.Store.ServerChannels(r.Context(), srv.ID)
+	visible, err := s.Store.ViewableServerChannels(r.Context(), srv.ID, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	chans, err := s.Store.ServerChannels(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	for _, c := range chans {
 		if _, ok := visible[c.ID]; !ok || c.KeyConvID != c.ID {
 			continue
 		}
-		eps, _ := s.Store.Epochs(r.Context(), c.ID)
-		flags, _ := s.Store.KeyFlags(r.Context(), c.ID)
+		eps, err := s.Store.Epochs(r.Context(), c.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		flags, err := s.Store.KeyFlags(r.Context(), c.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
 		out = append(out, convInfo{ConvID: c.ID, Name: "#" + c.Name, Epochs: eps, Flags: flags})
 	}
 	WriteJSON(w, http.StatusOK, out)

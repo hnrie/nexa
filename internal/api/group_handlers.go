@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"evilion.xyz/chat/internal/auth"
@@ -173,17 +174,15 @@ func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID)
 	ctx := r.Context()
 	// out of the group's call first, while they are still a recipient to hear it
 	s.dropVoice(ctx, uid, func(c *store.Channel) bool { return c.ID == ch.ID })
-	subs, err := s.Store.RemoveParticipant(ctx, ch.ID, uid)
+	// Who is left comes from the removal's own transaction. Filtering the
+	// recipient list loaded before it meant the last two members leaving at
+	// once each saw the other still there, so the empty group was never
+	// deleted and nothing ever cleaned it up.
+	subs, remaining, err := s.Store.RemoveParticipant(ctx, ch.ID, uid)
 	if err != nil {
 		return err
 	}
 	s.subchatsLeft(ctx, ch.ID, subs, uid)
-	remaining := make([]ids.ID, 0, len(ch.Recipients))
-	for _, id := range ch.Recipients {
-		if id != uid {
-			remaining = append(remaining, id)
-		}
-	}
 	if len(remaining) == 0 {
 		_ = s.deleteConversation(ctx, ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
@@ -249,7 +248,7 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 	}
 	// spend the use first: two people tapping a one-use link together must
 	// not both get in
-	if err := s.Store.UseInvite(ctx, in.Code); err == store.ErrNotFound {
+	if err := s.Store.UseInvite(ctx, in.Code); errors.Is(err, store.ErrNotFound) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	} else if err != nil {
@@ -259,7 +258,7 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 	subs, err := s.Store.AddParticipant(ctx, ch.ID, me.ID, me.ID)
 	if err != nil {
 		_ = s.Store.UnuseInvite(ctx, in.Code)
-		if err == store.ErrAlreadyExists {
+		if errors.Is(err, store.ErrAlreadyExists) {
 			WriteJSON(w, http.StatusOK, map[string]any{"channel": ch})
 			return
 		}

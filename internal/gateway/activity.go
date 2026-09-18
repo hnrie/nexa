@@ -322,7 +322,22 @@ func (c *conn) queueActivities(raw []json.RawMessage) {
 	}
 	c.actBusy = true
 	c.actMu.Unlock()
-	go c.resolveLoop()
+	// A panic here must not leave actBusy set, or this connection would never
+	// resolve another activity; it is not worth ending the connection over.
+	// Only a panic clears it — on the ordinary way out resolveLoop has already
+	// cleared it, and clearing it again could let a second resolver start
+	// beside one that had just begun.
+	c.hub.safely("activity resolver", func() {
+		defer func() {
+			if r := recover(); r != nil {
+				c.actMu.Lock()
+				c.actBusy = false
+				c.actMu.Unlock()
+				panic(r) // safely logs it
+			}
+		}()
+		c.resolveLoop()
+	})
 }
 
 func (c *conn) resolveLoop() {
@@ -429,14 +444,19 @@ func (h *Hub) activitiesChanged(c *conn) {
 	delay := c.actLimit.Reserve().Delay()
 	if delay == 0 {
 		c.actMu.Unlock()
-		h.broadcastUser(context.Background(), c.user.ID)
+		ctx, cancel := background()
+		defer cancel()
+		h.broadcastUser(ctx, c.userID)
 		return
 	}
 	c.actTimer = time.AfterFunc(delay, func() {
+		defer h.recoverTimer("activity flush")
 		c.actMu.Lock()
 		c.actTimer = nil
 		c.actMu.Unlock()
-		h.broadcastUser(context.Background(), c.user.ID)
+		ctx, cancel := background()
+		defer cancel()
+		h.broadcastUser(ctx, c.userID)
 	})
 	c.actMu.Unlock()
 }

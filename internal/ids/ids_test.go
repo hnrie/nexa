@@ -109,3 +109,62 @@ func TestJSON(t *testing.T) {
 		t.Error("parse/string round trip")
 	}
 }
+
+// Two chatd processes behind one database must not both issue the same first
+// id of a millisecond.
+func TestNodeIDSeparatesProcesses(t *testing.T) {
+	mu.Lock()
+	savedNode, savedLast, savedSeq := node, lastMs, seq
+	mu.Unlock()
+	defer func() { mu.Lock(); node, lastMs, seq = savedNode, savedLast, savedSeq; mu.Unlock() }()
+
+	if err := SetNode(MaxNode + 1); err == nil {
+		t.Error("a node id past the ten bits must be refused")
+	}
+	if err := SetNode(-1); err == nil {
+		t.Error("a negative node id must be refused")
+	}
+	if err := SetNode(0); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	lastMs, seq = 0, 0
+	mu.Unlock()
+	a := New()
+	if err := SetNode(3); err != nil {
+		t.Fatal(err)
+	}
+	// the same millisecond and the same sequence, a different process
+	mu.Lock()
+	lastMs, seq = 0, 0
+	mu.Unlock()
+	b := New()
+	if a == b {
+		t.Fatal("two nodes issued the same id")
+	}
+	if a>>timeShift == b>>timeShift && (a>>seqBits)&((1<<nodeBits)-1) == (b>>seqBits)&((1<<nodeBits)-1) {
+		t.Errorf("the node id is not in the id: %d vs %d", a, b)
+	}
+}
+
+// A sequence spent in a millisecond that will not advance must still return.
+func TestExhaustedSequenceDoesNotSpinForever(t *testing.T) {
+	mu.Lock()
+	savedNow, savedLast, savedSeq := now, lastMs, seq
+	frozen := time.Now().UnixMilli()
+	now = func() int64 { return frozen }
+	lastMs, seq = frozen, seqMask
+	mu.Unlock()
+	defer func() { mu.Lock(); now, lastMs, seq = savedNow, savedLast, savedSeq; mu.Unlock() }()
+
+	done := make(chan ID, 1)
+	go func() { done <- New() }()
+	select {
+	case id := <-done:
+		if id.Time().UnixMilli() <= frozen-1 {
+			t.Errorf("id came from before the stuck millisecond: %v", id.Time())
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("New never returned with the clock standing still")
+	}
+}

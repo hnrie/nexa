@@ -189,10 +189,28 @@ func (r *Registry) RecentlyActive(ch ids.ID) bool {
 // returns the state they left, if any. Moderation flags survive only when
 // keepModeration is set, which the caller does for moves within one server:
 // nobody elsewhere could lift them. Self flags come from the new state.
-func (r *Registry) Join(st State, keepModeration bool) *State {
+// started reports that this join is the one that turned an empty channel into
+// a call, so the caller rings the other side and writes the system message
+// exactly once. It is decided here, under the one lock, because the same
+// person joining from two tabs within a few milliseconds used to have both
+// connections read "nobody is in it" from separate snapshots: the other party's
+// phone rang twice and the transcript showed the call starting twice.
+func (r *Registry) Join(st State, keepModeration bool) (old *State, started bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	var old *State
+	if !st.Guest {
+		// Guests waiting in a call do not make it one; the first account to
+		// join still starts it. Somebody already in this channel means it had
+		// started, whether that is the other party or an earlier connection of
+		// this same person.
+		started = true
+		for _, other := range r.byChannel[st.ChannelID] {
+			if !other.Guest {
+				started = false
+				break
+			}
+		}
+	}
 	if prev, ok := r.byUser[st.UserID]; ok {
 		cp := *prev
 		old = &cp
@@ -216,7 +234,7 @@ func (r *Registry) Join(st State, keepModeration bool) *State {
 		r.byChannel[st.ChannelID] = map[ids.ID]*State{}
 	}
 	r.byChannel[st.ChannelID][st.UserID] = &cp
-	return old
+	return old, started
 }
 
 // SetSFU gives a user's call its SFU session, as long as the call is still in

@@ -109,6 +109,14 @@ func (m *Memory) Allow(_ context.Context, key string, n int, window time.Duratio
 	return false, delay, nil
 }
 
+// ResetRate forgets a key's bucket.
+func (m *Memory) ResetRate(_ context.Context, key string) error {
+	m.mu.Lock()
+	delete(m.buckets, key)
+	m.mu.Unlock()
+	return nil
+}
+
 func (m *Memory) Publish(_ context.Context, channel string, payload []byte) error {
 	m.mu.Lock()
 	fns := append([]func([]byte){}, m.subs[channel]...)
