@@ -17,7 +17,7 @@ Android 1.0.3, desktop 1.0.5. Working tree was clean at `5d80e12`.
 | server-api | SAPI | audit-done | 3 | 50 findings: P1 3 · P2 11 · P3 36 |
 | server-core | SCORE | audit-done | 4 | 30 findings (014–043): P0 1 · P1 5 · P2 16 · P3 8; 001–013 lost → `server-store` supplement |
 | web-core | WCORE | audit-done | 3 | 29 findings: P2 9 · P3 20 |
-| web-chat-ui | WCHAT | dispatched (opus) | 3 | |
+| web-chat-ui | WCHAT | audit-done | 4 | 104 findings: P1 5 · P2 47 · P3 52 |
 | web-shell-ui | WSHELL | dispatched (opus) | 3 | |
 | voice | VOICE | audit-done | 3 | 28 findings: P1 4 · P2 11 · P3 13 |
 | android | DROID | dispatched (fable) | 3 | |
@@ -142,3 +142,5 @@ Agent type `general-purpose`, model `fable` (or `opus`).
   Its first agent's 13 findings never reached disk (it believed the Write
   tool refused .md files; successors used heredocs). A `server-store`
   supplement agent re-reads internal/store + migrations (prefix SSTORE).
+- 2026-09-19 03:40 — web-chat-ui audit-done (104 findings, all accepted; message-list
+  virtualisation declined on its evidence). 6 agents running.

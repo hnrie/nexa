@@ -1,6 +1,120 @@
 # Findings — web-chat-ui
 
-(Summary is written at the top when the audit is done.)
+## Summary
+
+104 findings, WCHAT-001..104. Every file in `BRIEF.md`'s scope was read, plus the
+eleven Android files for parity and the four round-1 reports.
+
+**By priority** — P0 0 · P1 5 · P2 47 · P3 52.
+**By kind** — a11y 32 · i18n 21 · ux 18 · bug 11 · design 7 · parity 5 · perf 4 ·
+security 3 · code 3.
+
+No P0: nothing in this area loses a message, a key or a call. The P1s are all
+"the app is unusable this way for some people", not "the app is broken for
+everyone".
+
+The shape of it: **the message surface is mouse-only**. Every action on a message
+lives in a toolbar a hover reveals, so a keyboard cannot reach any of them (017)
+and a phone cannot reach some of them (023, 044). **Eleven languages are
+half-done in the leaves**: the chrome is translated and the failure paths, the
+button labels a screen reader reads, the plural forms and the date formats are
+not (003, 025, 031, 034, 043, 048, 050, 066, 074, 078, 082, 086, 087, 092, 101).
+**RTL survived round 1 in CSS but not in inline styles and masks** (001, 033).
+And **the composer is where the real bugs are** (060, 061, 062, 063, 064, 076).
+
+### The ten to read first
+
+1. **WCHAT-017 · P1 · a11y** — a keyboard user cannot reply, react, edit, pin,
+   copy, mark unread or delete *any* message; every action is behind
+   `@media (hover: hover)`. The core path of the product.
+2. **WCHAT-061 · P1 · a11y** — `useKeepFocused` sends Space to the message box,
+   so pressing Space on any focused button outside a dialog types a space
+   instead of pressing the button. Breaks every icon button in the app.
+3. **WCHAT-060 · P1 · bug** — in a split view the same hook pulls the caret into
+   the pane you are not looking at, so typing goes to the wrong conversation.
+4. **WCHAT-018 · P1 · a11y** — the font-size setting changes nothing in a
+   message (round 1 recorded this as BROKEN and it is still open), and the
+   viewport tag forbids pinch-zoom, so there is no way left to make text bigger.
+5. **WCHAT-028 · P1 · perf** — every picture scrolled past stays decrypted in
+   memory for the life of the channel, with no eviction. A long image channel on
+   a phone ends in a reload.
+6. **WCHAT-063 · P2 · security** — link previews are fetched *as you type*; the
+   privacy setting that governs them promises the opposite in all eleven
+   languages. `linkPreviews.test.ts` documents the behaviour.
+7. **WCHAT-091 · P2 · bug** — any failure to open a DM (offline, 500, token
+   refresh) redirects to the conversation list with `replace: true` and says
+   nothing. `ServerPage` solved this properly; `DMPage` never got the lesson.
+8. **WCHAT-062 · P2 · bug** — Enter does nothing visible for up to 1.5 s when
+   the message contains a link, and anything typed in that gap survives the send.
+9. **WCHAT-055 · P2 · security** — a masked link's real destination is only in a
+   `title`, which no phone shows; `render.test.tsx:51` pins that as intended.
+10. **WCHAT-076 + WCHAT-099 · P2/P3 · bug** — a sticker or GIF sent while
+    replying is not a reply and skips slow mode, on the web *and* on Android.
+    Two files, one mistake, fix them together.
+
+Worth a glance next: 020 (nothing in the app is `dir="auto"`, so every
+mixed-direction message is laid out the wrong way round), 044 (who reacted is a
+`title` fetched on mouse-enter — unreachable on a phone), 097 (the phone's
+composer has no `/`, `#` or `:` completions and publishes `/spoiler` verbatim),
+103 (so does the web, for any command it does not know).
+
+### Cross-area items
+
+- **WCHAT-032 · [i18n-copy]** — Arabic is missing the `one` plural form in 20
+  entries; one of them (`chat.groupMemberList.membersOnly`) is genuinely wrong,
+  the rest are deliberate. Includes a suggestion for `tools/i18n_keys_used.py`.
+- **WCHAT-073 · [server-api]** — `@here` is sent as `mention_everyone`, so the
+  server cannot scope it; the autocomplete promises online-only. Needs a wire
+  field or the removal of `@here`.
+- **WCHAT-097, 098, 100, 102 · [android]** — the phone's composer completions,
+  the staged-attachment tray (no spoiler, 18 dp remove), pictures stretched to
+  320 dp and centre-cropped, and rich presence parsed but never drawn.
+- **WCHAT-099 · [android]** — the Android half of WCHAT-076.
+- **Not written up here, for `web-shell-ui`**: `Toasts.module.css`'s `top: 16px`
+  may sit under the iOS status bar in the home-screen app. `web/index.html:5`
+  has `viewport-fit=cover` and no `apple-mobile-web-app-*` meta at all, so
+  whether it does depends on the shell's insets, which are that area's file.
+
+### Round 1 verification
+
+- **Confirmed fixed, and still fixed**: `Modal` traps focus, restores it and
+  sets `aria-modal` (the picture viewer does not — 030 — but the machinery is
+  there); `lib/theme.ts` derives `--on-brand` for any accent and `Button` uses
+  it; the message list's anchor-by-first-visible-row holds, with six regression
+  tests in `MessageList.test.tsx` covering both of the bugs round 1 fixed; the
+  "failure drawn as an empty state" pass holds in this area — `PinsPanel` has a
+  real error state with Try again (`data-testid="pins-retry"`), `MemberList`
+  keeps a `pagingFailed` flag and retries on `online`, and the pickers have
+  retry buttons. The one surface in scope that still draws a failure as
+  something else is `DMPage` (091).
+- **Still open or half-fixed, as their titles say**: 001 (RTL presence ring —
+  round 1 BROKEN, untouched), 002 (context-menu hover still `#fff` — half),
+  007, 008 (half), 010, 011, 012, 015, 016, 018 (BROKEN, untouched).
+- **Round 1's 15 skipped IDEA findings** were read. Four of them landed in the
+  meantime and are verified above or nearby: `--on-brand` (002 is its one
+  leftover), reduced motion that keeps the signal (`Chat.module.css`'s
+  `tdotCalm` typing dots), the unread jump pill with a count (`.newPill`), and
+  the focus-trap primitive (`Modal`; 030 is the surface that does not use it).
+  Two are re-raised with a concrete design here: a copy button and language
+  label on code blocks (057) and pause-on-hover toasts (015). **Message-list
+  virtualisation is deliberately declined** — 021, 028 and 058 measure where the
+  cost actually is (the eager hover toolbar, the picture cache that cannot
+  evict, the render context rebuilt per row) and each is a smaller change with
+  more of the benefit; 104 asks for the unused dependency to go with that
+  decision. The remaining IDEAs belong to other areas (moderation `AsyncList`,
+  the settings shell, keyboard reordering, per-viewer theme) or were judged not
+  to improve the product.
+- **Cross-platform after checking Android**: 057 (the 90 % code block that never
+  wraps and has no copy button), 059 (a relative `<t:…:R>` timestamp that never
+  ticks), 088 (no user-confirmed "verified" state after two people compare
+  safety numbers) and 094 (24 px reaction pills) are true on both clients. 018
+  and 087 are web-only — Android honours the font-size setting and formats dates
+  in the app's language. Android's `MediaLinks`/`CoilSetup` re-sign stale proxy
+  links and refuse every other host, exactly as the web's `lib/mediaLinks.ts`
+  does, so neither client leaks a reader's address to a linked site. The Android
+  expression picker is better than the web's on both counts 075 and 080 raise:
+  the sheet grows by the keyboard's height and never autofocuses its search box,
+  and every control in it is 44–48 dp.
 
 ---
 
@@ -819,5 +933,13 @@
 - What: The composer advertises six commands in its `/` autocomplete, and anything else typed after a slash is sent verbatim. `/ban alice`, `/kick bob`, `/timeout 10m`, `/giphy cats`, `/nick x` — every command a person arrives from another chat app expecting — appear in the conversation as messages. So does a bare `/me`, because the no-argument branch returns `null` rather than doing nothing.
 - Impact: The failure is public: the message goes to everyone in the channel, and whoever typed it learns the command does not exist only by seeing their own attempt published. In a moderated server "/ban someone" landing in the channel as text is a small humiliation with a real audience.
 - Fix: `applyCommand` should distinguish "not a command" (no leading slash → send as typed) from "a command this app does not have" and "a command that needs an argument". For the latter two, refuse the send and toast — `composer.composer.*` already has the toast pattern two lines above — or, better, keep the `/` autocomplete open and show "No such command" while the text still looks like one. `commands.test.ts` covers only `/shrug`; the same test should pin `/me`, `/spoiler`, and the refusal.
+- Effort: S
+- Status: open
+
+### WCHAT-104 · P3 · code · The app credits a virtualisation library it does not use, on the licence page people can open
+- Where: `web/package.json:18` (`"@tanstack/react-virtual": "^3.14.12"`), `web/src/data/licenses.json:95` (the entry the in-app licence list renders), and no import anywhere — `grep -rn "react-virtual" web/src` finds only that JSON. Round 1 recorded it as `audit/REVIEW.md` "Still open" item 3.
+- What: The dependency was added for a message-list virtualisation that was never built. Vite does not bundle an unimported package, so it costs nothing at runtime, but it is installed on every `npm ci`, it is in the lockfile's audit surface, and — the visible part — the generated licence data lists it, so the product tells people it uses a library it does not.
+- Impact: Small but not nothing: an attribution page that is wrong is the kind of thing that is only ever noticed by the one person who checks. It also keeps alive the idea that virtualisation is half-done; WCHAT-021, 028 and 058 argue concretely that the row's own weight, the picture cache and the render context are the real costs and that virtualisation is not the fix.
+- Fix: decide once, in the fix phase, and record it: either drop the dependency (`npm uninstall`, regenerate `web/src/data/licenses.json` with whatever produced it) or keep it and say in `MessageList.tsx` why. Dropping it is the honest option given 021/028/058.
 - Effort: S
 - Status: open

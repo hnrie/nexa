@@ -1,7 +1,7 @@
 # Progress — web-chat-ui
-State: auditing
-Last checkpoint: 2026-09-19T11:14Z
-Next finding id: 104
+State: audit-done
+Last checkpoint: 2026-09-19T11:31Z
+Next finding id: 105
 
 ## Inspected
 
@@ -90,7 +90,7 @@ Chat:
 
 Markdown:
 - [x] web/src/markdown/render.tsx
-- [ ] web/src/markdown/render.test.tsx
+- [x] web/src/markdown/render.test.tsx
 - [x] web/src/markdown/parse.ts        (owned by web-core; read only for render findings)
 - [x] web/src/markdown/ast.ts
 
@@ -120,9 +120,9 @@ Pickers:
 
 Search:
 - [x] web/src/components/search/SearchPanel.tsx
-- [ ] web/src/components/search/SearchPanel.test.tsx
+- [x] web/src/components/search/SearchPanel.test.tsx
 - [x] web/src/components/search/SearchSuggestions.tsx
-- [ ] web/src/components/search/SearchSuggestions.test.ts
+- [x] web/src/components/search/SearchSuggestions.test.ts
 - [x] web/src/components/search/useFullSearch.ts
 - [x] web/src/components/search/Search.module.css
 
@@ -227,7 +227,18 @@ Android parity pass done → WCHAT-094..102. What it produced:
   is cross-platform, as are 057 (the 90 % code block) and 059 (a relative
   timestamp that never ticks).
 
-Next: the ten remaining test files (MessageList.test.tsx, mediaLinks.test.ts,
-messageMenu.test.ts, groupMemberMenu.test.ts, render.test.tsx, commands.test.ts,
-mentions.test.ts, linkPreviews.test.ts, SearchPanel.test.tsx,
-SearchSuggestions.test.ts), then the Summary at the top of FINDINGS.md.
+Tests done → WCHAT-103 (an unknown `/command` is published as text; found via
+commands.test.ts covering only `/shrug`) and 104 (the unused
+`@tanstack/react-virtual`, which the in-app licence page credits). The suites
+themselves are good and need no findings: MessageList.test.tsx builds a fake
+layout and pins both anchoring bugs round 1 fixed; messageMenu.test.ts covers the
+permission matrix and batched deletes; render.test.tsx covers spoilers, links,
+mentions, emoji, highlighting and `parseHighlightHtml`'s escaping;
+SearchPanel.test.tsx drives the whole walk with a stubbed API.
+Tests the fix phase must update with their findings: `render.test.tsx:51` pins the
+masked-link `title` (055), `:70`/`:87` pin `@unknown-user`/`#deleted-channel` (101),
+`linkPreviews.test.ts` pins fetch-as-you-type (062, 063), `commands.test.ts` wants
+`/me` and the refusal (103).
+
+AUDIT DONE. Every file ticked, 104 findings, Summary written at the top of
+FINDINGS.md. Nothing is left pending.

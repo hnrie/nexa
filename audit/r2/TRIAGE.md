@@ -154,3 +154,40 @@ for declining is "wrong, harmful, or not this product".
 - SCORE-041 accept · cap the mention count like the unread count; `mention_count` column is a follow-up if a profile shows it matters.
 - SCORE-042 accept · marshal once per event, enqueue bytes.
 - SCORE-043 accept · every one-liner listed.
+
+## web-chat-ui (WCHAT) — 104 findings, 104 accepted
+
+Everything is accepted as written. Where the finding offered a choice, the
+decision is below; findings not listed are "do exactly what the Fix says".
+Every new user-facing string lands in all eleven catalogues.
+
+- WCHAT-017 · P1 · rows focusable (`role="article"`, arrow keys between rows, Shift+F10/Menu at the row's rect); toolbar revealed on `:focus-within` and kept in the tab order (visibility, not `display: none`); `role="toolbar"` gets arrow keys. Do together with 021 (toolbar rendered only for the hovered/focused row, never on `(hover: none)`).
+- WCHAT-018 · P1 · chat type in `rem`/`calc(px * var(--font-scale))` (content, author, time, reply, edited, gutter, `markdown.css`), `html { font-size: calc(100% * var(--font-scale)) }`; the rest of the app's px sizes audited in the same package as far as time allows; pinch-zoom restored by WCORE-002.
+- WCHAT-019 · `role="log" aria-live="polite"` on the inner list, `aria-live="off"` during a prepend, rows labelled author + time + body.
+- WCHAT-020 · `dir="auto"` on every element holding user-authored text (body, reply quote, pin preview, search result, names, topic, composer and edit textareas).
+- WCHAT-022 · named z-index steps in `tokens.css` (menu 40 · modal 100 · lightbox 200 · toast 300), every bare `z-index` in `web/src` mapped onto them.
+- WCHAT-023 · absolute time as a read-only row in the message menu **and** tapping the group header's time swaps it to the absolute form for a few seconds.
+- WCHAT-028 · P1 · all three steps (release the cache ref off screen; gate the eager path on `useInView`; trim `ids` to ~400 around the reading position).
+- WCHAT-041 · the real envelope (RMS of 48 windows after decrypt, cached by blob id).
+- WCHAT-042 · `ContextMenu` takes an anchor rect + `start`/`end` alignment and flips in RTL; the three call sites use it.
+- WCHAT-044 · long-press / Enter opens a reactor popover (one per message); Android gets the same sheet (android package).
+- WCHAT-049 · one `copyToClipboard(text, successKey)` helper in `lib/`, used by every copy action in the app (grep `clipboard`).
+- WCHAT-055 · (a) the host appended after masked link text everywhere, plus (b) a confirm modal when the link text itself looks like a URL whose host differs; Android renders the host the same way.
+- WCHAT-058 · with WCORE-024: context built once per conversation in `ChatView` and provided; rows subscribe to their author only.
+- WCHAT-062 · clear the box and reply state as soon as the send is accepted; restore on failure; pending row created before the embed wait.
+- WCHAT-063 · previews are fetched on send, never while typing; the setting's copy stays as it is (it becomes true).
+- WCHAT-064 · no `maxLength`; the limit enforced in code; counter shown on phones; a paste past the limit offers "attach as a text file".
+- WCHAT-069 · ranked matches (exact · prefix · substring · recent speakers) and the server member search merged in when fewer than eight local hits.
+- WCHAT-073 · `mention_here` on the wire; the server notifies only members who are online (server-api routes and store: `[server-api]` half); both clients send and render it; the autocomplete's promise becomes true.
+- WCHAT-074 · load `emojibase-data/<lang>/compact.json` for the app language, `en` as fallback.
+- WCHAT-075 · app-wide keyboard tracking through `visualViewport` → `--kb` on `:root`, used by the picker sheet, the autocomplete popup and any other bottom-anchored layer.
+- WCHAT-076 + WCHAT-099 · one `afterSend`/option assembly shared by text, GIF and sticker paths on each client; fixed together.
+- WCHAT-077 · frequency ranking with recency tie-break, custom and pack emoji included; the title stays "Frequently used" because it becomes true.
+- WCHAT-085 · one `common/SearchBox` replaces all five boxes.
+- WCHAT-088 · `verified` flag (key + time) in the encrypted settings blob, "Mark as verified"/"Unverify" in `VerifyKeyModal`, a fourth chip state with the shield reserved for it, and a blocking `KeyChangeModal` when a verified key changes; Android `KeyVerify.kt` gets the same states.
+- WCHAT-095 · swipe-to-reply on the web's touch layout, mirroring `SwipeToReply.kt`'s rules.
+- WCHAT-097 · android package: `#`, `:`, `/` completions, roles and `@everyone`, commands applied in `doSend`.
+- WCHAT-102 · android package: `StatusLine` row under names in the member sheet, friends list and DM list, then the activity card in the profile sheet — after 086 and 089 are fixed on the web.
+- WCHAT-103 · unknown commands and argument-less `/me`/`/spoiler` refuse to send with an explanation; `commands.test.ts` pins all six.
+- WCHAT-104 (with WCORE-003) · virtualisation is **declined** on the agent's evidence (021/028/058 are the real costs); drop `@tanstack/react-virtual` and regenerate `licenses.json`.
+- WCHAT-032 → i18n-copy package (Arabic `one` forms; teach `tools/i18n_keys_used.py` to compare plural form sets).
