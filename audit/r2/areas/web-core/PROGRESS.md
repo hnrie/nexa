@@ -1,7 +1,7 @@
 # Progress — web-core
 State: auditing
-Last checkpoint: 2026-09-19T00:02Z
-Next finding id: 004
+Last checkpoint: 2026-09-19T00:58Z
+Next finding id: 019
 
 ## Inspected
 
@@ -78,48 +78,48 @@ Next finding id: 004
 - [ ] web/src/stores/auth.test.ts
 - [x] web/src/stores/keys.ts
 - [ ] web/src/stores/keys.test.ts
-- [ ] web/src/stores/messages.ts
+- [x] web/src/stores/messages.ts
 - [ ] web/src/stores/messages.test.ts
-- [ ] web/src/stores/channels.ts
-- [ ] web/src/stores/servers.ts
+- [x] web/src/stores/channels.ts
+- [x] web/src/stores/servers.ts
 - [ ] web/src/stores/servers.test.ts
-- [ ] web/src/stores/users.ts
-- [ ] web/src/stores/relationships.ts
-- [ ] web/src/stores/readStates.ts
+- [x] web/src/stores/users.ts
+- [x] web/src/stores/relationships.ts
+- [x] web/src/stores/readStates.ts
 - [ ] web/src/stores/readStates.test.ts
-- [ ] web/src/stores/settings.ts
+- [x] web/src/stores/settings.ts
 - [ ] web/src/stores/settings.test.ts
 - [ ] web/src/stores/settings.slowstart.test.ts
-- [ ] web/src/stores/ui.ts
+- [x] web/src/stores/ui.ts
 - [ ] web/src/stores/ui.test.ts
-- [ ] web/src/stores/panes.ts
-- [ ] web/src/stores/presence.ts
-- [ ] web/src/stores/typing.ts
-- [ ] web/src/stores/selection.ts
+- [x] web/src/stores/panes.ts
+- [x] web/src/stores/presence.ts
+- [x] web/src/stores/typing.ts
+- [x] web/src/stores/selection.ts
 - [ ] web/src/stores/selection.test.ts
-- [ ] web/src/stores/expressions.ts
+- [x] web/src/stores/expressions.ts
 - [ ] web/src/stores/expressions.test.ts
-- [ ] web/src/stores/slowmode.ts
-- [ ] web/src/stores/keyAlerts.ts
-- [ ] web/src/stores/desktop.ts
-- [ ] web/src/stores/serverNav.ts
+- [x] web/src/stores/slowmode.ts
+- [x] web/src/stores/keyAlerts.ts
+- [x] web/src/stores/desktop.ts
+- [x] web/src/stores/serverNav.ts
 
 ### gateway/
-- [ ] web/src/gateway/client.ts
+- [x] web/src/gateway/client.ts
 - [ ] web/src/gateway/client.test.ts
-- [ ] web/src/gateway/dispatch.ts
+- [x] web/src/gateway/dispatch.ts
 - [ ] web/src/gateway/dispatch.test.ts
-- [ ] web/src/gateway/events.ts
-- [ ] web/src/gateway/session.ts
+- [x] web/src/gateway/events.ts
+- [x] web/src/gateway/session.ts
 
 ### lib/ (callLayout, callPanel, audioKeeper are `voice`'s)
 - [x] web/src/lib/attachments.ts
 - [ ] web/src/lib/attachments.test.ts
 - [x] web/src/lib/upload.worker.ts
-- [ ] web/src/lib/download.ts
-- [ ] web/src/lib/mediaLinks.ts
+- [x] web/src/lib/download.ts
+- [x] web/src/lib/mediaLinks.ts
 - [ ] web/src/lib/mediaLinks.test.ts
-- [ ] web/src/lib/mediaCache.ts
+- [x] web/src/lib/mediaCache.ts
 - [ ] web/src/lib/mediaCache.test.ts
 - [x] web/src/lib/keyPins.ts
 - [ ] web/src/lib/keyPins.test.ts
@@ -127,15 +127,15 @@ Next finding id: 004
 - [x] web/src/lib/appLock.ts
 - [ ] web/src/lib/appLock.test.ts
 - [x] web/src/lib/storage.ts
-- [ ] web/src/lib/notify.ts
+- [x] web/src/lib/notify.ts
 - [ ] web/src/lib/notify.test.ts
-- [ ] web/src/lib/sounds.ts
+- [x] web/src/lib/sounds.ts
 - [ ] web/src/lib/sounds.test.ts
-- [ ] web/src/lib/search.ts
+- [x] web/src/lib/search.ts
 - [ ] web/src/lib/search.test.ts
-- [ ] web/src/lib/fullSearch.ts
+- [x] web/src/lib/fullSearch.ts
 - [ ] web/src/lib/fullSearch.test.ts
-- [ ] web/src/lib/export.ts
+- [x] web/src/lib/export.ts
 - [ ] web/src/lib/export.test.ts
 - [ ] web/src/lib/activity.ts
 - [ ] web/src/lib/activity.test.ts
@@ -148,7 +148,7 @@ Next finding id: 004
 - [ ] web/src/lib/color.test.ts
 - [ ] web/src/lib/convMembers.ts
 - [x] web/src/lib/crashReport.ts
-- [ ] web/src/lib/decrypt.ts
+- [x] web/src/lib/decrypt.ts
 - [ ] web/src/lib/desktopBridge.ts
 - [ ] web/src/lib/errors.ts
 - [ ] web/src/lib/errors.test.ts
@@ -182,7 +182,7 @@ Next finding id: 004
 - [ ] web/src/lib/playableType.test.ts
 - [ ] web/src/lib/readPosition.ts
 - [ ] web/src/lib/serverKdf.ts
-- [ ] web/src/lib/settingsCrypto.ts
+- [x] web/src/lib/settingsCrypto.ts
 - [ ] web/src/lib/shortcodes.ts
 - [ ] web/src/lib/subchatLock.ts
 - [ ] web/src/lib/theme.ts
@@ -230,14 +230,18 @@ Next finding id: 004
 - [ ] audit/performance.md (web section)
 
 ## Handoff note
-Read so far: entry/config, sw, download-sw, all api/, all crypto/ (+tests skimmed by
-name; fingerprint vector confirmed in both suites; KDF floor confirmed in Kdf.kt),
-stores/auth.ts, stores/keys.ts, lib/attachments.ts, upload.worker.ts, keyPins, keyring,
-appLock, storage. Findings 001-003 written. Pending write-ups (evidence gathered next):
-- upload cancel: uploadStaged/PieceSender have no abort; check the composer's cancel.
-- api.upload pre-aborted signal hang: unreachable if nobody passes a signal (grep).
-- single-request uploads (<= 90 MB) are not resumable; a stall restarts from zero.
-- keys store: one IndexedDB transaction per grant on ready (perf).
-- lockApp only nulls the auth store's identity; check session.ts tears down keys/ring/messages.
-- app lock: 4-digit numeric minimum vs offline brute force of ec.lock.<uid> (P3 design).
-Successor (2nd agent) resumed 2026-09-19T00:02Z: gathering evidence for the six pending write-ups above, then gateway/* and stores/messages.ts.
+Agent 1 read: entry/config, sw, download-sw, all api/, all crypto/ (fingerprint vector
+confirmed in both suites; KDF floor confirmed in Kdf.kt), stores/auth.ts, stores/keys.ts,
+lib/attachments.ts, upload.worker.ts, keyPins, keyring, appLock, storage; findings 001-003.
+Agent 2 (resumed 2026-09-19T00:02Z): findings 004-018 written; every store, all of gateway/,
+and lib download/mediaLinks/mediaCache/notify/sounds/search/fullSearch/export/decrypt/
+settingsCrypto read and ticked. Checked and NOT findings: settings.load cannot throw
+(decryptSettings returns null); every server event name is in events.ts; guest session
+is stopped by GuestCallPage on unmount; dispatchHooks.onReady has no registrations (dead
+but harmless). Open question being verified: internal/store/channels.go:185
+DMChannelsForUser starts `var out []*Channel` — if it can return nil, ready's
+`[...d.channels]` (dispatch.ts:149) throws for an account with no DMs; new accounts
+work in practice, so read the whole function before writing anything.
+Next: remaining lib/*.ts (convMembers, subchatLock, serverKdf, readPosition, unread, perms,
+platform, workerTimers first), then hooks/, i18n/core.ts, markdown/parse.ts + Parser.kt,
+sw/download-sw already done, then test files (skim `it(` names for gaps), then round-1 docs.

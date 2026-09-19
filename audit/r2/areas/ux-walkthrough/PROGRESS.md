@@ -1,7 +1,7 @@
 # Progress — ux-walkthrough
 State: auditing
-Last checkpoint: 2026-09-18T20:40Z
-Next finding id: 001
+Last checkpoint: 2026-09-19T00:12Z
+Next finding id: 006
 
 ## Environment (re-create with exactly these; never web/dist, never bin/chatd)
 
@@ -32,14 +32,14 @@ Shots: audit/r2/shots/<platform>/<theme>/<lang>/<screen>.png
 Legend: [ ] not done · [x] done · [~] in progress. One line per platform × theme × language × screen group.
 
 ### 1. Web desktop 1366×768 · dark · en  (the bulk)
-- [ ] home page (/) — first impression, light/dark, argument
-- [ ] register form → recovery-key moment → first-run empty state
-- [ ] login (/login), wrong password, logout → login
-- [ ] recover (/recover) with the saved recovery key
-- [ ] friends page: Online / All / Pending / Blocked / Add Friend tabs; add a friend both ways
-- [ ] DM: send text, every markdown kind (seed messages), 2,000-char message, URL-only message
+- [x] home page (/) — first impression, light/dark, argument
+- [x] register form → recovery-key moment → first-run empty state
+- [x] login (/login), wrong password, logout → login
+- [x] recover (/recover) with the saved recovery key
+- [x] friends page: Online / All / Pending / Blocked / Add Friend tabs; add a friend both ways
+- [x] DM: send text, every markdown kind (seed messages), 2,000-char message, URL-only message
 - [ ] attachments: image, video, audio, file; twenty attachments; drop overlay
-- [ ] reactions, reply, edit, delete, pin, pins panel, message context menu, selection bar
+- [x] reactions, reply, edit, delete, pin, pins panel, message context menu, selection bar
 - [ ] create server modal → server page → #general
 - [ ] create channel (text, voice, private), create category, channel topic modal, channel settings (overview, permissions, delete)
 - [ ] server settings: overview, roles, emoji, stickers, encryption, members, invites, bans, audit log, delete

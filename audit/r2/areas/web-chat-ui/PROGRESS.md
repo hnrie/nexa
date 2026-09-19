@@ -1,7 +1,7 @@
 # Progress — web-chat-ui
 State: auditing
-Last checkpoint: 2026-09-18T20:26Z
-Next finding id: 017
+Last checkpoint: 2026-09-19T00:35Z
+Next finding id: 054
 
 ## Inspected
 
@@ -54,39 +54,39 @@ Common:
 - [x] web/src/components/common/animatedImage.test.ts
 
 Chat:
-- [ ] web/src/components/chat/ChatView.tsx
-- [ ] web/src/components/chat/MessageList.tsx
+- [x] web/src/components/chat/ChatView.tsx
+- [x] web/src/components/chat/MessageList.tsx
 - [ ] web/src/components/chat/MessageList.test.tsx
-- [ ] web/src/components/chat/MessageItem.tsx
-- [ ] web/src/components/chat/Chat.module.css
-- [ ] web/src/components/chat/Attachments.tsx
-- [ ] web/src/components/chat/Embeds.tsx
-- [ ] web/src/components/chat/Embeds.module.css
-- [ ] web/src/components/chat/VideoPlayer.tsx
-- [ ] web/src/components/chat/VideoPlayer.module.css
-- [ ] web/src/components/chat/AudioPlayer.tsx
-- [ ] web/src/components/chat/AudioPlayer.module.css
-- [ ] web/src/components/chat/fitMedia.ts
+- [x] web/src/components/chat/MessageItem.tsx
+- [x] web/src/components/chat/Chat.module.css
+- [x] web/src/components/chat/Attachments.tsx
+- [x] web/src/components/chat/Embeds.tsx
+- [x] web/src/components/chat/Embeds.module.css
+- [x] web/src/components/chat/VideoPlayer.tsx
+- [x] web/src/components/chat/VideoPlayer.module.css
+- [x] web/src/components/chat/AudioPlayer.tsx
+- [x] web/src/components/chat/AudioPlayer.module.css
+- [x] web/src/components/chat/fitMedia.ts
 - [ ] web/src/components/chat/fitMedia.test.ts
-- [ ] web/src/components/chat/mediaLinks.ts
+- [x] web/src/components/chat/mediaLinks.ts
 - [ ] web/src/components/chat/mediaLinks.test.ts
-- [ ] web/src/components/chat/StickerPopout.tsx
-- [ ] web/src/components/chat/Sticker.module.css
-- [ ] web/src/components/chat/Reactions.tsx
-- [ ] web/src/components/chat/EditMessage.tsx
-- [ ] web/src/components/chat/messageMenu.ts
+- [x] web/src/components/chat/StickerPopout.tsx
+- [x] web/src/components/chat/Sticker.module.css
+- [x] web/src/components/chat/Reactions.tsx
+- [x] web/src/components/chat/EditMessage.tsx
+- [x] web/src/components/chat/messageMenu.ts
 - [ ] web/src/components/chat/messageMenu.test.ts
-- [ ] web/src/components/chat/SelectionBar.tsx
-- [ ] web/src/components/chat/SystemMessage.tsx
-- [ ] web/src/components/chat/TypingBar.tsx
-- [ ] web/src/components/chat/PinsPanel.tsx
-- [ ] web/src/components/chat/SubchatPanel.tsx
-- [ ] web/src/components/chat/MemberList.tsx
-- [ ] web/src/components/chat/MemberList.module.css
-- [ ] web/src/components/chat/GroupMemberList.tsx
-- [ ] web/src/components/chat/groupMemberMenu.ts
+- [x] web/src/components/chat/SelectionBar.tsx
+- [x] web/src/components/chat/SystemMessage.tsx
+- [x] web/src/components/chat/TypingBar.tsx
+- [x] web/src/components/chat/PinsPanel.tsx
+- [x] web/src/components/chat/SubchatPanel.tsx
+- [x] web/src/components/chat/MemberList.tsx
+- [x] web/src/components/chat/MemberList.module.css
+- [x] web/src/components/chat/GroupMemberList.tsx
+- [x] web/src/components/chat/groupMemberMenu.ts
 - [ ] web/src/components/chat/groupMemberMenu.test.ts
-- [ ] web/src/components/chat/LockedChannel.tsx
+- [x] web/src/components/chat/LockedChannel.tsx
 
 Markdown:
 - [ ] web/src/markdown/render.tsx
@@ -164,4 +164,27 @@ Round 1 cross-check:
 ## Handoff note
 Styles and common/ done (16 findings, WCHAT-001..016). Round-1 cross-check done: RTL avatar cut (001), context-menu #fff (002), hardcoded English (003), toast lifetime (015), cropper keyboard (007), FloatingPlane touch (008) are round-1 items still open; Modal trap/labels, ContextMenu keyboard, Toasts live region, Tooltip describedby/Escape, Field aria, ImageCrop errors are confirmed fixed.
 Pending checks to make when reaching the files: (a) Chat.module.css — does the font-scale slider move chat text now (round 1 BROKEN); is the lightbox z-index 200 = Toasts 200 (toast hidden behind lightbox?); (b) render.tsx — spoiler a11y (text node only `color: transparent`), `<t:>` formatters via lib/time, RenderNodes index keys, code-block copy button; (c) Attachments lightbox keyboard for ZoomPan; (d) Toasts `top: 16px` and index.html `viewport-fit=cover` with no shell top inset — write as finding once the apple status-bar meta is known.
-Next: chat/ChatView.tsx, MessageList.tsx, MessageItem.tsx, Chat.module.css.
+Predecessor's pending checks now resolved: font-scale is still broken (WCHAT-018),
+lightbox z-index 200 does collide with Toasts 200 (WCHAT-022). Still pending:
+(b) render.tsx spoiler a11y / `<t:>` formatters / RenderNodes keys / code-block copy;
+(c) Attachments lightbox keyboard for ZoomPan; (d) Toasts `top: 16px` vs the iOS
+status bar — `index.html:5` has `viewport-fit=cover` and no `apple-mobile-web-app-*`
+meta at all, so check with web-shell-ui before writing it.
+ChatView/MessageList/MessageItem/Chat.module.css done → WCHAT-017..027. The two
+biggest: no keyboard route to any message action (017) and the font-size setting
+being a no-op (018).
+Hardcoded English: now written up (003/025/031/034/043/048/050 cover everything
+found so far; add to a new finding if the composer/pickers/search turn up more).
+Old list, kept for reference:
+VideoPlayer.tsx:294 `SPOILER`, AudioPlayer.tsx:134 `Pause/Play ${name}`, :175-176
+`Unmute/Mute` (in 003), :180 `Download ${name}`, Embeds.tsx handled by 034,
+StickerPopout handled by 046, Attachments handled by 031, SystemMessage.tsx:14
+`"someone"` fallback. Also for that finding: messageMenu.ts:84-85 uses the literal
+`4` instead of MSG_FLAG_SUPPRESS_EMBEDS (server masks the field, so no bug).
+Pending: one P3 `code` finding for the six hand-rolled `<input>` search boxes
+(ChatView:238, SubchatPanel:170, EmojiPicker:464, GifPicker:154, StickerPicker:53,
+SearchPanel:119, SearchSuggestions:80) instead of common/TextInput — write it once
+Picker.module.css and Search.module.css are read, so the differences are concrete.
+Next: MemberList, GroupMemberList, groupMemberMenu → markdown/render.tsx →
+composer → pickers → search → profile → activity → pages → Android parity → tests.
+MessageList.test.tsx left with the other tests at the end.

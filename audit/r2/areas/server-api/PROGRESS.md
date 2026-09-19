@@ -1,7 +1,7 @@
 # Progress — server-api
 State: auditing
-Last checkpoint: 2026-09-19T00:03Z (resumed by successor)
-Next finding id: 015
+Last checkpoint: 2026-09-19T01:40Z
+Next finding id: 035
 
 ## Inspected
 
@@ -25,9 +25,9 @@ Reading order from BRIEF.md; tests at the end, read alongside the handler they c
 - [x] internal/api/mfa_handlers.go
 - [x] internal/api/mfa_handlers_test.go
 - [x] internal/api/captcha.go
-- [ ] internal/api/captcha_test.go
+- [x] internal/api/captcha_test.go
 - [x] internal/totp/totp.go
-- [ ] internal/totp/totp_test.go
+- [x] internal/totp/totp_test.go
 
 ### Servers and permissions
 - [x] internal/api/server_handlers.go
@@ -49,69 +49,69 @@ Reading order from BRIEF.md; tests at the end, read alongside the handler they c
 - [ ] internal/api/subchat_lock_test.go
 
 ### Messages, uploads, media, proxy, unfurl
-- [ ] internal/api/message_handlers.go
-- [ ] internal/api/message_handlers_test.go
-- [ ] internal/api/upload_handlers.go
-- [ ] internal/api/upload_handlers_test.go
-- [ ] internal/api/media_handlers.go
-- [ ] internal/api/media_handlers_test.go
-- [ ] internal/api/media_variants_test.go
-- [ ] internal/api/gif_preview_test.go
-- [ ] internal/api/proxy_handlers.go
-- [ ] internal/api/proxy_handlers_test.go
-- [ ] internal/api/unfurl_handlers.go
-- [ ] internal/api/unfurl_handlers_test.go
+- [x] internal/api/message_handlers.go
+- [x] internal/api/message_handlers_test.go
+- [x] internal/api/upload_handlers.go
+- [x] internal/api/upload_handlers_test.go
+- [x] internal/api/media_handlers.go
+- [x] internal/api/media_handlers_test.go
+- [x] internal/api/media_variants_test.go
+- [x] internal/api/gif_preview_test.go
+- [x] internal/api/proxy_handlers.go
+- [x] internal/api/proxy_handlers_test.go
+- [x] internal/api/unfurl_handlers.go
+- [x] internal/api/unfurl_handlers_test.go
 
 ### Keys, relationships, users, expressions
-- [ ] internal/api/key_handlers.go
-- [ ] internal/api/key_handlers_test.go
-- [ ] internal/api/relationship_handlers.go
-- [ ] internal/api/relationship_handlers_test.go
-- [ ] internal/api/user_handlers.go
-- [ ] internal/api/user_handlers_test.go
-- [ ] internal/api/expression_handlers.go
-- [ ] internal/api/expression_handlers_test.go
+- [x] internal/api/key_handlers.go
+- [x] internal/api/key_handlers_test.go
+- [x] internal/api/relationship_handlers.go
+- [x] internal/api/relationship_handlers_test.go
+- [x] internal/api/user_handlers.go
+- [x] internal/api/user_handlers_test.go
+- [x] internal/api/expression_handlers.go
+- [x] internal/api/expression_handlers_test.go
 
 ### Guests, voice/SFU (auth, validation, rate limits only), activity
-- [ ] internal/api/guest_handlers.go
-- [ ] internal/api/guest_handlers_test.go
-- [ ] internal/api/sfu_handlers.go
-- [ ] internal/api/sfu_handlers_test.go
-- [ ] internal/api/voice_glue.go
-- [ ] internal/api/voice_handlers_test.go
-- [ ] internal/api/activity_glue.go
-- [ ] internal/api/gateway_sessions_test.go
+- [x] internal/api/guest_handlers.go
+- [x] internal/api/guest_handlers_test.go
+- [x] internal/api/sfu_handlers.go
+- [x] internal/api/sfu_handlers_test.go
+- [x] internal/api/voice_glue.go
+- [x] internal/api/voice_handlers_test.go
+- [x] internal/api/activity_glue.go
+- [x] internal/api/gateway_sessions_test.go
 
 ### Admin, legal, crash
-- [ ] internal/api/admin_handlers.go
-- [ ] internal/api/admin_handlers_test.go
-- [ ] internal/api/legal_handlers.go
-- [ ] internal/api/legal_handlers_test.go
-- [ ] internal/api/crash_handlers.go
-- [ ] internal/api/crash_handlers_test.go
+- [x] internal/api/admin_handlers.go
+- [x] internal/api/admin_handlers_test.go
+- [x] internal/api/legal_handlers.go
+- [x] internal/api/legal_handlers_test.go
+- [x] internal/api/crash_handlers.go
+- [x] internal/api/crash_handlers_test.go
 
 ### Release routes, static, disk
-- [ ] internal/api/desktop_handlers.go
-- [ ] internal/api/desktop_handlers_test.go
-- [ ] internal/api/android_handlers.go
-- [ ] internal/api/static.go
-- [ ] internal/api/static_test.go
-- [ ] internal/api/static_dot_test.go
-- [ ] internal/api/disk.go
+- [x] internal/api/desktop_handlers.go
+- [x] internal/api/desktop_handlers_test.go
+- [x] internal/api/android_handlers.go
+- [x] internal/api/static.go
+- [x] internal/api/static_test.go
+- [x] internal/api/static_dot_test.go
+- [x] internal/api/disk.go
 
 ### Process, config, rate limiting, text
-- [ ] cmd/chatd/main.go
-- [ ] cmd/chatd/main_test.go
-- [ ] internal/config/config.go
-- [ ] internal/config/config_test.go
-- [ ] internal/ratelimit/limiter.go
-- [ ] internal/ratelimit/limiter_test.go
-- [ ] internal/ratelimit/ratelimit_test.go
+- [x] cmd/chatd/main.go
+- [x] cmd/chatd/main_test.go
+- [x] internal/config/config.go
+- [x] internal/config/config_test.go
+- [x] internal/ratelimit/limiter.go
+- [x] internal/ratelimit/limiter_test.go
+- [x] internal/ratelimit/ratelimit_test.go
 - [x] internal/textutil/textutil.go
 
 ### Remaining tests
-- [ ] internal/api/audit_regressions_test.go
-- [ ] internal/api/router_test.go
+- [x] internal/api/audit_regressions_test.go
+- [x] internal/api/router_test.go
 - [ ] internal/api/testutil_test.go
 
 ### Round-1 verification
@@ -124,10 +124,12 @@ Reading order from BRIEF.md; tests at the end, read alongside the handler they c
 - [ ] android/.../net/Endpoints.kt, ApiClient.kt, Models.kt (spot-check against routes)
 
 ## Handoff note
-Findings SAPI-001..014 written. Pending items to settle before writing them up:
-- password-verifying routes (auth/password, auth/recovery, mfa/*, account delete) only have the generic 600/min limiter — list the account-delete route from user_handlers.go, then write it.
-- `handleRecipientRemove` (channel_handlers.go:341) never calls `dropVoice`, unlike `removeFromGroup`; check in voice_glue.go whether a member kicked from a group by its owner stays in the group's call.
-- limiter.go: confirm whether `Reset` clears the shared (Redis) counter (round-1 LOW).
-- static.go: HSTS / CSP (round-1 hardening).
-- server-correctness.md's api items are being verified handler by handler (not read as a whole yet).
-Next: message_handlers.go, upload_handlers.go, media_handlers.go, proxy_handlers.go, unfurl_handlers.go, then keys/relationships/users/expressions.
+Findings SAPI-001..022 written. Still pending from the first agent's list:
+- (settled → SAPI-027) group kick leaves the member in the call.
+- (settled) limiter.go Reset clears the shared counter; tested.
+- (settled → SAPI-030, SAPI-033) CSP and HSTS.
+- server-correctness.md's api items verified handler by handler; the file itself not yet read as a whole.
+Open threads of mine: SAPI-016 names `handlePasswordChange`/`handleRecoveryReplace`/`handleMFADisable` from the predecessor's note — confirm each calls VerifyAuthKey without limAuthUsr when reading mfa tests; `about_me` is 100 000 runes and `Public()` includes it — check whether message authors / member lists embed PublicUser before writing a perf finding.
+Settled: expression caps → SAPI-026; rpcapps has FailTTL+pacing (no finding). Candidate P3 from sfu_handlers.go: server-mute/deafen/suppress are flags only — a muted member may still publish audio and a deafened one still subscribe (enforce in handleSFUPublish/Subscribe); guests get a fresh Cloudflare TURN credential on every /voice/ice call (no reuse, voice_glue.go:527-536).
+Pending: config finding (TURN pair unvalidated; PUBLIC_URL default is the live domain; env-example covers every key, precedence documented); shared-limiter collision — every ipLimited limiter uses the bare IP as key and Redis namespaces only by 'rate:' (cache/redis.go:149), confirm the Lua script then write P2 (latent, REDIS_URL only); router_test.go TestReadJSON is an empty stub (P3 test).
+Next: testutil/perms/server_perms/membership/admin_powers tests, then server_handlers/channel/subchat tests, round-1 server-correctness.md, client spot-check, admin/legal/crash, desktop/android/static, main/config/limiter/totp tests, remaining tests, client contract spot-check.

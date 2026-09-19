@@ -118,3 +118,12 @@ Agent type `general-purpose`, model `fable` (or `opus`).
 - 2026-09-18 16:00 — wave 1 resumed, same prompts: fable for server-api,
   web-core, voice, android; opus for server-core, web-chat-ui,
   web-shell-ui, ux-walkthrough.
+- 2026-09-18 16:18 — all eight terminated again: the limit is account-wide
+  and rolling (5 h), so wave 1's usage still counted; reset 21:00. Only 18
+  minutes of work, but per-file ticking made it count: server-api 78/90
+  (34 findings), server-core 63/106 (17), web-core 107/202 (18),
+  web-chat-ui 76/134 (53), web-shell-ui 86/140 (32), voice 70/98 (14),
+  android 62/106 (21), ux 7/47 (5).
+- 2026-09-18 21:02 — wave 1 resumed a second time, same model split.
+  Expect ~3.5 h of work per 5 h window from here; when the limit hits,
+  wait for the reset and send the same prompts again.

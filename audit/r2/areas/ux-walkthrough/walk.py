@@ -355,6 +355,761 @@ def step_d1_auth(base, pw):
     browser.close()
 
 
+def step_dump_general(base, pw):
+    """Print every message row in #general as the web client renders it (text + html shape)."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    w.login()
+    open_alice_general(w)
+    rows = w.page.evaluate("""() => [...document.querySelectorAll('[data-id]')].map(el => ({
+        id: el.getAttribute('data-id'),
+        text: (el.innerText || '').replace(/\\n/g, ' | ').slice(0, 160),
+        imgs: [...el.querySelectorAll('img')].map(i => i.getAttribute('alt') || i.getAttribute('src')?.slice(0, 40)),
+        mention: !!el.querySelector('[class*=mention], a[data-user], span[data-mention]'),
+    }))""")
+    for i, r in enumerate(rows, 1):
+        print(f"{i:3d} {r['id'][:6]} mention={r['mention']} imgs={r['imgs']} :: {r['text']}")
+    browser.close()
+
+
+def step_mention(base, pw):
+    """The mention/channel autocomplete: does Escape close it or throw the draft away, and how does a
+    sent mention render? (seed.py's mention message never arrived — this finds out why.)"""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    w.login()
+    open_alice_general(w)
+    p = w.page
+    box = w.composer()
+    box.click()
+    p.keyboard.type("hello @bo", delay=30)
+    p.wait_for_timeout(800)
+    w.shot("composer-mention-autocomplete")
+    print("  value before Escape:", repr(box.input_value()))
+    print("  listbox:", p.locator("[role=listbox]").count(), p.locator("[role=listbox]").first.inner_text()[:200].replace("\n", " | ") if p.locator("[role=listbox]").count() else "")
+    p.keyboard.press("Escape")
+    p.wait_for_timeout(400)
+    print("  value after 1st Escape:", repr(box.input_value()))
+    w.shot("composer-after-escape")
+    p.keyboard.press("Escape")
+    p.wait_for_timeout(300)
+    print("  value after 2nd Escape:", repr(box.input_value()))
+    # and the same for the channel autocomplete
+    box.click()
+    box.fill("")
+    p.keyboard.type("see #gen", delay=30)
+    p.wait_for_timeout(800)
+    w.shot("composer-channel-autocomplete")
+    print("  channel value before Escape:", repr(box.input_value()))
+    p.keyboard.press("Escape")
+    p.wait_for_timeout(400)
+    print("  channel value after Escape:", repr(box.input_value()))
+    # now actually send a mention, picking it from the list
+    box.click()
+    box.fill("")
+    p.keyboard.type("a mention of @bo", delay=30)
+    p.wait_for_timeout(800)
+    p.keyboard.press("Enter")       # takes the highlighted suggestion
+    p.wait_for_timeout(400)
+    print("  value after picking:", repr(box.input_value()))
+    p.keyboard.type("and a channel #gen", delay=30)
+    p.wait_for_timeout(700)
+    p.keyboard.press("Enter")
+    p.wait_for_timeout(400)
+    print("  value after picking channel:", repr(box.input_value()))
+    p.keyboard.press("Enter")
+    p.wait_for_timeout(2000)
+    w.shot("general-mention-sent")
+    print("  last row:", p.locator("[data-id]").last.inner_text().replace("\n", " | ")[:200])
+    browser.close()
+
+
+def step_mention_seed(base, pw):
+    """Replay seed.py's exact sequence for the message that never arrived: type, Escape, Enter."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    w.login()
+    open_alice_general(w)
+    p, box = w.page, w.composer()
+    before = p.locator("[data-id]").count()
+    box.click()
+    p.keyboard.type("a mention of @bob and a channel #general", delay=4)
+    p.wait_for_timeout(600)
+    w.shot("composer-seed-mention-typed")
+    print("  listbox open:", p.locator("[role=listbox]").count(), "value:", repr(box.input_value()))
+    p.keyboard.press("Escape")
+    p.wait_for_timeout(300)
+    print("  after Escape value:", repr(box.input_value()), "listbox:", p.locator("[role=listbox]").count())
+    p.keyboard.press("Enter")
+    p.wait_for_timeout(2500)
+    print("  after Enter value:", repr(box.input_value()))
+    after = p.locator("[data-id]").count()
+    print("  rows before/after:", before, after)
+    w.shot("general-seed-mention-after-enter")
+    print("  last row:", p.locator("[data-id]").last.inner_text().replace("\n", " | ")[:220])
+    # what a message with a real channel link looks like, typed the way a person would
+    box.click(); box.fill("")
+    p.keyboard.type("go to #gen", delay=30)
+    p.wait_for_timeout(800)
+    n = p.locator("[role=listbox]").count()
+    print("  channel listbox:", n, p.locator("[role=listbox]").first.inner_text()[:120].replace("\n", " | ") if n else "")
+    p.keyboard.press("Tab")
+    p.wait_for_timeout(500)
+    print("  after Tab value:", repr(box.input_value()))
+    w.shot("composer-channel-tab")
+    p.keyboard.press("Enter")
+    p.wait_for_timeout(2000)
+    print("  last row now:", p.locator("[data-id]").last.inner_text().replace("\n", " | ")[:220])
+    w.shot("general-channel-link-sent")
+    browser.close()
+
+
+FAILS = []
+
+
+def attempt(w, label, fn):
+    """Run one screen's worth of driving; a failure is recorded, shot and stepped over."""
+    try:
+        fn()
+        return True
+    except Exception as e:
+        msg = f"{type(e).__name__}: {str(e).splitlines()[0][:160] if str(e) else ''}"
+        print(f"  !! {label}: {msg}")
+        FAILS.append(f"{w.platform}/{w.theme}/{w.lang} {label}: {msg}")
+        try:
+            w.shot("fail-" + label)
+        except Exception:
+            pass
+        for _ in range(3):
+            try:
+                w.page.keyboard.press("Escape")
+                w.page.wait_for_timeout(150)
+            except Exception:
+                pass
+        return False
+
+
+def diag(w, label, small=True):
+    u = w.unlabeled()
+    s = w.small_targets() if small else []
+    o = w.overflow()
+    if u:
+        print(f"  [{label}] unlabeled: {json.dumps(u)[:900]}")
+    if s:
+        print(f"  [{label}] small: {json.dumps(s)[:900]}")
+    if o["docScroll"] or o["items"]:
+        print(f"  [{label}] overflow: docScroll={o['docScroll']} {json.dumps(o['items'])[:700]}")
+
+
+def seed_ids():
+    return json.loads((SHOTS / "seed.json").read_text())
+
+
+def open_alice_general(w):
+    ids = seed_ids()
+    w.page.goto(w.base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+    w.page.wait_for_selector("[data-id]", timeout=20000)
+    w.page.wait_for_timeout(800)
+
+
+def step_d2_friends(base, pw):
+    """Friends page: every tab, the add-friend errors, a request, accepting it, the new DM."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    alice = Walk(browser, base, "alice", "web-desktop")
+    bob = Walk(browser, base, "bob", "web-desktop")
+    alice.login()
+    bob.login()
+    a, b = alice.page, bob.page
+    a.wait_for_timeout(1200)
+    attempt(alice, "friends-online", lambda: (a.goto(base + "/channels/@me", wait_until="networkidle"), a.wait_for_timeout(800), alice.shot("friends-online"), diag(alice, "friends-online")))
+    for tab in ("All", "Pending", "Blocked"):
+        attempt(alice, "friends-" + tab.lower(), lambda tab=tab: (a.click(f"button:has-text('{tab}')"), a.wait_for_timeout(600), alice.shot("friends-" + tab.lower())))
+    def add_friend_screens():
+        a.click("text=Add Friend")
+        a.wait_for_timeout(500)
+        alice.shot("friends-add")
+        diag(alice, "friends-add")
+        print("  add-friend submit enabled when empty:", a.locator("button:has-text('Send Friend Request')").is_enabled())
+        a.fill("input[aria-label=Username]", "nosuchperson")
+        a.click("text=Send Friend Request")
+        a.wait_for_timeout(2000)
+        alice.shot("friends-add-unknown")
+        print("  unknown-user text:", " | ".join(t.strip() for t in a.locator("[role=status], [class*=error], [class*=Error]").all_inner_texts())[:300])
+        a.fill("input[aria-label=Username]", "alice")
+        a.click("text=Send Friend Request")
+        a.wait_for_timeout(2000)
+        alice.shot("friends-add-self")
+        print("  self text:", " | ".join(t.strip() for t in a.locator("[role=status], [class*=error], [class*=Error]").all_inner_texts())[:300])
+        a.fill("input[aria-label=Username]", "bob")
+        a.click("text=Send Friend Request")
+        a.wait_for_timeout(2500)
+        alice.shot("friends-add-sent")
+        print("  sent text:", " | ".join(t.strip() for t in a.locator("[role=status], [class*=Success], [class*=success]").all_inner_texts())[:300])
+    attempt(alice, "friends-add", add_friend_screens)
+    attempt(alice, "friends-pending-outgoing", lambda: (a.click("button:has-text('Pending')"), a.wait_for_timeout(800), alice.shot("friends-pending-outgoing")))
+    def bob_accepts():
+        b.goto(base + "/channels/@me", wait_until="networkidle")
+        b.wait_for_timeout(1000)
+        bob.shot("friends-pending-badge")
+        b.click("button:has-text('Pending')")
+        b.wait_for_timeout(800)
+        bob.shot("friends-pending-incoming")
+        diag(bob, "friends-pending-incoming")
+        b.click("button[aria-label=Accept]")
+        b.wait_for_timeout(2500)
+        bob.shot("friends-after-accept")
+        print("  bob url after accept:", b.url)
+    attempt(bob, "friends-accept", bob_accepts)
+    def alice_dm():
+        a.goto(base + "/channels/@me", wait_until="networkidle")
+        a.click("button:has-text('All')")
+        a.wait_for_timeout(900)
+        alice.shot("friends-all-with-bob")
+        diag(alice, "friends-all-with-bob")
+        row = a.locator("[data-user] button[aria-label=Message]").first
+        row.click()
+        a.wait_for_url("**/channels/@me/*", timeout=15000)
+        a.wait_for_timeout(1200)
+        alice.shot("dm-empty")
+        diag(alice, "dm-empty")
+    attempt(alice, "dm-open", alice_dm)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d3_messages(base, pw):
+    """A DM conversation: sending, hover actions, reaction, reply, edit, pin, delete, long and URL-only
+    messages, then the seeded formatting messages in #general."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    alice = Walk(browser, base, "alice", "web-desktop")
+    bob = Walk(browser, base, "bob", "web-desktop")
+    alice.login(); bob.login()
+    a, b = alice.page, bob.page
+    a.wait_for_timeout(1000)
+    attempt(alice, "dm-open", lambda: alice.open_dm_from_sidebar("Bob", "bob"))
+    def send_basics():
+        alice.send("hey bob, first DM message")
+        a.wait_for_selector("[data-id]:has-text('first DM message')", timeout=20000)
+        alice.shot("dm-sent")
+        b.wait_for_timeout(1500)
+    attempt(alice, "dm-send", send_basics)
+    def typing_indicator():
+        bob.open_dm_from_sidebar("Alice", "alice")
+        b.wait_for_timeout(800)
+        bob.composer().click()
+        b.keyboard.type("bob is typing a reply", delay=30)
+        a.wait_for_timeout(1500)
+        alice.shot("dm-typing-indicator")
+        print("  typing text:", a.locator("main").inner_text()[-260:].replace("\n", " | "))
+        b.keyboard.press("Enter")
+        a.wait_for_timeout(1200)
+        alice.shot("dm-two-people")
+    attempt(bob, "dm-typing", typing_indicator)
+    def hover_actions():
+        row = alice.message_row("first DM message")
+        row.hover()
+        a.wait_for_timeout(400)
+        alice.shot("dm-hover-actions")
+        print("  hover toolbar aria:", row.aria_snapshot()[:700])
+    attempt(alice, "dm-hover", hover_actions)
+    def context_menu():
+        alice.right_click(alice.message_row("first DM message"))
+        alice.shot("dm-context-menu")
+        print("  menu aria:", a.locator("[role=menu]").first.aria_snapshot()[:900] if a.locator("[role=menu]").count() else "NO [role=menu]")
+        a.keyboard.press("Escape")
+    attempt(alice, "dm-context-menu", context_menu)
+    def reaction():
+        row = alice.message_row("first DM message")
+        row.hover()
+        a.wait_for_timeout(300)
+        row.locator("button[aria-label*='eact'], button[aria-label*='moji']").first.click()
+        a.wait_for_timeout(700)
+        alice.shot("emoji-picker-react")
+        diag(alice, "emoji-picker")
+        a.locator("[role=dialog] button[data-emoji], [role=dialog] button").nth(8).click()
+        a.wait_for_timeout(1200)
+        alice.shot("dm-reacted")
+    attempt(alice, "dm-react", reaction)
+    def reply():
+        row = alice.message_row("bob is typing a reply") if a.locator("[data-id]:has-text('bob is typing a reply')").count() else alice.message_row("first DM message")
+        row.hover()
+        a.wait_for_timeout(300)
+        row.locator("button[aria-label*='eply']").first.click()
+        a.wait_for_timeout(600)
+        alice.shot("dm-reply-composing")
+        alice.composer().type("replying to that")
+        a.keyboard.press("Enter")
+        a.wait_for_timeout(1500)
+        alice.shot("dm-replied")
+    attempt(alice, "dm-reply", reply)
+    def edit():
+        row = alice.message_row("replying to that")
+        row.hover()
+        a.wait_for_timeout(300)
+        if row.locator("button[aria-label*='dit']").count():
+            row.locator("button[aria-label*='dit']").first.click()
+        else:
+            alice.right_click(row); a.click("[role=menu] >> text=Edit")
+        a.wait_for_timeout(600)
+        alice.shot("dm-editing")
+        a.keyboard.type(" (edited text)")
+        a.keyboard.press("Enter")
+        a.wait_for_timeout(1500)
+        alice.shot("dm-edited")
+    attempt(alice, "dm-edit", edit)
+    def pin():
+        row = alice.message_row("first DM message")
+        alice.right_click(row)
+        a.click("[role=menu] >> text=Pin")
+        a.wait_for_timeout(900)
+        alice.shot("dm-pin-confirm")
+        if a.locator("[role=dialog] button:has-text('Pin')").count():
+            a.locator("[role=dialog] button:has-text('Pin')").last.click()
+            a.wait_for_timeout(1200)
+        alice.shot("dm-pinned")
+        a.click("button[aria-label*='inned']")
+        a.wait_for_timeout(900)
+        alice.shot("dm-pins-panel")
+        diag(alice, "pins-panel")
+        a.keyboard.press("Escape")
+    attempt(alice, "dm-pin", pin)
+    def long_and_url():
+        alice.composer().fill("x" * 40 + " " + ("a very long sentence that keeps going " * 45))
+        a.wait_for_timeout(400)
+        alice.shot("dm-composer-long")
+        a.keyboard.press("Enter")
+        a.wait_for_timeout(1800)
+        alice.shot("dm-long-message")
+        alice.send("https://example.com")
+        a.wait_for_timeout(2500)
+        alice.shot("dm-url-only")
+        alice.send("https://github.com/evilion/nexa/blob/main/README.md?x=1#section")
+        a.wait_for_timeout(2500)
+        alice.shot("dm-url-long")
+    attempt(alice, "dm-long", long_and_url)
+    def deleting():
+        row = alice.message_row("https://example.com")
+        alice.right_click(row)
+        a.click("[role=menu] >> text=Delete")
+        a.wait_for_timeout(800)
+        alice.shot("dm-delete-confirm")
+        a.locator("[role=dialog] button:has-text('Delete')").last.click()
+        a.wait_for_timeout(1500)
+        alice.shot("dm-after-delete")
+    attempt(alice, "dm-delete", deleting)
+    def formatting():
+        open_alice_general(alice)
+        alice.shot("general-formatting-bottom")
+        n = a.locator("[data-id]").count()
+        print("  messages in general:", n)
+        a.mouse.wheel(0, -1400); a.wait_for_timeout(700); alice.shot("general-formatting-mid")
+        a.mouse.wheel(0, -1400); a.wait_for_timeout(700); alice.shot("general-formatting-up")
+        a.mouse.wheel(0, -1400); a.wait_for_timeout(700); alice.shot("general-formatting-top")
+        alice.shot("general-formatting-full", full=True)
+        diag(alice, "general")
+        sp = a.locator("[data-id] :text('a spoiler')").first
+        if sp.count():
+            sp.click(); a.wait_for_timeout(500); alice.shot("general-spoiler-open")
+    attempt(alice, "general-formatting", formatting)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d4_attach(base, pw):
+    """Attachments: image, file, many; the lightbox; the drop overlay."""
+    import io, struct as _struct, zlib as _zlib
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    alice = Walk(browser, base, "alice", "web-desktop")
+    alice.login()
+    a = alice.page
+    a.wait_for_timeout(1000)
+    attempt(alice, "dm-open", lambda: alice.open_dm_from_sidebar("Bob", "bob"))
+    files = [
+        {"name": "screenshot.png", "mimeType": "image/png", "buffer": png_bytes(900, 600, (80, 120, 220))},
+        {"name": "notes.txt", "mimeType": "text/plain", "buffer": b"a text file with a few words in it\n" * 40},
+    ]
+    def upload_one():
+        a.set_input_files("input[type=file]", files[0])
+        a.wait_for_timeout(1200)
+        alice.shot("composer-attachment-preview")
+        diag(alice, "attachment-preview")
+        a.keyboard.press("Enter")
+        a.wait_for_timeout(3500)
+        alice.shot("dm-image-sent")
+    attempt(alice, "attach-image", upload_one)
+    def lightbox():
+        a.locator("[data-id] img").last.click()
+        a.wait_for_timeout(900)
+        alice.shot("image-lightbox")
+        diag(alice, "lightbox")
+        print("  lightbox aria:", a.locator("[role=dialog]").first.aria_snapshot()[:700] if a.locator("[role=dialog]").count() else "no dialog")
+        a.keyboard.press("Escape")
+    attempt(alice, "lightbox", lightbox)
+    def upload_file():
+        a.set_input_files("input[type=file]", files[1])
+        a.wait_for_timeout(1000)
+        a.keyboard.press("Enter")
+        a.wait_for_timeout(3000)
+        alice.shot("dm-file-sent")
+    attempt(alice, "attach-file", upload_file)
+    def upload_many():
+        many = [{"name": f"pic{i:02d}.png", "mimeType": "image/png", "buffer": png_bytes(240, 160, (30 + i * 9, 90, 200 - i * 6))} for i in range(20)]
+        a.set_input_files("input[type=file]", many)
+        a.wait_for_timeout(2500)
+        alice.shot("composer-twenty-attachments")
+        diag(alice, "twenty-attachments")
+        print("  attachment error text:", a.locator("main").inner_text()[-400:].replace("\n", " | "))
+    attempt(alice, "attach-twenty", upload_many)
+    def drop_overlay():
+        a.reload(wait_until="networkidle")
+        a.wait_for_timeout(1500)
+        a.evaluate("""() => {
+            const dt = new DataTransfer();
+            dt.items.add(new File(['x'], 'a.png', { type: 'image/png' }));
+            const ev = new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer: dt });
+            document.querySelector('main, body').dispatchEvent(ev);
+            const ev2 = new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt });
+            document.querySelector('main, body').dispatchEvent(ev2);
+        }""")
+        a.wait_for_timeout(600)
+        alice.shot("drop-overlay")
+        print("  drop overlay present:", a.locator("[data-testid=drop-overlay]").count())
+    attempt(alice, "drop-overlay", drop_overlay)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d5_server(base, pw):
+    """The server: header menu, invite, create channel/category, channel settings, every server-settings page,
+    the member list and its menus."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    w.login()
+    p = w.page
+    attempt(w, "server-open", lambda: open_alice_general(w))
+    attempt(w, "server-menu", lambda: (p.click("button:has-text(\"Alice's server\")"), p.wait_for_timeout(500), w.shot("server-header-menu"), print("  menu:", p.locator("[role=menu]").first.aria_snapshot()[:800] if p.locator("[role=menu]").count() else "none")))
+    p.keyboard.press("Escape")
+    attempt(w, "invite-modal", lambda: (p.click("button[aria-label='Invite People']"), p.wait_for_timeout(1200), w.shot("invite-modal"), diag(w, "invite-modal"), p.keyboard.press("Escape")))
+    def create_channel():
+        p.click("button[aria-label='Create Channel']")
+        p.wait_for_timeout(600)
+        w.shot("create-channel-modal")
+        diag(w, "create-channel-modal")
+        print("  create-channel aria:", p.locator("[role=dialog]").first.aria_snapshot()[:900])
+        p.fill("[data-testid=channel-name]", "Plans For The Weekend")
+        p.wait_for_timeout(300)
+        w.shot("create-channel-filled")
+        print("  name as typed:", p.locator("[data-testid=channel-name]").input_value())
+        p.click("button:has-text('Create Channel')")
+        p.wait_for_timeout(2500)
+        w.shot("channel-empty")
+        print("  url:", p.url)
+    attempt(w, "create-channel", create_channel)
+    def create_voice_and_private():
+        p.click("button[aria-label='Create Channel']")
+        p.wait_for_timeout(500)
+        p.locator("[role=dialog] button:has-text('Voice')").first.click()
+        p.fill("[data-testid=channel-name]", "Late Night")
+        p.locator("[role=dialog] input[role=switch]").first.check()
+        p.wait_for_timeout(300)
+        w.shot("create-channel-voice-private")
+        p.click("button:has-text('Create Channel')")
+        p.wait_for_timeout(2000)
+        w.shot("sidebar-after-channels")
+    attempt(w, "create-voice-private", create_voice_and_private)
+    def channel_settings():
+        row = p.locator("[data-channel]:has-text('Plans For The Weekend')").first
+        row.hover()
+        p.wait_for_timeout(300)
+        w.shot("channel-row-hover")
+        row.locator("button").last.click()
+        p.wait_for_timeout(900)
+        w.shot("channel-settings-overview")
+        diag(w, "channel-settings")
+        print("  channel settings aria:", p.locator("[role=dialog]").first.aria_snapshot()[:1200])
+        for nav in ("permissions", "delete"):
+            if p.locator(f"[data-nav={nav}]").count():
+                p.click(f"[data-nav={nav}]")
+                p.wait_for_timeout(700)
+                w.shot("channel-settings-" + nav)
+        p.keyboard.press("Escape")
+    attempt(w, "channel-settings", channel_settings)
+    def server_settings():
+        p.click("button:has-text(\"Alice's server\")")
+        p.wait_for_timeout(400)
+        p.click("text=Server Settings")
+        p.wait_for_timeout(1200)
+        w.shot("server-settings-overview")
+        diag(w, "server-settings")
+        print("  server settings nav:", p.locator("[role=dialog] nav").first.inner_text().replace("\n", " | ")[:300])
+        for nav in ("roles", "emoji", "stickers", "encryption", "members", "invites", "bans", "audit", "delete"):
+            if p.locator(f"[data-nav={nav}]").count() == 0:
+                print("  no nav:", nav)
+                continue
+            p.click(f"[data-nav={nav}]")
+            p.wait_for_timeout(900)
+            w.shot("server-settings-" + nav)
+            diag(w, "server-settings-" + nav, small=False)
+        p.keyboard.press("Escape")
+    attempt(w, "server-settings", server_settings)
+    def roles_editor():
+        p.click("button:has-text(\"Alice's server\")")
+        p.wait_for_timeout(400)
+        p.click("text=Server Settings")
+        p.wait_for_timeout(900)
+        p.click("[data-nav=roles]")
+        p.wait_for_timeout(600)
+        p.click("[data-testid=create-role]")
+        p.wait_for_timeout(900)
+        w.shot("role-editor")
+        diag(w, "role-editor")
+        p.fill("[data-testid=role-name]", "Moderators")
+        p.wait_for_timeout(300)
+        w.shot("role-editor-filled")
+        p.click("[data-testid=save]")
+        p.wait_for_timeout(1200)
+        w.shot("role-saved")
+        p.keyboard.press("Escape")
+    attempt(w, "roles", roles_editor)
+    def members_and_profile():
+        open_alice_general(w)
+        p.locator("[data-testid=member-list] [data-user]").first.click()
+        p.wait_for_timeout(900)
+        w.shot("profile-card")
+        diag(w, "profile-card")
+        p.keyboard.press("Escape")
+        w.right_click(p.locator("[data-testid=member-list] [data-user]").last)
+        w.shot("member-context-menu")
+        print("  member menu:", p.locator("[role=menu]").first.aria_snapshot()[:800] if p.locator("[role=menu]").count() else "none")
+        p.keyboard.press("Escape")
+    attempt(w, "members", members_and_profile)
+    def notif_and_profile_modals():
+        p.click("button:has-text(\"Alice's server\")")
+        p.wait_for_timeout(400)
+        menu = p.locator("[role=menu]").first.inner_text().replace("\n", " | ")
+        print("  server menu items:", menu[:300])
+        for label in ("Notification Settings", "Edit Server Profile", "Privacy Settings"):
+            if label in menu:
+                p.click(f"[role=menu] >> text={label}")
+                p.wait_for_timeout(900)
+                w.shot("server-menu-" + label.lower().replace(" ", "-"))
+                diag(w, label, small=False)
+                p.keyboard.press("Escape")
+                p.wait_for_timeout(400)
+                p.click("button:has-text(\"Alice's server\")")
+                p.wait_for_timeout(400)
+        p.keyboard.press("Escape")
+    attempt(w, "server-menu-modals", notif_and_profile_modals)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+SETTINGS_NAVS = ["account", "profiles", "privacy", "security", "devices", "appearance", "voice", "notifications", "stickers", "licenses", "admin", "get-app"]
+
+
+def step_d6_settings(base, pw):
+    """Every user-settings page, the profile and status modals, search, the quick switcher, shortcuts."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    w.login()
+    p = w.page
+    p.wait_for_timeout(1200)
+    def settings_pages():
+        p.click("button[aria-label='User Settings']")
+        p.wait_for_timeout(1000)
+        w.shot("settings-open")
+        print("  settings nav:", p.locator("[role=dialog] nav").first.inner_text().replace("\n", " | ")[:400])
+        for nav in SETTINGS_NAVS:
+            if p.locator(f"[data-nav={nav}]").count() == 0:
+                print("  no nav:", nav)
+                continue
+            p.click(f"[data-nav={nav}]")
+            p.wait_for_timeout(900)
+            w.shot("settings-" + nav)
+            w.shot("settings-" + nav + "-full", full=True)
+            diag(w, "settings-" + nav, small=False)
+        p.keyboard.press("Escape")
+    attempt(w, "settings-pages", settings_pages)
+    def own_profile():
+        p.click("button[aria-label='User Settings']")
+        p.wait_for_timeout(700)
+        p.click("[data-nav=profiles]")
+        p.wait_for_timeout(900)
+        w.shot("settings-profiles-detail")
+        p.keyboard.press("Escape")
+        p.wait_for_timeout(500)
+        p.locator("button[aria-label*='Alice'], button:has-text('Alice')").first.click()
+        p.wait_for_timeout(800)
+        w.shot("own-user-panel-menu")
+        print("  panel menu:", p.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if p.locator("[role=menu]").count() else "none")
+        if p.locator("[role=menu] >> text=/Custom Status|Set Status/i").count():
+            p.locator("[role=menu] >> text=/Custom Status|Set Status/i").first.click()
+            p.wait_for_timeout(900)
+            w.shot("custom-status-modal")
+            diag(w, "custom-status")
+        p.keyboard.press("Escape")
+    attempt(w, "own-profile", own_profile)
+    def search():
+        open_alice_general(w)
+        p.click("input[placeholder='Search'], [aria-label=Search]")
+        p.wait_for_timeout(700)
+        w.shot("search-suggestions")
+        diag(w, "search")
+        p.keyboard.type("formatting", delay=30)
+        p.keyboard.press("Enter")
+        p.wait_for_timeout(2500)
+        w.shot("search-results")
+        diag(w, "search-results", small=False)
+        print("  results text:", p.locator("main, [class*=search]").first.inner_text()[:400].replace("\n", " | "))
+        p.keyboard.press("Escape")
+    attempt(w, "search", search)
+    def switcher():
+        p.keyboard.press("Control+k")
+        p.wait_for_timeout(700)
+        w.shot("quick-switcher")
+        diag(w, "quick-switcher")
+        p.keyboard.type("gen", delay=40)
+        p.wait_for_timeout(800)
+        w.shot("quick-switcher-typed")
+        print("  hits:", p.locator("[data-testid=switcher-hit]").count(), p.locator("[data-testid=switcher-hit]").first.inner_text()[:80] if p.locator("[data-testid=switcher-hit]").count() else "")
+        p.keyboard.press("Escape")
+    attempt(w, "switcher", switcher)
+    def shortcuts():
+        p.keyboard.press("Control+/")
+        p.wait_for_timeout(800)
+        w.shot("shortcuts-help")
+        if p.locator("[role=dialog]").count() == 0:
+            p.keyboard.press("Shift+?")
+            p.wait_for_timeout(800)
+            w.shot("shortcuts-help-2")
+        print("  shortcuts dialog:", p.locator("[role=dialog]").count())
+        p.keyboard.press("Escape")
+    attempt(w, "shortcuts", shortcuts)
+    def slash_commands():
+        open_alice_general(w)
+        w.composer().click()
+        p.keyboard.type("/", delay=50)
+        p.wait_for_timeout(800)
+        w.shot("composer-slash-commands")
+        print("  slash listbox:", p.locator("[role=listbox]").count(), p.locator("[role=listbox]").first.inner_text()[:300].replace("\n", " | ") if p.locator("[role=listbox]").count() else "")
+        p.keyboard.press("Escape")
+        w.composer().fill("")
+    attempt(w, "slash", slash_commands)
+    def pickers():
+        open_alice_general(w)
+        p.click("button[aria-label='Select emoji']")
+        p.wait_for_timeout(1000)
+        w.shot("expression-picker-emoji")
+        diag(w, "picker-emoji")
+        for tab in ("GIFs", "Stickers"):
+            if p.locator(f"[role=dialog] button:has-text('{tab}')").count():
+                p.click(f"[role=dialog] button:has-text('{tab}')")
+                p.wait_for_timeout(900)
+                w.shot("expression-picker-" + tab.lower())
+        p.keyboard.press("Escape")
+    attempt(w, "pickers", pickers)
+    def tab_pass():
+        open_alice_general(w)
+        p.keyboard.press("Escape")
+        order = w.tab_order(22)
+        print("  channel tab order:")
+        for o in order:
+            print("   ", o)
+        w.shot("focus-ring-channel")
+    attempt(w, "tab-order", tab_pass)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d7_voice(base, pw):
+    """Voice: two people in the server's General, the call UI, mute/deafen, screen share, a DM call and the
+    incoming-call screen."""
+    browser = pw.chromium.launch(args=CHROME_ARGS + ["--auto-select-desktop-capture-source=Entire screen"])
+    alice = Walk(browser, base, "alice", "web-desktop")
+    bob = Walk(browser, base, "bob", "web-desktop")
+    alice.login(); bob.login()
+    a, b = alice.page, bob.page
+    a.wait_for_timeout(1000)
+    ids = seed_ids()
+    def join():
+        open_alice_general(alice)
+        a.locator("[data-channel]:has-text('General')").first.click()
+        a.wait_for_timeout(2500)
+        alice.shot("voice-joined-alone")
+        diag(alice, "voice")
+        print("  voice status:", a.locator("[data-testid=voice-status]").inner_text().replace("\n", " | ")[:200] if a.locator("[data-testid=voice-status]").count() else "none")
+    attempt(alice, "voice-join", join)
+    def bob_join():
+        b.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        b.wait_for_timeout(1500)
+        b.locator("[data-channel]:has-text('General')").first.click()
+        b.wait_for_timeout(4000)
+        bob.shot("voice-two-people-bob")
+        alice.shot("voice-two-people")
+        diag(alice, "voice-two")
+    attempt(bob, "voice-join-bob", bob_join)
+    def controls():
+        for label in ("Mute", "Deafen"):
+            if a.locator(f"button[aria-label='{label}']").count():
+                a.click(f"button[aria-label='{label}']")
+                a.wait_for_timeout(800)
+                alice.shot("voice-" + label.lower())
+        if a.locator("button[aria-label='Unmute']").count():
+            a.click("button[aria-label='Unmute']")
+        if a.locator("button[aria-label='Undeafen']").count():
+            a.click("button[aria-label='Undeafen']")
+        a.wait_for_timeout(500)
+        if a.locator("[data-testid=voice-participants]").count():
+            alice.shot("voice-participants")
+    attempt(alice, "voice-controls", controls)
+    def screen_share():
+        btn = a.locator("[data-testid=go-live], button[aria-label*='Screen'], button[aria-label*='Share']").first
+        btn.click()
+        a.wait_for_timeout(1200)
+        alice.shot("screen-share-modal")
+        diag(alice, "screen-share")
+        print("  share modal:", a.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:400] if a.locator("[role=dialog]").count() else "none")
+        if a.locator("[data-testid=display-share]").count():
+            a.click("[data-testid=display-share]")
+            a.wait_for_timeout(3000)
+            alice.shot("screen-sharing")
+            b.wait_for_timeout(2000)
+            bob.shot("screen-share-seen-by-bob")
+    attempt(alice, "screen-share", screen_share)
+    def leave():
+        if a.locator("[data-testid=voice-status-leave]").count():
+            a.click("[data-testid=voice-status-leave]")
+        a.wait_for_timeout(1500)
+        alice.shot("voice-after-leave")
+        if b.locator("[data-testid=voice-status-leave]").count():
+            b.click("[data-testid=voice-status-leave]")
+        b.wait_for_timeout(1000)
+    attempt(alice, "voice-leave", leave)
+    def dm_call():
+        alice.open_dm_from_sidebar("Bob", "bob")
+        a.wait_for_timeout(1200)
+        a.locator("[data-testid=start-call], button[aria-label='Start Voice Call']").first.click()
+        a.wait_for_timeout(2500)
+        alice.shot("dm-call-ringing")
+        bob.open_dm_from_sidebar("Alice", "alice")
+        b.wait_for_timeout(2500)
+        bob.shot("incoming-call")
+        print("  incoming call present:", b.locator("[data-testid=incoming-call]").count())
+        if b.locator("[data-testid=accept-call]").count():
+            b.click("[data-testid=accept-call]")
+            b.wait_for_timeout(3500)
+            bob.shot("dm-call-connected-bob")
+            alice.shot("dm-call-connected")
+            diag(alice, "dm-call")
+        if a.locator("[data-testid=voice-status-leave]").count():
+            a.click("[data-testid=voice-status-leave]")
+        a.wait_for_timeout(1200)
+        alice.shot("dm-after-call")
+    attempt(alice, "dm-call", dm_call)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)

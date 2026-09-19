@@ -1,7 +1,7 @@
 # Progress — web-shell-ui
 State: auditing
-Last checkpoint: 2026-09-18T20:40Z
-Next finding id: 001
+Last checkpoint: 2026-09-19T00:45Z
+Next finding id: 032
 
 ## Inspected
 
@@ -72,43 +72,43 @@ Modals:
 - [x] web/src/components/modals/VerifyKeyModal.tsx
 
 Settings:
-- [ ] web/src/components/settings/SettingsModal.tsx
-- [ ] web/src/components/settings/Settings.module.css
-- [ ] web/src/components/settings/AccountPage.tsx
-- [ ] web/src/components/settings/ProfilePage.tsx
-- [ ] web/src/components/settings/SecurityPage.tsx
-- [ ] web/src/components/settings/EncryptionSection.tsx
-- [ ] web/src/components/settings/DevicesPage.tsx
-- [ ] web/src/components/settings/PrivacyPage.tsx
-- [ ] web/src/components/settings/NotificationsPage.tsx
-- [ ] web/src/components/settings/AppearancePage.tsx
-- [ ] web/src/components/settings/CustomColorIcon.tsx
-- [ ] web/src/components/settings/VoicePage.tsx
-- [ ] web/src/components/settings/Voice.module.css
-- [ ] web/src/components/settings/DesktopPage.tsx
-- [ ] web/src/components/settings/StickersPage.tsx
-- [ ] web/src/components/settings/AdminPage.tsx
-- [ ] web/src/components/settings/LicensesPage.tsx
+- [x] web/src/components/settings/SettingsModal.tsx
+- [x] web/src/components/settings/Settings.module.css
+- [x] web/src/components/settings/AccountPage.tsx
+- [x] web/src/components/settings/ProfilePage.tsx
+- [x] web/src/components/settings/SecurityPage.tsx
+- [x] web/src/components/settings/EncryptionSection.tsx
+- [x] web/src/components/settings/DevicesPage.tsx
+- [x] web/src/components/settings/PrivacyPage.tsx
+- [x] web/src/components/settings/NotificationsPage.tsx
+- [x] web/src/components/settings/AppearancePage.tsx
+- [x] web/src/components/settings/CustomColorIcon.tsx
+- [x] web/src/components/settings/VoicePage.tsx
+- [x] web/src/components/settings/Voice.module.css
+- [x] web/src/components/settings/DesktopPage.tsx
+- [x] web/src/components/settings/StickersPage.tsx
+- [x] web/src/components/settings/AdminPage.tsx
+- [x] web/src/components/settings/LicensesPage.tsx
 - [ ] web/src/components/settings/LicensesPage.test.tsx
-- [ ] web/src/components/settings/Licenses.module.css
+- [x] web/src/components/settings/Licenses.module.css
 
 Server settings:
-- [ ] web/src/components/server/SettingsLayer.tsx
-- [ ] web/src/components/server/ServerSettingsModal.tsx
-- [ ] web/src/components/server/ServerSettings.module.css
+- [x] web/src/components/server/SettingsLayer.tsx
+- [x] web/src/components/server/ServerSettingsModal.tsx
+- [x] web/src/components/server/ServerSettings.module.css
 - [ ] web/src/components/server/ChannelSettingsModal.tsx
 - [ ] web/src/components/server/MemberActionModal.tsx
-- [ ] web/src/components/server/PermissionGrid.tsx
+- [x] web/src/components/server/PermissionGrid.tsx
 - [ ] web/src/components/server/PermissionGrid.module.css
 - [ ] web/src/components/server/RoleChips.module.css
 - [ ] web/src/components/server/PackEditor.tsx
 - [ ] web/src/components/server/PackEditor.module.css
 - [ ] web/src/components/server/memberMenu.ts
-- [ ] web/src/components/server/pages/ServerOverviewPage.tsx
-- [ ] web/src/components/server/pages/RolesPage.tsx
+- [x] web/src/components/server/pages/ServerOverviewPage.tsx
+- [x] web/src/components/server/pages/RolesPage.tsx
 - [ ] web/src/components/server/pages/rolePositions.ts
 - [ ] web/src/components/server/pages/rolePositions.test.ts
-- [ ] web/src/components/server/pages/MembersPage.tsx
+- [x] web/src/components/server/pages/MembersPage.tsx
 - [ ] web/src/components/server/pages/BansPage.tsx
 - [ ] web/src/components/server/pages/BansPage.test.tsx
 - [ ] web/src/components/server/pages/InvitesPage.tsx
@@ -130,7 +130,7 @@ Pages:
 - [ ] web/src/pages/Auth.module.css
 - [ ] web/src/pages/LoginPage.tsx
 - [ ] web/src/pages/LoginPage.test.tsx
-- [ ] web/src/pages/RegisterPage.tsx
+- [x] web/src/pages/RegisterPage.tsx
 - [ ] web/src/pages/RecoverPage.tsx
 - [ ] web/src/pages/RecoverPage.test.tsx
 - [ ] web/src/pages/LockPage.tsx
@@ -168,5 +168,13 @@ Round 1:
 - [ ] audit/product-gaps.md (the 15 IDEA findings — re-judge as design)
 
 ## Handoff note
-Fresh start 2026-09-18. Nothing read yet. Reading order per BRIEF: shell → rail/sidebar →
-banners → modals → settings → server → pages → desktop → Android parity → tests.
+Resumed 2026-09-19T00:05Z by successor #2. The header said "Next finding id: 001" but
+FINDINGS.md already held WSHELL-001..010 (shell, rail/sidebar, modals) — corrected to 011.
+Shell, rail/sidebar and modals were done by the predecessor. Working through settings now
+(SettingsModal, Settings.module.css, Account, Profile, Security, Privacy done; RegisterPage
+read early for the recovery-key comparison). Two cross-cutting threads to finish:
+(a) hard-coded English — WSHELL-001/020 hold the list, scan each new file;
+(b) one-time secrets dismissible by Escape — WSHELL-012/021.
+Next: EncryptionSection, DevicesPage, NotificationsPage, AppearancePage, CustomColorIcon,
+VoicePage, DesktopPage, StickersPage, AdminPage, LicensesPage → server/* → pages/* →
+desktop/* → Android parity → round-1 reports.

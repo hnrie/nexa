@@ -1,7 +1,7 @@
 # Progress — server-core
 State: auditing
-Last checkpoint: 2026-09-18T13:05Z
-Next finding id: 014
+Last checkpoint: 2026-09-19T05:03Z
+Next finding id: 031
 
 ## Inspected
 
@@ -44,11 +44,11 @@ Next finding id: 014
 - [x] internal/store/guests.go
 - [x] internal/store/locks.go
 - [x] internal/store/mfa.go
-- [ ] internal/store/settings.go
-- [ ] internal/store/instance.go
-- [ ] internal/store/legal.go
-- [ ] internal/store/errors_log.go
-- [ ] internal/store/realtime.go
+- [x] internal/store/settings.go
+- [x] internal/store/instance.go
+- [x] internal/store/legal.go
+- [x] internal/store/errors_log.go
+- [x] internal/store/realtime.go
 - [ ] internal/store/channels_test.go
 - [ ] internal/store/errors_log_test.go
 - [ ] internal/store/guests_test.go
@@ -62,10 +62,10 @@ Next finding id: 014
 - [x] internal/store/users_test.go
 
 ### internal/gateway
-- [ ] internal/gateway/protocol.go
-- [ ] internal/gateway/conn.go
-- [ ] internal/gateway/hub.go
-- [ ] internal/gateway/activity.go
+- [x] internal/gateway/protocol.go
+- [x] internal/gateway/conn.go
+- [x] internal/gateway/hub.go
+- [x] internal/gateway/activity.go
 - [ ] internal/gateway/activity_test.go
 - [ ] internal/gateway/conn_test.go
 - [ ] internal/gateway/hub_test.go
@@ -105,7 +105,7 @@ Next finding id: 014
 ### internal/voice, rpcapps, ids
 - [ ] internal/voice/registry.go
 - [ ] internal/voice/registry_test.go
-- [ ] internal/rpcapps/rpcapps.go
+- [x] internal/rpcapps/rpcapps.go
 - [ ] internal/rpcapps/rpcapps_test.go
 - [x] internal/ids/ids.go
 - [ ] internal/ids/ids_test.go
@@ -116,15 +116,15 @@ Next finding id: 014
 - [ ] cmd/chatmigrate/helpers_test.go
 
 ### ops
-- [ ] deploy/install.sh
-- [ ] deploy/route-dns.sh
-- [ ] deploy/xyz.evilion.chat.plist.in
-- [ ] deploy/README.md
+- [x] deploy/install.sh
+- [x] deploy/route-dns.sh
+- [x] deploy/xyz.evilion.chat.plist.in
+- [x] deploy/README.md
 - [x] backup.sh
 - [x] run.sh
-- [ ] Makefile
-- [ ] chatd.env.example
-- [ ] README.md
+- [x] Makefile
+- [x] chatd.env.example
+- [x] README.md
 - [x] tools/gen_pg_schema.sh
 - [x] tools/pg_schema.py
 
@@ -134,6 +134,9 @@ Next finding id: 014
 - [ ] audit/performance.md (server section)
 
 ## Handoff note
-46 files done, SCORE-001..013 written. Store is read except settings/instance/legal/errors_log/realtime and the remaining tests.
-Pending to write once verified: (a) backup.sh — tar failure swallowed (`|| true`) yet "written" printed; misses chatd.env (check whether the server secret in it seals user_mfa.totp_secret — if so a restore without it locks out every 2FA user), release.jks, update-key.pem, data/desktop, data/android; no pruning; (b) a structural perf finding on perms.go: ChannelPerms = 9 queries, channelViewers = 6 + 2/1000 members and O(members) perms.Compute — write it after reading gateway/hub.go to say how often fan-out calls it; (c) packsQuery N+1 PackStickers — check callers; (d) role icon / member avatar columns look unreachable from the API (dead schema) — confirm with a grep for RolePatch{/MemberPatch{ before deciding whether to report.
-Verified and NOT findings: pin handler checks message channel; detachUser hands owned servers on and removes memberships/groups before DeleteAccount; both deadlock scans (pool use inside Tx; query while cursor open) are clean.
+**FINDINGS.md was missing on a resume**: the first agent's SCORE-001..013 never reached disk (the `Write` tool refuses `.md` files; use a Bash heredoc/`cat >>`). Numbering restarts at 014; 001-013 are lost.
+Successor progress: all ops files, db/db.go + dialect.go re-read, chatmigrate/main.go, store settings/instance/errors_log/legal/realtime. Findings 014-025 written.
+Predecessor's pending items: (a) backup.sh -> SCORE-014/015 (the sealing key is `data/server.secret`, cmd/chatd/main.go:259 + api/mfa_handlers.go:53,159). (d) role icon / member avatar dead columns -> SCORE-023. Still open: (b) perms.go perf finding (write after gateway/hub.go, to say how often fan-out calls channelViewers), (c) packsQuery N+1 PackStickers (check callers in expressions.go + api).
+Verified NOT findings: install.sh's `[ "$i" = 30 ] && die` does not trip `set -e` (tested, bash 3.2); chatmigrate enumerates tables from sqlite_master (new tables carried) and SQLite's version lives in `PRAGMA user_version`, so nothing collides with Postgres's `schema_version` table; **the Postgres schema is byte-identical to a regeneration from the SQLite migrations** (rebuilt the migrations with the sqlite3 CLI in $TMPDIR, ran tools/pg_schema.py, diff = 0 lines); the only SQLite-only SQL anywhere in store/api is `json_each`, which goes through `Dialect.JSONArrayHas`, and every user-facing `LIKE` lowers its column through `Dialect.Lower` (usernames are lowercased by `api.ValidUsername`/register, so the un-lowered `username LIKE ?` is safe on Postgres too).
+Third agent (from 2026-09-19T05:03Z): all four of the predecessor's pending items are settled and written — (a) SCORE-014/015, (b) SCORE-026, (c) SCORE-030, (d) SCORE-023. gateway/{protocol,conn,hub,activity}.go are read (SCORE-026..029 came out of them). Remaining: cache, media, unfurl, realtime, voice/registry, the tests everywhere, round-1 cross-check. ~8,700 lines.
+Next: internal/cache -> media -> unfurl -> realtime -> voice -> rpcapps/ids/chatmigrate tests -> store tests -> gateway tests -> round-1 cross-check.
