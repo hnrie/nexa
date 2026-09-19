@@ -1,7 +1,7 @@
 # Progress — ux-walkthrough
 State: auditing
-Last checkpoint: 2026-09-19T00:12Z
-Next finding id: 006
+Last checkpoint: 2026-09-19T05:35Z
+Next finding id: 024
 
 ## Environment (re-create with exactly these; never web/dist, never bin/chatd)
 
@@ -38,16 +38,16 @@ Legend: [ ] not done · [x] done · [~] in progress. One line per platform × th
 - [x] recover (/recover) with the saved recovery key
 - [x] friends page: Online / All / Pending / Blocked / Add Friend tabs; add a friend both ways
 - [x] DM: send text, every markdown kind (seed messages), 2,000-char message, URL-only message
-- [ ] attachments: image, video, audio, file; twenty attachments; drop overlay
+- [~] attachments: image, file, twenty attachments, lightbox, drop overlay done (UX-006). Video/audio attachments not tried.
 - [x] reactions, reply, edit, delete, pin, pins panel, message context menu, selection bar
-- [ ] create server modal → server page → #general
-- [ ] create channel (text, voice, private), create category, channel topic modal, channel settings (overview, permissions, delete)
-- [ ] server settings: overview, roles, emoji, stickers, encryption, members, invites, bans, audit log, delete
-- [ ] invite modal → join from bob (invite page) → server notifications modal → server profile modal → leave server
+- [x] create server modal → server page → #general (server made by seed; UX-001)
+- [~] create channel text done (UX-007). Voice+private, category, topic modal, channel settings NOT done — walk.py's selector for the private switch is wrong and the channel-row gear was not found; re-run `d5-server` after fixing.
+- [x] server settings: every page shot (UX-010); roles editor + create role shot
+- [~] invite modal, invite page, bob joined, server notification + profile modals shot. Leave-server flow NOT done.
 - [ ] server with fifty channels; channel with no messages; long names everywhere
-- [ ] profile modal / profile card / key verify / custom status modal
-- [ ] user settings: account, profiles, privacy, security (2FA + passcode), devices, appearance, voice, notifications, stickers, licenses, admin, get-app
-- [ ] search panel + suggestions; quick switcher; shortcuts help
+- [~] profile card + member context menu shot; key verify and custom status NOT confirmed
+- [x] user settings: all 12 pages shot (UX-008..013). Note: `full_page=True` does NOT capture the settings overlay (it is a fixed overlay with its own scroller) — scroll inside `[role=dialog]` instead; content below 768 px is still unseen on Account/Privacy/Voice/Security.
+- [x] search panel + suggestions, quick switcher, shortcuts help, slash commands, pickers shot
 - [ ] notifications (toasts, banners), app lock (passcode page), lock now
 - [ ] group DM: create DM modal, edit group modal, group invite modal, group member list
 - [ ] voice: join General between alice and bob, voice view, mute/deafen, participants, screen share modal (fake device), leave; DM call + incoming call screen; guest link modal + guest call page
@@ -60,15 +60,15 @@ Legend: [ ] not done · [x] done · [~] in progress. One line per platform × th
 - [ ] home, friends, DM, server channel, settings, voice — line length, dead space, scaling
 
 ### 3. Web phone 390×844 (touch, is_mobile) · dark · en
-- [ ] home, register, recovery key, login
-- [ ] friends, drawer ("Open navigation"), DM, composer + keyboard, send button
-- [ ] message actions without hover (long-press / menu), reactions, reply, edit, pin
-- [ ] server page, channel list in drawer, channel settings, server settings (tabs scroll sideways)
-- [ ] user settings pages on a phone
-- [ ] search, quick switcher, pickers (emoji/gif/sticker) sized with vh
+- [x] home, login (register/recovery key already covered on desktop; phone home + login shot)
+- [x] friends (UX-018), drawer, DM (UX-017), composer + send button (UX-019)
+- [x] message actions: long press → contextmenu handler exists and the menu is well sized; the hover bar is 26×24 (UX-019, UX-022)
+- [~] server page + channel list in drawer shot; channel/server settings on a phone NOT done
+- [x] user settings on a phone: account, appearance, privacy, security, voice (UX-020)
+- [x] search + results (UX-023), emoji picker (390×506 of an 844 viewport — fine). Quick switcher on a phone NOT done.
 - [ ] voice: call UI on the phone viewport, incoming call, share screen
 - [ ] standalone (`localStorage.__standalone = "1"`) — safe area / notch checks noted as "could not check on iOS"
-- [ ] tap targets < 44 px measured
+- [x] tap targets measured (UX-019)
 
 ### 4. Web phone · light · en
 - [ ] the same screens in light (contrast, call UI in light, home page in light)
@@ -103,8 +103,20 @@ Legend: [ ] not done · [x] done · [~] in progress. One line per platform × th
 ### 12. Summary at the top of FINDINGS.md; State: audit-done; emulator + server stopped
 
 ## Handoff note
-Fresh start 2026-09-18 ~20:40Z. Read README, BRIEF, tools/e2e.py, seed.py, ui.py, emulator.sh, routes.tsx,
-settings nav ids (user: account profiles privacy security devices appearance voice notifications stickers
-licenses admin get-app [desktop in app]; server: overview roles emoji stickers encryption members invites bans
-audit delete; channel: overview permissions delete). Round-1 REVIEW.md Done/Not doing/Still open read.
-Next: scratch builds, start the server, seed, write walk.py, begin section 1.
+2026-09-19T05:35Z — successor #2. Server :64675 still up. UX-001..023 written.
+
+Done this session: mined the predecessor's desktop shots (UX-006..013); added `probe`, `viewport_pass` and the
+steps `p-dark-en`, `p-light-en`, `p-dark-ar`, `p-dark-de`, `desktop-light`, `tablet`, `wide` to walk.py; ran
+`probe` and `p-dark-en`.
+
+Gotchas for a successor driving walk.py:
+- the phone keeps the whole sidebar in a drawer — click `button[aria-label='Open navigation']` before anything
+  in the sidebar or the user panel (`[data-testid=user-settings]`), or the click times out.
+- `Walk.unlabeled()` has false positives: a radio wrapped in `<label>` has a name. Confirm with
+  `page.locator(...).aria_snapshot()` before writing an a11y finding.
+- `full_page=True` does not capture the settings overlay; scroll its inner scroller instead.
+- theme/language live on the account and sync, so `viewport_pass` sets them at the start and resets to dark/en
+  at the end. If a pass dies half-way, bob may be left in ar/de — reset by hand before the Android pass.
+
+Next: `p-light-en`, `p-dark-ar`, `p-dark-de`, `desktop-light`, `tablet`, `wide`, then `d7-voice`, then Android
+(check `vm_stat` first: needs free+inactive > 1.3 M pages).

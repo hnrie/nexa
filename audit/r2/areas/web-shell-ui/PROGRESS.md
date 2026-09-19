@@ -1,7 +1,7 @@
 # Progress — web-shell-ui
 State: auditing
-Last checkpoint: 2026-09-19T00:45Z
-Next finding id: 032
+Last checkpoint: 2026-09-19T06:15Z
+Next finding id: 066
 
 ## Inspected
 
@@ -89,77 +89,77 @@ Settings:
 - [x] web/src/components/settings/StickersPage.tsx
 - [x] web/src/components/settings/AdminPage.tsx
 - [x] web/src/components/settings/LicensesPage.tsx
-- [ ] web/src/components/settings/LicensesPage.test.tsx
+- [x] web/src/components/settings/LicensesPage.test.tsx
 - [x] web/src/components/settings/Licenses.module.css
 
 Server settings:
 - [x] web/src/components/server/SettingsLayer.tsx
 - [x] web/src/components/server/ServerSettingsModal.tsx
 - [x] web/src/components/server/ServerSettings.module.css
-- [ ] web/src/components/server/ChannelSettingsModal.tsx
-- [ ] web/src/components/server/MemberActionModal.tsx
+- [x] web/src/components/server/ChannelSettingsModal.tsx
+- [x] web/src/components/server/MemberActionModal.tsx
 - [x] web/src/components/server/PermissionGrid.tsx
-- [ ] web/src/components/server/PermissionGrid.module.css
-- [ ] web/src/components/server/RoleChips.module.css
-- [ ] web/src/components/server/PackEditor.tsx
-- [ ] web/src/components/server/PackEditor.module.css
-- [ ] web/src/components/server/memberMenu.ts
+- [x] web/src/components/server/PermissionGrid.module.css
+- [x] web/src/components/server/RoleChips.module.css
+- [x] web/src/components/server/PackEditor.tsx
+- [x] web/src/components/server/PackEditor.module.css
+- [x] web/src/components/server/memberMenu.ts
 - [x] web/src/components/server/pages/ServerOverviewPage.tsx
 - [x] web/src/components/server/pages/RolesPage.tsx
-- [ ] web/src/components/server/pages/rolePositions.ts
-- [ ] web/src/components/server/pages/rolePositions.test.ts
+- [x] web/src/components/server/pages/rolePositions.ts
+- [x] web/src/components/server/pages/rolePositions.test.ts
 - [x] web/src/components/server/pages/MembersPage.tsx
-- [ ] web/src/components/server/pages/BansPage.tsx
-- [ ] web/src/components/server/pages/BansPage.test.tsx
-- [ ] web/src/components/server/pages/InvitesPage.tsx
-- [ ] web/src/components/server/pages/EmojiPage.tsx
-- [ ] web/src/components/server/pages/ServerStickersPage.tsx
-- [ ] web/src/components/server/pages/AuditLogPage.tsx
-- [ ] web/src/components/server/pages/EncryptionPage.tsx
-- [ ] web/src/components/server/pages/DeleteServerPage.tsx
+- [x] web/src/components/server/pages/BansPage.tsx
+- [x] web/src/components/server/pages/BansPage.test.tsx
+- [x] web/src/components/server/pages/InvitesPage.tsx
+- [x] web/src/components/server/pages/EmojiPage.tsx
+- [x] web/src/components/server/pages/ServerStickersPage.tsx
+- [x] web/src/components/server/pages/AuditLogPage.tsx
+- [x] web/src/components/server/pages/EncryptionPage.tsx
+- [x] web/src/components/server/pages/DeleteServerPage.tsx
 
 Friends and desktop:
-- [ ] web/src/components/friends/Friends.module.css
-- [ ] web/src/components/desktop/DesktopEffects.tsx
-- [ ] web/src/components/desktop/DisplayPicker.tsx
-- [ ] web/src/components/desktop/Desktop.module.css
+- [x] web/src/components/friends/Friends.module.css
+- [x] web/src/components/desktop/DesktopEffects.tsx
+- [x] web/src/components/desktop/DisplayPicker.tsx
+- [x] web/src/components/desktop/Desktop.module.css
 
 Pages:
-- [ ] web/src/pages/AuthLayout.tsx
-- [ ] web/src/pages/AuthLayout.test.tsx
-- [ ] web/src/pages/Auth.module.css
-- [ ] web/src/pages/LoginPage.tsx
-- [ ] web/src/pages/LoginPage.test.tsx
+- [x] web/src/pages/AuthLayout.tsx
+- [x] web/src/pages/AuthLayout.test.tsx
+- [x] web/src/pages/Auth.module.css
+- [x] web/src/pages/LoginPage.tsx
+- [x] web/src/pages/LoginPage.test.tsx
 - [x] web/src/pages/RegisterPage.tsx
-- [ ] web/src/pages/RecoverPage.tsx
-- [ ] web/src/pages/RecoverPage.test.tsx
-- [ ] web/src/pages/LockPage.tsx
-- [ ] web/src/pages/PasscodePage.tsx
-- [ ] web/src/pages/HomePage.tsx
-- [ ] web/src/pages/Home.module.css
-- [ ] web/src/pages/DownloadPage.tsx
-- [ ] web/src/pages/DownloadPage.module.css
-- [ ] web/src/pages/InvitePage.tsx
-- [ ] web/src/pages/InvitePage.module.css
-- [ ] web/src/pages/OfflinePage.tsx
-- [ ] web/src/pages/FriendsPage.tsx
-- [ ] web/index.html                            (meta/OG/CSP for HomePage — brief asks for it)
+- [x] web/src/pages/RecoverPage.tsx
+- [x] web/src/pages/RecoverPage.test.tsx
+- [x] web/src/pages/LockPage.tsx
+- [x] web/src/pages/PasscodePage.tsx
+- [x] web/src/pages/HomePage.tsx
+- [x] web/src/pages/Home.module.css
+- [x] web/src/pages/DownloadPage.tsx
+- [x] web/src/pages/DownloadPage.module.css
+- [x] web/src/pages/InvitePage.tsx
+- [x] web/src/pages/InvitePage.module.css
+- [x] web/src/pages/OfflinePage.tsx
+- [x] web/src/pages/FriendsPage.tsx
+- [x] web/index.html                            (meta/OG/CSP for HomePage — brief asks for it)
 
 Context only (not in scope, read to know what exists): `web/src/components/common/*`,
 `web/src/pages/DMPage.tsx`, `web/src/pages/ServerPage.tsx`, `web/src/pages/StickerPackPage.tsx`
 (web-chat-ui), `web/src/pages/GuestCallPage.tsx` (voice).
 
 Parity (read-only, Android):
-- [ ] android/.../ui/main/MainScreen.kt
+- [x] android/.../ui/main/MainScreen.kt
 - [ ] android/.../ui/main/Sidebar.kt
-- [ ] android/.../ui/auth/AuthScreen.kt
-- [ ] android/.../ui/auth/RecoveryKeyOverlay.kt
+- [x] android/.../ui/auth/AuthScreen.kt
+- [x] android/.../ui/auth/RecoveryKeyOverlay.kt
 - [ ] android/.../ui/settings/SettingsScreen.kt
 - [ ] android/.../ui/server/ServerSettingsScreen.kt
-- [ ] android/.../ui/friends/FriendsScreen.kt
+- [x] android/.../ui/friends/FriendsScreen.kt
 - [ ] android/.../ui/invite/InviteScreen.kt
 - [ ] android/.../ui/sheets/*
-- [ ] android/.../ui/Nav.kt
+- [x] android/.../ui/Nav.kt
 
 Round 1:
 - [ ] audit/REVIEW.md (Done / Not doing / Still open)
@@ -168,13 +168,14 @@ Round 1:
 - [ ] audit/product-gaps.md (the 15 IDEA findings — re-judge as design)
 
 ## Handoff note
-Resumed 2026-09-19T00:05Z by successor #2. The header said "Next finding id: 001" but
-FINDINGS.md already held WSHELL-001..010 (shell, rail/sidebar, modals) — corrected to 011.
-Shell, rail/sidebar and modals were done by the predecessor. Working through settings now
-(SettingsModal, Settings.module.css, Account, Profile, Security, Privacy done; RegisterPage
-read early for the recovery-key comparison). Two cross-cutting threads to finish:
-(a) hard-coded English — WSHELL-001/020 hold the list, scan each new file;
-(b) one-time secrets dismissible by Escape — WSHELL-012/021.
-Next: EncryptionSection, DevicesPage, NotificationsPage, AppearancePage, CustomColorIcon,
-VoicePage, DesktopPage, StickersPage, AdminPage, LicensesPage → server/* → pages/* →
-desktop/* → Android parity → round-1 reports.
+Successor #3, 2026-09-19T05:12Z. Server settings are done (all pages, modals, PackEditor,
+memberMenu, rolePositions, the CSS), friends is done. Findings through WSHELL-043.
+Remaining: desktop/* -> pages/* + web/index.html -> Android parity -> round-1 reports.
+Two cross-cutting threads, scan every new file for them:
+(a) hard-coded English — WSHELL-001/020/033/034 hold the running list; also found and NOT
+    yet written up anywhere: `EmojiPage.tsx:87` (`title: `Delete :name:``). Put it in the
+    Summary addendum if no better home.
+(b) one-time secrets dismissible by Escape — WSHELL-012/021; `RecoverPage.tsx` shows a
+    fresh recovery key at :71, check it for the same gap when you read it.
+Open question to settle in pages/*: `LoginPage` autocomplete attributes, the TOTP step,
+and whether the 90-day session length is stated anywhere (brief asks).

@@ -1,7 +1,7 @@
 # Progress — server-api
-State: auditing
-Last checkpoint: 2026-09-19T01:40Z
-Next finding id: 035
+State: audit-done
+Last checkpoint: 2026-09-19T05:19Z
+Next finding id: 051
 
 ## Inspected
 
@@ -31,22 +31,22 @@ Reading order from BRIEF.md; tests at the end, read alongside the handler they c
 
 ### Servers and permissions
 - [x] internal/api/server_handlers.go
-- [ ] internal/api/server_handlers_test.go
-- [ ] internal/api/server_perms_test.go
+- [x] internal/api/server_handlers_test.go
+- [x] internal/api/server_perms_test.go
 - [x] internal/api/server_glue.go
 - [x] internal/perms/perms.go
-- [ ] internal/perms/perms_test.go
-- [ ] internal/api/membership_test.go
-- [ ] internal/api/admin_powers_test.go
+- [x] internal/perms/perms_test.go
+- [x] internal/api/membership_test.go
+- [x] internal/api/admin_powers_test.go
 
 ### Channels, groups, subchats
 - [x] internal/api/channel_handlers.go
-- [ ] internal/api/channel_handlers_test.go
+- [x] internal/api/channel_handlers_test.go
 - [x] internal/api/group_handlers.go
 - [x] internal/api/groups.go
 - [x] internal/api/subchat_handlers.go
-- [ ] internal/api/subchat_handlers_test.go
-- [ ] internal/api/subchat_lock_test.go
+- [x] internal/api/subchat_handlers_test.go
+- [x] internal/api/subchat_lock_test.go
 
 ### Messages, uploads, media, proxy, unfurl
 - [x] internal/api/message_handlers.go
@@ -112,24 +112,16 @@ Reading order from BRIEF.md; tests at the end, read alongside the handler they c
 ### Remaining tests
 - [x] internal/api/audit_regressions_test.go
 - [x] internal/api/router_test.go
-- [ ] internal/api/testutil_test.go
+- [x] internal/api/testutil_test.go
 
 ### Round-1 verification
 - [x] audit/REVIEW.md (Done / Not doing / Still open)
 - [x] audit/server-security.md
-- [ ] audit/server-correctness.md (api parts)
+- [x] audit/server-correctness.md (api parts)
 
 ### Client contract comparison
-- [ ] web/src/api/*.ts (spot-check against routes)
-- [ ] android/.../net/Endpoints.kt, ApiClient.kt, Models.kt (spot-check against routes)
+- [x] web/src/api/*.ts (spot-check against routes)
+- [x] android/.../net/Endpoints.kt, ApiClient.kt, Models.kt (spot-check against routes)
 
 ## Handoff note
-Findings SAPI-001..022 written. Still pending from the first agent's list:
-- (settled → SAPI-027) group kick leaves the member in the call.
-- (settled) limiter.go Reset clears the shared counter; tested.
-- (settled → SAPI-030, SAPI-033) CSP and HSTS.
-- server-correctness.md's api items verified handler by handler; the file itself not yet read as a whole.
-Open threads of mine: SAPI-016 names `handlePasswordChange`/`handleRecoveryReplace`/`handleMFADisable` from the predecessor's note — confirm each calls VerifyAuthKey without limAuthUsr when reading mfa tests; `about_me` is 100 000 runes and `Public()` includes it — check whether message authors / member lists embed PublicUser before writing a perf finding.
-Settled: expression caps → SAPI-026; rpcapps has FailTTL+pacing (no finding). Candidate P3 from sfu_handlers.go: server-mute/deafen/suppress are flags only — a muted member may still publish audio and a deafened one still subscribe (enforce in handleSFUPublish/Subscribe); guests get a fresh Cloudflare TURN credential on every /voice/ice call (no reuse, voice_glue.go:527-536).
-Pending: config finding (TURN pair unvalidated; PUBLIC_URL default is the live domain; env-example covers every key, precedence documented); shared-limiter collision — every ipLimited limiter uses the bare IP as key and Redis namespaces only by 'rate:' (cache/redis.go:149), confirm the Lua script then write P2 (latent, REDIS_URL only); router_test.go TestReadJSON is an empty stub (P3 test).
-Next: testutil/perms/server_perms/membership/admin_powers tests, then server_handlers/channel/subchat tests, round-1 server-correctness.md, client spot-check, admin/legal/crash, desktop/android/static, main/config/limiter/totp tests, remaining tests, client contract spot-check.
+Audit done 2026-09-19T05:19Z. Every file in scope inspected; Summary written at the top of FINDINGS.md (50 findings, SAPI-001..050). Nothing pending. If a fourth agent is ever started here: do not re-audit; the fix phase's PLAN.md is the next thing that touches this area.

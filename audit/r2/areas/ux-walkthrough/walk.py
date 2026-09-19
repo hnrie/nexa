@@ -25,8 +25,9 @@ _catalogs = {}
 
 def L(lang, key):
     """A catalogue string by key, so the Arabic and German passes can find controls by their translated names."""
-    if lang not in _catalogs:
-        _catalogs[lang] = json.load(open(ROOT / "web/src/i18n/locales" / f"{lang}.json"))
+    for lg in ("en", lang):
+        if lg not in _catalogs:
+            _catalogs[lg] = json.load(open(ROOT / "web/src/i18n/locales" / f"{lg}.json"))
     v = _catalogs[lang].get(key) or _catalogs["en"].get(key) if lang != "en" else _catalogs[lang].get(key)
     if isinstance(v, dict):
         v = v.get("other") or next(iter(v.values()))
@@ -113,6 +114,7 @@ class Walk(Session):
                 const r = el.getBoundingClientRect();
                 if (r.width === 0 || r.height === 0) continue;
                 if (r.bottom < 0 || r.top > innerHeight) continue;
+                if (r.right < 0 || r.left > innerWidth) continue;
                 if (r.width < min || r.height < min) {
                     const label = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('placeholder') || '').trim().slice(0, 40);
                     out.push({ label, w: Math.round(r.width), h: Math.round(r.height), tag: el.tagName.toLowerCase(), x: Math.round(r.x), y: Math.round(r.y) });
@@ -185,6 +187,13 @@ class Walk(Session):
             p.wait_for_timeout(1500)
         self.close_settings()
         p.wait_for_timeout(500)
+
+    def composer(self):
+        """e2e's helper matches the English aria-label; the other languages need their own."""
+        loc = self.page.locator("textarea[aria-label^='Message']")
+        if loc.count():
+            return loc
+        return self.page.locator("textarea[aria-label]").last
 
     def right_click(self, locator):
         locator.click(button="right")
@@ -1108,6 +1117,289 @@ def step_d7_voice(base, pw):
     attempt(alice, "dm-call", dm_call)
     print("FAILS:", FAILS)
     browser.close()
+
+
+def step_probe(base, pw):
+    """Targeted live checks behind findings: how a channel's settings are reached, whether the member-list
+    moderation icons have names, where the Devices sweep button sits, the lightbox chrome, contrasts."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    w.login()
+    p = w.page
+    def channel_entry():
+        open_alice_general(w)
+        row = p.locator("[data-channel]").first
+        print("  channel row html:", row.evaluate("el => el.outerHTML.slice(0, 400)"))
+        row.hover(); p.wait_for_timeout(500)
+        print("  buttons in row on hover:", row.locator("button").count(),
+              [row.locator("button").nth(i).get_attribute("aria-label") for i in range(row.locator("button").count())])
+        w.shot("probe-channel-row-hover")
+        w.right_click(row)
+        print("  channel right-click menu:", p.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if p.locator("[role=menu]").count() else "NO MENU")
+        w.shot("probe-channel-context-menu")
+        p.keyboard.press("Escape")
+    attempt(w, "probe-channel-entry", channel_entry)
+    def member_icons():
+        p.click("button:has-text(\"Alice's server\")"); p.wait_for_timeout(400)
+        p.click("text=Server Settings"); p.wait_for_timeout(1200)
+        p.click("[data-nav=members]"); p.wait_for_timeout(900)
+        rows = p.locator("[role=dialog] button")
+        print("  member page buttons:", p.evaluate("""() => [...document.querySelectorAll('[role=dialog] button')].map(b => ({
+            label: (b.getAttribute('aria-label') || b.getAttribute('title') || b.textContent || '').trim().slice(0, 40),
+            w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) }))"""))
+        _ = rows
+        print("  unlabeled here:", json.dumps(w.unlabeled())[:600])
+        w.shot("probe-server-members")
+        p.keyboard.press("Escape")
+    attempt(w, "probe-member-icons", member_icons)
+    def devices():
+        w.open_settings("devices"); p.wait_for_timeout(1200)
+        info = p.evaluate("""() => {
+            const d = document.querySelector('[role=dialog]');
+            const sc = [...d.querySelectorAll('*')].find(e => e.scrollHeight > e.clientHeight + 20 && e.clientHeight > 300);
+            const btn = [...d.querySelectorAll('button')].find(b => /all other/i.test(b.textContent || ''));
+            return { scrollHeight: sc ? sc.scrollHeight : null, clientHeight: sc ? sc.clientHeight : null,
+                     sweepTop: btn ? Math.round(btn.getBoundingClientRect().top) : null, innerHeight };
+        }""")
+        print("  devices:", info)
+        w.shot("probe-devices-top")
+        p.evaluate("""() => { const d = document.querySelector('[role=dialog]'); const sc = [...d.querySelectorAll('*')].find(e => e.scrollHeight > e.clientHeight + 20 && e.clientHeight > 300); if (sc) sc.scrollTop = sc.scrollHeight; }""")
+        p.wait_for_timeout(500)
+        w.shot("probe-devices-bottom")
+        w.close_settings()
+    attempt(w, "probe-devices", devices)
+    def lightbox():
+        alice_dm = lambda: w.open_dm_from_sidebar("Bob", "bob")
+        alice_dm()
+        p.wait_for_timeout(1500)
+        img = p.locator("[data-id] img").last
+        img.click()
+        p.wait_for_timeout(1200)
+        print("  lightbox chrome:", p.evaluate("""() => {
+            const out = [];
+            for (const el of document.querySelectorAll('button, a[href]')) {
+                const r = el.getBoundingClientRect();
+                if (r.height === 0 || r.top < innerHeight - 90) continue;
+                out.push({ t: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 24), x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) });
+            }
+            const comp = document.querySelector("textarea[aria-label^='Message']");
+            return { bottom: out, composerTop: comp ? Math.round(comp.getBoundingClientRect().top) : null, innerHeight };
+        }"""))
+        print("  lightbox filename shown:", "screenshot.png" in p.locator("body").inner_text())
+        w.shot("probe-lightbox")
+        p.keyboard.press("Escape")
+    attempt(w, "probe-lightbox", lightbox)
+    def contrasts():
+        open_alice_general(w)
+        for sel in ("[data-channel] a, [data-channel]", "time", "[class*=hint]", "textarea[aria-label^='Message']"):
+            print(f"  contrast {sel}:", w.contrast_of(sel))
+        print("  placeholder contrast:", p.evaluate("""() => {
+            const ta = document.querySelector("textarea[aria-label^='Message']"); if (!ta) return null;
+            const cs = getComputedStyle(ta, '::placeholder'); return { color: cs.color, size: cs.fontSize };
+        }"""))
+    attempt(w, "probe-contrast", contrasts)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+# ---- the phone / tablet / other-viewport passes ------------------------------
+
+def viewport_pass(base, pw, platform, theme, lang, account="bob", standalone=False):
+    """One platform × theme × language: the screens a person actually walks through."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, account, platform, theme=theme, lang=lang, standalone=standalone)
+    p = w.page
+    phone = VIEWPORTS[platform][0] < 768
+    ids = seed_ids()
+    def home():
+        t0 = time.time()
+        p.goto(base + "/", wait_until="networkidle")
+        print("  home timing", w.nav_timing(), "wall %.2fs" % (time.time() - t0))
+        w.shot("home")
+        w.shot("home-full", full=True)
+        diag(w, "home")
+    attempt(w, "home", home)
+    attempt(w, "login-page", lambda: (p.goto(base + "/login", wait_until="networkidle"), p.wait_for_timeout(500), w.shot("login"), diag(w, "login")))
+    def sign_in():
+        w.login()
+        p.wait_for_timeout(2000)
+    attempt(w, "login", sign_in)
+
+    def open_drawer():
+        if phone and p.locator(f"button[aria-label='{L(lang, 'shell.pageHeader.openNavigation')}']").count():
+            p.click(f"button[aria-label='{L(lang, 'shell.pageHeader.openNavigation')}']")
+            p.wait_for_timeout(600)
+    # the theme is a stored setting; the language follows the browser locale
+    def skin():
+        # The language needs nothing: the app follows the browser's locale by default and the context
+        # is created with it. Only the theme is a stored setting, and its switch lives in the drawer.
+        if theme == "dark":
+            return
+        open_drawer()
+        p.click("[data-testid=user-settings]")
+        p.wait_for_timeout(900)
+        p.click("[data-nav=appearance]")
+        p.wait_for_timeout(700)
+        p.locator(f"[role=dialog] [data-theme-choice={theme}], [role=dialog] button:has-text('{theme.capitalize()}')").first.click()
+        p.wait_for_timeout(700)
+        w.close_settings()
+        p.wait_for_timeout(600)
+    attempt(w, "skin", skin)
+    attempt(w, "friends", lambda: (p.goto(base + "/channels/@me", wait_until="networkidle"), p.wait_for_timeout(1200), w.shot("friends"), diag(w, "friends")))
+    def drawer():
+        if not phone:
+            return
+        p.click(f"button[aria-label='{L(lang, 'shell.pageHeader.openNavigation')}']")
+        p.wait_for_timeout(700)
+        w.shot("drawer")
+        diag(w, "drawer")
+        print("  drawer side:", p.evaluate("""() => { const a = [...document.querySelectorAll('aside, nav')].map(e => { const r = e.getBoundingClientRect(); return { cls: String(e.className).slice(0,30), x: Math.round(r.x), w: Math.round(r.width) }; }).filter(o => o.w > 40); return a; }"""))
+        p.keyboard.press("Escape")
+        p.wait_for_timeout(400)
+    attempt(w, "drawer", drawer)
+    def dm():
+        p.goto(base + "/channels/@me", wait_until="networkidle")
+        p.wait_for_timeout(1000)
+        open_drawer()
+        p.locator("button:has(span:text-is('Alice')), button:has(span:text-is('alice'))").first.click()
+        p.wait_for_url("**/channels/@me/*", timeout=15000)
+        p.wait_for_timeout(2000)
+        w.shot("dm")
+        diag(w, "dm")
+        w.composer().click()
+        p.wait_for_timeout(400)
+        w.shot("dm-composer-focused")
+        w.composer().fill("a message typed on this viewport, long enough to wrap onto a second line in the box")
+        p.wait_for_timeout(400)
+        w.shot("dm-composer-typed")
+        diag(w, "dm-composer")
+        w.send("hello from " + platform + " " + theme + " " + lang)
+        p.wait_for_timeout(2500)
+        w.shot("dm-sent")
+    attempt(w, "dm", dm)
+    def actions_without_hover():
+        row = p.locator("[data-id]").last
+        if phone:
+            box = row.bounding_box()
+            p.touchscreen.tap(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+            p.wait_for_timeout(900)
+            w.shot("message-tap")
+            row.click(button="right")   # stands in for the long press
+            p.wait_for_timeout(700)
+        else:
+            row.click(button="right")
+            p.wait_for_timeout(500)
+        w.shot("message-actions")
+        print("  actions menu:", p.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if p.locator("[role=menu]").count() else "NO MENU")
+        diag(w, "message-actions")
+        p.keyboard.press("Escape")
+    attempt(w, "message-actions", actions_without_hover)
+    def server():
+        p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        p.wait_for_selector("[data-id]", timeout=20000)
+        p.wait_for_timeout(1500)
+        w.shot("server-channel")
+        diag(w, "server-channel")
+        w.shot("server-channel-full", full=True)
+        p.mouse.wheel(0, -1200); p.wait_for_timeout(700); w.shot("server-channel-up")
+        p.mouse.wheel(0, -1200); p.wait_for_timeout(700); w.shot("server-channel-top")
+    attempt(w, "server", server)
+    def members():
+        if phone:
+            btn = p.locator("button[aria-label*='ember'], button[aria-label*='عضو'], button[aria-label*='itglied']").first
+            if btn.count():
+                btn.click(); p.wait_for_timeout(800); w.shot("member-list"); diag(w, "member-list"); p.keyboard.press("Escape")
+        else:
+            w.shot("member-list")
+    attempt(w, "members", members)
+    def composer_pickers():
+        p.click("button[aria-label=\"" + (L(lang, "composer.composer.selectEmoji") or "Select emoji") + "\"]")
+        p.wait_for_timeout(1200)
+        w.shot("picker-emoji")
+        diag(w, "picker-emoji")
+        print("  picker box:", p.evaluate("""() => { const d = document.querySelector('[role=dialog]'); if (!d) return null; const r = d.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), innerH: innerHeight }; }"""))
+        p.keyboard.press("Escape")
+    attempt(w, "picker", composer_pickers)
+    def settings():
+        open_drawer()
+        p.click("[data-testid=user-settings]")
+        p.wait_for_timeout(1200)
+        w.shot("settings")
+        diag(w, "settings")
+        print("  settings nav overflow:", p.evaluate("""() => { const n = document.querySelector('[role=dialog] nav'); if (!n) return null; const r = n.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), sw: n.scrollWidth, cw: n.clientWidth }; }"""))
+        for nav in ("account", "appearance", "privacy", "security", "voice"):
+            if p.locator(f"[data-nav={nav}]").count() == 0:
+                continue
+            p.click(f"[data-nav={nav}]")
+            p.wait_for_timeout(800)
+            w.shot("settings-" + nav)
+            diag(w, "settings-" + nav, small=False)
+        p.keyboard.press("Escape")
+        p.wait_for_timeout(400)
+        p.keyboard.press("Escape")
+    attempt(w, "settings", settings)
+    def search():
+        p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        p.wait_for_timeout(1200)
+        sel = "input[aria-label=\"" + (L(lang, "chat.chat.searchMessages") or "Search messages") + "\"]"
+        if p.locator(sel).count() == 0:
+            btn = p.locator("button[aria-label=\"" + (L(lang, "chat.chat.searchMessages") or "Search messages") + "\"]")
+            if btn.count():
+                btn.first.click()
+                p.wait_for_timeout(600)
+        p.locator(sel).first.click()
+        p.wait_for_timeout(800)
+        w.shot("search")
+        diag(w, "search")
+        p.keyboard.type("heading", delay=30)
+        p.keyboard.press("Enter")
+        p.wait_for_timeout(2500)
+        w.shot("search-results")
+        diag(w, "search-results", small=False)
+        p.keyboard.press("Escape")
+    attempt(w, "search", search)
+    def reset_skin():
+        if theme == "dark":
+            return
+        open_drawer()
+        p.click("[data-testid=user-settings]")
+        p.wait_for_timeout(900)
+        p.click("[data-nav=appearance]")
+        p.wait_for_timeout(700)
+        p.locator("[role=dialog] [data-theme-choice=dark], [role=dialog] button:has-text('Dark')").first.click()
+        p.wait_for_timeout(700)
+        w.close_settings()
+    attempt(w, "reset-skin", reset_skin)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_p_dark_en(base, pw):
+    viewport_pass(base, pw, "web-phone", "dark", "en")
+
+
+def step_p_light_en(base, pw):
+    viewport_pass(base, pw, "web-phone", "light", "en")
+
+
+def step_p_dark_ar(base, pw):
+    viewport_pass(base, pw, "web-phone", "dark", "ar")
+
+
+def step_p_dark_de(base, pw):
+    viewport_pass(base, pw, "web-phone", "dark", "de")
+
+
+def step_desktop_light(base, pw):
+    viewport_pass(base, pw, "web-desktop", "light", "en")
+
+
+def step_tablet(base, pw):
+    viewport_pass(base, pw, "web-tablet", "dark", "en")
+
+
+def step_wide(base, pw):
+    viewport_pass(base, pw, "web-desktop-1920", "dark", "en")
 
 
 def main():

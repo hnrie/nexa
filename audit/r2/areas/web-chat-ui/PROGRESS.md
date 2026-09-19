@@ -1,7 +1,7 @@
 # Progress — web-chat-ui
 State: auditing
-Last checkpoint: 2026-09-19T00:35Z
-Next finding id: 054
+Last checkpoint: 2026-09-19T05:46Z
+Next finding id: 093
 
 ## Inspected
 
@@ -89,58 +89,58 @@ Chat:
 - [x] web/src/components/chat/LockedChannel.tsx
 
 Markdown:
-- [ ] web/src/markdown/render.tsx
+- [x] web/src/markdown/render.tsx
 - [ ] web/src/markdown/render.test.tsx
-- [ ] web/src/markdown/parse.ts        (owned by web-core; read only for render findings)
-- [ ] web/src/markdown/ast.ts
+- [x] web/src/markdown/parse.ts        (owned by web-core; read only for render findings)
+- [x] web/src/markdown/ast.ts
 
 Composer:
-- [ ] web/src/components/composer/Composer.tsx
-- [ ] web/src/components/composer/Composer.module.css
-- [ ] web/src/components/composer/Autocomplete.tsx
-- [ ] web/src/components/composer/DropOverlay.tsx
-- [ ] web/src/components/composer/DropOverlay.module.css
-- [ ] web/src/components/composer/commands.ts
+- [x] web/src/components/composer/Composer.tsx
+- [x] web/src/components/composer/Composer.module.css
+- [x] web/src/components/composer/Autocomplete.tsx
+- [x] web/src/components/composer/DropOverlay.tsx
+- [x] web/src/components/composer/DropOverlay.module.css
+- [x] web/src/components/composer/commands.ts
 - [ ] web/src/components/composer/commands.test.ts
-- [ ] web/src/components/composer/mentions.ts
+- [x] web/src/components/composer/mentions.ts
 - [ ] web/src/components/composer/mentions.test.ts
-- [ ] web/src/components/composer/linkPreviews.ts
+- [x] web/src/components/composer/linkPreviews.ts
 - [ ] web/src/components/composer/linkPreviews.test.ts
-- [ ] web/src/components/composer/send.ts
-- [ ] web/src/components/composer/useAutosize.ts
+- [x] web/src/components/composer/send.ts
+- [x] web/src/components/composer/useAutosize.ts
 
 Pickers:
-- [ ] web/src/components/pickers/ExpressionPicker.tsx
-- [ ] web/src/components/pickers/EmojiPicker.tsx
-- [ ] web/src/components/pickers/emojiIndex.ts
-- [ ] web/src/components/pickers/GifPicker.tsx
-- [ ] web/src/components/pickers/GifGrid.tsx
-- [ ] web/src/components/pickers/StickerPicker.tsx
-- [ ] web/src/components/pickers/Picker.module.css
+- [x] web/src/components/pickers/ExpressionPicker.tsx
+- [x] web/src/components/pickers/EmojiPicker.tsx
+- [x] web/src/components/pickers/emojiIndex.ts
+- [x] web/src/components/pickers/GifPicker.tsx
+- [x] web/src/components/pickers/GifGrid.tsx
+- [x] web/src/components/pickers/StickerPicker.tsx
+- [x] web/src/components/pickers/Picker.module.css
 
 Search:
-- [ ] web/src/components/search/SearchPanel.tsx
+- [x] web/src/components/search/SearchPanel.tsx
 - [ ] web/src/components/search/SearchPanel.test.tsx
-- [ ] web/src/components/search/SearchSuggestions.tsx
+- [x] web/src/components/search/SearchSuggestions.tsx
 - [ ] web/src/components/search/SearchSuggestions.test.ts
-- [ ] web/src/components/search/useFullSearch.ts
-- [ ] web/src/components/search/Search.module.css
+- [x] web/src/components/search/useFullSearch.ts
+- [x] web/src/components/search/Search.module.css
 
 Profile and activity:
-- [ ] web/src/components/profile/ProfileCard.tsx
-- [ ] web/src/components/profile/ProfileModal.tsx
-- [ ] web/src/components/profile/Profile.module.css
-- [ ] web/src/components/profile/KeyVerify.tsx
-- [ ] web/src/components/profile/KeyVerify.module.css
-- [ ] web/src/components/activity/ActivityCard.tsx
-- [ ] web/src/components/activity/StatusLine.tsx
-- [ ] web/src/components/activity/Activity.module.css
+- [x] web/src/components/profile/ProfileCard.tsx
+- [x] web/src/components/profile/ProfileModal.tsx
+- [x] web/src/components/profile/Profile.module.css
+- [x] web/src/components/profile/KeyVerify.tsx
+- [x] web/src/components/profile/KeyVerify.module.css
+- [x] web/src/components/activity/ActivityCard.tsx
+- [x] web/src/components/activity/StatusLine.tsx
+- [x] web/src/components/activity/Activity.module.css
 
 Pages:
-- [ ] web/src/pages/DMPage.tsx
-- [ ] web/src/pages/ServerPage.tsx
-- [ ] web/src/pages/ServerPage.module.css
-- [ ] web/src/pages/StickerPackPage.tsx
+- [x] web/src/pages/DMPage.tsx
+- [x] web/src/pages/ServerPage.tsx
+- [x] web/src/pages/ServerPage.module.css
+- [x] web/src/pages/StickerPackPage.tsx
 
 Android parity (read-only, comparison):
 - [ ] android ui/chat/ChatScreen.kt
@@ -162,29 +162,52 @@ Round 1 cross-check:
 - [x] audit/product-gaps.md parity matrix
 
 ## Handoff note
-Styles and common/ done (16 findings, WCHAT-001..016). Round-1 cross-check done: RTL avatar cut (001), context-menu #fff (002), hardcoded English (003), toast lifetime (015), cropper keyboard (007), FloatingPlane touch (008) are round-1 items still open; Modal trap/labels, ContextMenu keyboard, Toasts live region, Tooltip describedby/Escape, Field aria, ImageCrop errors are confirmed fixed.
-Pending checks to make when reaching the files: (a) Chat.module.css — does the font-scale slider move chat text now (round 1 BROKEN); is the lightbox z-index 200 = Toasts 200 (toast hidden behind lightbox?); (b) render.tsx — spoiler a11y (text node only `color: transparent`), `<t:>` formatters via lib/time, RenderNodes index keys, code-block copy button; (c) Attachments lightbox keyboard for ZoomPan; (d) Toasts `top: 16px` and index.html `viewport-fit=cover` with no shell top inset — write as finding once the apple status-bar meta is known.
-Predecessor's pending checks now resolved: font-scale is still broken (WCHAT-018),
-lightbox z-index 200 does collide with Toasts 200 (WCHAT-022). Still pending:
-(b) render.tsx spoiler a11y / `<t:>` formatters / RenderNodes keys / code-block copy;
-(c) Attachments lightbox keyboard for ZoomPan; (d) Toasts `top: 16px` vs the iOS
-status bar — `index.html:5` has `viewport-fit=cover` and no `apple-mobile-web-app-*`
-meta at all, so check with web-shell-ui before writing it.
-ChatView/MessageList/MessageItem/Chat.module.css done → WCHAT-017..027. The two
-biggest: no keyboard route to any message action (017) and the font-size setting
-being a no-op (018).
-Hardcoded English: now written up (003/025/031/034/043/048/050 cover everything
-found so far; add to a new finding if the composer/pickers/search turn up more).
-Old list, kept for reference:
-VideoPlayer.tsx:294 `SPOILER`, AudioPlayer.tsx:134 `Pause/Play ${name}`, :175-176
-`Unmute/Mute` (in 003), :180 `Download ${name}`, Embeds.tsx handled by 034,
-StickerPopout handled by 046, Attachments handled by 031, SystemMessage.tsx:14
-`"someone"` fallback. Also for that finding: messageMenu.ts:84-85 uses the literal
-`4` instead of MSG_FLAG_SUPPRESS_EMBEDS (server masks the field, so no bug).
-Pending: one P3 `code` finding for the six hand-rolled `<input>` search boxes
-(ChatView:238, SubchatPanel:170, EmojiPicker:464, GifPicker:154, StickerPicker:53,
-SearchPanel:119, SearchSuggestions:80) instead of common/TextInput — write it once
-Picker.module.css and Search.module.css are read, so the differences are concrete.
-Next: MemberList, GroupMemberList, groupMemberMenu → markdown/render.tsx →
-composer → pickers → search → profile → activity → pages → Android parity → tests.
-MessageList.test.tsx left with the other tests at the end.
+Done so far: styles, all of `common/`, all of `chat/` (bar its five test files),
+`markdown/` (render.tsx + ast.ts + the parts of parse.ts the renderer depends on).
+Findings WCHAT-001..059. Round-1 cross-check is done (see the list below).
+
+Settled pending checks: font-scale still broken (018); lightbox z-index collides
+with Toasts (022); `<t:>` formatters *do* use the app locale via `lib/time.ts`
+(no finding); RenderNodes' content keys are deliberate and correct (no finding);
+spoiler a11y is a finding (054); code-block copy is a finding (057).
+
+Still pending:
+- (c) ZoomPan keyboard: WCHAT-029/030 cover opening the viewer and the missing
+  focus trap; panning by arrow keys is still unchecked (`common/ZoomPan.tsx` is
+  ticked, so re-read only the key handling if a successor wants it).
+- (d) Toasts `top: 16px` under the iOS status bar: `web/index.html:5` has
+  `viewport-fit=cover` and no `apple-mobile-web-app-*` meta at all, so whether a
+  toast lands under the status bar depends on web-shell-ui's shell insets. Left
+  for web-shell-ui; do not write it here.
+- (settled) the hand-rolled search boxes are now WCHAT-085; the conclusion is that
+  `common/TextInput` is the wrong target (it is a bordered form field) and the
+  missing thing is a `SearchBox`. SubchatPanel:170 is a name field, not a search box.
+- English residue: 003/025/031/034/043/048/050 cover chat + common. If the
+  composer, pickers, search, profile or activity turn up more, add one finding
+  per surface rather than extending those.
+
+Composer done → WCHAT-060..073. The two P1s are `useKeepFocused`
+(`Composer.tsx:565`): it steals the caret into the wrong pane in a split (060) and
+it eats Space on every focused button outside a dialog (061). Both want a browser
+check if anyone has a session up. DropOverlay.module.css read with DropOverlay.
+
+Pickers done → WCHAT-074..080. They are the best-built part of the area
+(virtualised emoji grid, arrow keys, focus trap, real retry states); the findings
+are search-in-English-only, the keyboard covering the phone sheet, and stickers/GIFs
+losing the reply. GIF previews *are* proxied by the server (checked
+internal/api/expression_handlers.go:958) — no third-party leak there.
+
+Search done → WCHAT-081..085.
+
+Profile + activity done → WCHAT-086..090. Checked and NOT findings: settings
+(and therefore a profile note) are encrypted and the save is debounced 800 ms
+(stores/settings.ts:295); activity images are proxied and non-https ones dropped by
+the server (internal/gateway/activity.go:172, activity_test.go:119). KeyVerify.module.css
+read with KeyVerify.tsx.
+
+Pages done → WCHAT-091..092 (StickerPackPage is behind RequireAuth, so no anonymous-visitor finding).
+
+Next: the Android parity files → profile/* → activity/* → pages/* →
+the Android parity files → the six test files (MessageList.test.tsx,
+fitMedia.test.ts, mediaLinks.test.ts, messageMenu.test.ts,
+groupMemberMenu.test.ts, render.test.tsx) last.

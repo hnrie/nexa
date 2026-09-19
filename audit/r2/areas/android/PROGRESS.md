@@ -1,7 +1,7 @@
 # Progress — android
 State: auditing
-Last checkpoint: 2026-09-19T00:18Z
-Next finding id: 022
+Last checkpoint: 2026-09-19T05:24Z
+Next finding id: 062
 
 ## Inspected
 
@@ -77,27 +77,27 @@ UI main:
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/main/Sidebar.kt
 
 UI chat:
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/ChatScreen.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/MessageRow.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/Composer.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/MessageActions.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/AttachmentViews.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/Players.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/chat/SwipeToReply.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/ChatScreen.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/MessageRow.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/Composer.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/MessageActions.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/AttachmentViews.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/Players.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/chat/SwipeToReply.kt
 
 UI markdown (+ web parser for parity):
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Ast.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Parser.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Render.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Highlight.kt
-- [ ] web/src/markdown/parse.ts (read-only reference)
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Ast.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Parser.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Render.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/markdown/Highlight.kt
+- [x] web/src/markdown/parse.ts (read-only reference)
 
 UI pickers:
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/EmojiIndex.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/EmojiTab.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/EmojiIndex.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/EmojiTab.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionCells.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionSheet.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionState.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionState.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/Expressions.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/GifTab.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/StickerTab.kt
@@ -152,4 +152,4 @@ Round 1 cross-check:
 - [ ] audit/product-gaps.md (Android column)
 
 ## Handoff note
-Second agent. Ticked through media/*. Findings 011-015 written. Carrying: (a) GatewayService dataSync 6h cap on Android 15 — verify in Services.kt; (b) no boot receiver, no battery-optimisation exemption request (Doze delays); (c) Nav: SettingsScreen/ServerSettings/Invite back all go to Route.Chat(null,null) not the previous channel — verify what MainScreen shows for Chat(null,null); (d) sign-out leaves Nav route/layers and message notifications; (e) notification tap on cold start passes serverId=null; (f) Embed parse in MessageCrypto.fromJson drops web-only fields (author, icon, media*, player*, published_at) and MessageService.edit re-encrypts the lossy payload — confirm the web puts those fields in embeds; (g) Channel.locked (password subchat) has no model field or unlock flow on Android — confirm the web's endpoint; (h) single-request upload buffers up to uploadSingleBytes in memory (check server default); (i) AttachmentStore.file() uses removePrefix(Api.baseUrl) which breaks if baseUrl ends with '/'. Next: service/Services.kt, notify/Notifications.kt, then ui/.
+Third agent. ui/chat/* and ui/markdown/* done (022-061). Pending: DROID-062 to write = scrolling past a video downloads and decrypts the whole file for its poster (CoilSetup.kt:74-82 AttachmentFetcher -> AttachmentStore.file; AttachmentViews.kt:138-143 AsyncImage(model = meta) for videos) — confirm the web's approach in VideoPlayer.tsx first. DROID-031 still needs a Where line for MessageActions.kt:122-131 (26 dp icon). Next: ExpressionCells, ExpressionSheet, Expressions, GifTab, StickerTab, then sheets/*.

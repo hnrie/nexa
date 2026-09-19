@@ -14,16 +14,16 @@ Android 1.0.3, desktop 1.0.5. Working tree was clean at `5d80e12`.
 
 | Area | Prefix | State | Runs | Notes |
 |---|---|---|---|---|
-| server-api | SAPI | dispatched (fable) | 1 | |
-| server-core | SCORE | dispatched (fable) | 1 | |
-| web-core | WCORE | dispatched (fable) | 1 | |
-| web-chat-ui | WCHAT | dispatched (fable) | 1 | |
-| web-shell-ui | WSHELL | dispatched (fable) | 1 | |
-| voice | VOICE | dispatched (fable) | 1 | |
-| android | DROID | dispatched (fable) | 1 | |
-| ux-walkthrough | UX | dispatched (fable) | 1 | owns the emulator |
-| desktop-release | DESK | queued | 0 | starts when a slot frees |
-| i18n-copy | I18N | queued | 0 | starts when a slot frees |
+| server-api | SAPI | audit-done | 3 | 50 findings: P1 3 · P2 11 · P3 36 |
+| server-core | SCORE | dispatched (opus) | 3 | |
+| web-core | WCORE | audit-done | 3 | 29 findings: P2 9 · P3 20 |
+| web-chat-ui | WCHAT | dispatched (opus) | 3 | |
+| web-shell-ui | WSHELL | dispatched (opus) | 3 | |
+| voice | VOICE | audit-done | 3 | 28 findings: P1 4 · P2 11 · P3 13 |
+| android | DROID | dispatched (fable) | 3 | |
+| ux-walkthrough | UX | dispatched (opus) | 3 | owns the emulator |
+| desktop-release | DESK | dispatched (fable) | 1 | |
+| i18n-copy | I18N | dispatched (fable) | 1 | |
 
 "State" is one of: queued · dispatched · audit-done · needs-successor ·
 triaged · fixing · fix-done. The agent's own `PROGRESS.md` is the truth
@@ -127,3 +127,13 @@ Agent type `general-purpose`, model `fable` (or `opus`).
 - 2026-09-18 21:02 — wave 1 resumed a second time, same model split.
   Expect ~3.5 h of work per 5 h window from here; when the limit hits,
   wait for the reset and send the same prompts again.
+- 2026-09-18 21:22 — voice, server-api, web-core audit-done (~17 min each
+  this run). desktop-release and i18n-copy dispatched (fable) in the freed
+  slots; 7 agents running.
+- 2026-09-18 21:24 — wave 3 terminated after ~20 min (limit, reset 02:00).
+  Checkpoints: server-core 103/106 (26 findings), web-chat-ui 112/134 (92),
+  web-shell-ui 131/140 (65), android 77/106 (61), ux 17/42 (26),
+  desktop-release 0/122 (list written), i18n-copy 7/33 (0).
+- 2026-09-19 02:32 — the seven unfinished areas resumed (same models).
+  `TRIAGE.md` now holds the decisions for server-api, web-core and voice
+  (106 of 107 accepted; SAPI-002 declined).

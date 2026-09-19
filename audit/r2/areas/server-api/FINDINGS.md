@@ -1,6 +1,32 @@
 # Findings — server-api
 
-(Summary is written at the top when the audit is done.)
+## Summary
+
+Audit done 2026-09-19T05:19Z (three agents; the first two were cut off by session limits, all files in scope inspected, round 1 verified). 50 findings.
+
+By priority: P0 0 · P1 3 · P2 11 · P3 36.
+By kind: bug 18 · security 17 · code 4 · test 2 · ux 2 · parity 2 · perf 2 · design 2 · docs 1.
+
+Read first:
+1. SAPI-015 · P1 · one signed-in account can fill the disk: free space is checked at reservation, never when the bytes land.
+2. SAPI-043 · P1 · a wrong current password signs Android users out (401 reused for "wrong password"; the fix is one status code on the server).
+3. SAPI-044 · P1 · the ban list and audit log on Android spin forever (server answers `{list, users}`, Android decodes a bare list).
+4. SAPI-016 · P2 · whoever holds a session gets 600 password guesses a minute on the routes that verify the password.
+5. SAPI-027 · P2 · a member removed from a group by its owner stays in the group's call.
+6. SAPI-047 · P2 · the "Video" permission is in every role editor and enforced nowhere.
+7. SAPI-049 · P2 · creation routes have no idempotency key and Android's OkHttp replays lost POSTs (two servers from one tap).
+8. SAPI-045 · P2 · invites made on Android never expire (`expires_in` vs `max_age`).
+9. SAPI-035 · P2 · with `REDIS_URL`, every per-address limiter shares one counter (twenty pictures cost your login attempts) — latent, single process today.
+10. SAPI-019 · P2 · a re-signed proxy link is a new URL each time, so nothing older than a day is ever cached.
+
+Cross-area (the coordinator moves these):
+- [android] SAPI-043, 044, 045, 046, 050; the client halves of 047 and 049.
+- [voice] SAPI-027 (group call ghost), 037 (SFU never enforces server mute/deafen/suppress), 038 (guest TURN minting).
+- [web-chat-ui] the rendering half of SAPI-017 (text reaction pills), the button gating in 047.
+- [desktop-release] SAPI-030 (CSP) and 033 (HSTS) live in `static.go`/`middleware.go`, shared.
+- [server-core] the store halves of SAPI-012/026 (caps), 020 (`PutGrants` first-wins), 023 (`Public()` carries `about_me`), 035 (`cache/redis.go` key namespace).
+
+Round 1: the key-grant recipient cross-check holds (`membership_test.go` TestKeyGrantsNeedARealHolder), `Limiter.Reset` with Redis, the invite-preview and media-proxy rate limits, the `turnCache` sweep, the successor error path and the wrong-JSON-type patch are fixed and confirmed. Still open from round 1: SAPI-001 (nil dereference after a successful recovery), 003 (`retryAfter` no-op), 004 (unbounded limiter keys), 006 (`X-Forwarded-For` from loopback), 013 (a locked subchat can be deleted without its password). Username enumeration (SAPI-002) is judged acceptable and can be declined.
 
 ## Findings
 
@@ -273,5 +299,133 @@
 - What: a banned or kicked member's invite links keep admitting people (unlimited, up to 30 days), and appear in the invite list only to someone with Manage Server who thinks to look.
 - Impact: banning the person who posted the server's link everywhere does not close the door they opened; the moderator has to find and delete each code by hand.
 - Fix: in `removeMember` (kick, ban, leave, account deletion) delete the invites whose `inviter_id` is the departing member and emit `invite_delete` to Manage Server holders, as `handleInviteDelete` does; optionally refuse joins through an invite whose inviter is no longer a member.
+- Effort: S
+- Status: open
+
+### SAPI-035 · P2 · bug · With `REDIS_URL` set, every per-address limiter shares one Redis counter, so looking at pictures uses up your login attempts
+- Where: `internal/api/router.go:228-230` (`ipLimited` keys on the bare `auth.ClientIP(r)`), `:64-68` of `auth_handlers.go`, `guest_handlers.go:54-55`, `proxy_handlers.go:47-48`, `server_handlers.go:63` (the routes wrapped that way: register on `limReg`, kdf and invite preview on `limGeneric`, login / recover / login-mfa / guest link check on `limAuthIP`, guest join on `limGuest`, media proxy on `limProxy`), `internal/cache/redis.go:149` (`r.key("rate", key)`: the Redis key is `rate:<ip>` whatever the limiter), `:136-146` (the Lua script INCRs that one key, sets its life on the first hit from *that* limiter's window, and compares the count with *this* limiter's `n`), `internal/ratelimit/limiter.go:48-58` (`Share`: `n = burst`, `window = burst/rate`)
+- What: in-process, each `Limiter` has its own map, so the same IP in `limProxy` and `limAuthIP` are two buckets. Behind Redis they are one counter. `limProxy` (burst 60, 30 s window), `limAuthIP` (20, 60 s), `limReg` (10, 1 h), `limGuest` (10, 20 min) and the ip-keyed `limGeneric` (300, 30 s) all increment `rate:1.2.3.4`, each judging the shared count against its own ceiling, with the key's lifetime fixed by whichever limiter touched it first. Every login also calls `GET /auth/kdf` first, so one login attempt costs two counts. `ratelimit_test.go:11-33` tests two limiters sharing *one process's* counter for the same key on purpose, so nothing catches the cross-limiter case.
+- Impact: with Redis on, a person who scrolled a channel with twenty proxied pictures, then signs out and back in from the same address, gets `429 Too many attempts` on login; after ten pictures nobody at that address can register or join a call as a guest; if a registration was the first request in the hour, the counter lives an hour and every picture and login from that NAT counts against it. Latent today (live runs one process without Redis) but `REDIS_URL` is a documented, tested switch (`chatd.env.example:80-84`), and this is the first thing a second process would do.
+- Fix: give each limiter a name (`ratelimit.New("proxy", …)` or `Share(s, "proxy")`) and prefix it into the shared key (`rate:proxy:<ip>`); add a `ratelimit` test where two limiters with different `n` share a `fakeShared` for the same key and must not see each other's counts.
+- Effort: S
+- Status: open
+
+### SAPI-036 · P3 · test · `TestReadJSON` in `router_test.go` is an empty stub that always passes
+- Where: `internal/api/router_test.go:27-32`; compare `internal/api/auth_handlers_test.go:273-288` (`TestReadJSONRejectsTrailingAndBig`, the real test)
+- What: the function starts a server, builds a request and discards both. It asserts nothing, yet counts as a passing test named after a security-relevant helper (`ReadJSON` is the body-size and strictness gate for every JSON route). The real coverage lives under another name in another file; `DisallowUnknownFields`, nulls-for-required-fields and number handling are covered by neither.
+- Impact: a reader looking for ReadJSON's test finds one that proves nothing; the strictness properties (unknown fields refused? `null` for a required string?) have no test at all.
+- Fix: delete the stub or make it the test: unknown field → `ErrBadJSON`, `Content-Length` over the cap → `ErrTooLarge`, trailing data → `ErrBadJSON`, an empty body → the documented error, a `null` body → the documented error.
+- Effort: S
+- Status: open
+
+### SAPI-037 · P3 · security · Server mute, deafen and "no Speak" are flags the SFU routes never enforce
+- Where: `internal/api/sfu_handlers.go:117-203` (`handleSFUPublish`: checks the session, the kinds and the video meter, never `st.ServerMute` or `st.Suppress`), `:205-300` (`handleSFUSubscribe`: never `st.ServerDeaf`), `internal/api/voice_glue.go:717-730` (mute/deafen set the flags and broadcast, nothing else), `:308,741` (`Suppress` is computed at join and on a move only), `:68` (the flag reaches clients as `server_mute`)
+- What: a stock client honours `server_mute` by stopping its own audio, and that flag is the server's only leverage. A modified client, or a tab running an older build, keeps publishing audio after being muted and the SFU forwards it to everyone in the call; a deafened one keeps pulling. Taking Speak away from a member's role while they are in the call changes nothing until they rejoin, because nothing recomputes `Suppress` on a role or overwrite change; Discord silences them at once. (Call semantics are the voice area's; this is the authorization gap on the routes.)
+- Impact: moderating a live call is advisory; disconnecting (`channel_id: null`) is the only action the server backs up.
+- Fix: in `handleSFUPublish` refuse `kind == "audio"` while `st.ServerMute || st.Suppress` (`403 muted`); when `handleVoiceModerate` sets mute, close the member's published audio track at the SFU (the name is in `st.Tracks`) and when it sets deafen close their pulled audio; recompute `Suppress` where role and overwrite changes already run `syncVisibility`; tests for all three.
+- Effort: M
+- Status: open
+
+### SAPI-038 · P3 · security · Every `GET /voice/ice` from a guest mints a new Cloudflare TURN credential
+- Where: `internal/api/voice_glue.go:83` (the route is `callAuthed`: the generic 600/min per identity and nothing else), `:520-536` (`cloudflareTURN`: guests skip `reuseTURN` on purpose, "minted fresh rather than handed out again"), `:538-560` (one outbound call to Cloudflare's credential API per miss)
+- What: a member gets one credential per three hours (`turnReuse`); a guest gets a fresh one per request, with a TTL of whatever is left on their link (up to 4 h). One guest token can therefore make this instance call Cloudflare's credential API 600 times a minute, each call minting a four-hour credential. Guest tokens are cheap: any member may create 50 links per channel and guest join is 30/h per address.
+- Impact: Cloudflare throttles or flags the TURN key; from then on `turn credentials refused` → `nil` for members too as their cached credentials age out, and calls on restrictive networks fail for everyone; an abuse signal on the owner's account.
+- Fix: cache per guest id as for members, with `min(turnReuse, remaining − 1 min)` as the reuse window, or put `/voice/ice` behind `limVoice` with a tight bucket for guests (a handful per hour per guest id); a test that two guest calls in a row make one upstream request.
+- Effort: S
+- Status: open
+
+### SAPI-039 · P3 · bug · A half-set TURN pair is accepted at startup and silently turns the relay off; the defaults point a stranger's copy at chat.evilion.xyz
+- Where: `internal/config/config.go:213-220` (the Turnstile and Realtime pairs are validated "set both or neither"; nothing validates `TURN_KEY_ID`/`TURN_API_TOKEN` or `TURN_URLS`/`TURN_USERNAME`/`TURN_CREDENTIAL`), `internal/api/voice_glue.go:520-522` (`cloudflareTURN` returns nil when either half is empty, with no log line), `:455-462` (a `TURN_URLS` entry goes out with no credential when `TURN_USERNAME` is unset, and with `credential: ""` when only the password is missing), `config.go:92` (`PublicURL` defaults to `https://chat.evilion.xyz`), `chatd.env.example:26` ("invite: registration needs REGISTRATION_KEY", while any live invite code also registers — SAPI-014)
+- What: (1) a typo in `TURN_API_TOKEN`, or setting only the key id, passes startup and every call from then on has no relay; it surfaces weeks later as "calls are silent on some networks". The two sibling pairs fail loudly, so this looks like an oversight rather than a choice. (2) Whoever runs this code without `PUBLIC_URL` gets a server whose gateway origin check, links and invite URLs all name the author's domain; what they see is a WebSocket refused with no hint. `LISTEN` defaults to loopback, so it works until the first remote browser.
+- Impact: silent misconfiguration on the one setting that costs money and is hardest to test; a confusing first run for anyone else.
+- Fix: validate both TURN pairs like the others (`TURN_URLS` needs both username and credential unless a documented `TURN_ANONYMOUS=1`); `Warn` when TURN is configured and the first mint fails; make `PUBLIC_URL` required (fail at startup quoting the example line) or default it to `http://<LISTEN>`; correct the env comment for invite mode.
+- Effort: S
+- Status: open
+
+### SAPI-040 · P3 · bug · The admin page says "TURN: not configured" on an instance that relays every call through Cloudflare
+- Where: `internal/api/admin_handlers.go:310` (`"turn": len(s.Cfg.TurnURLs) > 0`), against `:56` (`turn_configured` counts `TurnKeyID` too), `web/src/components/settings/AdminPage.tsx:131`, `web/src/api/types.ts:338`, `android/app/src/main/java/xyz/evilion/chat/net/Models.kt:603`
+- What: the settings view only counts static `TURN_URLS`. Live uses `TURN_KEY_ID`/`TURN_API_TOKEN` (the path `chatd.env.example:41` recommends), so the admin's limits line reads "not configured" while every call mints relay credentials.
+- Impact: an admin chasing "calls fail on my phone's network" is told the relay is off and looks in the wrong place.
+- Fix: one helper (`turnConfigured()`) used by both views.
+- Effort: S
+- Status: open
+
+### SAPI-041 · P3 · code · `createEpoch` in the API tests hides its return value in dead arithmetic
+- Where: `internal/api/channel_handlers_test.go:29-60`
+- What: `self := grants[:0:0]` is filled and never read; the result is `epoch + 0*len(self) + func() int { srv := ts; _ = srv; return 0 }() + grantAll(...)`, and `grantAll` always returns 0. Every server test's key setup passes through this helper.
+- Impact: none at runtime; the next person touching key tests stops to work out whether it means something.
+- Fix: call `grantAll(...)` as a statement and `return epoch`.
+- Effort: S
+- Status: open
+
+### SAPI-042 · P2 · test · Role hierarchy is tested for overwrites and kicks only; bans, timeouts, nicknames and role assignment have no negative test
+- Where: `internal/api/server_handlers.go:1727` (ban: `CanActOn`), `:1513` (timeout), `:1466` (nickname of another member), `:1537` and `:1615` (assigning a role at or above one's own, and to a member one outranks not), against the tests: `internal/api/audit_regressions_test.go:150-190` (overwrites, thorough), `internal/api/server_handlers_test.go:290` and `internal/api/admin_powers_test.go:51` (kicking the owner), `internal/api/server_perms_test.go:23-40` (a timed-out moderator, which is the permission check, not the hierarchy)
+- What: `grep role_hierarchy internal/api/*_test.go` finds five assertions, all on overwrites or kicking the owner. Nothing asserts that a moderator cannot ban, time out or rename someone whose highest role is at or above theirs, nor that Manage Roles cannot hand out a role at or above the actor's own (the exact escalation `:1537` exists to stop: give yourself the Admin role). These are the checks a refactor of `canActOn`/`CanManageRole` would silently break, and they are the ones with the highest payoff for an attacker.
+- Impact: a regression in any of the five would ship green.
+- Fix: one table-driven test with owner / high mod / low mod / member: for each of ban, timeout, nick, add role, remove role, `PATCH members/{id} {roles}`, assert 403 `role_hierarchy` upward and at level, 2xx downward; include the owner-target case for each.
+- Effort: S
+- Status: open
+
+### SAPI-043 · P1 · bug · [android] A wrong current password signs the person out of the Android app: the server answers 401 and the client treats every 401 as a dead session
+- Where: `internal/api/auth_handlers.go:426-429` (`POST /auth/password`), `:460-463` (`POST /auth/recovery`), `internal/api/mfa_handlers.go:179-188` (`requirePassword`: TOTP setup, MFA disable, new backup codes), `internal/api/user_handlers.go:221-224` (`POST /users/@me/delete`) — all `401 invalid_credentials`; `android/app/src/main/java/xyz/evilion/chat/net/ApiClient.kt:213` (`if (res.code == 401 && token != null) onUnauthorized?.invoke()`), `android/app/src/main/java/xyz/evilion/chat/data/Session.kt:95` (`onUnauthorized = { signOutLocally() }`), `:387-395` (clears the token, `SecureStore`, the keys and the app state), `android/app/src/main/java/xyz/evilion/chat/ui/settings/SettingsScreen.kt:511-549` (the four dialogs that send the current password); compare `web/src/api/client.ts:228-231`, which signs out only on the code `unauthorized`, with a comment naming exactly this trap
+- What: 401 is what the bearer middleware answers for a dead token (`internal/auth/middleware.go:116`, code `unauthorized`); the five password-confirming routes reuse the status for "the password you typed is wrong" (code `invalid_credentials`). The web tells them apart by code; Android does not.
+- Impact: on Android one typo in "current password" — changing the password, turning MFA off, minting backup codes, setting up an authenticator — wipes the session, the stored keys and the app state and drops the person on the sign-in screen; the server-side session stays valid and keeps showing in the sessions list. Someone who just mistyped their password now needs it to get back in.
+- Fix: server: answer `403 invalid_credentials` on those five routes (a valid session, a refused action) — the smaller change, and it fixes every client at once; Android: also key `onUnauthorized` on `code == "unauthorized"` as the web does. A test that a wrong `auth_key` on `POST /auth/password` is not 401.
+- Effort: S
+- Status: open
+
+### SAPI-044 · P1 · bug · [android] The member, ban and audit-log routes answer `{list, users}` and Android decodes a bare list, so the ban list and audit log on Android spin forever
+- Where: `internal/api/server_handlers.go:1397` (`{"members", "users"}`), `:1698` (`{"bans", "users"}`), `:2108` (`{"entries", "users"}`); `android/app/src/main/java/xyz/evilion/chat/net/Endpoints.kt:223-224` (`members(): List<Member>`), `:240` (`bans(): List<Ban>`), `:262-263` (`auditLog(): List<AuditEntry>`); `android/app/src/main/java/xyz/evilion/chat/ui/server/ServerSettingsScreen.kt:436,467` (`runCatching { bans = … }` / `entries = …` leave the state `null`, which the `when` right below renders as an endless `CircularProgressIndicator`), `:243` and `android/app/src/main/java/xyz/evilion/chat/ui/sheets/ChannelSheets.kt:93` (the member fetch fails inside `runCatching`, so the sheet only ever shows the members the ready payload carried); compare `web/src/api/servers.ts:133,155,180` (typed as the wrappers)
+- What: kotlinx.serialization cannot decode a JSON object as `List<T>`; every call site swallows the exception in `runCatching` and nothing logs it.
+- Impact: on Android the Bans page and the Audit Log page never finish loading, and the member list neither refreshes nor pages. Three server-settings features are dead on one platform, silently.
+- Fix: Android: decode the wrappers (`{members, users}`, `{bans, users}`, `{entries, users}`), merge `users` into `AppState` as the web does, and show an error state instead of an endless spinner when a fetch fails. Server: nothing to change, but a contract test that decodes each list route's response with the Android models (or a JSON fixture both clients' tests share) would have caught this, SAPI-046 and SAPI-050 in one go.
+- Effort: S
+- Status: open
+
+### SAPI-045 · P2 · bug · [android] Invites made on Android never expire: the client sends `expires_in`, the server reads `max_age`
+- Where: `internal/api/server_handlers.go:1898-1899` (`max_age`, `max_uses`; unknown fields are ignored — `ReadJSON` never sets `DisallowUnknownFields`), `android/app/src/main/java/xyz/evilion/chat/net/Endpoints.kt:249-253` (`put("expires_in", it)`), `android/app/src/main/java/xyz/evilion/chat/ui/sheets/ChannelSheets.kt:378` (`createInvite(channelId, maxUses = 0, expiresIn = 7 * 24 * 3600)`); compare `web/src/api/servers.ts:167` (`max_age`)
+- What: the seven-day expiry the Android app intends travels under a name the server does not know, so every invite created from Android is `max_age: 0`, `max_uses: 0`: permanent and unlimited.
+- Impact: a link pasted from the phone into a public place admits anyone forever while its maker believes it died after a week; with SAPI-034 the only cleanup is a moderator finding it in the list.
+- Fix: Android: send `max_age`. Server: have `ReadJSON` reject unknown fields on create routes (a 400 would have surfaced this on the first try) or log them at debug level.
+- Effort: S
+- Status: open
+
+### SAPI-046 · P2 · bug · [android] Accepting a group invite on Android shows an error although the person was added
+- Where: `internal/api/group_handlers.go:246,262,286` (a group invite answers `{"channel": …}` / `{"channel", "users"}`), `android/app/src/main/java/xyz/evilion/chat/net/Models.kt:178` (`JoinResult(val server: ServerView, …)`, `server` required), `android/app/src/main/java/xyz/evilion/chat/net/Endpoints.kt:257-258`, `android/app/src/main/java/xyz/evilion/chat/ui/invite/InviteScreen.kt:106`; compare `web/src/api/servers.ts:10` (`JoinedInvite = {server, users} | {channel, users?}`)
+- What: the join route has two answer shapes; Android models only the server one, so a group invite's answer throws `MissingFieldException` after the server has already added the member and emitted `channel_create`.
+- Impact: the Android user is told the join failed while the group appears in their list a moment later; a second tap answers 200 `{channel}` and fails the same way.
+- Fix: Android: `JoinResult(server: ServerView? = null, channel: Channel? = null, users)` and branch. Server (API design): one shape for both — `{server?, channel?, users}` — is friendlier than a union the clients must sniff.
+- Effort: S
+- Status: open
+
+### SAPI-047 · P2 · bug · The "Video" permission (STREAM) is in every role editor and enforced nowhere
+- Where: `internal/perms/perms.go:26` (`Stream`), `internal/api/guest_handlers.go:46` (the only reference: `guestPerms` includes it and nothing reads it back), `internal/api/voice_glue.go:308,283-286` (join and resume take `video`/`streaming` from the request unchecked), `internal/api/sfu_handlers.go:117-203` (`handleSFUPublish` accepts `video` and `screen` tracks with only the monthly meter as a gate); `web/src/lib/perms.ts:91` ("Video — allows members to share their video", offered per voice channel), `android/app/src/main/java/xyz/evilion/chat/data/Perms.kt:96`; neither client gates the camera or screen-share button on it (`STREAM` appears nowhere outside the two permission tables)
+- What: a moderator who denies Video for @everyone in a voice channel (a common "voice only" setup) watches the toggle take; members turn their camera or screen on regardless, on every platform, and the SFU forwards it to everyone.
+- Impact: a permission the product advertises does nothing.
+- Fix: server: in `handleSFUPublish` refuse `video`/`screen`/`screen_audio` tracks unless the member's channel permissions include `Stream` (`403 missing_permission`), and clear `Video`/`Streaming` on join and resume for members without it; in the P2P path the flags are advisory, so also gate the buttons in both clients (`can(STREAM)`), which is what the person sees. Test: deny Stream on the channel, publish video → 403.
+- Effort: M
+- Status: open
+
+### SAPI-048 · P3 · design · The role editor offers toggles for features that do not exist (polls, soundboard, priority speaker, voice activity) and one the server never checks (embed links)
+- Where: `web/src/lib/perms.ts:77,83,92-94` (EMBED_LINKS, CREATE_POLLS, USE_SOUNDBOARD, USE_VAD, PRIORITY_SPEAKER), `android/app/src/main/java/xyz/evilion/chat/data/Perms.kt` (the same list); server: `perms.EmbedLinks`, `perms.CreatePolls`, `perms.UseSoundboard`, `perms.PrioritySpeaker` are referenced by no handler and `perms.UseVAD` only by `guestPerms`; `grep -rli soundboard\|createPoll web/src` finds nothing
+- What: the table was copied from Discord's whole. Four toggles govern features this product has not built, so an admin reading "Use Soundboard" goes looking for the soundboard; "Embed Links" is honoured by neither the send route nor the unfurl route.
+- Impact: role editing is the most complicated screen in the app and a third of its voice section is inert; admins cannot tell which toggles work (SAPI-047 is the one that matters).
+- Fix: hide the four from both editors until the feature exists (keep the bits reserved); enforce Embed Links cheaply by forcing `MsgFlagSuppressEmbeds` at send time for authors without it, or hide it too; if Priority Speaker and Voice Activity stay, say in the help text that clients honour them, not the server.
+- Effort: S
+- Status: open
+
+### SAPI-049 · P2 · bug · Creation routes have no idempotency key, and the Android client replays a POST whose answer was lost
+- Where: `android/app/src/main/java/xyz/evilion/chat/net/ApiClient.kt:81` (`retryOnConnectionFailure(true)`, OkHttp 5.5.0: a replayable body is sent again on a new connection after an `IOException` that arrives once the request has gone out — the "unexpected end of stream" a flaky mobile link produces); the routes with side effects and no key: `POST /servers` (`server_handlers.go:231`), `POST /users/@me/channels` for a group (DMs dedupe, groups do not: `channel_handlers_test.go:102` vs `:377`), `POST /channels/{id}/invites` (`server_handlers.go:1898`), `POST /channels/{id}/subchats`, `POST /channels/{id}/guest-links`, `POST /keys/epochs` with a manual reason (`membership_test.go:234`: "a manual rotation is always allowed"), `POST /auth/register` (the replay answers `username_taken` for the account just made), `PUT /servers/{id}/bans/{uid}` with `delete_message_days` (the purge and `ban_add` run twice); compare `POST …/messages`, which has `nonce` for exactly this (`message_handlers.go:215-230`), and uploads, keyed by offset
+- What: only messages and uploads are safe to retry; the client retries everything.
+- Impact: on a bad connection an Android user who taps "Create server" once can end up with two servers (each with four channels and a role), two groups with the same people, two invites, two subchats, two key rotations; registration can answer "that name is taken" for the account the person just created, and they conclude it failed.
+- Fix: server: an optional `nonce`/`Idempotency-Key` on the create routes, remembered per account for a few minutes and answered with the stored response on a repeat — the message route is the template; Android: `retryOnConnectionFailure(false)` and retry only what the app knows is safe (it already has `isTransient` for that decision). The web client does not auto-retry, so it is unaffected.
+- Effort: M
+- Status: open
+
+### SAPI-050 · P3 · code · [android] Three Android endpoint wrappers cannot work against this server
+- Where: `android/app/src/main/java/xyz/evilion/chat/net/Endpoints.kt:429-432` (`GuestsApi.createLink`: sends `expires_in`, never `epoch`; the server requires `epoch` to equal the latest and otherwise answers `409 stale_epoch` — `internal/api/guest_handlers.go:123-151` — so the call can never succeed, and the age field is `max_age`), `:185-186` (`MessagesApi.reactors(): List<PublicUser>`; the server answers a list of ids — `internal/api/message_handlers.go:577-589`, `internal/store/messages.go:429`), `:195` (`ServersApi.get(): ServerView`; the server answers `{server, users}` — `web/src/api/servers.ts:70`)
+- What: none of the three has a caller in the app today, so nothing is broken yet; the first feature to use one fails the way SAPI-044 did.
+- Impact: latent; a trap for the next Android feature (guest links, reaction tooltips, opening a server the ready payload did not carry).
+- Fix: correct the three signatures; better, generate both clients' wire types from one source (`web/src/api/types.ts` is already the reference) or add the contract test from SAPI-044.
 - Effort: S
 - Status: open

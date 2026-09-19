@@ -1,7 +1,7 @@
 # Progress — web-core
-State: auditing
-Last checkpoint: 2026-09-19T00:58Z
-Next finding id: 019
+State: audit-done
+Last checkpoint: 2026-09-19T05:20Z
+Next finding id: 030
 
 ## Inspected
 
@@ -75,30 +75,30 @@ Next finding id: 019
 
 ### stores/
 - [x] web/src/stores/auth.ts
-- [ ] web/src/stores/auth.test.ts
+- [x] web/src/stores/auth.test.ts
 - [x] web/src/stores/keys.ts
-- [ ] web/src/stores/keys.test.ts
+- [x] web/src/stores/keys.test.ts
 - [x] web/src/stores/messages.ts
-- [ ] web/src/stores/messages.test.ts
+- [x] web/src/stores/messages.test.ts
 - [x] web/src/stores/channels.ts
 - [x] web/src/stores/servers.ts
-- [ ] web/src/stores/servers.test.ts
+- [x] web/src/stores/servers.test.ts
 - [x] web/src/stores/users.ts
 - [x] web/src/stores/relationships.ts
 - [x] web/src/stores/readStates.ts
-- [ ] web/src/stores/readStates.test.ts
+- [x] web/src/stores/readStates.test.ts
 - [x] web/src/stores/settings.ts
-- [ ] web/src/stores/settings.test.ts
-- [ ] web/src/stores/settings.slowstart.test.ts
+- [x] web/src/stores/settings.test.ts
+- [x] web/src/stores/settings.slowstart.test.ts
 - [x] web/src/stores/ui.ts
-- [ ] web/src/stores/ui.test.ts
+- [x] web/src/stores/ui.test.ts
 - [x] web/src/stores/panes.ts
 - [x] web/src/stores/presence.ts
 - [x] web/src/stores/typing.ts
 - [x] web/src/stores/selection.ts
-- [ ] web/src/stores/selection.test.ts
+- [x] web/src/stores/selection.test.ts
 - [x] web/src/stores/expressions.ts
-- [ ] web/src/stores/expressions.test.ts
+- [x] web/src/stores/expressions.test.ts
 - [x] web/src/stores/slowmode.ts
 - [x] web/src/stores/keyAlerts.ts
 - [x] web/src/stores/desktop.ts
@@ -106,142 +106,135 @@ Next finding id: 019
 
 ### gateway/
 - [x] web/src/gateway/client.ts
-- [ ] web/src/gateway/client.test.ts
+- [x] web/src/gateway/client.test.ts
 - [x] web/src/gateway/dispatch.ts
-- [ ] web/src/gateway/dispatch.test.ts
+- [x] web/src/gateway/dispatch.test.ts
 - [x] web/src/gateway/events.ts
 - [x] web/src/gateway/session.ts
 
 ### lib/ (callLayout, callPanel, audioKeeper are `voice`'s)
 - [x] web/src/lib/attachments.ts
-- [ ] web/src/lib/attachments.test.ts
+- [x] web/src/lib/attachments.test.ts
 - [x] web/src/lib/upload.worker.ts
 - [x] web/src/lib/download.ts
 - [x] web/src/lib/mediaLinks.ts
-- [ ] web/src/lib/mediaLinks.test.ts
+- [x] web/src/lib/mediaLinks.test.ts
 - [x] web/src/lib/mediaCache.ts
-- [ ] web/src/lib/mediaCache.test.ts
+- [x] web/src/lib/mediaCache.test.ts
 - [x] web/src/lib/keyPins.ts
-- [ ] web/src/lib/keyPins.test.ts
+- [x] web/src/lib/keyPins.test.ts
 - [x] web/src/lib/keyring.ts
 - [x] web/src/lib/appLock.ts
-- [ ] web/src/lib/appLock.test.ts
+- [x] web/src/lib/appLock.test.ts
 - [x] web/src/lib/storage.ts
 - [x] web/src/lib/notify.ts
-- [ ] web/src/lib/notify.test.ts
+- [x] web/src/lib/notify.test.ts
 - [x] web/src/lib/sounds.ts
-- [ ] web/src/lib/sounds.test.ts
+- [x] web/src/lib/sounds.test.ts
 - [x] web/src/lib/search.ts
-- [ ] web/src/lib/search.test.ts
+- [x] web/src/lib/search.test.ts
 - [x] web/src/lib/fullSearch.ts
-- [ ] web/src/lib/fullSearch.test.ts
+- [x] web/src/lib/fullSearch.test.ts
 - [x] web/src/lib/export.ts
-- [ ] web/src/lib/export.test.ts
-- [ ] web/src/lib/activity.ts
-- [ ] web/src/lib/activity.test.ts
-- [ ] web/src/lib/avatarColor.ts
-- [ ] web/src/lib/avatarColor.test.ts
+- [x] web/src/lib/export.test.ts
+- [x] web/src/lib/activity.ts
+- [x] web/src/lib/activity.test.ts
+- [x] web/src/lib/avatarColor.ts
+- [x] web/src/lib/avatarColor.test.ts
 - [x] web/src/lib/busy.ts
-- [ ] web/src/lib/busy.test.ts
-- [ ] web/src/lib/captcha.ts
-- [ ] web/src/lib/color.ts
-- [ ] web/src/lib/color.test.ts
-- [ ] web/src/lib/convMembers.ts
+- [x] web/src/lib/busy.test.ts
+- [x] web/src/lib/captcha.ts
+- [x] web/src/lib/color.ts
+- [x] web/src/lib/color.test.ts
+- [x] web/src/lib/convMembers.ts
 - [x] web/src/lib/crashReport.ts
 - [x] web/src/lib/decrypt.ts
-- [ ] web/src/lib/desktopBridge.ts
-- [ ] web/src/lib/errors.ts
-- [ ] web/src/lib/errors.test.ts
-- [ ] web/src/lib/fullscreen.ts
-- [ ] web/src/lib/fullscreen.test.ts
-- [ ] web/src/lib/gifFavorites.ts
-- [ ] web/src/lib/gridKeys.ts
-- [ ] web/src/lib/gridKeys.test.ts
-- [ ] web/src/lib/guestLink.ts
-- [ ] web/src/lib/ids.ts
-- [ ] web/src/lib/imageActions.ts
-- [ ] web/src/lib/imageActions.test.ts
-- [ ] web/src/lib/inviteLink.ts
-- [ ] web/src/lib/inviteLink.test.ts
+- [x] web/src/lib/desktopBridge.ts
+- [x] web/src/lib/errors.ts
+- [x] web/src/lib/errors.test.ts
+- [x] web/src/lib/fullscreen.ts
+- [x] web/src/lib/fullscreen.test.ts
+- [x] web/src/lib/gifFavorites.ts
+- [x] web/src/lib/gridKeys.ts
+- [x] web/src/lib/gridKeys.test.ts
+- [x] web/src/lib/guestLink.ts
+- [x] web/src/lib/ids.ts
+- [x] web/src/lib/imageActions.ts
+- [x] web/src/lib/imageActions.test.ts
+- [x] web/src/lib/inviteLink.ts
+- [x] web/src/lib/inviteLink.test.ts
 - [x] web/src/lib/lazyChunk.ts
-- [ ] web/src/lib/longPress.ts
-- [ ] web/src/lib/longPress.test.ts
-- [ ] web/src/lib/markdownCtx.ts
-- [ ] web/src/lib/masonry.ts
-- [ ] web/src/lib/masonry.test.ts
-- [ ] web/src/lib/names.ts
-- [ ] web/src/lib/nextPath.ts
-- [ ] web/src/lib/nextPath.test.ts
+- [x] web/src/lib/longPress.ts
+- [x] web/src/lib/longPress.test.ts
+- [x] web/src/lib/markdownCtx.ts
+- [x] web/src/lib/masonry.ts
+- [x] web/src/lib/masonry.test.ts
+- [x] web/src/lib/names.ts
+- [x] web/src/lib/nextPath.ts
+- [x] web/src/lib/nextPath.test.ts
 - [x] web/src/lib/noZoom.ts
-- [ ] web/src/lib/noZoom.test.ts
-- [ ] web/src/lib/packRemoval.ts
-- [ ] web/src/lib/perms.ts
-- [ ] web/src/lib/perms.test.ts
-- [ ] web/src/lib/platform.ts
-- [ ] web/src/lib/platform.test.ts
-- [ ] web/src/lib/playableType.test.ts
-- [ ] web/src/lib/readPosition.ts
-- [ ] web/src/lib/serverKdf.ts
+- [x] web/src/lib/noZoom.test.ts
+- [x] web/src/lib/packRemoval.ts
+- [x] web/src/lib/perms.ts
+- [x] web/src/lib/perms.test.ts
+- [x] web/src/lib/platform.ts
+- [x] web/src/lib/platform.test.ts
+- [x] web/src/lib/playableType.test.ts
+- [x] web/src/lib/readPosition.ts
+- [x] web/src/lib/serverKdf.ts
 - [x] web/src/lib/settingsCrypto.ts
-- [ ] web/src/lib/shortcodes.ts
-- [ ] web/src/lib/subchatLock.ts
-- [ ] web/src/lib/theme.ts
-- [ ] web/src/lib/time.ts
-- [ ] web/src/lib/title.ts
-- [ ] web/src/lib/title.test.ts
-- [ ] web/src/lib/twemoji.ts
-- [ ] web/src/lib/twemoji.test.ts
-- [ ] web/src/lib/unread.ts
-- [ ] web/src/lib/workerTimers.ts
-- [ ] web/src/lib/zoomPan.ts
-- [ ] web/src/lib/zoomPan.test.ts
+- [x] web/src/lib/shortcodes.ts
+- [x] web/src/lib/subchatLock.ts
+- [x] web/src/lib/theme.ts
+- [x] web/src/lib/time.ts
+- [x] web/src/lib/title.ts
+- [x] web/src/lib/title.test.ts
+- [x] web/src/lib/twemoji.ts
+- [x] web/src/lib/twemoji.test.ts
+- [x] web/src/lib/unread.ts
+- [x] web/src/lib/workerTimers.ts
+- [x] web/src/lib/zoomPan.ts
+- [x] web/src/lib/zoomPan.test.ts
 
 ### hooks/
-- [ ] web/src/hooks/useIsMobile.ts
-- [ ] web/src/hooks/useNow.ts
-- [ ] web/src/hooks/usePortalRoot.ts
-- [ ] web/src/hooks/useReorder.tsx
-- [ ] web/src/hooks/useReorder.test.tsx
-- [ ] web/src/hooks/useReveal.ts
-- [ ] web/src/hooks/useShiftHeld.ts
-- [ ] web/src/hooks/useWakeLock.ts
+- [x] web/src/hooks/useIsMobile.ts
+- [x] web/src/hooks/useNow.ts
+- [x] web/src/hooks/usePortalRoot.ts
+- [x] web/src/hooks/useReorder.tsx
+- [x] web/src/hooks/useReorder.test.tsx
+- [x] web/src/hooks/useReveal.ts
+- [x] web/src/hooks/useShiftHeld.ts
+- [x] web/src/hooks/useWakeLock.ts
 
 ### i18n/ (locale JSON contents are `i18n-copy`'s)
-- [ ] web/src/i18n/core.ts
-- [ ] web/src/i18n/core.test.ts
-- [ ] web/src/i18n/index.tsx
-- [ ] web/src/i18n/locales.test.ts
+- [x] web/src/i18n/core.ts
+- [x] web/src/i18n/core.test.ts
+- [x] web/src/i18n/index.tsx
+- [x] web/src/i18n/locales.test.ts
 
 ### markdown/ (render.tsx is `web-chat-ui`'s)
-- [ ] web/src/markdown/ast.ts
-- [ ] web/src/markdown/parse.ts
-- [ ] web/src/markdown/parse.test.ts
-- [ ] web/src/markdown/index.ts
-- [ ] android/.../ui/markdown/Parser.kt (parity read only)
+- [x] web/src/markdown/ast.ts
+- [x] web/src/markdown/parse.ts
+- [x] web/src/markdown/parse.test.ts
+- [x] web/src/markdown/index.ts
+- [x] android/.../ui/markdown/Parser.kt (parity read only)
 
 ### test/
 - [x] web/src/test/setup.ts
-- [ ] web/src/test/fakeAudio.ts
+- [x] web/src/test/fakeAudio.ts
 
 ### Round 1 cross-check
 - [x] audit/REVIEW.md (Done / Not doing / Still open)
-- [ ] audit/crypto.md
-- [ ] audit/web-bugs.md (non-component parts)
-- [ ] audit/performance.md (web section)
+- [x] audit/crypto.md
+- [x] audit/web-bugs.md (non-component parts)
+- [x] audit/performance.md (web section)
 
 ## Handoff note
-Agent 1 read: entry/config, sw, download-sw, all api/, all crypto/ (fingerprint vector
-confirmed in both suites; KDF floor confirmed in Kdf.kt), stores/auth.ts, stores/keys.ts,
-lib/attachments.ts, upload.worker.ts, keyPins, keyring, appLock, storage; findings 001-003.
-Agent 2 (resumed 2026-09-19T00:02Z): findings 004-018 written; every store, all of gateway/,
-and lib download/mediaLinks/mediaCache/notify/sounds/search/fullSearch/export/decrypt/
-settingsCrypto read and ticked. Checked and NOT findings: settings.load cannot throw
-(decryptSettings returns null); every server event name is in events.ts; guest session
-is stopped by GuestCallPage on unmount; dispatchHooks.onReady has no registrations (dead
-but harmless). Open question being verified: internal/store/channels.go:185
-DMChannelsForUser starts `var out []*Channel` — if it can return nil, ready's
-`[...d.channels]` (dispatch.ts:149) throws for an account with no DMs; new accounts
-work in practice, so read the whole function before writing anything.
-Next: remaining lib/*.ts (convMembers, subchatLock, serverKdf, readPosition, unread, perms,
-platform, workerTimers first), then hooks/, i18n/core.ts, markdown/parse.ts + Parser.kt,
-sw/download-sw already done, then test files (skim `it(` names for gaps), then round-1 docs.
+Audit complete (agent 3, 2026-09-19T05:20Z). Every file in scope is read; test files were skimmed by
+test name (counts and names recorded in this session, gaps in WCORE-029); Parser.kt read in
+full for parity (WCORE-025). Findings 001-029; Summary written at the top of FINDINGS.md.
+No Playwright or device run was made: Safari/iOS claims (018) come from documented WebKit
+behaviour, perf claims (024, 028) from reading, bundle numbers (027) from a scratch build
+(`npx vite build --outDir $TMPDIR/dist-wcore`, since removed). Round-1 Done claims that
+touch this area were verified and are listed in the Summary; the captive-portal one is a
+half-fix (WCORE-001). Nothing outside audit/r2/areas/web-core/ was edited.

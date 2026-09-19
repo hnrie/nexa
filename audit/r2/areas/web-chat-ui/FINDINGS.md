@@ -422,3 +422,314 @@
 - Fix: `new Intl.Collator(translator().locale, …)` built lazily (it is module-level today, so it would need to follow a language change — `lib/time.ts` caches per locale and is the pattern); a `chat.memberList.roleGroupCount = "{label} — {count}"` key for the header.
 - Effort: S
 - Status: open
+
+### WCHAT-054 · P2 · a11y · A screen reader reads every spoiler out loud before it is revealed, and calls the secret the name of the button
+- Where: `web/src/styles/markdown.css:11` (`.md-spoiler { color: transparent }`), `:13-14` (`.md-spoiler[data-revealed="false"] * { visibility: hidden }` — element children only), `web/src/markdown/render.tsx:235-252` (`role="button" tabIndex={0}` with no name of its own, no `aria-expanded`)
+- What: A spoiler's plain text is a bare text node, not an element, so the `*` rule never touches it — only `color: transparent` hides it, and transparent text is fully present in the accessibility tree. The span is also `role="button"`, whose accessible name is computed from its contents, so the spoiler is announced as "«the thing that was hidden», button". Nothing says the word "spoiler" anywhere in the markup, and the role and `tabIndex` stay on after the reveal, so the revealed text is still announced as a button that does nothing.
+- Impact: The one feature whose entire purpose is to withhold text withholds it from sighted users only. A screen-reader user is told the ending of the film they asked not to be told. (A spoilered image or custom emoji *is* hidden, because those are elements — so the bug only bites the common case.)
+- Fix: wrap the children in a `<span className="md-spoiler-inner">` and hide that (`visibility: hidden` covers text and elements alike), give the button an explicit `aria-label` while hidden (`render.spoilerHidden` = "Spoiler, activate to show"), add `aria-expanded={open}`, and drop `role`/`tabIndex`/the key handler once `open` so the text becomes ordinary selectable prose.
+- Effort: S
+- Status: open
+
+### WCHAT-055 · P2 · security · A masked link can say anything: the real destination is only in a `title`, which a phone never shows
+- Where: `web/src/markdown/render.tsx:183-194` (`title={node.masked ? node.url : undefined}` is the only disclosure), `web/src/markdown/parse.ts:415-436` (`[text](url)` from any message, any sender, as long as the url is http(s)), `web/src/styles/markdown.css:21-23` (a masked link is styled exactly like a bare one)
+- What: Anyone can send `[https://accounts.google.com/signin](https://evil.example/signin)` and it renders as the first URL, coloured and underlined like a real link, pointing at the second. On a touch screen there is no hover, so `title` is unreachable; the same for a keyboard or screen-reader user, who gets the link text as the accessible name and nothing else. `javascript:`/`data:` are correctly refused by `RE_HTTP`, so this is not XSS — it is plain phishing, and the product's users are exactly the people who expect a private channel to be safe. Discord ships a "You are leaving Discord" dialog naming the host for this reason, and Slack shows the host inline.
+- Impact: The most effective attack available to a stranger in a group DM or a public server on this platform, with no defence a careful user could exercise on a phone.
+- Fix: when `masked`, either (a) append the destination's host after the link text (`… (evil.example)`), which is cheap and visible everywhere, or (b) intercept the click and show a confirm modal with the full href when `new URL(url).host` does not match a host named in the link text. (a) plus a `title` is enough; do (b) only for the "link text looks like a URL" case. Android's `ui/markdown/Render.kt` renders the same masked links and needs the same treatment in the same pass.
+- Effort: M
+- Status: open
+
+### WCHAT-056 · P3 · ux · `@everyone`, `@here` and every role mention look clickable and are not
+- Where: `web/src/styles/markdown.css:24` (`.md-mention { cursor: pointer }`), `:25` (`.md-mention:hover` repaints), `web/src/markdown/render.tsx:197-200` (`everyone`/`here` are plain spans), `:291-301` (`RoleMention` has no handler), against `:265-289` where the user and channel mentions are `role="button"` with handlers
+- What: One class carries both the interactive and the decorative mention. Three of the five kinds have no behaviour, but they still get the hand cursor and a hover colour change.
+- Impact: People click a role mention expecting the role's members (Discord shows nothing either, but Discord's role mention has `cursor: default`), and nothing happens; the hover feedback makes it look like a failed click rather than an inert label.
+- Fix: `cursor: pointer`/`:hover` only on `.md-mention[role="button"]`. If a role mention should do something, "show who has this role" is a reasonable card — but inert and honest is better than what is there now.
+- Effort: S
+- Status: open
+
+### WCHAT-057 · P3 · design · A code block is capped at 90 % of the message width, never wraps, and has no copy button
+- Where: `web/src/styles/markdown.css:9` (`max-width: 90%; white-space: pre; overflow-x: auto`), `web/src/markdown/render.tsx:443-449` (the `<pre>`; nothing else is rendered)
+- What: Three things, all visible on a phone. The 90 % cap leaves a permanent ragged strip to the right of every block for no reason (the column is already padded). `white-space: pre` plus `overflow-x: auto` puts a nested horizontal scroller inside the vertical message list, with no `overscroll-behavior: contain`, so dragging a long log line sideways on iOS regularly scrolls the conversation instead. And there is no copy button: the only way to get a snippet out is "Copy Text" on the whole message, which hands you the ``` fences and everything else the message said.
+- Impact: Sharing code — a thing this product's users plainly do, since there is a highlighter — is awkward on every client, and worst on the phone.
+- Fix: `max-width: 100%`, `overscroll-behavior-x: contain`, and a copy button in the block's top-inline-end corner revealed on hover and always visible on touch (`@media (hover: none)`), with the `copyToClipboard` helper WCHAT-049 asks for. A "wrap lines" toggle is what Discord lacks and people ask for; optional.
+- Effort: S
+- Status: open
+
+### WCHAT-058 · P2 · perf · Every message on screen rebuilds the role table of every server you are in, whenever anyone's profile arrives
+- Where: `web/src/lib/markdownCtx.ts:11-34` (`useRenderCtx`: subscribes to `users.byId`, `channels.byId` and `servers.byId` whole, and rebuilds `roles` from `Object.values(servers)` × `Object.values(st.roles)` inside the memo), `web/src/components/chat/MessageItem.tsx:85` and `:50` (the row and its `ReplyPreview` each call it — two per message), `web/src/components/chat/MessageItem.tsx:46` (`ReplyPreview` also subscribes to the whole `users.byId`), `web/src/components/chat/MessageList.tsx:492-497` (every loaded message is mounted; the list is not virtualised)
+- What: The context is built per row rather than per chat, and its memo depends on three entire store maps. `useUsers((u) => u.byId)` fires on every upsert — and `stores/messages.ts:25` upserts the author of any arriving message the client has not seen, `gateway/dispatch.ts:147/275/295/304` upsert on member chunks and profile updates, `voice/session.ts:153/159` on anyone joining a call. Each such event re-renders *every* mounted row (the `memo()` at `MessageItem.tsx:76` cannot help: the re-render comes from the row's own subscription), and each row then rebuilds a fresh `roles` dictionary over all servers and re-creates every React element of its markdown body.
+- Impact: In a channel scrolled back a few pages — say 600 rows — one stranger's message means 1,200 rebuilds of the roles table plus 600 full markdown re-renders, for a change that affects one author's name. This is the mechanism behind "the app hitches when a busy channel is open", and it is worse the longer you have been reading. On the phone it is worse again.
+- Fix: build the context once per conversation and pass it down — `ChatView` creates it and provides it through a React context (it is already a `useMemo`, it just lives in the wrong place) — and keep the roles map in `stores/servers` as a derived selector rather than recomputing it. Rows should subscribe to the one author they render (`useUsers((u) => u.byId[id])`), as `MessageItem.tsx:78` already does for the author; `ReplyPreview` should do the same for the parent's author. `lib/markdownCtx.ts` is `web-core`'s file, so this one is shared.
+- Effort: M
+- Status: open
+
+### WCHAT-059 · P3 · bug · A relative `<t:…:R>` timestamp is rendered once and then never ticks
+- Where: `web/src/markdown/render.tsx:323-333` (`Timestamp` computes `formatStamp(date, props.style)` at render time), `web/src/lib/time.ts:125-133` (`R` is computed from `Date.now()`), `web/src/markdown/render.tsx:24` (`parse` is memoised on the source, so nothing re-renders the node on its own)
+- What: `R` is the countdown style ("in 2 hours", "5 minutes ago"), and it is a pure render-time read of the clock with no interval. The row only re-renders when something else disturbs it, so the number shown is however old the last render was — a message posted with `<t:…:R>` reads "in 2 hours" for the rest of the day if the channel stays quiet, and can show a future time long after it has passed.
+- Impact: The one timestamp style whose whole point is to be live is the one that is stale. Anyone using it to announce when something starts is telling people the wrong time.
+- Fix: in `Timestamp`, when `style === "R"`, set an interval whose period follows the distance (10 s under a minute, 30 s under an hour, then a minute) and re-render; clear it on unmount. About fifteen lines, and it is the only styling of the seven that needs it.
+- Effort: S
+- Status: open
+
+### WCHAT-060 · P1 · bug · In a split view the caret is pulled into the pane you are not looking at, so typing goes to the wrong conversation
+- Where: `web/src/components/composer/Composer.tsx:153` (`useKeepFocused(taRef)` — called with no pane guard), `:565-596` (the hook installs a document-level `pointerup` and `keydown` handler per instance and focuses *its own* textarea), against `:169` where the channel-switch focus does check the pane (`if (paneFocused && …)`); `web/src/components/shell/AppShell.tsx:224-225` (`split={panes.length > 1}`, one `PaneView` — hence one `ChatView` and one `Composer` — per pane)
+- What: Every mounted composer adds its own `document` listener. With two panes open, a click anywhere that is not a text field (a message, the member list, a channel row) runs both handlers in mount order: the first focuses the left box, then the second sees that it is not the active element and focuses the right box. The guard at `:579` only bails when the active element is a field *inside a dialog*, so a sibling composer never stops it. The same for the `keydown` branch: the first printable character typed with nothing focused is delivered to the last-mounted pane's textarea.
+- Impact: In a split, clicking into the left conversation and typing puts the words in the right conversation's box — and the placeholder, which is the only label, is off to the side where nobody is looking. Press Enter and the message goes to the wrong channel. This is the one class of bug that cannot be taken back in a chat app; a private message ends up in a server channel.
+- Fix: pass `paneFocused` into `useKeepFocused` and return early when the pane is not the focused one (the hook is already a no-op on touch, so this is the same shape of guard); better still, install the listeners once for the app and have them focus `document.querySelector('[data-pane-focused] textarea')`. Worth a Playwright check in a two-pane tab afterwards.
+- Effort: S
+- Status: open
+
+### WCHAT-061 · P1 · a11y · Pressing Space on any focused button outside a dialog types a space into the message box instead of pressing the button
+- Where: `web/src/components/composer/Composer.tsx:582-588` (`onKeyDown`: `if (e.key.length !== 1 && e.key !== "Backspace") return;` then `focus()` on the textarea), `:548-557` (`wantsKeyboard` only knows `INPUT`/`TEXTAREA`/`SELECT`/contenteditable; `inOwnLayer` only exempts `[role=dialog]`, `[data-modal-layer]`, `[role=menu]`, `[role=listbox]`)
+- What: `" "` has length 1, so Space counts as a printable character. A focused `<button>` is not "wantsKeyboard" and the chat surface is not a dialog, so the handler moves focus to the composer mid-keydown. A native button's Space activation happens on *keyup*, which is now delivered to the textarea — so the button never fires and a space character is inserted into the draft instead. `Backspace` is explicitly included too, so pressing Backspace while a button has focus deletes a character from the draft. (The app relies on exactly this focus-steal to make a typed letter land in the box, so the redirection is the intended, working mechanism — it was just never excluded for keys that belong to a control.)
+- Impact: With the keyboard alone, Space does not work on the rail, the channel list, the header buttons, the member list, reaction pills, the attach/emoji/send buttons or anything else outside a modal — and each attempt silently edits the draft. Buttons in modals and menus work, which is why this survived: every a11y pass that tested a dialog passed. Together with WCHAT-017 (no keyboard route to a message action at all) this is most of what makes the app unusable without a mouse.
+- Fix: in the `keydown` branch, bail when the key is not a text-producing key (`if (e.key === " " || e.key === "Enter" || e.key === "Backspace") return;` — Backspace-to-edit is not worth this) and when the active element is interactive: `document.activeElement?.closest('button, a[href], [role=button], [role=option], [role=tab], [tabindex]:not([tabindex="-1"]), input, textarea, select')`. Same list for the `pointerup` branch, which today also yanks focus off a button a person just clicked.
+- Effort: S
+- Status: open
+
+### WCHAT-062 · P2 · bug · Enter does nothing visible for up to 1.5 seconds when the message has a link, and whatever you type in that gap stays in the box after the message is sent
+- Where: `web/src/components/composer/Composer.tsx:361` (`const embeds = linkPreviews ? previews.embedsFor(…, PREVIEW_WAIT) : null`), `:380` (`const got = embeds ? await embeds : []`), `:384` (`if (channelRef.current === channelId && textRef.current === sentText) { setText("") … }`), `:403` (`await sendMessage(…)` — which is where the optimistic row is created, `composer/send.ts:52`), `:41` (`PREVIEW_WAIT = 1500`)
+- What: The box is cleared and the pending row is created only *after* the uploads and the link-preview wait. So: paste a URL, press Enter, and for up to 1.5 s the text sits in the box with no pending message anywhere — the app looks like it ignored the Enter. Worse, the clear is conditional on the box still holding exactly what was sent; type one more character while waiting (or while an attachment uploads, which can be minutes) and the condition fails, so the text that was already sent stays in the box. The `else if` at `:394` only covers the case where you switched channels.
+- Impact: Two failures from one cause. People press Enter twice when nothing happens, which sends the message twice. And after a send with an attachment, the message body is still sitting in the box, which the next Enter sends again — a duplicate message that looks like the user's mistake.
+- Fix: clear the box (and the reply state) as soon as the send is accepted, before awaiting anything, and restore the text into the box if the send throws — which is what `send.ts` already does for the message row (`addPending` then `failPending`). If the text must stay for the upload case, remove the sent prefix instead of requiring equality (`if (textRef.current.startsWith(sentText)) setText(textRef.current.slice(sentText.length))`). Separately, create the pending row before the embed wait so Enter always has an immediate effect: the embeds can be attached to the pending payload when they land, or dropped.
+- Effort: M
+- Status: open
+
+### WCHAT-063 · P2 · security · Link previews are fetched as you type, not when you send — the privacy setting that governs them says the opposite in every language
+- Where: `web/src/components/composer/Composer.tsx:120-126` (a 600 ms debounce after each keystroke calls `previews.start(url)` for every URL in the box), `web/src/components/composer/linkPreviews.ts:33` (`fetchPreview` → `api/unfurl`), `web/src/i18n/locales/en.json:1820` (`"Fetch link previews when I send links"`), `:1832` (`"Your device asks the server to look up the page you linked … Turn this off if you do not want the server to see the links you send."`), `web/src/stores/settings.ts:96` (`linkPreviews: true` by default)
+- What: The unfurl request leaves the device 600 ms after you stop typing a URL — before you send, and whether or not you ever send. A link pasted into the wrong channel and deleted, a URL in a draft that is abandoned, a link someone pastes to check what it is: all of them are handed to the server (which then fetches the third-party page from its own address) in plaintext, with a timestamp. The setting's label and its explanation both promise this happens on send. The fragment is correctly stripped (`linkPreviews.ts:21-32`, so invite keys never leave), which shows the privacy story was thought about — just not this half of it.
+- Impact: In a product whose whole proposition is that the server cannot read your messages, the server gets a live feed of the links you type. It is also the one place where the app's own privacy copy is untrue, which is worse than the leak: a user who read the setting and left it on was misled.
+- Fix: either move the fetch to the send path (`embedsFor` already starts anything not yet started, and it waits for it — the 600 ms pre-warm only buys latency), or make the copy true and say the lookup happens while typing. The first is right: the pre-warm's only benefit is that a card is ready 600 ms sooner, against disclosing every abandoned draft. If the latency matters, start the fetch on Enter and let `PREVIEW_WAIT` cover it.
+- Effort: S
+- Status: open
+
+### WCHAT-064 · P2 · ux · Pasting a long text silently throws away everything past 4,500 characters, and on a phone there is no counter to warn you
+- Where: `web/src/components/composer/Composer.tsx:529` (`maxLength={MAX_LEN + 500}`), `:36` (`MAX_LEN = 4000`), `:343` (over the limit, Send toasts and refuses), `:452` (`counterOn = text.length > MAX_LEN - 200`), `web/src/components/composer/Composer.module.css:48` (`@media (max-width: 767px) { .counter { display: none } }`)
+- What: The textarea's `maxLength` is 4,500 and the browser enforces it by truncating a paste without a word. So pasting a 9,000-character log leaves 4,500 characters in the box — the second half is gone, not "not yet sent" — and Send then refuses because 4,500 > 4,000. The counter that would explain any of this is hidden on phones, and there is no "too long, upload as a file?" offer anywhere (Discord's answer to the same case).
+- Impact: A person pastes something long, sees a box that looks full and a red toast about a limit, trims it to fit — and sends text whose end was destroyed by the paste. There is no undo: the clipboard may well have been overwritten by then.
+- Fix: drop `maxLength` (or set it far above the limit) and enforce the limit yourself so nothing is destroyed; show the counter on mobile too (it is 12 px, there is room beside the slowmode label); and when a paste would exceed the limit, offer to attach it as a `.txt` file, which is the behaviour people expect and the upload path already exists.
+- Effort: M
+- Status: open
+
+### WCHAT-065 · P2 · a11y · The `@`/`:`/`/` autocomplete is invisible to a screen reader: nothing tells the textarea it exists
+- Where: `web/src/components/composer/Autocomplete.tsx:29` (`role="listbox"` with a `.acHead` `div` as its first child), `:32` (`role="option"` rows with no `id`), `web/src/components/composer/Composer.tsx:512-531` (the textarea has no `role="combobox"`, no `aria-expanded`, no `aria-controls`, no `aria-activedescendant`, no `aria-autocomplete`)
+- What: The popup is a detached listbox. A screen-reader user typing `@ali` is told nothing: not that a list appeared, not how many entries, not which one Enter will pick — and Enter then inserts something they were never told about. The listbox also has a non-option element as a child, which is invalid ARIA (and the keep-in-view code has to compensate with `list.children[index + 1]` at `:19`).
+- Impact: Mentions, custom emoji and slash commands are unusable with a screen reader, and surprising: pressing Enter to send inserts a completion instead.
+- Fix: the standard editable-combobox wiring — `role="combobox" aria-expanded={!!ac} aria-controls="composer-ac" aria-autocomplete="list" aria-activedescendant={ac ? `ac-${ac.index}` : undefined}` on the textarea, `id` on each option, and the header moved out of the listbox (wrap the popup in a `div` and keep `role="listbox"` on the rows' container, or give the header `role="presentation"`). Add a live-region count ("8 members") if you want it to be genuinely pleasant.
+- Effort: M
+- Status: open
+
+### WCHAT-066 · P2 · i18n · The reply bar is English in all eleven languages, and the translation for it already exists and is unused
+- Where: `web/src/components/composer/Composer.tsx:481` (`<span>Replying to <b>{users[…]?.display_name ?? "Unknown"}</b></span>`), `:484` (`@ {replyTo?.ping ? "ON" : "OFF"}`), `:495` (`{f.file.type.split("/")[0] || "file"}` — the tray's fallback tile), `:540` (`${remaining}s` — the slowmode countdown's unit), `web/src/components/composer/commands.ts:11` (`desc: "Appends ¯\\_(ツ)_/¯ to your message."` — the only one of the six commands left untranslated); the key `composer.replyingTo` = `"Replying to {name}"` exists at `web/src/i18n/locales/en.json:358` **and is translated in all ten other catalogues, and used by nobody**
+- What: The reply bar sits above the message box every time anyone replies — the most-used state the composer has — and it is hardcoded English, including the fallback name "Unknown" and the "ON"/"OFF" of the mention toggle. Somebody clearly did the translation work (`composer.replyingTo` is in de/es/fr/hi/ja/ko/pt-BR/ru/zh-CN) and the call site was never switched over. The same line also uses `display_name` raw, where the rest of the chat shows a friend nickname or server nickname via `displayName()`/`memberColor` — so the reply bar can name someone differently from the message list right below it.
+- Impact: An Arabic or Japanese user replying to a message reads «Replying to …» and a bare `@ ON`. `tools/i18n_keys_used.py` cannot see it, because no key is asked for.
+- Fix: `t("composer.replyingTo", { name })` with `<Tr>` for the bold name, keys for `on`/`off` (or replace the words with an icon plus `aria-pressed`, see WCHAT-067), `time.seconds` for the countdown, `composer.commands.appendsShrug` for `/shrug`, and `displayName(user)` for the name.
+- Effort: S
+- Status: open
+
+### WCHAT-067 · P3 · a11y · The reply bar's "mention the author" toggle has no name and no pressed state
+- Where: `web/src/components/composer/Composer.tsx:484` (`<button className={s.pingBtn} data-on={replyTo?.ping} …>@ {…? "ON" : "OFF"}</button>`), `web/src/components/composer/Composer.module.css:6-7` (`.pingBtn[data-on="true"] { color: var(--text-brand) }`)
+- What: A toggle button whose whole label is `@ ON`, with no `aria-pressed`, no `aria-label` and no tooltip explaining what the `@` does. Its state is carried by the word plus an accent colour.
+- Impact: A screen reader announces "at ON, button"; nobody is told that this decides whether the person you are replying to gets a notification. It is the only control in the composer that changes what the recipient's phone does.
+- Fix: `aria-pressed={!!replyTo?.ping}` and `aria-label={t("composer.mentionAuthor")}`, plus the existing `Tooltip` component with a sentence ("Notify the author of the message you are replying to").
+- Effort: S
+- Status: open
+
+### WCHAT-068 · P2 · i18n · `@` autocomplete matches ASCII only, so a person whose name is written in Arabic, Japanese or Russian cannot be mentioned by name
+- Where: `web/src/components/composer/Composer.tsx:54` (`/(?:^|\s)(@[a-z0-9_.]*|:[\w+-]{2,}|^\/\w*)$/i` — the token that opens the popup), `:219` (the filter does search `display_name` and `nickname`, so the data is there), `web/src/components/composer/mentions.ts:23` (`@([a-z0-9_.]{2,32}|everyone|here)` — the token that is turned into a real mention on send)
+- What: The popup only opens while the text after `@` is ASCII letters, digits, `_` and `.`. Type `@أح` or `@たな` and the first non-ASCII character ends the token, so the list closes and no mention is possible; the same regex on the send path means such a token would never become a `<@id>` anyway. The filter behind it already matches display names and nicknames case-insensitively, so this is purely the token pattern.
+- Impact: In an eleven-language product, mentioning a person by the name you see requires knowing their Latin username. Everyone in a Japanese or Arabic-speaking channel has to type names in a script they are not writing in.
+- Fix: widen the token to `@[^\s@]*` for the popup (it is only used to decide what to search for) and keep the strict pattern for the wire form — the completion inserts `@username`, which `mentions.ts` then resolves, so nothing downstream needs to change. Matching should use `String.prototype.localeCompare`-style folding or a simple `toLocaleLowerCase()`; Android's composer needs the same check.
+- Effort: S
+- Status: open
+
+### WCHAT-069 · P2 · ux · `@` only finds members the client happens to have loaded, and does not rank the matches
+- Where: `web/src/components/composer/Composer.tsx:210-221` (`for (const id of Object.keys(serverState.members)) if (users[id]) pool.set(…)`, then `.filter(u => u.username.includes(query) || …).slice(0, 8)`), `web/src/api/servers.ts:133-138` (`members(id, { q })` — a server-side member search already exists and is not used here)
+- What: Two things. The pool is whatever members this client has fetched, so in a server whose member list has not been opened (or is larger than a page) typing `@alice` finds nobody — with no hint that the list is incomplete. And the filter is a plain `includes` over an unordered map, so what you get is in hash order with no preference for a prefix match: typing `@al` can offer "michal" above "alice", and there is no tie-break on nickname, display name or who spoke recently.
+- Impact: The mention you want is often absent or fourth. People give up and type the name by hand, which produces a plain-text `@alice` that notifies nobody (`mentions.ts` only rewrites names it can resolve from the loaded users) — so the message looks like a mention and pings no one.
+- Fix: rank before slicing — exact username, then prefix on username/nickname/display name, then substring, then recent speakers in the channel; and when fewer than 8 local matches and the channel is in a server, call `servers.members(serverId, { q })` (debounced) and merge. `GroupMemberList`/`MemberList` already upsert what they fetch, so the results warm the same store.
+- Effort: M
+- Status: open
+
+### WCHAT-070 · P2 · a11y · The send button is 36 px on a phone, and an attachment's spoiler and remove buttons are 32 px
+- Where: `web/src/components/composer/Composer.module.css:34` (`.iconBtn { width: 36px; height: 36px }` — the emoji toggle and, on mobile, `.sendMobile`), `:19` (`.cardBtn { width: 32px; height: 32px }`), `:47-48` (`.sendMobile { display: none }` … shown under 768 px), `:56` (the `@media (pointer: coarse)` block exists and enlarges only `.closeBtn` and `.pingBtn`)
+- What: The file already knows about coarse pointers and bumps the reply bar's two small controls to 40×36. The send button — the single most-tapped control in the product, and the *only* way to send on a phone, since Enter is a newline there (`Composer.tsx:423-429`) — stays 36 px, sits 2 px from the emoji toggle, and is 6 px from the screen edge (`.wrap` padding 8 px). The attachment tray's spoiler and delete buttons are 32 px and overlap the card's corner.
+- Impact: Under the 44 px floor on the controls that matter most, and the two neighbours are "send this now" and "open the emoji picker". Mis-sends and accidental picker openings are the cheap consequence; deleting the wrong attachment is the expensive one.
+- Fix: extend the existing `@media (pointer: coarse)` block: `.iconBtn { width: 44px; height: 44px }`, `.btns { gap: 4px }`, `.cardBtn { width: 40px; height: 40px }`. The box's `min-height: 44px` already leaves room.
+- Effort: S
+- Status: open
+
+### WCHAT-071 · P3 · a11y · An upload's progress is a bare `div`, and a failed upload has no way to try again
+- Where: `web/src/components/composer/Composer.tsx:499` (`<div className={s.bar}><i style={{ width: … }} /></div>` — no `role="progressbar"`, no `aria-valuenow`, no text), `:500` (`f.error` as text), `:502-503` (the card's two buttons carry `title` but no `aria-label`), `:404-407` (a failure marks the card and toasts; nothing offers a retry), `web/src/components/composer/Composer.module.css:25` (`.err` covers the whole thumbnail)
+- What: There is no accessible signal that an upload is in progress or how far along it is, and the only way out of a failure is to delete the file and add it again — pressing Send again re-uploads every file in the tray from zero, including the ones that already succeeded.
+- Impact: A blind user gets silence between "Send" and either a message or a toast, on the operation most likely to take a minute. Everyone else loses their completed uploads when one file in a batch fails.
+- Fix: `role="progressbar" aria-valuenow={Math.round(f.progress*100)} aria-valuemin={0} aria-valuemax={100} aria-label={f.name}` on `.bar`; `aria-label` beside the `title` on both card buttons; keep the `blob_id` of a file that finished (the shape `retryPending` in `send.ts:144-147` already uses) so a retry only re-sends what failed, and put a "Try again" button in the `.err` overlay.
+- Effort: M
+- Status: open
+
+### WCHAT-072 · P3 · bug · In a split view a dragged file shows two "Drag to Upload" cards and can land in the pane you are not looking at
+- Where: `web/src/components/composer/DropOverlay.tsx:43-90` (window-level `dragenter`/`drop` handlers, one set per mounted instance, each with its own `over` state and portal), `:67` (`e.defaultPrevented` is what stops the second handler taking the file), `web/src/components/composer/Composer.tsx:465` (one `DropOverlay` per composer), `web/src/components/shell/AppShell.tsx:224-225` (one composer per pane)
+- What: With two panes, a file dragged over the window turns on both overlays: two full-screen scrims, each naming its own channel, the later-mounted one painted on top. On drop, the handlers run in mount order and the *first* one wins (the second sees `defaultPrevented`), which is not necessarily the pane whose name the user just read, nor the focused one.
+- Impact: The overlay says the file is going to `#random` and it goes to `#general`. Dropping a file into the wrong conversation is not recoverable — the upload is already on the server, visible to everyone in that channel, before the person can react.
+- Fix: one overlay for the app, rendered by the shell, targeting the focused pane (`usePanes` already knows which that is); or, minimally, `if (!paneFocused) return` in the composer's `DropOverlay` and one scrim.
+- Effort: M
+- Status: open
+
+### WCHAT-073 · P3 · bug · `@here` and `@everyone` are the same thing on the wire, so `@here` notifies people who are not here
+- Where: `web/src/components/composer/mentions.ts:23-27` (`@everyone` and `@here` both set `everyone = true`), `web/src/components/composer/send.ts:69` (`if (everyone) body.mention_everyone = true` — the only field there is), `web/src/markdown/render.tsx:197-200` (the renderer draws them as two different things), `web/src/components/composer/Composer.tsx:223` (the autocomplete offers `here` as its own entry with its own description, "Notify everyone online in this channel")
+- What: The client offers `@here`, describes it as online-only, and renders it distinctly — and then sends it as `mention_everyone`. Nothing in the payload distinguishes the two, so the server cannot scope the notification and no recipient client can either.
+- Impact: Someone uses `@here` precisely to avoid waking the whole server, and wakes the whole server. The description in the autocomplete is a promise the product does not keep.
+- Fix: either carry the distinction (`mention_here` beside `mention_everyone`, with the server notifying only members whose presence is online — a `[server-api]` change) or drop `@here` from the autocomplete and the renderer until it means something. The first is what the copy already promises.
+- Effort: M
+- Status: open
+
+### WCHAT-074 · P2 · i18n · Emoji search only understands English, in all eleven languages
+- Where: `web/src/components/pickers/emojiIndex.ts:86-89` (`import("emojibase-data/en/compact.json")`, `en/shortcodes/iamcal.json`, `en/shortcodes/emojibase.json`), `:171-191` (`searchEmoji` scores against `e.shortcodes`, `e.label` and `e.tags` — all English), `web/src/components/pickers/EmojiPicker.tsx:464` (the search box, whose placeholder *is* translated: "Find the perfect emoji")
+- What: The dataset is pinned to `en`, so labels and tags are English words. A Spanish user typing "corazón", a German typing "herz", an Arabic user typing «قلب» or a Japanese user typing「ねこ」gets "No emoji match" — for emoji that are right there. emojibase ships the same compact data per locale (`emojibase-data/<lang>/compact.json` exists for ar, de, es, fr, hi, it, ja, ko, pt, ru, zh and more), and the app already loads this chunk lazily, so the machinery for it is in place.
+- Impact: The emoji picker's search box — the only practical way to find one emoji among 1,800 — works for English speakers only. Every other language has to scroll nine categories. The same index backs `:shortcode:` autocomplete in the composer, where English-only is defensible (a shortcode is a token, and iamcal names are what Slack and Discord use); the *search* is not.
+- Fix: load `emojibase-data/${lang}/compact.json` when the app language is not English, falling back to `en` when the locale is missing, and keep the iamcal/emojibase shortcodes as they are (they stay searchable). Merge the localised `label`/`tags` into the entries; `searchEmoji` needs no change beyond lower-casing with `toLocaleLowerCase()`. One extra lazy chunk for non-English users.
+- Effort: M
+- Status: open
+
+### WCHAT-075 · P2 · ux · On a phone the keyboard covers the picker you opened, the moment you use its search box
+- Where: `web/src/components/pickers/EmojiPicker.tsx:19-21` (`focusSearchOnOpen()` returns false on a coarse pointer, with the comment "that raises the keyboard, which covers the picker's sheet"), `web/src/components/pickers/ExpressionPicker.tsx:66-70` (the composer is deliberately blurred on open for the same reason), `web/src/components/pickers/Picker.module.css:37` (`@media (max-width: 767px) { .pop { position: fixed; bottom: 0; height: 60vh } }`), `:10-11` (the search row is the first thing in the sheet); `grep -rn visualViewport web/src` → **no hits anywhere in the app**
+- What: The code knows the keyboard covers the sheet — that is why it will not focus the search field for you — and then the field is still the first thing in the sheet, so the first thing anyone does is tap it. Nothing in the product listens to `window.visualViewport`, so the sheet stays pinned to the bottom of the layout viewport, behind the keyboard: on iOS a `position: fixed` bottom sheet is not moved for the keyboard, and 60 vh of sheet minus ~45 vh of keyboard leaves the search row and perhaps one row of emoji.
+- Impact: Searching for an emoji, a sticker or a GIF on a phone means typing into a box you cannot see above a grid you cannot see. The same applies to the GIF and sticker tabs, which are search-first surfaces. This is the client the owner uses daily.
+- Fix: track the keyboard once, app-wide: on `visualViewport` `resize`/`scroll` set `--kb: calc(<layout height> - <visual height> - <offsetTop>)px` on `:root`, and give the sheet `bottom: var(--kb, 0px); max-height: calc(100dvh - var(--kb, 0px) - 48px)`. The composer's autocomplete popup (`Composer.module.css:40`) wants the same variable. Alternatively move the search row to the *bottom* of the sheet on mobile, which is what iOS apps do, so the keyboard sits under it and the grid stays visible.
+- Effort: M
+- Status: open
+
+### WCHAT-076 · P2 · bug · A sticker or a GIF sent while you are replying is not a reply, and it ignores slow mode
+- Where: `web/src/components/composer/Composer.tsx:475` (`onPick={(g) => { setPicker(false); void sendMessage(channel.id, g.url, { embeds: [...] }) }}`), `:476` (the sticker path, `sendMessage(channel.id, "", { sticker })`), against `:339-403` (`send()`, which assembles `opts.replyTo`/`opts.ping`, checks `remaining > 0` for slow mode, and clears the reply state afterwards)
+- What: The two picker paths call `sendMessage` directly and pass neither the reply nor the ping choice, so the message is an ordinary one. The reply bar stays on screen afterwards, so the *next* message becomes the reply instead — and the slow-mode guard is skipped entirely, so in a slow-mode channel the sticker is sent, refused by the server and reported as an error toast.
+- Impact: "Reply to this with a sticker" — the single most common way stickers are used — silently produces a loose message, and then mis-attaches the reply to whatever is typed next. In a slow-mode channel the failure is a red toast with no explanation of why the send button was greyed out but the sticker was not.
+- Fix: factor the option assembly out of `send()` (reply, ping, slow-mode check, `setReplyTo(null)` after) and use it for all three paths. The GIF path should also respect `MAX_LEN` and the pending text: today it sends the URL as its own message even when the box is full of something else.
+- Effort: S
+- Status: open
+
+### WCHAT-077 · P3 · ux · "Frequently used" is neither frequency-based nor able to hold a custom emoji
+- Where: `web/src/components/pickers/EmojiPicker.tsx:298` (the section title `pickers.emojiPicker.frequentlyUsed`), `:351-354` (`pick` records `recentEmoji` — a plain most-recent-first list, capped at 40 — but only after the two `return`s at `:343` and `:347`, which are the custom-emoji and pack-emoji cases), `web/src/stores/settings.ts` (`recentEmoji`)
+- What: The row is recency, labelled frequency, and the two kinds of emoji a community actually reuses — the server's own custom emoji and installed pack emoji — never enter it. Ten uses of `:blobcat:` leave no trace; one use of 🥔 puts the potato at the front.
+- Impact: The one shortcut row in the picker is useless exactly where the product is differentiated (custom emoji), and its title promises something it does not do. On a phone, where the categories are a 32 px rail, that row is most of how people pick anything.
+- Fix: record custom and pack picks too (key them as `c:<id>` / `p:<id>` and resolve them back through `useExpressions`), and either rank by a small frequency count with recency as the tie-break — which makes the existing title true — or rename the section "Recently used" (`pickers.emojiPicker.recentlyUsed`). Frequency is what Discord does and what the title already claims.
+- Effort: M
+- Status: open
+
+### WCHAT-078 · P3 · i18n · Two English literals left in the pickers, one of them the accessible name of every GIF
+- Where: `web/src/components/pickers/EmojiPicker.tsx:279` (`name: servers[id]?.server.name ?? "Server"` — the section title for a server whose name has not arrived), `web/src/components/pickers/GifPicker.tsx:121` (`label: g.title || "GIF"` — used as `aria-label` on the tile, `GifGrid.tsx:145`)
+- What: The rest of both files is fully translated, so these are the residue. The GIF one is the accessible name a screen-reader user hears for every untitled result — most of them.
+- Impact: Small, but it is the label of the most numerous control in the picker.
+- Fix: `t("pickers.emojiPicker.serverFallback")` and `t("pickers.gifPicker.aGif")` (the catalogue already has `pickers.gifPicker.favoriteGif` in the same shape, used for favourites at `:130`).
+- Effort: S
+- Status: open
+
+### WCHAT-079 · P3 · code · The emoji grid recomputes each cell's position with a fresh array scan per row
+- Where: `web/src/components/pickers/EmojiPicker.tsx:510` (`pos={`${first + rows.slice(first, last).indexOf(r)}:${ci}`}`)
+- What: Inside the `map` over `rows.slice(first, last)`, each row slices that window again and searches it for itself — an O(n) scan plus an array allocation per row, so O(n²) over a window that is 40 rows deep, on every scroll frame. The index it is looking for is the `map` callback's own second argument.
+- Impact: Wasted work on the only surface in the app that re-renders at 60 fps while scrolling, and a line nobody can read. No user-visible bug today.
+- Fix: `rows.slice(first, last).map((r, ri) => …)` and `pos={`${first + ri}:${ci}`}`.
+- Effort: S
+- Status: open
+
+### WCHAT-080 · P2 · a11y · Every control in the picker except the emoji themselves is 32 px or less on a phone
+- Where: `web/src/components/pickers/Picker.module.css:4` (`.tab { padding: 4px 8px; font-size: 16px }` — about 28 px tall: these are the Emoji / GIFs / Stickers tabs), `:7` (`.close { 32px }`), `:14` (`.tone { 32px }`), `:18` (`.toneOption { 32px }`), `:24` (`.cat { 32px }` — the category rail), `:45` (`.gifRemove { 24px }`), `:11` (`.search { height: 32px }`), `:37` (on a phone all of this is a bottom sheet); against `Modal.module.css:19` and `VideoPlayer.module.css`, which both have `@media (pointer: coarse)` bumps
+- What: The picker has no coarse-pointer rules at all. On the phone sheet, switching between emoji, GIFs and stickers means hitting a 28 px-tall word; picking a category means a 32 px circle in a 48 px rail; removing a favourite GIF is a 24 px cross in the corner of a tile.
+- Impact: The most-opened popover in the app is the least tappable surface in it. Missing the tab strip taps an emoji and inserts it; missing the GIF cross sends the GIF.
+- Fix: one block — `@media (pointer: coarse) { .tab { min-height: 40px; padding: 8px 12px } .close, .cat, .tone, .toneOption { width: 40px; height: 40px } .gifRemove { width: 32px; height: 32px } .search { height: 40px } }`. The 48 px rail already has room for 40 px buttons.
+- Effort: S
+- Status: open
+
+### WCHAT-081 · P2 · a11y · On a phone the search panel covers the whole conversation but is not a dialog: focus stays behind it and the results are never announced
+- Where: `web/src/components/search/Search.module.css:39` (`@media (max-width: 767px) { .panel { position: absolute; inset: 0; z-index: 5 } }`), `:38` (a 420 px overlay from 768–1099 px), `web/src/components/search/SearchPanel.tsx:111` (`<aside className={s.panel}>` — no `role`, no `aria-label`), `:113` (the result count lives in a plain `<span>`), `:169` (the progress line, a `<span>`), `web/src/components/chat/ChatView.tsx:335` (the message list and composer stay mounted behind it)
+- What: The panel is presentationally a full-screen sheet on a phone and an overlay on a tablet, and structurally a bare `<aside>` beside the chat. Nothing moves focus into it (except the mobile input's `autoFocus`), nothing keeps focus inside it, and the chat it covers keeps every one of its focusable controls — so Tab from the search box goes into the invisible conversation underneath. The two pieces of information the panel exists to give — "12 results" and "searched 4,200 messages in 12 conversations" — are in inert spans, so a screen-reader user who types a query is told nothing at all, ever: there is no live region and the panel is not even named.
+- Impact: Search is unusable with a screen reader and confusing with a keyboard. Worse on the phone, where the thing you tab into cannot be seen.
+- Fix: `role="dialog" aria-modal="true" aria-label={t("chat.chat.searchMessages")}` (plus `inert` on the chat behind it, see WCHAT-052) when the panel is an overlay — the breakpoint is already a media query, so a `useIsMobile`-style flag decides; move focus to the input on open and back to the search button on close; and make the count a live region: `<span role="status">{t("search.search.results", { count })}</span>`, with the progress line `aria-live="off"` so the running count does not chatter.
+- Effort: M
+- Status: open
+
+### WCHAT-082 · P2 · i18n · A search result whose message was a sticker or a file reads `[sticker]` / `[3 files]` in every language, and the help panel says "exclude" in English
+- Where: `web/src/components/search/SearchPanel.tsx:152` (`m.payload?.sticker ? "[sticker]" : m.payload?.att?.length ? `[${n} file${n === 1 ? "" : "s"}]` : ""`), `:133` (`<dt>-word</dt><dd>exclude</dd>`)
+- What: The same shape as the pins panel's `[attachment]` (WCHAT-050): a bracketed English placeholder standing in for a message with no text, with an inline English plural rule. The help list translates every other row and leaves the last description as the bare word "exclude".
+- Impact: Any search that turns up a sticker or an image-only message shows English brackets in the middle of a translated panel, and the help that teaches people the query syntax is half-translated.
+- Fix: `chat.search.stickerResult`, `chat.search.fileResults` (a proper plural entry — `en.json` already has `{count, plural}` entries), `search.search.excludeHint`. Worth sharing one key set with the pins panel and the sidebar's last-message preview, which have the same problem.
+- Effort: S
+- Status: open
+
+### WCHAT-083 · P3 · a11y · The search filter suggestions cannot be reached from the keyboard without leaving the query
+- Where: `web/src/components/search/SearchSuggestions.tsx:98`/`:111`/`:124` (rows are `<button>`s with `onMouseDown` prevented), `web/src/components/search/SearchPanel.tsx:119-123` (the input and the suggestion list are siblings with no ARIA relationship), `web/src/components/chat/ChatView.tsx:238-247` (on desktop the input is in the header and the suggestions render inside the panel, further down the document)
+- What: Typing `from:` opens a list of people, and the only way to choose one is a mouse click or Tab (which on desktop means tabbing out of the header, past the close button, into the panel). There are no arrow keys, no Enter-to-take-the-first, and no `role="combobox"`/`aria-activedescendant` wiring, so a screen reader is not told the list exists — the same gap as the composer's autocomplete (WCHAT-065), in a second surface.
+- Impact: The filter syntax the panel spends a paragraph teaching is only completable with a pointer.
+- Fix: the same combobox wiring as WCHAT-065, plus ArrowDown/ArrowUp/Enter handled on the input (the rows already come from one array — an `index` in state is all that is missing). Doing both surfaces with one small `useListbox` hook is the cheaper route.
+- Effort: M
+- Status: open
+
+### WCHAT-084 · P3 · a11y · The clear button in the mobile search box is a 20 px circle
+- Where: `web/src/components/search/Search.module.css:52` (`.clear { width: 20px; height: 20px }`), used by `SearchPanel.tsx:120` (the phone's own search box) and `ChatView.tsx:248-252` (the desktop header box), with `:40` bumping only `.close` for coarse pointers
+- What: The one control that empties a search is 20 px square, inside a 32 px-tall box, on the surface that is full-screen on a phone.
+- Impact: Missing it puts the caret back in the box, which on a phone reopens the keyboard over the results.
+- Fix: `@media (pointer: coarse) { .clear { width: 32px; height: 32px; margin-inline-end: -6px } }`.
+- Effort: S
+- Status: open
+
+### WCHAT-085 · P3 · design · Five search boxes, five different controls
+- Where: `web/src/components/chat/ChatView.tsx:236-253` with `Chat.module.css`'s `.searchBox` (28 px tall, magnifier icon, clear button, grows from 180 px to 260 px on focus), `web/src/components/search/SearchPanel.tsx:117-121` with `Search.module.css:6` (32 px, icon, clear), `web/src/components/pickers/EmojiPicker.tsx:464`, `GifPicker.tsx:154` and `StickerPicker.tsx:53` with `Picker.module.css:11` (32 px, no icon, no clear button) — and `web/src/components/common/TextInput.tsx:65`, the shared input, used by none of them
+- What: Five places let a person filter a list, and each is a hand-rolled `<input>`: three heights, two with a clear affordance and three without, two with a leading icon and three without, none with `type="search"` (so no platform clear on iOS, no search keyboard hint), none with `enterKeyHint="search"`, and no shared placeholder or `aria-label` convention. `common/TextInput` is a bordered form field and genuinely does not fit an inline filter box — which is the point: the missing component is a `SearchBox`, not a use of `TextInput`.
+- Impact: The pickers' boxes cannot be cleared without selecting the text and deleting it, which on a phone is the worst interaction in the app; and the app looks assembled rather than designed when two search boxes are visible at once (the header's and the picker's).
+- Fix: one `common/SearchBox` — 32 px (40 px on coarse pointers), leading magnifier, trailing clear button that appears when there is text, `type="search"`, `enterKeyHint="search"`, `aria-label` required by the props type — and replace all five. The header's grow-on-focus can stay as a prop.
+- Effort: M
+- Status: open
+
+### WCHAT-086 · P2 · i18n · A Rich Presence card is glued together from English words: "by", "on", "of", "left", "elapsed"
+- Where: `web/src/components/activity/ActivityCard.tsx:37` (`text: a.type === 2 ? `by ${a.state}` : …`), `:38` (`` `on ${a.assets.large_text}` ``), `:41` (`` ` (${a.party.size[0]} of ${a.party.size[1]})` ``), `:67` (`{formatClock(clock.remaining)} left`), `:68` (`{formatClock(clock.elapsed)} elapsed`); `web/src/lib/activity.ts`'s `activityHeading` *is* translated, which is why the rest looks deliberate
+- What: Five hardcoded English words in the card that is shown for everybody who is listening to something or playing something — "by Rick Astley", "on Whenever You Need Somebody", "(2 of 4)", "1:12 left", "43:20 elapsed". The card's heading ("Listening to Spotify") goes through `t()`; these do not.
+- Impact: Every profile of anyone playing music reads half-English in ten languages, and in Arabic the English fragment also flips the line's direction around the artist's name. Rich Presence is a shipped, visible feature (there is a banner component for it), so this is on screen daily.
+- Fix: `activity.card.byArtist` (`"by {name}"`), `activity.card.onAlbum`, `activity.card.partySize` (`"({current} of {max})"`), `activity.card.timeLeft`, `activity.card.timeElapsed`. All five want to be whole sentences with placeholders, not concatenations, so a language can reorder them.
+- Effort: S
+- Status: open
+
+### WCHAT-087 · P3 · i18n · "Member since" and "Friends since" are formatted in the browser's language, not the app's
+- Where: `web/src/components/profile/ProfileCard.tsx:30` (`const dateOf = (ms) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })`), used at `:358` and `:363`; `web/src/lib/time.ts:32-44` exists to prevent exactly this and caches a formatter per language
+- What: The third instance of the same slip in this area (`Embeds.tsx:121` is WCHAT-034, `MemberList.tsx:20`'s collator is WCHAT-053). `undefined` means "the browser's locale", so an Arabic or Japanese user on an English system reads "Sep 18, 2026" in Latin script and English month names inside an otherwise translated card.
+- Impact: Small on its own; together with the other two it is a pattern, and the pattern is what should be fixed.
+- Fix: add a `shortDate` kind to `lib/time.ts` and call `formatShortDate(ms)`. Then make it impossible to regress: an ESLint `no-restricted-syntax` rule banning `toLocaleDateString`/`toLocaleTimeString`/`toLocaleString`/`new Intl.*` outside `lib/time.ts` would have caught all three (`grep -rn "toLocale\|new Intl" web/src --include='*.tsx' --include='*.ts' | grep -v lib/time` is the check).
+- Effort: S
+- Status: open
+
+### WCHAT-088 · P2 · design · Two people can compare their safety numbers and the app remembers nothing: there is no "verified" state
+- Where: `web/src/components/profile/KeyVerify.tsx:37-43` (`verdictFor` has exactly three outcomes: `first`, `same`, `changed`), `:71-98` (`KeyStatusChip` — "New to this device" / "Same key as before" / "Key changed"), `web/src/lib/keyPins.ts:31-39` (the `PinVerdict` union; there is no verified concept anywhere in the file), `web/src/components/modals/VerifyKeyModal.tsx:18` (the dialog's only action is "Done" — a `web-shell-ui` file)
+- What: The whole dialog exists so that two people can read thirty digits to each other and establish that no server sat in the middle. When they have done it, there is nothing to press. The chip goes on saying "New to this device", and the next time the app is restarted it says "Same key as before" — which is what it would say for a key the server substituted before this device ever saw the person. The honest copy (`noteWhatThisProves`) is right to be careful, and that is exactly why the missing piece hurts: the product tells you the check proves nothing *and* gives you no way to make it prove something.
+- Impact: The one defence against a malicious server is a ritual with no result. A user cannot tell, a week later, which of their contacts they have checked; a key change after a verification gets the same warning as any other; and the effort of comparing digits is never rewarded, so nobody does it twice. Signal, Element and WhatsApp all store the verification and escalate a later change for verified contacts — that escalation is the actual value.
+- Fix: a `verified` flag beside the pin in `lib/keyPins.ts` (key + timestamp), a "I've compared these" / "Mark as verified" button in `VerifyKeyModal` (and an "unverify"), a fourth chip state `encryption.chipVerified` with the `ShieldCheck` icon reserved for it (`same` moves to a neutral icon), and a louder, blocking `KeyChangeModal` when a *verified* key changes — "you verified this person's key in person on 12 March; it is now different" is a sentence that means something. Android's `KeyVerify.kt` needs the same states, and the flag belongs in the encrypted settings blob so it follows the account to a new device.
+- Effort: M
+- Status: open
+
+### WCHAT-089 · P3 · security · An activity card's title, lines and buttons are attacker-chosen labels over attacker-chosen links, with the destination shown nowhere
+- Where: `web/src/components/activity/ActivityCard.tsx:9-15` (`Linked` sets `title={title}` — the *text*, never the href), `:63` (the title links to `a.details_url`), `:65` (each line to `l.href`), `:83` (`<a href={b.url}>{b.label}</a>` for up to two Rich Presence buttons)
+- What: Everything in the card comes from another user's presence payload, which their local app (or a modified client) fills in freely. A button labelled "Verify your Nexa account" pointing at `https://evil.example` renders as a full-width button in a profile, and there is no `title`, no host, and no confirmation on the way out. The server does validate the *scheme* and drops non-https and malformed urls (`internal/gateway/activity.go`, covered by `activity_test.go:99-119`), and it proxies the images — so this is not an IP leak or an XSS, it is the same phishing surface as WCHAT-055 with a button instead of a link.
+- Impact: A stranger in a shared server can put a convincing button in their own profile and wait. Lower reach than a masked link in a message, hence P3, but the same fix.
+- Fix: show the host: `title={b.url}` on the buttons and lines, and the host in small text under a button's label (Discord shows the domain on hover); or route every activity link through the same "you are leaving" confirmation WCHAT-055 asks for, which would cover both surfaces at once.
+- Effort: S
+- Status: open
+
+### WCHAT-090 · P3 · a11y · The profile card's own controls are 22–32 px on a phone, where the card is full-screen
+- Where: `web/src/components/profile/Profile.module.css:123` (`.noteBtn { padding: 2px }` around an 18 px icon — a 22 px target), `:65` (`.bannerBtn { 32px }` — "Add friend", "Accept", "More", "Close"), `:129` (`.chip { height: 22px }`), `:132`/`:135` (`.primary`/`.square` 36 px); the file has no `@media (pointer: coarse)` rule at all, while `Activity.module.css:22` next door does have one
+- What: On a phone the profile opens as a near-full-screen modal, and its actions are a 32 px circle on the banner (including the only close button) and a 22 px notebook icon beside the name. The sibling activity card already bumps its buttons to 40 px on coarse pointers, so the convention exists.
+- Impact: Accepting a friend request or closing the profile is a 32 px target in the corner of the screen; the note button is the smallest control in the product.
+- Fix: `@media (pointer: coarse) { .bannerBtn { width: 40px; height: 40px } .noteBtn { padding: 10px; margin: -10px } .primary, .square, .fullBtn { height: 44px } }`. This is the fourth surface in this area with the same gap (WCHAT-070 composer, WCHAT-080 pickers, WCHAT-084 search) — worth one pass over every `width: <n>px; height: <n>px` on a `button` in the area, with a checklist rather than four separate fixes.
+- Effort: S
+- Status: open
+
+### WCHAT-091 · P2 · bug · A DM that will not load throws you back to the conversation list with no explanation, whatever went wrong
+- Where: `web/src/pages/DMPage.tsx:28-35` (`channelsApi.get(channelId).catch(() => setMissing(true))` — every failure is "missing"), `:41-43` (`if (missing) nav("/channels/@me", { replace: true })` — no toast, no page), against `web/src/pages/ServerPage.tsx:29-34` and `:66-74`, where the same situation is handled properly: 403/404 toast and go home, anything else shows a page with a "Try again" button, with a comment explaining exactly why ("a network blip indistinguishable from being removed")
+- What: The lesson was learned for servers and not applied to DMs. Any error from `GET /channels/:id` — offline, a 500, a timeout, an expired token being refreshed — sends the reader to `/channels/@me` with `replace: true`, so Back does not even return them, and nothing is said.
+- Impact: Tapping a DM notification on a flaky connection closes the conversation you were trying to open, silently. It reads as the app losing the conversation, and the natural response — tap it again — does the same thing. This is the most common deep link in the product (a notification, a link to a message, restoring a tab).
+- Fix: mirror `ServerPage`: distinguish 403/404 (toast + home) from anything else (stay, show "That conversation could not be opened / The request did not get through" with Try again). The strings exist as `server.thatServerCouldNotBeOpened`/`server.theRequestDidNotGetThrough` and want DM-shaped siblings.
+- Effort: S
+- Status: open
+
+### WCHAT-092 · P3 · i18n · A private sticker pack's page says "private" in English
+- Where: `web/src/pages/StickerPackPage.tsx:90` (`{packCount(pack)}{pack.public ? "" : " · private"}`)
+- What: The one untranslated string on an otherwise fully translated share page — and it is the word that tells the owner why nobody else can open the link.
+- Fix: `t("stickerPack.privateSuffix")`, or better `t("stickerPack.countAndPrivate", { count, })` so the separator is the language's.
+- Effort: S
+- Status: open

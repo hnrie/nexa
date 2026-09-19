@@ -170,3 +170,303 @@ commit `d7af1d9` (working tree at audit start). Paths under
 - Fix: use `Nav.back()` from every screen's close/back (with `previous` defaulting to the last `Route.Chat` with a channel, kept in a small stack rather than one deep); remove `emptyChat` from the `BackHandler` condition once the drawer has been shown, so a second back exits; remember the last `Route.Chat` in device prefs and restore it on start when the channel still exists.
 - Effort: S
 - Status: open
+
+### DROID-022 · P1 · parity · A password-locked subchat cannot be opened on the phone: no lock in the list, no password prompt, and "Could not load messages" with the server's English sentence
+- Where: `net/Models.kt:88-112` (`Channel` has no `locked`), `ui/chat/ChatScreen.kt:103-109,189` (the load failure is the end of the road), `ui/sheets/ChannelSheets.kt:296` (subchat creation: a name, no password); server `internal/api/access.go:52-55` (403 `locked` "This subchat asks for its password first."), `internal/api/subchat_handlers.go:18-19,67` (`GET /channels/{id}/lock` gives `salt`/`params`, `POST /channels/{id}/unlock` takes `password_key`), `internal/api/subchat_lock_test.go:126-133` (the channel object and both channel lists carry `locked: true`); web `web/src/components/chat/ChatView.tsx:139-162`, `web/src/components/chat/LockedChannel.tsx`, `web/src/lib/subchatLock.ts`, `web/src/components/modals/SubchatModal.tsx:27-47`
+- What: the web can put a password on a subchat (stretched on the device by `lib/subchatLock`, checked by the server per session); the channel then arrives with `locked: true` and every read is refused with 403 `locked` until `POST …/unlock` has been sent from that session. Android's `Channel` model drops the field (`ignoreUnknownKeys`), the sidebar draws the subchat like any other, and opening it runs `loadInitial` straight into the 403: `ChatScreen` shows the empty state "Could not load messages" with the detail "This subchat asks for its password first." — the server's English, in all eleven languages — and offers nowhere to type it. The phone can neither create nor edit a locked subchat.
+- Impact: a person whose friends use locked subchats sees a conversation that looks normal in the list and is dead when opened, with a sentence telling them to do something the app cannot do. Round 1's "Android is a read-and-chat client" matrix predates this feature; it is a new parity hole.
+- Fix: add `locked: Boolean = false` to `Channel`; a lock glyph in `Sidebar` beside a locked subchat; in `ChatScreen`, when `channel.locked`, ask `GET …/lock` for `salt`/`params`, show a password screen shaped like `LockedChannel.tsx` (title, one field, "Unlock"), stretch with `Kdf` exactly as `subchatLock.ts` does (same argon2id parameters — add a test vector against a web-made lock), post `password_key`, then load. Creation/edit with a password in `ChannelSheets` can follow.
+- Effort: M
+- Status: open
+
+### DROID-023 · P2 · security · Signing out leaves the account's messages in the notification shade and its screens in the navigation state
+- Where: `data/Session.kt:387-396` (`signOutLocally`), `notify/Notifications.kt:142-150` (only per-conversation cancels exist; `cancelAll` is never called), `ui/Nav.kt:40-42,104` (`route`, `layers`, `jump` are never reset), `ui/main/MainScreen.kt:52` (layers are drawn from `Nav.layers` whenever `MainScreen` is up), `MainActivity.kt:164-183` (`handleIntent`)
+- What: `signOutLocally` — the Sign out row, and every forced sign-out (401, `session_expired`, DROID-009) — resets the token, the keys and `AppState`, but (1) never cancels the message notifications already posted: the decrypted text and sender names of the account stay readable on the lock screen and in the shade after sign-out, and tapping one runs `handleIntent` into `Route.Chat(null, thatChannel)` on top of the sign-in screen; (2) never resets `Nav`: `route` keeps `Route.Settings` (where the Sign out row lives) or whatever screen the 401 arrived on, `layers` keeps any open sheet (a profile, the members list, a channel's settings, built from the old account's ids) and `jump` its pending target — hidden while `AuthScreen` shows, back on the next sign-in, so a second account opens on the first account's Settings screen with the first account's sheet over it. (`SettingsStore` surviving sign-out is DROID-001.)
+- Impact: signing out is what people do before handing a phone to someone; the shade defeats it. The stale navigation is a confusion on every account switch and every forced sign-out.
+- Fix: in `signOutLocally`: `NotificationManagerCompat.from(App.instance).cancelAll()` (the foreground service re-posts its own if it is running), `Nav.route.value = Route.Chat(null, null)`, `Nav.clearLayers()`, `Nav.jump.value = null`, plus DROID-001's `SettingsStore.reset()`.
+- Effort: S
+- Status: open
+
+### DROID-024 · P1 · bug · A file up to 90 MB is encrypted into memory twice before the upload starts — an `OutOfMemoryError` crash on phones with a small heap, and no progress until it is done
+- Where: `media/Uploads.kt:109-112` (`ByteArrayOutputStream(total)` then `toByteArray()`), `net/ApiClient.kt:151-172` (`upload` takes a `ByteArray`), `net/Endpoints.kt:398-401`, `ui/chat/Composer.kt:199-205` (`singleLimit` = the server's `upload_single_bytes`; 90 MB on the live instance, `internal/api/upload_handlers.go:24`), `android/app/src/main/AndroidManifest.xml:43` (`largeHeap`)
+- What: any file whose encrypted size is at or under the server's single-request ceiling is encrypted into a byte array sized to the whole file, then copied once more for the request body: a 60 MB video holds 120 MB of heap for the whole encryption and upload, on top of Compose and the image cache. `largeHeap` raises the limit (256–512 MB depending on the phone) so one such file usually survives on a recent phone; on the budget phones with a 256 MB large heap, a 90 MB video (180 MB plus the app's baseline) does not, and the `OutOfMemoryError` is not inside any `runCatching` — the app dies. The in-pieces path, which streams and resumes after a dropped connection, is used only above the ceiling, so on a mobile network — where a dropped connection is the normal case — a 60 MB single POST that fails at 95 % starts from zero. And because `onProgress` fires only while the body is written, the ring under the thumbnail shows nothing during the several seconds of encryption.
+- Impact: videos are the file most likely to be sent from a phone and the one most likely to crash it here. Crash on some phones, a stall-then-restart on all.
+- Fix: stream — a `RequestBody` whose `writeTo` runs `encryptChunks` straight into the sink, `contentLength() = total`, no buffer; lower the phone's single-request threshold to a few MB (8 MB, say) so anything larger goes in resumable pieces; report progress from the chunk loop.
+- Effort: M
+- Status: open
+
+### DROID-025 · P3 · code · A server URL with a trailing slash breaks every attachment download, silently
+- Where: `media/AttachmentStore.kt:54` (`Media.attachment(id).removePrefix(Api.baseUrl)`), `net/ApiClient.kt:97-98` (`url` trims the slash before joining, so the prefix eats the path's leading slash), `android/app/build.gradle.kts:59-62` (`-PserverUrl` is trimmed of whitespace only), `App.kt:54`; `ui/auth/AuthScreen.kt:333` strips the slash for a typed address, so the live build is safe
+- What: the attachment path is built as an absolute URL and then turned back into a path by removing the base. With `Api.baseUrl = "http://10.0.2.2:1234/"` the result is `media/attachments/x` (no leading slash), which `Api.url` no longer recognises as a verbatim site path and prefixes with `/api/v1`, giving `…/api/v1media/attachments/x` → 404 on every image, video and file. A dev build made with `-PserverUrl=http://10.0.2.2:1234/` (the natural thing to paste) shows every attachment as failed with no clue why.
+- Fix: `Media.attachmentPath(blobId) = "/media/attachments/$blobId"` and pass the path; `trimEnd('/')` on `DEFAULT_SERVER` in Gradle and on `Api.baseUrl`'s setter.
+- Effort: S
+- Status: open
+
+### DROID-026 · P2 · ux · "Could not load messages" is a dead end: no Try again, no automatic retry, no retry when the network returns
+- Where: `ui/chat/ChatScreen.kt:103-109,189`; web `web/src/components/chat/MessageList.tsx:436-445,485`
+- What: `loadInitial` runs once per visit. If it fails — offline for a moment, a 502, the socket mid-reconnect — the screen shows "Could not load messages" with the raw error under it (DROID-007) and nothing else. The web retries with backoff, retries on `online`, and has a "Try again" button; the phone's only way out is to leave the conversation and come back, which nobody knows.
+- Impact: on a phone transient failures are the normal case (tunnel, lift, Wi-Fi handover); each one turns the conversation into a wall until the person discovers the trick.
+- Fix: a "Try again" button (`chat.messageList.tryAgain` exists) that re-runs `loadInitial`; a backoff retry in the effect; re-run when `Session.connection` becomes OPEN.
+- Effort: S
+- Status: open
+
+### DROID-027 · P3 · bug · The status ring in a DM's header never changes while the conversation is open
+- Where: `ui/chat/ChatScreen.kt:302` (`AppState.presences.value[other]?.status`), `data/AppState.kt:66`
+- What: the header reads the presence map with `.value` instead of `collectAsState()`, so the ring is computed only when something else recomposes the header. The other person going online or offline does not redraw it; the sidebar, which subscribes, disagrees with the header on the same screen.
+- Fix: `val presences by AppState.presences.collectAsState()`.
+- Effort: S
+- Status: open
+
+### DROID-028 · P3 · perf · The typing bar ticks once a second for as long as any conversation is open
+- Where: `ui/chat/ChatScreen.kt:381-388`
+- What: `TypingBar` runs `while (true) { delay(1000); now = … }` whether or not anyone is typing, writing a state that recomposes the bar every second. The same waste as DROID-005, one per open chat.
+- Fix: run the loop only while `typing[channelId]` has an entry whose expiry is in the future; stop when the last one lapses.
+- Effort: S
+- Status: open
+
+### DROID-029 · P3 · i18n · [i18n-copy] The web's typing bar glues an English "and" between translated names; the phone joins with commas, so the two clients also differ
+- Where: `web/src/components/chat/TypingBar.tsx:21-22`; `ui/chat/ChatScreen.kt:393-397` for the phone's shape
+- What: for two or three people the web renders `<b>{a}</b> and <b>{b}</b> {t("chat.typingBar.areTyping")}`: a German reader sees "Alice and Bob schreiben…". The phone avoids the word and prints "Alice, Bob are typing", which is not English either. The catalogue only has the verb.
+- Fix: one string per shape in the catalogue — `chat.typingBar.twoAreTyping` "{a} and {b} are typing…", `threeAreTyping` — used by both clients.
+- Effort: S
+- Status: open
+
+### DROID-030 · P3 · i18n · The day divider ignores how the language writes a date, while the timestamps beside it do not
+- Where: `ui/chat/MessageRow.kt:624-634` (`dayLabel`, fixed `"d MMMM yyyy"`), `:605-622` (`shortTime`/`messageStamp` use `DateTimePatternGenerator`)
+- What: the divider between days is formatted with a fixed day-month-year pattern; the stamps beside names use the language's best pattern. An English (US) list reads "18 September 2026" over messages stamped "September 18, 2026 at 10:42 PM"; Japanese gets "18 9月 2026" instead of "2026年9月18日". "Yesterday" is decided with `DAY_OF_YEAR` under a same-year guard, so on 1 January yesterday is a full date.
+- Fix: `format(bestPattern("yMMMMd"))`; decide yesterday with `sameDay(millis, now - 86_400_000L)` as `messageStamp` already does.
+- Effort: S
+- Status: open
+
+### DROID-031 · P2 · a11y · Reaction pills, the failed-message actions and the remove-attachment cross are 11–24 dp tap targets
+- Where: `ui/chat/MessageRow.kt:435-446` (reaction pills: 24 dp tall, 4 dp apart), `:469-474` (the add-reaction pill, 24 dp), `:247-268` ("Not sent, tap to try again" and "Discard": 11 sp words with no padding, 10 dp apart), `:182-188` (author name in a 22 dp row), `:358` (reply line, 24 dp), `ui/chat/Composer.kt:327-333` (the X on a staged attachment: 18 dp)
+- What: these are `Modifier.clickable` on plain rows and texts, which Compose does not pad to the 48 dp minimum the way it does `IconButton`. A 24 dp pill is missed by a thumb often, and the two failure actions are two 11 sp words 10 dp apart where the wrong one deletes the message. The web's pills are the same size, but a mouse is not a thumb.
+- Impact: reactions are the most-tapped control in a chat; the failure actions are the ones tapped in a hurry. Fails Android's 48 dp guideline and WCAG 2.5.8 for the failure actions.
+- Fix: `Modifier.minimumInteractiveComponentSize()` on pills (the visual stays 24 dp; the hit area grows), buttons with 12 dp padding and 16 dp between them for retry/discard, a 32 dp hit area for the tray's X.
+- Effort: S
+- Status: open
+
+### DROID-032 · P2 · bug · The upload ring under a staged file freezes at its first tick
+- Where: `ui/chat/Composer.kt:198-205` (`staged.map { if (it === item) it.copy(progress = done) else it }`), `:92-97` (`Staged` is a data class; `copy` makes a new object)
+- What: the first progress callback replaces the staged entry with a copy carrying the new fraction; the second compares by identity against the original `item`, which is no longer in the list, so nothing updates again. The ring stops at the first reported slice (64 KB of the file — a per-cent or less) for the whole upload. For a 40 MB video on a mobile connection that is a minute of a spinner that looks hung, while the send button is disabled.
+- Fix: `it.id == item.id`.
+- Effort: S
+- Status: open
+
+### DROID-033 · P3 · ux · The keyboard does not capitalise the start of a message
+- Where: `ui/chat/Composer.kt:387-402`
+- What: `BasicTextField` is used with the default `KeyboardOptions`, whose `capitalization` is `None`: the keyboard never proposes a capital at the start of a message or after a full stop. Every messenger on Android sets `Sentences`.
+- Fix: `keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)`.
+- Effort: S
+- Status: open
+
+### DROID-034 · P3 · ux · Starting an edit throws away whatever was being typed
+- Where: `ui/chat/Composer.kt:139-143`, `:217`, `:222-223`, `:281-284`
+- What: editing replaces the composer's text with the message being edited; cancelling sets the field to empty; finishing clears the field and the stored draft. A half-typed message is gone the moment "Edit" is chosen from the long-press sheet (after a cancel it comes back only on re-entering the conversation, which is stranger than losing it). The web edits inline on the message (`EditMessage.tsx`), so its composer draft is untouched.
+- Fix: park the draft in a `remember` when `editing` becomes non-null and restore it on cancel and finish, or edit inline in the row as the web does.
+- Effort: S
+- Status: open
+
+### DROID-035 · P2 · bug · A message that fails to send is left in two places, and sending it again makes two
+- Where: `ui/chat/Composer.kt:219-234` (the field and tray are cleared only on success), `data/MessageService.kt:290-312` (`send` marks the optimistic row failed and rethrows); web `web/src/components/composer/Composer.tsx:385` (`setText("")` at send time; the row carries the retry)
+- What: on failure `send` keeps the optimistic row in the list as "Not sent. Tap to try again. · Discard" and throws; `doSend` catches, toasts `e.message` (raw, DROID-007) and leaves the text and the staged files in the composer. The person now has the same message in the box and in the list. Tapping Send again (the obvious move once the network is back) sends the composer's copy and leaves the failed row where it is; tapping "try again" on the row as well sends it twice. With attachments the composer's copy re-uploads the files.
+- Impact: every failed send — a lift, a tunnel — ends with a duplicate or a stray "Not sent" row that has to be discarded by hand. The web clears the composer at send time and lets the row own the retry.
+- Fix: clear `value`/`staged`/the draft as soon as the optimistic row is in the list (move the clearing before `work.await()` for the send case; edits can stay as they are), and stop toasting on failure — the row already says it.
+- Effort: S
+- Status: open
+
+### DROID-036 · P2 · ux · Delete on the long-press sheet deletes at once, with no confirmation and no undo
+- Where: `ui/chat/MessageActions.kt:179-187`; web `web/src/components/chat/messageMenu.ts:93-101` (a "Delete message — are you sure?" dialog; Shift skips it)
+- What: the red "Delete" row is the last row of the sheet, directly above where the thumb rests after a long press; one tap removes the message for everyone with nothing in between. The web asks first.
+- Fix: a small confirm (`chat.messageMenu.deleteMessage` / `chat.messageMenu.areYouSureYouWantTo` / `chat.messageItem.delete` all exist) — an `AlertDialog` or a second sheet.
+- Effort: S
+- Status: open
+
+### DROID-037 · P3 · parity · The long-press sheet lacks "Remove embeds" and multi-select
+- Where: `ui/chat/MessageActions.kt:103-188`; web `web/src/components/chat/messageMenu.ts:83-91`
+- What: the web's menu offers "Remove embeds / Show embeds" (the `flags = 4` toggle; the phone honours the flag when rendering, `MessageRow.kt:233`, but cannot set it) and "Select messages" for bulk delete. The phone has neither, so a link preview posted by mistake can only be removed by editing the text.
+- Fix: an "Remove embeds" row when `payload.embeds` is non-empty (one `MessagesApi.edit` with `flags`); multi-select can wait.
+- Effort: S
+- Status: open
+
+### DROID-038 · P3 · parity · There is no way to see who reacted
+- Where: `ui/chat/MessageRow.kt:435-446`; web `web/src/components/chat/Reactions.tsx:57-75` (names on hover, fetched from `/reactions/{emoji}`)
+- What: a pill toggles the reaction and nothing else; the web's tooltip lists the people. On a phone the natural idiom is a long press on the pill (or a "Reactions" row in the sheet) opening a small list with avatars.
+- Fix: `combinedClickable` on the pill; long press → a `ModalBottomSheet` listing users per emoji from `MessagesApi` (the endpoint the web uses).
+- Effort: S
+- Status: open
+
+### DROID-039 · P3 · parity · A message link opens the conversation but does not go to the message
+- Where: `MainActivity.kt:176-181` (`handleIntent`: `channels/{server}/{channel}` opens the channel; a fourth segment is ignored), `ui/chat/MessageActions.kt:143-149` (the phone itself copies links with the message id); web `web/src/routes.tsx:41,44` (`:messageId` routes jump and flash)
+- What: "Copy link" on the phone and on the web both produce `…/channels/{server|@me}/{channel}/{message}`. Opened on the web it lands on the message; opened on the phone it lands at the bottom of the conversation. `Nav.jumpTo` exists and does exactly the right thing for replies, search and pins.
+- Fix: `parts.getOrNull(3)?.let { Nav.jumpTo(parts[2], it) }` after `openChannel`.
+- Effort: S
+- Status: open
+
+### DROID-040 · P2 · parity · A GIF from the picker shows as a bare URL line plus a boxed card; the web shows the GIF
+- Where: `ui/chat/MessageRow.kt:220-233` (the text is always rendered), `ui/chat/AttachmentViews.kt:244-285` (`EmbedList` draws every embed as a card with a 4 dp colour bar, 10 dp padding, site/title/description, then the image), `ui/chat/Composer.kt:428-437` (the phone sends `text = url` + `Embed(type = "gif")`, as the web does); web `web/src/components/chat/mediaLinks.ts:18` (`isOnlyMediaLinks` hides the text), `web/src/components/chat/MessageItem.tsx:25`, `web/src/components/chat/Embeds.tsx` (a media embed is the picture alone in `fitMedia`'s frame; a YouTube `video_id` gets a player; an `invite_code` gets a card with member counts and Join)
+- What: on the phone every GIF, every image link and every YouTube link is a raw URL in link colour followed by a card that looks like an article preview. The GIF picker is one of the app's headline features and its output looks broken in the phone's own list, and in the web's list looks right — so the same message renders differently on the two clients.
+- Impact: every GIF, on every phone, in every conversation.
+- Fix: port `isOnlyMediaLinks` (hide the text when it is only media links whose embeds are media); in `EmbedList` render `type == "gif"`/image embeds as the picture alone in the same frame as an image attachment, `video_id` as a thumbnail with a play glyph that opens YouTube, `invite_code` as an invite card with `member_count`/`online_count` and a Join button that routes to `Route.Invite`.
+- Effort: M
+- Status: open
+
+### DROID-041 · P2 · ux · A tall screenshot takes more than a screen; a panorama is cropped
+- Where: `ui/chat/AttachmentViews.kt:80-97` (`aspectRatio(ratio.coerceIn(0.4f, 2.5f))`, `ContentScale.Crop`, `widthIn(max = 320.dp).fillMaxWidth()`); web `web/src/components/chat/fitMedia.ts:1-19` (fit inside 550 × 350, never crop)
+- What: the image box takes the full column width (about 290 dp on a 360 dp phone) and its height from the ratio, so a phone screenshot (1080 × 2400, ratio 0.45) is drawn 290 × 645 dp — most of the screen — and the list scrolls a screenful per screenshot. Ratios outside 0.4–2.5 are cropped rather than fitted, so a panorama loses its ends and a long chat screenshot its top and bottom, with nothing to say so. The web caps height at 350 px and never crops.
+- Fix: size like `fitMedia`: `heightIn(max = 300.dp)` with the width derived from the ratio (`ContentScale.Fit` inside a box no wider than the column), no crop; the same for video posters.
+- Effort: S
+- Status: open
+
+### DROID-042 · P2 · bug · A spoilered video, voice message or file is shown in the clear
+- Where: `ui/chat/AttachmentViews.kt:117-170` (`VideoAttachment` never reads `meta.spoiler`), `:173-215` (audio and file rows likewise); web `web/src/components/chat/Attachments.tsx:205` (`VideoPlayer … spoiler={att.spoiler}` blurs the poster)
+- What: the sender marked the attachment as a spoiler; on the phone only images honour the flag. A spoilered video shows its poster frame, playable at one tap; a spoilered file shows its name.
+- Fix: the same blur-and-pill wrapper `ImageAttachment` uses, around the video poster; a "Spoiler" pill over the name for audio and files until tapped.
+- Effort: S
+- Status: open
+
+### DROID-043 · P2 · bug · A video that cannot be downloaded turns into a spinner that never ends; a file that cannot be opened says nothing
+- Where: `ui/chat/AttachmentViews.kt:146-155` (`runCatching { AttachmentStore.file(meta) }` then `playing = true` regardless), `ui/chat/Players.kt:56-65` (`VideoPlayer` swallows the failure and shows a spinner while `file` is null), `ui/chat/AttachmentViews.kt:192-199` (`openAttachment` failure: the spinner stops, no message), `ui/chat/Players.kt:121` (audio: same silence)
+- What: a 404 (blob gone), a 401 mid-refresh, or plain lack of network on the play button flips the box into the player, which asks the store again, fails again, and shows an indefinite spinner over black; there is no message, no retry and no way back to the poster. Files and voice messages fail quietly to the idle state.
+- Fix: keep the failure (`readable()`) in state; show it in the box with a "Try again"; only set `playing` when `file()` returned.
+- Effort: S
+- Status: open
+
+### DROID-044 · P2 · ux · Video plays only inline, in a 340 dp box, with no way to go fullscreen or landscape
+- Where: `ui/chat/Players.kt:75-78` (`PlayerView` with the default controller; no `setFullscreenButtonClickListener`, so the controller hides its fullscreen button), `ui/chat/AttachmentViews.kt:130-134`
+- What: a landscape video from a phone camera plays in a box the width of the column; the system's rotation does nothing useful because the list is portrait. The web's player has the browser's fullscreen. There is also no share or save for a video (images have the viewer; whether it saves is checked under `ui/sheets/Misc.kt`).
+- Fix: `setFullscreenButtonClickListener { Nav.push(Layer.VideoViewer(meta)) }` opening a full-screen layer with the same `ExoPlayer` instance (hand it over rather than re-preparing), landscape allowed there.
+- Effort: M
+- Status: open
+
+### DROID-045 · P3 · bug · Media playback ignores audio focus and the app's lifecycle; two voice messages can play at once
+- Where: `ui/chat/Players.kt:66-73` (`ExoPlayer.Builder(context).build()` with no `setAudioAttributes(…, handleAudioFocus = true)`), `:92-100` (same for audio; one player per row, none shared), no lifecycle observer on either
+- What: playing a video or a voice message does not pause the music app underneath; pressing Home leaves a video's sound running in the background; tapping play on a second voice message plays it over the first.
+- Fix: `setAudioAttributes(AudioAttributes.Builder().setUsage(USAGE_MEDIA).setContentType(CONTENT_TYPE_MOVIE/SPEECH).build(), true)`; pause on `Lifecycle.Event.ON_STOP`; one shared `ExoPlayer` for voice messages so starting one stops the other.
+- Effort: S
+- Status: open
+
+### DROID-046 · P3 · bug · A voice message that has played to the end cannot be played again
+- Where: `ui/chat/Players.kt:125-126` (`p.play()` on a player in `STATE_ENDED`)
+- What: when playback ends `isPlaying` turns false and the button shows Play, but `Player.play()` on an ended player does nothing — the reference controller's own play button does `seekToDefaultPosition()` first (`Util.handlePlayButtonAction`). The row has to be scrolled out and back (which releases the player) to hear it again. Medium confidence: confirm on a device.
+- Fix: `if (p.playbackState == Player.STATE_ENDED) p.seekTo(0); p.play()`.
+- Effort: S
+- Status: open
+
+### DROID-047 · P3 · perf · The audio row polls the player five times a second for as long as it exists, playing or not
+- Where: `ui/chat/Players.kt:103-112`
+- What: `while (true) { …; delay(200) }` once a file is loaded, paused or ended included. One voice message left on screen is five wakeups a second.
+- Fix: poll only while `isPlaying`, and use a `Player.Listener` for the state flips.
+- Effort: S
+- Status: open
+
+### DROID-048 · P2 · parity · `:shortcode:` emoji typed on the web are literal text on the phone
+- Where: `ui/markdown/Parser.kt:180-273` (`inlineLine` has no shortcode rule), `ui/pickers/EmojiIndex.kt:164-176` (the phone expands `:name:` only on its own way out); web `web/src/markdown/parse.ts:31,334-347` (`RE_SHORTCODE` → `shortcodeToEmoji` at render time; nothing expands at send time)
+- What: the web stores `:shrug:` as typed and turns it into the emoji while drawing. The phone's parser does not know the form, so every message a web or desktop user typed with shortcodes — a common habit — shows `:shrug:` in plain text on Android. (The reverse is fine: the phone rewrites its own text before sending.)
+- Fix: the same rule in `inlineLine`: at `:`, match `:([a-z0-9_+-]{1,60}):`, and if `EmojiIndex.byName` knows it, emit `UnicodeEmoji` (the index is loaded in a quiet moment already; if it is not yet loaded, leave the text).
+- Effort: S
+- Status: open
+
+### DROID-049 · P2 · bug · A spoiler written `|| like this ||` is hidden on the web and shown in the clear on the phone
+- Where: `ui/markdown/Parser.kt:297-336` (`emphasisAt`: the closer is rejected when the character before it is a space, for `|` and `~` as much as for `*`); web `web/src/markdown/parse.ts:383-397,559-579` (`findPair` has no whitespace rule)
+- What: `|| the ending ||` (spaces inside the bars, which people type) is a spoiler on the web and desktop and literal text with the bars on the phone. The sender believes it is hidden; every phone reader sees it. Input: `|| Snape kills Dumbledore ||`. The same rule makes `~~ struck ~~` literal on the phone.
+- Fix: for `~` and `|`, mirror `findPair` — the first later `||`/`~~` closes, whatever precedes it.
+- Effort: S
+- Status: open
+
+### DROID-050 · P2 · parity · The phone's emphasis rules differ from the web's on everyday text: underscores in names, a `*` before a space, markers inside code spans
+- Where: `ui/markdown/Parser.kt:252-258,297-336`; web `web/src/markdown/parse.ts:362-380,527-557`
+- What, with inputs that render differently (web left, phone right):
+  - `file_name_here` / `john_doe_99` → web literal (a `_` opener needs a non-word character before it, and its closer a non-word character after); phone: "file*name*here" with "name" in italics. Every identifier and every username with two underscores.
+  - `2 * 3 * 4` → web literal (an opener needs a non-space after it); phone: " 3 " in italics.
+  - `* not a list*` → web literal; phone: italics.
+  - `*see `a*b` here*` → web: one italic run containing the code span (markers inside backticks are skipped); phone: the `*` inside the code closes the run early.
+  - `_a_b` → web literal; phone: "a" italic, then "b".
+- Fix: port `canOpen` (non-space after the opener; for `_` no word character before), the `_` word-boundary rule on the closer, and `skipCode` in the closer search. The web's `failed` memo would also make the phone's search linear (today `* * * * …` is quadratic on the main thread — 8 000 characters of it is tens of milliseconds per row).
+- Effort: S
+- Status: open
+
+### DROID-051 · P2 · parity · A blank line between paragraphs disappears on the phone
+- Where: `ui/markdown/Parser.kt:147-151` (a blank line flushes and is dropped), `ui/markdown/Render.kt:114-121` (blocks stack with no gap); web `web/src/markdown/parse.ts:215-220` (a blank line is a paragraph line, so `br` `br` renders an empty line)
+- What: `first paragraph\n\nsecond paragraph` shows an empty line between them on the web and desktop; on the phone the two are stacked with no gap, so a message written in paragraphs reads as one block. Input: any message with a blank line.
+- Fix: keep blank lines in the paragraph as the web does (the web's paragraph model), or give consecutive paragraphs a one-line gap.
+- Effort: S
+- Status: open
+
+### DROID-052 · P3 · parity · Quotes on the phone parse headings, lists and fences inside them; the web keeps a quote's body inline
+- Where: `ui/markdown/Parser.kt:107-128` (`blocks(quoted)`), `:107` (`>>>` needs a trailing space; a bare `>>>` line is not a quote); web `web/src/markdown/parse.ts:157-173` (`parseInline` for both forms; `>>>` alone on a line starts one)
+- What: `> # Title` is a quote containing the literal "# Title" on the web and a quote containing a heading on the phone; `> - a` likewise (text vs. a bullet). `>>>` on a line by itself followed by text is a quote of everything after it on the web and a literal ">>>" paragraph on the phone.
+- Fix: parse a quote's body with `inline(...)`; accept the bare `>>>`.
+- Effort: S
+- Status: open
+
+### DROID-053 · P3 · parity · Keycaps, ©/®, clocks and arrows are not emoji on the phone
+- Where: `ui/markdown/Parser.kt:260-266` (the emoji rule only runs for `c.code > 0x1000` or a high surrogate), `:29-36` (the class omits 231A–231B, 2328, 23CF, 23E9–23F3, 23F8–23FA, 24C2, 25AA–25AB, 25B6, 25C0, 25FB–25FE); web `web/src/markdown/parse.ts:44-45,349-360` (`\p{Extended_Pictographic}`, tried from `#`, `*`, digits and `©` up)
+- What: `1️⃣`, `#️⃣`, `©️`, `⌚`, `⏰`, `▶️`, `◀️`, `⏸️` are Twemoji on the web (and jumbo when alone) and the phone's system glyph at text size. Input: `⏰ 5 minutes` or a message of just `1️⃣`.
+- Fix: run the emoji rule for digits, `#`, `*` and any code ≥ 0xA9 as the web does; add the missing ranges to `RE_EMOJI`.
+- Effort: S
+- Status: open
+
+### DROID-054 · P3 · parity · Remaining parser divergences (each with an input)
+- Where: `ui/markdown/Parser.kt`; web `web/src/markdown/parse.ts`
+- What:
+  - URL trimming: `https://en.wikipedia.org/wiki/Foo_(bar)` — the web keeps a balanced `)` (`trimUrl`, `:582-616`), the phone strips every trailing `)` (`:240`), so the link 404s. Common with Wikipedia.
+  - Backtick runs: `` ``a` `` — the web needs a closing run of the same length (`findBacktickClose`), the phone accepts any longer run, then re-parses leftovers one backtick at a time (`:209-218`).
+  - Escapes: `\ ` or `\é` — the web escapes ASCII punctuation only (`RE_PUNCT`); the phone drops the backslash before any non-alphanumeric (`:203-207`).
+  - `@everyone`/`@here` after a word character: `me@here.com` — the web needs a non-word character before `@`; the phone makes a mention chip inside the address (`:246-250`).
+  - Lists: `- a\n    - b` — the web nests only at exactly two spaces and treats four as top level; the phone indents by `indent / 2` levels (`:130-145`), and every depth change starts a new list with its own 4 dp gaps.
+  - After a fence closes mid-line: ` ```x```# h ` — the web treats "# h" as paragraph text (`atLineStart = false`); the phone re-runs `blocks()` on it and makes a heading (`:85-87`).
+  - `\r\n` and leading newlines: the web normalises (`normalize`); the phone does not (harmless today, since both composers send `\n`).
+- Fix: port the corresponding rules; a shared fixture file of inputs run by both `parse.test.ts` and a Kotlin test is the durable fix (see the tests section).
+- Effort: M
+- Status: open
+
+### DROID-055 · P2 · parity · A link sent from the phone never gets a preview, on any client
+- Where: `net/Endpoints.kt:407` (`MiscApi.unfurl` exists and has no caller), `ui/markdown/Parser.kt:345-348` (`Markdown.links` exists and has no caller), `data/MessageService.kt:230-312` (`send` takes `embeds` only from the GIF and sticker paths), `ui/chat/Composer.kt:175-235`; web `web/src/components/composer/linkPreviews.ts`, `web/src/components/composer/send.ts:15` (`extractUrls` → `/unfurl` → the embed rides inside the ciphertext)
+- What: previews are made by the sender ("the server never makes one"), and the phone's sender makes none. A YouTube link, an article, a tweet posted from the phone is a bare URL everywhere — the web renders the same link with a card when it was posted from the web.
+- Impact: every link from the phone, on every reader.
+- Fix: at send time, `extractUrls` over the parsed tree — as the web does, skipping spoilers, code and `<…>` — `MiscApi.unfurl` each (max 5), and pass the results as `embeds`; the composer shows "Loading preview…" or sends without when unfurl fails. Note for the implementer: do not use `Markdown.links` (a regex over raw text) — it would preview URLs inside spoilers and code blocks, which reveals the spoiler to everyone.
+- Effort: M
+- Status: open
+
+### DROID-056 · P2 · security · A masked link cannot be inspected before it is opened
+- Where: `ui/markdown/Render.kt:482-486` (a tap opens `node.url` at once; no long press, no label showing the target), `ui/chat/MessageRow.kt:317-329` (`openLink`); web `web/src/markdown/render.tsx:190` (`title={url}` on hover)
+- What: `[chat.evilion.xyz/settings](https://evil.example/login)` reads as a link to the site; on the phone there is no way to see where it goes before tapping, and tapping opens it in the browser. The web at least shows the target on hover; Discord asks "Leaving Nexa? This link takes you to …" for a masked link whose text is not its target.
+- Fix: for `masked` links whose text is not the URL's host, open a small dialog with the real URL and "Open"/"Copy"/"Cancel" (`chat.chat.leavingNexa`-style copy shared with the web, which should get the same dialog); a long press on any link copies it.
+- Effort: S
+- Status: open
+
+### DROID-057 · P3 · bug · A mention rendered before the name was known keeps saying `@unknown-user`
+- Where: `ui/markdown/Render.kt:264-273` (`remember(nodes, revealed, colors, style, edited)` — `ctx` is not a key), `ui/chat/MessageRow.kt:290-315` (`rememberMdContext` makes a new context when the user/channel maps grow)
+- What: the annotated string is built once per message text. When the member list, a DM's user or a channel arrives after the row first drew (a cold start, a jump into old history, the first page of a big server), the row recomposes with a fresh `ctx` but the string is not rebuilt, so the chip stays "@unknown-user" / "#deleted-channel" until the message text changes — i.e. never.
+- Fix: add `ctx` to the `remember` keys (it is a data class, so equality is by content).
+- Effort: S
+- Status: open
+
+### DROID-058 · P2 · bug · In right-to-left text the chips behind spoilers, inline code and mentions are not drawn — an Arabic spoiler is invisible with nothing to tap
+- Where: `ui/markdown/Render.kt:373-405` (`drawChip`: `left = getBoundingBox(from).left`, `right = getBoundingBox(to - 1).right`, `if (right <= left) continue`), `:455-469` (a hidden spoiler's text is transparent; only the chip shows where it is)
+- What: for a right-to-left run the first logical character sits at the visual right and the last at the visual left, so `right - left` is negative and the chip is skipped. Inline code in Arabic, Hebrew or Persian has no box; a mention has no background; a spoiler — transparent text plus no box — leaves an empty gap in the sentence with no visible thing to tap (the link annotation is still there, invisible). Medium confidence: from the geometry; the `ux-walkthrough` agent can confirm with an Arabic `||سر||`.
+- Fix: per line, take `min`/`max` over the bounding boxes of `from` and `to - 1` (or use `getBoundingBox` of every character in the run — runs are short), and handle bidi runs that split within a line by iterating `getHorizontalPosition` for both directions.
+- Effort: S
+- Status: open
+
+### DROID-059 · P3 · a11y · Emoji placeholders are sized in sp while the pictures are in dp, so at a large font size every emoji has a gap around it; jumbo emoji do not scale at all
+- Where: `ui/markdown/Render.kt:281,292` (`Placeholder((glyph.value + 2).sp, …)` with `glyph` a `Dp`), `:336` (`Modifier.size(size)` in dp), `ui/chat/MessageRow.kt:212-219` (48/36/28 dp jumbo sizes)
+- What: at the system's 200 % font size a 22 dp emoji sits in a 48 sp placeholder — a hole twice its size in every line that has one — and a message of three emoji stays 48 dp while the text around it doubled.
+- Fix: size both in the same unit (`with(density) { glyph.toSp() }` for the placeholder), and derive jumbo sizes from the text style's font size.
+- Effort: S
+- Status: open
+
+### DROID-060 · P3 · a11y · TalkBack reads a hidden spoiler aloud
+- Where: `ui/markdown/Render.kt:455-469` (the hidden text is transparent but present in the `AnnotatedString`)
+- What: a screen reader speaks the spoiler's content without any "spoiler" cue, revealed or not. The web's `plainText` substitutes "[spoiler]" for replies and notifications; the renderer should do the equivalent for semantics.
+- Fix: while hidden, replace the run with "[spoiler]" (or `t("chat.messageItem.spoiler")`) in the string and keep the chip; reveal swaps the real text in.
+- Effort: S
+- Status: open
+
+### DROID-061 · P3 · bug · The sheet offers "Pin" to authors who cannot pin, and the server's English refusal is the answer
+- Where: `ui/chat/MessageActions.kt:168-178` (`if (canManage || mine)`), server `internal/api/server_glue.go:18` (`NeedPin` needs Manage Messages in a server channel); web `web/src/components/chat/messageMenu.ts:36-40` (`canPin`: DM → yes, server → `MANAGE_MESSAGES`)
+- What: in a server channel an ordinary member sees "Pin" on their own message, taps it, and gets a toast "You do not have permission to do that here." — the server's sentence, untranslated.
+- Fix: `if (canManage || channel.isDm)`, as the web does.
+- Effort: S
+- Status: open

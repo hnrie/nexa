@@ -1,7 +1,7 @@
 # Progress — server-core
 State: auditing
-Last checkpoint: 2026-09-19T05:03Z
-Next finding id: 031
+Last checkpoint: 2026-09-19T10:32Z
+Next finding id: 040
 
 ## Inspected
 
@@ -49,14 +49,14 @@ Next finding id: 031
 - [x] internal/store/legal.go
 - [x] internal/store/errors_log.go
 - [x] internal/store/realtime.go
-- [ ] internal/store/channels_test.go
-- [ ] internal/store/errors_log_test.go
-- [ ] internal/store/guests_test.go
+- [x] internal/store/channels_test.go
+- [x] internal/store/errors_log_test.go
+- [x] internal/store/guests_test.go
 - [x] internal/store/keys_test.go
-- [ ] internal/store/messages_test.go
-- [ ] internal/store/relationships_test.go
-- [ ] internal/store/server_refs_test.go
-- [ ] internal/store/servers_test.go
+- [x] internal/store/messages_test.go
+- [x] internal/store/relationships_test.go
+- [x] internal/store/server_refs_test.go
+- [x] internal/store/servers_test.go
 - [x] internal/store/sessions_test.go
 - [x] internal/store/testutil_test.go
 - [x] internal/store/users_test.go
@@ -66,54 +66,54 @@ Next finding id: 031
 - [x] internal/gateway/conn.go
 - [x] internal/gateway/hub.go
 - [x] internal/gateway/activity.go
-- [ ] internal/gateway/activity_test.go
-- [ ] internal/gateway/conn_test.go
-- [ ] internal/gateway/hub_test.go
-- [ ] internal/gateway/limits_test.go
+- [x] internal/gateway/activity_test.go
+- [x] internal/gateway/conn_test.go
+- [x] internal/gateway/hub_test.go
+- [x] internal/gateway/limits_test.go
 
 ### internal/cache
-- [ ] internal/cache/cache.go
-- [ ] internal/cache/memory.go
-- [ ] internal/cache/redis.go
-- [ ] internal/cache/cache_test.go
+- [x] internal/cache/cache.go
+- [x] internal/cache/memory.go
+- [x] internal/cache/redis.go
+- [x] internal/cache/cache_test.go
 
 ### internal/media
-- [ ] internal/media/handler.go
-- [ ] internal/media/store.go
-- [ ] internal/media/validate.go
-- [ ] internal/media/variants.go
-- [ ] internal/media/media_test.go
+- [x] internal/media/handler.go
+- [x] internal/media/store.go
+- [x] internal/media/validate.go
+- [x] internal/media/variants.go
+- [x] internal/media/media_test.go
 
 ### internal/unfurl
-- [ ] internal/unfurl/cache.go
-- [ ] internal/unfurl/fetch.go
-- [ ] internal/unfurl/guard.go
-- [ ] internal/unfurl/players.go
-- [ ] internal/unfurl/youtube.go
-- [ ] internal/unfurl/cache_test.go
-- [ ] internal/unfurl/fetch_test.go
-- [ ] internal/unfurl/guard_test.go
-- [ ] internal/unfurl/players_test.go
-- [ ] internal/unfurl/youtube_test.go
+- [x] internal/unfurl/cache.go
+- [x] internal/unfurl/fetch.go
+- [x] internal/unfurl/guard.go
+- [x] internal/unfurl/players.go
+- [x] internal/unfurl/youtube.go
+- [x] internal/unfurl/cache_test.go
+- [x] internal/unfurl/fetch_test.go
+- [x] internal/unfurl/guard_test.go
+- [x] internal/unfurl/players_test.go
+- [x] internal/unfurl/youtube_test.go
 
 ### internal/realtime
-- [ ] internal/realtime/client.go
-- [ ] internal/realtime/meter.go
-- [ ] internal/realtime/client_test.go
-- [ ] internal/realtime/meter_test.go
+- [x] internal/realtime/client.go
+- [x] internal/realtime/meter.go
+- [x] internal/realtime/client_test.go
+- [x] internal/realtime/meter_test.go
 
 ### internal/voice, rpcapps, ids
-- [ ] internal/voice/registry.go
-- [ ] internal/voice/registry_test.go
+- [x] internal/voice/registry.go
+- [x] internal/voice/registry_test.go
 - [x] internal/rpcapps/rpcapps.go
-- [ ] internal/rpcapps/rpcapps_test.go
+- [x] internal/rpcapps/rpcapps_test.go
 - [x] internal/ids/ids.go
-- [ ] internal/ids/ids_test.go
+- [x] internal/ids/ids_test.go
 
 ### cmd/chatmigrate
 - [x] cmd/chatmigrate/main.go
-- [ ] cmd/chatmigrate/main_test.go
-- [ ] cmd/chatmigrate/helpers_test.go
+- [x] cmd/chatmigrate/main_test.go
+- [x] cmd/chatmigrate/helpers_test.go
 
 ### ops
 - [x] deploy/install.sh
@@ -139,4 +139,5 @@ Successor progress: all ops files, db/db.go + dialect.go re-read, chatmigrate/ma
 Predecessor's pending items: (a) backup.sh -> SCORE-014/015 (the sealing key is `data/server.secret`, cmd/chatd/main.go:259 + api/mfa_handlers.go:53,159). (d) role icon / member avatar dead columns -> SCORE-023. Still open: (b) perms.go perf finding (write after gateway/hub.go, to say how often fan-out calls channelViewers), (c) packsQuery N+1 PackStickers (check callers in expressions.go + api).
 Verified NOT findings: install.sh's `[ "$i" = 30 ] && die` does not trip `set -e` (tested, bash 3.2); chatmigrate enumerates tables from sqlite_master (new tables carried) and SQLite's version lives in `PRAGMA user_version`, so nothing collides with Postgres's `schema_version` table; **the Postgres schema is byte-identical to a regeneration from the SQLite migrations** (rebuilt the migrations with the sqlite3 CLI in $TMPDIR, ran tools/pg_schema.py, diff = 0 lines); the only SQLite-only SQL anywhere in store/api is `json_each`, which goes through `Dialect.JSONArrayHas`, and every user-facing `LIKE` lowers its column through `Dialect.Lower` (usernames are lowercased by `api.ValidUsername`/register, so the un-lowered `username LIKE ?` is safe on Postgres too).
 Third agent (from 2026-09-19T05:03Z): all four of the predecessor's pending items are settled and written — (a) SCORE-014/015, (b) SCORE-026, (c) SCORE-030, (d) SCORE-023. gateway/{protocol,conn,hub,activity}.go are read (SCORE-026..029 came out of them). Remaining: cache, media, unfurl, realtime, voice/registry, the tests everywhere, round-1 cross-check. ~8,700 lines.
-Next: internal/cache -> media -> unfurl -> realtime -> voice -> rpcapps/ids/chatmigrate tests -> store tests -> gateway tests -> round-1 cross-check.
+Verified fixed from round 1: the gateway caps (limits_test.go passes them: per-account/per-IP/instance/unidentified), the `conn.user` race (it is an atomic.Value now), Limiter.Reset through Redis. Next: round-1 cross-check only (audit/server-correctness.md store+gateway+media parts, audit/performance.md server section), plus the BRIEF verify list (media proxy expiry store side, mfa backup codes). Every source and test file in scope is inspected. -> round-1 cross-check (server-correctness.md + performance.md server sections). No findings from the voice/ids/rpcapps/chatmigrate/realtime tests: all four suites are thorough. Done since: cache (SCORE-031/032), media (SCORE-033/034). Round-1 REVIEW.md read: its "Still open" list = no Android updater, per-ABI APKs undownloaded, the three structural perf items (SCORE-026 is one of them), android-ui BROKENs, signing key not backed up (SCORE-014 is adjacent). `Limiter.Reset` through Redis (round-1 BROKEN) IS fixed (ratelimit/limiter.go:113-126). Round-1's unbounded `login:<4KiB username>` limiter key is NOT fixed (auth_handlers.go:225) but `internal/ratelimit` + `cmd/chatd` belong to server-api, so left to them.
+Old next-order (for reference): internal/cache -> media -> unfurl -> realtime -> voice -> rpcapps/ids/chatmigrate tests -> store tests -> gateway tests -> round-1 cross-check.
