@@ -183,6 +183,9 @@ up. Parity check against Android AttachmentViews.kt not yet done.
 - **On a resumed start**: read `PROGRESS.md`, skip the ticked files, read the
   handoff note, read the existing `FINDINGS.md` (to keep numbering and avoid
   duplicates), and continue.
+- **If the Write tool refuses a file**, write it with a Bash heredoc
+  (`cat > path <<'EOF' … EOF`) and read it back; one agent lost thirteen
+  findings believing they had been written.
 - **Finishing**: when every file is ticked, write a `## Summary` section at
   the **top** of `FINDINGS.md` (counts by priority and kind; the ten findings
   the coordinator should read first, one line each; cross-area items that

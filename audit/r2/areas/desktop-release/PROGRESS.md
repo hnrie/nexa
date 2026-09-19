@@ -1,6 +1,6 @@
 # Progress — desktop-release
 State: auditing
-Last checkpoint: 2026-09-19T05:23Z
+Last checkpoint: 2026-09-19T10:41Z
 Next finding id: 001
 
 Scope = BRIEF.md globs expanded with `git ls-files` (2026-09-19), plus
@@ -11,21 +11,21 @@ ticked after a provenance/size check, not a read.
 ## Inspected
 
 ### desktop — build and release
-- [ ] desktop/package.json
+- [x] desktop/package.json
 - [ ] desktop/package-lock.json                 (skim: versions, integrity, koffi)
-- [ ] desktop/build.mjs
-- [ ] desktop/electron-builder.yml
-- [ ] desktop/scripts/sign-release.mjs
-- [ ] desktop/tsconfig.json
-- [ ] desktop/vitest.config.ts
-- [ ] desktop/.gitignore
+- [x] desktop/build.mjs
+- [x] desktop/electron-builder.yml
+- [x] desktop/scripts/sign-release.mjs
+- [x] desktop/tsconfig.json
+- [x] desktop/vitest.config.ts
+- [x] desktop/.gitignore
 
 ### desktop — main process
-- [ ] desktop/src/main/index.ts
-- [ ] desktop/src/main/window.ts
-- [ ] desktop/src/main/permissions.ts
-- [ ] desktop/src/main/config.ts
-- [ ] desktop/src/main/settings.ts
+- [x] desktop/src/main/index.ts
+- [x] desktop/src/main/window.ts
+- [x] desktop/src/main/permissions.ts
+- [x] desktop/src/main/config.ts
+- [x] desktop/src/main/settings.ts
 - [ ] desktop/src/main/tray.ts
 - [ ] desktop/src/main/strings.ts
 - [ ] desktop/src/main/displayPicker.ts
@@ -102,8 +102,8 @@ ticked after a provenance/size check, not a read.
 - [ ] tools/licenses/CC-BY-4.0.txt
 - [ ] Makefile
 - [ ] backup.sh
-- [ ] .gitignore
-- [ ] desktop/.gitignore (listed above)
+- [x] .gitignore
+- [x] desktop/.gitignore (listed above)
 
 ### tools — tests and screenshots
 - [ ] tools/e2e.py
@@ -163,11 +163,13 @@ ticked after a provenance/size check, not a read.
 - [ ] version consistency: desktop/package.json, android build.gradle, data/desktop manifests (read only), web copy
 
 ## Handoff note
-Fresh start 2026-09-19T05:23Z. Nothing read yet. Reading order follows the
-brief: package.json → build.mjs → electron-builder.yml → sign-release.mjs →
-main/index.ts → window.ts → permissions.ts → config.ts → settings.ts →
-preload → bridge → rpc/* → update/* → picker/appAudio/displayPicker → tray,
-strings → tests → web bridge files → Go routes → publish tools → the rest.
-Round-1 cross-check (REVIEW.md + desktop-and-release.md) to be read right
-after the Electron main files, so each claimed fix is verified as its file
-is read.
+2026-09-19T10:41Z. Read the build files and main/index,window,permissions,config,
+settings. Keys are gitignored + untracked (checked). Findings being written now:
+will-redirect has no isMainFrame/frameable check (cancels subframe redirects);
+permissions.ts `pending` entry never deleted on dismiss so the display-media
+callback is called twice (dismiss + 120s timeout) - verifying whether Electron
+throws on the 2nd call; Windows/Linux have no menu so no Ctrl+R/zoom/F11;
+settings.ts typeof-loop cannot load `lastUpdateSeen` (default null) - grep to
+see if it is used; setBadge(Infinity) would throw in app.setBadgeCount;
+restartApp uses app.exit(0) which skips will-quit (stopRpc/flush).
+Next: preload/index.ts, shared/bridge.ts, then rpc/*.

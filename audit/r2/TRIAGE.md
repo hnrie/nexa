@@ -121,3 +121,36 @@ for declining is "wrong, harmful, or not this product".
 - VOICE-026 accept · keep the band inside the call on coarse pointers.
 - VOICE-027 accept · `insetInlineStart`.
 - VOICE-028 accept · with WCORE-027.
+
+## server-core (SCORE) — 30 findings (014–043; 001–013 were lost before reaching disk), 30 accepted
+
+- SCORE-014 accept · P0. `backup.sh` copies `data/server.secret` (0600); `loadOrCreateSecret` refuses to mint a new secret when `user_mfa` has rows; deploy README says which file cannot be lost.
+- SCORE-015 accept · check `tar`'s status, print real sizes, fail loudly; keep the newest 5 of each kind; README says `backup/` is not off-box.
+- SCORE-016 accept · README rewrite: SFU relay when keys are set, P2P otherwise, allowance behaviour; list the missing packages.
+- SCORE-017 accept · correct `launchctl` commands; `chatmigrate` warns on a non-empty WAL / live `-shm`.
+- SCORE-018 accept · Klipy, not Tenor.
+- SCORE-019 accept · `newsyslog.d` drop-in installed by `install.sh` (size-based, keep 5) + README line.
+- SCORE-020 accept · `make clean` never touches `bin/` or `web/dist`; a separate `clean-deploy` target prints and asks for `DEPLOY=1`.
+- SCORE-021 accept · `Migrate` refuses a database newer than the binary, both dialects; logs the version at start.
+- SCORE-022 accept · add the MFA columns (and invite/guest codes) to `keyColumns`.
+- SCORE-023 accept · finish both: `avatar_id` on the member PATCH (self, avatar-kind blob) and `icon_id` on the role PATCH; web UI in `ServerProfileModal` (per-server avatar) and the role editor (icon), drawn in member-list headers and role mentions; Android reads them (parity item for the android package).
+- SCORE-024 accept · `EmojisTotal` from `count(*)` + `capped()`.
+- SCORE-025 accept.
+- SCORE-026 accept · L. Per-server permission cache (roles, overwrites by channel, members with roles, owner, instance admins) with a version bumped by every write to those tables; `ChannelPerms`/`channelViewers` read it; invalidation tests for every write path; `EmitChannel` reuses the handler's viewer list.
+- SCORE-027 accept · per-connection typing budget across channels (5 per 10 s) + the cache.
+- SCORE-028 accept · one pass per server for `ready`; `PresenceOf` from fields already loaded.
+- SCORE-029 accept · per-user co-member set cached in the hub, invalidated by the membership/friend/DM events that already fan out; `broadcastUser` takes the user it has.
+- SCORE-030 accept · one `IN (…)` query; sticker cap per pack from SAPI-026.
+- SCORE-031 accept · two parts. Now: README says Redis shares the rate-limit allowance only; chatd logs a loud warning when `REDIS_URL` and a non-zero `NODE_ID` are both set. Later (last in the queue, L): real cross-process presence and fan-out through `Publish`/`Subscribe`.
+- SCORE-032 accept · idle sweep in `Memory`; `Subscribe` deletes its entry; fixed-window semantics to match Redis + a half-window test.
+- SCORE-033 accept · P1. Strip on ingest in `PutPublic` (re-encode stills; chunk-filter animated WebP/APNG; GIF as is); Android decodes, downscales to 1024 and re-encodes (and gets a cropper — android package); web `keepOriginal` chunk-filters; a line in the profile settings says pictures are stripped.
+- SCORE-034 accept · the minimal shape: `blob_uploaders(blob_id, user_id, created_at)` written on every upload (including dedup hits), legal record built from it; the existence oracle is noted as residual, not fixed now.
+- SCORE-035 accept · stream the tokenizer over the body; per-account byte budget (32 MiB/h) in `watchedReader`; instance-wide fetch semaphore; cache `ErrTooLarge` briefly.
+- SCORE-036 accept · default ports only unless `UNFURL_PORTS` lists more; log host and port; 204 for every failure.
+- SCORE-037 accept · P1. Close from known mids (`voice.State.Tracks` + meter pulls) without the GET; three retries with backoff; meter keeps charging until a close is confirmed; error log + counter shown on the admin calls card (VOICE-020).
+- SCORE-038 accept · charge while a video/screen track is *published*; declaring a source off makes the server close that track at the SFU (instant-on is given up: the client republishes on "on"); subscribe refuses tracks whose publisher declares off; screen shares charged from the server-side tier table (with VOICE-010). The voice package adapts the web and Android camera-off paths.
+- SCORE-039 accept · presence and activity audience = self + friends + server co-members, minus blocks in either direction (a DM alone no longer subscribes anyone to your presence, as Discord); clients' DM list shows the dot only when that relationship exists.
+- SCORE-040 accept · the three steps + memoise across `Needs`.
+- SCORE-041 accept · cap the mention count like the unread count; `mention_count` column is a follow-up if a profile shows it matters.
+- SCORE-042 accept · marshal once per event, enqueue bytes.
+- SCORE-043 accept · every one-liner listed.

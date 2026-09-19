@@ -1,6 +1,97 @@
 # Findings — server-core (prefix `SCORE`)
 
-State: auditing
+State: audit-done
+
+## Summary
+
+30 findings, `SCORE-014` … `SCORE-043` (001–013 were lost before they reached disk — see the note
+below). Every file in the brief's scope is inspected, and round 1's server-core findings are
+re-checked in code one by one.
+
+**By priority**: P0 1 · P1 5 · P2 16 · P3 8.
+**By kind**: bug 9 · perf 9 · security 5 · docs 3 · code 3 · test 1.
+
+### The ten to read first
+
+1. **SCORE-014** (P0) — `backup.sh` never copies `data/server.secret`, and chatd silently mints a new
+   one when it is missing: a restore from the backup locks every 2FA account out permanently, backup
+   codes included.
+2. **SCORE-037** (P1) — force-closing an SFU session never actually succeeds on this instance (250 of
+   the 432 lines in `logs/chatd.log` are that failure): a removed member is not cut off, and the
+   usage meter stops counting media that is still flowing.
+3. **SCORE-033** (P1) — nothing strips EXIF on ingest and the Android app uploads the camera
+   original, so a profile picture can publish the owner's home GPS coordinates on an unauthenticated
+   URL.
+4. **SCORE-031** (P1) — Redis is wired to rate limits only; `Online`/`Publish`/`Subscribe` are dead
+   code, so with two chatd processes half the events never arrive and presence is wrong —
+   `deploy/README.md` promises the opposite.
+5. **SCORE-026** (P1) — every event in a server channel recomputes permissions for every member from
+   the database, with no cache anywhere: ~16 queries and N permission computations per message.
+6. **SCORE-015** (P1) — the backup prints "written" even when the media tarball failed, and nothing
+   ever prunes `backup/`, on the same volume as the live database.
+7. **SCORE-039** (P2) — blocking someone does not stop them receiving your presence, custom status
+   and Rich Presence, for the life of the DM row.
+8. **SCORE-038** (P2) — the usage meter charges on what the client claims it is sending, so two
+   ordinary accounts can relay video for free and walk past the 90 %/99 % guards.
+9. **SCORE-021** (P2) — chatd starts without complaint on a database newer than the binary, which is
+   exactly what the documented `cp bin/chatd.prev bin/chatd` rollback produces.
+10. **SCORE-020** (P2) — `make clean` deletes `bin/chatd`, `web/dist` *and* the `bin/chatd.prev`
+    rollback copy: one reflex command takes the site down with no way back.
+
+Also worth an early look: **SCORE-027** (one socket can drive a whole server's permission resolution
+several times a second by typing) and **SCORE-024** (the legal record prints a capped list's length as
+a total).
+
+### Cross-area items
+
+- `[android]` SCORE-033's client half: `SettingsScreen.kt:257-278` PUTs the picked photo's bytes
+  unchanged — the app needs the web's decode/downscale/re-encode step (and a cropper) regardless of
+  the server-side fix.
+- `[web-chat-ui]` SCORE-033's `keepOriginal` path (`ImageCropModal.tsx:100-102`) sends the file as
+  picked, which is the default for animated images.
+- `[server-api]` SCORE-038's other half: `handleSFUSubscribe` (`sfu_handlers.go:239-241`) hands out a
+  track whose publisher declares it off.
+- `[server-api]` the byte budget and route limiters SCORE-035/036 ask for live in `unfurl_handlers.go`
+  / `proxy_handlers.go` / `router.go`.
+- `[server-api]` round 1's unbounded `login:<username>` limiter key is still there
+  (`auth_handlers.go:225`); `internal/ratelimit`'s sweeper is the only thing bounding it.
+- `[server-api]` round 1's SEVERE "nothing is compressed by the server" is still true — a grep for
+  `gzip`/`Content-Encoding`/`compress/` across `internal/` and `cmd/` finds nothing. Cloudflare's
+  tunnel covers the live web client; the desktop app, any direct origin hit and every self-hoster pay
+  3–8× the bytes.
+- `[server-api]` round 1's SEVERE "every authenticated request costs two queries and no session is
+  ever cached" (`internal/auth/middleware.go`) is unchanged; `internal/auth` is outside this area.
+- `[voice]` SCORE-037's retry policy and what the meter should charge for an unconfirmed close are
+  call semantics.
+- `[desktop-release]` SCORE-014 is the store half of "the signing key is on one machine and in no
+  backup": `data/server.secret`, `chatd.env`, `android/release.jks` and `desktop/update-key.pem` are
+  all outside `backup.sh`.
+
+### Round-1 verification
+
+`audit/REVIEW.md`'s three server "Done" claims hold, and so does everything `dd9997a`,
+`096d401` and `4680e1c` said they fixed. Confirmed in code: the ban purge is one transaction;
+`CreateDM` sets `key_conv_id` and holds the pair through the new `tx.Serialise`
+(`pg_advisory_xact_lock`), which also covers the subchat and reaction-emoji limits; `Migrate` takes an
+advisory lock on Postgres; ids carry a node id and read a monotonic clock with a bounded spin; the
+writer pool is `synchronous(FULL)` and blob commits fsync their directory; `SubchatsFor` drains its
+cursor before hydrating; `PutPublic` re-reads on a unique violation; `AttachmentByBlob` and
+`UnreferencedBlobs` order deterministically; `perms.go` uses `errors.Is`; both raw `lower()` calls go
+through the dialect; `RecordClientError` trims only past a slack; the gateway wraps every goroutine
+and timer in `safely`/`recoverTimer`, gives fan-out a 5 s context, and uses `IsDMLike` + `DMBlocked`
+in `Viewers`/`CanAccess`/typing (closing the blocked-user-typing-in-a-subchat hole); `turnCache` is
+gone; `FinishTOTPSetup` is one transaction that refuses a repeat; `RemoveParticipant` reads who is
+left inside the write transaction (fixing both the group-delete data loss and its stale-snapshot
+sibling); the media proxy signature carries a 24 h expiry and neither the unfurl cache (1 h, raw
+URLs) nor the GIF cache (2 min) outlives it; the gateway caps and the `conn.user` race are covered by
+`limits_test.go` and an `atomic.Value`. No regressions or half-fixes found.
+
+Still open from round 1 in this area: SCORE-040 (`KeysMaybeNeeded`/`Needs`), SCORE-041 (the uncapped
+mention count in `ready`), SCORE-042 (per-connection marshal) and the ten one-liners in SCORE-043.
+Not re-reported: everything `performance.md` filed as NOTABLE or MINOR, which `REVIEW.md` declines
+pending a profiler — `PROGRESS.md` lists the ones in this area that are still true, so the coordinator
+can pick them up if the fix phase has room.
+
 
 > **Note on missing SCORE-001..013.** The first agent for this area recorded in
 > `PROGRESS.md` that it had written findings 001–013, but `FINDINGS.md` was
@@ -222,3 +313,45 @@ State: auditing
 - Effort: S
 - Status: open
 
+### SCORE-040 · P2 · perf · Every message send resolves the whole audience a second time, reads the grant table twice, and takes the hub lock once per key holder
+- Where: `internal/gateway/hub.go:432-458` (`KeysMaybeNeeded`), `internal/store/keys.go:208-233` (`Entitled`), `:260-278` (`UsersLackingGrant` → `HoldersOf`), `:240-258` (`HoldersOf`), `internal/store/keys.go:283-317` (`Needs`, the same shape on a second path), called from `internal/api/message_handlers.go:315` on every send and from `channel_handlers.go:336`, `group_handlers.go:142,276`, `server_handlers.go:225,1998,2004`
+- What: after `EmitChannel` has already resolved the audience (SCORE-026), the same handler calls `KeysMaybeNeeded(env.Conv)`, which resolves it **again**: `Entitled` is `channelViewers` for a server channel with its own key — the full `ServerByID` + `Roles` + `Overwrites` + `allMembers` + `instanceAdmins` + one `perms.Compute` per member — or `MemberIDs` for a server-root conversation. Then `UsersLackingGrant` calls `HoldersOf`, and `hub.go:451` calls `HoldersOf` again for the same (conv, epoch): the grants table is read twice per send. Finally the holder list is walked calling `h.Online(uid)`, which takes `h.mu.RLock()` **once per holder** rather than intersecting under one lock — `OnlineUsers()` and the unused `cache.OnlineAmong` both exist. `store.Needs` (`GET /api/v1/keys/needs`, called by every client on connect and after every `keys_needed`) has the identical shape: `Entitled` + `UsersLackingGrant` per held conversation, nothing memoised across the loop.
+- Impact: it doubles the per-message cost measured in SCORE-026 for a private channel — so a message in a 5,000-member private channel is ~32 queries and 10,000 permission computations, not 16 and 5,000 — and adds 5,000 mutex acquisitions on the hub's `RWMutex`, which is the same lock `register`/`unregister` need exclusively, so a busy channel measurably slows down new connections. Round 1 reported this as a SEVERE (`audit/performance.md:96-108`); it is not in `audit/REVIEW.md`'s "Not doing" list and the code is unchanged.
+- Fix: three separate, small steps. (1) Pass the entitled set that `EmitChannel` already computed into `KeysMaybeNeeded` instead of recomputing it (or share SCORE-026's cache). (2) Have `KeysMaybeNeeded` reuse the holder list `UsersLackingGrant` already loaded rather than calling `HoldersOf` twice. (3) Add `Hub.OnlineAmong(ids []ids.ID) []ids.ID` that takes the read lock once, and use it here and in the other per-id `Online` loops. (2) and (3) are a dozen lines each and are worth doing even if the cache never happens. Memoise `Roles`/`allMembers`/`instanceAdmins` across `Needs`'s loop while there.
+- Effort: M
+- Status: open
+
+### SCORE-041 · P2 · perf · The unread-mention count on connect is uncapped: it parses the mentions JSON of every message since you joined, for every channel, before `ready` can be sent
+- Where: `internal/store/readstates.go:60-84` (the mention subquery), `:79` (the unread subquery, which *is* capped with `LIMIT MaxUnreadCount`), called from `internal/gateway/conn.go` (`buildReady`) with every channel the user can see
+- What: the same statement computes two counts per channel. The unread count is bounded — `SELECT count(*) FROM (SELECT 1 FROM messages m WHERE … LIMIT ?)` with `MaxUnreadCount` — because, in the file's own words, "a long-ignored one costs no more than a short one". The mention count beside it has no such cap: `SELECT count(*) FROM messages m WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor AND (m.mention_everyone = 1 OR <json_each(m.mentions) has ?>)`. It walks every message above the floor and evaluates a JSON array membership test on each. The floor is the read marker, or the join time for a channel never opened — so for someone who joined a server and never opened a channel, the floor is their join and the scan is everything since.
+- Impact: this runs inside `ready`, so it is on the critical path of every connect and every reconnect, on every platform. A user in a busy server with 100 channels they have never opened pays a JSON parse per message per channel before their client can draw anything; round 1 put the worst case at a million parses (`audit/performance.md:190-203`, SEVERE, not declined). Today's instance is small enough that it is invisible, but the cost grows with other people's traffic, not with anything this user does, and a reconnect storm (a deploy, a network blip) multiplies it by the number of clients.
+- Fix: cap it the way the unread count beside it is already capped — wrap the count in `SELECT count(*) FROM (SELECT 1 FROM messages m WHERE … LIMIT ?)` with a mention cap (the clients render "9+" past a point anyway). Three lines, and it bounds the worst case immediately. The durable fix is a `mention_count` column on `read_states` maintained on insert and on ack.
+- Effort: S
+- Status: open
+
+### SCORE-042 · P3 · perf · Every gateway event is JSON-encoded and deflated once per recipient connection
+- Where: `internal/gateway/conn.go:328-352` (`writeLoop`: `json.Marshal(f)` per frame per connection), `internal/gateway/hub.go:263-300` (`EmitUsers` enqueues the `ServerFrame` struct to every connection), `internal/gateway/conn.go:268` (`CompressionNoContextTakeover`, so each copy is deflated separately too)
+- What: the hub builds one `ServerFrame` and hands the same struct to every connection; each connection's write loop marshals and compresses it independently. The marshalling is deterministic and identical for every recipient — the frame carries no per-connection field.
+- Impact: CPU per event is linear in the size of the audience rather than constant. A 1 KB `message_create` to 2,000 online members is 2,000 marshals plus 2,000 deflates (round 1 measured the shape at ~40–80 ms of CPU for one message, `audit/performance.md:150-161`). It is invisible on this instance and is the single clearest structural difference from how a large gateway is built.
+- Fix: marshal once in `EmitUsers`/`EmitChannel` and enqueue the `[]byte`, keeping the struct path only for per-connection frames (`ready`, `hello`, the revoke frame). ~50 lines. Optionally pre-compress once as well.
+- Note: round 1 filed this as NOTABLE and `audit/REVIEW.md` declined "most of `performance.md`'s 42 NOTABLE" pending a profiler. I am re-raising it at P3 only because it is one of the few whose cost is provably linear in audience and whose fix is local and testable — not because I disagree with the general policy.
+- Effort: M
+- Status: open
+
+### SCORE-043 · P3 · code · Round-1 findings in this area that were never fixed and never declined
+- Where: each listed below
+- What: I re-checked every round-1 `server-correctness.md` finding that lands in `server-core`. Almost all of the serious ones are genuinely fixed (see the verification list in the Summary). These are the leftovers — each is still exactly as round 1 described it, and none appears in `audit/REVIEW.md`'s "Not doing":
+  - `internal/gateway/protocol.go:39-86` — two thirds of the `Ev*` constants still have zero references outside the file (checked: `EvMemberAdd`, `EvMemberUpdate`, `EvMemberRemove`, `EvRoleDelete`, `EvServerUpdate`, `EvBanAdd`, `EvBanRemove`, `EvEmojiUpdate`, `EvSessionExpired`, `EvKeyGrant`, `EvReadState`, `EvPinUpdate`, `EvSettingsUpdate`, `EvInviteCreate`, `EvInviteDelete`, `EvChannelPositions`, `EvStickerUpdate`), while the handlers emit string literals. A typo in a literal compiles and ships.
+  - `internal/store/perms.go:32-38` — `IsInstanceAdmin` still turns any read error into "not an admin", so a transient failure silently strips an instance admin of every elevated permission and answers 403/404 instead of 500.
+  - `internal/store/readstates.go:79` — the capped unread count is still `CASE WHEN f.type IN ('dm','group_dm')`, so subchats never get one although they are DM-like everywhere else (`store.IsDMLike`).
+  - `internal/store/servers.go:632-639` — `CreateServerChannel` still runs the `type = 'x'` query that can never match, then immediately re-queries correctly.
+  - `internal/store/messages.go:481` — `Pins` is still `ORDER BY p.pinned_at DESC LIMIT 500` with a millisecond tie and no cursor; `:429-432` — `Reactors` still caps at 100 with no cursor.
+  - `internal/store/messages.go:20,23,64,66` — `has_attachments` is still written, selected and scanned into a local that is dropped.
+  - `internal/store/messages.go:278` — `UpdateMessage` still writes `int64(keyConv)` where `InsertMessage` writes `nullID`, so a zero would become 0 instead of NULL (unreachable today: `checkEnvelope` rejects it).
+  - `internal/store/keys.go:123-132` — `contains` still reimplements `strings.Contains` in O(n·m) for `isFKError`.
+  - `internal/store/invites.go:15-22`, `internal/store/guests.go:57-64` — invite and guest codes are still modulo-biased over a 56-character alphabet, and `CreateInvite` still has no `ON CONFLICT` retry.
+  - `internal/realtime/meter.go:162` — `if !m.off[source] == live` still reads as the opposite of what it does.
+- Impact: none of them is user-visible today; together they are the residue that makes the next reader unsure which of the two spellings of a rule is the real one. The `IsInstanceAdmin` one is the only one with a behavioural edge (it fails closed, so it degrades rather than leaks).
+- Fix: they are round 1's own one-line fixes; the file:line references above are current.
+- Effort: S
+- Status: open

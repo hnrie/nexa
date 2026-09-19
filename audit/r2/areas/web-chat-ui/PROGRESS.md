@@ -1,7 +1,7 @@
 # Progress — web-chat-ui
 State: auditing
-Last checkpoint: 2026-09-19T05:46Z
-Next finding id: 093
+Last checkpoint: 2026-09-19T11:14Z
+Next finding id: 104
 
 ## Inspected
 
@@ -56,7 +56,7 @@ Common:
 Chat:
 - [x] web/src/components/chat/ChatView.tsx
 - [x] web/src/components/chat/MessageList.tsx
-- [ ] web/src/components/chat/MessageList.test.tsx
+- [x] web/src/components/chat/MessageList.test.tsx
 - [x] web/src/components/chat/MessageItem.tsx
 - [x] web/src/components/chat/Chat.module.css
 - [x] web/src/components/chat/Attachments.tsx
@@ -67,15 +67,15 @@ Chat:
 - [x] web/src/components/chat/AudioPlayer.tsx
 - [x] web/src/components/chat/AudioPlayer.module.css
 - [x] web/src/components/chat/fitMedia.ts
-- [ ] web/src/components/chat/fitMedia.test.ts
+- [x] web/src/components/chat/fitMedia.test.ts
 - [x] web/src/components/chat/mediaLinks.ts
-- [ ] web/src/components/chat/mediaLinks.test.ts
+- [x] web/src/components/chat/mediaLinks.test.ts
 - [x] web/src/components/chat/StickerPopout.tsx
 - [x] web/src/components/chat/Sticker.module.css
 - [x] web/src/components/chat/Reactions.tsx
 - [x] web/src/components/chat/EditMessage.tsx
 - [x] web/src/components/chat/messageMenu.ts
-- [ ] web/src/components/chat/messageMenu.test.ts
+- [x] web/src/components/chat/messageMenu.test.ts
 - [x] web/src/components/chat/SelectionBar.tsx
 - [x] web/src/components/chat/SystemMessage.tsx
 - [x] web/src/components/chat/TypingBar.tsx
@@ -85,7 +85,7 @@ Chat:
 - [x] web/src/components/chat/MemberList.module.css
 - [x] web/src/components/chat/GroupMemberList.tsx
 - [x] web/src/components/chat/groupMemberMenu.ts
-- [ ] web/src/components/chat/groupMemberMenu.test.ts
+- [x] web/src/components/chat/groupMemberMenu.test.ts
 - [x] web/src/components/chat/LockedChannel.tsx
 
 Markdown:
@@ -101,11 +101,11 @@ Composer:
 - [x] web/src/components/composer/DropOverlay.tsx
 - [x] web/src/components/composer/DropOverlay.module.css
 - [x] web/src/components/composer/commands.ts
-- [ ] web/src/components/composer/commands.test.ts
+- [x] web/src/components/composer/commands.test.ts
 - [x] web/src/components/composer/mentions.ts
-- [ ] web/src/components/composer/mentions.test.ts
+- [x] web/src/components/composer/mentions.test.ts
 - [x] web/src/components/composer/linkPreviews.ts
-- [ ] web/src/components/composer/linkPreviews.test.ts
+- [x] web/src/components/composer/linkPreviews.test.ts
 - [x] web/src/components/composer/send.ts
 - [x] web/src/components/composer/useAutosize.ts
 
@@ -143,17 +143,17 @@ Pages:
 - [x] web/src/pages/StickerPackPage.tsx
 
 Android parity (read-only, comparison):
-- [ ] android ui/chat/ChatScreen.kt
-- [ ] android ui/chat/MessageRow.kt
-- [ ] android ui/chat/Composer.kt
-- [ ] android ui/chat/AttachmentViews.kt
-- [ ] android ui/chat/MessageActions.kt
-- [ ] android ui/chat/Players.kt
-- [ ] android ui/chat/SwipeToReply.kt
-- [ ] android ui/markdown/Render.kt
-- [ ] android ui/pickers/*
-- [ ] android ui/sheets/ProfileSheet.kt
-- [ ] android KeyVerify.kt
+- [x] android ui/chat/ChatScreen.kt
+- [x] android ui/chat/MessageRow.kt
+- [x] android ui/chat/Composer.kt
+- [x] android ui/chat/AttachmentViews.kt
+- [x] android ui/chat/MessageActions.kt
+- [x] android ui/chat/Players.kt
+- [x] android ui/chat/SwipeToReply.kt
+- [x] android ui/markdown/Render.kt
+- [x] android ui/pickers/*
+- [x] android ui/sheets/ProfileSheet.kt
+- [x] android KeyVerify.kt
 
 Round 1 cross-check:
 - [x] audit/REVIEW.md (Done / Not doing / Still open)
@@ -172,9 +172,9 @@ with Toasts (022); `<t:>` formatters *do* use the app locale via `lib/time.ts`
 spoiler a11y is a finding (054); code-block copy is a finding (057).
 
 Still pending:
-- (c) ZoomPan keyboard: WCHAT-029/030 cover opening the viewer and the missing
-  focus trap; panning by arrow keys is still unchecked (`common/ZoomPan.tsx` is
-  ticked, so re-read only the key handling if a successor wants it).
+- (c) SETTLED: ZoomPan has no key handling at all (no `onKeyDown`, no `tabIndex`);
+  `zoomBy` always zooms about the centre, so keyboard zoom + no pan = only the
+  middle of a picture is ever reachable → WCHAT-093.
 - (d) Toasts `top: 16px` under the iOS status bar: `web/index.html:5` has
   `viewport-fit=cover` and no `apple-mobile-web-app-*` meta at all, so whether a
   toast lands under the status bar depends on web-shell-ui's shell insets. Left
@@ -207,7 +207,27 @@ read with KeyVerify.tsx.
 
 Pages done → WCHAT-091..092 (StickerPackPage is behind RequireAuth, so no anonymous-visitor finding).
 
-Next: the Android parity files → profile/* → activity/* → pages/* →
-the Android parity files → the six test files (MessageList.test.tsx,
-fitMedia.test.ts, mediaLinks.test.ts, messageMenu.test.ts,
-groupMemberMenu.test.ts, render.test.tsx) last.
+Android parity pass done → WCHAT-094..102. What it produced:
+- against the web: swipe-to-reply (095), the react permission not checked (096),
+  24 px reaction pills on both (094).
+- against Android (`[android]`): no `/`,`#`,`:` completions (097), no spoiler on a
+  staged file + an 18 dp remove (098), sticker/GIF ignores the reply and slow mode
+  — the phone's copy of 076 (099), pictures stretched to 320 dp and cropped (100),
+  rich presence parsed and never drawn (102). 101 is the renderer's untranslated
+  `@unknown-user`/`#deleted-channel`/`@unknown-role`, on both clients.
+- Checked and NOT findings: Android's media goes through `MediaLinks`/`CoilSetup`,
+  which re-signs stale `/media/proxy/` links and refuses any other host — the same
+  rule as the web's `lib/mediaLinks.ts`, so no third-party leak on either. The
+  Android picker is *better* than the web's on the two things 075 and 080 complain
+  about (the sheet grows by the IME height and never autofocuses the search box;
+  every control is 44-48 dp), and its GIF/sticker tabs are fully translated with
+  real error/empty/retry states. Android honours the font-size setting (018 is
+  web-only), formats "Joined on" in the app's language (087 is web-only), and its
+  key-pinning chips/dialog match the web's, so 088 (no user-confirmed "verified")
+  is cross-platform, as are 057 (the 90 % code block) and 059 (a relative
+  timestamp that never ticks).
+
+Next: the ten remaining test files (MessageList.test.tsx, mediaLinks.test.ts,
+messageMenu.test.ts, groupMemberMenu.test.ts, render.test.tsx, commands.test.ts,
+mentions.test.ts, linkPreviews.test.ts, SearchPanel.test.tsx,
+SearchSuggestions.test.ts), then the Summary at the top of FINDINGS.md.

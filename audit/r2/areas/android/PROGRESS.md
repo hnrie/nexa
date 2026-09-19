@@ -1,7 +1,7 @@
 # Progress — android
 State: auditing
-Last checkpoint: 2026-09-19T05:24Z
-Next finding id: 062
+Last checkpoint: 2026-09-19T10:38Z
+Next finding id: 066
 
 ## Inspected
 
@@ -95,18 +95,18 @@ UI markdown (+ web parser for parity):
 UI pickers:
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/EmojiIndex.kt
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/EmojiTab.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionCells.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionSheet.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionCells.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionSheet.kt
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/ExpressionState.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/Expressions.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/GifTab.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/pickers/StickerTab.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/Expressions.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/GifTab.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/StickerTab.kt
 
 UI sheets:
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/ChannelSheets.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Dismiss.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Dismiss.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/KeyVerify.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Layers.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Layers.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Misc.kt
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/ProfileSheet.kt
 
@@ -152,4 +152,4 @@ Round 1 cross-check:
 - [ ] audit/product-gaps.md (Android column)
 
 ## Handoff note
-Third agent. ui/chat/* and ui/markdown/* done (022-061). Pending: DROID-062 to write = scrolling past a video downloads and decrypts the whole file for its poster (CoilSetup.kt:74-82 AttachmentFetcher -> AttachmentStore.file; AttachmentViews.kt:138-143 AsyncImage(model = meta) for videos) — confirm the web's approach in VideoPlayer.tsx first. DROID-031 still needs a Where line for MessageActions.kt:122-131 (26 dp icon). Next: ExpressionCells, ExpressionSheet, Expressions, GifTab, StickerTab, then sheets/*.
+Fourth agent. Carried items settled: DROID-062 written, DROID-031 got its MessageActions/ExpressionSheet Where lines. Pickers done (063-065). Read KeyVerify.kt and ProfileSheet.kt (not yet ticked): pending to write = (a) KeyChangeDialog has no verticalScroll so Accept/Not now can be off-screen at large font (P3 a11y); (b) ProfileSheet "outgoing" cancel uses rememberCoroutineScope not detached (P3 code), Message-button failure is silent; (c) DROID-031 Where line for KeyVerify.kt:119-128 (26 dp expander row); (d) parity of ProfileSheet actions vs web ProfileCard (check Block / kick / nickname); (e) P3 parity: phone cannot create/install/discover expression packs (StickerTab.kt:175-182 vs web StickersPage.tsx) — confirm SettingsScreen has no packs page first. Next: Misc.kt, ChannelSheets.kt, then settings/server, auth/invite/friends, Strings.kt, drawables, tests, round-1 skim.

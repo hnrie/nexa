@@ -15,15 +15,16 @@ Android 1.0.3, desktop 1.0.5. Working tree was clean at `5d80e12`.
 | Area | Prefix | State | Runs | Notes |
 |---|---|---|---|---|
 | server-api | SAPI | audit-done | 3 | 50 findings: P1 3 · P2 11 · P3 36 |
-| server-core | SCORE | dispatched (opus) | 3 | |
+| server-core | SCORE | audit-done | 4 | 30 findings (014–043): P0 1 · P1 5 · P2 16 · P3 8; 001–013 lost → `server-store` supplement |
 | web-core | WCORE | audit-done | 3 | 29 findings: P2 9 · P3 20 |
 | web-chat-ui | WCHAT | dispatched (opus) | 3 | |
 | web-shell-ui | WSHELL | dispatched (opus) | 3 | |
 | voice | VOICE | audit-done | 3 | 28 findings: P1 4 · P2 11 · P3 13 |
 | android | DROID | dispatched (fable) | 3 | |
 | ux-walkthrough | UX | dispatched (opus) | 3 | owns the emulator |
-| desktop-release | DESK | dispatched (fable) | 1 | |
-| i18n-copy | I18N | dispatched (fable) | 1 | |
+| desktop-release | DESK | dispatched (fable) | 2 | |
+| i18n-copy | I18N | dispatched (fable) | 2 | |
+| server-store | SSTORE | dispatched (fable) | 1 | supplement: re-reads internal/store + migrations because SCORE-001..013 were lost |
 
 "State" is one of: queued · dispatched · audit-done · needs-successor ·
 triaged · fixing · fix-done. The agent's own `PROGRESS.md` is the truth
@@ -137,3 +138,7 @@ Agent type `general-purpose`, model `fable` (or `opus`).
 - 2026-09-19 02:32 — the seven unfinished areas resumed (same models).
   `TRIAGE.md` now holds the decisions for server-api, web-core and voice
   (106 of 107 accepted; SAPI-002 declined).
+- 2026-09-19 03:05 — server-core audit-done (30 findings incl. P0 backup gap).
+  Its first agent's 13 findings never reached disk (it believed the Write
+  tool refused .md files; successors used heredocs). A `server-store`
+  supplement agent re-reads internal/store + migrations (prefix SSTORE).

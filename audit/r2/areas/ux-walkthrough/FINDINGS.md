@@ -218,3 +218,37 @@ Environment: throwaway chatd on http://127.0.0.1:64675 built from `5d80e12` + wo
 - Fix: as UX-018/UX-020; verify in `ar` and `de` after fixing.
 - Effort: S
 - Status: open
+
+### UX-027 · P2 · i18n · In German the phone Friends header loses "Ausstehend" and "Freund hinzufügen", and the DM header loses the call, video and search buttons
+- Where: same code as UX-017 / UX-018 / UX-020 — `web/src/pages/Friends.module.css` (`_header_…`), `web/src/components/chat/ChatView.tsx` (DM header), `web/src/components/settings/Settings.module.css` (`_navWrap_…`)
+- What: the walkthrough's German phone pass (390×844, `de-DE`). Friends: `☰ Freunde │ Online  Alle  Ausstehen…` — the third tab is cut mid-word at the right edge and "Freund hinzufügen" is entirely off-screen (English already loses it — UX-018 — but German loses a tab as well). DM: the header is `☰ · @ · Derselbe Schlüssel wie bisher · 📞` and stops there — the name is gone (UX-017) **and so are the video-call and search buttons**, because the German key badge is 26 % wider than the English one. Settings: `Mein Konto │ Profile │ Privatsphäre & Sich…` with the ✕ sitting on the third label. Shots: `audit/r2/shots/web-phone/dark/de/friends.png`, `dm.png`, `settings.png`, `settings-privacy.png`.
+- Impact: German is one of the twelve shipped locales. On a phone a German user cannot start a call from a DM at all — the button is not merely small, it is not rendered on screen — and cannot see pending friend requests.
+- Fix: the fixes in UX-017 (name takes the space, key badge collapses to its icon under ~420 px), UX-018 (Add Friend pinned out of the scrolling strip) and UX-020 (reserve the ✕'s width). Verify each in `de` and `ar`, which are the longest and the mirrored cases.
+- Effort: S
+- Status: open
+
+### UX-028 · P1 · ux · Calling someone looks identical to being in a call, and a declined call leaves the caller sitting in an empty one for ever
+- Where: `web/src/components/voice/VoiceStatus.tsx` (the "Voice Connected" panel), `web/src/components/voice/VoiceView.tsx` (the stage), `web/src/voice/session.ts:425` (`startCallingTone`), `:106` (`stopCallingTone`, also called from the `call_end` handler at `:939` — it stops the tone and nothing else)
+- What: alice opens the DM with bob and presses the phone icon.
+  - **Ringing looks like connected.** The left panel immediately reads **"Voice Connected / Bob"** and the stage shows one tile with alice's own avatar and the full control bar. There is no "Calling Bob…", no ringing animation, no "waiting for Bob to answer". The only difference from a real call is that the other tile is absent and the quality chip reads `● …` instead of `● 1 ms`. Shots: `audit/r2/shots/web-desktop/dark/en/dm-call-ringing-2.png` vs `dm-call-connected-2.png`.
+  - **A decline is invisible.** Bob presses the red Decline button; the server sends `call_end`, the client calls `stopCallingTone()` — and that is all. Alice's screen does not change: still "Voice Connected", still her own tile, still the hang-up button she has to find and press herself. No toast, no "Bob declined", no auto-leave. Shot: `audit/r2/shots/web-desktop/dark/en/dm-call-declined-caller.png` (taken after bob declined).
+  - The ringback tone stops itself after 60 s (`callingTimer`), so after a minute a caller who walked away is in a silent, empty, permanent "call".
+- Impact: the single most important piece of feedback in a phone call — "is it ringing, did they pick up, did they say no" — is missing on the caller's side. People will talk into an empty call believing they are connected (the panel says so), and a declined call leaves a live microphone open until someone notices.
+- Fix: (a) a distinct ringing state — "Calling Bob…" in the panel and on the stage, the callee's avatar pulsing, the control bar reduced to Cancel; (b) on `call_end` with a decline, show "Bob declined the call" and leave the call automatically; (c) when the tone's 60 s are up with nobody there, leave and show "No answer". Android has the same states to check.
+- Effort: M
+- Status: open
+
+### UX-029 · P2 · ux · A DM's history says "Alice started a call." and never says whether it was answered, declined, missed or how long it lasted
+- Where: the `system_call` message (`internal/api/voice_glue.go:353` inserts it; `web/src/components/chat/MessageItem.tsx` renders it), `web/src/i18n/locales/en.json` ("started a call")
+- What: two calls between alice and bob — one answered and hung up after a minute, one declined outright — leave exactly two identical lines in the DM: `📞 Alice started a call. Today at 2:35 AM` and `📞 Alice started a call. Today at 2:40 AM`. Nothing marks the declined one, nothing says the first one ended, nothing gives a duration, and a call that was never answered is indistinguishable from one that lasted an hour. Shot: `audit/r2/shots/web-desktop/dark/en/dm-after-call-2.png`.
+- Impact: the call log is the DM timeline, and it cannot answer "did I miss a call from you?" — the question it exists to answer. Someone who was away sees "Alice started a call" and cannot tell whether Alice is still waiting in it right now.
+- Fix: update the system message when the call ends (as the server already knows: it emits `call_end` with a reason) — "Call ended · 4 min", "Missed call from Alice", "Alice declined the call" — and make a missed call a row the recipient can press to call back. Android and desktop render the same message type, so this is one server-side change plus three renderers.
+- Effort: M
+- Status: open
+
+### UX-030 · P3 · design · In "Invite guests to this call" the destructive "Revoke All Guest Links" is the biggest, brightest control in the dialog
+- Where: `web/src/components/voice/GuestLinkModal.tsx`
+- What: the modal's controls are, by visual weight: a full-width red **Revoke All Guest Links** (448×38) at the bottom, then the purple **Copy** (88×38) next to the link, then a plain **New Link** (94×38). The thing a person opened the dialog to do — copy the link — is a third of the width of the one that breaks every link already handed out. There is also no confirmation step on the revoke. Shot: `audit/r2/shots/web-desktop/dark/en/guest-link-modal.png`.
+- What would be better: make Copy the primary full-width action (or put the link and Copy in one prominent row), and demote Revoke to a small text button — "Revoke all links" — in the dialog's footer, with a confirm ("Everyone you sent a link to will be locked out. Continue?"). The rest of this modal is the best-written screen in the product: the sentence about the key after `#` is exactly right.
+- Effort: S
+- Status: open

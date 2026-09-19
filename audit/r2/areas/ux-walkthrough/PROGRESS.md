@@ -1,7 +1,7 @@
 # Progress — ux-walkthrough
 State: auditing
-Last checkpoint: 2026-09-19T05:35Z
-Next finding id: 024
+Last checkpoint: 2026-09-19T10:52Z
+Next finding id: 031
 
 ## Environment (re-create with exactly these; never web/dist, never bin/chatd)
 
@@ -50,7 +50,7 @@ Legend: [ ] not done · [x] done · [~] in progress. One line per platform × th
 - [x] search panel + suggestions, quick switcher, shortcuts help, slash commands, pickers shot
 - [ ] notifications (toasts, banners), app lock (passcode page), lock now
 - [ ] group DM: create DM modal, edit group modal, group invite modal, group member list
-- [ ] voice: join General between alice and bob, voice view, mute/deafen, participants, screen share modal (fake device), leave; DM call + incoming call screen; guest link modal + guest call page
+- [x] voice: alice+bob in General, the stage, mute/deafen/camera, share-screen modal + Go Live + bob's Watch Stream, guest-link modal, full screen, leave; DM call, incoming-call modal, accept, decline (UX-028..030). Guest *call page* still to do in `d12-routes`.
 - [ ] download page (/download), sticker pack page, offline page, 404 route
 - [ ] keyboard pass: tab order + focus ring on 5 screens; a11y snapshot for unlabeled controls
 - [ ] performance: first paint, login→usable chat, typing lag with a long message, channel switch, picker open
@@ -74,10 +74,10 @@ Legend: [ ] not done · [x] done · [~] in progress. One line per platform × th
 - [ ] the same screens in light (contrast, call UI in light, home page in light)
 
 ### 5. Web phone · dark · ar (RTL)
-- [ ] home, auth, friends, drawer side, DM, composer, message actions, settings, search, voice, mixed-direction messages, numbers/dates
+- [x] home, auth, friends, drawer side, DM, composer, message actions, settings, search, mixed-direction messages, numbers/dates (UX-024..026; 25 shots). Voice in ar not done.
 
 ### 6. Web phone · dark · de (long words)
-- [ ] auth, friends, DM, settings, server settings, modals — button labels, truncation, overflow
+- [x] auth, friends, DM, settings, search, pickers, message actions — button labels, truncation, overflow (UX-027; 25 shots). Server settings in de not done; no console errors in any phone pass.
 
 ### 7. Web desktop 1366 · light · en
 - [ ] home, friends, DM (code blocks, mentions), server, settings, voice, pickers, context menus
@@ -103,20 +103,25 @@ Legend: [ ] not done · [x] done · [~] in progress. One line per platform × th
 ### 12. Summary at the top of FINDINGS.md; State: audit-done; emulator + server stopped
 
 ## Handoff note
-2026-09-19T05:35Z — successor #2. Server :64675 still up. UX-001..023 written.
+2026-09-19T10:52Z — successor #3. Server :64675 still up (`curl http://127.0.0.1:64675/api/health`). UX-001..030 written.
 
-Done this session: mined the predecessor's desktop shots (UX-006..013); added `probe`, `viewport_pass` and the
-steps `p-dark-en`, `p-light-en`, `p-dark-ar`, `p-dark-de`, `desktop-light`, `tablet`, `wide` to walk.py; ran
-`probe` and `p-dark-en`.
+Done this session: mined the predecessor's German shots (UX-027); rewrote the voice pass as `d7b-voice`
+(UX-028..030) and added the steps `d8-group`, `d9-misc`, `d10-names`, `d11-perf`, `d12-routes` to walk.py.
 
-Gotchas for a successor driving walk.py:
+Gotchas for a successor driving walk.py (keep these):
 - the phone keeps the whole sidebar in a drawer — click `button[aria-label='Open navigation']` before anything
   in the sidebar or the user panel (`[data-testid=user-settings]`), or the click times out.
 - `Walk.unlabeled()` has false positives: a radio wrapped in `<label>` has a name. Confirm with
   `page.locator(...).aria_snapshot()` before writing an a11y finding.
 - `full_page=True` does not capture the settings overlay; scroll its inner scroller instead.
-- theme/language live on the account and sync, so `viewport_pass` sets them at the start and resets to dark/en
-  at the end. If a pass dies half-way, bob may be left in ar/de — reset by hand before the Android pass.
+- **`[data-channel]:has-text('General')` also matches `#general`** — that is why the first voice pass never
+  joined a call. Use the id from `audit/r2/shots/seed.json` (`voice`), or `[data-testid=join-voice]`.
+- **never `goto()` on the callee's page while a call is ringing**: `ringing` lives in memory only, so a
+  navigation drops the incoming-call modal and you will think it is broken. `open_dm_from_sidebar` gotos.
+- call-control testids: `voice-mute`, `screen-share`, `voice-leave`, `join-voice`, `invite-guests`,
+  `call-fullscreen`, `go-live`, `accept-call`.
+- `d10-names` changes alice's display name and puts it back at the end; run it after the viewport passes
+  anyway, in case it dies half way (fix by hand in Settings ▸ My Account).
 
-Next: `p-light-en`, `p-dark-ar`, `p-dark-de`, `desktop-light`, `tablet`, `wide`, then `d7-voice`, then Android
-(check `vm_stat` first: needs free+inactive > 1.3 M pages).
+Next: `d10-names`, `d11-perf`, then `p-light-en`, `desktop-light`, `tablet`, `wide`, then Android
+(check `vm_stat` first: needs free+inactive > 1.3 M pages), then the side-by-side and "what is missing" passes.

@@ -1,7 +1,7 @@
 # Progress — web-shell-ui
 State: auditing
-Last checkpoint: 2026-09-19T06:15Z
-Next finding id: 066
+Last checkpoint: 2026-09-19T10:42Z
+Next finding id: 088
 
 ## Inspected
 
@@ -151,14 +151,14 @@ Context only (not in scope, read to know what exists): `web/src/components/commo
 
 Parity (read-only, Android):
 - [x] android/.../ui/main/MainScreen.kt
-- [ ] android/.../ui/main/Sidebar.kt
+- [x] android/.../ui/main/Sidebar.kt
 - [x] android/.../ui/auth/AuthScreen.kt
 - [x] android/.../ui/auth/RecoveryKeyOverlay.kt
-- [ ] android/.../ui/settings/SettingsScreen.kt
-- [ ] android/.../ui/server/ServerSettingsScreen.kt
+- [x] android/.../ui/settings/SettingsScreen.kt
+- [x] android/.../ui/server/ServerSettingsScreen.kt
 - [x] android/.../ui/friends/FriendsScreen.kt
-- [ ] android/.../ui/invite/InviteScreen.kt
-- [ ] android/.../ui/sheets/*
+- [x] android/.../ui/invite/InviteScreen.kt
+- [~] android/.../ui/sheets/* (ChannelSheets done; Misc, ProfileSheet, KeyVerify, Layers, Dismiss left)
 - [x] android/.../ui/Nav.kt
 
 Round 1:
@@ -168,14 +168,18 @@ Round 1:
 - [ ] audit/product-gaps.md (the 15 IDEA findings — re-judge as design)
 
 ## Handoff note
-Successor #3, 2026-09-19T05:12Z. Server settings are done (all pages, modals, PackEditor,
-memberMenu, rolePositions, the CSS), friends is done. Findings through WSHELL-043.
-Remaining: desktop/* -> pages/* + web/index.html -> Android parity -> round-1 reports.
-Two cross-cutting threads, scan every new file for them:
-(a) hard-coded English — WSHELL-001/020/033/034 hold the running list; also found and NOT
-    yet written up anywhere: `EmojiPage.tsx:87` (`title: `Delete :name:``). Put it in the
-    Summary addendum if no better home.
-(b) one-time secrets dismissible by Escape — WSHELL-012/021; `RecoverPage.tsx` shows a
-    fresh recovery key at :71, check it for the same gap when you read it.
-Open question to settle in pages/*: `LoginPage` autocomplete attributes, the TOTP step,
-and whether the 90-day session length is stated anywhere (brief asks).
+Successor #4, 2026-09-19T10:39Z. Android parity: Sidebar.kt (067, 069), InviteScreen.kt (066, 068, 070),
+SettingsScreen.kt (071-079), ServerSettingsScreen.kt (080-084) done. Remaining: sheets/*
+(ChannelSheets, Misc, ProfileSheet, KeyVerify, Layers, Dismiss) -> the four round-1 reports ->
+Summary. ChannelSheets.kt done (085-087): Android has NO channel creation at all, no delete,
+no private channels, no slowmode setter. Server icon upload from the phone is still unchecked --
+web has it (ServerOverviewPage.tsx:95); if Android has none, fold it into a parity finding.
+Checked and NOT findings (do not re-investigate): Android language switching works end to end
+(`key(Strings.epoch)` in MainActivity rebuilds the tree); `settings.settingsScreen.thisDevice`
+already ends in " . " so the session row is not glued; Android's RecoveryKeyOverlay is the best
+recovery-key presentation in the product (see WSHELL-078's note to the coordinator).
+Threads to keep scanning for:
+(a) hard-coded English — WSHELL-001/020/033/034/070; still homeless: `EmojiPage.tsx:87`
+    (`title: `Delete :name:``) — put it in the Summary addendum if no better home.
+(b) Android `runCatching { }` with nothing chained — WSHELL-062/064/076 so far.
+(c) Android pages that draw a failed fetch as a spinner or an empty state — WSHELL-064, 072.

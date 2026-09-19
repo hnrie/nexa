@@ -1402,6 +1402,660 @@ def step_wide(base, pw):
     viewport_pass(base, pw, "web-desktop-1920", "dark", "en")
 
 
+def step_d7b_voice(base, pw):
+    """Voice done properly: the server's voice channel by id (":has-text('General')" also matches
+    #general, which is why the first pass never joined a call), both people live, the controls, the
+    share-screen modal, the guest link, then a DM call with the callee's page left alone so the ring
+    actually reaches it."""
+    browser = pw.chromium.launch(args=CHROME_ARGS + ["--auto-select-desktop-capture-source=Entire screen"])
+    alice = Walk(browser, base, "alice", "web-desktop")
+    bob = Walk(browser, base, "bob", "web-desktop")
+    alice.login(); bob.login()
+    a, b = alice.page, bob.page
+    a.wait_for_timeout(1200)
+    ids = seed_ids()
+    def lobby():
+        a.goto(base + f"/channels/{ids['server']}/{ids['voice']}", wait_until="networkidle")
+        a.wait_for_timeout(2000)
+        alice.shot("voice-lobby")
+        diag(alice, "voice-lobby")
+        print("  join-voice button:", a.locator("[data-testid=join-voice]").count(),
+              a.locator("[data-testid=join-voice]").first.inner_text() if a.locator("[data-testid=join-voice]").count() else "")
+    attempt(alice, "voice-lobby", lobby)
+    def join():
+        if a.locator("[data-testid=join-voice]").count():
+            a.click("[data-testid=join-voice]")
+        else:
+            a.locator(f'[data-channel="{ids["voice"]}"]').first.click()
+        a.wait_for_timeout(4000)
+        alice.shot("voice-joined-alone-2")
+        diag(alice, "voice-joined")
+        print("  controls aria:", a.locator("[class*=controls]").first.aria_snapshot()[:900] if a.locator("[class*=controls]").count() else "none")
+        print("  control sizes:", a.evaluate("""() => [...document.querySelectorAll('[class*=ctl], [class*=sideBtn]')].map(e => { const r = e.getBoundingClientRect(); return { l: (e.getAttribute('aria-label') || '').slice(0, 22), w: Math.round(r.width), h: Math.round(r.height) }; }).filter(o => o.w)"""))
+        print("  voice status panel:", a.locator("[data-testid=voice-status]").inner_text().replace("\n", " | ")[:200] if a.locator("[data-testid=voice-status]").count() else "none")
+    attempt(alice, "voice-join", join)
+    def bob_join():
+        b.goto(base + f"/channels/{ids['server']}/{ids['voice']}", wait_until="networkidle")
+        b.wait_for_timeout(1500)
+        if b.locator("[data-testid=join-voice]").count():
+            b.click("[data-testid=join-voice]")
+        b.wait_for_timeout(5000)
+        bob.shot("voice-two-bob")
+        alice.shot("voice-two-alice")
+        diag(alice, "voice-two")
+        print("  tiles:", a.evaluate("() => [...document.querySelectorAll('[class*=tile]')].length"))
+    attempt(bob, "voice-join-bob", bob_join)
+    def controls():
+        for tid, name in (("voice-mute", "muted"), ("voice-mute", "unmuted")):
+            a.click(f"[data-testid={tid}]")
+            a.wait_for_timeout(700)
+            alice.shot("voice-call-" + name)
+        for lab in ("Deafen", "Turn on camera"):
+            loc = a.locator(f"[class*=controls] button[aria-label='{lab}']")
+            if loc.count():
+                loc.first.click()
+                a.wait_for_timeout(1500)
+                alice.shot("voice-call-" + lab.lower().replace(" ", "-"))
+        print("  after camera, tiles:", a.evaluate("() => [...document.querySelectorAll('[class*=tile]')].length"))
+        b.wait_for_timeout(1200)
+        bob.shot("voice-two-bob-camera")
+    attempt(alice, "voice-controls", controls)
+    def share():
+        a.click("[data-testid=screen-share]")
+        a.wait_for_timeout(1200)
+        alice.shot("share-screen-modal")
+        diag(alice, "share-screen")
+        print("  share modal:", a.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:500] if a.locator("[role=dialog]").count() else "none")
+        if a.locator("[data-testid=go-live]").count():
+            a.click("[data-testid=go-live]")
+            a.wait_for_timeout(4000)
+            alice.shot("voice-sharing")
+            b.wait_for_timeout(2500)
+            bob.shot("voice-sharing-seen-by-bob")
+            diag(bob, "voice-sharing-bob")
+    attempt(alice, "voice-share", share)
+    def guests():
+        if a.locator("[data-testid=invite-guests]").count():
+            a.click("[data-testid=invite-guests]")
+            a.wait_for_timeout(1500)
+            alice.shot("guest-link-modal")
+            diag(alice, "guest-link")
+            link = a.locator("[data-testid=guest-link]").first
+            val = link.input_value() if link.count() else ""
+            print("  guest link:", val[:120])
+            (SHOTS / "guest.json").write_text(json.dumps({"link": val}))
+            a.keyboard.press("Escape")
+    attempt(alice, "guest-link", guests)
+    def fullscreen():
+        a.click("[data-testid=call-fullscreen]")
+        a.wait_for_timeout(1200)
+        alice.shot("voice-fullscreen")
+        a.click("[data-testid=call-fullscreen]")
+        a.wait_for_timeout(800)
+    attempt(alice, "voice-fullscreen", fullscreen)
+    def leave():
+        for w, pg in ((alice, a), (bob, b)):
+            if pg.locator("[data-testid=voice-leave]").count():
+                pg.click("[data-testid=voice-leave]")
+                pg.wait_for_timeout(1500)
+        alice.shot("voice-after-leave-2")
+    attempt(alice, "voice-leave", leave)
+    def dm_call():
+        # bob opens the DM and is then LEFT ALONE: a goto here drops the ring (it lives in memory only)
+        bob.open_dm_from_sidebar("Alice", "alice")
+        b.wait_for_timeout(1500)
+        alice.open_dm_from_sidebar("Bob", "bob")
+        a.wait_for_timeout(1500)
+        a.locator("[data-testid=start-call], button[aria-label='Start Voice Call']").first.click()
+        a.wait_for_timeout(3000)
+        alice.shot("dm-call-ringing-2")
+        b.wait_for_timeout(1500)
+        bob.shot("incoming-call-2")
+        print("  incoming-call modal:", b.locator("[data-testid=incoming-call]").count())
+        print("  incoming aria:", b.locator("[data-testid=incoming-call]").first.aria_snapshot()[:500] if b.locator("[data-testid=incoming-call]").count() else "")
+        print("  ring button sizes:", b.evaluate("""() => [...document.querySelectorAll('[data-testid=incoming-call] button')].map(e => { const r = e.getBoundingClientRect(); return { l: e.getAttribute('aria-label'), w: Math.round(r.width), h: Math.round(r.height) }; })"""))
+        if b.locator("[data-testid=accept-call]").count():
+            b.click("[data-testid=accept-call]")
+            b.wait_for_timeout(4000)
+            bob.shot("dm-call-connected-bob-2")
+            alice.shot("dm-call-connected-2")
+            diag(alice, "dm-call")
+        for w, pg in ((alice, a), (bob, b)):
+            if pg.locator("[data-testid=voice-leave]").count():
+                pg.click("[data-testid=voice-leave]")
+                pg.wait_for_timeout(1200)
+        alice.shot("dm-after-call-2")
+        print("  call system message:", a.locator("[data-id]").last.inner_text().replace("\n", " | ")[:200])
+    attempt(alice, "dm-call", dm_call)
+    def decline():
+        a.locator("[data-testid=start-call], button[aria-label='Start Voice Call']").first.click()
+        a.wait_for_timeout(2500)
+        if b.locator("button[aria-label='Decline']").count():
+            b.click("button[aria-label='Decline']")
+            b.wait_for_timeout(2000)
+            bob.shot("incoming-call-declined-bob")
+        a.wait_for_timeout(1500)
+        alice.shot("dm-call-declined-caller")
+        print("  caller sees:", a.locator("main").inner_text()[-300:].replace("\n", " | "))
+        if a.locator("[data-testid=voice-leave]").count():
+            a.click("[data-testid=voice-leave]")
+    attempt(alice, "dm-call-decline", decline)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d8_group(base, pw):
+    """A group DM: the create-DM modal, a group of three, its header and member list, the edit-group
+    modal, the group invite link, adding someone, and what an unnamed group is called."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    alice = Walk(browser, base, "alice", "web-desktop")
+    carol = Walk(browser, base, "carol", "web-desktop")
+    alice.login(); carol.login()
+    a, c = alice.page, carol.page
+    a.wait_for_timeout(1200)
+    def befriend():
+        a.goto(base + "/channels/@me", wait_until="networkidle")
+        a.wait_for_timeout(800)
+        if a.locator("button:has(span:text-is('Carol'))").count() == 0:
+            a.click("text=Add Friend")
+            a.wait_for_timeout(600)
+            a.fill("input[aria-label=Username]", "carol")
+            a.click("text=Send Friend Request")
+            a.wait_for_timeout(2500)
+            c.goto(base + "/channels/@me", wait_until="networkidle")
+            c.wait_for_timeout(1200)
+            c.click("button:has-text('Pending')")
+            c.wait_for_timeout(900)
+            carol.shot("friends-pending-carol")
+            c.click("button[aria-label=Accept]")
+            c.wait_for_timeout(2500)
+    attempt(alice, "befriend-carol", befriend)
+    def create_group():
+        a.goto(base + "/channels/@me", wait_until="networkidle")
+        a.wait_for_timeout(1000)
+        a.click("button[aria-label='Create DM']")
+        a.wait_for_timeout(900)
+        alice.shot("create-dm-modal")
+        diag(alice, "create-dm-modal")
+        print("  create-dm aria:", a.locator("[role=dialog]").first.aria_snapshot()[:900])
+        rows = a.locator("[role=dialog] label")
+        print("  friend rows:", rows.count())
+        for i in range(rows.count()):
+            rows.nth(i).locator("input[type=checkbox]").check()
+            a.wait_for_timeout(250)
+        alice.shot("create-dm-two-picked")
+        print("  name field:", a.locator("input[aria-label='Group name (optional)']").count())
+        a.fill("input[aria-label='Group name (optional)']", "Weekend plans")
+        a.wait_for_timeout(300)
+        alice.shot("create-dm-named")
+        a.locator("[role=dialog] button:has-text('Create Group DM')").last.click()
+        a.wait_for_timeout(3000)
+        alice.shot("group-dm")
+        diag(alice, "group-dm")
+        print("  url:", a.url)
+        print("  header:", a.locator("header, [class*=header]").first.inner_text().replace("\n", " | ")[:200])
+    attempt(alice, "create-group", create_group)
+    def group_bits():
+        alice.send("hello group")
+        a.wait_for_timeout(2500)
+        alice.shot("group-dm-sent")
+        for tid, name in (("group-member-list", "members"), ("edit-group", "edit"), ("group-invite-link", "invite")):
+            btn = a.locator(f"[data-testid={tid}]")
+            print(f"  {tid} present:", btn.count())
+        a.locator("[data-testid=chat-more], button[aria-label*='More']").first.click()
+        a.wait_for_timeout(700)
+        alice.shot("group-dm-menu")
+        print("  group menu:", a.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if a.locator("[role=menu]").count() else "none")
+        a.keyboard.press("Escape")
+    attempt(alice, "group-bits", group_bits)
+    def edit_group():
+        for label in ("Edit Group", "Group Settings", "Change Icon"):
+            if a.locator(f"button:has-text('{label}')").count():
+                a.locator(f"button:has-text('{label}')").first.click()
+                a.wait_for_timeout(900)
+                alice.shot("edit-group-modal")
+                diag(alice, "edit-group")
+                a.keyboard.press("Escape")
+                break
+        else:
+            print("  no edit-group entry found from the header")
+    attempt(alice, "edit-group", edit_group)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d9_misc(base, pw):
+    """App lock and the passcode screen, 2FA setup, data export, the custom status modal, key verify,
+    subchats, a very long channel name, an empty channel, and leaving a server."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "carol", "web-desktop")
+    w.login()
+    p = w.page
+    p.wait_for_timeout(1200)
+    def security():
+        w.open_settings("security")
+        p.wait_for_timeout(1200)
+        w.shot("settings-security-top")
+        print("  security text:", p.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:700])
+        p.click("[data-testid=mfa-enable]")
+        p.wait_for_timeout(1500)
+        w.shot("mfa-setup")
+        diag(w, "mfa-setup")
+        print("  mfa dialog:", p.locator("[role=dialog]").last.inner_text().replace("\n", " | ")[:500])
+        p.keyboard.press("Escape")
+        p.wait_for_timeout(500)
+    attempt(w, "mfa", security)
+    def applock():
+        w.open_settings("security")
+        p.wait_for_timeout(900)
+        p.click("[data-testid=lock-set]")
+        p.wait_for_timeout(900)
+        w.shot("passcode-set-modal")
+        diag(w, "passcode-set")
+        p.fill("[data-testid=passcode-new]", "1234")
+        p.fill("[data-testid=passcode-confirm]", "1235")
+        w.shot("passcode-mismatch")
+        p.click("[data-testid=passcode-save]")
+        p.wait_for_timeout(1200)
+        w.shot("passcode-mismatch-after-save")
+        print("  mismatch text:", p.locator("[role=dialog]").last.inner_text().replace("\n", " | ")[:400])
+        p.fill("[data-testid=passcode-confirm]", "1234")
+        p.click("[data-testid=passcode-save]")
+        p.wait_for_timeout(1500)
+        w.shot("passcode-set")
+        print("  lock row now:", p.locator("[data-testid=lock-row]").inner_text().replace("\n", " | ")[:300] if p.locator("[data-testid=lock-row]").count() else "none")
+        p.click("[data-testid=lock-now]")
+        p.wait_for_timeout(1800)
+        w.shot("passcode-locked")
+        diag(w, "passcode-locked")
+        print("  lock screen:", p.locator("body").inner_text().replace("\n", " | ")[:400])
+        print("  lock tab order:", w.tab_order(6))
+        p.fill("[data-testid=passcode-input]", "9999")
+        p.click("[data-testid=passcode-submit]")
+        p.wait_for_timeout(1500)
+        w.shot("passcode-wrong")
+        print("  wrong passcode text:", p.locator("body").inner_text().replace("\n", " | ")[:300])
+        p.fill("[data-testid=passcode-input]", "1234")
+        p.click("[data-testid=passcode-submit]")
+        p.wait_for_timeout(2000)
+        w.shot("passcode-unlocked")
+        # take it off again so the account is usable
+        w.open_settings("security")
+        p.wait_for_timeout(900)
+        if p.locator("[data-testid=lock-remove]").count():
+            p.click("[data-testid=lock-remove]")
+            p.wait_for_timeout(900)
+            w.shot("passcode-remove-confirm")
+            p.locator("[role=dialog] button").last.click()
+            p.wait_for_timeout(1200)
+        w.close_settings()
+    attempt(w, "applock", applock)
+    def export_data():
+        w.open_settings("privacy")
+        p.wait_for_timeout(900)
+        if p.locator("[data-testid=export-data]").count():
+            print("  export button text:", p.locator("[data-testid=export-data]").inner_text())
+            p.click("[data-testid=export-data]")
+            p.wait_for_timeout(2500)
+            w.shot("export-data")
+            print("  after export:", p.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[-400:])
+        w.close_settings()
+    attempt(w, "export", export_data)
+    def status():
+        p.locator("[data-testid=user-settings]").first.wait_for(timeout=10000)
+        p.locator("button:has-text('Carol')").first.click()
+        p.wait_for_timeout(900)
+        w.shot("user-panel-menu")
+        print("  panel menu:", p.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if p.locator("[role=menu]").count() else "none")
+        item = p.locator("[role=menu] >> text=/status/i").first
+        if item.count():
+            item.click()
+            p.wait_for_timeout(1000)
+            w.shot("custom-status-modal-2")
+            diag(w, "custom-status")
+            print("  status modal:", p.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:400])
+            if p.locator("[data-testid=profile-status]").count():
+                p.fill("[data-testid=profile-status]", "away from the keyboard for a while, back later")
+                p.wait_for_timeout(400)
+                w.shot("custom-status-typed")
+            p.keyboard.press("Escape")
+    attempt(w, "custom-status", status)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d10_names(base, pw):
+    """Long names and empty rooms: a channel with a very long name, a category, the channel topic modal,
+    an empty channel's first-message state, a long display name, and leaving a server."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    alice = Walk(browser, base, "alice", "web-desktop")
+    bob = Walk(browser, base, "bob", "web-desktop")
+    alice.login(); bob.login()
+    a, b = alice.page, bob.page
+    ids = seed_ids()
+    a.wait_for_timeout(1200)
+    def empty_channel():
+        a.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        a.wait_for_timeout(1500)
+        row = a.locator("[data-channel]:has-text('plans-for-the-weekend')").first
+        if row.count():
+            row.click()
+            a.wait_for_timeout(2000)
+            alice.shot("channel-empty-state")
+            diag(alice, "channel-empty")
+            print("  empty channel text:", a.locator("main").inner_text().replace("\n", " | ")[:400])
+    attempt(alice, "empty-channel", empty_channel)
+    def long_channel():
+        a.click("button[aria-label='Create Channel']")
+        a.wait_for_timeout(700)
+        a.fill("[data-testid=channel-name]", "a-channel-with-an-extremely-long-name-that-nobody-would-ever-type-but-someone-will")
+        a.wait_for_timeout(300)
+        alice.shot("create-channel-long-name")
+        print("  maxlength:", a.locator("[data-testid=channel-name]").get_attribute("maxlength"),
+              "value len:", len(a.locator("[data-testid=channel-name]").input_value()))
+        a.click("button:has-text('Create Channel')")
+        a.wait_for_timeout(2500)
+        alice.shot("sidebar-long-channel")
+        print("  url:", a.url)
+        diag(alice, "long-channel")
+    attempt(alice, "long-channel", long_channel)
+    def category_and_topic():
+        a.locator("button[aria-label='Create Category'], [role=menu] >> text=Create Category").first.click()
+        a.wait_for_timeout(800)
+        alice.shot("create-category-modal")
+        diag(alice, "create-category")
+        inp = a.locator("[role=dialog] input").first
+        inp.fill("Weekend Things")
+        a.wait_for_timeout(300)
+        a.locator("[role=dialog] button").last.click()
+        a.wait_for_timeout(2000)
+        alice.shot("sidebar-with-category")
+    attempt(alice, "category", category_and_topic)
+    def channel_settings():
+        row = a.locator("[data-channel]").first
+        row.hover()
+        a.wait_for_timeout(400)
+        row.locator("button[aria-label='Edit Channel']").first.click()
+        a.wait_for_timeout(1200)
+        alice.shot("channel-settings")
+        diag(alice, "channel-settings")
+        print("  channel settings nav:", a.locator("[role=dialog] nav").first.inner_text().replace("\n", " | ")[:200] if a.locator("[role=dialog] nav").count() else "none")
+        print("  channel settings aria:", a.locator("[role=dialog]").first.aria_snapshot()[:1200])
+        if a.locator("[data-testid=channel-settings-name]").count():
+            a.fill("[data-testid=channel-settings-name]", "General Chat Renamed")
+            a.wait_for_timeout(400)
+            alice.shot("channel-settings-renamed")
+        a.keyboard.press("Escape")
+        a.wait_for_timeout(600)
+        a.keyboard.press("Escape")
+    attempt(alice, "channel-settings", channel_settings)
+    def long_display_name():
+        alice.open_settings("account")
+        a.wait_for_timeout(1000)
+        btns = a.locator("[role=dialog] button:has-text('Edit')")
+        if btns.count():
+            btns.first.click()
+            a.wait_for_timeout(800)
+            alice.shot("edit-display-name")
+            inp = a.locator("[role=dialog] input").last
+            inp.fill("Alice Margatroid van der Hoogenbosch III")
+            a.wait_for_timeout(300)
+            alice.shot("edit-display-name-long")
+            print("  maxlength:", inp.get_attribute("maxlength"), "value:", inp.input_value())
+            a.locator("[role=dialog] button:has-text('Save')").last.click()
+            a.wait_for_timeout(2000)
+            alice.shot("account-long-name")
+        alice.close_settings()
+        a.wait_for_timeout(800)
+        a.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        a.wait_for_timeout(2000)
+        alice.shot("channel-long-name-everywhere")
+        diag(alice, "long-name")
+        # put it back: every other pass finds her by the name "Alice"
+        alice.open_settings("account")
+        a.wait_for_timeout(1000)
+        a.locator("[role=dialog] button:has-text('Edit')").first.click()
+        a.wait_for_timeout(800)
+        a.locator("[role=dialog] input").last.fill("Alice")
+        a.locator("[role=dialog] button:has-text('Save')").last.click()
+        a.wait_for_timeout(1800)
+        alice.close_settings()
+        print("  display name restored")
+    attempt(alice, "long-display-name", long_display_name)
+    def leave_server():
+        b.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        b.wait_for_timeout(2000)
+        b.click("button:has-text(\"Alice's server\")")
+        b.wait_for_timeout(600)
+        bob.shot("server-menu-member")
+        print("  member's server menu:", b.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if b.locator("[role=menu]").count() else "none")
+        item = b.locator("[role=menu] >> text=/Leave/i").first
+        if item.count():
+            item.click()
+            b.wait_for_timeout(900)
+            bob.shot("leave-server-confirm")
+            print("  leave confirm:", b.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:400])
+            b.keyboard.press("Escape")   # do NOT actually leave; the rest of the walk needs bob in
+        b.keyboard.press("Escape")
+    attempt(bob, "leave-server", leave_server)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d11_perf(base, pw):
+    """Felt performance and the keyboard: cold load, login to a usable chat, channel switch, picker open,
+    typing in a long message, scrolling a long channel, and a tab pass over five screens."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "alice", "web-desktop")
+    p = w.page
+    ids = seed_ids()
+    out = {}
+    def cold():
+        t0 = time.time()
+        p.goto(base + "/", wait_until="load")
+        out["home"] = w.nav_timing()
+        out["home_wall"] = round(time.time() - t0, 2)
+        print("  home:", out["home"], out["home_wall"])
+        print("  transferred:", p.evaluate("() => performance.getEntriesByType('resource').reduce((n, r) => n + (r.transferSize || 0), 0)"),
+              "requests:", p.evaluate("() => performance.getEntriesByType('resource').length"))
+        print("  biggest:", p.evaluate("() => performance.getEntriesByType('resource').map(r => [r.name.split('/').pop().slice(0,40), Math.round(r.transferSize/1024)]).sort((a,b) => b[1]-a[1]).slice(0,8)"))
+    attempt(w, "perf-cold", cold)
+    def login_to_chat():
+        t0 = time.time()
+        w.login()
+        p.wait_for_url("**/channels/@me", timeout=60000)
+        out["login_url"] = round(time.time() - t0, 2)
+        p.wait_for_selector("text=Friends", timeout=20000)
+        out["login_friends"] = round(time.time() - t0, 2)
+        t1 = time.time()
+        p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="commit")
+        p.wait_for_selector("[data-id]", timeout=30000)
+        out["channel_first_message"] = round(time.time() - t1, 2)
+        print("  login:", out)
+    attempt(w, "perf-login", login_to_chat)
+    def switching():
+        chans = p.locator("[data-channel]")
+        n = min(chans.count(), 4)
+        times = []
+        for i in range(n):
+            t0 = time.time()
+            chans.nth(i).click()
+            p.wait_for_timeout(50)
+            p.wait_for_function("() => !document.querySelector('[class*=skeleton], [class*=Skeleton]')", timeout=15000)
+            times.append(round(time.time() - t0, 2))
+        out["channel_switch"] = times
+        print("  channel switches:", times)
+    attempt(w, "perf-switch", switching)
+    def picker():
+        p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        p.wait_for_timeout(1500)
+        t0 = time.time()
+        p.click("button[aria-label='Select emoji']")
+        p.wait_for_selector("[role=dialog]", timeout=15000)
+        p.wait_for_timeout(50)
+        out["picker_open"] = round(time.time() - t0, 2)
+        print("  picker open:", out["picker_open"], "emoji rendered:", p.locator("[role=dialog] button").count())
+        p.keyboard.press("Escape")
+    attempt(w, "perf-picker", picker)
+    def typing():
+        box = w.composer()
+        box.click()
+        box.fill("x" * 1800)
+        p.wait_for_timeout(300)
+        t0 = time.time()
+        p.keyboard.type("the quick brown fox jumps over the lazy dog", delay=0)
+        out["type_43_chars_after_1800"] = round(time.time() - t0, 2)
+        print("  typing 43 chars into an 1800-char draft:", out["type_43_chars_after_1800"], "s")
+        w.shot("composer-1800-chars")
+        box.fill("")
+        t0 = time.time()
+        p.keyboard.type("the quick brown fox jumps over the lazy dog", delay=0)
+        out["type_43_chars_empty"] = round(time.time() - t0, 2)
+        print("  typing 43 chars into an empty box:", out["type_43_chars_empty"], "s")
+        box.fill("")
+    attempt(w, "perf-typing", typing)
+    def scrolling():
+        p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        p.wait_for_timeout(2000)
+        frames = p.evaluate("""async () => {
+            const list = [...document.querySelectorAll('*')].find(e => e.scrollHeight > e.clientHeight + 200 && e.clientHeight > 300);
+            if (!list) return null;
+            const times = []; let last = performance.now(); let stop = false;
+            const tick = () => { const n = performance.now(); times.push(n - last); last = n; if (!stop) requestAnimationFrame(tick); };
+            requestAnimationFrame(tick);
+            for (let i = 0; i < 40; i++) { list.scrollTop -= 120; await new Promise(r => setTimeout(r, 16)); }
+            stop = true;
+            const sorted = times.slice(2).sort((a, b) => a - b);
+            return { frames: sorted.length, median: Math.round(sorted[Math.floor(sorted.length / 2)]), p95: Math.round(sorted[Math.floor(sorted.length * 0.95)]), worst: Math.round(sorted[sorted.length - 1]) };
+        }""")
+        out["scroll_frames_ms"] = frames
+        print("  scroll frames:", frames)
+    attempt(w, "perf-scroll", scrolling)
+    def tabs():
+        for name, url in (("friends", "/channels/@me"), ("channel", f"/channels/{ids['server']}/{ids['general']}")):
+            p.goto(base + url, wait_until="networkidle")
+            p.wait_for_timeout(1500)
+            print(f"  --- tab order on {name}:")
+            for o in w.tab_order(18):
+                print("     ", o)
+            w.shot("focus-" + name)
+        w.open_settings("account")
+        p.wait_for_timeout(1200)
+        print("  --- tab order in settings:")
+        for o in w.tab_order(14):
+            print("     ", o)
+        w.shot("focus-settings")
+        print("  settings unlabeled:", json.dumps(w.unlabeled())[:600])
+        p.keyboard.press("Escape")
+    attempt(w, "tab-pass", tabs)
+    (SHOTS / "perf.json").write_text(json.dumps(out, indent=1))
+    print("PERF", json.dumps(out))
+    print("FAILS:", FAILS)
+    browser.close()
+
+
+def step_d12_routes(base, pw):
+    """The routes nobody links to: the offline page, a bad URL, the sticker-pack page, a guest call link,
+    and the invite page seen by someone who is already a member."""
+    browser = pw.chromium.launch(args=CHROME_ARGS)
+    w = Walk(browser, base, "bob", "web-desktop")
+    p = w.page
+    ids = seed_ids()
+    def bad_url():
+        p.goto(base + "/definitely-not-a-page", wait_until="networkidle")
+        p.wait_for_timeout(1200)
+        w.shot("route-bad-url-signed-out")
+        print("  signed out, bad url ->", p.url, "|", p.locator("body").inner_text().replace("\n", " | ")[:200])
+    attempt(w, "bad-url-signed-out", bad_url)
+    attempt(w, "login", lambda: (w.login(), p.wait_for_timeout(2000)))
+    def bad_url_in():
+        p.goto(base + "/definitely-not-a-page", wait_until="networkidle")
+        p.wait_for_timeout(1500)
+        w.shot("route-bad-url-signed-in")
+        print("  signed in, bad url ->", p.url)
+        p.goto(base + f"/channels/{ids['server']}/9999999999999999", wait_until="networkidle")
+        p.wait_for_timeout(1800)
+        w.shot("route-bad-channel")
+        print("  bad channel id ->", p.url, "|", p.locator("main").inner_text().replace("\n", " | ")[:250])
+        p.goto(base + "/channels/9999999999999999/9999999999999998", wait_until="networkidle")
+        p.wait_for_timeout(1800)
+        w.shot("route-bad-server")
+        print("  bad server id ->", p.url, "|", p.locator("main").inner_text().replace("\n", " | ")[:250])
+    attempt(w, "bad-url-signed-in", bad_url_in)
+    def offline():
+        p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
+        p.wait_for_timeout(1500)
+        w.ctx.set_offline(True)
+        p.wait_for_timeout(3000)
+        w.shot("offline-in-channel")
+        print("  offline in channel:", p.locator("body").inner_text().replace("\n", " | ")[:300])
+        w.composer().fill("a message typed while offline")
+        p.keyboard.press("Enter")
+        p.wait_for_timeout(3000)
+        w.shot("offline-message-sent")
+        print("  offline send:", p.locator("[data-id]").last.inner_text().replace("\n", " | ")[:250],
+              "| retry button:", p.locator("[data-testid=retry-send]").count())
+        p.reload(wait_until="commit")
+        p.wait_for_timeout(4000)
+        w.shot("offline-page")
+        print("  offline page:", p.locator("body").inner_text().replace("\n", " | ")[:300])
+        w.ctx.set_offline(False)
+        p.wait_for_timeout(1000)
+        if p.locator("[data-testid=offline-retry]").count():
+            p.click("[data-testid=offline-retry]")
+        p.wait_for_timeout(4000)
+        w.shot("offline-recovered")
+        print("  after reconnect:", p.url)
+    attempt(w, "offline", offline)
+    def invite_member():
+        link = ids.get("invite")
+        if link:
+            p.goto(link, wait_until="networkidle")
+            p.wait_for_timeout(2500)
+            w.shot("invite-page-already-member")
+            print("  invite as a member:", p.locator("body").inner_text().replace("\n", " | ")[:300])
+    attempt(w, "invite-member", invite_member)
+    def guest():
+        gp = SHOTS / "guest.json"
+        if not gp.exists():
+            print("  no guest link recorded (run d7b-voice first)")
+            return
+        link = json.loads(gp.read_text())["link"]
+        if not link:
+            print("  guest link empty")
+            return
+        g = Walk(browser, base, "guest", "web-desktop")
+        g.page.goto(link, wait_until="networkidle")
+        g.page.wait_for_timeout(2500)
+        g.shot("guest-landing")
+        diag(g, "guest-landing")
+        print("  guest landing:", g.page.locator("body").inner_text().replace("\n", " | ")[:400])
+        if g.page.locator("[data-testid=guest-name]").count():
+            g.page.fill("[data-testid=guest-name]", "Dana")
+            g.page.wait_for_timeout(300)
+            g.shot("guest-named")
+            g.page.click("[data-testid=guest-join]")
+            g.page.wait_for_timeout(5000)
+            g.shot("guest-call")
+            diag(g, "guest-call")
+            print("  guest call:", g.page.locator("body").inner_text().replace("\n", " | ")[:300])
+            if g.page.locator("[data-testid=guest-leave]").count():
+                g.page.click("[data-testid=guest-leave]")
+                g.page.wait_for_timeout(2000)
+                g.shot("guest-left")
+    attempt(w, "guest-call", guest)
+    def stickers():
+        w.open_settings("stickers")
+        p.wait_for_timeout(1500)
+        w.shot("settings-stickers-page")
+        diag(w, "stickers")
+        print("  stickers page:", p.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:400])
+        w.close_settings()
+    attempt(w, "stickers", stickers)
+    print("FAILS:", FAILS)
+    browser.close()
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
