@@ -89,7 +89,32 @@ Agent type `general-purpose`, model `fable` (or `opus`).
    `make publish-android`, versionCode bump) and desktop (`make desktop`,
    `make publish-desktop`, version bump) if they changed. Record in memory.
 
+## Lessons so far
+
+- **Checkpoint after every file, not every five.** The first wave was cut
+  off by the Fable session limit after ~3.5 h; four of eight agents had
+  written findings but ticked nothing, so their successors re-read
+  everything. The dispatch prompt now says every file.
+- Use `date -u +%Y-%m-%dT%H:%MZ` for the checkpoint time; agents guessed
+  and were hours off.
+- The machine sits at 100–400 MB free with the owner's browser and Discord
+  open; the emulator (~4 GB) is only safe when `vm_stat` shows free +
+  inactive above ~5 GB. The walkthrough agent does the Android part last
+  and checks first.
+
 ## Log
 
 - 2026-09-18 20:30 — workspace written (README, 10 briefs), baseline green,
-  wave 1 dispatched: 8 agents.
+  wave 1 dispatched: 8 agents. A memory backstop runs as
+  `~/.claude/jobs/ba92b842/tmp/watchdog.sh` (pid in `watchdog.pid`, log in
+  `watchdog.log`); it only ever kills the emulator and Playwright's Chromium.
+  Kill it when the round ends. (Times above are local AKDT; the wave
+  actually started 12:18.)
+- 2026-09-18 15:50 — all eight agents terminated: Fable session limit
+  (resets 16:00). Checkpoints: server-api 26/90 files, 14 findings;
+  server-core 46/106, 13 findings; web-core 76/202, 3; web-chat-ui 48/134,
+  16; web-shell-ui 0/140, 0; voice 0/98, 0; android 0/106, 10; ux 0/47, 2
+  (its throwaway server is still up; see its PROGRESS.md).
+- 2026-09-18 16:00 — wave 1 resumed, same prompts: fable for server-api,
+  web-core, voice, android; opus for server-core, web-chat-ui,
+  web-shell-ui, ux-walkthrough.
