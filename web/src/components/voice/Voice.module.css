@@ -85,8 +85,12 @@
 .ctl[data-off="true"]:hover, .ctl[data-on="true"]:hover { background: #e3e3e6; }
 .narrowOnly { display: none; }
 .leave { background: var(--danger); color: #fff; }
-/* the handset points down, and the icon stays centred in the button */
-.hangUp { transform: rotate(135deg); }
+/* the handset points down. The phone glyph's stroke mass sits down-left of the
+   viewport centre, and rotating it 135deg carries that offset to straight up
+   (~1.5 units), so the handset rides high in the button. The translate runs in
+   the rotated frame and puts the visual mass back on centre; as percentages of
+   the icon's own box it holds at every size HangUp is used at (18/22/24px). */
+.hangUp { transform: rotate(135deg) translate(4.5%, -4.5%); }
 .leave:hover { background: var(--danger-hover); }
 .sideBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); }
 .sideBtn:hover { color: #fff; background: var(--bg-surface); }
