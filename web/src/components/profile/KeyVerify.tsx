@@ -17,8 +17,10 @@
 import { KeyRound, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { useMemo } from "react";
 import { QrCode } from "@/components/common/QrCode";
+import { b64 } from "@/crypto/bytes";
 import { fingerprintOfB64 } from "@/crypto/fingerprint";
 import { learnedThisSession, pinnedKey, startedWithNoPins, type PinVerdict } from "@/lib/keyPins";
+import { useAuth } from "@/stores/auth";
 import { useKeyAlerts } from "@/stores/keyAlerts";
 import { useUsers } from "@/stores/users";
 import s from "./KeyVerify.module.css";
@@ -98,18 +100,42 @@ export function KeyStatusChip({ userId, onClick, iconOnly }: { userId: string; o
 }
 
 /**
- * The whole story for one person: their digits, what this device remembers, and
- * the plain sentence about what that does and does not prove.
+ * The whole story for two people: your key and their key, side by side, so
+ * the comparison the instruction asks for is unambiguous. Your key is read
+ * from the private key in hand on this device, never from the server; their
+ * key is the one the server names for them, which is exactly what is being
+ * checked.
  */
 export function KeyVerifyBody({ userId, name }: { userId: string; name: string }) {
   const user = useUsers((u) => u.byId[userId]);
   const pending = useKeyAlerts((k) => k.pending[userId]);
-  const key = user?.public_key ?? null;
-  const verdict = pending ? "changed" : verdictFor(userId, key);
+  const me = useAuth((a) => a.me);
+  const identity = useAuth((a) => a.identity);
+  const contactKey = user?.public_key ?? null;
+  const myKey = identity ? b64.enc(identity.publicKey) : (me?.public_key ?? null);
+  const verdict = pending ? "changed" : verdictFor(userId, contactKey);
+  if (userId === me?.id) {
+    return (
+      <div className={s.panel}>
+        <p className={s.compare}>{t("encryption.selfKeyIntro")}</p>
+        {myKey ? <SafetyNumber publicKey={myKey} /> : <p className={s.note}>{t("encryption.noKeyToShow")}</p>}
+        <p className={s.note}>
+          <KeyRound size={13} aria-hidden /> {t("encryption.noteWhatThisProves")}
+        </p>
+      </div>
+    );
+  }
   return (
     <div className={s.panel}>
       <p className={s.compare}>{t("encryption.compareInstruction", { name })}</p>
-      {key ? <SafetyNumber publicKey={key} /> : <p className={s.note}>{t("encryption.noKeyToShow")}</p>}
+      <div className={s.pair}>
+        <p className={s.pairLabel}>{t("encryption.yourKeyLabel")}</p>
+        {myKey ? <SafetyNumber publicKey={myKey} /> : <p className={s.note}>{t("encryption.noKeyToShow")}</p>}
+      </div>
+      <div className={s.pair}>
+        <p className={s.pairLabel}>{t("encryption.contactKeyLabel", { name })}</p>
+        {contactKey ? <SafetyNumber publicKey={contactKey} /> : <p className={s.note}>{t("encryption.noKeyToShow")}</p>}
+      </div>
       {verdict === "same" ? (
         <p className={s.note}>{t("encryption.noteSameSinceFirstSeen", { name })}</p>
       ) : verdict === "first" ? (
