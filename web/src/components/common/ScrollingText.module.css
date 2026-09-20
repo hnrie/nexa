@@ -2,11 +2,9 @@
 /* while it fits, the ellipsis is what shows; once it does not, it travels */
 .inner { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .inner[data-scrolling] { max-width: none; overflow: visible; text-overflow: clip; animation: travel var(--dur) ease-in-out infinite; }
-/* a hard cut mid-letter reads as a glitch; the ends fade instead */
-.box:has(.inner[data-scrolling]) { mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 10px), transparent 100%); }
 @keyframes travel {
   0%, 22% { transform: translateX(0); }
   50%, 72% { transform: translateX(var(--shift)); }
   100% { transform: translateX(0); }
 }
-@media (prefers-reduced-motion: reduce) { .inner[data-scrolling] { animation: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; } .box:has(.inner[data-scrolling]) { mask-image: none; } }
+@media (prefers-reduced-motion: reduce) { .inner[data-scrolling] { animation: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; } }
