@@ -164,13 +164,6 @@ function StreamSurface({ zoomable, children }: { zoomable: boolean; children: Re
   }, [apply]);
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    // a double tap on the tile asks for the whole picture back
-    el.addEventListener("ec-zoom-reset", reset);
-    return () => el.removeEventListener("ec-zoom-reset", reset);
-  }, [reset]);
-  useEffect(() => {
     if (!zoomable) reset();
   }, [zoomable, reset]);
 
@@ -296,10 +289,6 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     },
     [],
   );
-  const lastTap = useRef<{ key: string; at: number } | null>(null);
-  const lastPointer = useRef("mouse");
-  /** A click on the focused tile waits out the double-click window before it sends the tile back. */
-  const unfocusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connected = mine?.channel_id === channel.id;
   const participants = useMemo(() => participantsOf(byChannel, channel.id), [byChannel, channel.id]);
 
@@ -522,60 +511,27 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   };
 
   /**
-   * A click or tap focuses a stream; a double click or tap puts it full
-   * screen, or back to the whole picture when zoomed in. It is watched on the
-   * whole stage, because the first click moves its tile to the focused spot
-   * and the second may land beside it. A mouse keeps the system's
-   * double-click speed (the click's count); taps are timed here, since iOS
-   * does not reliably send dblclick.
+   * A click or tap focuses a stream; clicking what is already focused sends
+   * it back to the grid at once. Full screen lives on the tile and control
+   * buttons, so there is no double-click gesture and nothing to wait out. It
+   * is watched on the whole stage, because the first click moves its tile to
+   * the focused spot and the second may land beside it.
    */
   const onStageClick = (e: MouseEvent) => {
     const el = (e.target as Element).closest<HTMLElement>("[data-tile]");
     const t = el ? tiles.find((x) => x.key === el.dataset.tile) : undefined;
-    const now = performance.now();
-    const last = lastTap.current;
-    const double = !!last && (lastPointer.current === "mouse" ? e.detail >= 2 : now - last.at < DOUBLE_TAP_MS);
-    if (double) {
-      lastTap.current = null;
-      if (unfocusTimer.current) {
-        clearTimeout(unfocusTimer.current);
-        unfocusTimer.current = null;
-      }
-      const first = tiles.find((x) => x.key === last.key);
-      if (!first || !showsStream(first)) return;
-      const zoomed = tileRefs.current.get(first.key)?.querySelector<HTMLElement>("[data-zoomed='true']");
-      if (zoomed) zoomed.dispatchEvent(new Event("ec-zoom-reset"));
-      else fullscreenTile(first);
-      return;
-    }
-    if (!t) {
-      lastTap.current = null;
-      return;
-    }
-    lastTap.current = { key: t.key, at: now };
+    if (!t) return;
     if (el?.dataset.place !== "focus") {
       // the menu offers Focus only where there is a picture; a click used to
       // fill the stage with an avatar that had no way back
       if (showsStream(t)) setFocused(t.key);
       return;
     }
-    // Clicking what is already focused sends it back to the grid — but a
-    // double click means full screen, so this waits out that window first.
+    // Clicking what is already focused sends it back to the grid at once.
     // A stream zoomed in is being panned, not dismissed.
     if (tileIsFull(t) || el.querySelector("[data-zoomed='true']")) return;
-    if (unfocusTimer.current) clearTimeout(unfocusTimer.current);
-    unfocusTimer.current = setTimeout(() => {
-      unfocusTimer.current = null;
-      setFocused(null);
-    }, DOUBLE_TAP_MS);
+    setFocused(null);
   };
-
-  useEffect(
-    () => () => {
-      if (unfocusTimer.current) clearTimeout(unfocusTimer.current);
-    },
-    [],
-  );
 
   const renderTile = (t: Tile, place: "grid" | "focus" | "strip") => {
     const vs = byChannel[channel.id]?.[t.userId];
@@ -724,9 +680,6 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       <div
         className={s.stage}
         ref={stageRef}
-        onPointerDown={(e) => {
-          lastPointer.current = e.pointerType;
-        }}
         onClick={onStageClick}
       >
         {micBlocked && !micNoteDismissed ? (
