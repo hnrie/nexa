@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { NexaWordmark } from "@/components/common/Brand";
-import { CONTACT_EMAIL } from "@/lib/legal";
+import { CONTACT_EMAIL, LEGAL_VERSION } from "@/lib/legal";
 import { t } from "@/i18n";
 import { PrivacyFull, TermsFull } from "@/components/legal/LegalContent";
 import s from "./Auth.module.css";
@@ -22,7 +22,7 @@ export default function LegalPage({ page }: { page: "terms" | "privacy" | "about
         {page === "terms" ? <TermsFull /> : page === "privacy" ? <PrivacyFull /> : null}
         {page === "about" ? (
           <>
-            <p className={l.body}>{t("legal.aboutIntro", { version: "" })}</p>
+            <p className={l.body}>{t("legal.aboutIntro", { version: LEGAL_VERSION })}</p>
             <TermsFull />
             <PrivacyFull />
           </>

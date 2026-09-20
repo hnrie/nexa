@@ -11,17 +11,17 @@ export function ContactBlock() {
     <p className={s.body}>
       {t("legal.contactOwner")}: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
       {" · "}
-      <a href="/channels/@me">{t("legal.inApp", { user: `@${OWNER_USERNAME}` })}</a>
+      {t("legal.inApp", { user: `@${OWNER_USERNAME}` })}
     </p>
   );
 }
 
 export function EncryptionNote() {
   return (
-    <section className={s.section}>
+    <div className={s.section}>
       <h3 className={s.h}>{t("legal.encryptionTitle")}</h3>
       <p className={s.body}>{t("legal.encryptionBody")}</p>
-    </section>
+    </div>
   );
 }
 
@@ -33,7 +33,7 @@ export function RulesSummary() {
     t("legal.ruleHate"),
   ];
   return (
-    <section className={s.section}>
+    <div className={s.section}>
       <h3 className={s.h}>{t("legal.rulesTitle")}</h3>
       <ol className={s.list}>
         {rules.map((r) => (
@@ -43,7 +43,7 @@ export function RulesSummary() {
         ))}
       </ol>
       <p className={s.body}>{t("legal.enforcementBody")}</p>
-    </section>
+    </div>
   );
 }
 

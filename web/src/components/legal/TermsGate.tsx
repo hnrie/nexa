@@ -11,7 +11,7 @@ import { EncryptionNote, RulesSummary } from "./LegalContent";
 /**
  * First-run gate: blocks the app until the account accepts the current Terms
  * + Privacy Policy. Persists per account in localStorage; bumping
- * LEGAL_VERSION asks everyone again. No dismiss, no Escape hatch — Agree is
+ * LEGAL_VERSION asks everyone again. No dismiss, no Escape hatch: Agree is
  * the only way through.
  */
 export function TermsGate() {
