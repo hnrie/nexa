@@ -45,7 +45,7 @@ export interface MessagePayload {
   t?: string;
   att?: AttachmentMeta[];
   /** A sticker reference: enough to render it without owning the pack. */
-  sticker?: { id: string; blob?: string; name?: string; w?: number; h?: number; animated?: boolean };
+  sticker?: { id: string; blob?: string; name?: string; w?: number; h?: number; animated?: boolean; format?: string };
   embeds?: unknown[];
   flags?: number;
 }
@@ -154,6 +154,7 @@ function sanitizePayload(p: Obj): MessagePayload {
     if (isNum(st["w"])) sticker.w = st["w"];
     if (isNum(st["h"])) sticker.h = st["h"];
     if (typeof st["animated"] === "boolean") sticker.animated = st["animated"];
+    if (typeof st["format"] === "string") sticker.format = st["format"];
     out.sticker = sticker;
   }
   if (Array.isArray(p["embeds"])) {

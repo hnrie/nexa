@@ -490,7 +490,7 @@ export function Composer({ channel }: { channel: Channel }) {
             if (gifReply && curReply?.channelId === gifReply.channelId && curReply.messageId === gifReply.messageId) setReplyTo(null);
             void sendMessage(channel.id, g.url, opts);
           }} />}
-          stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => { setPicker(false); void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated } }); }} />}
+          stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => { setPicker(false); void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated, format: sticker.format } }); }} />}
         />
       ) : null}
       {replyTarget ? (

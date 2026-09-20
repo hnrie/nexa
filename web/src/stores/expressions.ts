@@ -166,3 +166,12 @@ export function searchStickers(packs: StickerPack[], q: string, limit = 60): { s
 export function packImageUrl(pack: StickerPack, sticker: Sticker, css = 160): string {
   return pack.kind === "emoji" ? emojiUrl(sticker.blob_id, sticker.animated, 48) : stickerUrl(sticker.blob_id, css);
 }
+
+/** A sticker's format by id, across the packs on this device, if one holds it. */
+export function stickerFormatOf(packs: Record<string, StickerPack>, id: string): string | undefined {
+  for (const pack of Object.values(packs)) {
+    const found = pack.stickers.find((st) => st.id === id);
+    if (found) return found.format;
+  }
+  return undefined;
+}

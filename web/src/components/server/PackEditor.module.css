@@ -9,7 +9,7 @@
 .packRemove:hover { background: var(--bg-hover); color: var(--danger); }
 .packItem:hover .packRemove, .packItem:focus-within .packRemove { display: flex; }
 .cover { width: 32px; height: 32px; border-radius: var(--radius-xs); object-fit: contain; background: var(--bg-surface); flex: none; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--text); overflow: hidden; }
-.cover img { width: 100%; height: 100%; object-fit: contain; }
+.cover [data-sticker-media] { width: 100%; height: 100%; object-fit: contain; }
 .packText { min-width: 0; display: flex; flex-direction: column; }
 .packName { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .packSub { font-size: 12px; color: var(--text-muted); }
@@ -39,13 +39,13 @@
 .dropzone[data-over="true"] { border-color: var(--brand); color: var(--text); background: var(--bg-hover); }
 .uploadRow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; margin-top: 12px; }
 .pending { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-top: 8px; }
-.pending img { width: 48px; height: 48px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-raised); }
+.pending [data-sticker-media] { width: 48px; height: 48px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-raised); }
 .linkRow { display: flex; gap: 8px; margin-top: 8px; }
 .linkRow input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 13px; }
 .browseGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
 .browseCard { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); }
 .browseStickers { display: flex; gap: 6px; }
-.browseStickers img { width: 44px; height: 44px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-raised); }
+.browseStickers [data-sticker-media] { width: 44px; height: 44px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-raised); }
 .empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
 .tab { padding: 10px 2px; font-size: 15px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }

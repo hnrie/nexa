@@ -15,6 +15,8 @@ import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
 import { useShiftHeld } from "@/hooks/useShiftHeld";
 import { stickerUrl } from "@/api/users";
+import { StickerView as StickerMedia } from "@/components/stickers/StickerView";
+import { stickerFormatOf, useExpressions } from "@/stores/expressions";
 import { imageTarget, type ImageTarget } from "@/lib/imageActions";
 import type { MessagePayload } from "@/crypto/message";
 import { Attachments } from "./Attachments";
@@ -263,9 +265,40 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const close = useCallback(() => setAnchor(null), []);
+  const packs = useExpressions((x) => x.packs);
+  // New messages carry the format; older ones are looked up in the packs on
+  // this device. Anything still unknown renders as a picture, exactly as
+  // before, which is right for every image format.
+  const format = sticker.format ?? useMemo(() => stickerFormatOf(packs, sticker.id), [packs, sticker.id]);
   if (!sticker.blob) return <span className={s.edited}>{t("chat.messageItem.sticker")}</span>;
   const w = sticker.w && sticker.h ? Math.round((160 * sticker.w) / sticker.h) : 160;
   const toggle = (el: HTMLElement) => setAnchor((cur) => (cur ? null : el));
+  // The lightbox only shows pictures, so video and animated stickers get
+  // their own branch: no lightbox hook, and their click only opens the popout.
+  if (format === "tgs" || format === "webm") {
+    const size = { width: Math.min(160, w), height: 160 };
+    return (
+      <>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={sticker.name ? `Sticker: ${sticker.name}` : "Sticker"}
+          aria-expanded={!!anchor}
+          data-testid="message-sticker"
+          onClick={(e) => toggle(e.currentTarget)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            toggle(e.currentTarget);
+          }}
+          style={{ display: "contents" }}
+        >
+          <StickerMedia format={format} src={stickerUrl(sticker.blob, 160)} alt={sticker.name ?? "sticker"} className={s.sticker} style={size} />
+        </span>
+        {anchor ? <StickerPopout sticker={sticker} anchor={anchor} onClose={close} /> : null}
+      </>
+    );
+  }
   return (
     <>
       <img

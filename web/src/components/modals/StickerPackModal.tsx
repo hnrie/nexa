@@ -5,6 +5,7 @@ import { expressions } from "@/api/expressions";
 import type { StickerInfo } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
+import { StickerView } from "@/components/stickers/StickerView";
 import { useAuth } from "@/stores/auth";
 import { packImageUrl, useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
@@ -66,7 +67,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
   return (
     <Modal open onClose={onClose} title={pack.name} width={540} footer={footer}>
       <div className={s.top} data-testid="sticker-pack">
-        <img className={s.big} src={packImageUrl(pack, current)} alt={current.name} draggable={false} />
+        <StickerView format={current.format} src={packImageUrl(pack, current)} alt={current.name} className={s.big} eager />
         <div className={s.info}>
           <div className={s.stickerName} data-testid="sticker-pack-name">{current.name}</div>
           <div className={s.creator}>
@@ -84,7 +85,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
       <div className={s.grid}>
         {pack.stickers.map((x) => (
           <button key={x.id} className={s.tile} data-on={x.id === current.id} onClick={() => setPicked(x.id)} title={x.name} aria-label={x.name} aria-pressed={x.id === current.id}>
-            <img src={packImageUrl(pack, x)} alt="" loading="lazy" draggable={false} />
+            <StickerView format={x.format} src={packImageUrl(pack, x)} alt="" />
           </button>
         ))}
       </div>

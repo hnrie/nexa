@@ -55,6 +55,9 @@ type Config struct {
 	// KlipyAPIKey enables GIF search. Without it the picker still offers
 	// whatever has been favourited.
 	KlipyAPIKey string
+	// TelegramBotToken enables Telegram sticker pack imports. The token never
+	// leaves this server: the client only ever sends a pack URL.
+	TelegramBotToken string
 	// TurnstileSiteKey and TurnstileSecretKey turn on Cloudflare Turnstile
 	// captchas for the actions bots abuse. Both are free to get; without them
 	// nothing asks for a captcha.
@@ -125,6 +128,7 @@ func Load(getenv func(string) string) (Config, error) {
 	str("TURN_KEY_ID", &c.TurnKeyID)
 	str("TURN_API_TOKEN", &c.TurnAPIToken)
 	str("KLIPY_API_KEY", &c.KlipyAPIKey)
+	str("TELEGRAM_BOT_TOKEN", &c.TelegramBotToken)
 	str("TURNSTILE_SITE_KEY", &c.TurnstileSiteKey)
 	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
 	str("REALTIME_APP_ID", &c.RealtimeAppID)

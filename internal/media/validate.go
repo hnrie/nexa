@@ -4,7 +4,9 @@ package media
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"image"
 	_ "image/gif"
@@ -25,6 +27,14 @@ var (
 	ErrBadDimensions = errors.New("image dimensions out of range")
 )
 
+// MimeTGS is a Telegram animated sticker: gzip-compressed Lottie JSON. MimeWebM
+// is a Telegram video sticker. Both move, so they count as animated wherever
+// that matters (variant sizing, client badges).
+const (
+	MimeTGS  = "application/x-tgsticker"
+	MimeWebM = "video/webm"
+)
+
 // Sniff identifies an image by its bytes. head should hold the beginning of
 // the file (up to 1 MiB is inspected for animation markers).
 func Sniff(head []byte) (mime string, animated bool, ok bool) {
@@ -41,6 +51,14 @@ func Sniff(head []byte) (mime string, animated bool, ok bool) {
 			anim = head[20]&0x02 != 0
 		}
 		return "image/webp", anim, true
+	case len(head) >= 2 && head[0] == 0x1f && head[1] == 0x8b:
+		// gzip: the only thing this server stores in that shape is a Telegram
+		// animated sticker, which TgsDims confirms before anything is kept.
+		return MimeTGS, true, true
+	case len(head) >= 4 && head[0] == 0x1a && head[1] == 0x45 && head[2] == 0xdf && head[3] == 0xa3:
+		// EBML: a video sticker. Dimensions are not decoded here; the file
+		// plays at its own size and the stored dimensions stay empty.
+		return MimeWebM, true, true
 	}
 	return "", false, false
 }
@@ -97,6 +115,29 @@ func gifFrameCount(b []byte, max int) int {
 		}
 	}
 	return count
+}
+
+// TgsDims reads a Telegram animated sticker's canvas out of its own JSON.
+// A .tgs file is gzipped Lottie, and Lottie carries its width and height at
+// the top level. Anything that is not gzip, is not JSON, or names no usable
+// size is not a sticker.
+func TgsDims(r io.Reader) (int, int, error) {
+	zr, err := gzip.NewReader(io.LimitReader(r, 1<<20))
+	if err != nil {
+		return 0, 0, ErrUnsupported
+	}
+	defer zr.Close()
+	var doc struct {
+		W float64 `json:"w"`
+		H float64 `json:"h"`
+	}
+	if err := json.NewDecoder(io.LimitReader(zr, 1<<20)).Decode(&doc); err != nil {
+		return 0, 0, ErrUnsupported
+	}
+	if doc.W < 1 || doc.H < 1 || doc.W != float64(int(doc.W)) || doc.H != float64(int(doc.H)) {
+		return 0, 0, ErrUnsupported
+	}
+	return int(doc.W), int(doc.H), nil
 }
 
 // ImageDims decodes only the header of an image.

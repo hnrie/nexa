@@ -122,15 +122,40 @@ func (m *Store) PutPublic(ctx context.Context, kind string, r io.Reader, lim Lim
 	if !ok {
 		return nil, ErrUnsupported
 	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
-	w, h, err := ImageDims(f)
-	if err != nil {
-		return nil, err
-	}
-	if err := lim.Check(w, h); err != nil {
-		return nil, err
+	// Animated and video stickers are sticker-pack members only: nowhere else
+	// takes anything but pictures. Their dimensions come from their own
+	// metadata (Lottie JSON) or stay empty (video), never from an image
+	// header, which neither of them has.
+	var width, height *int
+	if mime == MimeTGS || mime == MimeWebM {
+		if kind != "sticker" {
+			return nil, ErrUnsupported
+		}
+		if mime == MimeTGS {
+			if _, err := f.Seek(0, io.SeekStart); err != nil {
+				return nil, err
+			}
+			w, h, err := TgsDims(f)
+			if err != nil {
+				return nil, err
+			}
+			if err := lim.Check(w, h); err != nil {
+				return nil, err
+			}
+			width, height = &w, &h
+		}
+	} else {
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		w, h, err := ImageDims(f)
+		if err != nil {
+			return nil, err
+		}
+		if err := lim.Check(w, h); err != nil {
+			return nil, err
+		}
+		width, height = &w, &h
 	}
 	if existing, err := m.st.BlobBySHA(ctx, sha, kind); err == nil {
 		if err := m.st.AddBlobRef(ctx, existing.ID, 1); err != nil {
@@ -145,7 +170,7 @@ func (m *Store) PutPublic(ctx context.Context, kind string, r io.Reader, lim Lim
 		return nil, err
 	}
 	ow := owner
-	b := &store.Blob{SHA256: sha, Size: size, Mime: mime, Kind: kind, Encrypted: false, RefCount: 1, OwnerID: &ow, Width: &w, Height: &h, Animated: animated}
+	b := &store.Blob{SHA256: sha, Size: size, Mime: mime, Kind: kind, Encrypted: false, RefCount: 1, OwnerID: &ow, Width: width, Height: height, Animated: animated}
 	if err := m.st.InsertBlob(ctx, b); err != nil {
 		// Two people setting the same picture within the same moment both miss
 		// the lookup above and both insert; there is a unique index on

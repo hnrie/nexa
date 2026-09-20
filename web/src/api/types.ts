@@ -194,7 +194,7 @@ export interface Sticker {
   name: string;
   tags: string;
   blob_id: Snowflake;
-  format: "png" | "apng" | "gif" | "webp";
+  format: "png" | "apng" | "gif" | "webp" | "tgs" | "webm";
   position: number;
   creator_id: Snowflake;
   created_at: number;
