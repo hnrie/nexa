@@ -44,7 +44,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   // a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows
   const cell = (sticker: Sticker, pack: StickerPack) => (
     <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} tabIndex={-1} onClick={() => onPick({ sticker, pack })}>
-      <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} className={s.cellImg} />
+      <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} />
     </button>
   );
 
