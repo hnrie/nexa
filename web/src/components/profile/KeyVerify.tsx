@@ -68,7 +68,7 @@ export function SafetyNumber({ publicKey, qr = true, old = false }: { publicKey:
  * more: "new to this device" is not "verified", and saying otherwise would be
  * the same lie the product used to tell by saying nothing at all.
  */
-export function KeyStatusChip({ userId, onClick }: { userId: string; onClick?: () => void }) {
+export function KeyStatusChip({ userId, onClick, iconOnly }: { userId: string; onClick?: () => void; iconOnly?: boolean }) {
   const user = useUsers((u) => u.byId[userId]);
   // Subscribed so accepting a change re-labels the chip immediately.
   const pending = useKeyAlerts((k) => k.pending[userId]);
@@ -80,18 +80,18 @@ export function KeyStatusChip({ userId, onClick }: { userId: string; onClick?: (
   const body = (
     <>
       <Icon size={13} aria-hidden />
-      {label}
+      {iconOnly ? null : label}
     </>
   );
   if (!onClick) {
     return (
-      <span className={s.chip} data-state={state} data-testid="key-chip">
+      <span className={s.chip} data-state={state} data-icon-only={iconOnly || undefined} title={iconOnly ? label : undefined} data-testid="key-chip">
         {body}
       </span>
     );
   }
   return (
-    <button type="button" className={s.chip} data-state={state} data-testid="key-chip" onClick={onClick} aria-label={t("encryption.openSafetyNumber")}>
+    <button type="button" className={s.chip} data-state={state} data-icon-only={iconOnly || undefined} title={iconOnly ? label : undefined} data-testid="key-chip" onClick={onClick} aria-label={iconOnly ? label : t("encryption.openSafetyNumber")}>
       {body}
     </button>
   );

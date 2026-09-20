@@ -21,6 +21,8 @@
   transition: background var(--transition);
 }
 button.chip:hover { background: color-mix(in srgb, var(--bg-active), var(--text) 14%); }
+/* icon-only (the DM header): a square shield button instead of a text chip */
+.chip[data-icon-only="true"] { padding: 0 5px; }
 .chip[data-state="changed"] { background: color-mix(in srgb, var(--danger), transparent 80%); color: var(--danger); }
 .chip[data-state="new"] { color: var(--text-muted); }
 

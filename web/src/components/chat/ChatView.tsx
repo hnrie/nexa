@@ -209,8 +209,9 @@ export function ChatView({ channel }: { channel: Channel }) {
         {channel.type === "dm" && other ? (
           // Whether this device has seen this person's encryption key before,
           // and the way to the digits that let two people check it out of band.
-          // A DM is where that matters most and where there is room to say it.
-          <span className={s.hKey}><KeyStatusChip userId={other} onClick={() => openModal("verifyKey", { userId: other })} /></span>
+          // A DM is where that matters most; an icon-only shield keeps the
+          // header compact on every screen size.
+          <span className={s.hKey}><KeyStatusChip userId={other} iconOnly onClick={() => openModal("verifyKey", { userId: other })} /></span>
         ) : null}
         <span className={s.hSpacer} />
         {!isServer && !mobile ? (
