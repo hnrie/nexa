@@ -212,8 +212,13 @@ export function Composer({ channel }: { channel: Channel }) {
       if (serverState) {
         for (const id of Object.keys(serverState.members)) if (users[id]) pool.set(id, users[id]!);
       } else {
-        for (const id of channel.recipient_ids) if (users[id]) pool.set(id, users[id]!);
-        for (const r of Object.values(rels)) if (r.type === "friend") pool.set(r.user.id, users[r.user.id] ?? r.user);
+        // DMs and group DMs only suggest the people in the conversation, never
+        // the whole friends list: a ping to someone outside cannot notify them.
+        for (const id of channel.recipient_ids) {
+          const rel = rels[id];
+          const u = users[id] ?? (rel?.type === "friend" ? rel.user : undefined);
+          if (u) pool.set(id, u);
+        }
       }
       items = [...pool.values()]
         .filter((u) => !tok.query || u.username.includes(tok.query) || u.display_name.toLowerCase().includes(tok.query) || (serverState?.members[u.id]?.nickname ?? "").toLowerCase().includes(tok.query))
