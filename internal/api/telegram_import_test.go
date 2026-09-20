@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -102,16 +104,29 @@ func TestTelegramImport(t *testing.T) {
 		t.Fatalf("unknown set: %d", res.StatusCode)
 	}
 
-	res, body := do(t, ts, "POST", "/api/v1/stickers/packs/import/telegram", tokA, map[string]any{"url": "https://t.me/addstickers/dennicat"})
+	res, lines := postImport(t, ts, tokA, "https://t.me/addstickers/dennicat")
 	if res.StatusCode != 201 {
-		t.Fatalf("import: %d %v", res.StatusCode, body)
+		t.Fatalf("import: %d %v", res.StatusCode, lines)
 	}
-	pack := body["pack"].(map[string]any)
+	final := lines[len(lines)-1]
+	pack := final["pack"].(map[string]any)
 	if pack["name"] != "Denni" || pack["owner_user_id"] == nil {
 		t.Errorf("pack: %v", pack)
 	}
-	if body["imported"] != float64(3) || body["failed"] != float64(1) || body["total"] != float64(4) {
-		t.Errorf("counts: %v", body)
+	if final["imported"] != float64(3) || final["failed"] != float64(1) || final["total"] != float64(4) {
+		t.Errorf("counts: %v", final)
+	}
+	seenFetch, seenStore := false, false
+	for _, l := range lines {
+		if l["phase"] == "fetch" {
+			seenFetch = true
+		}
+		if l["phase"] == "store" {
+			seenStore = true
+		}
+	}
+	if !seenFetch || !seenStore {
+		t.Errorf("progress lines: want fetch and store phases, got %d lines", len(lines))
 	}
 	stickers := pack["stickers"].([]any)
 	if len(stickers) != 3 {
@@ -132,4 +147,38 @@ func TestTelegramImport(t *testing.T) {
 	if res, _ := do(t, ts, "GET", "/api/v1/stickers/packs/"+pack["id"].(string), tokA, nil); res.StatusCode != 200 {
 		t.Errorf("pack fetch: %d", res.StatusCode)
 	}
+}
+
+// postImport runs an import and returns every newline-delimited line of the
+// answer, so the test sees the same progress the client does.
+func postImport(t *testing.T, ts *httptest.Server, token, url string) (*http.Response, []map[string]any) {
+	t.Helper()
+	req, _ := http.NewRequest("POST", ts.URL+"/api/v1/stickers/packs/import/telegram", strings.NewReader(`{"url":`+strconv.Quote(url)+`}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 201 {
+		return res, nil
+	}
+	var lines []map[string]any
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("line %q: %v", line, err)
+		}
+		lines = append(lines, m)
+	}
+	if len(lines) == 0 || lines[len(lines)-1]["done"] != true {
+		t.Fatalf("stream ends without the pack: %q", raw)
+	}
+	return res, lines
 }

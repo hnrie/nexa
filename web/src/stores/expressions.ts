@@ -8,6 +8,8 @@ interface ExpressionsState {
   emojis: Record<string, Emoji[]>;
   /** Every sticker pack the user owns, installed, or shares a server with. */
   packs: Record<string, StickerPack>;
+  /** The account's last-used stickers, newest first. Saved server side. */
+  recents: Sticker[];
   /** Whether the server has GIF search configured; null until asked. */
   gifEnabled: boolean | null;
   setEmojis: (serverId: string, list: Emoji[]) => void;
@@ -16,13 +18,20 @@ interface ExpressionsState {
   setPacks: (list: StickerPack[]) => void;
   upsertPack: (pack: StickerPack) => void;
   removePack: (id: string) => void;
+  setRecents: (list: Sticker[]) => void;
+  /** Moves a sticker to the front of the recent row, dropping the tail past the cap. */
+  noteRecent: (sticker: Sticker) => void;
   setGifEnabled: (v: boolean) => void;
   clear: () => void;
 }
 
+/** How many recent stickers the picker offers. Mirrors the server's cap. */
+export const MAX_RECENTS = 24;
+
 export const useExpressions = create<ExpressionsState>()((set) => ({
   emojis: {},
   packs: {},
+  recents: [],
   gifEnabled: null,
   setEmojis: (serverId, list) => set((s) => ({ emojis: { ...s.emojis, [serverId]: list } })),
   setAllEmojis: (list) => {
@@ -55,7 +64,10 @@ export const useExpressions = create<ExpressionsState>()((set) => ({
       return { packs };
     }),
   setGifEnabled: (gifEnabled) => set({ gifEnabled }),
-  clear: () => set({ emojis: {}, packs: {}, gifEnabled: null }),
+  setRecents: (list) => set({ recents: list.slice(0, MAX_RECENTS) }),
+  noteRecent: (sticker) =>
+    set((s) => ({ recents: [sticker, ...s.recents.filter((x) => x.id !== sticker.id)].slice(0, MAX_RECENTS) })),
+  clear: () => set({ emojis: {}, packs: {}, recents: [], gifEnabled: null }),
 }));
 
 /** Emoji that come from installed or owned emoji packs, as picker entries. */

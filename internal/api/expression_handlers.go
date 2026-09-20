@@ -35,6 +35,8 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiDelete))
 	mux.Handle("GET /api/v1/stickers/packs", s.authed(s.handlePacks))
 	mux.Handle("POST /api/v1/stickers/packs", s.authed(s.handlePackCreate))
+	mux.Handle("GET /api/v1/stickers/recent", s.authed(s.handleRecents))
+	mux.Handle("POST /api/v1/stickers/recent", s.authed(s.handleRecentTouch))
 	mux.Handle("GET /api/v1/stickers/packs/public", s.authed(s.handlePacksPublic))
 	mux.Handle("GET /api/v1/stickers/packs/{id}", s.authed(s.handlePackGet))
 	mux.Handle("PATCH /api/v1/stickers/packs/{id}", s.authed(s.handlePackPatch))
@@ -50,6 +52,47 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/gif/status", s.authed(s.handleGifStatus))
 	mux.Handle("GET /api/v1/gif/search", s.authed(s.handleGifSearch))
 	mux.Handle("GET /api/v1/gif/trending", s.authed(s.handleGifTrending))
+}
+
+// --- recent stickers ------------------------------------------------------
+
+// handleRecents lists the caller's last-used stickers, newest first, for the
+// picker's recent row. It is per account, so every device offers the same row.
+func (s *Server) handleRecents(w http.ResponseWriter, r *http.Request) {
+	list, err := s.Store.RecentStickers(r.Context(), auth.UserFrom(r.Context()).ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, list)
+}
+
+// handleRecentTouch records that the caller sent a sticker. The sticker has
+// to exist; anything else about it was already checked when it was sent.
+func (s *Server) handleRecentTouch(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	var req struct {
+		StickerID ids.ID `json:"sticker_id"`
+	}
+	if err := ReadJSON(w, r, &req, 1<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if req.StickerID.IsZero() {
+		WriteError(w, E(http.StatusBadRequest, "bad_sticker", "Name the sticker just sent."))
+		return
+	}
+	st, err := s.Store.StickerByID(r.Context(), req.StickerID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if err := s.Store.TouchRecentSticker(r.Context(), me.ID, st.ID); err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.Bcast.EmitUsers([]ids.ID{me.ID}, "sticker_recent", map[string]any{"sticker": st})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- server emoji --------------------------------------------------------

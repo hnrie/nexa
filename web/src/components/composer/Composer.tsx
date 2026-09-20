@@ -21,6 +21,7 @@ import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { GifPicker } from "@/components/pickers/GifPicker";
 import { StickerPicker } from "@/components/pickers/StickerPicker";
 import { emojiToken, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
+import { expressions as expressionsApi } from "@/api/expressions";
 import { extractUrls } from "@/markdown";
 import { emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
 import { channelDisplayName } from "@/lib/names";
@@ -490,7 +491,18 @@ export function Composer({ channel }: { channel: Channel }) {
             if (gifReply && curReply?.channelId === gifReply.channelId && curReply.messageId === gifReply.messageId) setReplyTo(null);
             void sendMessage(channel.id, g.url, opts);
           }} />}
-          stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => { setPicker(false); void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated, format: sticker.format } }); }} />}
+          stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => {
+            setPicker(false);
+            // The send settles first so a failed send never lands in recents;
+            // the row updates at once here and again over the gateway, which
+            // is what carries it to the account's other devices.
+            void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated, format: sticker.format } })
+              .then(() => {
+                useExpressions.getState().noteRecent(sticker);
+                void expressionsApi.touchRecentSticker(sticker.id).catch(() => undefined);
+              })
+              .catch(() => undefined);
+          }} />}
         />
       ) : null}
       {replyTarget ? (

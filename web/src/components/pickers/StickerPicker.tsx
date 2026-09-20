@@ -19,6 +19,7 @@ export interface StickerPick {
 /** The Stickers tab: this server's packs, mine, installed; searchable by name and tags. */
 export function StickerPicker({ serverId, onPick }: { serverId: string | null | undefined; onPick: (p: StickerPick) => void }) {
   const packs = useExpressions((x) => x.packs);
+  const recents = useExpressions((x) => x.recents);
   const meId = useAuth((a) => a.me?.id);
   // whether a pack can be removed depends on the servers you are in
   useServers((x) => x.byId);
@@ -29,6 +30,18 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   const groups = useMemo(() => groupPacks(packs, serverId, meId), [packs, serverId, meId]);
   const all = useMemo(() => groups.flatMap((g) => g.packs), [groups]);
   const results = useMemo(() => (q.trim() ? searchStickers(all, q) : null), [all, q]);
+  // Recently sent stickers first, resolved against the packs on this device
+  // so each cell keeps its pack for sending. Anything whose pack is gone
+  // (deleted, uninstalled) simply stays out of the row.
+  const recentItems = useMemo(() => {
+    const out: StickerPick[] = [];
+    for (const st of recents) {
+      const pack = packs[st.pack_id];
+      if (pack && (pack.kind ?? "sticker") === "sticker") out.push({ sticker: st, pack });
+      if (out.length >= 24) break;
+    }
+    return out;
+  }, [recents, packs]);
   const jump = (id: string) => gridRef.current?.querySelector<HTMLElement>(`[data-pack="${id}"]`)?.scrollIntoView({ block: "start" });
   const edit = (p: StickerPack) => openModal("settings", { page: "stickers", packId: p.id });
   // right click, or a long press on a phone
@@ -86,7 +99,14 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
           {results ? (
             results.length === 0 ? <div className={s.empty}>{t("pickers.stickerPicker.noStickersMatch")}</div> : <div className={s.stickerGrid}>{results.map((r) => cell(r.sticker, r.pack))}</div>
           ) : (
-            groups.map((g) => (
+            <>
+              {recentItems.length > 0 ? (
+                <div>
+                  <div className={s.section}>{t("pickers.stickerPicker.recent")}</div>
+                  <div className={s.stickerGrid}>{recentItems.map((r) => cell(r.sticker, r.pack))}</div>
+                </div>
+              ) : null}
+              {groups.map((g) => (
               <div key={g.label}>
                 <div className={s.section}>{g.label}</div>
                 {g.packs.map((p) => (
@@ -100,7 +120,8 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
                   </div>
                 ))}
               </div>
-            ))
+              ))}
+            </>
           )}
         </div>
       </div>

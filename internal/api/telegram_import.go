@@ -3,11 +3,13 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
@@ -86,8 +88,31 @@ func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	// From here on the pack exists, so every exit reports what landed in it
-	// rather than leaving a half-built pack behind unexplained.
+	// From here on the pack exists and the answer is 201 with a
+	// newline-delimited body: a line per sticker while the import runs, then
+	// the pack as the last line, so the client can fill a progress bar.
+	// Everything that can fail before the pack exists stays a plain JSON
+	// error above. If the client goes away mid-stream the import still
+	// finishes: the pack arrives separately over the gateway anyway.
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.WriteHeader(http.StatusCreated)
+	enc := json.NewEncoder(w)
+	flushed := func() {
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}
+	alive := true
+	send := func(v any) {
+		if !alive {
+			return
+		}
+		if err := enc.Encode(v); err != nil {
+			alive = false
+			return
+		}
+		flushed()
+	}
 	total := len(set.Stickers)
 	if total > telegram.MaxStickers {
 		total = telegram.MaxStickers
@@ -97,57 +122,53 @@ func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 	// waits for an answer. Storing stays sequential below, in set order, so
 	// positions match the original set and the database never sees
 	// concurrent writes from one import.
-	bodies := fetchTelegramFiles(ctx, client, set.Stickers[:total])
+	bodies := fetchTelegramFiles(ctx, client, set.Stickers[:total], func(done int) {
+		send(map[string]any{"phase": "fetch", "done": done, "total": total})
+	})
 	imported, skipped, failed := 0, 0, 0
+	tally := func(err error, fileID string) {
+		if err == nil {
+			imported++
+			return
+		}
+		if err == errTelegramSkipped {
+			skipped++
+			return
+		}
+		failed++
+		s.Log.Warn("telegram import file", "pack", p.ID.String(), "file", fileID, "err", err)
+	}
 	for i := 0; i < total; i++ {
 		ts := set.Stickers[i]
 		stickerName := strings.TrimSpace(ts.Emoji)
 		if stickerName == "" {
 			stickerName = fmt.Sprintf("Sticker %d", i+1)
 		}
-		body, err := bodies[i].body, bodies[i].err
-		if err != nil {
-			if err == errTelegramSkipped {
-				skipped++
-			} else {
-				failed++
-				s.Log.Warn("telegram import file", "pack", p.ID.String(), "file", ts.FileID, "err", err)
-			}
-			continue
+		if err := bodies[i].err; err != nil {
+			tally(err, ts.FileID)
+		} else if err := s.importTelegramStickerBody(ctx, p, me.ID, stickerName, ts.Emoji, telegramLimits(ts), bodies[i].body); err != nil {
+			tally(err, ts.FileID)
+		} else {
+			tally(nil, ts.FileID)
 		}
-		if err := s.importTelegramStickerBody(ctx, p, me.ID, stickerName, ts.Emoji, telegramLimits(ts), body); err != nil {
-			if err == errTelegramSkipped {
-				skipped++
-			} else {
-				failed++
-				s.Log.Warn("telegram import file", "pack", p.ID.String(), "file", ts.FileID, "err", err)
-			}
-			continue
-		}
-		imported++
+		send(map[string]any{"phase": "store", "done": i + 1, "total": total, "imported": imported, "skipped": skipped, "failed": failed})
 	}
 	if imported == 0 {
 		_ = s.Store.DeletePack(ctx, p.ID)
 		if skipped > 0 && failed == 0 {
-			WriteError(w, E(http.StatusBadRequest, "unsupported_pack", "Nothing in that set is a sticker this site accepts."))
+			send(map[string]any{"error": map[string]any{"code": "unsupported_pack", "message": "Nothing in that set is a sticker this site accepts."}})
 			return
 		}
-		WriteError(w, E(http.StatusBadGateway, "telegram_unavailable", "Nothing in that set could be downloaded right now."))
+		send(map[string]any{"error": map[string]any{"code": "telegram_unavailable", "message": "Nothing in that set could be downloaded right now."}})
 		return
 	}
 	updated, err := s.Store.PackByID(ctx, p.ID)
 	if err != nil {
-		WriteError(w, err)
+		send(map[string]any{"error": map[string]any{"code": "internal", "message": "Something went wrong on the server."}})
 		return
 	}
 	s.notifyPack(ctx, updated, false)
-	WriteJSON(w, http.StatusCreated, map[string]any{
-		"pack":     updated,
-		"imported": imported,
-		"skipped":  skipped,
-		"failed":   failed,
-		"total":    len(set.Stickers),
-	})
+	send(map[string]any{"done": true, "pack": updated, "imported": imported, "skipped": skipped, "failed": failed, "total": len(set.Stickers)})
 }
 
 // errTelegramSkipped marks a file that is not a sticker at all (too big for
@@ -156,10 +177,11 @@ func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 var errTelegramSkipped = errors.New("not a usable sticker file")
 
 // fetchTelegramFiles downloads every sticker file, a few at a time, keeping
-// set order: results[i] answers set[i]. A file that is empty or a shape this
-// site never stores is marked skipped up front, so junk never reaches the
-// store; anything else that goes wrong is an error for the caller to count.
-func fetchTelegramFiles(ctx context.Context, client *telegram.Client, stickers []telegram.Sticker) []struct {
+// set order: results[i] answers set[i]. progress hears each completion in
+// arrival order. A file that is empty or a shape this site never stores is
+// marked skipped up front, so junk never reaches the store; anything else
+// that goes wrong is an error for the caller to count.
+func fetchTelegramFiles(ctx context.Context, client *telegram.Client, stickers []telegram.Sticker, progress func(done int)) []struct {
 	body []byte
 	err  error
 } {
@@ -169,6 +191,7 @@ func fetchTelegramFiles(ctx context.Context, client *telegram.Client, stickers [
 		err  error
 	}, len(stickers))
 	var wg sync.WaitGroup
+	var done atomic.Int64
 	sem := make(chan struct{}, concurrent)
 	for i := range stickers {
 		wg.Add(1)
@@ -179,18 +202,21 @@ func fetchTelegramFiles(ctx context.Context, client *telegram.Client, stickers [
 				defer func() { <-sem }()
 			case <-ctx.Done():
 				out[i].err = ctx.Err()
+				progress(int(done.Add(1)))
 				return
 			}
 			ts := stickers[i]
 			bf, err := client.GetFile(ctx, ts.FileID)
 			if err != nil {
 				out[i].err = err
+				progress(int(done.Add(1)))
 				return
 			}
 			lim := telegramLimits(ts)
 			body, err := client.DownloadFile(ctx, client.FileURL(bf.FilePath), lim.MaxBytes+1)
 			if err != nil {
 				out[i].err = err
+				progress(int(done.Add(1)))
 				return
 			}
 			head := body
@@ -199,13 +225,16 @@ func fetchTelegramFiles(ctx context.Context, client *telegram.Client, stickers [
 			}
 			if len(head) == 0 {
 				out[i].err = errTelegramSkipped
+				progress(int(done.Add(1)))
 				return
 			}
 			if _, _, ok := media.Sniff(head); !ok {
 				out[i].err = errTelegramSkipped
+				progress(int(done.Add(1)))
 				return
 			}
 			out[i].body = body
+			progress(int(done.Add(1)))
 		}(i)
 	}
 	wg.Wait()

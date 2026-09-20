@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { StickerPack } from "@/api/types";
@@ -31,6 +31,14 @@ export function CreatePackModal({ kind, onClose, onCreate, onImported }: {
   const [url, setUrl] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number; phase: string } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const close = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    onClose();
+  };
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
@@ -44,26 +52,42 @@ export function CreatePackModal({ kind, onClose, onCreate, onImported }: {
     if (working || !url.trim()) return;
     setWorking(true);
     setError(null);
+    setProgress(null);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     void expressionsApi
-      .importTelegram(url.trim())
-      .then((res) => onImported(res.pack, { imported: res.imported, skipped: res.skipped, failed: res.failed }))
-      .catch((err) => setError(err instanceof ApiError ? err.message : t("settings.stickers.importFailed")))
+      .importTelegramStream(
+        url.trim(),
+        (done, total, phase) => setProgress({ done, total, phase }),
+        ctrl.signal,
+      )
+      .then((res) => {
+        abortRef.current = null;
+        onImported(res.pack, { imported: res.imported, skipped: res.skipped, failed: res.failed });
+      })
+      .catch((err) => {
+        abortRef.current = null;
+        // Closing the dialog cancels the request; that is not an error.
+        if (err instanceof ApiError && err.code === "aborted") return;
+        setError(err instanceof ApiError ? err.message : t("settings.stickers.importFailed"));
+      })
       .finally(() => setWorking(false));
   };
 
   if (step === "import") {
+    const pct = progress && progress.total > 0 ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : 0;
     return (
       <Modal
         open
-        onClose={onClose}
+        onClose={close}
         title={t("settings.stickers.importTitle")}
         width={460}
         footer={
           <>
             <span style={{ marginRight: "auto" }}>
-              <Button variant="ghost" onClick={() => { setStep("create"); setError(null); }}>{t("settings.stickers.back")}</Button>
+              <Button variant="ghost" onClick={() => { setStep("create"); setError(null); setProgress(null); }}>{t("settings.stickers.back")}</Button>
             </span>
-            <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
+            <Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button>
             <Button loading={working} disabled={!url.trim()} onClick={() => runImport()}>{t("settings.stickers.importButton")}</Button>
           </>
         }
@@ -74,7 +98,16 @@ export function CreatePackModal({ kind, onClose, onCreate, onImported }: {
           <Field label={t("settings.stickers.importLinkLabel")}>
             <TextInput value={url} onChange={(e) => setUrl(e.target.value)} placeholder={t("settings.stickers.importPlaceholder")} autoComplete="off" spellCheck={false} autoFocus data-testid="telegram-import-url" />
           </Field>
-          {working ? <p style={{ color: "var(--text-muted)", fontSize: 14, margin: "12px 0 0" }}>{t("settings.stickers.importing")}</p> : null}
+          {working ? (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ height: 6, borderRadius: 3, background: "var(--bg-active)", overflow: "hidden" }} role="progressbar" aria-valuemin={0} aria-valuemax={progress?.total ?? 0} aria-valuenow={progress?.done ?? 0} data-testid="telegram-import-progress">
+                <i style={{ display: "block", height: "100%", width: `${pct}%`, background: "var(--brand)", borderRadius: 3, transition: "width 200ms" }} />
+              </div>
+              <p style={{ color: "var(--text-muted)", fontSize: 14, margin: "8px 0 0" }}>
+                {progress ? t(progress.phase === "store" ? "settings.stickers.savingStickers" : "settings.stickers.fetchingStickers", { done: progress.done, total: progress.total }) : t("settings.stickers.importing")}
+              </p>
+            </div>
+          ) : null}
         </form>
       </Modal>
     );

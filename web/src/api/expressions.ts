@@ -1,5 +1,6 @@
-import { api, ApiError } from "./client";
+import { api, ApiError, errorFromResponse } from "./client";
 import type { Emoji, GifPage, Snowflake, Sticker, StickerInfo, StickerPack } from "./types";
+import { t } from "@/i18n";
 
 type Progress = (loaded: number, total: number) => void;
 
@@ -64,8 +65,100 @@ export const expressions = {
   install(packId: Snowflake): Promise<StickerPack> {
     return api.request<StickerPack>("PUT", `/stickers/packs/${packId}/install`);
   },
-  importTelegram(url: string): Promise<{ pack: StickerPack; imported: number; skipped: number; failed: number; total: number }> {
-    return api.request("POST", "/stickers/packs/import/telegram", { url });
+  /** The account's last-used stickers, newest first, for the picker's recent row. */
+  recentStickers(): Promise<Sticker[]> {
+    return api.request<Sticker[]>("GET", "/stickers/recent");
+  },
+  /** Records that a sticker was just sent. Never rejects the send if it fails. */
+  touchRecentSticker(id: Snowflake): Promise<void> {
+    return api.request<void>("POST", "/stickers/recent", { sticker_id: id });
+  },
+  /**
+   * Imports a Telegram set with progress. The server answers newline-delimited
+   * JSON (a line per sticker, the pack last), so this reads the body as it
+   * arrives rather than waiting for the whole import like api.request does.
+   */
+  importTelegramStream(
+    url: string,
+    onProgress?: (done: number, total: number, phase: string) => void,
+    signal?: AbortSignal,
+  ): Promise<{ pack: StickerPack; imported: number; skipped: number; failed: number; total: number }> {
+    const headers: Record<string, string> = { Accept: "application/x-ndjson", "Content-Type": "application/json" };
+    const token = api.getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    // Imports run for tens of seconds; the usual request deadline does not apply.
+    const ctrl = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      ctrl.abort();
+    }, 150_000);
+    if (signal) {
+      if (signal.aborted) ctrl.abort();
+      else signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+    }
+    const badResponse = (): ApiError => new ApiError(0, "bad_response", t("attachments.theServerSAnswerCouldNot"));
+    return (async () => {
+      let res: Response;
+      try {
+        res = await api.fetchImpl(api.url("/stickers/packs/import/telegram"), {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ url }),
+          signal: ctrl.signal,
+        });
+      } catch (err) {
+        if (timedOut) throw new ApiError(0, "timeout", t("offline.couldNotReachTheServer"));
+        if (err instanceof ApiError) throw err;
+        if (err instanceof DOMException && err.name === "AbortError") throw new ApiError(0, "aborted", t("errors.thatWasCancelledBeforeItFinished"));
+        throw new ApiError(0, "network", t("offline.couldNotReachTheServer"));
+      } finally {
+        clearTimeout(timer);
+      }
+      if (!res.ok) {
+        const err = await errorFromResponse(res);
+        if (res.status === 401 && token && err.code === "unauthorized") api.onUnauthorized?.();
+        throw err;
+      }
+      if (!res.body) throw badResponse();
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      let result: { pack: StickerPack; imported: number; skipped: number; failed: number; total: number } | undefined;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let idx: number;
+        while ((idx = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, idx).trim();
+          buf = buf.slice(idx + 1);
+          if (!line) continue;
+          let msg: Record<string, unknown>;
+          try {
+            msg = JSON.parse(line) as Record<string, unknown>;
+          } catch {
+            throw badResponse();
+          }
+          if (msg["done"] === true) {
+            result = {
+              pack: msg["pack"] as StickerPack,
+              imported: Number(msg["imported"] ?? 0),
+              skipped: Number(msg["skipped"] ?? 0),
+              failed: Number(msg["failed"] ?? 0),
+              total: Number(msg["total"] ?? 0),
+            };
+          } else if (msg["error"] && typeof msg["error"] === "object") {
+            const e = msg["error"] as { code?: unknown; message?: unknown };
+            throw new ApiError(res.status, typeof e.code === "string" ? e.code : "import_failed", typeof e.message === "string" ? e.message : t("settings.stickers.importFailed"));
+          } else if (typeof msg["done"] === "number" && typeof msg["total"] === "number") {
+            onProgress?.(msg["done"] as number, msg["total"] as number, typeof msg["phase"] === "string" ? (msg["phase"] as string) : "");
+          }
+        }
+      }
+      if (!result) throw badResponse();
+      return result;
+    })();
   },
   uninstall(packId: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/stickers/packs/${packId}/install`);

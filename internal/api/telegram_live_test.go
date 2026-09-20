@@ -16,16 +16,17 @@ func TestTelegramImportLive(t *testing.T) {
 	srv, ts := newTestServer(t)
 	tokA, _ := register(t, ts, "alice")
 	srv.Cfg.TelegramBotToken = token
-	res, body := do(t, ts, "POST", "/api/v1/stickers/packs/import/telegram", tokA, map[string]any{"url": "https://t.me/addstickers/dennicat"})
+	res, lines := postImport(t, ts, tokA, "https://t.me/addstickers/dennicat")
 	if res.StatusCode != 201 {
-		t.Fatalf("import: %d %v", res.StatusCode, body)
+		t.Fatalf("import: %d %v", res.StatusCode, lines)
 	}
-	total := body["total"].(float64)
-	t.Logf("dennicat: imported=%v skipped=%v failed=%v total=%v", body["imported"], body["skipped"], body["failed"], total)
-	if total < 100 || body["imported"] != total || body["failed"] != float64(0) || body["skipped"] != float64(0) {
-		t.Fatalf("counts: %v", body)
+	final := lines[len(lines)-1]
+	total := final["total"].(float64)
+	t.Logf("dennicat: imported=%v skipped=%v failed=%v total=%v", final["imported"], final["skipped"], final["failed"], total)
+	if total < 100 || final["imported"] != total || final["failed"] != float64(0) || final["skipped"] != float64(0) {
+		t.Fatalf("counts: %v", final)
 	}
-	pack := body["pack"].(map[string]any)
+	pack := final["pack"].(map[string]any)
 	if len(pack["stickers"].([]any)) != int(total) {
 		t.Fatalf("pack stickers: %d", len(pack["stickers"].([]any)))
 	}

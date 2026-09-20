@@ -19,6 +19,7 @@ import { appOnScreen } from "@/lib/notify";
 import { readingPresent } from "@/lib/readPosition";
 import { users as usersApi } from "@/api/users";
 import { channels as channelsApi } from "@/api/channels";
+import { expressions as expressionsApi } from "@/api/expressions";
 import { ring } from "@/lib/keyring";
 import type { Message, PublicUser, Relationship, ServerView } from "@/api/types";
 
@@ -154,6 +155,14 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       for (const view of servers) useServers.getState().setFromView(view);
       useExpressions.getState().setAllEmojis(d.emojis ?? []);
       useExpressions.getState().setPacks(d.sticker_packs ?? []);
+      // Recents ride REST rather than ready: one small request after the
+      // reconnect storm, and every device lands on the same saved row.
+      void expressionsApi
+        .recentStickers()
+        .then((list) => {
+          if (!gone()) useExpressions.getState().setRecents(list);
+        })
+        .catch(() => undefined);
       onReadyVoice(d.voice_states ?? [], d.session_id);
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
@@ -270,6 +279,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "sticker_update":
       if (e.d.deleted || !e.d.pack) useExpressions.getState().removePack(e.d.pack_id);
       else useExpressions.getState().upsertPack(e.d.pack);
+      return;
+    case "sticker_recent":
+      useExpressions.getState().noteRecent(e.d.sticker);
       return;
     case "member_add":
       useUsers.getState().upsert(e.d.user);

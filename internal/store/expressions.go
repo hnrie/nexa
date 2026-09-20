@@ -437,6 +437,53 @@ func (s *Store) AddSticker(ctx context.Context, st *Sticker) error {
 	})
 }
 
+// MaxRecentStickers is how many of an account's last-used stickers are kept
+// for the picker's recent row.
+const MaxRecentStickers = 24
+
+// TouchRecentSticker records that uid sent sid, refreshing its position and
+// dropping whatever fell off the end. Unknown stickers fail with ErrNotFound.
+func (s *Store) TouchRecentSticker(ctx context.Context, uid, sid ids.ID) error {
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		var one int
+		if err := tx.QueryRowContext(ctx, `SELECT 1 FROM stickers WHERE id = ?`, int64(sid)).Scan(&one); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+		now := nowMs()
+		if _, err := tx.ExecContext(ctx, `INSERT INTO recent_stickers (user_id, sticker_id, used_at) VALUES (?,?,?)
+			ON CONFLICT(user_id, sticker_id) DO UPDATE SET used_at = excluded.used_at`, int64(uid), int64(sid), now); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM recent_stickers WHERE user_id = ?
+			AND sticker_id NOT IN (SELECT sticker_id FROM recent_stickers WHERE user_id = ? ORDER BY used_at DESC, sticker_id DESC LIMIT ?)`,
+			int64(uid), int64(uid), MaxRecentStickers)
+		return err
+	})
+}
+
+// RecentStickers lists uid's last-used stickers, newest first.
+func (s *Store) RecentStickers(ctx context.Context, uid ids.ID) ([]*Sticker, error) {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+stickerCols+` FROM stickers s
+		JOIN blobs b ON b.id = s.blob_id JOIN recent_stickers r ON r.sticker_id = s.id
+		WHERE r.user_id = ? ORDER BY r.used_at DESC, s.id DESC LIMIT ?`, int64(uid), MaxRecentStickers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Sticker{}
+	for rows.Next() {
+		st, err := scanSticker(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
+}
+
 // StickerByID loads one sticker.
 func (s *Store) StickerByID(ctx context.Context, id ids.ID) (*Sticker, error) {
 	return scanSticker(s.db.R.QueryRowContext(ctx, `SELECT `+stickerCols+` FROM stickers s JOIN blobs b ON b.id = s.blob_id WHERE s.id = ?`, int64(id)))

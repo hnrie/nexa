@@ -15,6 +15,7 @@ import type {
   Server,
   ServerView,
   Snowflake,
+  Sticker,
   StickerPack,
   VoiceState,
 } from "@/api/types";
@@ -55,6 +56,7 @@ export type GatewayEvent =
   | { t: "key_rotation_needed"; d: { conv_id: Snowflake } }
   | { t: "emoji_update"; d: { server_id: Snowflake; emojis: Emoji[] } }
   | { t: "sticker_update"; d: { pack_id: Snowflake; deleted: boolean; pack?: StickerPack } }
+  | { t: "sticker_recent"; d: { sticker: Sticker } }
   | { t: "pin_update"; d: { channel_id: Snowflake; message_id: Snowflake; pinned: boolean } }
   | { t: "ban_add"; d: { server_id: Snowflake; user_id: Snowflake; reason: string } }
   | { t: "ban_remove"; d: { server_id: Snowflake; user_id: Snowflake } }

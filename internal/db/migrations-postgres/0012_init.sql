@@ -337,15 +337,6 @@ CREATE TABLE realtime_usage (
   updated_at BIGINT NOT NULL
 );
 
-CREATE TABLE relationships (
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  target_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  type TEXT NOT NULL,               -- friend | outgoing | incoming | blocked
-  nickname TEXT NOT NULL DEFAULT '',
-  created_at BIGINT NOT NULL,
-  PRIMARY KEY (user_id, target_id)
-);
-
 CREATE TABLE sticker_packs (
   id BIGINT PRIMARY KEY,
   owner_user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
@@ -358,13 +349,6 @@ CREATE TABLE sticker_packs (
   updated_at BIGINT NOT NULL
 , kind TEXT NOT NULL DEFAULT 'sticker');
 
-CREATE TABLE sticker_installs (
-  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  pack_id BIGINT NOT NULL REFERENCES sticker_packs(id) ON DELETE CASCADE,
-  installed_at BIGINT NOT NULL,
-  PRIMARY KEY (user_id, pack_id)
-);
-
 CREATE TABLE stickers (
   id BIGINT PRIMARY KEY,
   pack_id BIGINT NOT NULL REFERENCES sticker_packs(id) ON DELETE CASCADE,
@@ -375,6 +359,29 @@ CREATE TABLE stickers (
   position BIGINT NOT NULL DEFAULT 0,
   creator_id BIGINT NOT NULL,
   created_at BIGINT NOT NULL
+);
+
+CREATE TABLE recent_stickers (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sticker_id BIGINT NOT NULL REFERENCES stickers(id) ON DELETE CASCADE,
+  used_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, sticker_id)
+);
+
+CREATE TABLE relationships (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  target_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,               -- friend | outgoing | incoming | blocked
+  nickname TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, target_id)
+);
+
+CREATE TABLE sticker_installs (
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  pack_id BIGINT NOT NULL REFERENCES sticker_packs(id) ON DELETE CASCADE,
+  installed_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, pack_id)
 );
 
 CREATE TABLE uploads (
@@ -428,6 +435,8 @@ CREATE INDEX guests_channel ON guests(channel_id);
 CREATE INDEX guests_link ON guests(link_code);
 
 CREATE INDEX idx_channel_unlocks_session ON channel_unlocks(session_id);
+
+CREATE INDEX idx_recent_stickers_user ON recent_stickers(user_id, used_at DESC);
 
 CREATE INDEX invites_channel ON invites(channel_id);
 
