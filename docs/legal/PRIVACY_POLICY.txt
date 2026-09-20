@@ -1,0 +1,134 @@
+NEXA — PRIVACY POLICY
+Instance: chat.evilion.xyz
+Operator: Nora (in-app: @nora) — contact: evilionx3@proton.me
+Effective: 2026-09-20 (draft for review, not yet published)
+
+This policy describes exactly what this instance holds. It is written
+against the actual database schema — if something is not listed here,
+there is no column for it and nothing to produce.
+
+1. SUMMARY
+
+- Your messages, files, and calls are end-to-end encrypted. The
+  operator cannot read them and cannot monitor anything you do inside
+  a conversation.
+- The ONLY content the operator can actually see is profile
+  information you choose to make public (username, display name,
+  avatar, banner, about-me, pronouns, status, and similar fields),
+  plus the delivery metadata the server needs (who sent what where
+  and when, mentions, reactions, sizes) and public images (avatars,
+  banners, server icons, custom emoji, stickers).
+- No email, no phone number, no real name, no payment info, no
+  location, no contacts, no analytics, no push tokens are ever
+  collected.
+
+2. WHAT IS END-TO-END ENCRYPTED (OPERATOR CANNOT READ)
+
+- Message text and edits. Stored only as ciphertext envelopes.
+- Attachment contents, file names, file types, dimensions, and
+  per-file keys (the key travels inside the encrypted message).
+- Call audio and video. Not recorded, never written to disk.
+- Your client settings blob (themes, notification choices, mutes).
+  Only its size, version, and last-written time are legible.
+- Your password and recovery key. The password never leaves your
+  device — the browser sends only a derived verifier. The recovery
+  key is shown once in the browser and never stored anywhere.
+- Your identity private key and conversation keys. The private key
+  exists on the server only wrapped by your password/recovery key.
+  Conversation keys exist on the server only sealed to each member's
+  public key. The operator holds no usable key of any kind, and no
+  escrow or master key exists.
+
+There is no setting, admin action, or software change available to
+the operator that would decrypt already-sent content, and no
+mechanism to deliver future content in readable form.
+
+3. WHAT THE OPERATOR CAN SEE
+
+a) Profile information (public by design, typed by you):
+   username, display name, avatar and banner images, about-me,
+   pronouns, accent color, custom status + expiry, presence
+   preference, DM privacy setting, per-server nicknames/avatars,
+   account id, creation/last-change times, admin/disabled flags.
+   Nothing here is identity-verified.
+
+b) Public images (stored as uploaded, producible on request):
+   avatars, banners, server/community icons, custom emoji, stickers.
+
+c) Delivery metadata (needed to route and notify, not content):
+   message id, channel, author, type, timestamps, edited time,
+   reply target, mentions (user/role/@everyone — kept outside the
+   ciphertext so the server knows who to notify), attachment presence
+   and sizes, reaction values and counts, pins, read positions, poll
+   vote indexes (not the question/option text, which is encrypted).
+
+d) Membership and structure (typed by users, stored as typed):
+   friends/requests/blocks, server memberships + roles, DM/group
+   participants, channel names/topics/structure, invite codes created
+   (uses and expiry — not who used them), bans and per-community
+   audit-log entries.
+
+e) Sessions: one row per signed-in device — session id, IP address
+   recorded ONCE at sign-in (never updated), user-agent string,
+   sign-in and last-activity times. Deleted on sign-out/expiry.
+   This is the only place an IP is written. A locked subchat
+   additionally records which sessions have typed its password
+   (neither the password nor a hash of the message content is kept
+   there — the password only unlocks the screen, messages stay
+   encrypted under the conversation key). Guest call links are keyed
+   to the link, not to your account.
+
+f) Credentials (values not producible, listed to close the point):
+   auth_hash (Argon2id verifier), kdf_salt/params, public_key,
+   enc_private_key (unopenable without your password),
+   enc_private_key_recovery + recovery_auth_hash. None is a password
+   and none can be turned into one.
+
+g) Operational: unfinished upload progress (declared/received sizes),
+   crash reports (error kind, code path, build, message — never any
+   conversation or file), one instance-wide monthly byte total (not
+   per-account), server request logs (method/path/status/size/
+   duration — no IP recorded there).
+
+4. WHAT IS NEVER COLLECTED
+
+No email address. No telephone number. No legal name, birth date,
+age, ID documents. No payment data. No registration-IP or
+last-known-IP field beyond the per-session sign-in IP above. No IP
+or access history. No presence/online-time history. No call records
+(who called whom, how long). No device/advertising IDs or push
+tokens. No location. No address-book imports. No search queries,
+link clicks, analytics, telemetry, or behavioral profiles. No
+drafts, backups, or undelivered copies. Search runs locally on
+messages your device already decrypted.
+
+5. WHO SEES WHAT
+
+- Other users see your public profile, your messages once their
+  client decrypts them, and the communities/channels you share.
+- The operator (one person) sees 3a–3g above and nothing else.
+- No third parties, no advertisers, no analytics providers. Nothing
+  is sold or shared except as compelled by valid legal process (see
+  Terms Section 5), and then only what exists above — content still
+  cannot be produced.
+
+6. RETENTION AND DELETION
+
+- Deleted messages, files, and accounts are removed from the
+  database; no tombstone, archive, or recycle bin is kept.
+- Deleting an account overwrites profile columns, deletes sessions,
+  relationships, settings, key grants, and second-factor rows. Past
+  messages stay, still encrypted, attributed to a deleted user.
+- Backups, if kept for disaster recovery, hold the same encrypted
+  content under the same limitations.
+
+7. CONTACT AND REQUESTS
+
+  Email: evilionx3@proton.me
+  In-app: @nora
+
+Include the account identifier and legal basis for any formal
+request. Responses list exactly the rows held, with timestamps in
+UTC and raw values alongside — nothing inferred or enriched.
+
+END OF POLICY (DRAFT)

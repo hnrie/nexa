@@ -16,6 +16,7 @@ const InvitePage = lazyPage(() => import("@/pages/InvitePage"));
 const StickerPackPage = lazyPage(() => import("@/pages/StickerPackPage"));
 const DownloadPage = lazyPage(() => import("@/pages/DownloadPage"));
 const GuestCallPage = lazyPage(() => import("@/pages/GuestCallPage"));
+const LegalPage = lazyPage(() => import("@/pages/LegalPage"));
 
 export function AppRoutes() {
   return (
@@ -27,6 +28,9 @@ export function AppRoutes() {
         <Route path="/recover" element={<RecoverPage />} />
         <Route path="/invite/:code" element={<InvitePage />} />
         <Route path="/download" element={<DownloadPage />} />
+        <Route path="/terms" element={<LegalPage page="terms" />} />
+        <Route path="/privacy" element={<LegalPage page="privacy" />} />
+        <Route path="/about" element={<LegalPage page="about" />} />
         {/* a guest link: the call and nothing else, with no account */}
         <Route path="/call/:code" element={<GuestCallPage />} />
         <Route path="/stickers/pack/:packId" element={<RequireAuth><StickerPackPage /></RequireAuth>} />

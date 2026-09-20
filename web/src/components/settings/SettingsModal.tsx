@@ -22,6 +22,7 @@ const VoicePage = lazyPage(() => import("./VoicePage"));
 const AdminPage = lazyPage(() => import("./AdminPage"));
 const DesktopPage = lazyPage(() => import("./DesktopPage"));
 const LicensesPage = lazyPage(() => import("./LicensesPage"));
+const AboutPage = lazyPage(() => import("./AboutPage"));
 
 /** The navigation, built per render so it follows the language. */
 function navGroups(): { id: string; head: string; items: { id: string; label: string }[] }[] {
@@ -39,7 +40,8 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   const mobile = useIsMobile();
   // Licenses sits at the bottom of the app settings: nobody comes looking for it, and
   // the desktop entry only exists when there is a desktop app to have settings for.
-  const appItems = [...(inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []), { id: "licenses", label: t("settings.licenses.licenses") }];
+  // About is last of all: Terms, Privacy, encryption note, and owner contact.
+  const appItems = [...(inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []), { id: "licenses", label: t("settings.licenses.licenses") }, { id: "about", label: t("legal.aboutTitle") }];
   const base = navGroups().map((g) => (g.id === "app" ? { ...g, items: [...g.items, ...appItems] } : g));
   const nav = isAdmin ? [...base, { id: "instance", head: t("settings.settings.instance"), items: [{ id: "admin", label: t("settings.admin.instanceAdmin") }] }] : base;
   const ref = useRef<HTMLDivElement>(null);
@@ -54,7 +56,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   const body =
-    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "licenses" ? <LicensesPage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage /> : <AccountPage onClose={onClose} />;
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "licenses" ? <LicensesPage /> : page === "about" ? <AboutPage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage /> : <AccountPage onClose={onClose} />;
   return createPortal(
     <div ref={ref} className={s.layer} role="dialog" aria-modal="true" aria-label={t("settings.settings.userSettings")} data-modal-layer="">
       <div className={s.navWrap}>

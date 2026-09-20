@@ -127,6 +127,12 @@ export default function RegisterPage() {
         {progress ? <div className={s.progress}>{progress}</div> : null}
         <Button type="submit" size="lg" block loading={busy} disabled={!canSubmit}>{t("settings.security.continue")}</Button>
         <div className={s.foot}>
+          {t("legal.gatePrivacy")}{" "}
+          <Link to="/terms" target="_blank" rel="noreferrer noopener">{t("legal.termsTitle")}</Link>
+          {" · "}
+          <Link to="/privacy" target="_blank" rel="noreferrer noopener">{t("legal.privacyTitle")}</Link>
+        </div>
+        <div className={s.foot}>
           <Link to="/login">{t("register.alreadyHaveAnAccount")}</Link>
         </div>
       </form>
