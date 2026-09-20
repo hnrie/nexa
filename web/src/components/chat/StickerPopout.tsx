@@ -5,6 +5,7 @@ import type { StickerInfo } from "@/api/types";
 import { stickerUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
+import { StickerView } from "@/components/stickers/StickerView";
 import type { MessagePayload } from "@/crypto/message";
 import { portalRoot } from "@/hooks/usePortalRoot";
 import { useUI } from "@/stores/ui";
@@ -109,7 +110,7 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
   return createPortal(
     <div ref={card} className={s.popout} role="dialog" aria-label={name} data-testid="sticker-popout" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
       <div className={s.head}>
-        {sticker.blob ? <img className={s.preview} src={stickerUrl(sticker.blob, 64)} alt="" draggable={false} /> : null}
+        {sticker.blob ? <StickerView format={sticker.format ?? info?.sticker.format} src={stickerUrl(sticker.blob, 64)} alt="" className={s.preview} /> : null}
         <div className={s.text}>
           <div className={s.name}>{name}</div>
           {info ? <div className={s.sub}>{t("chat.stickerPopout.fromPack", { name: info.pack.name })}</div> : null}

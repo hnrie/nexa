@@ -46,6 +46,7 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/stickers/{sid}", s.authed(s.handleStickerInfo))
 	mux.Handle("PUT /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(true)))
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(false)))
+	mux.Handle("POST /api/v1/stickers/packs/import/telegram", s.userLimited(s.limUpload, s.handleTelegramImport))
 	mux.Handle("GET /api/v1/gif/status", s.authed(s.handleGifStatus))
 	mux.Handle("GET /api/v1/gif/search", s.authed(s.handleGifSearch))
 	mux.Handle("GET /api/v1/gif/trending", s.authed(s.handleGifTrending))
@@ -523,6 +524,10 @@ func stickerFormat(mime string, animated bool) string {
 		return "gif"
 	case "image/webp":
 		return "webp"
+	case "application/x-tgsticker":
+		return "tgs"
+	case "video/webm":
+		return "webm"
 	}
 	return ""
 }
@@ -557,8 +562,17 @@ func (s *Server) handleStickerCreate(w http.ResponseWriter, r *http.Request) {
 	if format == "" && kind == "emoji" && b.Mime == "image/jpeg" {
 		format = "jpeg"
 	}
+	if kind == "emoji" && (format == "tgs" || format == "webm") {
+		s.releaseBlob(r.Context(), b.ID)
+		WriteError(w, E(http.StatusBadRequest, "unsupported_format", "Images must be PNG, APNG, GIF or WebP."))
+		return
+	}
 	if format == "" {
 		s.releaseBlob(r.Context(), b.ID)
+		if kind == "sticker" {
+			WriteError(w, E(http.StatusBadRequest, "unsupported_format", "Stickers must be PNG, APNG, GIF, WebP, TGS or WebM video."))
+			return
+		}
 		WriteError(w, E(http.StatusBadRequest, "unsupported_format", "Images must be PNG, APNG, GIF or WebP."))
 		return
 	}

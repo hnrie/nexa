@@ -1,0 +1,12 @@
+/* The box a Telegram animated sticker plays in. The svg the player mounts
+   fills whatever size the surrounding rule gives this box. */
+.tgs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tgs > svg {
+  width: 100% !important;
+  height: 100% !important;
+}

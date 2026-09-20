@@ -7,6 +7,7 @@ import { packImageUrl } from "@/stores/expressions";
 import { Button } from "@/components/common/Button";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
+import { StickerView } from "@/components/stickers/StickerView";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
 import { useReorder } from "@/hooks/useReorder";
 import { describeError } from "@/lib/errors";
@@ -18,7 +19,8 @@ import s from "./PackEditor.module.css";
 import { promptFields } from "@/components/modals/PromptModal";
 
 import { t } from "@/i18n";
-const ACCEPT = "image/png,image/gif,image/webp,image/apng";
+const ACCEPT_IMAGE = "image/png,image/gif,image/webp,image/apng";
+const ACCEPT_STICKER = `${ACCEPT_IMAGE},video/webm,.tgs`;
 const MAX_STICKER = 5 * 1024 * 1024;
 
 export function packCover(p: StickerPack): Sticker | undefined {
@@ -61,7 +63,7 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, 
           return (
             <div key={p.id} className={s.packItem}>
               <button className={s.packRow} data-selected={selected?.id === p.id} data-removable={removable || undefined} onClick={() => onSelect(p.id)} data-pack={p.id}>
-                <span className={s.cover}>{cover ? <img src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
+                <span className={s.cover}>{cover ? <StickerView format={cover.format} src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
                 <span className={s.packText}>
                   <span className={s.packName}>{p.name}</span>
                   <span className={s.packSub}>{packCount(p)}{removable ? " · installed" : p.public ? " · public" : ""}</span>
@@ -95,7 +97,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   const [drag, setDrag] = useState<string | null>(null);
   const [drop, setDrop] = useState<{ id: string; after: boolean } | null>(null);
   const [over, setOver] = useState(false);
-  const [pending, setPending] = useState<{ file: File; name: string; tags: string; preview: string }[]>([]);
+  const [pending, setPending] = useState<{ file: File; name: string; tags: string; preview: string; format?: string }[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   // previews stay alive while they are staged: each is revoked when it is removed or uploaded, and the rest on unmount
   const pendingRef = useRef(pending);
@@ -130,9 +132,15 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   };
   const stage = (files: FileList | File[]) => {
     const list: typeof pending = [];
+    // A .tgs file usually arrives with no usable MIME type, so it is
+    // recognised by its extension; video stickers arrive as video/webm.
+    // Emoji packs take pictures only, in either case.
+    const accept = isEmoji ? ACCEPT_IMAGE : ACCEPT_STICKER;
     for (const f of Array.from(files)) {
-      if (!ACCEPT.split(",").includes(f.type)) {
-        toast(t("server.packEditor.mustBeAnImage", { name: f.name }), "error");
+      const tgs = f.name.toLowerCase().endsWith(".tgs");
+      const format = f.type === "video/webm" ? "webm" : tgs ? "tgs" : undefined;
+      if (!accept.split(",").includes(f.type) && !(format && !isEmoji)) {
+        toast(t(isEmoji ? "server.packEditor.mustBeAnImage" : "server.packEditor.stickersMustBeImages", { name: f.name }), "error");
         continue;
       }
       if (f.size > maxBytes) {
@@ -141,7 +149,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
       }
       const base = f.name.replace(/\.[a-z0-9]+$/i, "");
       const clean = isEmoji ? base.replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 32) : base.slice(0, 30);
-      list.push({ file: f, name: clean || noun, tags: "", preview: URL.createObjectURL(f) });
+      list.push({ file: f, name: clean || noun, tags: "", preview: URL.createObjectURL(f), ...(format ? { format } : {}) });
     }
     setPending((cur) => [...cur, ...list]);
   };
@@ -320,12 +328,12 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) stage(e.dataTransfer.files); }}
             data-drop-zone
           >
-            <Upload size={20} /> {t("server.packEditor.dropFilesHereOrClickTo", { size: Math.round(maxBytes / (1024 * 1024)) })}{isEmoji ? ` ${t("server.packEditor.emojiNamesAreLettersNumbersAnd")}` : ""}
+            <Upload size={20} /> {t("server.packEditor.dropFilesHereOrClickTo", { size: Math.round(maxBytes / (1024 * 1024)) })}{isEmoji ? ` ${t("server.packEditor.emojiNamesAreLettersNumbersAnd")}` : ` ${t("server.packEditor.stickerFormatsNote")}`}
           </button>
-          <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
+          <input ref={fileRef} type="file" accept={isEmoji ? ACCEPT_IMAGE : ACCEPT_STICKER} multiple hidden onChange={(e) => { if (e.target.files) stage(e.target.files); e.target.value = ""; }} data-testid="sticker-file" />
           {pending.map((p) => (
             <div key={p.preview} className={s.pending}>
-              <img src={p.preview} alt="" />
+              <StickerView format={p.format} src={p.preview} alt="" />
               <TextInput value={p.name} maxLength={30} placeholder={t("modals.subchat.name")} onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, name: e.target.value } : x)))} data-testid="sticker-name" />
               {isEmoji ? null : <TextInput value={p.tags} maxLength={200} placeholder={t("server.packEditor.tagsSpaceSeparated")} onChange={(e) => setPending((cur) => cur.map((x) => (x.preview === p.preview ? { ...x, tags: e.target.value } : x)))} />}
               <Button size="sm" variant="ghost" onClick={() => unstage(p.preview)}>{t("composer.composer.remove")}</Button>
@@ -360,7 +368,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             tabIndex={manage ? -1 : undefined}
           >
             {pack.cover_sticker_id === st.id ? <span className={s.coverBadge}>{t("server.packEditor.cover")}</span> : null}
-            <img className={s.cellImg} src={packImageUrl(pack, st)} alt={st.name} loading="lazy" draggable={false} />
+            <StickerView format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={s.cellImg} />
             <span className={s.cellName} title={st.name}>{st.name}</span>
             <span className={s.cellTags} title={st.tags}>{st.tags}</span>
             {manage ? (

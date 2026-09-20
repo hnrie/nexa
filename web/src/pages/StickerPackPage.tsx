@@ -7,6 +7,7 @@ import type { StickerPack } from "@/api/types";
 
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
+import { StickerView } from "@/components/stickers/StickerView";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { packCount, packCover } from "@/components/server/PackEditor";
 import { canRemovePack, removePack as removeInstalledPack, removePackQuestion } from "@/lib/packRemoval";
@@ -84,14 +85,14 @@ export default function StickerPackPage() {
         {pack ? (
           <>
             <p className={s.kicker}>{pack.kind === "emoji" ? t("stickerPack.emojiPack") : t("stickerPack.stickerPack")}</p>
-            <div className={s.iconBox}>{cover ? <img src={packImageUrl(pack, cover)} alt="" style={{ objectFit: "contain" }} /> : pack.name.slice(0, 1).toUpperCase()}</div>
+            <div className={s.iconBox}>{cover ? <StickerView format={cover.format} src={packImageUrl(pack, cover)} alt="" /> : pack.name.slice(0, 1).toUpperCase()}</div>
             <h1 className={s.title}>{pack.name}</h1>
             {pack.description ? <p className={s.sub}>{pack.description}</p> : null}
             <p className={s.sub}>{packCount(pack)}{pack.public ? "" : " · private"}</p>
             <div className={p.grid} style={{ width: "100%" }}>
               {pack.stickers.map((st) => (
                 <div key={st.id} className={p.cell} style={{ cursor: "default" }}>
-                  <img className={p.cellImg} src={packImageUrl(pack, st)} alt={st.name} loading="lazy" />
+                  <StickerView format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={p.cellImg} />
                   <span className={p.cellName}>{st.name}</span>
                 </div>
               ))}

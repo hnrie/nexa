@@ -64,6 +64,9 @@ export const expressions = {
   install(packId: Snowflake): Promise<StickerPack> {
     return api.request<StickerPack>("PUT", `/stickers/packs/${packId}/install`);
   },
+  importTelegram(url: string): Promise<{ pack: StickerPack; imported: number; skipped: number; failed: number; total: number }> {
+    return api.request("POST", "/stickers/packs/import/telegram", { url });
+  },
   uninstall(packId: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/stickers/packs/${packId}/install`);
   },
