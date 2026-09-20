@@ -149,7 +149,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
 
   return (
     <div className={s.body} style={{ flexDirection: "column" }}>
-      <div className={s.searchRow} style={{ flexDirection: "column", alignItems: "stretch" }}>
+      <div className={s.searchRow}>
         {enabled ? (
           <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder={tr_("pickers.gifPicker.searchKlipy")} aria-label={tr_("pickers.gifPicker.searchGifs")} autoFocus={focusSearchOnOpen()} />
         ) : null}

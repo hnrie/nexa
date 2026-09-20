@@ -62,7 +62,7 @@
 .catInitial { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text); font-size: 11px; font-weight: 700; }
 .gifSearchRow { display: flex; gap: 8px; padding: 0 0 8px; }
 .gifNote { padding: 12px 16px; font-size: 13px; color: var(--text-muted); text-align: center; }
-.gifTabs { display: flex; gap: 8px; padding: 0 0 8px; }
+.gifTabs { display: flex; flex: none; align-items: center; gap: 8px; }
 .gifTab { padding: 4px 10px; border-radius: var(--radius-xs); font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface); }
 .gifTab[data-on="true"] { background: var(--bg-selected); color: var(--text-strong); }
 .gifStar { position: absolute; top: 4px; inset-inline-end: 4px; display: flex; padding: 3px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; opacity: 0; }

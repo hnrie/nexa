@@ -477,7 +477,19 @@ export function Composer({ channel }: { channel: Channel }) {
             insertAt(caret, taRef.current?.selectionEnd ?? caret, em.unicode + " ");
           }}
           serverId={channel.server_id}
-          gifs={<GifPicker onPick={(g) => { setPicker(false); void sendMessage(channel.id, g.url, { embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] }); }} />}
+          gifs={<GifPicker onPick={(g) => {
+            setPicker(false);
+            const opts: SendOptions = { embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] };
+            // a GIF picked while replying answers that reply, like a typed message does
+            const gifReply = replyTo && replyTo.channelId === channel.id ? replyTo : null;
+            if (gifReply) {
+              opts.replyTo = gifReply.messageId;
+              opts.ping = gifReply.ping;
+            }
+            const curReply = useUI.getState().replyTo;
+            if (gifReply && curReply?.channelId === gifReply.channelId && curReply.messageId === gifReply.messageId) setReplyTo(null);
+            void sendMessage(channel.id, g.url, opts);
+          }} />}
           stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => { setPicker(false); void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated } }); }} />}
         />
       ) : null}
