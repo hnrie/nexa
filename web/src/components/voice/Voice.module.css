@@ -85,13 +85,8 @@
 .ctl[data-off="true"]:hover, .ctl[data-on="true"]:hover { background: #e3e3e6; }
 .narrowOnly { display: none; }
 .leave { background: var(--danger); color: #fff; }
-/* The handset points down. Rotating the phone glyph 135deg leaves a 28-unit-wide
-   shape in a 24-unit viewport, so the horns were clipped and it dwarfed the
-   buttons beside it; scale(0.78) fits it with sibling-like margins. The glyph's
-   stroke mass also sits down-left of centre, which the rotation carries upward,
-   so translate back in the scaled-rotated frame. Percentages resolve against
-   the unscaled box, so this holds at every size HangUp is used at (18/22/24px). */
-.hangUp { transform: rotate(135deg) scale(0.78) translate(4.5%, -4.5%); }
+/* the handset points down, and the icon stays centred in the button */
+.hangUp { transform: rotate(135deg); }
 .leave:hover { background: var(--danger-hover); }
 .sideBtn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); }
 .sideBtn:hover { color: #fff; background: var(--bg-surface); }
