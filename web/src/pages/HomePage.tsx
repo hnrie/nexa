@@ -252,6 +252,10 @@ export default function HomePage() {
       <footer className={s.foot}>
         <span>{t("home.foot.tagline")}</span>
         <span className={s.footLinks}>
+          <Link to="/about">{t("legal.aboutTitle")}</Link>
+          <Link to="/terms">{t("legal.termsTitle")}</Link>
+          <Link to="/privacy">{t("legal.privacyTitle")}</Link>
+          <a href="mailto:evilionx3@proton.me">{t("legal.contactOwner")}</a>
           <Link to="/download">{t("home.nav.download")}</Link>
           <Link to="/login">{t("home.nav.logIn")}</Link>
         </span>
