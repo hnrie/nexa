@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { android, androidVersionName, builds, type AndroidFile, type AndroidRelease } from "@/api/android";
 import { desktop, type DesktopFile, type DesktopRelease } from "@/api/desktop";
 import { Button } from "@/components/common/Button";
+import { Modal } from "@/components/common/Modal";
 import { Spinner } from "@/components/common/Spinner";
 import { currentAndroidAbi, currentPlatform, isAndroid, pickAndroid, pickDownload, type DesktopTarget } from "@/lib/platform";
 import { formatBytes } from "@/lib/time";
@@ -64,6 +65,9 @@ export default function DownloadPage() {
   // published, so that sentence is now simply untrue. A request that failed
   // says it failed.
   const [apkFailed, setApkFailed] = useState(false);
+  // The Android build the visitor tapped. Set while the rough-edges warning is
+  // up; downloading only starts from that dialog's own button.
+  const [warnApk, setWarnApk] = useState<AndroidFile | null>(null);
   const onAndroid = isAndroid();
   const toast = useUI((u) => u.toast);
 
@@ -139,7 +143,7 @@ export default function DownloadPage() {
 
         {apk && myApk && onAndroid ? (
           <div className={s.primary}>
-            <a className={s.bigButton} href={android.fileUrl(myApk.name)} data-testid="download-android" data-abi={myApk.abi}>
+            <a className={s.bigButton} href={android.fileUrl(myApk.name)} data-testid="download-android" data-abi={myApk.abi} onClick={(e) => { e.preventDefault(); setWarnApk(myApk); }}>
               <Download size={20} /> {t("download.downloadForAndroid")}
             </a>
             <span className={s.meta}>
@@ -209,7 +213,7 @@ export default function DownloadPage() {
                           {formatBytes(f.size)} · {t("download.androidMin", { version: androidVersionName(apk.min_sdk) })} · <button type="button" className={s.hash} title={t("download.copySha256")} aria-label={t("download.copySha256")} onClick={() => copyText(f.sha256)}>SHA-256 {f.sha256.slice(0, 16)}…</button>
                         </span>
                       </span>
-                      <Button size="sm" variant={onAndroid && myApk?.name === f.name ? "primary" : "secondary"} onClick={() => { location.href = android.fileUrl(f.name); }}>
+                      <Button size="sm" variant={onAndroid && myApk?.name === f.name ? "primary" : "secondary"} onClick={() => setWarnApk(f)}>
                         <Download size={16} /> {t("chat.attachments.download")}
                       </Button>
                     </div>
@@ -233,6 +237,39 @@ export default function DownloadPage() {
         <div className={s.foot}>
           <Link to="/channels/@me">{t("download.openNexaInYourBrowser")}</Link>
         </div>
+
+        {/* Android is not polished yet: nobody starts that download without
+            being told so first, in the same dialog style as everywhere else. */}
+        {warnApk ? (
+          <Modal
+            open
+            onClose={() => setWarnApk(null)}
+            title={t("download.androidWarningTitle")}
+            width={460}
+            footer={
+              <>
+                <Button variant="ghost" onClick={() => setWarnApk(null)}>{t("chat.editMessage.cancel")}</Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    location.href = android.fileUrl(warnApk.name);
+                    setWarnApk(null);
+                  }}
+                >
+                  {t("download.androidWarningDownload")}
+                </Button>
+              </>
+            }
+          >
+            <div style={{ color: "var(--text)", fontSize: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+              <span>{t("download.androidWarningBody")}</span>
+              <span>
+                {t("download.androidWarningWeb")}{" "}
+                <a href="https://evilion.xyz/login" target="_blank" rel="noreferrer noopener">{t("download.androidWarningWebLink")}</a>
+              </span>
+            </div>
+          </Modal>
+        ) : null}
       </main>
     </div>
   );
