@@ -34,7 +34,7 @@ func testPostgres(t *testing.T) string {
 	pg := embeddedpostgres.NewDatabase(embeddedpostgres.DefaultConfig().
 		Username("chat").Password("chat").Database("chatmigrate").Port(55433).
 		RuntimePath(filepath.Join(dir, "runtime-migrate")).
-		DataPath(filepath.Join(dir, "data-migrate")).
+		DataPath(t.TempDir()).
 		BinariesPath(filepath.Join(dir, "bin")).
 		StartTimeout(90 * time.Second))
 	if err := pg.Start(); err != nil {
