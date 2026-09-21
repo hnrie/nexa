@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
@@ -19,6 +19,12 @@ export function TermsGate() {
   const status = useAuth((a) => a.status);
   const [checked, setChecked] = useState(false);
   const [, force] = useState(0);
+  const gateRef = useRef<HTMLDivElement>(null);
+  // The dialog autofocuses its first input, which here is the checkbox at the
+  // bottom; without this the terms box opens already scrolled down to it.
+  useEffect(() => {
+    gateRef.current?.scrollTo({ top: 0 });
+  }, []);
   if (status !== "ready" || !me) return null;
   if (termsAccepted(me.id)) return null;
   const agree = () => {
@@ -40,7 +46,7 @@ export function TermsGate() {
         </Button>
       }
     >
-      <div className={s.gate}>
+      <div ref={gateRef} className={s.gate}>
         <p className={s.body}>{t("legal.gateIntro", { version: LEGAL_VERSION })}</p>
         <EncryptionNote />
         <RulesSummary />
