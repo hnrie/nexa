@@ -3,6 +3,8 @@ import { admin as adminApi, type ClientErrorReport } from "@/api/admin";
 import { ApiError } from "@/api/client";
 import type { AdminSettings, AdminStats, AdminUser, LegalReport } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
+import { OwnerBadge } from "@/components/common/OwnerBadge";
+import { isOwner } from "@/lib/owner";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -140,7 +142,7 @@ export default function AdminPage() {
         <div key={u.id} className={`${s.memberRow} ${st.adminUser}`}>
           <Avatar id={u.id} avatarId={null} name={u.display_name} size={36} />
           <div className={s.memberText}>
-            <span className={s.memberName}>{u.display_name}{u.admin ? <span style={{ fontSize: 11, color: "var(--text-brand)" }}>{tr_("settings.admin.adminTag")}</span> : null}{u.disabled ? <span style={{ fontSize: 11, color: "var(--danger)" }}>{tr_("settings.admin.disabledTag")}</span> : null}</span>
+            <span className={s.memberName}>{u.display_name}{isOwner(u.id) ? <OwnerBadge /> : u.admin ? <span style={{ fontSize: 11, color: "var(--text-brand)" }}>{tr_("settings.admin.adminTag")}</span> : null}{u.disabled ? <span style={{ fontSize: 11, color: "var(--danger)" }}>{tr_("settings.admin.disabledTag")}</span> : null}</span>
             <span className={s.memberSub}>@{u.username} · {tr_("server.members.joinedOn", { when: formatFull(u.created_at) })}</span>
           </div>
           {u.id !== meId ? (

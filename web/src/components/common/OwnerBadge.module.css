@@ -1,0 +1,49 @@
+/* The instance owner's crown and badge. The crown starts gold like every
+   other owner crown and cycles the rainbow; the word is rainbow text. Both
+   hold still for anyone who asked for less motion. */
+.crown {
+  color: var(--warning);
+  flex: none;
+  animation: owner-hue 4s linear infinite;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--bg-active);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.text {
+  background: linear-gradient(90deg, #ff3b3b, #ff8c00, #ffd400, #3ddc84, #3b82f6, #a855f7, #ff3b3b);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: owner-slide 4s linear infinite;
+}
+
+@keyframes owner-hue {
+  to {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@keyframes owner-slide {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crown,
+  .text {
+    animation: none;
+  }
+}
