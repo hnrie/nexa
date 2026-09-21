@@ -275,6 +275,9 @@ function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker
   const toggle = (el: HTMLElement) => setAnchor((cur) => (cur ? null : el));
   // The lightbox only shows pictures, so video and animated stickers get
   // their own branch: no lightbox hook, and their click only opens the popout.
+  // The wrapper is inline-block rather than contents: the popout positions
+  // itself from this element's box, and a contents box does not have one,
+  // which used to strand the popout in the top left corner.
   if (format === "tgs" || format === "webm") {
     const size = { width: Math.min(160, w), height: 160 };
     return (
@@ -291,7 +294,7 @@ function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker
             e.preventDefault();
             toggle(e.currentTarget);
           }}
-          style={{ display: "contents" }}
+          style={{ display: "inline-block", lineHeight: 0 }}
         >
           <StickerMedia format={format} src={stickerUrl(sticker.blob, 160)} alt={sticker.name ?? "sticker"} className={s.sticker} style={size} />
         </span>
