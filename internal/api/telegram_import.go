@@ -103,7 +103,10 @@ func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	alive := true
+	var sendMu sync.Mutex
 	send := func(v any) {
+		sendMu.Lock()
+		defer sendMu.Unlock()
 		if !alive {
 			return
 		}
