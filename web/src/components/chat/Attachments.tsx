@@ -11,6 +11,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { ZoomPan, type ZoomPanHandle } from "@/components/common/ZoomPan";
 import { AudioPlayer } from "./AudioPlayer";
 import { imageMenuItems } from "./messageMenu";
+import { FavoriteButton } from "./FavoriteButton";
 import { VideoPlayer } from "./VideoPlayer";
 import { fitMedia, fitVideo } from "./fitMedia";
 import s from "./Chat.module.css";
@@ -161,6 +162,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
   return (
     <>
       <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} onClick={() => (revealed ? url && setOpen(true) : setRevealed(true))}>
+        {att.type === "image/gif" ? <FavoriteButton url={`attach:${att.blob_id}`} w={att.w} h={att.h} att={att} className={s.favStar} /> : null}
         {url ? (
           <img src={url} alt={att.name} width={dims.width} height={dims.height} data-image-src={url} data-image-name={att.name} />
         ) : (

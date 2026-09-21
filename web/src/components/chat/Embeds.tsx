@@ -1,9 +1,9 @@
-import { Play, Star } from "lucide-react";
+import { Play } from "lucide-react";
 import { useState } from "react";
 import type { UnfurlResult } from "@/api/types";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/common/Button";
-import { toggleFavoriteGif } from "@/lib/gifFavorites";
+import { FavoriteButton } from "./FavoriteButton";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { Lightbox, fitMedia } from "./Attachments";
@@ -11,7 +11,7 @@ import { VideoPlayer } from "./VideoPlayer";
 import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 import { imageNameFromUrl } from "@/lib/imageActions";
-import { mediaKey, useMediaSrc } from "@/lib/mediaLinks";
+import { useMediaSrc } from "@/lib/mediaLinks";
 
 import { t } from "@/i18n";
 /** A readable name for a linked file: the last part of its address. */
@@ -28,27 +28,6 @@ function fitCard(w: number | undefined, h: number | undefined, maxW = 400, maxH 
   if (!w || !h) return undefined;
   const r = Math.min(1, maxW / w, maxH / h);
   return { width: Math.round(w * r), height: Math.round(h * r) };
-}
-
-/** Saves the proxied URL, so favourites load through this server too. */
-export function FavoriteButton({ url, w, h }: { url: string; w?: number; h?: number }) {
-  const on = useSettings((st) => st.settings.favoriteGifs.some((f) => mediaKey(f.url) === mediaKey(url)));
-  const toast = useUI((u) => u.toast);
-  return (
-    <button
-      className={s.star}
-      data-on={on}
-      title={on ? t("chat.embeds.removeFromFavorites") : t("chat.embeds.addToFavorites")}
-      aria-label={on ? t("chat.embeds.removeFromFavorites") : t("chat.embeds.addToFavorites")}
-      onClick={(e) => {
-        e.stopPropagation();
-        const now = toggleFavoriteGif({ url, ...(w ? { w } : {}), ...(h ? { h } : {}) });
-        toast(now ? t("chat.embeds.addedToYourGifFavorites") : t("chat.embeds.removedFromFavorites"), "success");
-      }}
-    >
-      <Star size={16} fill={on ? "currentColor" : "none"} />
-    </button>
-  );
 }
 
 /**

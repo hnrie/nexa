@@ -133,6 +133,12 @@
 .imgWrap[data-spoiler="true"] img, .imgWrap[data-spoiler="true"] video { filter: blur(44px); }
 .spoilerTag { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .spoilerTag span { padding: 6px 12px; border-radius: 20px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 14px; font-weight: 700; }
+/* the favourite star over an uploaded picture: hidden until hover, always
+   shown on touch screens and once starred, like link embeds */
+.favStar { position: absolute; top: 6px; inset-inline-end: 6px; width: 28px; height: 28px; border-radius: 6px; background: rgba(0, 0, 0, 0.6); color: #fff; display: none; align-items: center; justify-content: center; }
+.favStar[data-on="true"] { display: inline-flex; color: var(--warning); }
+@media (hover: hover) { .imgWrap:hover .favStar { display: inline-flex; } }
+@media (hover: none) { .favStar { display: inline-flex; } }
 .imgPlaceholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; }
 .loadFailed { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; text-align: center; }
 .file { display: flex; align-items: center; gap: 12px; width: 432px; max-width: 100%; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); }

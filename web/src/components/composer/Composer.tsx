@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, ty
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
+import { favoriteFile } from "@/lib/gifFavorites";
 import { fitsUploadLimit, stage, uploadLimit, uploadStaged, type Staged } from "@/lib/attachments";
 import { holdReload } from "@/lib/busy";
 import { useAuth } from "@/stores/auth";
@@ -480,6 +481,14 @@ export function Composer({ channel }: { channel: Channel }) {
           serverId={channel.server_id}
           gifs={<GifPicker onPick={(g) => {
             setPicker(false);
+            if (g.att) {
+              // an uploaded favourite: stage its decrypted bytes, then it goes
+              // up and out exactly like a file just chosen
+              void favoriteFile({ url: g.url, w: g.w, h: g.h, att: g.att })
+                .then(({ blob, name, type }) => addFiles([new File([blob], name, { type })]))
+                .catch(() => toast(tr_("composer.composer.uploadFailed"), "error"));
+              return;
+            }
             const opts: SendOptions = { embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] };
             // a GIF picked while replying answers that reply, like a typed message does
             const gifReply = replyTo && replyTo.channelId === channel.id ? replyTo : null;

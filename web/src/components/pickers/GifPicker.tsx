@@ -2,7 +2,9 @@ import { Star, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { GifResult } from "@/api/types";
+import type { AttachmentMeta } from "@/crypto/message";
 import { removeFavoriteGifs, toggleFavoriteGif, type FavoriteGif } from "@/lib/gifFavorites";
+import { attachmentObjectURL } from "@/lib/mediaCache";
 import { BLANK_IMAGE, mediaKey, useMediaLinks } from "@/lib/mediaLinks";
 import { useExpressions } from "@/stores/expressions";
 import { useSettings } from "@/stores/settings";
@@ -12,7 +14,7 @@ import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
 import { t as tr_ } from "@/i18n";
-type Pick = (gif: { url: string; w?: number; h?: number }) => void;
+type Pick = (gif: { url: string; w?: number; h?: number; att?: AttachmentMeta }) => void;
 
 interface ResultTile extends GifTileData {
   gif: GifResult;
@@ -110,6 +112,32 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, enabled, tab]);
 
+  // Uploaded favourites resolve through the attachment cache rather than the
+  // link signer: their bytes are decrypted on this device, not re-signed.
+  const [attUrls, setAttUrls] = useState<Record<string, string>>({});
+  const [attGone, setAttGone] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    let alive = true;
+    const missing = favs.filter((f) => f.att && !attUrls[f.att.blob_id] && !attGone.has(f.att.blob_id));
+    if (missing.length === 0) return;
+    void (async () => {
+      for (const f of missing) {
+        const att = f.att!;
+        try {
+          const url = await attachmentObjectURL(att);
+          if (!alive) return;
+          setAttUrls((m) => (m[att.blob_id] ? m : { ...m, [att.blob_id]: url }));
+        } catch {
+          if (!alive) return;
+          setAttGone((d) => (d.has(att.blob_id) ? d : new Set(d).add(att.blob_id)));
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [favs, attUrls, attGone]);
+
   const loadMore = useCallback(() => {
     if (loading || failed !== null || !next || shownFor === null) return;
     void load(shownFor, next);
@@ -123,6 +151,18 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
   // after a day: it is shown, and sent, as that link signed again. One this
   // server will not sign again is gone.
   const favoriteTiles: FavoriteTile[] = favs.map((f) => {
+    if (f.att) {
+      const src = attUrls[f.att.blob_id];
+      return {
+        key: f.url,
+        src: src ?? BLANK_IMAGE,
+        label: tr_("pickers.gifPicker.favoriteGif"),
+        w: f.w ?? f.att.w,
+        h: f.h ?? f.att.h,
+        dead: attGone.has(f.att.blob_id),
+        fav: f,
+      };
+    }
     const src = fresh(f.url);
     return {
       key: f.url,

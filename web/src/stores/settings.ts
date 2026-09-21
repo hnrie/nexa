@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { FavoriteGif } from "@/lib/gifFavorites";
 import { users as usersApi } from "@/api/users";
 import { ApiError } from "@/api/client";
 import { decryptSettings, encryptSettings } from "@/lib/settingsCrypto";
@@ -69,7 +70,7 @@ export interface Settings {
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
-  favoriteGifs: { url: string; w?: number; h?: number }[];
+  favoriteGifs: FavoriteGif[];
   skinTone: number;
   /**
    * desktop: notifications in a browser, which has to be allowed first.
