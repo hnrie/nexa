@@ -1,0 +1,33 @@
+# Template. deploy/install.sh substitutes @ROOT@, @USER@ and @GROUP@ and
+# installs the result to /etc/systemd/system/xyz.evilion.chat.service — edit
+# this file, not that copy.
+#
+# Evilion Chat (chat.evilion.xyz): one Go process serving the API, the
+# WebSocket gateway, media and the web app on 127.0.0.1:8090. The Cloudflare
+# tunnel forwards the hostname to it. Runs as the folder's owner, never root.
+[Unit]
+Description=Evilion Chat — end-to-end-encrypted chat (chatd)
+Documentation=file://@ROOT@/deploy/README.md
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=exec
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@ROOT@
+# run.sh execs bin/chatd, so chatd is the process systemd tracks and a
+# SIGTERM reaches it directly: it closes the gateway, finishes in-flight
+# requests and checkpoints SQLite before exiting (about 10 seconds).
+ExecStart=@ROOT@/run.sh
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# SQLite under concurrent load wants headroom past the default 1024.
+LimitNOFILE=8192
+Restart=always
+RestartSec=5s
+TimeoutStopSec=30
+SyslogIdentifier=xyz-evilion-chat
+
+[Install]
+WantedBy=multi-user.target

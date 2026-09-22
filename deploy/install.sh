@@ -14,9 +14,18 @@ for a in "$@"; do case "$a" in --check) CHECK=1;; --no-start) START=0;; *) echo 
 
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 LABEL="xyz.evilion.chat"
-PLIST="/Library/LaunchDaemons/$LABEL.plist"
 TUNNEL_CFG="$ROOT/../server/tunnel/config.yml"
-SITE_LABEL="xyz.evilion.evilionxyz"
+
+OS="$(uname -s)"
+if [ "$OS" = Darwin ]; then
+  UNIT="/Library/LaunchDaemons/$LABEL.plist"
+  # the parent stack that runs the tunnel, restarted so cloudflared reloads
+  # the ingress below
+  SITE_LABEL="xyz.evilion.evilionxyz"
+else
+  UNIT="/etc/systemd/system/$LABEL.service"
+  SITE_LABEL="evilionxyz"
+fi
 
 if [ -t 1 ]; then G=$'\033[32m'; Y=$'\033[33m'; R=$'\033[31m'; N=$'\033[0m'; else G=; Y=; R=; N=; fi
 ok()   { echo "${G}ok${N}    $*"; }
@@ -31,10 +40,16 @@ PUBLIC_URL="$(env_get PUBLIC_URL https://chat.evilion.xyz)"
 HOSTNAME_="${PUBLIC_URL#https://}"; HOSTNAME_="${HOSTNAME_#http://}"; HOSTNAME_="${HOSTNAME_%%/*}"
 
 # --- who runs it ------------------------------------------------------------
-OWNER="$(stat -f %Su "$ROOT")"
+# stat spells "owner" differently per OS; try this machine's spelling first.
+OWNER="$(stat -f %Su "$ROOT" 2>/dev/null || stat -c %U "$ROOT")"
 GROUP="$(id -gn "$OWNER")"
-OWNER_HOME="$(dscl . -read "/Users/$OWNER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
-[ -n "$OWNER_HOME" ] || OWNER_HOME="/Users/$OWNER"
+if [ "$OS" = Darwin ]; then
+  OWNER_HOME="$(dscl . -read "/Users/$OWNER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+  [ -n "$OWNER_HOME" ] || OWNER_HOME="/Users/$OWNER"
+else
+  OWNER_HOME="$(getent passwd "$OWNER" 2>/dev/null | cut -d: -f6)"
+  [ -n "$OWNER_HOME" ] || OWNER_HOME="/home/$OWNER"
+fi
 BASH_BIN="$(command -v bash)"
 DAEMON_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
@@ -56,29 +71,53 @@ doit chmod 700 "$ROOT/data" 2>/dev/null || true
 if [ -x "$ROOT/bin/chatd" ]; then ok "bin/chatd built"; else die "bin/chatd is missing — run 'make build' first"; fi
 [ -f "$ROOT/web/dist/index.html" ] && ok "web/dist built" || todo "web/dist missing — run 'make web' (the server starts but serves a 503 page until then)"
 
-# 4. launchd plist (needs root)
-render() { sed -e "s|@ROOT@|$ROOT|g" -e "s|@USER@|$OWNER|g" -e "s|@GROUP@|$GROUP|g" -e "s|@HOME@|$OWNER_HOME|g" -e "s|@BASH@|$BASH_BIN|g" -e "s|@PATH@|$DAEMON_PATH|g" "$ROOT/deploy/$LABEL.plist.in"; }
-if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then die "installing the LaunchDaemon needs root: sudo bash deploy/install.sh"; fi
-if [ -f "$PLIST" ] && diff -q <(render) "$PLIST" >/dev/null 2>&1; then ok "$PLIST up to date"; else
-  todo "writing $PLIST"
-  if [ "$CHECK" = 0 ]; then render > "$PLIST"; chown root:wheel "$PLIST"; chmod 644 "$PLIST"; fi
+# 4. service definition (needs root)
+render_launchd() { sed -e "s|@ROOT@|$ROOT|g" -e "s|@USER@|$OWNER|g" -e "s|@GROUP@|$GROUP|g" -e "s|@HOME@|$OWNER_HOME|g" -e "s|@BASH@|$BASH_BIN|g" -e "s|@PATH@|$DAEMON_PATH|g" "$ROOT/deploy/$LABEL.plist.in"; }
+render_systemd() { sed -e "s|@ROOT@|$ROOT|g" -e "s|@USER@|$OWNER|g" -e "s|@GROUP@|$GROUP|g" "$ROOT/deploy/$LABEL.service.in"; }
+if [ "$CHECK" = 0 ] && [ "$(id -u)" != 0 ]; then
+  if [ "$OS" = Darwin ]; then die "installing the LaunchDaemon needs root: sudo bash deploy/install.sh";
+  else die "installing the systemd unit needs root: sudo bash deploy/install.sh"; fi
+fi
+if [ "$OS" = Darwin ]; then
+  if [ -f "$UNIT" ] && diff -q <(render_launchd) "$UNIT" >/dev/null 2>&1; then ok "$UNIT up to date"; else
+    todo "writing $UNIT"
+    if [ "$CHECK" = 0 ]; then render_launchd > "$UNIT"; chown root:wheel "$UNIT"; chmod 644 "$UNIT"; fi
+  fi
+else
+  if [ -f "$UNIT" ] && diff -q <(render_systemd) "$UNIT" >/dev/null 2>&1; then ok "$UNIT up to date"; else
+    todo "writing $UNIT"
+    if [ "$CHECK" = 0 ]; then render_systemd > "$UNIT"; chmod 644 "$UNIT"; fi
+  fi
 fi
 
 # 5. start / restart
+wait_healthy() {
+  for i in $(seq 1 30); do
+    if curl -sf "http://$LISTEN/api/health" >/dev/null 2>&1; then ok "chatd answers on http://$LISTEN/api/health"; return 0; fi
+    sleep 1
+    [ "$i" = 30 ] && die "chatd did not come up — see $ROOT/logs/chatd.log"
+  done
+}
 if [ "$START" = 1 ]; then
-  if launchctl print "system/$LABEL" >/dev/null 2>&1; then
-    todo "restarting $LABEL"
-    doit launchctl bootout "system/$LABEL" || true
+  if [ "$OS" = Darwin ]; then
+    if launchctl print "system/$LABEL" >/dev/null 2>&1; then
+      todo "restarting $LABEL"
+      doit launchctl bootout "system/$LABEL" || true
+    else
+      todo "starting $LABEL"
+    fi
+    if [ "$CHECK" = 0 ]; then
+      launchctl bootstrap system "$UNIT"
+      wait_healthy
+    fi
   else
-    todo "starting $LABEL"
-  fi
-  if [ "$CHECK" = 0 ]; then
-    launchctl bootstrap system "$PLIST"
-    for i in $(seq 1 30); do
-      if curl -sf "http://$LISTEN/api/health" >/dev/null 2>&1; then ok "chatd answers on http://$LISTEN/api/health"; break; fi
-      sleep 1
-      [ "$i" = 30 ] && die "chatd did not come up — see $ROOT/logs/chatd.log"
-    done
+    todo "restarting $LABEL"
+    if [ "$CHECK" = 0 ]; then
+      systemctl daemon-reload
+      systemctl enable "$LABEL" >/dev/null 2>&1
+      systemctl restart "$LABEL"
+      wait_healthy
+    fi
   fi
 else
   ok "not starting (--no-start)"
@@ -107,11 +146,20 @@ if not done:
     sys.exit("catch-all rule not found in tunnel config")
 open(path, "w").write("\n".join(out))
 PY
-      if launchctl print "system/$SITE_LABEL" >/dev/null 2>&1; then
-        todo "restarting $SITE_LABEL so cloudflared reloads its ingress"
-        launchctl kickstart -k "system/$SITE_LABEL"
+      if [ "$OS" = Darwin ]; then
+        if launchctl print "system/$SITE_LABEL" >/dev/null 2>&1; then
+          todo "restarting $SITE_LABEL so cloudflared reloads its ingress"
+          launchctl kickstart -k "system/$SITE_LABEL"
+        else
+          todo "$SITE_LABEL is not installed on this box — restart cloudflared yourself"
+        fi
       else
-        todo "$SITE_LABEL is not installed on this box — restart cloudflared yourself"
+        if systemctl cat "$SITE_LABEL.service" >/dev/null 2>&1; then
+          todo "restarting $SITE_LABEL so cloudflared reloads its ingress"
+          systemctl restart "$SITE_LABEL.service"
+        else
+          todo "$SITE_LABEL is not installed on this box — restart cloudflared yourself"
+        fi
       fi
     fi
   fi
