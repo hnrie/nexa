@@ -103,6 +103,14 @@ if [ "$START" = 1 ]; then
     if launchctl print "system/$LABEL" >/dev/null 2>&1; then
       todo "restarting $LABEL"
       doit launchctl bootout "system/$LABEL" || true
+      if [ "$CHECK" = 0 ]; then
+        # bootout returns before the old copy is gone; bootstrapping into
+        # that window fails with "service already loaded"
+        for i in $(seq 1 60); do
+          launchctl print "system/$LABEL" >/dev/null 2>&1 || break
+          sleep 1
+        done
+      fi
     else
       todo "starting $LABEL"
     fi
