@@ -1,7 +1,7 @@
 import { Download, Monitor, Smartphone, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { android, type AndroidRelease } from "@/api/android";
+import { android, androidPaused, type AndroidRelease } from "@/api/android";
 import { desktop, type DesktopFile } from "@/api/desktop";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { desktopBridge } from "@/lib/desktopBridge";
@@ -31,7 +31,7 @@ export function DownloadBanner() {
   const [closed, setClosed] = useState(() => storage.get(key) !== null);
 
   useEffect(() => {
-    if (closed || desktopBridge()) return;
+    if (closed || desktopBridge() || androidBrowser) return;
     let alive = true;
     if (androidBrowser) {
       void android
@@ -68,7 +68,8 @@ export function DownloadBanner() {
   if (closed) return null;
 
   if (androidBrowser) {
-    if (!apk) return null;
+    // Android downloads are paused: phones get no banner until the app is worth installing again.
+    if (androidPaused || !apk) return null;
     return (
       <div className={s.banner} role="region" aria-label={t("shell.downloadBanner.androidApp")} data-testid="android-banner">
         <span className={s.icon}><Smartphone size={18} /></span>

@@ -63,3 +63,11 @@ export function androidVersionName(minSdk: number): string {
   const names: Record<number, string> = { 24: "7.0", 26: "8.0", 28: "9", 29: "10", 30: "11", 31: "12", 33: "13", 34: "14", 35: "15", 36: "16" };
   return names[minSdk] ?? `API ${minSdk}`;
 }
+
+/**
+ * Android downloads are paused: the app is too rough to offer right now.
+ * While this is true the download page and the banner hide every APK and say
+ * the app is being worked on instead. The published files stay where they
+ * are, so flipping this back is all it takes to offer them again.
+ */
+export const androidPaused = true;

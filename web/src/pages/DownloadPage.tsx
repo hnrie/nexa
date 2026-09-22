@@ -1,7 +1,7 @@
 import { Download, Laptop, Monitor, Smartphone, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { android, androidVersionName, builds, type AndroidFile, type AndroidRelease } from "@/api/android";
+import { android, androidPaused, androidVersionName, builds, type AndroidFile, type AndroidRelease } from "@/api/android";
 import { desktop, type DesktopFile, type DesktopRelease } from "@/api/desktop";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
@@ -134,14 +134,14 @@ export default function DownloadPage() {
           </div>
         ) : null}
 
-        {/* Nothing published for Android right now: say so rather than leave a page with no download on it. */}
-        {onAndroid && apk === null && !apkFailed && apk !== undefined ? (
+        {/* Nothing published for Android right now, or downloads paused: say so rather than leave a page with no download on it. */}
+        {onAndroid && (androidPaused || (apk === null && !apkFailed && apk !== undefined)) ? (
           <div className={s.empty} data-testid="android-paused">
             {t("download.theAndroidAppIsBeingWorked")}
           </div>
         ) : null}
 
-        {apk && myApk && onAndroid ? (
+        {apk && myApk && onAndroid && !androidPaused ? (
           <div className={s.primary}>
             <a className={s.bigButton} href={android.fileUrl(myApk.name)} data-testid="download-android" data-abi={myApk.abi} onClick={(e) => { e.preventDefault(); setWarnApk(myApk); }}>
               <Download size={20} /> {t("download.downloadForAndroid")}
@@ -199,7 +199,7 @@ export default function DownloadPage() {
               </div>
             </div>
 
-            {apk ? (
+            {apk && !androidPaused ? (
               <div className={s.section}>
                 <h2 className={s.label}>{t("download.android")}</h2>
                 {apkFiles.length > 1 ? <p className={s.meta} style={{ textAlign: "start", margin: 0 }}>{t("download.aBuildForYourOwnProcessor")}</p> : null}
@@ -228,7 +228,7 @@ export default function DownloadPage() {
                 <li><b>{t("download.windows")}</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>{t("download.moreInfo")}</b>, then <b>{t("download.runAnyway")}</b>.</li>
                 <li><b>macOS</b>: open the disk image and drag Nexa into Applications. The first time, right-click the app and choose <b>{t("chat.lockedChannel.open")}</b>.</li>
                 <li><b>{t("download.linux")}</b>: make the AppImage executable (<code>{t("download.chmodX")}</code>{t("download.andRunItItUpdatesItself")}</li>
-                {apk ? <li><b>{t("download.android")}</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>{t("settings.stickers.install")}</b>.</li> : null}
+                {apk && !androidPaused ? <li><b>{t("download.android")}</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>{t("settings.stickers.install")}</b>.</li> : null}
               </ul>
             </div>
           </>
