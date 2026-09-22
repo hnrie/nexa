@@ -54,13 +54,10 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
-  // a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows.
-  // Pictures load eagerly: the pack sections already skip offscreen work with
-  // content-visibility, and lazy images inside such sections double-gate in
-  // Chromium, sometimes sitting blank until an extra scroll nudge.
+  // a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows
   const cell = (sticker: Sticker, pack: StickerPack) => (
     <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} tabIndex={-1} onClick={() => onPick({ sticker, pack })}>
-      <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} eager />
+      <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} />
     </button>
   );
 
@@ -75,7 +72,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
             const cover = p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
             return (
               <button key={p.id} className={s.cat} title={p.name} aria-label={p.name} onClick={() => jump(p.id)} onContextMenu={packMenu(p)}>
-                {cover ? <StickerView format={cover.format} src={packImageUrl(p, cover, 24)} alt="" className={s.catImg} eager /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
+                {cover ? <StickerView format={cover.format} src={packImageUrl(p, cover, 24)} alt="" className={s.catImg} /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
               </button>
             );
           })}
