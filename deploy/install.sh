@@ -40,8 +40,14 @@ PUBLIC_URL="$(env_get PUBLIC_URL https://chat.evilion.xyz)"
 HOSTNAME_="${PUBLIC_URL#https://}"; HOSTNAME_="${HOSTNAME_#http://}"; HOSTNAME_="${HOSTNAME_%%/*}"
 
 # --- who runs it ------------------------------------------------------------
-# stat spells "owner" differently per OS; try this machine's spelling first.
-OWNER="$(stat -f %Su "$ROOT" 2>/dev/null || stat -c %U "$ROOT")"
+# stat spells "owner" differently per OS, and GNU stat accepts -f with a
+# completely different meaning (filesystem status) instead of failing, so
+# this branches rather than trying one spelling and falling back.
+if [ "$OS" = Darwin ]; then
+  OWNER="$(stat -f %Su "$ROOT")"
+else
+  OWNER="$(stat -c %U "$ROOT")"
+fi
 GROUP="$(id -gn "$OWNER")"
 if [ "$OS" = Darwin ]; then
   OWNER_HOME="$(dscl . -read "/Users/$OWNER" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
