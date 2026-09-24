@@ -441,7 +441,17 @@ func (s *Server) handleRecoverFinish(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	u, _ = s.Store.UserByID(r.Context(), u.ID)
+	// The account has changed and its old sessions are gone, so this answer
+	// is the only way in: a failed read-back keeps what was just written
+	// rather than answering with nothing (or crashing on it).
+	if fresh, err := s.Store.UserByID(r.Context(), u.ID); err == nil {
+		u = fresh
+	} else {
+		u.AuthHash, u.KDFSalt, u.KDFParams, u.EncPrivateKey = upd.AuthHash, upd.KDFSalt, upd.KDFParams, upd.EncPrivateKey
+		if upd.RecoveryAuthHash != "" {
+			u.RecoveryAuthHash, u.EncPrivateKeyRecovery = upd.RecoveryAuthHash, upd.EncPrivateKeyRecovery
+		}
+	}
 	resp := keyBundle(u)
 	resp["user"] = s.meView(r.Context(), u)
 	resp["token"] = token

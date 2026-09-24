@@ -383,7 +383,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.goLive(ServerFrame{T: EvReady, S: h.nextSeq(), D: ready})
 	// a guest has no presence: nobody lists them anywhere but in the call
 	if first && guest == nil {
-		h.broadcastPresence(ctx, user)
+		h.broadcastArrival(ctx, user)
 	} else if guest == nil && h.othersAway(user.ID, c) {
 		// someone idle on every other device is back, on this one
 		h.broadcastPresence(ctx, user)
@@ -422,7 +422,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if last && guest == nil {
 		if u, err := h.st.UserByID(bg, user.ID); err == nil {
-			h.broadcastPresence(bg, u)
+			h.broadcastArrival(bg, u)
 		}
 		if h.OnDisconnect != nil {
 			h.OnDisconnect(bg, user.ID)
@@ -868,8 +868,12 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 	for _, id := range userIDs {
 		if usr := users[id]; usr != nil {
 			p.Users = append(p.Users, usr.Public())
+			// only people who show as here: an "offline" entry for someone
+			// connected would mark them out as invisible
 			if h.Online(id) {
-				p.Presences = append(p.Presences, h.PresenceOf(ctx, usr))
+				if pr := h.PresenceOf(ctx, usr); pr.Status != "offline" {
+					p.Presences = append(p.Presences, pr)
+				}
 			}
 		}
 	}

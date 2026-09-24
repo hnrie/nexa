@@ -750,7 +750,9 @@ func (h *Hub) PresenceOf(ctx context.Context, u *store.User) Presence {
 	case "idle", "dnd":
 		p.Status = u.PresencePref
 	case "invisible":
-		p.Status = "offline"
+		// exactly what someone offline looks like: a custom status shown
+		// beside "offline" would say they are really here
+		return Presence{UserID: u.ID, Status: "offline"}
 	default:
 		p.Status = "online"
 		// online, but left alone on every device for a while: idle until back
@@ -793,6 +795,18 @@ func (h *Hub) PresenceChanged(uid ids.ID) {
 }
 
 // broadcastPresence pushes the user's current presence to interested users.
+// broadcastArrival is broadcastPresence for a first connection or a last
+// disconnection. Someone invisible looks offline either way, so the others
+// are told nothing — an "offline" arriving the moment they connect would be
+// the tell — and only their own other devices hear.
+func (h *Hub) broadcastArrival(ctx context.Context, u *store.User) {
+	if u.PresencePref == "invisible" {
+		h.EmitUsers([]ids.ID{u.ID}, EvPresence, h.selfPresence(ctx, u))
+		return
+	}
+	h.broadcastPresence(ctx, u)
+}
+
 func (h *Hub) broadcastPresence(ctx context.Context, u *store.User) {
 	interested := h.interestedIn(ctx, u.ID)
 	others := interested[:0:0]
