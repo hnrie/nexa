@@ -1,8 +1,11 @@
 package api
 
 import (
+	"errors"
 	"testing"
 	"time"
+
+	"evilion.xyz/chat/internal/store"
 )
 
 func TestFriendRequestsAndBlocks(t *testing.T) {
@@ -85,5 +88,51 @@ func TestFriendRequestsAndBlocks(t *testing.T) {
 	}
 	if res, body = do(t, ts, "POST", "/api/v1/users/@me/relationships", tokB, map[string]any{"username": "alice"}); res.StatusCode != 200 || body["type"] != "outgoing" {
 		t.Errorf("request after unblock: %d %v", res.StatusCode, body)
+	}
+}
+
+// Blocking someone who has blocked you adds your own block; it does not lift
+// theirs, so it cannot be used to get back in touch.
+func TestBlockingBackKeepsTheOtherBlock(t *testing.T) {
+	srv, ts := newTestServer(t)
+	aliceTok, aliceID := register(t, ts, "alice")
+	malTok, malID := register(t, ts, "mallory")
+	if res, _ := do(t, ts, "PUT", "/api/v1/users/@me/blocks/"+malID, aliceTok, nil); res.StatusCode != 204 {
+		t.Fatalf("alice blocks: %d", res.StatusCode)
+	}
+	if res, _ := do(t, ts, "PUT", "/api/v1/users/@me/blocks/"+aliceID, malTok, nil); res.StatusCode != 204 {
+		t.Fatalf("mallory blocks back: %d", res.StatusCode)
+	}
+	if res, _ := do(t, ts, "DELETE", "/api/v1/users/@me/blocks/"+aliceID, malTok, nil); res.StatusCode != 204 {
+		t.Fatalf("mallory unblocks: %d", res.StatusCode)
+	}
+	rel, err := srv.Store.Relationship(t.Context(), modID(aliceID), modID(malID))
+	if err != nil || rel.Type != "blocked" {
+		t.Fatalf("alice's block went: %+v %v", rel, err)
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/users/@me/relationships", malTok, map[string]any{"username": "alice"}); res.StatusCode != 403 || errCode(body) != "blocked" {
+		t.Errorf("mallory's request: %d %v", res.StatusCode, body)
+	}
+	if res, _ := do(t, ts, "POST", "/api/v1/users/@me/channels", malTok, map[string]any{"recipient_ids": []string{aliceID}}); res.StatusCode < 400 {
+		t.Errorf("mallory opened a DM: %d", res.StatusCode)
+	}
+}
+
+// A request that passed the block check just before a block landed is
+// refused rather than written over the block.
+func TestARequestDoesNotOverwriteABlock(t *testing.T) {
+	srv, ts := newTestServer(t)
+	register(t, ts, "alice")
+	_, aliceID := register(t, ts, "alice2")
+	_, bobID := register(t, ts, "bob")
+	ctx := t.Context()
+	if err := srv.Store.Block(ctx, modID(bobID), modID(aliceID)); err != nil {
+		t.Fatal(err)
+	}
+	if err := srv.Store.SetRelationshipPair(ctx, modID(aliceID), modID(bobID), "outgoing", "incoming"); !errors.Is(err, store.ErrBlocked) {
+		t.Fatalf("pair over a block: %v", err)
+	}
+	if rel, err := srv.Store.Relationship(ctx, modID(bobID), modID(aliceID)); err != nil || rel.Type != "blocked" {
+		t.Errorf("bob's block: %+v %v", rel, err)
 	}
 }

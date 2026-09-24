@@ -277,14 +277,15 @@ func (s *Server) finishDeletedAccounts(ctx context.Context) {
 		return
 	}
 	for _, uid := range list {
-		opt := purgeOptions{DMs: true}
-		if cases, err := s.Store.ModCasesForUser(ctx, uid); err == nil {
-			for _, c := range cases {
-				if c.Action == store.ActionDelete {
-					opt.DMs = false
-				}
-			}
+		// Who deleted it decides whether the other side keeps its DMs, so an
+		// account that cannot be looked up waits for the next sweep rather
+		// than being guessed at.
+		staff, err := s.Store.DeletedByStaff(ctx, uid)
+		if err != nil {
+			s.Log.Warn("deleted accounts: who deleted it", "user", uid.String(), "err", err)
+			continue
 		}
+		opt := purgeOptions{DMs: !staff}
 		pctx, cancel := context.WithTimeout(ctx, purgeTimeout)
 		r, _ := http.NewRequestWithContext(pctx, http.MethodPost, "/", nil)
 		if err := s.purgeAccount(r, uid, opt); err != nil {

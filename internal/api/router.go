@@ -80,6 +80,9 @@ type Server struct {
 	limVoice   *ratelimit.Limiter
 	limGuest   *ratelimit.Limiter
 	limRotate  *ratelimit.Limiter
+	limPass    *ratelimit.Limiter
+	limProfile *ratelimit.Limiter
+	limExpr    *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -155,6 +158,18 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// is held to well above real membership churn and far below what one
 		// account posting in a loop would manage.
 		limRotate: ratelimit.New(ratelimit.Every(60, time.Hour), 30, 2*time.Hour),
+		// Password checks by a signed-in account — changing it, a new
+		// recovery key, deleting the account, two-factor changes, a locked
+		// subchat — each cost an Argon2 hash, the most expensive thing the
+		// server does. A person mistyping gets several goes a minute.
+		limPass: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
+		// Profile and status changes, per account: each is sent to everyone
+		// who shares a server with the person.
+		limProfile: ratelimit.New(ratelimit.Every(20, time.Minute), 20, 10*time.Minute),
+		// New emoji and stickers, per account: a pack is filled by dropping a
+		// folder of images in at once, so the burst is generous; a script
+		// filling the disk is not.
+		limExpr: ratelimit.New(ratelimit.Every(120, time.Minute), 200, 10*time.Minute),
 	}
 }
 

@@ -30,7 +30,7 @@ const (
 
 func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/servers/{id}/emojis", s.authed(s.handleEmojis))
-	mux.Handle("POST /api/v1/servers/{id}/emojis", s.authed(s.handleEmojiCreate))
+	mux.Handle("POST /api/v1/servers/{id}/emojis", s.userLimited(s.limExpr, s.handleEmojiCreate))
 	mux.Handle("PATCH /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiPatch))
 	mux.Handle("DELETE /api/v1/servers/{id}/emojis/{eid}", s.authed(s.handleEmojiDelete))
 	mux.Handle("GET /api/v1/stickers/packs", s.authed(s.handlePacks))
@@ -41,7 +41,7 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/stickers/packs/{id}", s.authed(s.handlePackGet))
 	mux.Handle("PATCH /api/v1/stickers/packs/{id}", s.authed(s.handlePackPatch))
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}", s.authed(s.handlePackDelete))
-	mux.Handle("POST /api/v1/stickers/packs/{id}/stickers", s.authed(s.handleStickerCreate))
+	mux.Handle("POST /api/v1/stickers/packs/{id}/stickers", s.userLimited(s.limExpr, s.handleStickerCreate))
 	mux.Handle("PATCH /api/v1/stickers/packs/{id}/stickers", s.authed(s.handleStickerPositions))
 	mux.Handle("PATCH /api/v1/stickers/packs/{id}/stickers/{sid}", s.authed(s.handleStickerPatch))
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}/stickers/{sid}", s.authed(s.handleStickerDelete))

@@ -20,7 +20,7 @@ func (s *Server) channelRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/users/@me/channels", s.authed(s.handleDMList))
 	mux.Handle("GET /api/v1/channels/{id}", s.authed(s.handleChannelGet))
 	mux.Handle("PATCH /api/v1/channels/{id}", s.authed(s.handleChannelPatch))
-	mux.Handle("PUT /api/v1/channels/{id}/icon", s.authed(s.handleChannelIcon))
+	mux.Handle("PUT /api/v1/channels/{id}/icon", s.userLimited(s.limUpload, s.handleChannelIcon))
 	mux.Handle("DELETE /api/v1/channels/{id}/icon", s.authed(s.handleChannelIconDelete))
 	mux.Handle("POST /api/v1/channels/{id}/recipients/{uid}", s.authed(s.handleRecipientAdd))
 	mux.Handle("DELETE /api/v1/channels/{id}/recipients/{uid}", s.authed(s.handleRecipientRemove))
@@ -431,6 +431,14 @@ func (s *Server) handleAttachmentUpload(w http.ResponseWriter, r *http.Request) 
 	limit := s.Cfg.MaxUploadBytes
 	if limit > MaxSingleUploadBytes {
 		limit = MaxSingleUploadBytes
+	}
+	size := limit
+	if r.ContentLength > 0 && r.ContentLength < size {
+		size = r.ContentLength
+	}
+	if err := s.roomForUpload(r.Context(), me.ID, size, false); err != nil {
+		WriteError(w, err)
+		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
 	b, err := s.Media.PutEncrypted(r.Context(), r.Body, limit, me.ID)

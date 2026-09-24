@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 	"strings"
 
 	"evilion.xyz/chat/internal/auth"
@@ -13,7 +14,10 @@ import (
 )
 
 const (
-	maxAboutMe  = 100000
+	// About me is shown in full on a profile and travels with every profile
+	// change to everyone who shares a server with the person, so it is long
+	// enough for a life story and no longer.
+	maxAboutMe  = 20000
 	maxPronouns = 40
 	maxStatus   = 128
 	maxSettings = 1 << 20
@@ -49,6 +53,12 @@ func parseUserID(r *http.Request) (ids.ID, bool) {
 
 func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 	u := auth.UserFrom(r.Context())
+	// Every change goes out to everyone who shares a server with the person.
+	if ok, retry := s.limProfile.Allow("profile:" + u.ID.String()); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+		return
+	}
 	var raw map[string]json.RawMessage
 	if err := ReadJSON(w, r, &raw, 512<<10); err != nil {
 		WriteError(w, err)
@@ -82,6 +92,10 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		v = strings.ToLower(strings.TrimSpace(v))
 		if null || !ValidUsername(v) {
 			bad("invalid_username", "Usernames are 2–32 characters of a-z, 0-9, _ and . (no leading, trailing or double dots).")
+			return
+		}
+		if v != u.Username && reservedDisplayName(v) && !isSystem(u) {
+			bad("reserved_username", "That username belongs to the official Nexa account.")
 			return
 		}
 		p.Username = &v
@@ -219,7 +233,10 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.Bcast.UserUpdated(updated)
+	// A save that changed nothing anyone else sees goes nowhere.
+	if !reflect.DeepEqual(u.Public(), updated.Public()) || u.PresencePref != updated.PresencePref {
+		s.Bcast.UserUpdated(updated)
+	}
 	WriteJSON(w, http.StatusOK, s.meView(r.Context(), updated))
 }
 
@@ -232,9 +249,8 @@ func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	ok, err := auth.VerifyAuthKey(req.AuthKey, u.AuthHash)
-	if err != nil || !ok || len(req.AuthKey) != 32 {
-		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The password is wrong."))
+	if err := s.requirePassword(w, u, req.AuthKey, "The password is wrong."); err != nil {
+		WriteError(w, err)
 		return
 	}
 	ctx := r.Context()

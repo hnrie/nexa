@@ -326,6 +326,10 @@ func (s *Server) handleGuestJoin(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_display_name", "Names are 1–32 characters."))
 		return
 	}
+	if reservedDisplayName(name) {
+		WriteError(w, E(http.StatusBadRequest, "reserved_display_name", "That name belongs to the official Nexa account."))
+		return
+	}
 	ctx := r.Context()
 	link, ch, state := s.guestLink(ctx, req.Code, true)
 	if state == linkUnknown {

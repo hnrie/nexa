@@ -174,15 +174,18 @@ func (s *Server) issuer() string {
 	return host
 }
 
-// requirePassword re-checks the account password before a change to the
-// second factor, so a borrowed session cannot lock the owner out.
-func requirePassword(u *store.User, authKey []byte) error {
-	if len(authKey) != 32 {
-		return E(http.StatusUnauthorized, "invalid_credentials", "Your password is wrong.")
+// requirePassword re-checks the account password before a change that needs
+// it — the second factor, the password itself, deleting the account — so a
+// borrowed session cannot lock the owner out. wrong is what a wrong password
+// is told. The checks are metered per account: each is an Argon2 hash.
+func (s *Server) requirePassword(w http.ResponseWriter, u *store.User, authKey []byte, wrong string) error {
+	if ok, retry := s.limPass.Allow("pw:" + u.ID.String()); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		return ErrRateLimited
 	}
 	ok, err := auth.VerifyAuthKey(authKey, u.AuthHash)
 	if err != nil || !ok {
-		return E(http.StatusUnauthorized, "invalid_credentials", "Your password is wrong.")
+		return E(http.StatusUnauthorized, "invalid_credentials", wrong)
 	}
 	return nil
 }
@@ -218,7 +221,7 @@ func (s *Server) handleTOTPSetup(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if err := requirePassword(u, req.AuthKey); err != nil {
+	if err := s.requirePassword(w, u, req.AuthKey, "Your password is wrong."); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -297,7 +300,7 @@ func (s *Server) handleMFADisable(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if err := requirePassword(u, req.AuthKey); err != nil {
+	if err := s.requirePassword(w, u, req.AuthKey, "Your password is wrong."); err != nil {
 		WriteError(w, err)
 		return
 	}
@@ -317,7 +320,7 @@ func (s *Server) handleBackupCodes(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if err := requirePassword(u, req.AuthKey); err != nil {
+	if err := s.requirePassword(w, u, req.AuthKey, "Your password is wrong."); err != nil {
 		WriteError(w, err)
 		return
 	}

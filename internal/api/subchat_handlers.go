@@ -89,6 +89,11 @@ func (s *Server) handleUnlock(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]any{"unlocked": true})
 		return
 	}
+	if ok, retry := s.limPass.Allow("pw:" + auth.UserFrom(r.Context()).ID.String()); !ok {
+		w.Header().Set("Retry-After", retryAfter(retry))
+		WriteError(w, ErrRateLimited)
+		return
+	}
 	ok, err := auth.VerifyAuthKey(req.AuthKey, l.Hash)
 	if err != nil || !ok {
 		WriteError(w, E(http.StatusForbidden, "wrong_password", "That is not the password for this subchat."))

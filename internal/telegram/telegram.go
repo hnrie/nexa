@@ -35,13 +35,13 @@ const MaxStickers = 200
 
 // Sticker is one entry of a set: enough to fetch its file and to name it.
 type Sticker struct {
-	FileID   string `json:"file_id"`
-	Emoji    string `json:"emoji"`
-	Width    int    `json:"width"`
-	Height   int    `json:"height"`
-	IsVideo  bool   `json:"is_video"`
-	IsAnim   bool   `json:"is_animated"`
-	SetName  string `json:"set_name"`
+	FileID  string `json:"file_id"`
+	Emoji   string `json:"emoji"`
+	Width   int    `json:"width"`
+	Height  int    `json:"height"`
+	IsVideo bool   `json:"is_video"`
+	IsAnim  bool   `json:"is_animated"`
+	SetName string `json:"set_name"`
 }
 
 // StickerSet is what getStickerSet answers with.

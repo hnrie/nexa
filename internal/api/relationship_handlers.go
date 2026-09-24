@@ -50,6 +50,15 @@ func (s *Server) handleRelationships(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, out)
 }
 
+// blockedErr turns a block that landed while a request was on its way into
+// the answer the block check gives.
+func blockedErr(err error) error {
+	if errors.Is(err, store.ErrBlocked) {
+		return E(http.StatusForbidden, "blocked", "You cannot send a request to this user.")
+	}
+	return err
+}
+
 // emitRelationship tells both sides about their current relationship rows.
 func (s *Server) emitRelationship(r *http.Request, a, b *store.User) {
 	for _, pair := range [][2]*store.User{{a, b}, {b, a}} {
@@ -116,7 +125,7 @@ func (s *Server) handleFriendRequest(w http.ResponseWriter, r *http.Request) {
 			return
 		case "incoming":
 			if err := s.Store.SetRelationshipPair(ctx, me.ID, target.ID, "friend", "friend"); err != nil {
-				WriteError(w, err)
+				WriteError(w, blockedErr(err))
 				return
 			}
 			s.emitRelationship(r, me, target)
@@ -125,7 +134,7 @@ func (s *Server) handleFriendRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := s.Store.SetRelationshipPair(ctx, me.ID, target.ID, "outgoing", "incoming"); err != nil {
-		WriteError(w, err)
+		WriteError(w, blockedErr(err))
 		return
 	}
 	s.emitRelationship(r, me, target)
@@ -145,12 +154,12 @@ func (s *Server) handleFriendAccept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target, err := s.Store.UserByID(r.Context(), id)
-	if err != nil {
-		WriteError(w, ErrNotFound)
+	if err != nil || target.Flags&store.FlagDeleted != 0 {
+		WriteError(w, E(http.StatusNotFound, "no_request", "There is no pending request from that user."))
 		return
 	}
 	if err := s.Store.SetRelationshipPair(r.Context(), me.ID, id, "friend", "friend"); err != nil {
-		WriteError(w, err)
+		WriteError(w, blockedErr(err))
 		return
 	}
 	s.emitRelationship(r, me, target)

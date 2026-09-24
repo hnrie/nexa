@@ -110,3 +110,31 @@ func (s *Store) StaleUploads(ctx context.Context, cutoff int64) ([]ids.ID, error
 	}
 	return out, rows.Err()
 }
+
+// UploadRoom is what uploads already have a claim on: the bytes one account
+// has on the server but not in a message yet — files uploaded and not sent,
+// and what its unfinished transfers said they would bring — how many of those
+// transfers it has open, and what every unfinished transfer, anyone's, still
+// has to bring.
+type UploadRoom struct {
+	UserPending  int64
+	UserOpen     int
+	AllRemaining int64
+}
+
+// UploadRoomFor reads the claims uploads have on the disk, for uid.
+func (s *Store) UploadRoomFor(ctx context.Context, uid ids.ID) (UploadRoom, error) {
+	var r UploadRoom
+	var loose, declared int64
+	if err := s.db.R.QueryRowContext(ctx, `SELECT coalesce(sum(size), 0) FROM blobs WHERE owner_id = ? AND kind = 'attachment' AND ref_count = 0`, int64(uid)).Scan(&loose); err != nil {
+		return r, err
+	}
+	if err := s.db.R.QueryRowContext(ctx, `SELECT coalesce(sum(size), 0), count(*) FROM uploads WHERE user_id = ? AND blob_id IS NULL`, int64(uid)).Scan(&declared, &r.UserOpen); err != nil {
+		return r, err
+	}
+	if err := s.db.R.QueryRowContext(ctx, `SELECT coalesce(sum(size - received), 0) FROM uploads WHERE blob_id IS NULL`).Scan(&r.AllRemaining); err != nil {
+		return r, err
+	}
+	r.UserPending = loose + declared
+	return r, nil
+}

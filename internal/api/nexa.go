@@ -15,6 +15,7 @@ import (
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
+	"evilion.xyz/chat/internal/textutil"
 )
 
 // Nexa is the account the instance speaks as. It delivers moderation notices
@@ -648,43 +649,19 @@ func (s *Server) createSystemUser(ctx context.Context) (*store.User, error) {
 // errNexaNoDM answers anyone trying to open a conversation with Nexa.
 var errNexaNoDM = E(http.StatusForbidden, "nexa_system", "Nexa is the system account and doesn't take direct messages. To talk to the moderation team, reply in one of your case threads.")
 
-// reservedDisplayName reports a display name only the official account may
-// use, so nobody can dress up as Nexa in a conversation.
+// reservedDisplayName reports a name only the official account may use, so
+// nobody can dress up as Nexa in a conversation. It compares what names look
+// like, not their letters: "Nexa" spelt with a Cyrillic е, with a zero-width
+// space in it, in full-width letters or with a shield emoji after it is the
+// same name to the person reading it. Usernames and guest names get the same
+// check.
 func reservedDisplayName(name string) bool {
-	folded := []rune{}
-	for _, r := range name {
-		switch {
-		case r == ' ' || r == '.' || r == '_' || r == '-':
-		default:
-			folded = append(folded, r)
-		}
-	}
-	f := string(folded)
-	for _, bad := range []string{"nexa", "nexastaff", "nexateam", "nexasystem", "nexamoderation", "nexasupport", "nexaofficial"} {
-		if equalFoldASCII(f, bad) {
-			return true
-		}
+	switch textutil.Skeleton(name) {
+	case "nexa", "nexastaff", "nexateam", "nexasystem", "nexamoderation", "nexamoderator", "nexamoderators", "nexamod", "nexamods",
+		"nexasupport", "nexaofficial", "nexaadmin", "nexaadmins", "nexasafety", "nexasecurity", "nexahelp":
+		return true
 	}
 	return false
-}
-
-func equalFoldASCII(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := 0; i < len(a); i++ {
-		x, y := a[i], b[i]
-		if 'A' <= x && x <= 'Z' {
-			x += 'a' - 'A'
-		}
-		if 'A' <= y && y <= 'Z' {
-			y += 'a' - 'A'
-		}
-		if x != y {
-			return false
-		}
-	}
-	return true
 }
 
 // --- wiring -----------------------------------------------------------------------

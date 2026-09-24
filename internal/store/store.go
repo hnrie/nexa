@@ -19,6 +19,9 @@ var (
 	ErrConflict      = errors.New("conflict")
 	ErrAlreadyExists = errors.New("already exists")
 	ErrTooMany       = errors.New("too many")
+	// ErrBlocked is a change between two people that a block between them
+	// forbids.
+	ErrBlocked = errors.New("blocked")
 )
 
 // Store wraps the database pools.

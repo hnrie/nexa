@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"os"
@@ -34,7 +35,40 @@ const (
 	uploadIdleLife = 24 * time.Hour
 	// diskHeadroom is what must remain free after a transfer finishes.
 	diskHeadroom = 2 << 30
+	// maxOpenUploads is how many unfinished transfers one account may have.
+	maxOpenUploads = 12
+	// pendingAllowance is what one account may hold in files not sent yet,
+	// beyond the largest single file: room for a few files on their way
+	// while the big one finishes.
+	pendingAllowance = 4 << 30
 )
+
+var errNoSpace = E(http.StatusInsufficientStorage, "no_space", "This server does not have room for a file that size right now.")
+
+// roomForUpload decides whether an account may start putting size more bytes
+// on the server. The disk has to hold them on top of what every unfinished
+// transfer still has to bring, with headroom left over for the database —
+// without that, transfers started together all pass a free-space check made
+// before any of their bytes arrive. And no one account may hold more than a
+// file of the largest size plus a working allowance in files it has not sent,
+// so one account cannot fill the disk for everyone. session says a resumable
+// transfer is being opened, which counts against the open-transfer cap.
+func (s *Server) roomForUpload(ctx context.Context, uid ids.ID, size int64, session bool) error {
+	room, err := s.Store.UploadRoomFor(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if session && room.UserOpen >= maxOpenUploads {
+		return E(http.StatusTooManyRequests, "too_many_uploads", "You have too many uploads going at once. Let some finish first.")
+	}
+	if room.UserPending+size > s.Cfg.MaxUploadBytes+pendingAllowance {
+		return E(http.StatusInsufficientStorage, "upload_quota", "You have too much uploaded that has not been sent yet. Send or cancel some of it first.")
+	}
+	if free, err := freeSpace(s.Media.Dir); err == nil && free-room.AllRemaining < size+diskHeadroom {
+		return errNoSpace
+	}
+	return nil
+}
 
 func (s *Server) uploadRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/uploads", s.authed(s.handleUploadCreate))
@@ -77,13 +111,13 @@ func (s *Server) handleUploadCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusRequestEntityTooLarge, "too_large", "That file is larger than this server accepts."))
 		return
 	}
-	if free, err := freeSpace(s.Media.Dir); err == nil && free < req.Size+diskHeadroom {
-		WriteError(w, E(http.StatusInsufficientStorage, "no_space", "This server does not have room for a file that size right now."))
-		return
-	}
 	if ok, retry := s.limUpload.Allow("up:" + me.ID.String()); !ok {
 		w.Header().Set("Retry-After", retryAfter(retry))
 		WriteError(w, ErrRateLimited)
+		return
+	}
+	if err := s.roomForUpload(r.Context(), me.ID, req.Size, true); err != nil {
+		WriteError(w, err)
 		return
 	}
 	up, err := s.Store.CreateUpload(r.Context(), me.ID, req.Size)
@@ -132,6 +166,12 @@ func (s *Server) handleUploadChunk(w http.ResponseWriter, r *http.Request) {
 	limit := int64(MaxChunkBytes)
 	if room < limit {
 		limit = room
+	}
+	// what this piece brings was set aside when the transfer began, but the
+	// disk is shared with everything else the server writes
+	if free, err := freeSpace(s.Media.Dir); err == nil && free < limit+diskHeadroom/2 {
+		WriteError(w, errNoSpace)
+		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1)
 	// The body lands in a file of its own first: a request stuck on its body

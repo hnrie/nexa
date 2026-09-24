@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"evilion.xyz/chat/internal/db"
@@ -77,9 +78,11 @@ func (s *Store) DirectConversations(ctx context.Context, uid ids.ID) ([]*Channel
 func (s *Store) DeletedAccountsWithLeftovers(ctx context.Context) ([]ids.ID, error) {
 	return s.idList(ctx, `SELECT u.id FROM users u WHERE (u.flags & ?) != 0 AND (
 		EXISTS (SELECT 1 FROM messages WHERE author_id = u.id) OR
-		-- a one-to-one conversation outlives an account a moderator deleted,
-		-- for the person on the other side of it
-		EXISTS (SELECT 1 FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = u.id AND (c.type <> 'dm' OR NOT EXISTS (SELECT 1 FROM mod_cases mc WHERE mc.user_id = u.id AND mc.action = 'delete'))) OR
+		-- a one-to-one conversation, and the subchats under it, outlive an
+		-- account a moderator deleted, for the person on the other side
+		EXISTS (SELECT 1 FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = u.id AND NOT (
+			(c.type = 'dm' OR (c.type = 'subchat' AND EXISTS (SELECT 1 FROM channels pc WHERE pc.id = c.parent_id AND pc.type = 'dm')))
+			AND `+deletedByStaff+`)) OR
 		EXISTS (SELECT 1 FROM server_members WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM servers WHERE owner_id = u.id) OR
 		EXISTS (SELECT 1 FROM channels WHERE owner_id = u.id) OR
@@ -101,6 +104,24 @@ func (s *Store) DeletedAccountsWithLeftovers(ctx context.Context) ([]ids.ID, err
 		EXISTS (SELECT 1 FROM user_settings WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM key_grants WHERE user_id = u.id)
 	) ORDER BY u.id`, FlagDeleted)
+}
+
+// deletedByStaff says, of the account u, that a moderator deleted it rather
+// than its owner: the moderation panel opens a case for that, and every
+// deletion by staff, from the panel or the older admin route, is logged.
+const deletedByStaff = `(EXISTS (SELECT 1 FROM mod_cases mc WHERE mc.user_id = u.id AND mc.action = 'delete') OR
+	EXISTS (SELECT 1 FROM mod_log ml WHERE ml.target_id = u.id AND ml.action = 'delete'))`
+
+// DeletedByStaff reports whether a moderator, not its owner, deleted the
+// account; that decides whether its one-to-one conversations stay for the
+// people on the other side of them.
+func (s *Store) DeletedByStaff(ctx context.Context, uid ids.ID) (bool, error) {
+	var yes bool
+	err := s.db.R.QueryRowContext(ctx, `SELECT `+deletedByStaff+` FROM users u WHERE u.id = ?`, int64(uid)).Scan(&yes)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	return yes, err
 }
 
 // PurgeUserMessages deletes up to batch of the account's messages, from every

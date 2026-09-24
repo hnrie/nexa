@@ -175,3 +175,46 @@ func TestTheSweepFinishesDeletedAccounts(t *testing.T) {
 		t.Errorf("leftovers after the sweep: %v %v", left, err)
 	}
 }
+
+// An account deleted from the older admin route counts as deleted by staff,
+// like one deleted from the moderation panel: the sweep leaves its one-to-one
+// conversations, and the subchats under them, to the people on the other side
+// — and, having nothing else to do there, stops finding it.
+func TestStaffDeletionKeepsDMsThroughTheSweep(t *testing.T) {
+	srv, ts := newTestServer(t)
+	ctx := t.Context()
+	adminTok, _ := register(t, ts, "owner")
+	vicTok, vicID := register(t, ts, "spammer")
+	bobTok, bobID := register(t, ts, "bob")
+	befriend(t, ts, vicTok, bobTok, "bob", vicID)
+	dm := dmBetween(t, ts, vicTok, bobID)
+	createEpoch(t, ts, vicTok, dm)
+	sendMsg(t, ts, vicTok, dm, dm, 0, "buy my stuff", "", nil)
+	_, kept := sendMsg(t, ts, bobTok, dm, dm, 0, "no thanks", "", nil)
+	res, body := do(t, ts, "POST", "/api/v1/channels/"+dm+"/subchats", bobTok, map[string]any{"name": "bob's notes"})
+	if res.StatusCode != 201 {
+		t.Fatalf("subchat: %d %v", res.StatusCode, body)
+	}
+	sub := body["id"].(string)
+
+	if res, body := do(t, ts, "DELETE", "/api/v1/admin/users/"+vicID, adminTok, nil); res.StatusCode != 204 {
+		t.Fatalf("admin delete: %d %v", res.StatusCode, body)
+	}
+	if staff, err := srv.Store.DeletedByStaff(ctx, modID(vicID)); err != nil || !staff {
+		t.Fatalf("deleted by staff: %v %v", staff, err)
+	}
+	srv.finishDeletedAccounts(ctx)
+
+	if _, err := srv.Store.ChannelByID(ctx, modID(dm)); err != nil {
+		t.Errorf("the DM went: %v", err)
+	}
+	if _, err := srv.Store.MessageByID(ctx, modID(kept["id"].(string)), modID(bobID)); err != nil {
+		t.Errorf("bob's words went: %v", err)
+	}
+	if _, err := srv.Store.ChannelByID(ctx, modID(sub)); err != nil {
+		t.Errorf("bob's subchat went: %v", err)
+	}
+	if left, err := srv.Store.DeletedAccountsWithLeftovers(ctx); err != nil || len(left) != 0 {
+		t.Errorf("still found after the sweep: %v %v", left, err)
+	}
+}

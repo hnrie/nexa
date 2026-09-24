@@ -47,10 +47,19 @@ func (s *Store) SetRelationship(ctx context.Context, uid, target ids.ID, typ str
 	return err
 }
 
-// SetRelationshipPair writes both directions atomically.
+// SetRelationshipPair writes both directions atomically. It refuses, with
+// ErrBlocked, when either side has blocked the other: a request checked
+// against the block before a block landed must not write over it.
 func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typeB string) error {
 	now := nowMs()
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		var blocks int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM relationships WHERE type = 'blocked' AND ((user_id = ? AND target_id = ?) OR (user_id = ? AND target_id = ?))`, int64(a), int64(b), int64(b), int64(a)).Scan(&blocks); err != nil {
+			return err
+		}
+		if blocks > 0 {
+			return ErrBlocked
+		}
 		for _, p := range []struct {
 			u, t ids.ID
 			typ  string
@@ -65,6 +74,8 @@ func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typ
 }
 
 // Block records uid blocking target and removes target's row, as one change.
+// A block target already holds against uid stays: blocking back must not be a
+// way to lift someone else's block.
 //
 // Done as two statements with the delete first, a failure between them left
 // the blocker's own row untouched — their list still said "friend" while the
@@ -80,7 +91,7 @@ func (s *Store) Block(ctx context.Context, uid, target ids.ID) error {
 			ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, created_at = excluded.created_at`, int64(uid), int64(target), now); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `DELETE FROM relationships WHERE user_id = ? AND target_id = ?`, int64(target), int64(uid))
+		_, err := tx.ExecContext(ctx, `DELETE FROM relationships WHERE user_id = ? AND target_id = ? AND type <> 'blocked'`, int64(target), int64(uid))
 		return err
 	})
 }

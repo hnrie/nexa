@@ -25,9 +25,11 @@ func ValidUsername(s string) bool {
 // It lives in textutil so the gateway applies the same rules.
 func CleanText(s string, max int) (out string, ok bool) { return textutil.CleanText(s, max) }
 
-// CleanDisplayName returns a one-line display name of 1–32 runes.
+// CleanDisplayName returns a one-line display name of 1–32 runes, with
+// nothing in it that shows as nothing: a name made only of invisible
+// characters is no name.
 func CleanDisplayName(s string) (string, bool) {
-	out, ok := CleanText(strings.ReplaceAll(strings.ReplaceAll(s, "\n", " "), "\t", " "), 32)
+	out, ok := textutil.CleanName(s, 32)
 	if !ok || out == "" {
 		return "", false
 	}

@@ -19,9 +19,11 @@ func (s *Server) mediaRoutes(mux *http.ServeMux) {
 	// image at a size nobody has asked for yet — is already bounded by
 	// media.variantWork, which decodes two at a time whatever arrives.
 	mux.HandleFunc("GET /media/{kind}/{id}", s.handleMediaPublic)
-	mux.Handle("PUT /api/v1/users/@me/avatar", s.authed(s.handleAvatarPut("avatar")))
+	// Replacing a picture leaves the old one on disk for a day, so pictures
+	// are metered like any other upload.
+	mux.Handle("PUT /api/v1/users/@me/avatar", s.userLimited(s.limUpload, s.handleAvatarPut("avatar")))
 	mux.Handle("DELETE /api/v1/users/@me/avatar", s.authed(s.handleAvatarDelete("avatar")))
-	mux.Handle("PUT /api/v1/users/@me/banner", s.authed(s.handleAvatarPut("banner")))
+	mux.Handle("PUT /api/v1/users/@me/banner", s.userLimited(s.limUpload, s.handleAvatarPut("banner")))
 	mux.Handle("DELETE /api/v1/users/@me/banner", s.authed(s.handleAvatarDelete("banner")))
 }
 

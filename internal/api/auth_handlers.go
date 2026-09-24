@@ -136,6 +136,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_username", "Usernames are 2–32 characters of a-z, 0-9, _ and . (no leading, trailing or double dots)."))
 		return
 	}
+	if reservedDisplayName(req.Username) {
+		WriteError(w, E(http.StatusBadRequest, "reserved_username", "That username belongs to the official Nexa account."))
+		return
+	}
 	display, ok := CleanDisplayName(req.DisplayName)
 	if !ok {
 		WriteError(w, E(http.StatusBadRequest, "invalid_display_name", "Display names are 1–32 characters."))
@@ -437,9 +441,8 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	ok, err := auth.VerifyAuthKey(req.AuthKey, u.AuthHash)
-	if err != nil || !ok || len(req.AuthKey) != 32 {
-		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The current password is wrong."))
+	if err := s.requirePassword(w, u, req.AuthKey, "The current password is wrong."); err != nil {
+		WriteError(w, err)
 		return
 	}
 	if len(req.NewAuthKey) != 32 || len(req.NewEncPrivateKey) == 0 || len(req.NewEncPrivateKey) > maxWrappedKey || (len(req.NewKDFSalt) > 0 && (len(req.NewKDFSalt) < 16 || len(req.NewKDFSalt) > 64 || !validKDF(req.NewKDFParams))) {
@@ -447,6 +450,7 @@ func (s *Server) handlePasswordChange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upd := store.AuthUpdate{EncPrivateKey: req.NewEncPrivateKey, KDFSalt: req.NewKDFSalt, KDFParams: string(req.NewKDFParams)}
+	var err error
 	if upd.AuthHash, err = auth.HashAuthKey(req.NewAuthKey); err != nil {
 		WriteError(w, err)
 		return
@@ -471,9 +475,8 @@ func (s *Server) handleRecoveryReplace(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	ok, err := auth.VerifyAuthKey(req.AuthKey, u.AuthHash)
-	if err != nil || !ok || len(req.AuthKey) != 32 {
-		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The current password is wrong."))
+	if err := s.requirePassword(w, u, req.AuthKey, "The current password is wrong."); err != nil {
+		WriteError(w, err)
 		return
 	}
 	if len(req.RecoveryAuthKey) != 32 || len(req.EncPrivateKeyRecovery) == 0 || len(req.EncPrivateKeyRecovery) > maxWrappedKey {

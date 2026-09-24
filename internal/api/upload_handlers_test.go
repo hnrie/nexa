@@ -341,3 +341,46 @@ func TestSingleUploadIsCapped(t *testing.T) {
 		t.Errorf("an over-limit single upload should be refused: %d", res.StatusCode)
 	}
 }
+
+// One account can only have so many transfers open, and only so much on the
+// server that it has not sent: without that, one account opens transfers until
+// the disk is spoken for, or uploads files nobody ever sends until it is full.
+func TestUploadsHaveAnAllowancePerAccount(t *testing.T) {
+	srv, ts := newTestServer(t)
+	token, _ := register(t, ts, "alice")
+	other, _ := register(t, ts, "bob")
+	var first string
+	for i := 0; i < maxOpenUploads; i++ {
+		res, body := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": 1000})
+		if res.StatusCode != 201 {
+			t.Fatalf("transfer %d: %d %v", i, res.StatusCode, body)
+		}
+		if first == "" {
+			first = body["id"].(string)
+		}
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": 1000}); res.StatusCode != 429 || errCode(body) != "too_many_uploads" {
+		t.Errorf("one transfer too many: %d %v", res.StatusCode, body)
+	}
+	// someone else is not held up by it
+	if res, body := do(t, ts, "POST", "/api/v1/uploads", other, map[string]any{"size": 1000}); res.StatusCode != 201 {
+		t.Errorf("another account: %d %v", res.StatusCode, body)
+	}
+	// and cancelling one makes room again
+	if res, _ := do(t, ts, "DELETE", "/api/v1/uploads/"+first, token, nil); res.StatusCode != 204 {
+		t.Fatalf("cancel: %d", res.StatusCode)
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/uploads", token, map[string]any{"size": 1000}); res.StatusCode != 201 {
+		t.Errorf("after cancelling: %d %v", res.StatusCode, body)
+	}
+
+	// files uploaded and never sent count against the account too
+	srv.Cfg.MaxUploadBytes = 1 << 20
+	room, err := srv.Store.UploadRoomFor(t.Context(), modID(mustID(t, ts, token)))
+	if err != nil || room.UserOpen != maxOpenUploads || room.UserPending != maxOpenUploads*1000 {
+		t.Fatalf("room: %+v %v", room, err)
+	}
+	if err := srv.roomForUpload(t.Context(), modID(mustID(t, ts, token)), pendingAllowance+(1<<20), false); err == nil {
+		t.Error("a file past the allowance was let in")
+	}
+}
