@@ -15,12 +15,13 @@ import {
 } from "lucide-react";
 import { NexaWordmark } from "@/components/common/Brand";
 import { FloatingPlane } from "@/components/common/FloatingPlane";
-import { useAuth } from "@/stores/auth";
+import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
 import { useReveal } from "@/hooks/useReveal";
 import { currentPlatform } from "@/lib/platform";
 import { t } from "@/i18n";
 import s from "./Home.module.css";
+import { CONTACT_EMAIL } from "@/lib/legal";
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {
@@ -112,7 +113,7 @@ const NUMBERS = () => [
 ];
 
 export default function HomePage() {
-  const me = useAuth((a) => a.me);
+  const signedIn = useAuth((a) => !!a.me) || hasSavedSession();
   const [os, setOs] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -130,7 +131,7 @@ export default function HomePage() {
         <Link to="/" className={s.logo} aria-label="Nexa"><NexaWordmark height={26} /></Link>
         <nav className={s.nav}>
           <Link className={[s.quiet, s.navDownload].join(" ")} to="/download">{t("home.nav.download")}</Link>
-          {me ? (
+          {signedIn ? (
             <Link className={s.cta} to="/channels/@me">{t("home.nav.open")}</Link>
           ) : (
             <>
@@ -147,7 +148,7 @@ export default function HomePage() {
           <h1 className={s.h1}>{t("home.hero.title")}</h1>
           <p className={s.lede}>{t("home.hero.lede")}</p>
           <div className={s.actions}>
-            <Link className={s.big} to={me ? "/channels/@me" : "/register"}>{me ? t("home.nav.open") : t("home.hero.start")}</Link>
+            <Link className={s.big} to={signedIn ? "/channels/@me" : "/register"}>{signedIn ? t("home.nav.open") : t("home.hero.start")}</Link>
             <Link className={s.bigQuiet} to="/download">{os ? t("home.hero.downloadFor", { os }) : t("home.nav.download")}</Link>
           </div>
           <p className={s.fine}>{t("home.hero.fine")}</p>
@@ -243,7 +244,7 @@ export default function HomePage() {
           <NexaWordmark height={44} className={s.endMark} />
           <p className={s.body}>{t("home.end.body")}</p>
           <div className={s.actions}>
-            <Link className={s.big} to={me ? "/channels/@me" : "/register"}>{me ? t("home.nav.open") : t("home.hero.start")}</Link>
+            <Link className={s.big} to={signedIn ? "/channels/@me" : "/register"}>{signedIn ? t("home.nav.open") : t("home.hero.start")}</Link>
             <Link className={s.bigQuiet} to="/download">{t("home.nav.download")}</Link>
           </div>
         </Reveal>
@@ -255,7 +256,7 @@ export default function HomePage() {
           <Link to="/about">{t("legal.aboutTitle")}</Link>
           <Link to="/terms">{t("legal.termsTitle")}</Link>
           <Link to="/privacy">{t("legal.privacyTitle")}</Link>
-          <a href="mailto:evilionx3@proton.me">{t("legal.contactOwner")}</a>
+          <a href={`mailto:${CONTACT_EMAIL}`}>{t("legal.contactOwner")}</a>
           <Link to="/download">{t("home.nav.download")}</Link>
           <Link to="/login">{t("home.nav.logIn")}</Link>
         </span>

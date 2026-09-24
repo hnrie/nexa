@@ -77,7 +77,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className={s.wrap} role="alert">
         <div className={s.card}>
-          <h1 className={s.title}>{looping ? t("shell.errorBoundary.somethingKeepsGoingWrong") : "Reloading…"}</h1>
+          <h1 className={s.title}>{looping ? t("shell.errorBoundary.somethingKeepsGoingWrong") : t("shell.errorBoundary.reloading")}</h1>
           <p className={s.body}>
             {looping
               ? t("shell.errorBoundary.thisPageCrashedMoreThanOnce")

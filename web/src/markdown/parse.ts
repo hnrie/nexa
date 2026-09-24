@@ -718,7 +718,7 @@ function nodeText(node: Node, names?: PlainTextNames): string {
       return node.children.map((child) => nodeText(child, names)).join("");
     case "spoiler":
       // replies and notifications must not give away what it hides
-      return "[spoiler]";
+      return t("render.spoiler");
     case "list":
       return node.items
         .map((item) => item.map((child) => (child.type === "list" ? "\n" + nodeText(child, names) : nodeText(child, names))).join(""))
@@ -732,14 +732,14 @@ function nodeText(node: Node, names?: PlainTextNames): string {
         case "here":
           return "@here";
         case "channel":
-          return "#" + (names ? names.channels[node.id]?.name || "deleted-channel" : node.id);
+          return "#" + (names ? names.channels[node.id]?.name || t("render.deletedChannel") : node.id);
         case "user": {
           if (!names) return "@" + node.id;
           const user = names.users[node.id];
-          return "@" + (user ? user.display_name || user.username || "unknown-user" : "unknown-user");
+          return "@" + (user ? user.display_name || user.username || t("render.unknownUser") : t("render.unknownUser"));
         }
         default:
-          return "@" + (names ? names.roles?.[node.id]?.name || "unknown-role" : node.id);
+          return "@" + (names ? names.roles?.[node.id]?.name || t("render.unknownRole") : node.id);
       }
     case "emoji":
       return ":" + node.name + ":";

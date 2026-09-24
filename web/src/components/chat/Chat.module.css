@@ -71,8 +71,10 @@
 .msg[data-reply="true"] .avatar { top: 26px; }
 .msg[data-reply="true"] .replyLine::before { bottom: auto; height: 15px; }
 .gutterTime { position: absolute; inset-inline-start: 0; width: 72px; top: 4px; font-size: 11px; color: var(--text-muted); text-align: center; opacity: 0; user-select: none; }
-.headerRow { display: flex; align-items: baseline; gap: 6px; line-height: 22px; min-height: 22px; }
-.author { font-size: 16px; font-weight: 500; color: var(--text-strong); cursor: pointer; }
+.headerRow { display: flex; align-items: baseline; gap: 6px; line-height: 22px; min-height: 22px; min-width: 0; }
+/* a long name with no spaces ends in "…" rather than pushing the list sideways on a phone */
+.author { font-size: 16px; font-weight: 500; color: var(--text-strong); cursor: pointer; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.headerRow > :not(.author) { flex: none; }
 .author:hover { text-decoration: underline; }
 .time { font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .content { font-size: 16px; line-height: 22px; color: var(--text); word-break: break-word; }
@@ -83,7 +85,7 @@
 /* the spine hooks up from the avatar column into this line; the avatar sits below it */
 .replyLine::before { content: ""; position: absolute; inset-inline-start: -38px; top: 11px; bottom: -6px; width: 32px; border-inline-start: 2px solid var(--border-strong); border-top: 2px solid var(--border-strong); border-start-start-radius: 6px; pointer-events: none; }
 .replyLine > span:first-of-type { flex: none; }
-.replyName { font-weight: 500; color: var(--text); }
+.replyName { font-weight: 500; color: var(--text); min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .replyText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
 .replyLine:hover .replyText { color: var(--text); }
 /* The toolbar stays inside the row it belongs to. Hanging it into the gap
@@ -315,3 +317,12 @@
 .uploadCancel:hover { background: var(--bg-hover); color: var(--danger); }
 @media (prefers-reduced-motion: reduce) { .uploadBar i { transition: none; } }
 [data-reduced-motion="true"] .uploadBar i { transition: none; }
+
+/* Finger-sized on touch screens: header buttons, reaction pills, the add
+   button, and a failed message's Retry / Delete were 22–32px there. */
+@media (pointer: coarse) {
+  .hBtn { width: 40px; height: 40px; }
+  .pill { height: 32px; padding: 0 8px; }
+  .addReact { width: 36px; height: 32px; }
+  .retry { height: 32px; padding: 0 12px; }
+}

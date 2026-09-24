@@ -78,7 +78,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
         />
         {wantsPassword ? (
           <>
-            <Field label={channel?.locked ? t("settings.account.newPassword") : "Password"}>
+            <Field label={channel?.locked ? t("settings.account.newPassword") : t("chat.lockedChannel.password")}>
               <TextInput
                 type="password"
                 value={password}
@@ -97,7 +97,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
         ) : null}
         {error ? <div style={{ color: "var(--danger)", fontSize: 14 }}>{error}</div> : null}
         <Button block loading={busy} disabled={!name.trim()} onClick={() => void save()} data-testid="subchat-modal-save">
-          {editing ? "Save" : t("modals.subchat.createSubchat")}
+          {editing ? t("chat.editMessage.save") : t("modals.subchat.createSubchat")}
         </Button>
       </div>
     </Modal>

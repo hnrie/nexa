@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { admin as adminApi, type ClientErrorReport } from "@/api/admin";
@@ -15,6 +15,7 @@ import st from "./Settings.module.css";
 import s from "@/components/server/ServerSettings.module.css";
 
 import { t as tr_ } from "@/i18n";
+import { LoadError } from "@/components/common/LoadError";
 /** User settings → Instance Admin (admins only): stats, registration policy, users. */
 export default function AdminPage() {
   const toast = useUI((u) => u.toast);
@@ -25,10 +26,14 @@ export default function AdminPage() {
   const [key, setKey] = useState("");
   const nav = useNavigate();
 
-  useEffect(() => {
-    adminApi.stats().then(setStats).catch(() => setStats(null));
-    adminApi.settings().then(setSettings).catch(() => setSettings(null));
+  // a failure says so, with a way to try again, instead of spinning forever
+  const [failed, setFailed] = useState(false);
+  const loadAll = useCallback(() => {
+    setFailed(false);
+    adminApi.stats().then(setStats).catch(() => setFailed(true));
+    adminApi.settings().then(setSettings).catch(() => setFailed(true));
   }, []);
+  useEffect(() => loadAll(), [loadAll]);
 
   const setMode = async (mode: AdminSettings["registration"]) => {
     const before = settings;
@@ -70,7 +75,7 @@ export default function AdminPage() {
           <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.storedFiles")}</span><span className={st.rowValue}>{stats.blobs} · {formatBytes(stats.blob_bytes)}</span></div>
           <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.version")}</span><span className={st.rowValue}>{stats.version}</span></div>
         </div>
-      ) : <Spinner />}
+      ) : failed ? <LoadError message={tr_("moderation.loadFailed")} onRetry={loadAll} /> : <Spinner />}
       <h5 className={st.h5}>{tr_("settings.admin.registration")}</h5>
       {settings ? (
         <>
@@ -93,7 +98,7 @@ export default function AdminPage() {
           </Field>
           <p className={st.hint} style={{ marginTop: 12 }}>{tr_("settings.admin.configLimits", { uploads: formatBytes(settings.max_upload_bytes), avatars: formatBytes(settings.max_avatar_bytes), emoji: formatBytes(settings.max_emoji_bytes), stickers: formatBytes(settings.max_sticker_bytes), gif: settings.gif_search ? tr_("settings.admin.on") : tr_("settings.admin.off"), turn: settings.turn ? tr_("settings.admin.configured") : tr_("settings.admin.notConfigured") })}</p>
         </>
-      ) : <Spinner />}
+      ) : failed ? <LoadError message={tr_("moderation.loadFailed")} onRetry={loadAll} /> : <Spinner />}
       <h5 className={st.h5}>{tr_("settings.admin.users")}</h5>
       <div className={st.panelLink} data-testid="admin-panel-link">
         <span className={st.panelLinkIcon} aria-hidden="true"><Shield size={22} /></span>

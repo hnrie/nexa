@@ -21,7 +21,7 @@ export default function ServerStickersPage({ serverId }: { serverId: string }) {
   const list = useMemo(() => Object.values(packs).filter((p) => p.server_id === serverId).sort((a, b) => b.updated_at - a.updated_at), [packs, serverId]);
 
   const create = async () => {
-    const name = await promptText(t("server.serverStickers.createServerPack"), { label: t("server.packEditor.packName"), initial: `${server?.server.name ?? "Server"} stickers`, maxLength: 60 }, "Create");
+    const name = await promptText(t("server.serverStickers.createServerPack"), { label: t("server.packEditor.packName"), initial: t("server.serverStickers.defaultPackName", { name: server?.server.name ?? t("settings.settingsScreen.server") }), maxLength: 60 }, t("settings.stickers.create"));
     if (!name?.trim()) return;
     try {
       const pack = await expressionsApi.createPack({ name: name.trim(), server_id: serverId });

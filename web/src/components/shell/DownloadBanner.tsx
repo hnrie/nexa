@@ -91,7 +91,7 @@ export function DownloadBanner() {
     <div className={s.banner} role="region" aria-label={t("shell.downloadBanner.desktopApp")} data-testid="download-banner">
       <span className={s.icon}><Monitor size={18} /></span>
       <span className={s.text}>
-        <b>{t("shell.downloadBanner.getNexaFor", { os: OS_NAME[file.os] })}</b> — RPC support and a better experience.
+        <b>{t("shell.downloadBanner.getNexaFor", { os: OS_NAME[file.os] })}</b> — {t("download.rpcSupportAndABetterExperience")}
       </span>
       {sure ? (
         <>
@@ -103,7 +103,7 @@ export function DownloadBanner() {
       ) : (
         // a Mac that does not say which chip it has chooses between the two on the download page
         <Link className={s.download} to="/download" data-testid="download-banner-button">
-          <Download size={14} /> Download
+          <Download size={14} /> {t("shell.downloadBanner.download")}
         </Link>
       )}
       <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={close} data-testid="download-banner-close"><X size={16} /></button>

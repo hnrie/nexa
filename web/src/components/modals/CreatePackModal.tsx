@@ -84,7 +84,7 @@ export function CreatePackModal({ kind, onClose, onCreate, onImported }: {
         width={460}
         footer={
           <>
-            <span style={{ marginRight: "auto" }}>
+            <span style={{ marginInlineEnd: "auto" }}>
               <Button variant="ghost" onClick={() => { setStep("create"); setError(null); setProgress(null); }}>{t("settings.stickers.back")}</Button>
             </span>
             <Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button>
@@ -122,7 +122,7 @@ export function CreatePackModal({ kind, onClose, onCreate, onImported }: {
       footer={
         <>
           {kind === "sticker" ? (
-            <span style={{ marginRight: "auto" }}>
+            <span style={{ marginInlineEnd: "auto" }}>
               <Button variant="ghost" onClick={() => setStep("import")} data-testid="telegram-import-open">{t("settings.stickers.importTelegram")}</Button>
             </span>
           ) : null}

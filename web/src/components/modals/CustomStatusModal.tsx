@@ -7,6 +7,7 @@ import { Twemoji } from "@/components/common/Twemoji";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { gateway } from "@/gateway/session";
 import { useAuth } from "@/stores/auth";
+import { formatTimestamp } from "@/lib/time";
 import { usePresence } from "@/stores/presence";
 import s from "./CustomStatusModal.module.css";
 
@@ -27,6 +28,10 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
   const setPresence = usePresence((p) => p.set);
   const [text, setText] = useState(presence?.status_text ?? "");
   const [emoji, setEmoji] = useState(presence?.status_emoji ?? "");
+  // A status that clears itself keeps doing so unless told otherwise: saving
+  // an emoji change used to reset "Clear after" to never.
+  const [until] = useState(() => (presence?.status_expires_at && presence.status_expires_at > Date.now() ? presence.status_expires_at : null));
+  const choices = [...(until ? [{ label: tr_("modals.customStatus.keepUntil", { time: formatTimestamp(until) }), ms: -2 }] : []), ...clearChoices()];
   const [clear, setClear] = useState(0);
   const [picker, setPicker] = useState<DOMRect | null>(null);
   // The picker closes itself on any press outside it, this button included, before the click
@@ -35,9 +40,10 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
 
   const save = () => {
     if (!me) return;
-    const opt = clearChoices()[clear];
+    const opt = choices[clear];
     let expires: number | null = null;
-    if (opt?.ms === -1) {
+    if (opt?.ms === -2) expires = until;
+    else if (opt?.ms === -1) {
       const d = new Date();
       d.setHours(23, 59, 59, 999);
       expires = d.getTime();
@@ -92,7 +98,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
         ) : null}
         <Field label={tr_("modals.customStatus.clearAfter")}>
           <select className={s.select} value={clear} onChange={(e) => setClear(Number(e.target.value))}>
-            {clearChoices().map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
+            {choices.map((c, i) => <option key={c.label} value={i}>{c.label}</option>)}
           </select>
         </Field>
         {presence?.status_text || presence?.status_emoji ? (

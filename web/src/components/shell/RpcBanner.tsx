@@ -39,7 +39,7 @@ export function RpcBanner() {
         <span style={{ opacity: 0.8 }}> {t("shell.rpcBanner.programsAreReachingOnlyDiscordRestart")}</span>
       </span>
       <button className={s.download} onClick={() => void restart()} disabled={busy} data-testid="rpc-banner-restart">
-        <RotateCw size={14} /> {busy ? "Restarting…" : t("settings.desktop.restartDiscord")}
+        <RotateCw size={14} /> {busy ? t("shell.rpcBanner.restarting") : t("settings.desktop.restartDiscord")}
       </button>
       <button className={s.close} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={() => setClosed(true)} data-testid="rpc-banner-close"><X size={16} /></button>
     </div>

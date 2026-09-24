@@ -39,7 +39,7 @@ export default function ProfileModal({ onClose, userId }: { onClose: () => void;
   }
   if (!known) return <Modal open onClose={onClose} title={t("profile.profile.profile")}><p className={s.small}>{t("chat.pins.loading")}</p></Modal>;
   return (
-    <Modal open onClose={onClose} width={600} bare>
+    <Modal open onClose={onClose} width={600} bare ariaLabel={stored?.display_name || stored?.username || t("names.unknownUser")}>
       <ProfileCard userId={userId} variant="modal" onClose={onClose} />
     </Modal>
   );

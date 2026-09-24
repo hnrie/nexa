@@ -4,7 +4,7 @@ import { installNotifications, setNotificationNavigator } from "@/lib/notify";
 import { playSound } from "@/lib/sounds";
 import { installTitleBadge } from "@/lib/title";
 import { useAuth } from "@/stores/auth";
-import { selectDMs, useChannels } from "@/stores/channels";
+import { channelTree, selectDMs, useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
 import { activeTab, panesIn, usePanes } from "@/stores/panes";
@@ -82,16 +82,29 @@ export function Shortcuts() {
         else if (panes.tabs.length > 1) panes.closeTab(panes.active);
         return;
       }
+      // Alt+↑/↓ steps through the list beside the page: the server's channels
+      // in a server, the conversations otherwise. From the message box too,
+      // but not from other fields (Option+arrows move the caret there on a
+      // Mac) and not from behind a dialog.
       if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        const target = e.target as HTMLElement | null;
+        if ((inEditable(target) && !target?.hasAttribute("data-composer")) || document.querySelector("[data-modal-layer]")) return;
         e.preventDefault();
-        const meId = useAuth.getState().me?.id;
-        const dms = selectDMs(useChannels.getState().byId);
-        if (dms.length === 0) return;
-        const cur = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
-        const idx = dms.findIndex((c) => c.id === cur);
-        const next = e.key === "ArrowDown" ? (idx + 1) % dms.length : (idx - 1 + dms.length) % dms.length;
-        const target = dms[next];
-        if (target && meId) nav(`/channels/@me/${target.id}`);
+        if (!useAuth.getState().me) return;
+        const byId = useChannels.getState().byId;
+        const inServer = loc.pathname.match(/^\/channels\/(\d+)\/(\d+)/);
+        const list = inServer
+          ? (() => {
+              const tree = channelTree(byId, inServer[1]!);
+              return [...tree.loose, ...tree.categories.flatMap((c) => c.children)].filter((c) => c.type === "text" || c.type === "voice");
+            })()
+          : selectDMs(byId);
+        if (list.length === 0) return;
+        const cur = inServer ? inServer[2] : loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
+        const idx = list.findIndex((c) => c.id === cur);
+        const next = e.key === "ArrowDown" ? (idx + 1) % list.length : (idx - 1 + list.length) % list.length;
+        const to = list[next];
+        if (to) nav(inServer ? `/channels/${inServer[1]}/${to.id}` : `/channels/@me/${to.id}`);
         return;
       }
       if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown") && !inEditable(e.target)) {

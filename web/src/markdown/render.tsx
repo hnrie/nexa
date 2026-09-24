@@ -264,7 +264,7 @@ function pressed(e: KeyboardEvent): boolean {
 
 function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const user = props.ctx.users[props.id];
-  const name = user ? user.display_name || user.username || "unknown-user" : "unknown-user";
+  const name = user ? user.display_name || user.username || t("render.unknownUser") : t("render.unknownUser");
   return (
     <span
       className="md-mention"
@@ -280,7 +280,7 @@ function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
 
 function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const channel = props.ctx.channels[props.id];
-  const name = channel ? channel.name || "deleted-channel" : "deleted-channel";
+  const name = channel ? channel.name || t("render.deletedChannel") : t("render.deletedChannel");
   return (
     <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)} onKeyDown={(e) => pressed(e) && props.ctx.onChannelClick?.(props.id)}>
       {"#" + name}
@@ -290,7 +290,7 @@ function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
 
 function RoleMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const role = props.ctx.roles?.[props.id];
-  const name = role ? role.name || "unknown-role" : "unknown-role";
+  const name = role ? role.name || t("render.unknownRole") : t("render.unknownRole");
   // colour 0 is a role without a colour, which looks like any other mention
   const style = role && role.color !== 0 ? { color: hexColor(role.color), backgroundColor: rgbaColor(role.color, 0.1) } : undefined;
   return (

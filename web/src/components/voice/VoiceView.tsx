@@ -373,7 +373,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   // a phone showing someone's picture stays awake, the way a video call app does
   useWakeLock(connected && tiles.some(showsStream));
 
-  const nameOf = (uid: string) => memberName(serverState?.members[uid]?.nickname, users[uid], uid === meId ? "You" : tr_("names.unknownUser"));
+  const nameOf = (uid: string) => memberName(serverState?.members[uid]?.nickname, users[uid], uid === meId ? tr_("callScreen.you") : tr_("names.unknownUser"));
   const inDM = channel.type === "dm" || channel.type === "group_dm";
   // guests are let in by a link: anyone in a DM or group may make one, and in a server whoever may invite people and join the channel
   const canInviteGuests = !guest && guestLinksOn() !== false && (inDM || (channel.type === "voice" && canI(serverState, P.CREATE_INSTANT_INVITE | P.CONNECT, channel.id)));
@@ -704,7 +704,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       </div>
       <div className={s.controls}>
         <div className={s.controlsSide}>
-          <span className={s.quality} data-level={level} title={quality ? `${Math.round(quality.rtt)} ms · ${(quality.loss * 100).toFixed(1)}% loss` : "Measuring…"}>
+          <span className={s.quality} data-level={level} title={quality ? tr_("voice.voiceView.qualityLine", { rtt: Math.round(quality.rtt), loss: (quality.loss * 100).toFixed(1) }) : tr_("voice.voiceView.measuring")}>
             <i className={s.qualityDot} />
             {quality ? `${Math.round(quality.rtt)} ms` : "…"}
           </span>

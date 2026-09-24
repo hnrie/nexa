@@ -16,6 +16,7 @@ import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { ModerateModal } from "./ModerateModal";
 import m from "./Moderation.module.css";
+import { LoadError } from "@/components/common/LoadError";
 
 /** Whether a case belongs in a view of the Active Cases tab. */
 function inView(c: StaffCase, view: CaseView): boolean {
@@ -248,6 +249,7 @@ export function CasesTab() {
   const mergePeople = useModeration((s) => s.mergePeople);
   const [view, setView] = useState<CaseView>("needs_reply");
   const [cases, setCases] = useState<StaffCase[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const [counts, setCounts] = useState<CaseCounts | null>(null);
   const [people, setPeople] = useState<People>({});
   const [more, setMore] = useState(false);
@@ -256,6 +258,7 @@ export function CasesTab() {
   const load = useCallback(
     async (after?: StaffCase) => {
       setLoading(true);
+      setFailed(false);
       try {
         const r = await modApi.cases({ view, before_at: after?.last_activity_at, before_id: after?.id, limit: 50 });
         setCases((cur) => (after ? [...(cur ?? []), ...r.cases] : r.cases));
@@ -264,7 +267,9 @@ export function CasesTab() {
         mergePeople(r.people);
         setMore(r.cases.length === 50);
       } catch {
-        setCases((cur) => cur ?? []);
+        // said as a failure, never as an empty queue: "all caught up" during
+        // an outage tells staff nobody is waiting when somebody is
+        setFailed(true);
       } finally {
         setLoading(false);
       }
@@ -313,7 +318,9 @@ export function CasesTab() {
             </button>
           ))}
         </div>
-        {cases === null ? (
+        {failed && !cases?.length ? (
+          <LoadError message={t("moderation.loadFailed")} onRetry={() => void load()} busy={loading} center />
+        ) : cases === null ? (
           <div className={m.loadingRow}>
             <Spinner size={24} label={t("chat.pins.loading")} />
           </div>

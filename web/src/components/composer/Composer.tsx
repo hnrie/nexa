@@ -1,4 +1,4 @@
-import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer } from "lucide-react";
+import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, File as FileIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
@@ -36,6 +36,7 @@ import type { RefObject } from "react";
 import s from "./Composer.module.css";
 
 import { t as tr_, Tr } from "@/i18n";
+import { formatShortDuration } from "@/lib/time";
 const MAX_LEN = 4000;
 /** How many files one message carries. */
 const MAX_FILES = 10;
@@ -421,7 +422,8 @@ export function Composer({ channel }: { channel: Channel }) {
       else if (picker) setPicker(false);
       return;
     }
-    if (e.key === "ArrowUp" && text === "" && me && msgs) {
+    // plain ↑ only: Alt+↑ steps to another conversation (Shortcuts)
+    if (e.key === "ArrowUp" && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && text === "" && me && msgs) {
       // the newest message of one's own that can be edited — one this device
       // could not decrypt cannot, or the edit would replace it with nothing
       const mine = [...msgs.ids].reverse().find((id) => { const m = msgs.byId[id]; return !!m && canEdit(m); });
@@ -507,7 +509,7 @@ export function Composer({ channel }: { channel: Channel }) {
           {files.map((f) => (
             <div key={f.id} className={s.card}>
               <div className={s.thumb} data-spoiler={f.spoiler}>
-                {f.preview && f.file.type.startsWith("image/") ? <img src={f.preview} alt="" /> : f.preview ? <video src={f.preview} muted /> : <span>{f.file.type.split("/")[0] || "file"}</span>}
+                {f.preview && f.file.type.startsWith("image/") ? <img src={f.preview} alt="" /> : f.preview ? <video src={f.preview} muted /> : <FileIcon size={26} aria-hidden="true" />}
               </div>
               <div className={s.fname} title={f.name}>{f.name}</div>
               <div className={s.fsize}>{formatBytes(f.file.size)}</div>
@@ -523,6 +525,7 @@ export function Composer({ channel }: { channel: Channel }) {
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
         {canAttach ? <button className={s.attach} aria-label={tr_("composer.composer.uploadAFile")} onClick={() => fileRef.current?.click()}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
         <textarea
+          data-composer=""
           ref={taRef}
           className={s.ta}
           value={text}
@@ -550,7 +553,7 @@ export function Composer({ channel }: { channel: Channel }) {
       {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
         <span className={s.slowmode} data-active={remaining > 0} title={tr_("composer.composer.slowModeIsEnabled")}>
-          <Timer size={14} /> {remaining > 0 ? `${remaining}s` : tr_("composer.composer.slowmodeIsEnabled")}
+          <Timer size={14} /> {remaining > 0 ? formatShortDuration(remaining) : tr_("composer.composer.slowmodeIsEnabled")}
         </span>
       ) : null}
     </div>

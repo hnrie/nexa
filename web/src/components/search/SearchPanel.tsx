@@ -130,7 +130,7 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
             <dt>has:</dt><dd>{t("search.search.linkImageFileStickerEmbed")}</dd>
             <dt>{t("search.search.beforeAfter")}</dt><dd>2026-01-31</dd>
             <dt>{t("search.search.quotes")}</dt><dd>{t("search.search.exactPhrase")}</dd>
-            <dt>-word</dt><dd>exclude</dd>
+            <dt>-word</dt><dd>{t("search.search.exclude")}</dd>
           </dl>
         </div>
       ) : null}
@@ -149,7 +149,7 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
                 <span className={s.resultTime} title={formatFull(m.created_at)}>{formatTimestamp(m.created_at)}</span>
               </div>
               <div className={s.resultText}>
-                {m.payload?.t ? highlight(m.payload.t, q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? "[sticker]" : m.payload?.att?.length ? `[${m.payload.att.length} file${m.payload.att.length === 1 ? "" : "s"}]` : ""}
+                {m.payload?.t ? highlight(m.payload.t, q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("search.search.filesCount", { count: m.payload.att.length }) : ""}
               </div>
             </button>
           );

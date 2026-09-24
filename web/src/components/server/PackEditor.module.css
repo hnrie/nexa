@@ -39,6 +39,9 @@
 .dropzone[data-over="true"] { border-color: var(--brand); color: var(--text); background: var(--bg-hover); }
 .uploadRow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; margin-top: 12px; }
 .pending { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-top: 8px; }
+/* the preview, two fields and Remove wrap onto two lines in a phone-width column */
+.pending { flex-wrap: wrap; }
+.pending :global(input) { flex: 1 1 140px; min-width: 0; }
 .pending [data-sticker-media] { width: 48px; height: 48px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-raised); }
 .linkRow { display: flex; gap: 8px; margin-top: 8px; }
 .linkRow input { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 13px; }

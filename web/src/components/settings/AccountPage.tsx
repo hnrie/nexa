@@ -12,10 +12,13 @@ import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
+import { statusOf, usePresence } from "@/stores/presence";
 type Dialog = null | "username" | "displayName" | "password" | "recovery" | "delete";
 
 export default function AccountPage({ onClose }: { onClose: () => void }) {
   const me = useAuth((a) => a.me);
+  // the status the account actually shows, Do Not Disturb or Invisible included
+  const myStatus = usePresence((p) => statusOf(me ? p.byUser[me.id] : undefined));
   const setMe = useAuth((a) => a.setMe);
   const changePassword = useAuth((a) => a.changePassword);
   const newRecoveryKey = useAuth((a) => a.newRecoveryKey);
@@ -69,7 +72,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
       <div className={s.card}>
         <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : me.accent_color !== null ? { background: `#${me.accent_color.toString(16).padStart(6, "0")}` } : undefined} />
         <div className={s.cardHead}>
-          <div className={s.cardAvatar}><Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={80} status="online" /></div>
+          <div className={s.cardAvatar}><Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={80} status={myStatus} /></div>
           <div className={s.cardText}>
             <div className={s.cardName}>{me.display_name}</div>
             <div className={s.cardUser}>{me.username}</div>

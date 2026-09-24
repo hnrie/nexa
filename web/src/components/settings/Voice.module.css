@@ -1,2 +1,0 @@
-.meterFill[data-sent="true"] { background: var(--positive); }
-.diag { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; user-select: all; }

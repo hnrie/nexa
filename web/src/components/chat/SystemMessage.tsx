@@ -11,7 +11,7 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const openModal = useUI((u) => u.openModal);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const actor = displayName(users[msg.author_id]);
-  const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : "someone";
+  const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
   const A = <b onClick={() => openModal("profile", { userId: msg.author_id })}>{actor}</b>;
   const T = <b onClick={() => msg.mentions[0] && openModal("profile", { userId: msg.mentions[0] })}>{target}</b>;
   let icon = <ArrowRightToLine size={18} />;

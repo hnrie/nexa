@@ -82,10 +82,10 @@ export function QuickSwitcher() {
       const label = channelDisplayName(ch, users, meId);
       const other = ch.type === "dm" ? (ch.recipient_ids.find((id) => id !== meId) ?? "") : "";
       if (other) dmUsers.add(other);
-      out.push({ id: ch.id, kind: "dm", label, sub: ch.type === "dm" ? `@${users[other]?.username ?? ""}` : `${ch.recipient_ids.length} members`, avatarId: ch.type === "dm" ? (users[other]?.avatar_id ?? null) : ch.icon_id, userId: other || ch.id, go: () => nav(`/channels/@me/${ch.id}`) });
+      out.push({ id: ch.id, kind: "dm", label, sub: ch.type === "dm" ? `@${users[other]?.username ?? ""}` : t("chat.chatView.membersCount", { count: ch.recipient_ids.length }), avatarId: ch.type === "dm" ? (users[other]?.avatar_id ?? null) : ch.icon_id, userId: other || ch.id, go: () => nav(`/channels/@me/${ch.id}`) });
     }
     for (const st of Object.values(servers)) {
-      out.push({ id: "s" + st.server.id, kind: "server", label: st.server.name, sub: "Server", avatarId: null, userId: st.server.id, go: () => nav(`/channels/${st.server.id}`) });
+      out.push({ id: "s" + st.server.id, kind: "server", label: st.server.name, sub: t("settings.settingsScreen.server"), avatarId: null, userId: st.server.id, go: () => nav(`/channels/${st.server.id}`) });
       for (const ch of selectServerChannels(channels, st.server.id)) {
         if (ch.type !== "text") continue;
         out.push({ id: ch.id, kind: "channel", label: `#${ch.name}`, sub: st.server.name, avatarId: null, userId: ch.id, go: () => nav(`/channels/${st.server.id}/${ch.id}`) });

@@ -2,7 +2,7 @@ import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
-import { useChannels } from "@/stores/channels";
+import { selectServerChannels, useChannels } from "@/stores/channels";
 import { useReadStates, isUnread } from "@/stores/readStates";
 import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
@@ -57,10 +57,11 @@ export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem
   const settings = useSettings.getState().settings;
   const muted = settings.notifications.muted.includes(serverId);
   const owner = st.server.owner_id === me?.id;
-  const items: ContextMenuItem[] = [
-    { id: "read", label: t("sidebar.dmMenu.markAsRead"), onSelect: () => markServerRead(serverId), separatorAfter: true },
-    { id: "invite", label: t("chat.chat.invitePeople"), onSelect: () => ctx.openModal("invite", { serverId }) },
-  ];
+  const items: ContextMenuItem[] = [{ id: "read", label: t("sidebar.dmMenu.markAsRead"), onSelect: () => markServerRead(serverId), separatorAfter: true }];
+  // offered only where there is a channel to invite into: without one the
+  // dialog opened on an empty list and a blank link
+  const invitable = selectServerChannels(useChannels.getState().byId, serverId).some((c) => c.type === "text" && canI(st, P.CREATE_INSTANT_INVITE, c.id));
+  if (invitable) items.push({ id: "invite", label: t("chat.chat.invitePeople"), onSelect: () => ctx.openModal("invite", { serverId }) });
   if (anyOf(st.myPermissions, ANY_MANAGE)) items.push({ id: "settings", label: t("server.serverSettings.serverSettings"), onSelect: () => ctx.openModal("serverSettings", { serverId }) });
   if (canI(st, P.MANAGE_CHANNELS)) {
     items.push({ id: "channel", label: t("modals.createChannel.createChannel"), onSelect: () => ctx.openModal("createChannel", { serverId }) });

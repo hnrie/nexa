@@ -18,6 +18,8 @@ const held = new Map<string, Map<number, Uint8Array>>();
 
 /** At most this many keys are taken from one relay, which is more rotations than a guest's stay sees. */
 const MAX_RELAYED = 32;
+/** How many of the newest keys a relay carries, well inside MAX_RELAYED. */
+const RELAY_NEWEST = 8;
 
 export function setGuestKey(channelId: string, epoch: number, key: Uint8Array): void {
   let keys = held.get(channelId);
@@ -68,7 +70,12 @@ export async function sealKeysForGuest(channelId: string, guestId: string, base:
   if (!baseRoot) return null;
   const wrap = relayKey(voiceFrameKey(baseRoot, channelId));
   const keys: RelayedKeys["keys"] = [];
-  for (const epoch of epochs) {
+  // The newest few only: a server's key moves on with every member who joins
+  // or leaves, so a link a day old can be dozens of epochs behind, and a
+  // guest refuses a relay of more than MAX_RELAYED — which left them hearing
+  // nothing at all. Only the current keys carry the call anyway.
+  const wanted = epochs.filter((e) => e > base).sort((a, b) => a - b).slice(-RELAY_NEWEST);
+  for (const epoch of wanted) {
     const root = epoch > base ? rootOf(epoch) : undefined;
     if (!root) continue;
     const iv = randomBytes(12);

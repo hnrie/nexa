@@ -77,7 +77,7 @@ export default function EncryptionPage({ serverId }: { serverId: string }) {
       {needsRotation ? (
         <div className={s.warn}>
           <TriangleAlert size={16} style={{ verticalAlign: -3, marginInlineEnd: 6 }} />
-          Someone left or was removed and the keys they held have not been rotated yet. Rotating happens automatically when a key holder is online; you can also do it now.
+          {t("server.encryption.someoneLeftRotate")}
         </div>
       ) : null}
       {info === null && !failed ? <Spinner label={t("server.encryption.loadingKeys")} /> : null}

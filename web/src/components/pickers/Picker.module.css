@@ -34,7 +34,7 @@
 .inspector .big { font-size: 26px; line-height: 1; }
 .inspector .name { font-weight: 600; color: var(--text); }
 .pop[data-anchored="true"] { z-index: 120; }
-@media (max-width: 767px) { .pop { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: 100% !important; max-width: none; height: 60vh !important; padding-bottom: env(safe-area-inset-bottom); border-radius: var(--radius-md) var(--radius-md) 0 0; } }
+@media (max-width: 767px) { .pop { position: fixed !important; left: 0 !important; right: 0 !important; bottom: var(--kb-inset, 0px) !important; top: auto !important; width: 100% !important; max-width: none; height: 60vh !important; height: min(60dvh, calc(var(--vvh, 100dvh) - 56px)) !important; padding-bottom: env(safe-area-inset-bottom); border-radius: var(--radius-md) var(--radius-md) 0 0; } }
 /* GifGrid: two columns placed by script, scrolling down only */
 .gifScroll { flex: 1; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .gifGrid { position: relative; margin: 8px; }
@@ -83,3 +83,8 @@
 .section.stickyHead { position: sticky; top: 0; z-index: 2; height: 32px; margin-bottom: -32px; box-sizing: border-box; }
 /* a pack out of view is neither laid out nor painted until it scrolls near */
 .packSection { content-visibility: auto; }
+
+@media (pointer: coarse) {
+  .tab { padding: 8px 12px; }
+  .cat, .close { width: 40px; height: 40px; }
+}

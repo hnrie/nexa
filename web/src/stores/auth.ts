@@ -32,6 +32,15 @@ let pendingPolicy: AppLockPolicy | null = null;
 
 const TOKEN_KEY = "ec.token";
 
+/**
+ * Whether this browser holds a session, without opening it: the public pages
+ * offer "Open Nexa" instead of "Log in" to someone who is signed in, and the
+ * app itself checks the session when it opens.
+ */
+export function hasSavedSession(): boolean {
+  return !!storage.get(TOKEN_KEY);
+}
+
 interface AuthState {
   status: AuthStatus;
   me: MeUser | null;

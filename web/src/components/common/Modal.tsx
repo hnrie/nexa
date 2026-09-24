@@ -99,8 +99,11 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
     };
     document.addEventListener("keydown", onKey);
     const prev = document.activeElement as HTMLElement | null;
-    // start in the first field, so a dialog that asks for something is ready
-    const first = ref.current?.querySelector<HTMLElement>("input:not([type=hidden]):not([disabled]), textarea:not([disabled])");
+    // Start in the first field, so a dialog that asks for something is ready
+    // to type into — except on a touch screen, where focusing a field opens
+    // the keyboard over the dialog before anyone has read it.
+    const touch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+    const first = touch ? null : ref.current?.querySelector<HTMLElement>("input:not([type=hidden]):not([disabled]), textarea:not([disabled])");
     (first ?? ref.current)?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);

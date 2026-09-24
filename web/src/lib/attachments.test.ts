@@ -216,7 +216,14 @@ describe("uploadStaged", () => {
           (r) => (result = r),
           (e: unknown) => (failed = e),
         );
-        for (let i = 0; i < 200 && !result && !failed; i++) await vi.advanceTimersByTimeAsync(1000);
+        // Fake seconds for the waits, real time for the encryption: WebCrypto
+        // finishes on its own thread, so each step also lets the event loop
+        // turn. Counting fake steps alone raced the machine's speed, and on a
+        // slower run the loop ran out before the pieces were encrypted.
+        for (let i = 0; i < 3000 && !result && !failed; i++) {
+          await vi.advanceTimersByTimeAsync(1000);
+          await new Promise((r) => setImmediate(r));
+        }
         await run;
         expect(failed).toBeNull();
         expect(server.cancelled).toBe(0);

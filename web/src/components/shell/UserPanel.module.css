@@ -27,3 +27,6 @@
 /* the desktop app has an update downloaded: a green button to restart into it */
 .update { color: var(--positive); }
 .update:hover { color: #fff; background: var(--positive); }
+
+/* mute and deafen sit side by side; on a touch screen a slip hit the other */
+@media (pointer: coarse) { .icon { width: 40px; height: 40px; } }

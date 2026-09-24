@@ -176,7 +176,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
             </div>
           );
         }
-        const name = memberName(row.member.nickname, row.user, row.member.user_id === meId ? "You" : t("names.unknownUser"));
+        const name = memberName(row.member.nickname, row.user, row.member.user_id === meId ? t("callScreen.you") : t("names.unknownUser"));
         const p = presence[row.member.user_id];
         return (
           <button

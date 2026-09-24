@@ -55,8 +55,9 @@
 .endMark { color: var(--text-strong); flex: none; }
 
 .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); border-top: 1px solid var(--border-subtle); font-size: 14px; color: var(--text-muted); }
-.footLinks { display: flex; gap: 16px; }
-.footLinks a { color: var(--text-subtle); }
+/* six links: they wrap on a phone rather than push the page sideways */
+.footLinks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.footLinks a { color: var(--text-subtle); white-space: nowrap; }
 
 /* shown by default; the hook hides only what it can see is off screen */
 .reveal { opacity: 1; transform: none; transition: opacity 620ms cubic-bezier(0.2, 0.7, 0.3, 1), transform 620ms cubic-bezier(0.2, 0.7, 0.3, 1); }

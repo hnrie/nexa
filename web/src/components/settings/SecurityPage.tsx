@@ -228,10 +228,8 @@ export default function SecurityPage() {
       </div>
       {!checking && !unknown && on && left === 0 ? <div className={s.dangerBox} style={{ marginTop: 12 }}>{t("settings.security.youHaveNoBackupCodesLeft")}</div> : null}
 
-      <h3 className={s.h} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
-      <p className={s.hint}>
-        A passcode for this device. While it is on, your keys are stored wrapped by the passcode, so closing the tab or locking the app really does put your messages out of reach until you type it again. Ten wrong tries wipe the wrapped copy, and your account password gets you back in.
-      </p>
+      <h3 className={s.h5} style={{ marginTop: 28 }}><Lock size={16} /> {t("settings.security.appLock")}</h3>
+      <p className={s.hint}>{t("settings.security.appLockHint")}</p>
       <div className={s.device} data-testid="lock-row">
         <div>
           <div className={s.deviceName}>{policy ? t("settings.security.passcodeIsOnForThisAccount") : t("settings.security.noPasscodeSet")}</div>
@@ -397,7 +395,7 @@ function BackupCodes({ codes, copied, onCopy, onDownload, onDone }: { codes: str
         {codes.map((c) => <div key={c}>{c}</div>)}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <Button variant="secondary" onClick={onCopy}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? "Copied" : "Copy"}</Button>
+        <Button variant="secondary" onClick={onCopy}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? t("modals.groupInvite.copied") : t("modals.groupInvite.copy")}</Button>
         <Button variant="secondary" onClick={onDownload}><Download size={15} /> {t("chat.attachments.download")}</Button>
         <Button onClick={onDone} style={{ marginInlineStart: "auto" }}>{t("modals.serverNotifications.done")}</Button>
       </div>

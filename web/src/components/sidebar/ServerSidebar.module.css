@@ -43,3 +43,13 @@
   .row:hover .mention { display: none; }
 }
 @media (hover: none) { .catAdd { display: none; } }
+/* and from the keyboard: whatever a row or a category offers shows while focus
+   is on it, so Tab can reach Invite, Edit and the category's "+" */
+.row:focus-within .actions { display: flex; }
+.row:focus-within .mention { display: none; }
+.catHead:focus-within .catAdd { opacity: 1; }
+
+@media (pointer: coarse) {
+  .row { height: 40px; }
+  .catHead { height: 32px; }
+}

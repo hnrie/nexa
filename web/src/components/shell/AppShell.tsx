@@ -20,6 +20,7 @@ import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import { installAway } from "@/lib/away";
 import s from "./AppShell.module.css";
+import { t } from "@/i18n";
 
 /** Controls a horizontal drag already means something to. */
 const NATIVE_DRAG = "input, textarea, select, [contenteditable=''], [contenteditable='true'], [role=slider], [data-native-press]";
@@ -118,6 +119,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [dragX, setDragX] = useState<number | null>(null);
 
   const drawerWidth = () => Math.min(420, Math.max(240, window.innerWidth - 56));
+  // Which way "towards opening" is: in a right-to-left language the drawer
+  // lives on the right edge and opens with a swipe to the left. Everything
+  // below measures along that direction.
+  const flow = () => (document.documentElement.dir === "rtl" ? -1 : 1);
 
   /** A swipe inside something that scrolls sideways belongs to that thing. */
   const scrollsSideways = (target: EventTarget | null): boolean => {
@@ -147,7 +152,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     const d = drag.current;
     const t = e.touches[0];
     if (!d || !t) return;
-    const dx = t.clientX - d.x;
+    const dx = (t.clientX - d.x) * flow();
     const dy = t.clientY - d.y;
     if (d.axis === "") {
       if (Math.abs(dx) < 12 && Math.abs(dy) < 12) return;
@@ -169,7 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       setDragX(null);
       return;
     }
-    const dx = t.clientX - d.x;
+    const dx = (t.clientX - d.x) * flow();
     const w = drawerWidth();
     const speed = dx / Math.max(1, Date.now() - d.t);
     if (d.right) {
@@ -185,7 +190,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const dragging = dragX !== null;
-  const drawerStyle = dragging ? { transform: `translateX(${dragX - drawerWidth()}px)`, transition: "none" } : undefined;
+  const drawerStyle = dragging ? { transform: `translateX(${(dragX - drawerWidth()) * flow()}px)`, transition: "none" } : undefined;
   const backdropStyle = dragging ? { opacity: dragX / drawerWidth(), pointerEvents: "none" as const, transition: "none" } : undefined;
 
   return (
@@ -206,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
       <div className={s.main}>
         {connection !== "open" && connection !== "idle" ? (
-          <div className={s.connection} data-state={connection}>{connection === "connecting" ? "Connecting…" : "Disconnected — reconnecting…"}</div>
+          <div className={s.connection} data-state={connection} role="status">{connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting")}</div>
         ) : null}
         <UpdateBanner />
         <RpcBanner />

@@ -56,7 +56,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
     </Button>
   ) : installed ? (
     <Button variant="secondary" disabled data-testid="sticker-pack-installed">
-      <Check size={16} /> Installed
+      <Check size={16} /> {t("settings.stickers.installed")}
     </Button>
   ) : (
     <Button loading={busy} onClick={() => void install()} data-testid="install-sticker-pack">
@@ -81,7 +81,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
           {pack.description ? <div className={s.desc}>{pack.description}</div> : null}
         </div>
       </div>
-      <div className={s.label}>{pack.stickers.length === 1 ? "1 sticker" : `${pack.stickers.length} stickers`}</div>
+      <div className={s.label}>{t("server.packEditor.stickerCount", { count: pack.stickers.length })}</div>
       <div className={s.grid}>
         {pack.stickers.map((x) => (
           <button key={x.id} className={s.tile} data-on={x.id === current.id} onClick={() => setPicked(x.id)} title={x.name} aria-label={x.name} aria-pressed={x.id === current.id}>

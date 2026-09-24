@@ -274,7 +274,7 @@ export default function GuestCallPage() {
             <h1 className={s.title}>{ending?.text ?? t("guestCall.theCallIsOver")}</h1>
             {ending?.again ? (
               <Button onClick={() => { setEnding(null); setPhase("checking"); void guestsApi.check(code).then(() => setPhase("form"), () => { setError(t("guestCall.thisLinkIsInvalidOrHas")); setPhase("invalid"); }); }} data-testid="guest-again">
-                Join Again
+                {t("guestCall.joinAgain")}
               </Button>
             ) : null}
           </>
@@ -290,7 +290,7 @@ export default function GuestCallPage() {
               <Button type="submit" block disabled={!name.trim()} data-testid="guest-join">{t("guestCall.joinCall")}</Button>
             </form>
             <p className={s.fine}>
-              <ShieldCheck size={14} /> As a guest you can only be in this call. The call stays end-to-end encrypted.
+              <ShieldCheck size={14} /> {t("guestCall.guestNote")}
             </p>
           </>
         )}

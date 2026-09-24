@@ -12,8 +12,9 @@
 @keyframes pop { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 /* a bottom sheet on phones: sized to the visible screen, which vh is not while the toolbars show, and clear of the home indicator */
 @media (max-width: 767px) {
-  .overlay { padding: 0; align-items: flex-end; }
-  .card { width: 100% !important; max-height: 92vh; max-height: 92dvh; border-radius: var(--radius-md) var(--radius-md) 0 0; }
+  /* above the on-screen keyboard, where there is one (src/lib/keyboardInset.ts) */
+  .overlay { padding: 0; padding-bottom: var(--kb-inset, 0px); align-items: flex-end; }
+  .card { width: 100% !important; max-height: 92vh; max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px)); border-radius: var(--radius-md) var(--radius-md) 0 0; }
   .body:last-child, .footer { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }

@@ -6,7 +6,7 @@ import { servers as serversApi } from "@/api/servers";
 import { Button } from "@/components/common/Button";
 import { ChatView } from "@/components/chat/ChatView";
 import { VoiceView } from "@/components/voice/VoiceView";
-import { FullScreenSpinner } from "@/components/common/Spinner";
+import { PaneSpinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { channelTree, useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
@@ -122,7 +122,7 @@ export default function ServerPage() {
       </div>
     );
   }
-  if (!st) return <FullScreenSpinner text={tr_("server.openingServer")} />;
+  if (!st) return <PaneSpinner text={tr_("server.openingServer")} />;
   if (!channelId || (channelId && !channel && firstText)) {
     if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace />;
     if (!channelId) return <NoChannels />;

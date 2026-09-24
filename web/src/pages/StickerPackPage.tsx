@@ -88,7 +88,7 @@ export default function StickerPackPage() {
             <div className={s.iconBox}>{cover ? <StickerView format={cover.format} src={packImageUrl(pack, cover)} alt="" /> : pack.name.slice(0, 1).toUpperCase()}</div>
             <h1 className={s.title}>{pack.name}</h1>
             {pack.description ? <p className={s.sub}>{pack.description}</p> : null}
-            <p className={s.sub}>{packCount(pack)}{pack.public ? "" : " · private"}</p>
+            <p className={s.sub}>{packCount(pack)}{pack.public ? "" : " · " + t("settings.stickers.privateTag")}</p>
             <div className={p.grid} style={{ width: "100%" }}>
               {pack.stickers.map((st) => (
                 <div key={st.id} className={p.cell} style={{ cursor: "default" }}>

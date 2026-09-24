@@ -1,5 +1,5 @@
 import { Eye, Megaphone, PenLine, Send, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { moderation as modApi, type Announcement, type People } from "@/api/moderation";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
@@ -14,6 +14,7 @@ import { useModEvents } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import m from "./Moderation.module.css";
+import { LoadError } from "@/components/common/LoadError";
 
 const MAX_TITLE = 120;
 const MAX_BODY = 4000;
@@ -35,7 +36,9 @@ export function AnnouncementsTab() {
   const [previewing, setPreviewing] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
+  const [failed, setFailed] = useState(false);
+  const loadList = useCallback(() => {
+    setFailed(false);
     modApi
       .announcements()
       .then((r) => {
@@ -43,8 +46,9 @@ export function AnnouncementsTab() {
         setPeople(r.people);
         setRecipients(r.recipients);
       })
-      .catch(() => setList([]));
+      .catch(() => setFailed(true));
   }, []);
+  useEffect(() => loadList(), [loadList]);
 
   useModEvents((e) => {
     if (e.type === "announcement") {
@@ -141,7 +145,9 @@ export function AnnouncementsTab() {
           <h2 className={m.panelTitle} id="ann-history" style={{ marginBottom: 12 }}>
             {t("moderation.ann.history")}
           </h2>
-          {list === null ? (
+          {failed && !list?.length ? (
+            <LoadError message={t("moderation.loadFailed")} onRetry={loadList} />
+          ) : list === null ? (
             <Spinner label={t("chat.pins.loading")} />
           ) : list.length === 0 ? (
             <div className={m.empty}>

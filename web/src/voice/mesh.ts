@@ -8,6 +8,7 @@
 import type { VoiceState } from "@/api/types";
 import { Playback } from "./playback";
 import type { MediaKind, SignalPayload, TransportEvents, VoiceTransport } from "./transport";
+import { RecentLoss, type LossTotals } from "./recentLoss";
 
 export type { MediaKind, SignalPayload, TransportEvents } from "./transport";
 
@@ -56,6 +57,8 @@ const MAX_ICE_RESTARTS = 3;
 const OFFER_DEADLINE_MS = 10_000;
 
 export class MeshTransport implements VoiceTransport {
+  /** Loss is measured between readings, not over the whole call. */
+  private recentLoss = new RecentLoss();
   private peers = new Map<string, Peer>();
   private audioTrack: MediaStreamTrack | null = null;
   private videoTrack: MediaStreamTrack | null = null;
@@ -476,9 +479,8 @@ export class MeshTransport implements VoiceTransport {
   async stats(): Promise<{ rtt: number; loss: number }> {
     let rtt = 0;
     let n = 0;
-    let lost = 0;
-    let received = 0;
-    for (const p of this.peers.values()) {
+    const streams = new Map<string, LossTotals>();
+    for (const [peerId, p] of this.peers) {
       const report = await p.pc.getStats().catch(() => null);
       if (!report) continue;
       report.forEach((r) => {
@@ -488,11 +490,10 @@ export class MeshTransport implements VoiceTransport {
         }
         if (r.type === "inbound-rtp") {
           const x = r as RTCInboundRtpStreamStats;
-          lost += x.packetsLost ?? 0;
-          received += x.packetsReceived ?? 0;
+          streams.set(`${peerId}:${r.id}`, { lost: x.packetsLost ?? 0, received: x.packetsReceived ?? 0 });
         }
       });
     }
-    return { rtt: n ? rtt / n : 0, loss: received + lost > 0 ? lost / (received + lost) : 0 };
+    return { rtt: n ? rtt / n : 0, loss: this.recentLoss.measure(streams) };
   }
 }

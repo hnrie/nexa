@@ -11,9 +11,11 @@ function canPickOutput(): boolean {
 }
 
 /** A device's name; a browser hides them until a device of the kind has been allowed once. */
-function nameOf(d: MediaDeviceInfo, i: number, kind: string): string {
+/** A device's own name, or "Microphone 2" when the browser will not say it. */
+function nameOf(d: MediaDeviceInfo, i: number, kind: "microphone" | "speakers" | "camera"): string {
   if (d.label) return d.label;
-  return `${kind} ${i + 1}`;
+  const key = kind === "microphone" ? "voice.devices.microphoneN" : kind === "speakers" ? "voice.devices.speakersN" : "voice.devices.cameraN";
+  return t(key, { n: i + 1 });
 }
 
 /**
@@ -29,7 +31,7 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
   const items: ContextMenuItem[] = [{ id: "input-heading", label: t("voice.deviceMenus.inputDevice"), heading: true }];
   items.push({ id: "input-default", label: defaultDeviceLabel(devices.inputs), checked: !v.inputDeviceId, onSelect: () => set({ inputDeviceId: null, inputDeviceLabel: null }) });
   real(devices.inputs).forEach((d, i) => {
-    items.push({ id: `input-${d.deviceId}`, label: nameOf(d, i, "Microphone"), checked: v.inputDeviceId === d.deviceId, onSelect: () => set({ inputDeviceId: d.deviceId, inputDeviceLabel: d.label || null }) });
+    items.push({ id: `input-${d.deviceId}`, label: nameOf(d, i, "microphone"), checked: v.inputDeviceId === d.deviceId, onSelect: () => set({ inputDeviceId: d.deviceId, inputDeviceLabel: d.label || null }) });
   });
   const outputs = real(devices.outputs);
   if (canPickOutput() && outputs.length > 0) {
@@ -37,7 +39,7 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
     items.push({ id: "output-heading", label: t("voice.deviceMenus.outputDevice"), heading: true });
     items.push({ id: "output-default", label: defaultDeviceLabel(devices.outputs), checked: !v.outputDeviceId, onSelect: () => set({ outputDeviceId: null, outputDeviceLabel: null }) });
     outputs.forEach((d, i) => {
-      items.push({ id: `output-${d.deviceId}`, label: nameOf(d, i, "Speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => set({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) });
+      items.push({ id: `output-${d.deviceId}`, label: nameOf(d, i, "speakers"), checked: v.outputDeviceId === d.deviceId, onSelect: () => set({ outputDeviceId: d.deviceId, outputDeviceLabel: d.label || null }) });
     });
   }
   if (opts.settings === false) return items;
@@ -59,7 +61,7 @@ export async function cameraMenuItems(openModal: OpenModal, opts: { settings?: b
   } else {
     items.push({ id: "camera-default", label: defaultDeviceLabel(devices.cameras), checked: !v.cameraDeviceId, onSelect: () => set({ cameraDeviceId: null, cameraDeviceLabel: null }) });
     cameras.forEach((d, i) => {
-      items.push({ id: `camera-${d.deviceId}`, label: nameOf(d, i, "Camera"), checked: v.cameraDeviceId === d.deviceId, onSelect: () => set({ cameraDeviceId: d.deviceId, cameraDeviceLabel: d.label || null }) });
+      items.push({ id: `camera-${d.deviceId}`, label: nameOf(d, i, "camera"), checked: v.cameraDeviceId === d.deviceId, onSelect: () => set({ cameraDeviceId: d.deviceId, cameraDeviceLabel: d.label || null }) });
     });
   }
   if (opts.settings === false) return items;

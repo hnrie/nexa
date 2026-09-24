@@ -52,7 +52,7 @@ export function EncryptionSection() {
 
   return (
     <>
-      <h3 className={s.h} style={{ marginTop: 28 }}><KeyRound size={16} /> {t("encryption.sectionTitle")}</h3>
+      <h3 className={s.h5} style={{ marginTop: 28 }}><KeyRound size={16} /> {t("encryption.sectionTitle")}</h3>
       <p className={s.hint}>{t("encryption.sectionHint")}</p>
 
       {myKey ? (

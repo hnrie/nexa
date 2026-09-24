@@ -12,6 +12,7 @@ import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
+import { SaveBar } from "@/components/server/SettingsLayer";
 const PRESETS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#607d8b"];
 
 /** A colour column may be missing entirely on an older server, so treat anything but a number as unset. */
@@ -176,15 +177,7 @@ export default function ProfilePage() {
           }}
         />
       ) : null}
-      {dirty ? (
-        <div className={s.saveBar}>
-          <span>{t("server.settingsLayer.carefulYouHaveUnsavedChanges")}</span>
-          <span className={s.saveBtns}>
-            <Button variant="ghost" onClick={reset}>{t("common.imageCrop.reset")}</Button>
-            <Button variant="positive" loading={saving} onClick={() => void save()}>{t("settings.profile.saveChanges")}</Button>
-          </span>
-        </div>
-      ) : null}
+      <SaveBar dirty={dirty} busy={saving} onReset={reset} onSave={() => void save()} label={t("settings.profile.saveChanges")} />
     </>
   );
 }

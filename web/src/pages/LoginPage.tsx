@@ -149,7 +149,7 @@ export default function LoginPage() {
         </Field>
         <Button type="submit" size="lg" block loading={busy}>{t("login.logIn")}</Button>
         <div className={s.foot}>
-          Need an account? <Link to="/register">{t("login.register")}</Link>
+          {t("login.needAnAccount")} <Link to="/register">{t("login.register")}</Link>
         </div>
       </form>
     </AuthLayout>

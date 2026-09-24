@@ -43,7 +43,7 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
   // without a recorded size, the picture's own tells the frame what shape to be
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const dims = fitMedia(e.image_w ?? natural?.w, e.image_h ?? natural?.h);
-  const name = e.type === "gif" ? "GIF" : fileNameOf(e.url, "Image");
+  const name = e.type === "gif" ? "GIF" : fileNameOf(e.url, t("server.emoji.image"));
   // what "Download" saves it as; a GIF from the picker arrives through the proxy, whose address says nothing
   const fileName = e.type === "gif" ? "animation.gif" : fileNameOf(e.url, "image");
   if (src === null) return null;
@@ -135,7 +135,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
   const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null;
   if (src) {
     return (
-      <div className={s.card} style={e.color ? { borderLeftColor: e.color } : undefined}>
+      <div className={s.card} style={e.color ? { borderInlineStartColor: e.color } : undefined}>
         <CardHead e={e} />
         {title}
         {e.description ? <div className={s.desc}>{e.description}</div> : null}
@@ -143,7 +143,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
           {play ? (
             <iframe
               src={src}
-              title={e.title ?? "Video"}
+              title={e.title ?? t("perms.video")}
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
               allowFullScreen
@@ -159,7 +159,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
     );
   }
   return (
-    <div className={s.card} style={e.color ? { borderLeftColor: e.color } : undefined}>
+    <div className={s.card} style={e.color ? { borderInlineStartColor: e.color } : undefined}>
       <div className={s.cardRow}>
         <div className={s.cardText}>
           <CardHead e={e} />
@@ -170,7 +170,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
       </div>
       {/* a file this browser plays on its own; the page it came from runs nothing */}
       {media && e.media_kind === "video" ? (
-        <VideoPlayer src={media} name={fileNameOf(e.url, "Video")} width={e.media_w} height={e.media_h} />
+        <VideoPlayer src={media} name={fileNameOf(e.url, t("perms.video"))} width={e.media_w} height={e.media_h} />
       ) : media && e.media_kind === "audio" ? (
         <audio className={s.audio} src={media} controls preload="none" />
       ) : image && big ? (
@@ -201,7 +201,7 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
 /** A linked video file, played through the proxy like everything else a preview loads. */
 function VideoEmbed({ e }: { e: UnfurlResult }) {
   const src = useMediaSrc(e.image ?? e.url);
-  return src ? <VideoPlayer src={src} name={fileNameOf(e.url, "Video")} width={e.image_w} height={e.image_h} /> : null;
+  return src ? <VideoPlayer src={src} name={fileNameOf(e.url, t("perms.video"))} width={e.image_w} height={e.image_h} /> : null;
 }
 
 /** An invite to somewhere on this instance, with a way in. */
@@ -218,8 +218,8 @@ function InviteEmbed({ e }: { e: UnfurlResult }) {
       window.open(e.url, "_blank", "noopener");
     }
   };
-  const members = typeof e.member_count === "number" ? `${e.member_count} member${e.member_count === 1 ? "" : "s"}` : "";
-  const online = typeof e.online_count === "number" && e.online_count > 0 ? `${e.online_count} online` : "";
+  const members = typeof e.member_count === "number" ? t("chat.chatView.membersCount", { count: e.member_count }) : "";
+  const online = typeof e.online_count === "number" && e.online_count > 0 ? t("chat.embeds.onlineCount", { count: e.online_count }) : "";
   return (
     <div className={s.invite} data-testid="invite-embed">
       <div className={s.inviteHead}>{t("chat.embeds.youHaveBeenInvitedToJoin")}</div>

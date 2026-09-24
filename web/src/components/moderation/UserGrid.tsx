@@ -86,13 +86,15 @@ export function UserGrid() {
   // the next page loads as the end of the list comes into view
   useEffect(() => {
     const el = sentinel.current;
-    if (!el || !cursor) return;
+    // after a failed page it waits to be asked: the sentinel is still in view,
+    // and asking again at once looped as fast as the failures came back
+    if (!el || !cursor || failed) return;
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting) && !loading) void load(cursor);
     }, { rootMargin: "400px" });
     io.observe(el);
     return () => io.disconnect();
-  }, [cursor, loading, load]);
+  }, [cursor, loading, load, failed]);
 
   /** Reads one account again after something happened to it. */
   const refresh = useCallback(async (id: string) => {
@@ -239,6 +241,13 @@ export function UserGrid() {
         </div>
       ) : null}
       <div ref={sentinel} className={m.sentinel} />
+      {failed && users?.length && cursor ? (
+        <div className={m.loadingRow}>
+          <Button size="sm" variant="secondary" onClick={() => void load(cursor)} loading={loading}>
+            {t("moderation.retry")}
+          </Button>
+        </div>
+      ) : null}
       {loading && users ? (
         <div className={m.loadingRow}>
           <Spinner size={24} label={t("chat.pins.loading")} />

@@ -16,6 +16,7 @@ import { PlayoutDelay } from "./playoutDelay";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 
 import { t as tr_ } from "@/i18n";
+import { RecentLoss, type LossTotals } from "./recentLoss";
 type PubKind = "audio" | "video" | "screen" | "screen_audio";
 
 /** A track pulled from someone else, arriving on one of this connection's mids. */
@@ -146,7 +147,17 @@ class SyncLater extends Error {}
 
 const media = (kind: PubKind): "audio" | "video" => (kind === "audio" || kind === "screen_audio" ? "audio" : "video");
 const slot = (userId: string, kind: PubKind) => `${userId}:${kind}`;
-const timeout = () => AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+/**
+ * A signal that aborts after the request timeout. AbortSignal.timeout is
+ * missing from Safari before 16, where the call's encryption still works, so
+ * every step there threw and the call sat on "Connecting…" for good.
+ */
+const timeout = (): AbortSignal => {
+  if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const c = new AbortController();
+  setTimeout(() => c.abort(new DOMException("The request timed out.", "TimeoutError")), REQUEST_TIMEOUT_MS);
+  return c.signal;
+};
 
 function description(d: RTCSessionDescription | null): SfuDescription {
   return { type: d!.type as "offer" | "answer", sdp: d!.sdp };
@@ -187,6 +198,8 @@ function streamOf(current: MediaStream | null, tracks: MediaStreamTrack[]): Medi
 }
 
 export class SfuTransport implements VoiceTransport {
+  /** Loss is measured between readings, not over the whole call. */
+  private recentLoss = new RecentLoss();
   private pc: RTCPeerConnection;
   private readonly crypto = new FrameCrypto();
   private readonly playback: Playback;
@@ -382,6 +395,12 @@ export class SfuTransport implements VoiceTransport {
       }
       this.live(pc);
       this.sessionId = session;
+      // A rebuild still waiting from an earlier failure would tear down the
+      // session just made, a second or two in: an audible drop for nothing.
+      if (this.retry?.rebuild) {
+        clearTimeout(this.retry.timer);
+        this.retry = null;
+      }
       await this.publishNow(this.wantedKinds());
       this.scheduleSync();
     });
@@ -1048,19 +1067,22 @@ export class SfuTransport implements VoiceTransport {
   async stats(): Promise<{ rtt: number; loss: number }> {
     const report = await this.pc.getStats().catch(() => null);
     let rtt = 0;
-    let lost = 0;
-    let received = 0;
+    let selected: string | undefined;
+    const pairs = new Map<string, RTCIceCandidatePairStats>();
+    const streams = new Map<string, LossTotals>();
     report?.forEach((r) => {
-      if (r.type === "candidate-pair" && (r as RTCIceCandidatePairStats).nominated && (r as RTCIceCandidatePairStats).currentRoundTripTime !== undefined) {
-        rtt = (r as RTCIceCandidatePairStats).currentRoundTripTime! * 1000;
-      }
+      // the pair in use is the one the transport names; after an ICE restart
+      // an old nominated pair can still be in the report
+      if (r.type === "transport") selected = (r as RTCTransportStats).selectedCandidatePairId;
+      if (r.type === "candidate-pair") pairs.set(r.id, r as RTCIceCandidatePairStats);
       if (r.type === "inbound-rtp") {
         const x = r as RTCInboundRtpStreamStats;
-        lost += x.packetsLost ?? 0;
-        received += x.packetsReceived ?? 0;
+        streams.set(r.id, { lost: x.packetsLost ?? 0, received: x.packetsReceived ?? 0 });
       }
     });
-    return { rtt, loss: received + lost > 0 ? lost / (received + lost) : 0 };
+    const pair = (selected ? pairs.get(selected) : undefined) ?? [...pairs.values()].find((p) => p.nominated && p.currentRoundTripTime !== undefined);
+    if (pair?.currentRoundTripTime !== undefined) rtt = pair.currentRoundTripTime * 1000;
+    return { rtt, loss: this.recentLoss.measure(streams) };
   }
 
   close(): void {

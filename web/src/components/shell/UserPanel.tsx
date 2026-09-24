@@ -15,6 +15,7 @@ import s from "./UserPanel.module.css";
 import { micMenuItems } from "@/components/voice/deviceMenus";
 
 import { t } from "@/i18n";
+import { confirmLogout } from "@/lib/confirmLogout";
 function statusOptions(): { value: "online" | "idle" | "dnd" | "invisible"; label: string; sub?: string }[] {
   return [
   { value: "online", label: t("shell.user.online") },
@@ -26,7 +27,6 @@ function statusOptions(): { value: "online" | "idle" | "dnd" | "invisible"; labe
 
 export function UserPanel() {
   const me = useAuth((a) => a.me);
-  const logout = useAuth((a) => a.logout);
   const presence = usePresence((p) => (me ? p.byUser[me.id] : undefined));
   const setPresence = usePresence((p) => p.set);
   const openModal = useUI((u) => u.openModal);
@@ -167,7 +167,7 @@ export function UserPanel() {
             </button>
           ))}
           <div className={s.sep} role="separator" />
-          <button className={[s.opt, s.danger].join(" ")} role="menuitem" onClick={() => void logout()}>
+          <button className={[s.opt, s.danger].join(" ")} role="menuitem" onClick={() => { setOpen(false); confirmLogout(); }}>
             <LogOut size={16} />
             <span>{t("settings.settings.logOut")}</span>
           </button>

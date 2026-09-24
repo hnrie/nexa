@@ -19,7 +19,7 @@
 
 /* the stage: a grid sized to fit, or one stream up front with the rest in a strip */
 .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px; position: relative; }
-.stageNote { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.stageNote { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2; padding: 4px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.6); font-size: 12px; color: var(--text-muted); white-space: normal; text-align: center; width: max-content; max-width: calc(100% - 24px); }
 .grid { flex: 1; min-height: 0; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 8px; overflow: hidden; }
 .focus { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .strip { flex: none; height: 96px; display: flex; gap: 8px; justify-content: safe center; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
@@ -208,6 +208,9 @@
 /* settings meter */
 .meter { height: 8px; border-radius: 4px; background: var(--bg-input); overflow: hidden; margin-top: 8px; position: relative; }
 .meterFill { height: 100%; background: var(--positive); transition: width 60ms linear; }
+.meterFill[data-sent="true"] { background: var(--positive); }
+/* the microphone diagnostics in Voice & Video settings: wraps inside the column on a phone */
+.diag { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; user-select: all; }
 .meterMark { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--warning); }
 .keyCapture { height: 40px; padding: 0 12px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); font-family: var(--font-mono); display: flex; align-items: center; justify-content: space-between; cursor: pointer; border: 1px solid transparent; }
 .keyCapture[data-capturing="true"] { border-color: var(--brand); }

@@ -206,7 +206,7 @@ export default function VoicePage() {
           <Field label={tr_("settings.voice.pushToTalkKey")} hint={tr_("settings.voice.clickTheBoxThenPressThe")}>
             <button type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing(true)}>
               <span>{capturing ? tr_("settings.voice.pressAKey") : settings.pttKey}</span>
-              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? tr_("settings.voice.escToCancel") : "Change"}</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? tr_("settings.voice.escToCancel") : tr_("settings.security.change")}</span>
             </button>
           </Field>
         ) : (

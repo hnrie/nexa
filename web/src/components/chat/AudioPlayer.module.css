@@ -27,3 +27,8 @@
   .side { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
   .volume { display: none; }
 }
+
+@media (pointer: coarse) {
+  .ctl { width: 36px; height: 36px; }
+  .speed { height: 36px; padding: 0 10px; }
+}

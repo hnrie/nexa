@@ -6,6 +6,8 @@
 .switch { position: relative; width: 40px; height: 24px; flex: none; border-radius: 12px; background: var(--status-offline); transition: background-color var(--transition); }
 .switch[data-on="true"] { background: var(--positive); }
 .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+/* the real control is invisible, so the switch shows where keyboard focus is */
+.switch:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform var(--transition); pointer-events: none; }
 .switch[data-on="true"] .knob { transform: translateX(16px); }
 [dir="rtl"] .switch[data-on="true"] .knob { transform: translateX(-16px); }

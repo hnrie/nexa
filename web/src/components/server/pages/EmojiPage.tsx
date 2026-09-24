@@ -73,7 +73,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
     }
   };
   const rename = async (e: Emoji) => {
-    const next = await promptText(t("server.emoji.renameEmoji"), { label: t("server.emoji.emojiName"), hint: t("server.emoji.lettersNumbersAndUnderscores"), initial: e.name, maxLength: 32 }, "Rename");
+    const next = await promptText(t("server.emoji.renameEmoji"), { label: t("server.emoji.emojiName"), hint: t("server.emoji.lettersNumbersAndUnderscores"), initial: e.name, maxLength: 32 }, t("server.packEditor.rename"));
     if (next === null || next.trim() === e.name) return;
     try {
       await expressionsApi.renameEmoji(serverId, e.id, next.trim());

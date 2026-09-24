@@ -10,6 +10,7 @@ import { formatTimestamp } from "@/lib/time";
 import { useModEvents } from "@/stores/moderation";
 import { t } from "@/i18n";
 import m from "./Moderation.module.css";
+import { LoadError } from "@/components/common/LoadError";
 
 type Group = "all" | keyof typeof LOG_GROUPS;
 const PAGE = 50;
@@ -27,17 +28,19 @@ export function LogsTab() {
   const [people, setPeople] = useState<People>({});
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(
     async (before?: string) => {
       setLoading(true);
+      setFailed(false);
       try {
         const r = await modApi.log({ action: group === "all" ? undefined : LOG_GROUPS[group], q, before, limit: PAGE });
         setEntries((cur) => (before ? [...(cur ?? []), ...r.entries] : r.entries));
         setPeople((p) => ({ ...p, ...r.people }));
         setMore(r.entries.length === PAGE);
       } catch {
-        setEntries((cur) => cur ?? []);
+        setFailed(true);
       } finally {
         setLoading(false);
       }
@@ -131,7 +134,9 @@ export function LogsTab() {
           {t("moderation.logs.immutable")}
         </span>
       </div>
-      {entries === null ? (
+      {failed && !entries?.length ? (
+        <LoadError message={t("moderation.loadFailed")} onRetry={() => void load()} busy={loading} center />
+      ) : entries === null ? (
         <div className={m.loadingRow}>
           <Spinner label={t("chat.pins.loading")} />
         </div>

@@ -22,13 +22,12 @@ import { SaveBar, SettingsLayer, type NavGroup } from "./SettingsLayer";
 import s from "./ServerSettings.module.css";
 
 import { t as tr_ } from "@/i18n";
+import { formatShortDuration } from "@/lib/time";
+import { unlessUnsaved } from "@/stores/unsaved";
 const SLOWMODE = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600];
 
 function slowLabel(v: number): string {
-  if (v === 0) return "Off";
-  if (v < 60) return `${v}s`;
-  if (v < 3600) return `${v / 60}m`;
-  return `${v / 3600}h`;
+  return v === 0 ? tr_("server.channelSettings.slowmodeOff") : formatShortDuration(v);
 }
 
 export default function ChannelSettingsModal({ onClose, channelId, page: initial }: { onClose: () => void; channelId: string; page?: string | undefined }) {
@@ -268,7 +267,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
           ) : null}
           {targets.map((t) => (
             <div key={t.id} className={s.permTarget} data-selected={t.id === selectedTarget.id}>
-              <button className={s.permTargetBtn} onClick={() => setSelected(t.id)} data-target={t.id}>
+              <button className={s.permTargetBtn} onClick={t.id === selectedTarget.id ? undefined : unlessUnsaved(() => setSelected(t.id))} data-target={t.id}>
                 {t.type === "role" ? <span className={s.dot} style={{ background: t.color ?? "var(--text-muted)" }} /> : <Avatar id={t.id} avatarId={users[t.id]?.avatar_id ?? null} name={t.name} size={20} />}
                 <span className={s.permTargetName}>{t.name}</span>
               </button>

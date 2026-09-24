@@ -244,17 +244,19 @@ const CHUNK_TRIES = 4;
 /** How long an upload waits for a lost connection to come back without getting any further. */
 const STALL_MS = 5 * 60_000;
 
-/** Waits `ms`, or less if the device was offline and comes back online. */
-function connectionBack(ms: number): Promise<void> {
+/** Waits `ms`, or less if the device was offline and comes back online, or the upload is cancelled. */
+function connectionBack(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const offline = typeof window !== "undefined" && navigator.onLine === false;
     const done = (): void => {
       clearTimeout(timer);
       if (offline) window.removeEventListener("online", done);
+      signal?.removeEventListener("abort", done);
       resolve();
     };
     const timer = setTimeout(done, ms);
     if (offline) window.addEventListener("online", done);
+    signal?.addEventListener("abort", done);
   });
 }
 
@@ -264,8 +266,11 @@ function connectionBack(ms: number): Promise<void> {
  * apart each time, until `deadline`; null means it never answered.
  * `waited` says the connection was down for a while.
  */
-async function landedSoFar(id: string, deadline: number): Promise<{ received: number; waited: boolean } | null> {
+async function landedSoFar(id: string, deadline: number, signal?: AbortSignal): Promise<{ received: number; waited: boolean } | null> {
   for (let attempt = 0; ; attempt++) {
+    // a cancelled upload stops asking at once; it used to wait out its five
+    // minutes, holding back an app update and the server-side cancel with it
+    if (signal?.aborted) return null;
     try {
       const state = await uploadsApi.status(id);
       return { received: state.received, waited: attempt > 0 };
@@ -273,7 +278,7 @@ async function landedSoFar(id: string, deadline: number): Promise<{ received: nu
       // gone, or not ours any more: no amount of waiting brings it back
       if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 408 && err.status !== 429) return null;
       if (Date.now() >= deadline) return null;
-      await connectionBack(Math.min(30_000, 1000 * 2 ** attempt, Math.max(0, deadline - Date.now())));
+      await connectionBack(Math.min(30_000, 1000 * 2 ** attempt, Math.max(0, deadline - Date.now())), signal);
     }
   }
 }
@@ -333,7 +338,7 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
           // stopped on purpose: nothing to pick up again
           if (signal?.aborted) throw err;
           // ask where it got to, waiting for the connection if it dropped, then carry on from there
-          const landed = await landedSoFar(session.id, movedAt + STALL_MS);
+          const landed = await landedSoFar(session.id, movedAt + STALL_MS, signal);
           if (!landed || landed.received < start || landed.received > end) throw err;
           if (landed.received > sent) {
             tries = 0;

@@ -41,7 +41,7 @@ export async function promptText(title: string, field: Omit<PromptField, "key">,
   return values ? (values["value"] ?? "") : null;
 }
 
-export function PromptModal({ onClose, title, fields, confirmLabel = "Save", allowEmpty = false, resolve }: PromptOptions & { onClose: () => void; resolve: (values: Record<string, string> | null) => void }) {
+export function PromptModal({ onClose, title, fields, confirmLabel = t("chat.editMessage.save"), allowEmpty = false, resolve }: PromptOptions & { onClose: () => void; resolve: (values: Record<string, string> | null) => void }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, f.initial ?? ""])));
   const first = fields[0]?.key ?? "";
   const ready = allowEmpty || !!values[first]?.trim();

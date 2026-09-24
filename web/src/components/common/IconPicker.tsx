@@ -59,7 +59,7 @@ export function IconPicker({ currentUrl, picked, onPick, onRemove, initials, lab
         {!disabled ? (
           <span className={s.overlay} aria-hidden="true">
             <ImagePlus size={20} />
-            <span>{shown ? "Change" : "Upload"}</span>
+            <span>{shown ? t("settings.security.change") : t("common.iconPicker.upload")}</span>
           </span>
         ) : null}
       </button>

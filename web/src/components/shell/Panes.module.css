@@ -35,7 +35,7 @@
 }
 .tab:hover { background: var(--bg-hover); color: var(--text); }
 .tab[data-selected="true"] { background: var(--bg-raised); color: var(--text-strong); }
-.tab:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 /* where a dragged tab would land; a shadow has no logical form, so the
    mirrored case is spelled out rather than landing on the wrong edge */
 .tab[data-drop] { box-shadow: inset 2px 0 0 var(--brand); }
@@ -66,10 +66,14 @@
   border-radius: var(--radius-xs);
   color: var(--text-muted);
   opacity: 0;
+  /* hidden is untouchable too: a tap near a background tab's end switched to
+     nothing and closed it instead */
+  pointer-events: none;
 }
 .tab:hover .tabClose,
 .tab[data-selected="true"] .tabClose,
-.tabClose:focus-visible { opacity: 1; }
+.tabClose:focus-visible { opacity: 1; pointer-events: auto; }
+@media (pointer: coarse) { .tabClose { width: 32px; height: 32px; } }
 .tabClose:hover { background: var(--bg-active); color: var(--text-strong); }
 
 .tabAdd {
@@ -127,7 +131,7 @@
 .split[data-dir="row"] > .slot > .divider::after { inset-block: 0; inset-inline-start: 3px; width: 1px; }
 .split[data-dir="column"] > .slot > .divider::after { inset-inline: 0; top: 3px; height: 1px; }
 .divider:hover::after,
-.divider:focus-visible::after { background: var(--brand); }
+.divider:focus-visible::after { background: var(--focus-ring); }
 .split[data-dir="row"] > .slot > .divider:hover::after,
 .split[data-dir="row"] > .slot > .divider:focus-visible::after { inset-inline-start: 2px; width: 3px; }
 .split[data-dir="column"] > .slot > .divider:hover::after,
@@ -158,10 +162,13 @@
   color: var(--text-muted);
   box-shadow: var(--shadow-low);
   opacity: 0;
+  pointer-events: none;
   transition: opacity 120ms ease;
 }
 .pane:hover .paneClose,
-.paneClose:focus-visible { opacity: 1; }
+.paneClose:focus-visible { opacity: 1; pointer-events: auto; }
+/* no hover to reveal it on a touch screen, so it simply shows */
+@media (hover: none) { .paneClose { opacity: 1; pointer-events: auto; } }
 /* The button sits over the end of the chat's own header, where the member-list
    toggle already is. The header makes room for it rather than the button
    moving somewhere it would cover a message. Only inside a split: a lone pane

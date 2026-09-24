@@ -100,7 +100,7 @@ export async function captchaToken(action: string): Promise<string | null> {
     const overlay = document.createElement("div");
     overlay.className = "captcha-overlay";
     overlay.setAttribute("role", "dialog");
-    overlay.setAttribute("aria-label", "Captcha");
+    overlay.setAttribute("aria-label", t("captcha.label"));
     const sheet = document.createElement("div");
     sheet.className = "captcha-sheet";
     const title = document.createElement("div");
@@ -110,7 +110,7 @@ export async function captchaToken(action: string): Promise<string | null> {
     const cancel = document.createElement("button");
     cancel.type = "button";
     cancel.className = "captcha-cancel";
-    cancel.textContent = "Cancel";
+    cancel.textContent = t("chat.editMessage.cancel");
     sheet.append(title, slot, cancel);
     overlay.append(sheet);
     document.body.append(overlay);

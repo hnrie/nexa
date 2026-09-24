@@ -65,10 +65,17 @@ function useDecrypted(att: AttachmentMeta, eager: boolean): { url: string | null
 }
 
 /** Why an attachment is not showing, with a way to try again when that could help. */
-function LoadFailed({ error, what, onRetry }: { error: LoadError; what: string; onRetry: () => void }) {
+/** What failed, said per kind: a word slotted into one sentence reads wrong in most languages. */
+const FAILED = {
+  image: ["chat.attachments.imageUndecryptable", "chat.attachments.imageUnloadable"],
+  video: ["chat.attachments.videoUndecryptable", "chat.attachments.videoUnloadable"],
+  audio: ["chat.attachments.audioUndecryptable", "chat.attachments.audioUnloadable"],
+} as const;
+
+function LoadFailed({ error, what, onRetry }: { error: LoadError; what: keyof typeof FAILED; onRetry: () => void }) {
   return (
     <span className={s.loadFailed}>
-      {error === "decrypt" ? tr_("chat.attachments.couldNotBeDecrypted", { what }) : tr_("chat.attachments.couldNotBeLoaded", { what })}
+      {tr_(FAILED[what][error === "decrypt" ? 0 : 1])}
       {error === "load" ? (
         <button
           className={s.retry}
@@ -77,7 +84,7 @@ function LoadFailed({ error, what, onRetry }: { error: LoadError; what: string; 
             onRetry();
           }}
         >
-          Retry
+          {tr_("chat.messageItem.retry")}
         </button>
       ) : null}
     </span>
@@ -170,7 +177,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
             {error ? (
               <LoadFailed error={error} what="image" onRetry={retry} />
             ) : wanted || auto ? (
-              "Decrypting…"
+              tr_("chat.attachments.decryptingShort")
             ) : (
               <button
                 className={s.videoLoad}
@@ -181,7 +188,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
                   load();
                 }}
               >
-                Load image ({formatBytes(att.size)})
+                {tr_("chat.attachments.loadImage", { size: formatBytes(att.size) })}
               </button>
             )}
           </div>
@@ -213,7 +220,7 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
         <span className={s.videoLoading}><Spinner size={20} /> {tr_("chat.attachments.decryptingNamed", { name: att.name, size: formatBytes(att.size) })}</span>
       ) : (
         <button className={s.videoLoad} onClick={load}>
-          <Play size={20} /> Load video ({formatBytes(att.size)})
+          <Play size={20} /> {tr_("chat.attachments.loadVideo", { size: formatBytes(att.size) })}
         </button>
       )}
     </div>
@@ -235,7 +242,7 @@ function AudioAttachment({ att }: { att: AttachmentMeta }) {
         <span className={s.fileSize}>{tr_("chat.attachments.decrypting", { name: att.name })}</span>
       ) : (
         <button className={s.videoLoad} onClick={load}>
-          <Play size={16} /> Load {att.name} ({formatBytes(att.size)})
+          <Play size={16} /> {tr_("chat.attachments.loadNamed", { name: att.name, size: formatBytes(att.size) })}
         </button>
       )}
     </div>

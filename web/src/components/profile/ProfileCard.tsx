@@ -189,10 +189,36 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
     if (panel) items.push({ id: "full", label: t("profile.profileCard.viewFullProfile"), onSelect: () => openModal("profile", { userId }), separatorAfter: true });
     if (friend) {
       items.push({ id: "nick", label: rel.nickname ? t("profile.profileCard.editFriendNickname") : t("profile.profileCard.addFriendNickname"), onSelect: () => void editNickname() });
-      items.push({ id: "rm", label: t("profile.profileCard.removeFriend"), danger: true, onSelect: () => void relApi.remove(userId).then(() => removeRel(userId), failed) });
+      // asked first, as the friends list asks: neither is quick to take back
+      items.push({
+        id: "rm",
+        label: t("profile.profileCard.removeFriend"),
+        danger: true,
+        onSelect: () =>
+          openModal("confirm", {
+            title: t("profile.profileCard.removeFriend"),
+            body: t("friends.removeNameFromYourFriends", { name: user.display_name }),
+            confirmLabel: t("profile.profileCard.removeFriend"),
+            danger: true,
+            onConfirm: () => relApi.remove(userId).then(() => removeRel(userId), failed),
+          }),
+      });
     }
     if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), onSelect: () => void relApi.unblock(userId).then(() => removeRel(userId), failed) });
-    else items.push({ id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => void relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() }), failed) });
+    else
+      items.push({
+        id: "block",
+        label: t("profile.profileCard.block"),
+        danger: true,
+        onSelect: () =>
+          openModal("confirm", {
+            title: t("profile.profileCard.block"),
+            body: t("friends.blockNameTheyWillNotBe", { name: user.display_name }),
+            confirmLabel: t("profile.profileCard.block"),
+            danger: true,
+            onConfirm: () => relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() }), failed),
+          }),
+      });
     items[items.length - 1]!.separatorAfter = true;
     items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(userId) });
     openContextMenu({ x: r.left, y: r.bottom + 4, items });

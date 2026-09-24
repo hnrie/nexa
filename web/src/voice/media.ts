@@ -156,7 +156,7 @@ export function defaultDeviceName(list: MediaDeviceInfo[]): string | null {
 /** "Default (MacBook Pro Microphone)", or just "Default" when the name is not known. */
 export function defaultDeviceLabel(list: MediaDeviceInfo[]): string {
   const name = defaultDeviceName(list);
-  return name ? `Default (${name})` : "Default";
+  return name ? t("voice.media.defaultNamed", { name }) : t("voice.media.default");
 }
 
 export interface Devices {

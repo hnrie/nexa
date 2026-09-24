@@ -289,7 +289,7 @@ function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker
         <span
           role="button"
           tabIndex={0}
-          aria-label={sticker.name ? `Sticker: ${sticker.name}` : "Sticker"}
+          aria-label={sticker.name ? t("chat.messageItem.stickerNamed", { name: sticker.name }) : t("attachmentViews.sticker")}
           aria-expanded={!!anchor}
           data-testid="message-sticker"
           onClick={(e) => toggle(e.currentTarget)}
@@ -300,7 +300,7 @@ function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker
           }}
           style={{ display: "inline-block", lineHeight: 0 }}
         >
-          <StickerMedia format={format} src={stickerUrl(sticker.blob, 160)} alt={sticker.name ?? "sticker"} className={s.sticker} style={size} />
+          <StickerMedia format={format} src={stickerUrl(sticker.blob, 160)} alt={sticker.name ?? t("attachmentViews.sticker")} className={s.sticker} style={size} />
         </span>
         {anchor ? <StickerPopout sticker={sticker} anchor={anchor} onClose={close} /> : null}
       </>
@@ -311,14 +311,14 @@ function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker
       <img
         className={s.sticker}
         src={stickerUrl(sticker.blob, 160)}
-        alt={sticker.name ?? "sticker"}
+        alt={sticker.name ?? t("attachmentViews.sticker")}
         width={Math.min(160, w)}
         height={160}
         loading="lazy"
         draggable={false}
         role="button"
         tabIndex={0}
-        aria-label={sticker.name ? `Sticker: ${sticker.name}` : "Sticker"}
+        aria-label={sticker.name ? t("chat.messageItem.stickerNamed", { name: sticker.name }) : t("attachmentViews.sticker")}
         aria-expanded={!!anchor}
         data-testid="message-sticker"
         data-image-src={stickerUrl(sticker.blob)}

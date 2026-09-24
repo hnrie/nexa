@@ -22,6 +22,7 @@ import { rolePositionsAfterDrop } from "./rolePositions";
 import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
+import { unlessUnsaved } from "@/stores/unsaved";
 const SWATCHES = [0x1abc9c, 0x2ecc71, 0x3498db, 0x9b59b6, 0xe91e63, 0xf1c40f, 0xe67e22, 0xe74c3c, 0x95a5a6, 0x607d8b, 0x11806a, 0x1f8b4c, 0x206694, 0x71368a, 0xad1457, 0xc27c0e, 0xa84300, 0x992d22, 0x979c9f, 0x546e7a];
 
 function hex(c: number): string {
@@ -154,7 +155,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
                 }}
                 data-reorder-id={r.id}
                 aria-current={r.id === role.id}
-                onClick={() => { setSelected(r.id); if (r.id === serverId && tab === "members") setTab("display"); }}
+                onClick={r.id === selected ? undefined : unlessUnsaved(() => { setSelected(r.id); if (r.id === serverId && tab === "members") setTab("display"); })}
               >
                 <span className={s.dot} style={{ background: r.color ? hex(r.color) : "var(--text-muted)" }} />
                 <span className={s.roleName}>{r.name}</span>
@@ -165,9 +166,9 @@ export default function RolesPage({ serverId }: { serverId: string }) {
         </div>
         <div>
           <div className={s.tabs} role="tablist" aria-label={role.name}>
-            <button className={s.tab} role="tab" aria-selected={view === "display"} aria-controls={panelId} tabIndex={view === "display" ? 0 : -1} onKeyDown={onTabKey} data-on={view === "display"} onClick={() => setTab("display")}>{t("server.roles.display")}</button>
-            <button className={s.tab} role="tab" aria-selected={view === "permissions"} aria-controls={panelId} tabIndex={view === "permissions" ? 0 : -1} onKeyDown={onTabKey} data-on={view === "permissions"} onClick={() => setTab("permissions")}>{t("server.channelSettings.permissions")}</button>
-            {role.id !== serverId ? <button className={s.tab} role="tab" aria-selected={tab === "members"} aria-controls={panelId} tabIndex={tab === "members" ? 0 : -1} onKeyDown={onTabKey} data-on={tab === "members"} onClick={() => setTab("members")}>{t("server.roles.manageMembers")}</button> : null}
+            <button className={s.tab} role="tab" aria-selected={view === "display"} aria-controls={panelId} tabIndex={view === "display" ? 0 : -1} onKeyDown={onTabKey} data-on={view === "display"} onClick={unlessUnsaved(() => setTab("display"))}>{t("server.roles.display")}</button>
+            <button className={s.tab} role="tab" aria-selected={view === "permissions"} aria-controls={panelId} tabIndex={view === "permissions" ? 0 : -1} onKeyDown={onTabKey} data-on={view === "permissions"} onClick={unlessUnsaved(() => setTab("permissions"))}>{t("server.channelSettings.permissions")}</button>
+            {role.id !== serverId ? <button className={s.tab} role="tab" aria-selected={tab === "members"} aria-controls={panelId} tabIndex={tab === "members" ? 0 : -1} onKeyDown={onTabKey} data-on={tab === "members"} onClick={unlessUnsaved(() => setTab("members"))}>{t("server.roles.manageMembers")}</button> : null}
           </div>
           <div id={panelId} role="tabpanel" tabIndex={-1}>
           {view === "display" ? <DisplayTab key={role.id} role={role} editable={editable} everyone={role.id === serverId} onSaved={upsertRole} onDeleted={() => { removeRole(serverId, role.id); setSelected(serverId); }} /> : null}
@@ -316,7 +317,7 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
             <span className={s.memberName}>{name}</span>
             <span className={s.memberSub}>@{username}</span>
           </div>
-          <Button size="sm" variant={has ? "secondary" : "primary"} disabled={!editable || busy === m.user_id} onClick={() => void toggle(m.user_id, !has)}>{has ? "Remove" : "Add"}</Button>
+          <Button size="sm" variant={has ? "secondary" : "primary"} disabled={!editable || busy === m.user_id} onClick={() => void toggle(m.user_id, !has)}>{has ? t("server.packEditor.remove") : t("server.roles.addMember")}</Button>
         </div>
       ))}
     </div>

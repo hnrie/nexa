@@ -32,3 +32,5 @@
 .item[data-parent-selected="true"] { background: var(--bg-hover); }
 /* hover-only, since on iOS a tap that reveals it is taken as a hover and does not open the conversation; long-press offers Close DM */
 @media (hover: hover) { .item:hover .close { display: flex; } }
+/* reachable from the keyboard as well: it shows while the row has focus */
+.item:focus-within .close { display: flex; }

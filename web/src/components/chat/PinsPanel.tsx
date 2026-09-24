@@ -68,7 +68,7 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
               <span className={s.pinAuthor}>{displayName(users[m.author_id])}</span>
               <span className={s.time}>{formatTimestamp(m.created_at)}</span>
             </div>
-            <div className={s.pinText}>{m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.att?.length ? "[attachment]" : "[encrypted]"}</div>
+            <div className={s.pinText}>{m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.att?.length ? t("chat.pins.attachment") : t("chat.pins.encrypted")}</div>
             {canPin(m) ? (
               <button
                 className={s.pinRemove}

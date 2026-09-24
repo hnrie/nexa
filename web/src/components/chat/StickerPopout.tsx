@@ -56,7 +56,7 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
   const [info, setInfo] = useState<StickerInfo | null | undefined>(undefined);
   const openModal = useUI((u) => u.openModal);
-  const name = sticker.name || "Sticker";
+  const name = sticker.name || t("attachmentViews.sticker");
 
   useEffect(() => {
     let alive = true;
@@ -128,7 +128,7 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
             openModal("stickerPack", { info, stickerId: sticker.id });
           }}
         >
-          View Sticker Pack
+          {t("chat.stickerPopout.viewPack")}
         </Button>
       ) : null}
     </div>,

@@ -27,10 +27,10 @@ export function packCover(p: StickerPack): Sticker | undefined {
   return p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
 }
 
-/** "3 stickers", "1 sticker", "12 emoji". */
+/** "3 stickers", "1 sticker", "12 emoji", in the reader's language. */
 export function packCount(p: StickerPack): string {
-  const n = p.stickers.length;
-  return (p.kind ?? "sticker") === "emoji" ? `${n} emoji` : `${n} sticker${n === 1 ? "" : "s"}`;
+  const count = p.stickers.length;
+  return (p.kind ?? "sticker") === "emoji" ? t("server.packEditor.emojiCount", { count }) : t("server.packEditor.stickerCount", { count });
 }
 
 export function packUrl(id: string): string {
@@ -66,11 +66,11 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, 
                 <span className={s.cover}>{cover ? <StickerView format={cover.format} src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
                 <span className={s.packText}>
                   <span className={s.packName}>{p.name}</span>
-                  <span className={s.packSub}>{packCount(p)}{removable ? " · installed" : p.public ? " · public" : ""}</span>
+                  <span className={s.packSub}>{packCount(p)}{removable ? " · " + t("settings.stickers.installedTag") : p.public ? " · " + t("settings.stickers.publicTag") : ""}</span>
                 </span>
               </button>
               {removable ? (
-                <button className={s.packRemove} aria-label={`Remove ${p.name}`} title={t("server.packEditor.removePack")} onClick={() => confirmRemovePack(p, () => { if (selected?.id === p.id) onSelect(null); })}>
+                <button className={s.packRemove} aria-label={t("pickers.stickerPicker.removeName", { name: p.name })} title={t("server.packEditor.removePack")} onClick={() => confirmRemovePack(p, () => { if (selected?.id === p.id) onSelect(null); })}>
                   <X size={16} />
                 </button>
               ) : null}
@@ -170,7 +170,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
         done++;
       }
       upsertPack(await expressionsApi.pack(pack.id));
-      toast(done === 1 ? `${isEmoji ? "Emoji" : "Sticker"} added.` : `${done} ${noun} added.`, "success");
+      toast(t(isEmoji ? "server.packEditor.emojiAdded" : "server.packEditor.stickersAdded", { count: done }), "success");
     } catch (err) {
       toast(err instanceof ApiError ? err.message : t("composer.composer.uploadFailed"), "error");
       upsertPack(await expressionsApi.pack(pack.id).catch(() => pack));
@@ -381,7 +381,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
           </div>
         ))}
       </div>
-      {pack.stickers.length === 0 ? <div className={s.empty}>{manage ? t("server.packEditor.addYourFirst", { noun }) : t("pickers.stickerPicker.thisPackIsEmpty")}</div> : null}
+      {pack.stickers.length === 0 ? <div className={s.empty}>{manage ? t(isEmoji ? "server.packEditor.addYourFirstEmoji" : "server.packEditor.addYourFirstSticker") : t("pickers.stickerPicker.thisPackIsEmpty")}</div> : null}
       {manage ? <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(pack.name); setDescription(pack.description); }} onSave={() => void save()} /> : null}
     </div>
   );

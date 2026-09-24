@@ -44,7 +44,7 @@ export function VoiceStatus() {
       <div className={s.statusRow}>
         <div className={s.statusText}>
           <span className={s.statusHead} data-level={level} data-connecting={!mine}>
-            <Signal size={14} /> {mine ? t("voice.voiceStatus.voiceConnected") : "Connecting…"}
+            <Signal size={14} /> {mine ? t("voice.voiceStatus.voiceConnected") : t("voice.voice.connecting")}
           </span>
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>
@@ -65,10 +65,10 @@ export function VoiceStatus() {
             void cameraMenuItems(openModal).then((items) => useUI.getState().openContextMenu({ ...at, above: true, items }));
           }}
         >
-          <Video size={16} /> {localVideo ? t("voice.voiceStatus.cameraOn") : "Camera"}
+          <Video size={16} /> {localVideo ? t("voice.voiceStatus.cameraOn") : t("settings.voice.camera")}
         </button>
         {/* phone browsers cannot share a screen, so the camera gets the row */}
-        {canShareScreen ? <button className={s.statusWide} data-on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} disabled={!mine}><MonitorUp size={16} /> {localScreen ? "Sharing" : "Share"}</button> : null}
+        {canShareScreen ? <button className={s.statusWide} data-on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} disabled={!mine}><MonitorUp size={16} /> {localScreen ? t("voice.voiceStatus.sharing") : t("desktop.displayPicker.share")}</button> : null}
       </div>
     </div>
   );

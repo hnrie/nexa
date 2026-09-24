@@ -111,7 +111,7 @@ export default function MembersPage({ serverId }: { serverId: string }) {
             </div>
             <div className={s.memberActions}>
               {canRoles && (above || m.user_id === meId) ? <button title={t("server.members.roles")} aria-label={t("server.members.editRoles")} onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}><Shield size={18} /></button> : null}
-              {canTimeout && above ? <button title={timedOut ? t("server.members.removeTimeout") : "Timeout"} aria-label={t("server.members.timeout")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "timeout" })}><Clock size={18} /></button> : null}
+              {canTimeout && above ? <button title={timedOut ? t("server.members.removeTimeout") : t("server.members.timeout")} aria-label={t("server.members.timeout")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "timeout" })}><Clock size={18} /></button> : null}
               {canKick && above ? <button title={t("server.members.kick")} aria-label={t("server.members.kick")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "kick" })}><UserMinus size={18} /></button> : null}
               {canBan && above ? <button title={t("server.members.ban")} aria-label={t("server.members.ban")} data-danger="true" onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "ban" })}><Ban size={18} /></button> : null}
             </div>

@@ -20,7 +20,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const me = useAuth((a) => a.me);
   const toast = useUI((u) => u.toast);
   const [mode, setMode] = useState<"create" | "join">("create");
-  const [name, setName] = useState(() => (me ? `${me.display_name || me.username}'s server` : t("modals.createServer.myServer")));
+  const [name, setName] = useState(() => (me ? t("modals.createServer.namedServer", { name: me.display_name || me.username }) : t("modals.createServer.myServer")));
   const [code, setCode] = useState("");
   const [icon, setIcon] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);

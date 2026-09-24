@@ -12,6 +12,7 @@ import { decryptForStore } from "@/lib/decrypt";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
+import { t } from "@/i18n";
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
@@ -177,7 +178,7 @@ export async function exportMyData(onProgress: (text: string) => void): Promise<
     const label = ch.server_id ? `${useServers.getState().byId[ch.server_id]?.server.name ?? ch.server_id}/${ch.name}` : ch.name || ch.recipient_ids.join("-");
     onProgress(`${i + 1}/${all.length} ${label}`);
     try {
-      const msgs = await allMessages(ch.id, (n) => onProgress(`${i + 1}/${all.length} ${label} (${n} messages)`));
+      const msgs = await allMessages(ch.id, (n) => onProgress(`${i + 1}/${all.length} ${label} (${t("export.messagesCount", { count: n })})`));
       entries.push({ name: `messages/${ch.server_id ? safeName(useServers.getState().byId[ch.server_id]?.server.name ?? ch.server_id) + "/" : "dm/"}${safeName(ch.name || ch.id)}-${ch.id}.json`, data: json({ channel: ch, messages: msgs }) });
     } catch (err) {
       entries.push({ name: `messages/errors/${ch.id}.txt`, data: new TextEncoder().encode(String(err)) });

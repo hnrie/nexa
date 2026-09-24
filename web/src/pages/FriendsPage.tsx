@@ -225,9 +225,13 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
     });
   const more = (e: React.MouseEvent) => {
     e.preventDefault();
+    // Opened from the keyboard there is no pointer, and the click lands at
+    // 0,0: the menu goes by the button instead.
+    const fromKeys = e.clientX === 0 && e.clientY === 0;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     openContextMenu({
-      x: e.clientX,
-      y: e.clientY,
+      x: fromKeys ? r.left : e.clientX,
+      y: fromKeys ? r.bottom + 4 : e.clientY,
       items: [
         { id: "profile", label: tr_("profile.profile.profile"), onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
         { id: "msg", label: tr_("profile.profileCard.message"), onSelect: () => void message(), separatorAfter: rel.type !== "friend" },

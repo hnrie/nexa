@@ -423,8 +423,11 @@ export async function joinVoice(channelId: string): Promise<void> {
   for (const uid of Object.keys(voiceStore.watching)) transport.setWatching(uid, true);
   transport.setOutputMuted(useVoiceLocal.getState().deafened);
   transport.setMasterVolume(useSettings.getState().settings.voice.outputVolume);
+  // Always set, "default" included: the audio output lives as long as the
+  // page, so a speaker chosen in an earlier call stayed chosen after
+  // switching back to Default outside one.
   const out = useSettings.getState().settings.voice.outputDeviceId;
-  if (out) void transport.setOutputDevice(out);
+  void transport.setOutputDevice(out ?? null);
   applyTransmit();
   s.announced = true;
   sendState(channelId);
@@ -565,8 +568,13 @@ export async function refreshMic(): Promise<void> {
     s.transport.setLocalAudio(s.mic.getAudioTracks()[0] ?? null);
     startMeter(s);
     applyTransmit();
+    // a microphone that works again is no longer "blocked": the button and
+    // the note said so while every word was going out
+    useVoice.getState().setMicBlocked(false);
   } catch {
     useUI.getState().toast(tr_("session.couldNotSwitchTheMicrophone"), "error");
+    // and one that is gone is: the button read "Mute" while nothing was sent
+    if (session === s && !s.micRaw?.getAudioTracks().some((t) => t.readyState === "live")) useVoice.getState().setMicBlocked(true);
   }
 }
 
@@ -845,6 +853,12 @@ export function handleVoiceEvent(e: GatewayEvent): void {
           }
           // a join this device has since given up on; its leave is on the way
           if (!session) return;
+          // A state for another channel before this call was ever confirmed is
+          // an echo of the call just left (its join, a mute, a published
+          // track), arriving after the switch — not a moderator's move. Taken
+          // for one, it pulled the call back to the old channel, and the old
+          // channel's leave that followed ended it.
+          if (session.channelId !== vs.channel_id && store.mine?.channel_id !== session.channelId) return;
           store.setMine(vs);
           store.setJoining(null);
           if (session.channelId !== vs.channel_id) {
@@ -1023,7 +1037,10 @@ export function installVoice(): void {
     if (st.muted !== prev.muted) playSound(st.muted ? "mute" : "unmute");
     session?.transport.setOutputMuted(st.deafened);
     applyTransmit();
-    if (session) sendState(session.channelId);
+    // Only a call the server has been told about: during the microphone
+    // prompt the join is not sent yet, and a mute there sent it early — ringing
+    // the other side of a call this device could not yet leave.
+    if (session?.announced) sendState(session.channelId);
   });
   useSettings.subscribe((st, prev) => {
     const a = st.settings.voice;
@@ -1087,6 +1104,12 @@ export function installVoice(): void {
   for (const type of ["touchend", "click", "keydown"]) window.addEventListener(type, wake, { capture: true, passive: true });
   window.addEventListener("beforeunload", () => {
     if (session?.announced) sendState(null);
+  });
+  // iOS Safari never fires beforeunload, and Chrome on Android skips it for
+  // a tab swiped away; pagehide is what both do send. Without it the call
+  // lingered for everyone else until the server's grace ran out.
+  window.addEventListener("pagehide", (e) => {
+    if (!e.persisted && session?.announced) sendState(null);
   });
   // a call whose connection dropped with the network tries again the moment the network is back
   window.addEventListener("online", () => session?.transport.nudge?.());

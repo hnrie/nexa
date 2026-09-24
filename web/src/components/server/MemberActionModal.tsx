@@ -155,7 +155,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
     <Modal
       open
       onClose={onClose}
-      title={ban ? `Ban ${name}` : `Kick ${name}`}
+      title={ban ? t("server.memberAction.banNamed", { name }) : t("server.memberAction.kickNamed", { name })}
       width={440}
       footer={
         <>
@@ -171,7 +171,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
               })
             }
           >
-            {ban ? "Ban" : "Kick"}
+            {ban ? t("server.members.ban") : t("server.members.kick")}
           </Button>
         </>
       }

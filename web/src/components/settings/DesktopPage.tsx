@@ -172,7 +172,7 @@ function UpdateRow({ version, update: u }: { version: string; update: UpdateStat
 }
 
 function ProgramRow({ app, preview, onHide }: { app: RpcApp; preview: Activity | undefined; onHide: (hidden: boolean) => void }) {
-  const name = preview?.name || app.name || `Program ${app.clientId}`;
+  const name = preview?.name || app.name || tr_("settings.desktop.programNamed", { id: app.clientId });
   return (
     <div className={d.app} data-hidden={app.hidden} data-testid="rpc-app">
       <div className={d.appHead}>

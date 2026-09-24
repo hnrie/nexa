@@ -6,6 +6,7 @@ import type { EmojiEntry } from "@/components/pickers/emojiIndex";
 import { withTone } from "@/components/pickers/emojiIndex";
 import { useEffect, useRef } from "react";
 import s from "./Composer.module.css";
+import { t } from "@/i18n";
 
 export type AcItem = { kind: "user"; user: PublicUser } | { kind: "emoji"; entry: EmojiEntry } | { kind: "customEmoji"; emoji: Emoji } | { kind: "command"; name: string; desc: string };
 
@@ -24,7 +25,7 @@ export function Autocomplete({ items, index, onHover, onPick, tone }: { items: A
     else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
   }, [index, items]);
   if (items.length === 0) return null;
-  const head = items[0]?.kind === "user" ? "Members" : items[0]?.kind === "emoji" || items[0]?.kind === "customEmoji" ? "Emoji" : "Commands";
+  const head = items[0]?.kind === "user" ? t("server.serverSettings.members") : items[0]?.kind === "emoji" || items[0]?.kind === "customEmoji" ? t("server.emoji.emoji") : t("composer.autocomplete.commands");
   return (
     <div ref={listRef} className={s.ac} role="listbox" onMouseDown={(e) => e.preventDefault()}>
       <div className={s.acHead}>{head}</div>

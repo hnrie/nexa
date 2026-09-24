@@ -200,7 +200,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         {isSub ? (
           <button className={s.hParent} onClick={() => nav(`/channels/@me/${convo.id}`)} data-testid="subchat-parent">
             <ChevronLeft size={14} />
-            <span className={s.hParentText}>in {channelDisplayName(convo, users, me?.id, nicknames)}</span>
+            <span className={s.hParentText}>{tr_("chat.chatView.inConversation", { name: channelDisplayName(convo, users, me?.id, nicknames) })}</span>
           </button>
         ) : channel.type === "dm" && mobile ? null : channel.type === "dm" ? (
           // the status reads in its own colour; a custom status or activity keeps a dot of it in front
@@ -215,7 +215,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         ) : isServer ? (
           channel.topic ? <button className={[s.hSub, s.hTopic].join(" ")} title={channel.topic} onClick={() => openModal("channelTopic", { channelId: channel.id })}>{channel.topic}</button> : null
         ) : (
-          <span className={s.hSub}>{channel.recipient_ids.length} members</span>
+          <span className={s.hSub}>{tr_("chat.chatView.membersCount", { count: channel.recipient_ids.length })}</span>
         )}
         {channel.type === "dm" && other ? (
           // Whether this device has seen this person's encryption key before,

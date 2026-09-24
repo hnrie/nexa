@@ -57,7 +57,11 @@ export function formatTime(ms: number): string {
 /** "Today at 4:10 PM", "Yesterday at 9:02 AM", or "09/11/2026 4:10 PM". */
 export function formatTimestamp(ms: number, now = Date.now()): string {
   if (sameDay(ms, now)) return t("time.todayAt", { time: formatTime(ms) });
-  if (sameDay(ms, now - 86_400_000)) return t("time.yesterdayAt", { time: formatTime(ms) });
+  // the calendar's yesterday: 24 hours back lands on the wrong day around a
+  // daylight-saving change
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (sameDay(ms, yesterday.getTime())) return t("time.yesterdayAt", { time: formatTime(ms) });
   return t("time.dateAt", { date: fmt("date").format(new Date(ms)), time: formatTime(ms) });
 }
 
@@ -71,6 +75,21 @@ export function formatFull(ms: number): string {
 
 /** A size rounded the way it is shown, so the language formats the digits. */
 const round = (v: number, places: number): number => Number(v.toFixed(places));
+
+/**
+ * A short span in the reader's language — "5s", "2m", "1h" in English,
+ * "5 с", "2 мин" in Russian — for slow mode and anything else that counts in
+ * whole seconds, minutes or hours. Whole minutes and hours read as those.
+ */
+export function formatShortDuration(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const [value, unit] = s >= 3600 && s % 3600 === 0 ? [s / 3600, "hour"] : s >= 60 && s % 60 === 0 ? [s / 60, "minute"] : [s, "second"];
+  try {
+    return new Intl.NumberFormat(translator().locale, { style: "unit", unit, unitDisplay: "narrow" }).format(value);
+  } catch {
+    return `${value}${unit[0]}`;
+  }
+}
 
 export function formatBytes(n: number): string {
   if (n < 1024) return t("time.bytes", { n });

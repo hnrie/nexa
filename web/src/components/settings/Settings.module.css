@@ -18,7 +18,7 @@
 .close:hover { color: var(--text); border-color: var(--text); background: var(--bg-hover); }
 .esc { font-size: 13px; font-weight: 600; color: var(--text-muted); }
 .title { margin: 0 0 20px; font-size: 20px; font-weight: 600; color: var(--text-strong); }
-.h5 { margin: 24px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
+.h5 { display: flex; align-items: center; gap: 6px; margin: 24px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
 .card { background: var(--bg-surface); border-radius: var(--radius-sm); overflow: hidden; }
 .cardBanner { aspect-ratio: 5 / 2; background: var(--brand); background-size: cover; background-position: center; }
 .cardHead { position: relative; display: flex; align-items: center; justify-content: space-between; padding-block: 0 16px; padding-inline: 120px 16px; min-height: 70px; }
@@ -35,6 +35,10 @@
 .sep { height: 1px; background: var(--border); margin: 24px 0; }
 .form { display: flex; flex-direction: column; gap: 20px; }
 .hint { font-size: 14px; color: var(--text-muted); margin: 4px 0 0; }
+.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: #fff; }
+.shake :global(button) { color: inherit; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 15%, 55% { transform: translateX(-8px); } 35%, 75% { transform: translateX(8px); } }
+@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
 .saveBar { position: sticky; bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; padding-inline: 16px 10px; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); margin-top: 24px; font-size: 14px; color: var(--text); animation: slideUp 150ms ease-out; }
 @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
 .saveBtns { display: flex; gap: 8px; }
@@ -48,6 +52,7 @@
 .swatch { width: 40px; height: 40px; border-radius: var(--radius-xs); border: 2px solid transparent; position: relative; overflow: hidden; }
 .swatch[data-on="true"] { border-color: var(--text-strong); }
 .swatch input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.swatch:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .themeCard { padding: 10px; border-radius: var(--radius-sm); border: 2px solid var(--border); cursor: pointer; text-align: start; background: var(--bg-surface); }
 .themeCard[data-on="true"] { border-color: var(--brand); }

@@ -41,7 +41,7 @@ export function memberMenuItems(serverId: string, userId: string, ctx: { openMod
   if (!self && above) {
     const timedOut = !!st.members[userId]?.timeout_until && st.members[userId]!.timeout_until! > Date.now();
     const mod: ContextMenuItem[] = [];
-    if (canI(st, P.MODERATE_MEMBERS)) mod.push({ id: "timeout", label: timedOut ? t("server.memberAction.removeTimeout") : "Timeout", danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "timeout" }) });
+    if (canI(st, P.MODERATE_MEMBERS)) mod.push({ id: "timeout", label: timedOut ? t("server.memberAction.removeTimeout") : t("server.members.timeout"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "timeout" }) });
     if (canI(st, P.KICK_MEMBERS)) mod.push({ id: "kick", label: t("server.members.kick"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "kick" }) });
     if (canI(st, P.BAN_MEMBERS)) mod.push({ id: "ban", label: t("server.members.ban"), danger: true, onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "ban" }) });
     if (mod.length) {
