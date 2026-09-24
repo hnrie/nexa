@@ -16,7 +16,15 @@ const (
 	// ever carries it: guests live in their own table, and the flag only
 	// travels with the stand-in user the call code works with.
 	FlagGuest int64 = 8
+	// FlagSystem marks the account the instance itself speaks as: Nexa, which
+	// delivers moderation notices and announcements. Nobody signs in as it,
+	// and nobody can message, befriend or moderate it.
+	FlagSystem int64 = 16
 )
+
+// publicFlags are the bits other people may see: whether an account is staff,
+// and whether it is the system account rather than a person.
+const publicFlags = FlagAdmin | FlagSystem
 
 // User is a full account row. Fields tagged "-" never leave the server.
 type User struct {
@@ -70,7 +78,7 @@ type PublicUser struct {
 func (u *User) Public() PublicUser {
 	return PublicUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, BannerID: u.BannerID,
 		AboutMe: u.AboutMe, Pronouns: u.Pronouns, AccentColor: u.AccentColor, AccentColor2: u.AccentColor2, StatusText: u.StatusText, StatusEmoji: u.StatusEmoji,
-		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & FlagAdmin, CreatedAt: u.CreatedAt}
+		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, CreatedAt: u.CreatedAt}
 }
 
 // ProfilePatch describes optional profile changes. A nil pointer means "leave

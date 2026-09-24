@@ -293,6 +293,76 @@ CREATE TABLE mfa_backup_codes (
   PRIMARY KEY (user_id, code_hash)
 );
 
+CREATE TABLE mod_announcements (
+  id BIGINT PRIMARY KEY,
+  author_id BIGINT NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  body TEXT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE mod_cases (
+  id BIGINT PRIMARY KEY,
+  number BIGINT NOT NULL UNIQUE,              -- #1, #2, … as people refer to it
+  user_id BIGINT NOT NULL,                    -- the account acted on; no foreign key, the record outlives it
+  moderator_id BIGINT NOT NULL,
+  action TEXT NOT NULL,                        -- avatar_remove | field_reset | mute | ban | delete
+  reason TEXT NOT NULL,
+  details TEXT NOT NULL DEFAULT '{}',          -- JSON: exactly what was done (fields and values, duration)
+  target_username TEXT NOT NULL,               -- the account as it was when it was acted on
+  target_display_name TEXT NOT NULL,
+  expires_at BIGINT,                          -- when a mute or ban runs out; NULL when permanent or not timed
+  lifted_at BIGINT,                           -- a mute or ban a moderator ended early
+  lifted_by BIGINT,
+  lift_reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open',         -- open | closed
+  closed_at BIGINT,
+  closed_by BIGINT,
+  awaiting TEXT NOT NULL DEFAULT 'none',       -- who the thread is waiting on: staff | member | none
+  last_activity_at BIGINT NOT NULL,
+  member_read_id BIGINT NOT NULL DEFAULT 0,   -- the newest thread message the member has seen
+  notice_ack_at BIGINT,                       -- when the member dismissed the notice; until then it pops up again
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE mod_log (
+  id BIGINT PRIMARY KEY,
+  action TEXT NOT NULL,
+  moderator_id BIGINT NOT NULL,
+  moderator_username TEXT NOT NULL,
+  target_id BIGINT,
+  target_username TEXT NOT NULL DEFAULT '',
+  case_id BIGINT,
+  case_number BIGINT,
+  reason TEXT NOT NULL DEFAULT '',
+  details TEXT NOT NULL DEFAULT '{}',
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE mod_messages (
+  id BIGINT PRIMARY KEY,
+  case_id BIGINT NOT NULL REFERENCES mod_cases(id) ON DELETE CASCADE,
+  author_id BIGINT NOT NULL,
+  kind TEXT NOT NULL,                          -- member | staff | system
+  event TEXT NOT NULL DEFAULT '',              -- for system lines: lifted | closed | reopened | expired | replaced
+  body TEXT NOT NULL DEFAULT '',
+  created_at BIGINT NOT NULL
+);
+
+CREATE TABLE mod_restrictions (
+  user_id BIGINT NOT NULL,
+  kind TEXT NOT NULL,                          -- mute | ban
+  case_id BIGINT NOT NULL,
+  expires_at BIGINT,                          -- NULL: until a moderator lifts it
+  created_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, kind)
+);
+
+CREATE TABLE nexa_reads (
+  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  seen_at BIGINT NOT NULL
+);
+
 CREATE TABLE pins (
   channel_id BIGINT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
   message_id BIGINT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
@@ -408,6 +478,13 @@ CREATE TABLE user_settings (
   updated_at BIGINT NOT NULL
 );
 
+CREATE TABLE username_holds (
+  username TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  case_id BIGINT NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
 CREATE INDEX attachments_blob ON attachments(blob_id);
 
 CREATE INDEX attachments_message ON attachments(message_id);
@@ -452,6 +529,22 @@ CREATE INDEX messages_channel ON messages(channel_id, id DESC);
 
 CREATE UNIQUE INDEX messages_nonce ON messages(channel_id, author_id, nonce) WHERE nonce IS NOT NULL;
 
+CREATE INDEX mod_cases_activity ON mod_cases(status, last_activity_at DESC);
+
+CREATE INDEX mod_cases_awaiting ON mod_cases(awaiting, last_activity_at DESC);
+
+CREATE INDEX mod_cases_user ON mod_cases(user_id, id DESC);
+
+CREATE INDEX mod_log_action ON mod_log(action, id DESC);
+
+CREATE INDEX mod_log_moderator ON mod_log(moderator_id, id DESC);
+
+CREATE INDEX mod_log_target ON mod_log(target_id, id DESC);
+
+CREATE INDEX mod_messages_case ON mod_messages(case_id, id);
+
+CREATE INDEX mod_restrictions_expiry ON mod_restrictions(expires_at);
+
 CREATE INDEX relationships_target ON relationships(target_id);
 
 CREATE INDEX roles_server ON roles(server_id, position);
@@ -471,3 +564,15 @@ CREATE INDEX sticker_packs_server ON sticker_packs(server_id);
 CREATE INDEX stickers_pack ON stickers(pack_id, position);
 
 CREATE INDEX uploads_stale ON uploads(updated_at);
+
+CREATE INDEX username_holds_user ON username_holds(user_id);
+
+CREATE OR REPLACE FUNCTION refuse_change() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION '%', TG_ARGV[0];
+END
+$$;
+
+CREATE TRIGGER mod_log_no_delete BEFORE DELETE ON mod_log FOR EACH ROW EXECUTE FUNCTION refuse_change('mod_log is append-only');
+
+CREATE TRIGGER mod_log_no_update BEFORE UPDATE ON mod_log FOR EACH ROW EXECUTE FUNCTION refuse_change('mod_log is append-only');

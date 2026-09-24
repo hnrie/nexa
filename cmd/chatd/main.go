@@ -117,6 +117,8 @@ func main() {
 	srv.WireServers(hub)
 	srv.WireVoice(hub)
 	srv.WireActivities(hub)
+	// last: it wraps the ready extras the others installed
+	srv.WireModeration(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -124,6 +126,7 @@ func main() {
 	go hub.Run(ctx)
 	srv.StartLimiters(ctx)
 	srv.StartGuests(ctx)
+	srv.StartModeration(ctx)
 	if srv.Meter != nil {
 		go srv.Meter.Run(ctx, time.Minute, func(err error) { log.Warn("realtime usage", "err", err) })
 	}

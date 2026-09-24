@@ -90,6 +90,10 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 			bad("invalid_display_name", "Display names are 1–32 characters.")
 			return
 		}
+		if reservedDisplayName(clean) && !isSystem(u) {
+			bad("reserved_display_name", "That name belongs to the official Nexa account.")
+			return
+		}
 		p.DisplayName = &clean
 	}
 	if v, present, null := getString("about_me"); present {
@@ -195,6 +199,14 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.DMPrivacy = &v
+	}
+	// Muted, someone can still set their presence and who may message them,
+	// and take things off their profile, but not put anything new on it.
+	filled := func(v *string) bool { return v != nil && *v != "" }
+	public := p.Username != nil || p.DisplayName != nil || p.AccentColor != nil || p.AccentColor2 != nil ||
+		filled(p.AboutMe) || filled(p.Pronouns) || filled(p.StatusText) || filled(p.StatusEmoji)
+	if public && mutedFor(w, r) {
+		return
 	}
 	if err := s.Store.UpdateProfile(r.Context(), u.ID, p); err != nil {
 		WriteError(w, err)

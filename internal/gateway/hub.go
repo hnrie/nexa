@@ -116,6 +116,9 @@ type Hub struct {
 	ProxyURL func(raw string) string
 	// Apps names Discord Rich Presence applications and their art (nil: activities show as sent).
 	Apps AppLookup
+	// Restricted reports an account's moderation restrictions: a banned one
+	// is refused at identify, and a muted one cannot type or set a status.
+	Restricted func(ctx context.Context, uid ids.ID) (muted, banned bool)
 }
 
 // AppLookup finds a Discord Rich Presence application.
@@ -377,6 +380,21 @@ func (h *Hub) CloseSession(sid ids.ID) {
 	h.mu.RUnlock()
 	for _, c := range hit {
 		c.revoke()
+	}
+}
+
+// DisconnectUser closes every socket of a user with the given close code,
+// after the frames already queued for them have gone out — the notice that
+// explains the disconnect is one of them (api.Broadcaster).
+func (h *Hub) DisconnectUser(uid ids.ID, code int, reason string) {
+	var hit []*conn
+	h.mu.RLock()
+	for c := range h.conns[uid] {
+		hit = append(hit, c)
+	}
+	h.mu.RUnlock()
+	for _, c := range hit {
+		c.kick(websocket.StatusCode(code), reason)
 	}
 }
 

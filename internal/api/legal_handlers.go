@@ -723,8 +723,37 @@ func legalModeration(d *legalDoc, rec *store.AccountRecord) {
 	}
 	d.note("The audit log is per community and is written by the people who moderate that")
 	d.note("community, for their own use. It is not an instance-wide record of the")
-	d.note("account, and there is no instance-wide moderation log on this deployment.")
-	d.note("There is no warning or strike system, so no warnings exist to report.")
+	d.note("account; the instance's own record follows.")
+	d.blank()
+	d.field("Instance cases on them:", legalCount(len(rec.ModCases)))
+	d.field("Lines in their case threads:", legalCount(rec.ModThreadLines))
+	d.field("Instance actions by them:", legalCount(rec.ModActionsTaken))
+	d.blank()
+	for _, c := range rec.ModCases {
+		line := "case #" + strconv.FormatInt(c.Number, 10) + " (" + c.Action + ") by account " + c.ModeratorID.String() + " on " + legalTime(c.CreatedAt) + ", reason: " + legalText(c.Reason)
+		if c.ExpiresAt != nil {
+			line += ", ran until " + legalTime(*c.ExpiresAt)
+		}
+		if c.LiftedAt != nil {
+			line += ", lifted " + legalTime(*c.LiftedAt)
+		}
+		d.item(line + ", " + c.Status)
+	}
+	if len(rec.ModCases) > 0 {
+		d.capped(len(rec.ModCases))
+	}
+	for _, n := range rec.UsernameHolds {
+		d.item("former username " + legalText(n) + " was reset by staff and is held for this account")
+	}
+	if len(rec.UsernameHolds) > 0 {
+		d.blank()
+	}
+	d.note("Instance cases are actions this instance's staff took through its moderation")
+	d.note("panel: removing a profile picture, resetting profile fields, muting, banning")
+	d.note("or deleting an account. Each case has a thread between the member and the")
+	d.note("staff; those threads are not end-to-end encrypted and are held in readable")
+	d.note("form, and can be produced. Staff actions are also recorded in an append-only")
+	d.note("log that cannot be edited or deleted.")
 	d.blank()
 }
 

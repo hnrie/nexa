@@ -1,0 +1,569 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"evilion.xyz/chat/internal/auth"
+	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/store"
+)
+
+// The moderation panel's side of Nexa: the staff (instance admins) look
+// through accounts, act on them, work the case threads, read the log and
+// send announcements. The member's side is in nexa.go; the actions themselves
+// are in moderation_actions.go.
+
+func (s *Server) moderationRoutes(mux *http.ServeMux) {
+	mux.Handle("GET /api/v1/moderation/summary", s.admin(s.handleModSummary))
+	mux.Handle("GET /api/v1/moderation/users", s.admin(s.handleModUsers))
+	mux.Handle("GET /api/v1/moderation/users/{id}", s.admin(s.handleModUser))
+	mux.Handle("GET /api/v1/moderation/users/{id}/purge-preview", s.admin(s.handleModPurgePreview))
+	mux.Handle("POST /api/v1/moderation/users/{id}/actions", s.admin(s.handleModAction))
+	mux.Handle("GET /api/v1/moderation/cases", s.admin(s.handleModCases))
+	mux.Handle("GET /api/v1/moderation/cases/{id}", s.admin(s.handleModCase))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/messages", s.admin(s.handleModReply))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/lift", s.admin(s.handleModLift))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/close", s.admin(s.handleModClose(true)))
+	mux.Handle("POST /api/v1/moderation/cases/{id}/reopen", s.admin(s.handleModClose(false)))
+	mux.Handle("GET /api/v1/moderation/log", s.admin(s.handleModLog))
+	mux.Handle("GET /api/v1/moderation/announcements", s.admin(s.handleModAnnouncements))
+	mux.Handle("POST /api/v1/moderation/announcements", s.admin(s.handleModAnnounce))
+	mux.Handle("DELETE /api/v1/moderation/announcements/{id}", s.admin(s.handleModAnnouncementDelete))
+}
+
+// Why an account cannot be acted on, as the codes the panel shows.
+const (
+	blockSelf    = "self"
+	blockSystem  = "system"
+	blockDeleted = "deleted"
+	blockOwner   = "owner"
+	blockStaff   = "staff"
+)
+
+// moderationBlock says why me may not act on target, or "" when they may.
+// Staff are out of reach until their access is taken away, and the owner's
+// access can never be; so nobody can use the panel on the owner, and a
+// moderator cannot quietly mute or ban another.
+func (s *Server) moderationBlock(ctx context.Context, me, target *store.User) string {
+	switch {
+	case target.ID == me.ID:
+		return blockSelf
+	case isSystem(target):
+		return blockSystem
+	case target.Flags&store.FlagDeleted != 0:
+		return blockDeleted
+	}
+	if owner, err := s.Store.InstanceOwnerID(ctx); err == nil && owner == target.ID {
+		return blockOwner
+	}
+	if target.Flags&store.FlagAdmin != 0 {
+		return blockStaff
+	}
+	return ""
+}
+
+func blockError(code string) *Error {
+	switch code {
+	case blockSelf:
+		return E(http.StatusBadRequest, "moderate_self", "You cannot moderate your own account.")
+	case blockSystem:
+		return E(http.StatusForbidden, "moderate_system", "Nexa is the system account and cannot be moderated.")
+	case blockDeleted:
+		return E(http.StatusGone, "moderate_deleted", "That account has been deleted.")
+	case blockOwner:
+		return E(http.StatusForbidden, "moderate_owner", "The instance owner cannot be moderated.")
+	default:
+		return E(http.StatusForbidden, "moderate_staff", "Staff cannot be moderated. Take away their admin access first.")
+	}
+}
+
+func (s *Server) handleModSummary(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	counts, err := s.Store.CountModCases(ctx, time.Now().UnixMilli())
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	owner, _ := s.Store.InstanceOwnerID(ctx)
+	var nexa ids.ID
+	if sys, err := s.systemUser(ctx); err == nil {
+		nexa = sys.ID
+	}
+	staff, err := s.Store.StaffIDs(ctx)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"counts": counts, "owner_id": owner, "nexa_id": nexa, "staff_ids": staff, "people": s.people(ctx, staff...)})
+}
+
+// modUserView is one account in the grid or at the top of its case list:
+// its public profile and where it stands.
+type modUserView struct {
+	store.PublicUser
+	AdminFlags    int64            `json:"admin_flags"`
+	CaseCount     int              `json:"case_count"`
+	OpenCases     int              `json:"open_cases"`
+	AwaitingCases int              `json:"awaiting_cases"`
+	LastSeenAt    *int64           `json:"last_seen_at"`
+	Mute          *restrictionView `json:"mute"`
+	Ban           *restrictionView `json:"ban"`
+	// Blocked is why this moderator cannot act on the account ("" when they can).
+	Blocked string `json:"blocked"`
+}
+
+func (s *Server) handleModUsers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	if limit <= 0 || limit > 120 {
+		limit = 60
+	}
+	f := store.ModUserFilter{Query: q.Get("q"), Show: q.Get("show"), Sort: q.Get("sort"), Cursor: q.Get("cursor"), Limit: limit, Now: time.Now().UnixMilli()}
+	list, err := s.Store.ModUsers(ctx, f)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	owner, _ := s.Store.InstanceOwnerID(ctx)
+	out := make([]modUserView, 0, len(list))
+	for _, m := range list {
+		v := modUserView{PublicUser: m.PublicUser, AdminFlags: m.AdminFlags, CaseCount: m.CaseCount, OpenCases: m.OpenCases, AwaitingCases: m.AwaitingCase, LastSeenAt: m.LastSeenAt,
+			Mute: shortRestriction(m.Mute), Ban: shortRestriction(m.Ban)}
+		switch {
+		case m.ID == me.ID:
+			v.Blocked = blockSelf
+		case m.ID == owner:
+			v.Blocked = blockOwner
+		case m.AdminFlags&store.FlagAdmin != 0:
+			v.Blocked = blockStaff
+		}
+		out = append(out, v)
+	}
+	next := ""
+	if len(list) > 0 && len(list) >= limit {
+		last := list[len(list)-1]
+		if f.Sort == "name" {
+			next = last.Username
+		} else {
+			next = last.ID.String()
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"users": out, "next_cursor": next})
+}
+
+// shortRestriction is a restriction without its case's reason, which the grid
+// has no room for.
+func shortRestriction(r *store.Restriction) *restrictionView {
+	if r == nil {
+		return nil
+	}
+	return &restrictionView{Kind: r.Kind, CaseID: r.CaseID, ExpiresAt: r.ExpiresAt, CreatedAt: r.CreatedAt}
+}
+
+// modTarget loads the account a staff route names. Deleted accounts are found
+// too: their cases stay readable.
+func (s *Server) modTarget(w http.ResponseWriter, r *http.Request) *store.User {
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return nil
+	}
+	u, err := s.Store.UserByID(r.Context(), id)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return nil
+	}
+	return u
+}
+
+func (s *Server) modUserDetail(ctx context.Context, me, u *store.User) (modUserView, error) {
+	now := time.Now().UnixMilli()
+	v := modUserView{PublicUser: u.Public(), AdminFlags: u.Flags, Blocked: s.moderationBlock(ctx, me, u)}
+	mute, ban, err := s.Store.ActiveRestrictions(ctx, u.ID, now)
+	if err != nil {
+		return v, err
+	}
+	for _, pair := range []struct {
+		r   *store.Restriction
+		dst **restrictionView
+	}{{mute, &v.Mute}, {ban, &v.Ban}} {
+		if pair.r == nil {
+			continue
+		}
+		rv := shortRestriction(pair.r)
+		if c, err := s.Store.ModCaseByID(ctx, pair.r.CaseID); err == nil {
+			rv.CaseNumber, rv.Reason, rv.ModeratorID = c.Number, c.Reason, c.ModeratorID
+		}
+		*pair.dst = rv
+	}
+	return v, nil
+}
+
+// handleModUser is one account with every case about it, newest first.
+func (s *Server) handleModUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	u := s.modTarget(w, r)
+	if u == nil {
+		return
+	}
+	if isSystem(u) {
+		WriteError(w, blockError(blockSystem))
+		return
+	}
+	view, err := s.modUserDetail(ctx, me, u)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	cases, err := s.Store.ModCasesForUser(ctx, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	caseIDs := make([]ids.ID, 0, len(cases))
+	who := []ids.ID{u.ID}
+	for _, c := range cases {
+		caseIDs = append(caseIDs, c.ID)
+		who = append(who, casePeople(c)...)
+	}
+	last, err := s.Store.LastModMessages(ctx, caseIDs)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	cs := s.caseStateFor(ctx, u.ID)
+	views := make([]staffCase, 0, len(cases))
+	for _, c := range cases {
+		views = append(views, toStaffCase(c, cs, last[c.ID]))
+		if m := last[c.ID]; m != nil {
+			who = append(who, m.AuthorID)
+		}
+	}
+	view.CaseCount = len(cases)
+	for _, c := range cases {
+		if c.Status == store.CaseOpen {
+			view.OpenCases++
+			if c.Awaiting == store.AwaitStaff {
+				view.AwaitingCases++
+			}
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"user": view, "cases": views, "people": s.people(ctx, who...)})
+}
+
+func (s *Server) handleModPurgePreview(w http.ResponseWriter, r *http.Request) {
+	u := s.modTarget(w, r)
+	if u == nil {
+		return
+	}
+	counts, err := s.Store.PurgePreview(r.Context(), u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, counts)
+}
+
+// handleModCases pages cases for the Active Cases tab, with the counts every
+// view of it shows.
+func (s *Server) handleModCases(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	q := r.URL.Query()
+	now := time.Now().UnixMilli()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	beforeAt, _ := strconv.ParseInt(q.Get("before_at"), 10, 64)
+	beforeID, _ := ids.Parse(q.Get("before_id"))
+	view := q.Get("view")
+	if !OneOf(view, "needs_reply", "open", "in_effect", "closed", "all") {
+		view = "open"
+	}
+	cases, err := s.Store.ModCaseList(ctx, store.ModCaseFilter{View: view, BeforeAt: beforeAt, BeforeID: beforeID, Limit: limit, Now: now})
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	caseIDs := make([]ids.ID, 0, len(cases))
+	var who []ids.ID
+	for _, c := range cases {
+		caseIDs = append(caseIDs, c.ID)
+		who = append(who, casePeople(c)...)
+	}
+	last, err := s.Store.LastModMessages(ctx, caseIDs)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	states := map[ids.ID]caseState{}
+	views := make([]staffCase, 0, len(cases))
+	for _, c := range cases {
+		st, ok := states[c.UserID]
+		if !ok {
+			st = s.caseStateFor(ctx, c.UserID)
+			states[c.UserID] = st
+		}
+		views = append(views, toStaffCase(c, st, last[c.ID]))
+		if m := last[c.ID]; m != nil {
+			who = append(who, m.AuthorID)
+		}
+	}
+	counts, err := s.Store.CountModCases(ctx, now)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"cases": views, "counts": counts, "people": s.people(ctx, who...)})
+}
+
+// staffCaseFor loads the case a staff route names.
+func (s *Server) staffCaseFor(w http.ResponseWriter, r *http.Request) *store.ModCase {
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return nil
+	}
+	c, err := s.Store.ModCaseByID(r.Context(), id)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return nil
+	}
+	return c
+}
+
+func (s *Server) handleModCase(w http.ResponseWriter, r *http.Request) {
+	c := s.staffCaseFor(w, r)
+	if c == nil {
+		return
+	}
+	out, err := s.threadResponse(r.Context(), c, true)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, out)
+}
+
+// handleModReply is a member of staff writing in a case's thread. The member
+// sees it as coming from Nexa, with the name of whoever wrote it.
+func (s *Server) handleModReply(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	c := s.staffCaseFor(w, r)
+	if c == nil {
+		return
+	}
+	target, err := s.Store.UserByID(r.Context(), c.UserID)
+	if err != nil || target.Flags&store.FlagDeleted != 0 {
+		WriteError(w, E(http.StatusGone, "moderate_deleted", "That account has been deleted, so nobody would read a reply."))
+		return
+	}
+	body, ok := readCaseMessage(w, r)
+	if !ok {
+		return
+	}
+	msg, extra, updated, err := s.Store.AddModMessage(r.Context(), c.ID, me.ID, store.ModMsgStaff, body)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	lines := append(extra, msg)
+	s.emitCase(r.Context(), updated, lines...)
+	WriteJSON(w, http.StatusCreated, map[string]any{"message": msg, "messages": lines, "case": toStaffCase(updated, s.caseStateFor(r.Context(), c.UserID), msg)})
+}
+
+// handleModLift ends a case's mute or ban early, with a reason the member reads.
+func (s *Server) handleModLift(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	c := s.staffCaseFor(w, r)
+	if c == nil {
+		return
+	}
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := ReadJSON(w, r, &req, 8<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	reason, ok := readReason(w, req.Reason)
+	if !ok {
+		return
+	}
+	action := store.LogUnmute
+	if c.Action == store.ActionBan {
+		action = store.LogUnban
+	}
+	log := &store.ModLogEntry{Action: action, ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &c.UserID, TargetUsername: c.TargetUsername, Reason: reason}
+	if target, err := s.Store.UserByID(ctx, c.UserID); err == nil {
+		log.TargetUsername = target.Username
+	}
+	updated, line, err := s.Store.ModLift(ctx, c.ID, me.ID, reason, log)
+	if errors.Is(err, store.ErrNotRestricted) {
+		WriteError(w, E(http.StatusConflict, "not_in_effect", "That case's mute or ban is no longer in force."))
+		return
+	}
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.emitCase(ctx, updated, line)
+	s.emitLog(ctx, log)
+	WriteJSON(w, http.StatusOK, map[string]any{"case": toStaffCase(updated, s.caseStateFor(ctx, c.UserID), line)})
+}
+
+func (s *Server) handleModClose(closed bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		me := auth.UserFrom(ctx)
+		c := s.staffCaseFor(w, r)
+		if c == nil {
+			return
+		}
+		updated, line, err := s.Store.SetModCaseClosed(ctx, c.ID, me.ID, closed)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		if line != nil {
+			s.emitCase(ctx, updated, line)
+		}
+		WriteJSON(w, http.StatusOK, map[string]any{"case": toStaffCase(updated, s.caseStateFor(ctx, c.UserID), line)})
+	}
+}
+
+// emitLog shows a new log line to the staff as it is written.
+func (s *Server) emitLog(ctx context.Context, e *store.ModLogEntry) {
+	who := []ids.ID{e.ModeratorID}
+	if e.TargetID != nil {
+		who = append(who, *e.TargetID)
+	}
+	s.emitStaff(ctx, "mod_log", map[string]any{"entry": e, "people": s.people(ctx, who...)})
+}
+
+func (s *Server) handleModLog(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	q := r.URL.Query()
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	before, _ := ids.Parse(q.Get("before"))
+	target, _ := ids.Parse(q.Get("target"))
+	var actions []string
+	for _, a := range strings.Split(q.Get("action"), ",") {
+		if a = strings.TrimSpace(a); a != "" && len(actions) < 20 {
+			actions = append(actions, a)
+		}
+	}
+	entries, err := s.Store.ModLog(ctx, store.ModLogFilter{Actions: actions, TargetID: target, Query: q.Get("q"), Before: before, Limit: limit})
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	var who []ids.ID
+	for _, e := range entries {
+		who = append(who, e.ModeratorID)
+		if e.TargetID != nil {
+			who = append(who, *e.TargetID)
+		}
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"entries": entries, "people": s.people(ctx, who...)})
+}
+
+// --- announcements --------------------------------------------------------------
+
+const (
+	maxAnnouncementTitle = 120
+	maxAnnouncementBody  = 4000
+)
+
+func (s *Server) handleModAnnouncements(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	list, err := s.Store.Announcements(ctx, 0, before, 50)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	views := make([]announcementView, 0, len(list))
+	var who []ids.ID
+	for _, a := range list {
+		views = append(views, toAnnouncementView(a))
+		who = append(who, a.AuthorID)
+	}
+	recipients, err := s.Store.AccountIDs(ctx)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"announcements": views, "people": s.people(ctx, who...), "recipients": len(recipients)})
+}
+
+// handleModAnnounce sends an announcement to everyone through Nexa.
+func (s *Server) handleModAnnounce(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	var req struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}
+	if err := ReadJSON(w, r, &req, 64<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	title, ok := CleanText(strings.ReplaceAll(req.Title, "\n", " "), maxAnnouncementTitle)
+	if !ok {
+		WriteError(w, E(http.StatusBadRequest, "title_too_long", "Titles are at most 120 characters."))
+		return
+	}
+	body, ok := CleanText(req.Body, maxAnnouncementBody)
+	if !ok {
+		WriteError(w, E(http.StatusBadRequest, "body_too_long", "Announcements are at most 4000 characters."))
+		return
+	}
+	if body == "" {
+		WriteError(w, E(http.StatusBadRequest, "empty_message", "Write the announcement first."))
+		return
+	}
+	a := &store.Announcement{AuthorID: me.ID, Title: title, Body: body}
+	details, _ := json.Marshal(map[string]any{"title": title, "length": len([]rune(body))})
+	log := &store.ModLogEntry{Action: store.LogAnnouncement, ModeratorID: me.ID, ModeratorUsername: me.Username, Details: details}
+	if err := s.Store.CreateAnnouncement(ctx, a, log); err != nil {
+		WriteError(w, err)
+		return
+	}
+	view := toAnnouncementView(a)
+	people := s.people(ctx, me.ID)
+	if everyone, err := s.Store.AccountIDs(ctx); err == nil {
+		s.Bcast.EmitUsers(everyone, "nexa_announcement", map[string]any{"announcement": view, "people": people})
+	}
+	s.emitLog(ctx, log)
+	WriteJSON(w, http.StatusCreated, map[string]any{"announcement": view, "people": people})
+}
+
+// handleModAnnouncementDelete retracts an announcement from everyone's Nexa
+// conversation. The log keeps that it was sent, and who took it back.
+func (s *Server) handleModAnnouncementDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	me := auth.UserFrom(ctx)
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	log := &store.ModLogEntry{Action: store.LogAnnouncementDelete, ModeratorID: me.ID, ModeratorUsername: me.Username}
+	if _, err := s.Store.DeleteAnnouncement(ctx, id, log); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if everyone, err := s.Store.AccountIDs(ctx); err == nil {
+		s.Bcast.EmitUsers(everyone, "nexa_announcement_delete", map[string]any{"id": id})
+	}
+	s.emitLog(ctx, log)
+	w.WriteHeader(http.StatusNoContent)
+}

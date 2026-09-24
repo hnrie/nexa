@@ -397,6 +397,9 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrForbidden)
 		return
 	}
+	if m.AuthorID != me.ID && mutedFor(w, r) {
+		return
+	}
 	if err := s.Store.DeleteMessage(r.Context(), mid); err != nil {
 		WriteError(w, err)
 		return

@@ -70,20 +70,62 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	if u.RecoveryAuthHash != "" {
 		recovery = u.RecoveryAuthHash
 	}
-	res, err := s.db.W.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
-		int64(u.ID), u.Username, u.DisplayName, u.AuthHash, u.KDFSalt, u.KDFParams, u.PublicKey, u.EncPrivateKey, u.EncPrivateKeyRecovery, recovery,
-		nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt)
-	if err != nil {
-		return err
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		// a name a moderator took off an account is still that account's
+		if held, err := usernameHeldTx(ctx, tx, u.Username); err != nil || held {
+			if err == nil {
+				err = ErrUsernameTaken
+			}
+			return err
+		}
+		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
+			int64(u.ID), u.Username, u.DisplayName, u.AuthHash, u.KDFSalt, u.KDFParams, u.PublicKey, u.EncPrivateKey, u.EncPrivateKeyRecovery, recovery,
+			nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return ErrUsernameTaken
+		}
+		return nil
+	})
+}
+
+// usernameHeldTx reports whether a moderator reset took this name off an
+// account (see username_holds). It takes the name's lock first, so a reset and
+// a registration of the same name on Postgres cannot pass each other.
+func usernameHeldTx(ctx context.Context, tx *db.Tx, username string) (bool, error) {
+	if err := tx.Serialise(ctx, "username:"+username); err != nil {
+		return false, err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
+	var n int
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM username_holds WHERE username = ?`, username).Scan(&n); err != nil {
+		return false, err
 	}
-	if n == 0 {
-		return ErrUsernameTaken
+	return n > 0, nil
+}
+
+// UserBySignInName finds the account a sign-in names: the one with that
+// username, or else the one a moderator reset that username on. Someone whose
+// name was reset while they were away still knows only the old one, and must
+// not be locked out of their account for it.
+func (s *Store) UserBySignInName(ctx context.Context, username string) (*User, error) {
+	u, err := s.UserByUsername(ctx, username)
+	if !errors.Is(err, ErrNotFound) {
+		return u, err
 	}
-	return nil
+	var id int64
+	if err := s.db.R.QueryRowContext(ctx, `SELECT user_id FROM username_holds WHERE username = ?`, username).Scan(&id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return s.UserByID(ctx, ids.ID(id))
 }
 
 // UserByID loads one user.
@@ -135,7 +177,7 @@ func (s *Store) SearchUsers(ctx context.Context, q string, limit int) ([]*User, 
 		limit = 10
 	}
 	like := escapeLike(q) + "%"
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR `+s.db.Dialect.Lower("display_name")+` LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted, limit)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR `+s.db.Dialect.Lower("display_name")+` LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted|FlagSystem, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -160,10 +202,12 @@ func escapeLike(s string) string {
 	return r.Replace(s)
 }
 
-// CountUsers returns the number of accounts.
+// CountUsers returns the number of accounts people made. Nexa's is not one:
+// the first person to register must still find the instance empty, since
+// that is what makes them its admin.
 func (s *Store) CountUsers(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users`).Scan(&n)
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? = 0`, FlagSystem).Scan(&n)
 	return n, err
 }
 
@@ -216,7 +260,26 @@ func (s *Store) UpdateProfile(ctx context.Context, id ids.ID, p ProfilePatch) er
 	}
 	set("updated_at", nowMs())
 	args = append(args, int64(id))
-	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+	query := `UPDATE users SET ` + strings.Join(sets, ", ") + ` WHERE id = ?`
+	var res sql.Result
+	var err error
+	if p.Username != nil {
+		// a name a moderator took off an account is taken for good, and the
+		// check shares a transaction with the write so nothing slips between
+		err = s.Tx(ctx, func(tx *db.Tx) error {
+			held, err := usernameHeldTx(ctx, tx, *p.Username)
+			if err != nil {
+				return err
+			}
+			if held {
+				return ErrUsernameTaken
+			}
+			res, err = tx.ExecContext(ctx, query, args...)
+			return err
+		})
+	} else {
+		res, err = s.db.W.ExecContext(ctx, query, args...)
+	}
 	if err != nil {
 		if p.Username != nil && db.IsUniqueViolation(err) {
 			return ErrUsernameTaken

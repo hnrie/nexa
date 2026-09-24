@@ -47,6 +47,9 @@ type MeUser struct {
 	HasRecovery     bool   `json:"has_recovery"`
 	MFAEnabled      bool   `json:"mfa_enabled"`
 	BackupCodesLeft int    `json:"backup_codes_left"`
+	// Nexa is the account's moderation standing, so the app knows about a
+	// ban before it tries to connect and a mute before it shows a composer.
+	Nexa *nexaState `json:"nexa,omitempty"`
 }
 
 func (s *Server) meView(ctx context.Context, u *store.User) MeUser {
@@ -56,6 +59,11 @@ func (s *Server) meView(ctx context.Context, u *store.User) MeUser {
 		if n, err := s.Store.BackupCodesLeft(ctx, u.ID); err == nil {
 			v.BackupCodesLeft = n
 		}
+	}
+	if st, err := s.nexaState(ctx, u); err == nil {
+		v.Nexa = st
+	} else {
+		s.Log.Warn("nexa: state", "user", u.ID.String(), "err", err)
 	}
 	return v
 }
@@ -133,6 +141,10 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_display_name", "Display names are 1–32 characters."))
 		return
 	}
+	if reservedDisplayName(display) {
+		WriteError(w, E(http.StatusBadRequest, "reserved_display_name", "That name belongs to the official Nexa account."))
+		return
+	}
 	if len(req.AuthKey) != 32 || len(req.PublicKey) != 32 || len(req.KDFSalt) < 16 || len(req.KDFSalt) > 64 || len(req.EncPrivateKey) == 0 || len(req.EncPrivateKey) > maxWrappedKey || !validKDF(req.KDFParams) {
 		WriteError(w, E(http.StatusBadRequest, "invalid_keys", "The key material is malformed."))
 		return
@@ -190,8 +202,8 @@ func (s *Server) handleKDF(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "missing_username", "username is required"))
 		return
 	}
-	u, err := s.Store.UserByUsername(r.Context(), username)
-	if err != nil || u.Flags&store.FlagDeleted != 0 {
+	u, err := s.Store.UserBySignInName(r.Context(), username)
+	if err != nil || u.Flags&(store.FlagDeleted|store.FlagSystem) != 0 {
 		WriteJSON(w, http.StatusOK, map[string]any{"salt": s.fakeSalt(username), "params": json.RawMessage(defaultKDF)})
 		return
 	}
@@ -227,8 +239,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrRateLimited)
 		return
 	}
-	u, err := s.Store.UserByUsername(r.Context(), req.Username)
-	if err != nil || u.Flags&(store.FlagDeleted|store.FlagDisabled) != 0 || len(req.AuthKey) != 32 {
+	// A username a moderator reset still signs its account in, so someone
+	// who was away when it happened is not locked out (UserBySignInName).
+	u, err := s.Store.UserBySignInName(r.Context(), req.Username)
+	if err != nil || u.Flags&(store.FlagDeleted|store.FlagDisabled|store.FlagSystem) != 0 || len(req.AuthKey) != 32 {
 		fail()
 		return
 	}
@@ -295,8 +309,8 @@ func (s *Server) verifyRecovery(w http.ResponseWriter, r *http.Request, username
 		WriteError(w, ErrRateLimited)
 		return nil, false
 	}
-	u, err := s.Store.UserByUsername(r.Context(), username)
-	valid := err == nil && u.Flags&(store.FlagDeleted|store.FlagDisabled) == 0 && len(key) == 32 && u.RecoveryAuthHash != ""
+	u, err := s.Store.UserBySignInName(r.Context(), username)
+	valid := err == nil && u.Flags&(store.FlagDeleted|store.FlagDisabled|store.FlagSystem) == 0 && len(key) == 32 && u.RecoveryAuthHash != ""
 	if valid {
 		ok, verr := auth.VerifyAuthKey(key, u.RecoveryAuthHash)
 		valid = verr == nil && ok

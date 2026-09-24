@@ -70,6 +70,11 @@ type AccountRecord struct {
 	AuditAsActor int          // audit_log, actor_id = them
 	AuditOnThem  []LegalAudit // audit_log, target_id = them
 
+	ModCases        []LegalModCase // mod_cases, user_id = them
+	ModThreadLines  int            // mod_messages in their cases
+	ModActionsTaken int            // mod_log, moderator_id = them
+	UsernameHolds   []string       // username_holds, user_id = them
+
 	Emojis   []LegalExpression // emojis, creator_id = them
 	Packs    []LegalPack       // sticker_packs, owner_user_id = them
 	Stickers int               // stickers, creator_id = them
@@ -286,6 +291,21 @@ type LegalBan struct {
 	Reason     string
 	BannedBy   ids.ID
 	CreatedAt  int64
+}
+
+// LegalModCase is an action the instance's own staff took against this
+// account (the moderation panel), which unlike a community's audit log is
+// instance-wide.
+type LegalModCase struct {
+	ID          ids.ID
+	Number      int64
+	Action      string
+	Reason      string
+	ModeratorID ids.ID
+	ExpiresAt   *int64
+	LiftedAt    *int64
+	Status      string
+	CreatedAt   int64
 }
 
 // LegalAudit is a moderation action taken against this account inside one
@@ -761,7 +781,53 @@ func (s *Store) legalModeration(ctx context.Context, rec *AccountRecord, uid int
 		}
 		rec.AuditOnThem = append(rec.AuditOnThem, a)
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	return s.legalInstanceModeration(ctx, rec, uid)
+}
+
+// legalInstanceModeration reads what the instance's own staff did about the
+// account, and what it said back in its case threads.
+func (s *Store) legalInstanceModeration(ctx context.Context, rec *AccountRecord, uid int64) error {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id, number, action, reason, moderator_id, expires_at, lifted_at, status, created_at FROM mod_cases WHERE user_id = ? ORDER BY id LIMIT ?`, uid, LegalListCap)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var c LegalModCase
+		var exp, lifted sql.NullInt64
+		if err := rows.Scan(&c.ID, &c.Number, &c.Action, &c.Reason, &c.ModeratorID, &exp, &lifted, &c.Status, &c.CreatedAt); err != nil {
+			rows.Close()
+			return err
+		}
+		c.ExpiresAt, c.LiftedAt = int64Ptr(exp), int64Ptr(lifted)
+		rec.ModCases = append(rec.ModCases, c)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	if err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM mod_messages m JOIN mod_cases c ON c.id = m.case_id WHERE c.user_id = ?`, uid).Scan(&rec.ModThreadLines); err != nil {
+		return err
+	}
+	if err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM mod_log WHERE moderator_id = ?`, uid).Scan(&rec.ModActionsTaken); err != nil {
+		return err
+	}
+	names, err := s.db.R.QueryContext(ctx, `SELECT username FROM username_holds WHERE user_id = ? ORDER BY created_at`, uid)
+	if err != nil {
+		return err
+	}
+	defer names.Close()
+	for names.Next() {
+		var n string
+		if err := names.Scan(&n); err != nil {
+			return err
+		}
+		rec.UsernameHolds = append(rec.UsernameHolds, n)
+	}
+	return names.Err()
 }
 
 func (s *Store) legalExpressions(ctx context.Context, rec *AccountRecord, uid int64) error {

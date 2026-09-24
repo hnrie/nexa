@@ -396,6 +396,11 @@ func (s *Server) canJoinVoice(ctx context.Context, me *store.User, ch *store.Cha
 	if me.Flags&store.FlagGuest != 0 {
 		return s.canGuestJoinVoice(ctx, me, ch)
 	}
+	// a muted account is in no call: it was taken out of the one it was in
+	// when the mute began, and cannot start or join another until it ends
+	if mute, _, err := s.Store.ActiveRestrictions(ctx, me.ID, time.Now().UnixMilli()); err == nil && mute != nil {
+		return 0, false, "account_muted", mutedError(mute).Message
+	}
 	if ch.Type == "subchat" {
 		return 0, false, "no_call", "A subchat has no call of its own. Use the conversation it belongs to."
 	}

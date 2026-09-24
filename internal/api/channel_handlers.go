@@ -80,6 +80,10 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, ErrNotFound)
 			return
 		}
+		if isSystem(target) {
+			WriteError(w, errNexaNoDM)
+			return
+		}
 		ab, ba, err := s.Store.Blocked(ctx, me.ID, target.ID)
 		if err != nil {
 			WriteError(w, err)
@@ -354,6 +358,10 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	if uid != me.ID && !managesGroup(ch, me) {
 		WriteError(w, E(http.StatusForbidden, "not_owner", "Only the group owner can remove others."))
+		return
+	}
+	// muted, someone can still leave, but not put anybody else out
+	if uid != me.ID && mutedFor(w, r) {
 		return
 	}
 	// an instance admin outranks everyone in a group but its owner, as in a server

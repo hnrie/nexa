@@ -80,18 +80,40 @@ header = """-- The schema chatd runs on Postgres, generated from the SQLite one
 -- Do not edit by hand: run tools/gen_pg_schema.sh.
 """
 
+# A table that only takes new rows refuses the rest with a trigger. SQLite
+# writes that as RAISE(ABORT) in the trigger's own body; Postgres keeps the
+# body in a function, so one shared function does the refusing and each
+# trigger hands it the message.
+REFUSE = re.compile(
+    r"CREATE TRIGGER (\w+) BEFORE (UPDATE|DELETE) ON (\w+)\s+BEGIN\s+SELECT RAISE\(ABORT,\s*'([^']*)'\);\s*END;$",
+    re.I | re.S,
+)
+REFUSE_FUNCTION = """CREATE OR REPLACE FUNCTION refuse_change() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION '%', TG_ARGV[0];
+END
+$$;"""
+
 # Postgres needs a table to exist before another references it, so the tables
 # come out in dependency order rather than the alphabetical one SQLite lists
 # them in, and every index follows the lot.
-tables, indexes, other = {}, [], []
+tables, indexes, other, triggers = {}, [], [], []
 for s in out:
     m = re.match(r'CREATE TABLE (?:IF NOT EXISTS )?"?(\w+)"?', s, re.I)
+    t = REFUSE.match(s)
     if m:
         tables[m.group(1)] = s
     elif re.match(r"CREATE (?:UNIQUE )?INDEX", s, re.I):
         indexes.append(s)
+    elif t:
+        name, event, table, message = t.groups()
+        triggers.append(f"CREATE TRIGGER {name} BEFORE {event.upper()} ON {table} FOR EACH ROW EXECUTE FUNCTION refuse_change('{message}');")
+    elif re.match(r"CREATE TRIGGER", s, re.I):
+        sys.exit(f"pg_schema.py: no Postgres translation for trigger:\n{s}")
     else:
         other.append(s)
+if triggers:
+    other += [REFUSE_FUNCTION] + triggers
 
 def refs(body, name):
     found = set(re.findall(r"REFERENCES\s+(\w+)", body, re.I))

@@ -103,15 +103,31 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Disabled *bool `json:"disabled"`
-		Admin    *bool `json:"admin"`
+		Disabled *bool  `json:"disabled"`
+		Admin    *bool  `json:"admin"`
+		Reason   string `json:"reason"`
 	}
-	if err := ReadJSON(w, r, &req, 1<<10); err != nil {
+	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
 		WriteError(w, err)
 		return
 	}
 	if id == me.ID && ((req.Disabled != nil && *req.Disabled) || (req.Admin != nil && !*req.Admin)) {
 		WriteError(w, E(http.StatusBadRequest, "self", "You cannot disable or demote yourself."))
+		return
+	}
+	if isSystem(u) {
+		WriteError(w, blockError(blockSystem))
+		return
+	}
+	// Nobody can take the owner's access away: without this, any admin could
+	// demote the owner and then act on them like anyone else.
+	if owner, err := s.Store.InstanceOwnerID(r.Context()); err == nil && owner == id && id != me.ID {
+		WriteError(w, E(http.StatusForbidden, "owner_protected", "The instance owner's access cannot be changed."))
+		return
+	}
+	reason, ok := CleanText(req.Reason, maxModReason)
+	if !ok {
+		WriteError(w, E(http.StatusBadRequest, "reason_too_long", "Reasons are at most 1000 characters."))
 		return
 	}
 	// Only the bits this request names are touched, so a second admin changing
@@ -158,6 +174,26 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	// what actually changed goes in the log, one line per change
+	for _, ch := range []struct {
+		bit     int64
+		on, off string
+	}{{store.FlagAdmin, store.LogAdminGrant, store.LogAdminRevoke}, {store.FlagDisabled, store.LogAccountDisable, store.LogAccountEnable}} {
+		was, now := u.Flags&ch.bit != 0, flags&ch.bit != 0
+		if was == now {
+			continue
+		}
+		action := ch.off
+		if now {
+			action = ch.on
+		}
+		entry := &store.ModLogEntry{Action: action, ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &u.ID, TargetUsername: u.Username, Reason: reason}
+		if err := s.Store.AppendModLog(r.Context(), entry); err != nil {
+			s.Log.Warn("moderation: log access change", "user", id.String(), "err", err)
+			continue
+		}
+		s.emitLog(r.Context(), entry)
+	}
 	for i, srv := range servers {
 		s.syncVisibility(r.Context(), srv.ID, before[i], nil)
 	}
@@ -195,10 +231,21 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "self", "Delete your own account from your settings instead."))
 		return
 	}
+	if isSystem(u) {
+		WriteError(w, blockError(blockSystem))
+		return
+	}
 	if u.Flags&store.FlagAdmin != 0 {
 		WriteError(w, E(http.StatusBadRequest, "is_admin", "Take away their admin access before deleting their account."))
 		return
 	}
+	entry := &store.ModLogEntry{Action: "account_delete_profile", ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &u.ID, TargetUsername: u.Username,
+		Details: mustJSON(map[string]any{"messages_kept": true})}
+	if err := s.Store.AppendModLog(ctx, entry); err != nil {
+		WriteError(w, err)
+		return
+	}
+	s.emitLog(ctx, entry)
 	if err := s.detachUser(r, id, me.ID); err != nil {
 		WriteError(w, err)
 		return

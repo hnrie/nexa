@@ -70,6 +70,10 @@ const (
 	// account, the address or the instance. Reconnecting at once only gets the
 	// same answer; the client should close a tab or wait.
 	CloseTooManyConnections websocket.StatusCode = 4009
+	// CloseBanned says the account is banned from the instance. The session
+	// still works for the ban screen and an appeal, so the client keeps it and
+	// stops reconnecting instead of signing out.
+	CloseBanned websocket.StatusCode = 4003
 )
 
 // Conn is the exported view of a connection for hook implementers.
@@ -236,6 +240,26 @@ func (c *conn) close(code websocket.StatusCode, reason string) {
 // frameRevoked marks where a revoked connection's queue ends; it is never sent.
 const frameRevoked = "\x00revoked"
 
+// frameKick marks where a kicked connection's queue ends, carrying the close
+// code to end it with; it is never sent.
+const frameKick = "\x00kick"
+
+type kickInfo struct {
+	code   websocket.StatusCode
+	reason string
+}
+
+// kick ends a connection with its own close code once what is already queued
+// has gone out, which is how the notice explaining it reaches the client.
+func (c *conn) kick(code websocket.StatusCode, reason string) {
+	c.revoked.Store(true)
+	c.enqueue(ServerFrame{T: frameKick, D: kickInfo{code: code, reason: reason}})
+	time.AfterFunc(writeTimeout, func() {
+		defer c.hub.recoverTimer("kick")
+		c.close(code, reason)
+	})
+}
+
 // revoke ends a connection whose session is gone. Its ops are ignored at once,
 // but frames already queued, such as session_expired, still go out before the
 // close unless the client stops reading.
@@ -299,6 +323,14 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if user == nil {
 		_ = ws.Close(4001, "authentication failed")
 		return
+	}
+	// A banned account gets no live connection at all, so nothing said in
+	// its conversations reaches it; its ban screen asks for what it needs.
+	if guest == nil && h.Restricted != nil {
+		if _, banned := h.Restricted(ctx, user.ID); banned {
+			_ = ws.Close(CloseBanned, "banned")
+			return
+		}
 	}
 	c := &conn{id: ids.New(), hub: h, ws: ws, userID: user.ID, ip: ip, session: session, guest: guest, send: make(chan ServerFrame, h.sendBuffer), closed: make(chan struct{}), typing: map[ids.ID]time.Time{},
 		ops: rate.NewLimiter(opRate, opBurst), presence: rate.NewLimiter(rate.Every(presenceEvery), presenceBurst), signalBytes: rate.NewLimiter(signalBytesRate, signalBytesBurst),
@@ -412,6 +444,11 @@ func (c *conn) writeLoop() {
 				c.close(CloseSessionRevoked, "session revoked")
 				return
 			}
+			if f.T == frameKick {
+				k, _ := f.D.(kickInfo)
+				c.close(k.code, k.reason)
+				return
+			}
 			b, err := json.Marshal(f)
 			if err != nil {
 				continue
@@ -518,6 +555,11 @@ func (c *conn) applyPresence(ctx context.Context, raw json.RawMessage) {
 			p.PresencePref = d.Status
 		}
 	}
+	// A muted account keeps its online, idle and do-not-disturb, and may
+	// clear its status, but cannot put new words or an emoji in it.
+	if !d.ClearStatus && (d.StatusText != nil || d.StatusEmoji != nil) && h.muted(ctx, c.userID) {
+		d.StatusText, d.StatusEmoji, d.StatusExpiresAt = nil, nil, nil
+	}
 	if d.ClearStatus {
 		empty := ""
 		var nilExp *int64
@@ -584,6 +626,10 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		c.queueActivities(d.Activities)
 	case OpTyping:
+		// a muted account cannot post, so it has nothing to be typing
+		if h.muted(ctx, c.userID) {
+			return
+		}
 		var d typingData
 		if err := json.Unmarshal(f.D, &d); err != nil || d.ChannelID.IsZero() {
 			return
@@ -634,6 +680,15 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 			h.VoiceOp(ctx, &Conn{c: c}, f.Op, f.D)
 		}
 	}
+}
+
+// muted reports whether the account is muted, when moderation is wired in.
+func (h *Hub) muted(ctx context.Context, uid ids.ID) bool {
+	if h.Restricted == nil {
+		return false
+	}
+	m, _ := h.Restricted(ctx, uid)
+	return m
 }
 
 // TypingStop clears a typing indicator immediately (the author sent or cleared the box).

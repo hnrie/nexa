@@ -112,7 +112,10 @@ type ReadyPayload struct {
 	StickerPacks  []*store.StickerPack     `json:"sticker_packs"`
 	VoiceStates   []any                    `json:"voice_states"`
 	// Guest says which call a guest is in; only a guest's ready has it.
-	Guest any            `json:"guest,omitempty"`
+	Guest any `json:"guest,omitempty"`
+	// Nexa is the account's moderation state: restrictions in force, notices
+	// not yet dismissed, what is unread from Nexa, and for staff the queue.
+	Nexa  any            `json:"nexa,omitempty"`
 	Extra map[string]any `json:"-"`
 }
 

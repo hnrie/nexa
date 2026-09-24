@@ -65,6 +65,7 @@ func newTestServer(t *testing.T) (*Server, *httptest.Server) {
 	srv.WireServers(hub)
 	srv.WireVoice(hub)
 	srv.WireActivities(hub)
+	srv.WireModeration(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { ts.Close(); d.Close() })

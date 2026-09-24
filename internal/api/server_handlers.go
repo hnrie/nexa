@@ -854,6 +854,9 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 		WriteError(w, ErrNotFound)
 		return
 	}
+	if mutedFor(w, r) {
+		return
+	}
 	p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)
 	if err != nil || p == 0 {
 		WriteError(w, ErrNotFound)

@@ -65,6 +65,9 @@ func (s *Server) handleDMDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	purge := r.URL.Query().Get("purge") == "true"
+	if purge && mutedFor(w, r) {
+		return
+	}
 	if ch.Type == "group_dm" {
 		if !purge {
 			// leaving is the ordinary way out of a group

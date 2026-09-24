@@ -228,6 +228,10 @@ func (s *Server) handleSubchatDelete(w http.ResponseWriter, r *http.Request, ch 
 		WriteError(w, E(http.StatusForbidden, "not_allowed", "Only whoever opened this subchat can delete it."))
 		return
 	}
+	// it takes the room away from everyone in it, which a muted account cannot
+	if mutedFor(w, r) {
+		return
+	}
 	recipients := append([]ids.ID{}, ch.Recipients...)
 	if err := s.Store.DeleteChannel(r.Context(), ch.ID); err != nil {
 		WriteError(w, err)

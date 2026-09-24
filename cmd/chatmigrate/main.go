@@ -26,6 +26,11 @@ import (
 	"evilion.xyz/chat/internal/db"
 )
 
+// appendOnly names the tables whose triggers refuse updates and deletes (see
+// the mod_log migration). Rows go into them like any other; only a wipe has to
+// empty them another way.
+var appendOnly = map[string]bool{"mod_log": true}
+
 // tableOrder lists every table in the source, ordered so that a table is
 // always copied after whatever it points at. It is read from the database
 // rather than written down here, so a table added later is carried across
@@ -140,7 +145,13 @@ func run(from, to string, wipe bool, batch int) error {
 		if wipe {
 			// in reverse, so nothing is pointed at while it is emptied
 			for i := len(tables) - 1; i >= 0; i-- {
-				if _, err := tx.ExecContext(ctx, `DELETE FROM `+tables[i]); err != nil {
+				empty := `DELETE FROM ` + tables[i]
+				if appendOnly[tables[i]] {
+					// its triggers refuse row deletes; replacing the whole
+					// database is the one time emptying it is meant
+					empty = `TRUNCATE ` + tables[i]
+				}
+				if _, err := tx.ExecContext(ctx, empty); err != nil {
 					return fmt.Errorf("empty %s: %w", tables[i], err)
 				}
 			}

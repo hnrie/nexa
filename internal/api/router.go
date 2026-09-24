@@ -35,6 +35,9 @@ type Broadcaster interface {
 	// that were just deleted; except 0 closes all of a user's.
 	CloseSession(sessionID ids.ID)
 	CloseUserSessions(uid, except ids.ID)
+	// DisconnectUser closes a user's sockets with a close code of its own,
+	// once the frames already queued for them (the reason why) are out.
+	DisconnectUser(uid ids.ID, code int, reason string)
 }
 
 // NoopBroadcaster drops everything (tests, or before the gateway is wired).
@@ -48,6 +51,7 @@ func (NoopBroadcaster) PresenceChanged(ids.ID)                 {}
 func (NoopBroadcaster) Typing(context.Context, ids.ID, ids.ID) {}
 func (NoopBroadcaster) CloseSession(ids.ID)                    {}
 func (NoopBroadcaster) CloseUserSessions(ids.ID, ids.ID)       {}
+func (NoopBroadcaster) DisconnectUser(ids.ID, int, string)     {}
 
 // Server holds the dependencies of every handler.
 type Server struct {
@@ -101,6 +105,9 @@ type Server struct {
 	// show, so replaying a shared code cannot drive the work behind them.
 	countsMu     sync.Mutex
 	serverCounts map[ids.ID]serverCounts
+
+	// system holds the Nexa account once it has been looked up or made.
+	system systemAccount
 
 	// ChannelAccess decides server-channel access (Phase 2). DM access is built in.
 	ChannelAccess func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error)
@@ -197,14 +204,15 @@ func (s *Server) routes(mux *http.ServeMux) {
 	}
 }
 
-// authed wraps h with the bearer-token middleware and the generic per-user limiter.
+// authed wraps h with the bearer-token middleware, the generic per-user
+// limiter, and the account's mute or ban (see moderation_gate.go).
 func (s *Server) authed(h http.HandlerFunc) http.Handler {
 	return s.Auth.Middleware(RateLimit(s.limGeneric, func(r *http.Request) string {
 		if u := auth.UserFrom(r.Context()); u != nil {
 			return "u:" + u.ID.String()
 		}
 		return "ip:" + auth.ClientIP(r)
-	})(h))
+	})(s.restricted(h)))
 }
 
 // callAuthed is authed for the routes a call runs on, which guests use too.
@@ -214,7 +222,7 @@ func (s *Server) callAuthed(h http.HandlerFunc) http.Handler {
 			return "u:" + u.ID.String()
 		}
 		return "ip:" + auth.ClientIP(r)
-	})(h))
+	})(s.restricted(h)))
 }
 
 // guestAuthed lets in guests only.
