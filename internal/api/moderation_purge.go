@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -11,11 +12,18 @@ import (
 	"evilion.xyz/chat/internal/store"
 )
 
-// Deleting an account as a moderator takes everything it made with it: its
-// messages everywhere, its uploads, the servers and group chats it owns, its
-// packs, reactions and votes. Someone deleting their own account keeps their
-// messages behind under Deleted User instead (detachUser); this is the other
-// thing, and the case says what went.
+// Deleting an account takes everything it made with it, whoever deletes it:
+// its messages everywhere, its uploads, the servers and group chats it owns,
+// its packs, reactions and votes. Someone deleting their own account takes
+// their one-to-one conversations too, whole, for both people in them; a
+// moderator deleting one leaves those to the person on the other side, and the
+// case says what went.
+
+// purgeOptions says what else goes with an account.
+type purgeOptions struct {
+	// DMs deletes its one-to-one conversations whole, for both people in them.
+	DMs bool
+}
 
 // purgeTimeout bounds one deletion. It runs on a context of its own, so a
 // moderator closing the tab does not leave an account half deleted.
@@ -87,7 +95,7 @@ func (s *Server) actDelete(w http.ResponseWriter, r *http.Request, target *store
 
 	pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), purgeTimeout)
 	defer cancel()
-	if err := s.purgeAccount(r.WithContext(pctx), target.ID); err != nil {
+	if err := s.purgeAccount(r.WithContext(pctx), target.ID, purgeOptions{}); err != nil {
 		s.Log.Error("moderation: delete account", "user", target.ID.String(), "case", c.ID.String(), "err", err)
 		s.emitCaseStaff(pctx, c)
 		WriteError(w, E(http.StatusInternalServerError, "delete_incomplete", "The account is signed out and disabled, but not everything was deleted. Try again to finish."))
@@ -111,7 +119,7 @@ func (s *Server) actDelete(w http.ResponseWriter, r *http.Request, target *store
 // purgeAccount removes everything an account made, telling whoever can see
 // each thing as it goes, and then its profile. Every step finds only what the
 // steps before left, so running it again after a failure finishes the job.
-func (s *Server) purgeAccount(r *http.Request, uid ids.ID) error {
+func (s *Server) purgeAccount(r *http.Request, uid ids.ID, opt purgeOptions) error {
 	ctx := r.Context()
 	// The servers it owns go, with everything in them; the rest it leaves.
 	servers, err := s.Store.ServersForUser(ctx, uid)
@@ -157,6 +165,21 @@ func (s *Server) purgeAccount(r *http.Request, uid ids.ID) error {
 			ev["parent_id"] = *ch.ParentID
 		}
 		s.Bcast.EmitUsers(recipients, "channel_delete", ev)
+	}
+	// Its one-to-one conversations go whole, when it asked for everything to go.
+	if opt.DMs {
+		dms, err := s.Store.DirectConversations(ctx, uid)
+		if err != nil {
+			return err
+		}
+		for _, ch := range dms {
+			recipients := ch.Recipients
+			s.voiceChannelDeleted(ctx, ch)
+			if err := s.deleteConversation(ctx, ch); err != nil && !errors.Is(err, store.ErrNotFound) {
+				return err
+			}
+			s.Bcast.EmitUsers(recipients, "channel_delete", map[string]any{"id": ch.ID})
+		}
 	}
 	// It leaves the groups other people own.
 	groups, err := s.Store.GroupDMsForUser(ctx, uid)
@@ -237,4 +260,59 @@ func (s *Server) purgeAccount(r *http.Request, uid ids.ID) error {
 		}()
 	}
 	return nil
+}
+
+// accountSweep is how often deleted accounts are checked for anything left.
+const accountSweep = time.Hour
+
+// finishDeletedAccounts wipes whatever deleted accounts still own: accounts
+// deleted before deletion took everything, and any whose deletion stopped part
+// way. Each goes the way it was deleted: one a moderator deleted keeps its
+// one-to-one conversations for the people on the other side; any other takes
+// them too.
+func (s *Server) finishDeletedAccounts(ctx context.Context) {
+	list, err := s.Store.DeletedAccountsWithLeftovers(ctx)
+	if err != nil {
+		s.Log.Warn("deleted accounts: finding leftovers", "err", err)
+		return
+	}
+	for _, uid := range list {
+		opt := purgeOptions{DMs: true}
+		if cases, err := s.Store.ModCasesForUser(ctx, uid); err == nil {
+			for _, c := range cases {
+				if c.Action == store.ActionDelete {
+					opt.DMs = false
+				}
+			}
+		}
+		pctx, cancel := context.WithTimeout(ctx, purgeTimeout)
+		r, _ := http.NewRequestWithContext(pctx, http.MethodPost, "/", nil)
+		if err := s.purgeAccount(r, uid, opt); err != nil {
+			s.Log.Warn("deleted accounts: wiping", "user", uid.String(), "err", err)
+		} else {
+			s.Log.Info("deleted accounts: wiped what was left", "user", uid.String(), "direct_messages", opt.DMs)
+		}
+		cancel()
+		if ctx.Err() != nil {
+			return
+		}
+	}
+}
+
+// StartAccountSweep finishes deleted accounts now and then every hour, until
+// ctx ends.
+func (s *Server) StartAccountSweep(ctx context.Context) {
+	go func() {
+		s.finishDeletedAccounts(ctx)
+		t := time.NewTicker(accountSweep)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.finishDeletedAccounts(ctx)
+			}
+		}
+	}()
 }

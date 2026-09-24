@@ -8,6 +8,7 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { usernameProblem } from "@/pages/AuthLayout";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
+import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
@@ -18,7 +19,6 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
   const setMe = useAuth((a) => a.setMe);
   const changePassword = useAuth((a) => a.changePassword);
   const newRecoveryKey = useAuth((a) => a.newRecoveryKey);
-  const logout = useAuth((a) => a.logout);
   const toast = useUI((u) => u.toast);
   const openModal = useUI((u) => u.openModal);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -141,23 +141,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
         </Modal>
       ) : null}
 
-      {dialog === "delete" ? (
-        <Modal open onClose={close} title={t("settings.account.deleteAccount")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button variant="danger" loading={busy} disabled={!value} onClick={() => void run(async () => {
-          const { deriveAuthKey, deriveMaster } = await import("@/crypto/kdf");
-          const { b64 } = await import("@/crypto/bytes");
-          const { acceptServerKdf } = await import("@/lib/serverKdf");
-          const bundle = await usersApi.myKeys();
-          const master = await deriveMaster(value, b64.dec(bundle.kdf_salt), acceptServerKdf(bundle.kdf_params));
-          await usersApi.deleteMe(b64.enc(deriveAuthKey(master)));
-          await logout();
-        })}>{t("settings.account.deleteAccount")}</Button></>}>
-          <div className={s.form}>
-            {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
-            <p className={s.hint}>{t("settings.account.thisCannotBeUndoneEnterYour")}</p>
-            <Field label={t("chat.lockedChannel.password")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
-          </div>
-        </Modal>
-      ) : null}
+      {dialog === "delete" ? <DeleteAccountDialog onClose={close} /> : null}
     </>
   );
 }

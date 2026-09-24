@@ -210,10 +210,10 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, store.AdminUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, Flags: flags, CreatedAt: u.CreatedAt, Admin: flags&store.FlagAdmin != 0, Disabled: flags&store.FlagDisabled != 0})
 }
 
-// handleAdminUserDelete deletes someone's account as they could themselves:
-// their name and profile go, and what they wrote stays under Deleted User.
-// They are taken out of every server and group first, and a server they own
-// passes to another member rather than being left without an owner.
+// handleAdminUserDelete deletes an account the way the moderation panel's
+// Delete does, without the case: everything it made goes with it, everywhere,
+// including the servers and group chats it owns. Its one-to-one conversations
+// stay, for the people on the other side of them.
 func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	ctx := r.Context()
@@ -239,106 +239,37 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "is_admin", "Take away their admin access before deleting their account."))
 		return
 	}
-	entry := &store.ModLogEntry{Action: "account_delete_profile", ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &u.ID, TargetUsername: u.Username,
-		Details: mustJSON(map[string]any{"messages_kept": true})}
+	counts, err := s.Store.PurgePreview(ctx, id)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	entry := &store.ModLogEntry{Action: store.ActionDelete, ModeratorID: me.ID, ModeratorUsername: me.Username, TargetID: &u.ID, TargetUsername: u.Username,
+		Details: mustJSON(map[string]any{"counts": counts})}
 	if err := s.Store.AppendModLog(ctx, entry); err != nil {
 		WriteError(w, err)
 		return
 	}
 	s.emitLog(ctx, entry)
-	if err := s.detachUser(r, id, me.ID); err != nil {
+	// Signing in stops now, and any tab still open for them signs out, so
+	// nothing new is added while the rest goes.
+	if _, err := s.Store.ChangeUserFlags(ctx, id, store.FlagDisabled|store.FlagDeleted, 0); err != nil {
 		WriteError(w, err)
 		return
 	}
-	if err := s.Store.DeleteAccount(ctx, id); err != nil {
-		WriteError(w, err)
-		return
+	if err := s.Store.DeleteUserSessions(ctx, id, 0); err != nil {
+		s.Log.Warn("admin: delete sessions", "user", id.String(), "err", err)
 	}
-	// any tab still open for them signs out now
 	s.Bcast.EmitUsers([]ids.ID{id}, "session_expired", map[string]any{"reason": "deleted"})
 	s.Bcast.CloseUserSessions(id, 0)
-	if deleted, err := s.Store.UserByID(ctx, id); err == nil {
-		s.Bcast.UserUpdated(deleted)
+	pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), purgeTimeout)
+	defer cancel()
+	if err := s.purgeAccount(r.WithContext(pctx), id, purgeOptions{}); err != nil {
+		s.Log.Error("admin: delete account", "user", id.String(), "err", err)
+		WriteError(w, E(http.StatusInternalServerError, "delete_incomplete", "The account is closed, but not everything is gone yet. The rest goes by itself shortly."))
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// detachUser takes an account that is being deleted out of every server and
-// group; actor is whoever asked (an admin, or the user themselves). A server
-// it owns passes to another member (see successor) or, when nobody else is
-// in it, is deleted.
-func (s *Server) detachUser(r *http.Request, id, actor ids.ID) error {
-	ctx := r.Context()
-	servers, err := s.Store.ServersForUser(ctx, id)
-	if err != nil {
-		return err
-	}
-	for _, srv := range servers {
-		if srv.OwnerID == id {
-			next, ok, err := s.successor(ctx, srv, id, actor)
-			if err != nil {
-				return err
-			}
-			if !ok {
-				// nobody else is in it: there is nothing left to keep
-				if err := s.Store.DeleteServer(ctx, srv.ID); err != nil {
-					return err
-				}
-				s.Bcast.EmitUsers([]ids.ID{id}, "server_delete", map[string]any{"id": srv.ID})
-				continue
-			}
-			if err := s.Store.UpdateServer(ctx, srv.ID, store.ServerPatch{OwnerID: &next}); err != nil {
-				return err
-			}
-			s.audit(r, srv.ID, actor, "server_transfer", "user", &next, nil, "the owner's account was deleted")
-			if updated, err := s.Store.ServerByID(ctx, srv.ID); err == nil {
-				s.emitServer(ctx, srv.ID, "server_update", updated)
-				srv = updated
-			}
-		}
-		if err := s.removeMember(r, srv, id, "member_remove", map[string]any{"reason": "account_deleted"}); err != nil {
-			return err
-		}
-	}
-	groups, err := s.Store.GroupDMsForUser(ctx, id)
-	if err != nil {
-		return err
-	}
-	for _, gid := range groups {
-		ch, err := s.Store.ChannelByID(ctx, gid)
-		if err != nil {
-			continue
-		}
-		if err := s.removeFromGroup(r, ch, id); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// successor picks who takes a server over from an owner who is going: the
-// admin doing it if they are a member, otherwise whoever ranks highest. The
-// error is kept apart from "there is nobody": the caller deletes the server
-// when nobody is left, and a failed read must not look like that.
-func (s *Server) successor(ctx context.Context, srv *store.Server, leaving, admin ids.ID) (ids.ID, bool, error) {
-	members, err := s.Store.MemberIDs(ctx, srv.ID)
-	if err != nil {
-		return 0, false, err
-	}
-	var best ids.ID
-	bestRank, found := 0, false
-	for _, m := range members {
-		if m == leaving {
-			continue
-		}
-		if m == admin {
-			return m, true, nil
-		}
-		if rank, _ := s.actorHighest(ctx, srv, m); !found || rank > bestRank {
-			best, bestRank, found = m, rank, true
-		}
-	}
-	return best, found, nil
 }
 
 func (s *Server) adminSettingsView(r *http.Request) map[string]any {

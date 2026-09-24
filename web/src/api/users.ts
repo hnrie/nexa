@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { PurgeCounts } from "./moderation";
 import type { KdfParamsJson, MeUser, PublicUser, SettingsBlob, Snowflake } from "./types";
 
 export type MePatch = Partial<{
@@ -35,6 +36,10 @@ export const users = {
   },
   deleteMe(auth_key: string): Promise<void> {
     return api.request<void>("POST", "/users/@me/delete", { auth_key });
+  },
+  /** What deleting the account would take with it. */
+  deletePreview(): Promise<PurgeCounts> {
+    return api.request<PurgeCounts>("GET", "/users/@me/delete-preview");
   },
   get(id: Snowflake): Promise<PublicUser> {
     return api.request<PublicUser>("GET", `/users/${id}`);

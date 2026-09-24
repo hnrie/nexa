@@ -143,14 +143,21 @@ here has a way to read them.
 - Encrypted things (messages and files) stay readable only to the
   people holding the conversation key. Deleting a message deletes its
   server row.
-- If you delete your own account, its profile is overwritten and its
-  sessions, relationships, settings, key grants, and second factor
-  rows are deleted. Your past messages stay behind, still encrypted,
-  marked as written by a deleted user.
+- If you delete your own account, everything it made is deleted with
+  it: your messages everywhere, the files you uploaded, your
+  reactions, votes, and packs, the servers and group chats you own
+  (for everyone in them), and your direct message conversations, for
+  both people in them. Its profile is overwritten, and its sessions,
+  relationships, settings, keys, and second factor are deleted. What
+  is left is an empty stand-in named Deleted User, which nobody can
+  sign in as.
+- So when someone you have a direct message conversation with deletes
+  their own account, that conversation is deleted for you too.
 - If staff delete your account, everything it posted and uploaded is
   removed with it, everywhere, and servers and group chats it owns are
-  deleted for everyone in them. The moderation case and the log entry
-  about it stay.
+  deleted for everyone in them. Its direct message conversations stay
+  for the people on the other side, without its messages. The
+  moderation case and the log entry about it stay.
 
 8. AVAILABILITY AND CHANGES
 

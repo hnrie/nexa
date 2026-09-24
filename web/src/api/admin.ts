@@ -29,9 +29,6 @@ export const admin = {
     return api.request<AdminUser>("PATCH", `/admin/users/${id}`, body);
   },
   /** Deletes someone's account: their profile goes, their messages stay under Deleted User. */
-  deleteUser(id: Snowflake): Promise<void> {
-    return api.request<void>("DELETE", `/admin/users/${id}`);
-  },
   settings(): Promise<AdminSettings> {
     return api.request<AdminSettings>("GET", "/admin/settings");
   },

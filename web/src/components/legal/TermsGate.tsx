@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Spinner } from "@/components/common/Spinner";
-import { LEGAL_VERSION, acceptTerms, previouslyAccepted, termsAccepted } from "@/lib/legal";
+import { LEGAL_EFFECTIVE, acceptTerms, previouslyAccepted, termsAccepted } from "@/lib/legal";
 import { useLegalDocs } from "@/lib/legalDocs";
 import { useAuth } from "@/stores/auth";
 import { t } from "@/i18n";
@@ -77,7 +77,7 @@ export function TermsGate() {
       }
     >
       <div className={s.gate} data-testid="terms-gate" ref={gate}>
-        <p className={s.gateLead}>{previous ? t("legal.gateUpdatedIntro", { version: LEGAL_VERSION }) : t("legal.gateIntro", { version: LEGAL_VERSION })}</p>
+        <p className={s.gateLead}>{previous ? t("legal.gateUpdatedIntro", { version: LEGAL_EFFECTIVE }) : t("legal.gateIntro", { version: LEGAL_EFFECTIVE })}</p>
         {previous ? <LegalChanges /> : null}
         <div className={s.readTabs} role="tablist" aria-label={t("legal.readSummary")}>
           {tabs.map((x) => (

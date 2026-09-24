@@ -184,39 +184,6 @@ func TestOneUseInviteUnderConcurrentJoins(t *testing.T) {
 	}
 }
 
-func TestOwnerDeletingTheirAccountHandsTheServerOn(t *testing.T) {
-	_, ts := newTestServer(t)
-	register(t, ts, "alice")
-	tokB, idB := register(t, ts, "bob")
-	tokD, idD := register(t, ts, "dave")
-	view := createServer(t, ts, tokB, "Handover")
-	sid := view["id"].(string)
-	join(t, ts, tokD, inviteFor(t, ts, tokB, channelNamed(view, "general")["id"].(string)))
-	createServer(t, ts, tokB, "Alone")
-
-	if res, body := do(t, ts, "POST", "/api/v1/users/@me/delete", tokB, map[string]any{"auth_key": b64(key32)}); res.StatusCode != 204 {
-		t.Fatalf("delete account: %d %v", res.StatusCode, body)
-	}
-	res, got := do(t, ts, "GET", "/api/v1/servers/"+sid, tokD, nil)
-	if res.StatusCode != 200 || got["server"].(map[string]any)["owner_id"] != idD {
-		t.Fatalf("server after its owner left: %d %v", res.StatusCode, got["server"])
-	}
-	_, members := do(t, ts, "GET", "/api/v1/servers/"+sid+"/members?limit=100", tokD, nil)
-	list, _ := members["members"].([]any)
-	if len(list) != 1 {
-		t.Errorf("members: %v", list)
-	}
-	for _, m := range list {
-		if m.(map[string]any)["user_id"] == idB {
-			t.Error("the deleted account is still a member")
-		}
-	}
-	// dave, now the owner, can delete it
-	if res, _ := do(t, ts, "DELETE", "/api/v1/servers/"+sid, tokD, nil); res.StatusCode != 204 {
-		t.Errorf("new owner deletes: %d", res.StatusCode)
-	}
-}
-
 func TestAdminAccessChangesChannelsLive(t *testing.T) {
 	_, ts := newTestServer(t)
 	tokA, _ := register(t, ts, "alice")

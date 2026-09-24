@@ -6,7 +6,7 @@ import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { LegalHighlights } from "@/components/legal/LegalContent";
 import { LegalDocument } from "@/components/legal/LegalDocument";
-import { CONTACT_EMAIL, LEGAL_VERSION, OWNER_USERNAME, termsAccepted } from "@/lib/legal";
+import { CONTACT_EMAIL, LEGAL_EFFECTIVE, LEGAL_VERSION, OWNER_USERNAME, termsAccepted } from "@/lib/legal";
 import { useLegalDocs } from "@/lib/legalDocs";
 import { useAuth } from "@/stores/auth";
 import { t } from "@/i18n";
@@ -63,7 +63,7 @@ export default function AboutPage() {
       <span className={l.rowText}>
         <span className={l.rowTitle}>{title}</span>
         <span className={l.rowSub}>
-          {t("legal.aboutEffective", { date: docs?.[id].effective ?? LEGAL_VERSION })}
+          {t("legal.aboutEffective", { date: docs?.[id].effective ?? LEGAL_EFFECTIVE })}
           {agreed ? (
             <>
               {" · "}

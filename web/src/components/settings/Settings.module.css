@@ -140,3 +140,10 @@
   font-weight: 700;
   color: var(--text-strong);
 }
+
+/* what deleting an account takes with it */
+.purgeList { list-style: none; margin: 0; padding: 4px 12px; border-radius: var(--radius-sm); border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border-subtle)); background: color-mix(in srgb, var(--danger) 8%, var(--bg-raised)); }
+.purgeList li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 14px; color: var(--text); }
+.purgeList li + li { border-top: 1px solid var(--border-subtle); }
+.purgeCount { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-strong); }
+.purgeLoading { display: flex; justify-content: center; padding: 12px 0; }

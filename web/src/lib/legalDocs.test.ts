@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { LEGAL_VERSION } from "./legal";
+import { LEGAL_EFFECTIVE, LEGAL_VERSION } from "./legal";
 import { headingCase, loadLegalDocs, parseLegal, type LegalDoc } from "./legalDocs";
 
 describe("legal documents", () => {
@@ -11,8 +11,9 @@ describe("legal documents", () => {
 
   it("are the version the app asks people to agree to", () => {
     // bumping the wording without LEGAL_VERSION would never ask anyone again
-    expect(terms.effective).toBe(LEGAL_VERSION);
-    expect(privacy.effective).toBe(LEGAL_VERSION);
+    expect(terms.effective).toBe(LEGAL_EFFECTIVE);
+    expect(privacy.effective).toBe(LEGAL_EFFECTIVE);
+    expect(LEGAL_VERSION.startsWith(LEGAL_EFFECTIVE)).toBe(true);
   });
 
   it("parse into their titles and every numbered section, in order", () => {

@@ -141,9 +141,10 @@ decrypted.
 6. HOW LONG THINGS ARE KEPT
 
 - Sessions: until you sign out, or after 90 days without use.
-- Messages and files: until they are deleted, by their author, by a
-  conversation or server owner, or with the author's account when
-  staff delete it.
+- Messages and files: until they are deleted: by their author, by a
+  conversation or server owner, with the author's account, or, in a
+  direct message, with the account of the person on the other side
+  when they delete it themselves.
 - Unfinished uploads, and files nothing points at any more: removed
   after a day.
 - Crash reports: only the newest 500 are kept.
@@ -157,14 +158,21 @@ decrypted.
 
 - Deleted messages, files, and accounts are removed from the
   database. No trash bin or archive is kept.
-- Deleting your own account overwrites its profile, and deletes its
-  sessions, relationships, settings, key grants, and second factor
-  rows. Your past messages stay behind, still encrypted, marked as
-  written by a deleted user.
+- Deleting your own account deletes everything it made: your messages
+  everywhere, the files you uploaded, your reactions, votes, and
+  packs, the servers and group chats you own (for everyone in them),
+  and your direct message conversations, for both people in them. Its
+  profile is overwritten, and its sessions, relationships, settings,
+  keys, second factor, and crash reports are deleted. An empty
+  stand-in named Deleted User is all that is left, and nobody can sign
+  in as it.
+- When someone you have a direct message conversation with deletes
+  their own account, that conversation is deleted for you too.
 - When staff delete an account, everything it posted and uploaded is
   removed with it, everywhere, and servers and group chats it owns
-  are deleted for everyone in them. The moderation case, its thread,
-  and the log entry stay.
+  are deleted for everyone in them. Its direct message conversations
+  stay for the people on the other side, without its messages. The
+  moderation case, its thread, and the log entry stay.
 
 8. CONTACT
 

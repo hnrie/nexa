@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -22,6 +23,7 @@ func (s *Server) userRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/users/@me", s.authed(s.handleMe))
 	mux.Handle("PATCH /api/v1/users/@me", s.authed(s.handleMePatch))
 	mux.Handle("POST /api/v1/users/@me/delete", s.authed(s.handleMeDelete))
+	mux.Handle("GET /api/v1/users/@me/delete-preview", s.authed(s.handleMeDeletePreview))
 	mux.Handle("GET /api/v1/users/@me/settings", s.authed(s.handleSettingsGet))
 	mux.Handle("PUT /api/v1/users/@me/settings", s.authed(s.handleSettingsPut))
 	mux.Handle("GET /api/v1/users/@me/keys", s.authed(s.handleMyKeys))
@@ -235,21 +237,40 @@ func (s *Server) handleMeDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "The password is wrong."))
 		return
 	}
-	// leave every server and group first, handing owned servers on, so none
-	// is left with an owner nobody can sign in as
-	if err := s.detachUser(r, u.ID, u.ID); err != nil {
+	ctx := r.Context()
+	// From here the account is deleted: nobody can sign in as it and its open
+	// tabs close, so nothing new is added while the rest goes. A wipe that
+	// stops part way is finished by the sweep (finishDeletedAccounts).
+	if _, err := s.Store.ChangeUserFlags(ctx, u.ID, store.FlagDisabled|store.FlagDeleted, 0); err != nil {
 		WriteError(w, err)
 		return
 	}
-	if err := s.Store.DeleteAccount(r.Context(), u.ID); err != nil {
-		WriteError(w, err)
-		return
+	if err := s.Store.DeleteUserSessions(ctx, u.ID, 0); err != nil {
+		s.Log.Warn("delete account: sessions", "user", u.ID.String(), "err", err)
 	}
 	s.Bcast.CloseUserSessions(u.ID, 0)
-	if deleted, err := s.Store.UserByID(r.Context(), u.ID); err == nil {
-		s.Bcast.UserUpdated(deleted)
+	// Everything it made goes, and its one-to-one conversations with it, for
+	// both people in them. It runs on a context of its own, so closing the tab
+	// does not stop it half way.
+	pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), purgeTimeout)
+	defer cancel()
+	if err := s.purgeAccount(r.WithContext(pctx), u.ID, purgeOptions{DMs: true}); err != nil {
+		s.Log.Error("delete account", "user", u.ID.String(), "err", err)
+		WriteError(w, E(http.StatusInternalServerError, "delete_incomplete", "Your account is closed, but not everything is gone yet. The rest goes by itself shortly."))
+		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleMeDeletePreview says what deleting the account would take with it,
+// for the confirmation that asks.
+func (s *Server) handleMeDeletePreview(w http.ResponseWriter, r *http.Request) {
+	counts, err := s.Store.PurgePreview(r.Context(), auth.UserFrom(r.Context()).ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, counts)
 }
 
 func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {

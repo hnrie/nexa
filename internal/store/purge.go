@@ -8,14 +8,15 @@ import (
 	"evilion.xyz/chat/internal/ids"
 )
 
-// A moderator deleting an account takes everything it made with it — unlike
-// someone deleting their own, where the messages stay behind under Deleted
-// User. The api package runs the steps in order, telling everyone as each
-// lands; these are the pieces it runs them with. Every one of them can be run
-// again after a failure part way, and finds only what is left.
+// Deleting an account takes everything it made with it, whoever deletes it;
+// someone deleting their own takes their direct message conversations too,
+// for both people in them. The api package runs the steps in order, telling
+// everyone as each lands; these are the pieces it runs them with. Every one of
+// them can be run again after a failure part way, and finds only what is
+// left.
 
-// PurgeCounts is what deleting an account would take with it, shown to the
-// moderator before they confirm.
+// PurgeCounts is what deleting an account would take with it, shown before
+// anyone confirms.
 type PurgeCounts struct {
 	Messages        int   `json:"messages"`
 	Attachments     int   `json:"attachments"`
@@ -26,6 +27,9 @@ type PurgeCounts struct {
 	Groups          int   `json:"groups"`
 	Packs           int   `json:"packs"`
 	Reactions       int   `json:"reactions"`
+	// DirectMessages is its one-to-one conversations, which go whole when
+	// someone deletes their own account.
+	DirectMessages int `json:"direct_messages"`
 }
 
 // PurgePreview counts what deleting the account would remove.
@@ -41,9 +45,62 @@ func (s *Store) PurgePreview(ctx context.Context, uid ids.ID) (PurgeCounts, erro
 		(SELECT count(*) FROM server_members WHERE user_id = ?),
 		(SELECT count(*) FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = ? AND c.type = 'group_dm'),
 		(SELECT count(*) FROM sticker_packs WHERE owner_user_id = ?),
-		(SELECT count(*) FROM reactions WHERE user_id = ?)`,
-		id, id, id, id, id, id, id, id, id).Scan(&c.Messages, &c.Attachments, &c.AttachmentBytes, &c.OwnedServers, &c.OwnedGroups, &c.Servers, &c.Groups, &c.Packs, &c.Reactions)
+		(SELECT count(*) FROM reactions WHERE user_id = ?),
+		(SELECT count(*) FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = ? AND c.type = 'dm')`,
+		id, id, id, id, id, id, id, id, id, id).Scan(&c.Messages, &c.Attachments, &c.AttachmentBytes, &c.OwnedServers, &c.OwnedGroups, &c.Servers, &c.Groups, &c.Packs, &c.Reactions, &c.DirectMessages)
 	return c, err
+}
+
+// DirectConversations lists the one-to-one conversations an account is in.
+func (s *Store) DirectConversations(ctx context.Context, uid ids.ID) ([]*Channel, error) {
+	list, err := s.idList(ctx, `SELECT c.id FROM channels c JOIN dm_participants p ON p.channel_id = c.id WHERE p.user_id = ? AND c.type = 'dm' ORDER BY c.id`, int64(uid))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*Channel, 0, len(list))
+	for _, id := range list {
+		ch, err := s.ChannelByID(ctx, id)
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ch)
+	}
+	return out, nil
+}
+
+// DeletedAccountsWithLeftovers lists deleted accounts that something still
+// belongs to: accounts deleted before deletion took everything, and any whose
+// deletion stopped part way.
+func (s *Store) DeletedAccountsWithLeftovers(ctx context.Context) ([]ids.ID, error) {
+	return s.idList(ctx, `SELECT u.id FROM users u WHERE (u.flags & ?) != 0 AND (
+		EXISTS (SELECT 1 FROM messages WHERE author_id = u.id) OR
+		-- a one-to-one conversation outlives an account a moderator deleted,
+		-- for the person on the other side of it
+		EXISTS (SELECT 1 FROM dm_participants p JOIN channels c ON c.id = p.channel_id WHERE p.user_id = u.id AND (c.type <> 'dm' OR NOT EXISTS (SELECT 1 FROM mod_cases mc WHERE mc.user_id = u.id AND mc.action = 'delete'))) OR
+		EXISTS (SELECT 1 FROM server_members WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM servers WHERE owner_id = u.id) OR
+		EXISTS (SELECT 1 FROM channels WHERE owner_id = u.id) OR
+		EXISTS (SELECT 1 FROM reactions WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM sticker_packs WHERE owner_user_id = u.id) OR
+		EXISTS (SELECT 1 FROM sticker_installs WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM recent_stickers WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM read_states WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM invites WHERE inviter_id = u.id) OR
+		EXISTS (SELECT 1 FROM guest_links WHERE creator_id = u.id) OR
+		EXISTS (SELECT 1 FROM uploads WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM poll_votes WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM client_errors WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM bans WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM channel_overwrites WHERE target_id = u.id AND target_type = 'member') OR
+		EXISTS (SELECT 1 FROM mod_restrictions WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM sessions WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM relationships WHERE user_id = u.id OR target_id = u.id) OR
+		EXISTS (SELECT 1 FROM user_settings WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM key_grants WHERE user_id = u.id)
+	) ORDER BY u.id`, FlagDeleted)
 }
 
 // PurgeUserMessages deletes up to batch of the account's messages, from every
@@ -194,7 +251,11 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]ids.ID, er
 // PurgeUserLeftovers removes what the other steps do not reach: poll votes,
 // the invites and guest links it made, its unfinished uploads, its read
 // positions, recent stickers and installed packs, its per-server avatars
-// (whose pictures are let go), and its Nexa read position.
+// (whose pictures are let go), its Nexa read position, the crash reports its
+// devices sent, server bans and channel permissions naming it, and any mute
+// or ban still on it. The moderation cases about it, the log and the
+// usernames held for it stay: they are the record of what was done, and a
+// name taken away by a moderator stays out of anyone else's hands.
 func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 	id := int64(uid)
 	return s.Tx(ctx, func(tx *db.Tx) error {
@@ -211,6 +272,10 @@ func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 			`DELETE FROM recent_stickers WHERE user_id = ?`,
 			`DELETE FROM sticker_installs WHERE user_id = ?`,
 			`DELETE FROM nexa_reads WHERE user_id = ?`,
+			`DELETE FROM client_errors WHERE user_id = ?`,
+			`DELETE FROM bans WHERE user_id = ?`,
+			`DELETE FROM channel_overwrites WHERE target_id = ? AND target_type = 'member'`,
+			`DELETE FROM mod_restrictions WHERE user_id = ?`,
 		} {
 			if _, err := tx.ExecContext(ctx, q, id); err != nil {
 				return err

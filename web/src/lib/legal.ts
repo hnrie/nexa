@@ -10,12 +10,15 @@
  * a translated Terms is a different Terms.
  */
 
+/** The effective date of the Terms and Privacy Policy in docs/legal (a test holds the two to it). */
+export const LEGAL_EFFECTIVE = "2026-09-24";
+
 /**
- * The effective date of the Terms and Privacy Policy in docs/legal. Bumped
- * with the wording, so every account is asked again (a test holds the two to
- * the same date).
+ * What an account agrees to: the effective date, and which revision of that
+ * day's wording. Changing it asks every account again, so it moves with any
+ * change to what the documents say.
  */
-export const LEGAL_VERSION = "2026-09-24";
+export const LEGAL_VERSION = `${LEGAL_EFFECTIVE}.2`;
 
 export const CONTACT_EMAIL = "evilionx3@proton.me";
 

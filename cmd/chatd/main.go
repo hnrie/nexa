@@ -127,6 +127,8 @@ func main() {
 	srv.StartLimiters(ctx)
 	srv.StartGuests(ctx)
 	srv.StartModeration(ctx)
+	// whatever deleted accounts still own goes, now and every hour after
+	srv.StartAccountSweep(ctx)
 	if srv.Meter != nil {
 		go srv.Meter.Run(ctx, time.Minute, func(err error) { log.Warn("realtime usage", "err", err) })
 	}

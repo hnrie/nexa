@@ -103,29 +103,18 @@ func TestAdminDeletesAnAccount(t *testing.T) {
 	if res, _ := do(t, ts, "GET", "/api/v1/users/@me", tokB, nil); res.StatusCode != 401 {
 		t.Errorf("deleted token still works: %d", res.StatusCode)
 	}
-	// the shared server passes to the admin who did it; the empty one is gone
-	res, view := do(t, ts, "GET", "/api/v1/servers/"+sid, tokA, nil)
-	if res.StatusCode != 200 || view["server"].(map[string]any)["owner_id"] != idA {
-		t.Errorf("shared server after deletion: %d %v", res.StatusCode, view["server"])
+	// both servers it owned went with it, the shared one for everyone in it
+	if res, _ := do(t, ts, "GET", "/api/v1/servers/"+sid, tokA, nil); res.StatusCode != 404 {
+		t.Errorf("shared server after deletion: %d", res.StatusCode)
 	}
-	_, members := do(t, ts, "GET", "/api/v1/servers/"+sid+"/members?limit=100", tokA, nil)
-	list, _ := members["_list"].([]any)
-	if raw, ok := members["members"].([]any); ok {
-		list = raw
-	}
-	if len(list) != 2 {
-		t.Errorf("members after deletion: %v", members)
-	}
-	for _, m := range list {
-		if m.(map[string]any)["user_id"] == idB {
-			t.Error("the deleted account is still a member")
-		}
+	if res, _ := do(t, ts, "GET", "/api/v1/servers/"+sid, tokD, nil); res.StatusCode != 404 {
+		t.Errorf("a member still sees the shared server: %d", res.StatusCode)
 	}
 	_, stats = do(t, ts, "GET", "/api/v1/admin/stats", tokA, nil)
-	if stats["servers"].(float64) != serversBefore-1 {
+	if stats["servers"].(float64) != serversBefore-2 {
 		t.Errorf("servers: before %v after %v", serversBefore, stats["servers"])
 	}
-	// the account itself stays, anonymised, so what it wrote still has an author
+	// the account itself stays, as an empty stand-in nobody can sign in as
 	if res, u := do(t, ts, "GET", "/api/v1/users/"+idB, tokA, nil); res.StatusCode != 200 || u["display_name"] != "Deleted User" {
 		t.Errorf("the deleted account should remain as an anonymous record: %d %v", res.StatusCode, u)
 	}
