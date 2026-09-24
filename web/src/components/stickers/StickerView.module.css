@@ -10,3 +10,24 @@
   width: 100% !important;
   height: 100% !important;
 }
+
+/* the canvas a crowded grid draws on fills the box the same way */
+.tgs > canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* a grid sticker's box, and the sticker filling it */
+.lazy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+}
+.fill {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

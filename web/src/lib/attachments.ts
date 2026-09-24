@@ -11,11 +11,13 @@ import { t } from "@/i18n";
 export const MAX_UPLOAD = 100 * 1024 * 1024;
 
 /**
- * What this server takes: the largest file, the most one request may carry
- * (Cloudflare turns away a body over 100 MB), and the size of each piece of
- * a file too big for that.
+ * What this server takes: the largest file, the most to send in one request,
+ * and the size of each piece of a file bigger than that. A file over one
+ * piece goes up in pieces: each is encrypted whole in memory before it goes,
+ * and a dropped connection costs only the piece in flight, which on a phone
+ * matters far more than the round trip a piece adds.
  */
-const limits = { max: MAX_UPLOAD, single: 90 * 1024 * 1024, chunk: 32 * 1024 * 1024 };
+const limits = { max: MAX_UPLOAD, single: 32 * 1024 * 1024, chunk: 32 * 1024 * 1024 };
 
 /** Remembers the limits the server reported, so the composer can say no early. */
 export function setUploadLimits(reported: { max?: number | undefined; single?: number | undefined; chunk?: number | undefined }): void {
@@ -78,8 +80,13 @@ export interface PieceJob {
   skip: number;
 }
 
-/** Sends a stretch, resolving with the server's answer. */
-export type PieceSender = (job: PieceJob, onProgress: (loaded: number) => void) => Promise<unknown>;
+/** Sends a stretch, resolving with the server's answer; `signal` stops it part way. */
+export type PieceSender = (job: PieceJob, onProgress: (loaded: number) => void, signal?: AbortSignal) => Promise<unknown>;
+
+/** What an upload stopped on purpose rejects with. */
+function cancelled(): ApiError {
+  return new ApiError(0, "aborted", t("errors.thatWasCancelledBeforeItFinished"));
+}
 
 /** Encrypts the stretch a job describes: exactly the bytes its request carries. */
 async function bodyOf(job: PieceJob): Promise<Uint8Array<ArrayBuffer>> {
@@ -88,7 +95,7 @@ async function bodyOf(job: PieceJob): Promise<Uint8Array<ArrayBuffer>> {
 }
 
 /** Sends from the page itself, for a browser that cannot start the worker. */
-export const sendInPage: PieceSender = async (job, onProgress) => api.upload(job.path, await bodyOf(job), { method: job.method, headers: job.headers ?? {}, onProgress });
+export const sendInPage: PieceSender = async (job, onProgress, signal) => api.upload(job.path, await bodyOf(job), { method: job.method, headers: job.headers ?? {}, onProgress, ...(signal ? { signal } : {}) });
 
 let workers = typeof Worker !== "undefined";
 
@@ -104,9 +111,11 @@ const WORKER_STALL_MS = 90_000;
  * sends them and is ended once they have landed, so no finished request's
  * body outlives it (see upload.worker.ts).
  */
-export const sendInWorker: PieceSender = async (job, onProgress) => {
-  if (!workers) return sendInPage(job, onProgress);
+export const sendInWorker: PieceSender = async (job, onProgress, signal) => {
+  if (!workers) return sendInPage(job, onProgress, signal);
+  if (signal?.aborted) throw cancelled();
   const body = await bodyOf(job);
+  if (signal?.aborted) throw cancelled();
   const headers: Record<string, string> = { "Content-Type": "application/octet-stream", ...job.headers };
   const token = api.getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -116,12 +125,22 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
       worker = new Worker(new URL("./upload.worker.ts", import.meta.url), { type: "module" });
     } catch {
       workers = false;
-      api.upload(job.path, body, { method: job.method, headers: job.headers ?? {}, onProgress }).then(resolve, reject);
+      api.upload(job.path, body, { method: job.method, headers: job.headers ?? {}, onProgress, ...(signal ? { signal } : {}) }).then(resolve, reject);
       return;
     }
     let heard = false;
     let stall: ReturnType<typeof setTimeout> | undefined;
-    const settled = (): void => clearTimeout(stall);
+    // stopping the upload ends the worker, and the request with it
+    const onAbort = (): void => {
+      settled();
+      worker.terminate();
+      reject(cancelled());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    const settled = (): void => {
+      clearTimeout(stall);
+      signal?.removeEventListener("abort", onAbort);
+    };
     // A worker can be taken away outright — a backgrounded tab on a phone short
     // of memory — and then neither a message nor an error ever comes. The
     // upload would show a frozen bar for good, and the reload hold it took
@@ -169,7 +188,7 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
       // The body went to it, so make the stretch again and send it from here.
       e.preventDefault();
       workers = false;
-      sendInPage(job, onProgress).then(resolve, reject);
+      sendInPage(job, onProgress, signal).then(resolve, reject);
     };
     const request: PieceRequest = { url: new URL(api.url(job.path), location.href).href, method: job.method, headers, body: body.buffer };
     watch();
@@ -185,7 +204,7 @@ export const sendInWorker: PieceSender = async (job, onProgress) => {
  * sent. Either way the work happens in a worker that is ended afterwards, so
  * memory holds one request's worth at most, however big the file is.
  */
-export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
+export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
   if (!fitsUploadLimit(st.file.size)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(limits.max) }));
   const total = encryptedSize(st.file.size);
   const key = newFileKey();
@@ -196,9 +215,9 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   try {
     if (total <= limits.single) {
       const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
-      res = (await send(job, (loaded) => onProgress(loaded / total))) as { blob_id: string; size: number };
+      res = (await send(job, (loaded) => onProgress(loaded / total), signal)) as { blob_id: string; size: number };
     } else {
-      res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send);
+      res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send, signal);
     }
   } finally {
     release();
@@ -285,7 +304,7 @@ async function finishUpload(id: string): Promise<{ blob_id: string; size: number
  * that one piece rather than the whole transfer. Anything already spooled is
  * thrown away if the upload is abandoned.
  */
-export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8Array, onProgress: (sent: number) => void, send: PieceSender = sendInWorker): Promise<{ blob_id: string; size: number }> {
+export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8Array, onProgress: (sent: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ blob_id: string; size: number }> {
   const total = encryptedSize(file.size);
   const chunks = chunkCount(file.size);
   const session = await uploadsApi.create(total);
@@ -305,12 +324,14 @@ export async function uploadInPieces(file: Blob, key: Uint8Array, baseIv: Uint8A
         try {
           const job: PieceJob = { method: "PATCH", path: `/uploads/${session.id}`, headers: { "Upload-Offset": String(sent) }, file, key, baseIv, first, count, skip: sent - start };
           const from = sent;
-          const reply = (await send(job, (loaded) => onProgress(from + loaded))) as { received?: number } | undefined;
+          const reply = (await send(job, (loaded) => onProgress(from + loaded), signal)) as { received?: number } | undefined;
           const received = reply?.received ?? -1;
           if (received <= sent || received > end) throw new Error(t("attachments.theServerLostTrackOfThis"));
           sent = received;
           movedAt = Date.now();
         } catch (err) {
+          // stopped on purpose: nothing to pick up again
+          if (signal?.aborted) throw err;
           // ask where it got to, waiting for the connection if it dropped, then carry on from there
           const landed = await landedSoFar(session.id, movedAt + STALL_MS);
           if (!landed || landed.received < start || landed.received > end) throw err;

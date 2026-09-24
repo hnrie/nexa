@@ -57,8 +57,9 @@
 .stickerGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; padding: 4px 8px 12px; }
 .stickerCell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; overflow: hidden; }
 .stickerCell:hover { background: var(--bg-hover); }
-.stickerCell [data-sticker-media] { max-width: 100%; max-height: 100%; object-fit: contain; }
-.catImg { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; }
+/* the whole cell: a canvas-drawn sticker takes the size of its box, and has none of its own */
+.stickerCell [data-sticker-media] { width: 100%; height: 100%; object-fit: contain; }
+.catImg { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; overflow: hidden; }
 .catInitial { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text); font-size: 11px; font-weight: 700; }
 .gifSearchRow { display: flex; gap: 8px; padding: 0 0 8px; }
 .gifNote { padding: 12px 16px; font-size: 13px; color: var(--text-muted); text-align: center; }

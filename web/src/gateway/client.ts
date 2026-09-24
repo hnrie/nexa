@@ -300,6 +300,11 @@ export class GatewayClient {
     this.send("presence", p);
   }
 
+  /** Whether the person has left this device alone for a while (see lib/away.ts). */
+  sendAway(away: boolean): void {
+    this.send("away", { away });
+  }
+
   private flush(): void {
     if (!this.ws || this._status !== "open") return;
     const pending = this.queue;

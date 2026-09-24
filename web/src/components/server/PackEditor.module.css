@@ -45,6 +45,8 @@
 .browseGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
 .browseCard { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); }
 .browseStickers { display: flex; gap: 6px; }
+/* each one's box, which holds its place before the sticker is drawn in it */
+.browseStickers > * { flex: none; width: 44px; height: 44px; }
 .browseStickers [data-sticker-media] { width: 44px; height: 44px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-raised); }
 .empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }

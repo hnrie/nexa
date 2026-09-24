@@ -18,9 +18,16 @@ const (
 	// to be sent again after a dropped connection, and how much the sender has
 	// to hold in memory at once.
 	MaxChunkBytes = 32 << 20
-	// MaxSingleUploadBytes is the most a file may be and still go up in one
-	// request. Cloudflare's free plan refuses a body over 100 MB, so this sits
-	// just under that; only a file above it is worth the extra requests.
+	// SingleUploadBytes is the largest file clients are told to send in one
+	// request; anything bigger goes up in resumable pieces of MaxChunkBytes.
+	// It is one piece on purpose. Bigger requests would save a round trip or
+	// two per file, and cost the sender that much more memory (a piece is
+	// encrypted whole before it goes) and, when a connection drops, a restart
+	// from nothing rather than from the last piece that arrived.
+	SingleUploadBytes = MaxChunkBytes
+	// MaxSingleUploadBytes is the most one request may carry, which clients
+	// from before SingleUploadBytes still use. Cloudflare's free plan refuses
+	// a body over 100 MB, so this sits just under that.
 	MaxSingleUploadBytes = 90 << 20
 	// uploadIdleLife is how long an untouched transfer is kept before its
 	// bytes are swept up.

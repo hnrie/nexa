@@ -8,11 +8,11 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useDesktop } from "@/stores/desktop";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
-import { usePresence } from "@/stores/presence";
 import { useSettings, type Settings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { desktopBridge } from "./desktopBridge";
+import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 
 import { t } from "@/i18n";
@@ -121,8 +121,7 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
   const ui = useUI.getState();
   const alert = messageAlert(appOnScreen(), ui.activeChannelId === m.channel_id);
   if (!alert.sound && !alert.popup) return;
-  const myPresence = usePresence.getState().byUser[me.id];
-  if (myPresence?.status === "dnd") return;
+  if (doNotDisturb()) return;
   if (alert.sound && settings.notifications.sounds) playSound(mentioned ? "mention" : "message");
   if (!alert.popup || !notificationsEnabled(settings)) return;
   const users = useUsers.getState().byId;
@@ -136,7 +135,7 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
 /** A new friend request plays its own sound, and notifies while the app is not being looked at. */
 function onFriendRequest(r: Relationship): void {
   const me = useAuth.getState().me;
-  if (!me || usePresence.getState().byUser[me.id]?.status === "dnd") return;
+  if (!me || doNotDisturb()) return;
   const settings = useSettings.getState().settings;
   if (settings.notifications.sounds) playSound("friend");
   if (appOnScreen()) return;
@@ -152,7 +151,7 @@ function onFriendRequest(r: Relationship): void {
  */
 function onNexa(a: NexaAlert): void {
   const me = useAuth.getState().me;
-  if (!me || usePresence.getState().byUser[me.id]?.status === "dnd") return;
+  if (!me || doNotDisturb()) return;
   const path =
     a.kind === "appeal" ? `/channels/@admin/cases/${a.caseId}` : a.kind === "announcement" ? "/channels/@me/nexa" : a.kind === "reply" ? `/channels/@me/nexa/cases/${a.case.id}` : "/channels/@me/nexa";
   const onScreen = appOnScreen();

@@ -469,6 +469,41 @@ func (h *Hub) unregister(c *conn) bool {
 	return false
 }
 
+// allAway reports whether the user has connections and every one of them
+// says its person has been away for a while.
+func (h *Hub) allAway(uid ids.ID) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	set := h.conns[uid]
+	if len(set) == 0 {
+		return false
+	}
+	for c := range set {
+		if !c.away.Load() {
+			return false
+		}
+	}
+	return true
+}
+
+// othersAway reports whether the user has connections besides `except` and
+// all of those are away.
+func (h *Hub) othersAway(uid ids.ID, except *conn) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	others := 0
+	for c := range h.conns[uid] {
+		if c == except {
+			continue
+		}
+		if !c.away.Load() {
+			return false
+		}
+		others++
+	}
+	return others > 0
+}
+
 // Online reports whether the user has any open connection.
 func (h *Hub) Online(uid ids.ID) bool {
 	h.mu.RLock()
@@ -685,6 +720,10 @@ func (h *Hub) PresenceOf(ctx context.Context, u *store.User) Presence {
 		p.Status = "offline"
 	default:
 		p.Status = "online"
+		// online, but left alone on every device for a while: idle until back
+		if h.allAway(u.ID) {
+			p.Status = "idle"
+		}
 	}
 	// someone invisible shows no activity either
 	if p.Status != "offline" {

@@ -492,7 +492,7 @@ export function MessageList({ channel }: { channel: Channel }) {
           {rows.map((row, i) => {
             if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
             if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
-            if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} />;
+            if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} upload={row.p.upload} />;
             return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
           })}
           {hasNewer && loaded ? <div className={s.loader}><Spinner size={24} /></div> : null}

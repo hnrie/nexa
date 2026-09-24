@@ -56,7 +56,7 @@ func (s *Server) handleInstanceInfo(w http.ResponseWriter, r *http.Request) {
 		"turn_configured":     len(s.Cfg.TurnURLs) > 0 || s.Cfg.TurnKeyID != "",
 		"max_sticker_bytes":   s.Cfg.MaxStickerBytes,
 		"upload_chunk_bytes":  MaxChunkBytes,
-		"upload_single_bytes": MaxSingleUploadBytes,
+		"upload_single_bytes": SingleUploadBytes,
 		"captcha":             s.captchaInfo(),
 	})
 }

@@ -9,6 +9,7 @@ import type { GatewayEvent } from "@/gateway/events";
 import { gateway } from "@/gateway/session";
 import { holdReload } from "@/lib/busy";
 import { desktopBridge } from "@/lib/desktopBridge";
+import { doNotDisturb } from "@/lib/dnd";
 import { playSound, startCalling, startRinging, stopCalling, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -16,6 +17,7 @@ import { useSettings, type ShareFps, type ShareResolution } from "@/stores/setti
 import { describeError } from "@/lib/errors";
 import { useUI } from "@/stores/ui";
 import { activeMute, useNexa } from "@/stores/nexa";
+import { usePresence } from "@/stores/presence";
 import { mutedSentence } from "@/lib/moderation";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
@@ -805,6 +807,12 @@ function syncPeers(): void {
   for (const id of s.transport.peerIds()) if (!wanted.has(id)) s.transport.removePeer(id), useVoice.getState().removePeer(id);
 }
 
+/**
+ * Calls ignored on this device: they neither ring nor show here until they
+ * are over, and the caller is not told — to them it is still ringing.
+ */
+const ignoredCalls = new Set<string>();
+
 /** Stops ringing for a channel, and the timeout that would have stopped it. */
 function clearRing(channelId: string): void {
   useVoice.getState().setRinging(channelId, null);
@@ -937,7 +945,8 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       if (session && !useVoice.getState().mine) void leaveVoice(true);
       return;
     case "call_ring": {
-      if (e.d.from === myId || session?.channelId === e.d.channel_id) return;
+      // a caller who reconnects rings again; an ignored call stays quiet
+      if (e.d.from === myId || session?.channelId === e.d.channel_id || ignoredCalls.has(e.d.channel_id)) return;
       // the ringing store starts the repeating ring (see installVoice)
       store.setRinging(e.d.channel_id, e.d.from);
       const old = ringTimers.get(e.d.channel_id);
@@ -947,6 +956,7 @@ export function handleVoiceEvent(e: GatewayEvent): void {
     }
     case "call_end":
       if (e.d.reason === "ended" || e.d.user_id === myId) clearRing(e.d.channel_id);
+      if (e.d.reason === "ended") ignoredCalls.delete(e.d.channel_id);
       // the one person called said no
       if (session?.channelId === e.d.channel_id && e.d.user_id !== myId && useChannels.getState().byId[e.d.channel_id]?.type === "dm") stopCallingTone();
       return;
@@ -990,6 +1000,12 @@ export function onReadyVoice(list: VoiceState[], sessionId?: string): void {
 }
 
 /** Declines an incoming DM call. */
+/** Silences an incoming call here without answering or declining it. */
+export function ignoreCall(channelId: string): void {
+  ignoredCalls.add(channelId);
+  clearRing(channelId);
+}
+
 export async function declineCall(channelId: string): Promise<void> {
   clearRing(channelId);
   try {
@@ -1021,17 +1037,25 @@ export function installVoice(): void {
     if (a.mode !== b.mode) applyTransmit();
   });
   useVoice.subscribe((st, prev) => {
-    // One ring for however many calls are coming in, until the last is answered, declined or gone.
+    // One ring for however many calls are coming in, until the last is
+    // answered, declined or gone. Do Not Disturb shows the call but keeps it quiet.
     if (st.ringing !== prev.ringing) {
       const now = Object.keys(st.ringing).length > 0;
       const was = Object.keys(prev.ringing).length > 0;
-      if (now && !was) startRinging();
+      if (now && !was && !doNotDisturb()) startRinging();
       else if (!now && was) stopRinging();
+    }
+    if (ignoredCalls.size && st.byChannel !== prev.byChannel) {
+      for (const id of ignoredCalls) if (participantsOf(st.byChannel, id).length === 0) ignoredCalls.delete(id);
     }
     // A share's sound plays only while it is watched.
     if (session && st.watching !== prev.watching) {
       for (const id of new Set([...Object.keys(st.watching), ...Object.keys(prev.watching)])) session.transport.setWatching(id, !!st.watching[id]);
     }
+  });
+  // turning on Do Not Disturb quiets a call that is already ringing
+  usePresence.subscribe(() => {
+    if (doNotDisturb()) stopRinging();
   });
   const isPtt = (e: KeyboardEvent) => {
     const v = useSettings.getState().settings.voice;

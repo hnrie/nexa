@@ -1,6 +1,7 @@
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
+import { appendSection, copyIdItem } from "@/lib/copyId";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -150,6 +151,10 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
         }),
     });
   }
-  if (settings.developerMode) items.push({ id: "copy", label: t("sidebar.dmMenu.copyChannelId"), onSelect: () => void navigator.clipboard?.writeText(channelId) });
+  if (settings.developerMode) {
+    // in a one-to-one conversation, what was right-clicked is the person
+    const other = group ? undefined : ch.recipient_ids.find((id) => id !== me?.id);
+    appendSection(items, [...(other ? [copyIdItem("copy-user", t("chat.groupMemberMenu.copyUserId"), other)] : []), copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), channelId)]);
+  }
   return items;
 }

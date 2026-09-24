@@ -351,3 +351,69 @@ func TestPresenceChangesCoalesce(t *testing.T) {
 		t.Errorf("stored preference is %q, want dnd", u.PresencePref)
 	}
 }
+
+func TestAwayOnEveryDeviceShowsIdle(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	a, tokA := e.user(t, "a")
+	b, tokB := e.user(t, "b")
+	_ = e.st.SetRelationshipPair(ctx, a.ID, b.ID, "friend", "friend")
+	away := func(c *client, on bool) { c.send("away", map[string]bool{"away": on}) }
+	cb := e.dial(t)
+	if cb.identify(tokB) == nil {
+		t.Fatal("no ready for b")
+	}
+	phone := e.dial(t)
+	if phone.identify(tokA) == nil {
+		t.Fatal("no ready for a's phone")
+	}
+	if cb.presence(a.ID, "online", 3*time.Second) == nil {
+		t.Fatal("a never came online")
+	}
+	desk := e.dial(t)
+	if desk.identify(tokA) == nil {
+		t.Fatal("no ready for a's desk")
+	}
+
+	// one device left alone is not enough while another is in use
+	away(desk, true)
+	if cb.presence(a.ID, "idle", 400*time.Millisecond) != nil {
+		t.Fatal("idle while the phone is in use")
+	}
+	// every device left alone: idle
+	away(phone, true)
+	if cb.presence(a.ID, "idle", 3*time.Second) == nil {
+		t.Fatal("never went idle")
+	}
+	// nothing is stored: the status a chose is still online
+	if u, err := e.st.UserByID(ctx, a.ID); err != nil || (u.PresencePref != "" && u.PresencePref != "online") {
+		t.Fatalf("away was stored: %+v %v", u, err)
+	}
+	// back on one device: online
+	away(phone, false)
+	if cb.presence(a.ID, "online", 3*time.Second) == nil {
+		t.Fatal("never came back online")
+	}
+	// the one device in use closes while the other is away: idle
+	phone.ws.Close(websocket.StatusNormalClosure, "")
+	if cb.presence(a.ID, "idle", 3*time.Second) == nil {
+		t.Fatal("closing the device in use did not leave a idle")
+	}
+	// a new device in use: online again
+	fresh := e.dial(t)
+	if fresh.identify(tokA) == nil {
+		t.Fatal("no ready for a's new device")
+	}
+	if cb.presence(a.ID, "online", 3*time.Second) == nil {
+		t.Fatal("a new device in use did not bring a back")
+	}
+	// do not disturb stays do not disturb, however long a is away
+	fresh.send("presence", map[string]string{"status": "dnd"})
+	if cb.presence(a.ID, "dnd", 3*time.Second) == nil {
+		t.Fatal("dnd never showed")
+	}
+	away(fresh, true)
+	if cb.presence(a.ID, "idle", 500*time.Millisecond) != nil {
+		t.Error("do not disturb turned idle")
+	}
+}

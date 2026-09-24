@@ -2,13 +2,15 @@ import { ApiError } from "@/api/client";
 import { messages as messagesApi } from "@/api/messages";
 import type { SendMessageRequest } from "@/api/types";
 import { encryptMessage, type AttachmentMeta, type MessagePayload } from "@/crypto/message";
+import { sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
+import { holdReload } from "@/lib/busy";
 import { decryptForStore } from "@/lib/decrypt";
 import { nonce as newNonce, tmpId } from "@/lib/ids";
 import { channelKeyFor } from "@/lib/keyring";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
-import { useMessages } from "@/stores/messages";
+import { useMessages, type PendingMessage, type PendingUpload } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useSlowmode } from "@/stores/slowmode";
@@ -20,7 +22,8 @@ export interface SendOptions {
   replyTo?: string;
   ping?: boolean;
   attachments?: { meta: AttachmentMeta; blob_id: string; size: number }[];
-  embeds?: unknown[];
+  /** Link previews, or a promise of them: the message shows at once and waits for them before it goes. */
+  embeds?: unknown[] | Promise<unknown[]>;
   sticker?: MessagePayload["sticker"];
   flags?: number;
   /** A failed message this send replaces, dropped only once its own copy is in the store. */
@@ -35,36 +38,200 @@ export function convForChannel(channelId: string): string {
   return channelId;
 }
 
-/** Encrypts and sends a message, with an optimistic pending copy in the store. */
-export async function sendMessage(channelId: string, rawText: string, opts: SendOptions = {}): Promise<void> {
-  const me = useAuth.getState().me;
-  if (!me) return;
+/**
+ * The sends still going out in each channel. A message waits for the ones
+ * before it, so they arrive in the order they were written even when an
+ * earlier one is still waiting on its link preview. A message with files
+ * joins once its files are up: nothing waits for an upload.
+ */
+const queues = new Map<string, Promise<void>>();
+
+function enqueue(channelId: string, job: () => Promise<void>): Promise<void> {
+  // a new version of the app waits until the queue is through
+  const release = holdReload();
+  const run = (queues.get(channelId) ?? Promise.resolve()).then(job);
+  const tail = run.catch(() => undefined);
+  queues.set(channelId, tail);
+  void tail.then(() => {
+    release();
+    if (queues.get(channelId) === tail) queues.delete(channelId);
+  });
+  return run;
+}
+
+/** A message as written: its text with the mentions in it, and what goes with it. */
+interface Written {
+  payload: MessagePayload;
+  mentions: string[];
+  everyone: boolean;
+}
+
+function written(rawText: string, opts: SendOptions): Written {
   const { text, mentions, everyone } = extractMentions(rawText, useUsers.getState().byId);
   const payload: MessagePayload = {};
   if (text) payload.t = text;
   if (opts.attachments?.length) payload.att = opts.attachments.map((a) => a.meta);
-  if (opts.embeds?.length) payload.embeds = opts.embeds;
+  if (Array.isArray(opts.embeds) && opts.embeds.length) payload.embeds = opts.embeds;
   if (opts.sticker) payload.sticker = opts.sticker;
-  if (!payload.t && !payload.att && !payload.sticker) return;
+  return { payload, mentions, everyone };
+}
+
+/** What a pending copy keeps of the options, so a retry sends what was chosen. */
+function chosen(opts: SendOptions): Pick<PendingMessage, "replyToId" | "ping" | "flags"> {
+  return { ...(opts.replyTo ? { replyToId: opts.replyTo } : {}), ...(opts.ping !== undefined ? { ping: opts.ping } : {}), ...(opts.flags ? { flags: opts.flags } : {}) };
+}
+
+function pendingOf(channelId: string, tmp: string): PendingMessage | undefined {
+  return useMessages.getState().channels[channelId]?.pending.find((p) => p.tmpId === tmp);
+}
+
+/** Encrypts and sends a message, with an optimistic pending copy in the store. */
+export function sendMessage(channelId: string, rawText: string, opts: SendOptions = {}): Promise<void> {
+  const me = useAuth.getState().me;
+  if (!me) return Promise.resolve();
+  const w = written(rawText, opts);
+  if (!w.payload.t && !w.payload.att && !w.payload.sticker) return Promise.resolve();
   const nonce = newNonce();
   const tmp = tmpId();
   const messages = useMessages.getState();
-  messages.addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload, createdAt: Date.now(), status: "sending", ...(opts.replyTo ? { replyToId: opts.replyTo } : {}), ...(opts.ping !== undefined ? { ping: opts.ping } : {}), ...(opts.flags ? { flags: opts.flags } : {}) });
+  messages.addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload: w.payload, createdAt: Date.now(), status: "sending", ...chosen(opts) });
   // Only now, past the two returns above that leave nothing behind: the failed
   // copy is the only place a retried message still exists.
   if (opts.replaces) messages.removePending(channelId, opts.replaces);
+  return enqueue(channelId, () => deliver(channelId, me.id, w, tmp, nonce, opts));
+}
+
+/**
+ * Messages whose files are going up: the files, kept for a retry and for
+ * their previews, and the way to stop them.
+ */
+const uploading = new Map<string, { files: Staged[]; stop: AbortController | null }>();
+
+/** Lets go of a message's files once nothing shows them any more. */
+function forget(tmp: string): void {
+  const job = uploading.get(tmp);
+  if (!job) return;
+  uploading.delete(tmp);
+  for (const f of job.files) if (f.preview) URL.revokeObjectURL(f.preview);
+}
+
+/**
+ * Sends a message with files. It shows in the list at once, dimmed, with its
+ * upload's progress; the files go up in the background, whatever happens
+ * meanwhile — other messages sent, other conversations opened — and the
+ * message follows once they are through. The message now owns the files and
+ * their previews.
+ */
+export function sendWithFiles(channelId: string, rawText: string, files: Staged[], opts: SendOptions = {}): Promise<void> {
+  const me = useAuth.getState().me;
+  if (!me) return Promise.resolve();
+  const w = written(rawText, opts);
+  const nonce = newNonce();
+  const tmp = tmpId();
+  const upload: PendingUpload = {
+    files: files.map((f) => ({ id: f.id, name: f.name, size: f.file.size, type: f.file.type, preview: f.preview })),
+    loaded: 0,
+    total: files.reduce((n, f) => n + f.file.size, 0),
+    speed: 0,
+    done: false,
+    error: null,
+  };
+  useMessages.getState().addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload: w.payload, createdAt: Date.now(), status: "sending", ...chosen(opts), upload });
+  uploading.set(tmp, { files, stop: null });
+  return uploadThenSend(channelId, me.id, tmp, nonce, w, opts);
+}
+
+/** How fast the bytes are going, smoothed so that the number can be read. */
+function speedometer(): (bytes: number, now: number) => number {
+  let at = 0;
+  let last = 0;
+  let speed = 0;
+  return (bytes, now) => {
+    if (!at) {
+      at = now;
+      last = bytes;
+      return speed;
+    }
+    const seconds = (now - at) / 1000;
+    if (seconds < 0.4) return speed;
+    const instant = Math.max(0, (bytes - last) / seconds);
+    speed = speed ? speed * 0.6 + instant * 0.4 : instant;
+    at = now;
+    last = bytes;
+    return speed;
+  };
+}
+
+async function uploadThenSend(channelId: string, meId: string, tmp: string, nonce: string, w: Written, opts: SendOptions): Promise<void> {
+  const job = uploading.get(tmp);
+  if (!job) return;
+  const stop = new AbortController();
+  job.stop = stop;
+  const store = () => useMessages.getState();
+  const total = job.files.reduce((n, f) => n + f.file.size, 0);
+  const speed = speedometer();
+  let shownAt = 0;
+  // at most a few times a second: progress comes far more often than anyone reads it
+  const show = (loaded: number) => {
+    const now = performance.now();
+    const bytesPerSecond = speed(loaded, now);
+    if (now - shownAt < 200) return;
+    shownAt = now;
+    const cur = pendingOf(channelId, tmp);
+    if (cur?.upload) store().updatePending(channelId, tmp, { upload: { ...cur.upload, loaded: Math.min(loaded, total), speed: bytesPerSecond } });
+  };
+  const release = holdReload();
+  const ups: Awaited<ReturnType<typeof uploadStaged>>[] = [];
   try {
+    let before = 0;
+    for (const f of job.files) {
+      const done = before;
+      ups.push(await uploadStaged(channelId, f, (p) => show(done + p * f.file.size), sendInWorker, stop.signal));
+      before += f.file.size;
+    }
+  } catch (err) {
+    // stopped on purpose: the message went with it
+    if (stop.signal.aborted) return;
+    const msg = err instanceof Error ? err.message : t("composer.composer.uploadFailed");
+    const cur = pendingOf(channelId, tmp);
+    if (cur?.upload) store().updatePending(channelId, tmp, { status: "failed", upload: { ...cur.upload, speed: 0, error: msg } });
+    useUI.getState().toast(msg, "error");
+    return;
+  } finally {
+    job.stop = null;
+    release();
+  }
+  const cur = pendingOf(channelId, tmp);
+  // taken out of the list while its files went up
+  if (!cur?.upload) return forget(tmp);
+  const payload: MessagePayload = { ...w.payload, att: ups.map((u) => u.meta) };
+  // the card stays, full, until the message itself is in
+  store().updatePending(channelId, tmp, { payload, upload: { ...cur.upload, loaded: total, speed: 0, done: true } });
+  await enqueue(channelId, () => deliver(channelId, meId, { ...w, payload }, tmp, nonce, { ...opts, attachments: ups }));
+  forget(tmp);
+}
+
+/** Sends one message whose pending copy is already showing, and settles or fails that copy. */
+async function deliver(channelId: string, meId: string, w: Written, tmp: string, nonce: string, opts: SendOptions): Promise<void> {
+  const { mentions, everyone } = w;
+  let payload = w.payload;
+  try {
+    if (opts.embeds && !Array.isArray(opts.embeds)) {
+      // a preview that never comes is no reason not to send
+      const got = await opts.embeds.catch(() => []);
+      if (got.length) payload = { ...w.payload, embeds: got };
+    }
     const conv = convForChannel(channelId);
     const key = await useKeys.getState().ensureConvKey(conv);
     if (!key) throw new Error("waiting_for_key");
     const chanKey = channelKeyFor(conv, key.epoch, channelId);
     if (!chanKey) throw new Error("waiting_for_key");
-    const ciphertext = await encryptMessage(chanKey, { conv, epoch: key.epoch, channelId, authorId: me.id }, payload);
+    const ciphertext = await encryptMessage(chanKey, { conv, epoch: key.epoch, channelId, authorId: meId }, payload);
     const body: SendMessageRequest = { ciphertext, key_conv_id: conv, key_epoch: key.epoch, mentions: opts.ping === false ? mentions.filter((id) => !opts.replyTo || id !== replyAuthor(channelId, opts.replyTo)) : mentions, nonce };
     if (opts.replyTo) {
       body.reply_to_id = opts.replyTo;
       const author = replyAuthor(channelId, opts.replyTo);
-      if (opts.ping !== false && author && author !== me.id && !body.mentions.includes(author)) body.mentions = [...body.mentions, author];
+      if (opts.ping !== false && author && author !== meId && !body.mentions.includes(author)) body.mentions = [...body.mentions, author];
     }
     if (everyone) body.mention_everyone = true;
     if (opts.attachments?.length) body.attachments = opts.attachments.map((a) => ({ blob_id: a.blob_id, size: a.size }));
@@ -134,25 +301,46 @@ export async function editMessage(channelId: string, messageId: string, rawText:
 export async function retryPending(channelId: string, tmpId: string): Promise<void> {
   const store = useMessages.getState();
   const p = store.channels[channelId]?.pending.find((x) => x.tmpId === tmpId);
-  if (!p) return;
-  const opts: SendOptions = { replaces: tmpId };
+  const me = useAuth.getState().me;
+  if (!p || !me) return;
+  const opts: SendOptions = {};
   if (p.replyToId) opts.replyTo = p.replyToId;
   if (p.ping !== undefined) opts.ping = p.ping;
   if (p.flags) opts.flags = p.flags;
   if (p.payload.embeds?.length) opts.embeds = p.payload.embeds;
   if (p.payload.sticker) opts.sticker = p.payload.sticker;
+  if (p.upload && !p.upload.done && uploading.has(tmpId)) {
+    // its files never made it up: they go up again, in the same place in the list
+    store.updatePending(channelId, tmpId, { status: "sending", upload: { ...p.upload, loaded: 0, speed: 0, error: null } });
+    await uploadThenSend(channelId, me.id, tmpId, p.nonce, written(p.payload.t ?? "", opts), opts).catch(() => undefined);
+    return;
+  }
+  opts.replaces = tmpId;
   if (p.payload.att?.length) {
     // the files were already uploaded; reuse the blobs rather than asking again
     opts.attachments = p.payload.att.map((meta) => ({ meta, blob_id: meta.blob_id, size: meta.size }));
   }
+  const sending = sendMessage(channelId, p.payload.t ?? "", opts);
+  // the failed copy is gone now, and its previews with it
+  forget(tmpId);
   try {
-    await sendMessage(channelId, p.payload.t ?? "", opts);
+    await sending;
   } catch {
     /* sendMessage already reported it and left a fresh failed copy */
   }
 }
 
-/** Throws away a message that could not be sent. */
+/** Throws away a message that could not be sent, or stops one whose files are still going up. */
 export function discardPending(channelId: string, tmpId: string): void {
+  uploading.get(tmpId)?.stop?.abort();
+  forget(tmpId);
   useMessages.getState().removePending(channelId, tmpId);
+}
+
+/** Stops every upload and lets go of their files (sign-out). */
+export function stopAllUploads(): void {
+  for (const [tmp, job] of [...uploading]) {
+    job.stop?.abort();
+    forget(tmp);
+  }
 }

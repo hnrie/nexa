@@ -177,12 +177,18 @@
 [data-reduced-motion="true"] .ringAvatar { animation: none; box-shadow: 0 0 0 5px rgba(61, 158, 96, 0.5); }
 .ringName { font-size: 20px; font-weight: 600; color: var(--text-strong); }
 .ringSub { font-size: 14px; color: var(--text-muted); }
-.ringBtns { display: flex; gap: 16px; margin-top: 8px; }
-.ringBtn { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; }
+.ringBtns { display: flex; gap: 20px; margin-top: 8px; }
+/* each choice is its round button with its name under it, all one target */
+.ringAction { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 64px; border-radius: var(--radius-sm); }
+.ringLabel { font-size: 13px; color: var(--text-subtle); }
+.ringAction:hover .ringLabel { color: var(--text); }
+.ringBtn { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; transition: background-color var(--transition); }
 .ringAccept { background: var(--positive); }
-.ringAccept:hover { background: var(--positive-hover); }
+.ringAction:hover .ringAccept { background: var(--positive-hover); }
 .ringDecline { background: var(--danger); }
-.ringDecline:hover { background: var(--danger-hover); }
+.ringAction:hover .ringDecline { background: var(--danger-hover); }
+.ringIgnore { background: var(--bg-active); color: var(--text); }
+.ringAction:hover .ringIgnore { background: var(--bg-selected); }
 
 /* the share dialog: a row of choices each for resolution and frame rate */
 .shareForm { display: flex; flex-direction: column; gap: 16px; }

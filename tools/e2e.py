@@ -683,9 +683,11 @@ def files_flow(srv, alice, bob, browser, out):
         # the staged card, not a toast that happens to name the file
         alice.page.wait_for_selector(f"[title='{path.name}']", timeout=10000)
         alice.composer().press("Enter")
-        # a big video shows only its load button, which does not name it
-        shown = "[data-id] button:has-text('Load video')" if path == clip else f"[data-id]:has-text('{path.name}')"
-        alice.page.wait_for_selector(shown, timeout=120000)
+        # The message is in the chat at once, with its upload's progress; this
+        # waits for the message itself, sent. A big video shows only its load
+        # button, which does not name it.
+        shown = "[data-id][data-pending='false'] button:has-text('Load video')" if path == clip else f"[data-id][data-pending='false']:has-text('{path.name}')"
+        alice.page.wait_for_selector(shown, timeout=180000)
     singles = [u for m, u in sent if m == "POST" and u.endswith("/attachments")]
     pieces = [u for m, u in sent if m == "PATCH"]
     assert len(singles) == 2, f"5 MB and 30 MB files should each be one request: {sent}"

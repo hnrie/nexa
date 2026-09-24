@@ -5,7 +5,7 @@ import { expressions } from "@/api/expressions";
 import type { StickerInfo } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
-import { StickerView } from "@/components/stickers/StickerView";
+import { LazySticker, StickerView } from "@/components/stickers/StickerView";
 import { useAuth } from "@/stores/auth";
 import { packImageUrl, useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
@@ -85,7 +85,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
       <div className={s.grid}>
         {pack.stickers.map((x) => (
           <button key={x.id} className={s.tile} data-on={x.id === current.id} onClick={() => setPicked(x.id)} title={x.name} aria-label={x.name} aria-pressed={x.id === current.id}>
-            <StickerView format={x.format} src={packImageUrl(pack, x)} alt="" />
+            <LazySticker format={x.format} src={packImageUrl(pack, x, 100)} alt="" />
           </button>
         ))}
       </div>

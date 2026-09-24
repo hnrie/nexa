@@ -1,7 +1,9 @@
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
+import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { closeDM, isViewingDM, purgeDM } from "./dmMenu";
+import { useSettings } from "@/stores/settings";
+import { closeDM, dmMenuItems, isViewingDM, purgeDM } from "./dmMenu";
 
 function channel(id: string, type: Channel["type"], parent: string | null = null): Channel {
   return { id, type, parent_id: parent, recipient_ids: [] } as unknown as Channel;
@@ -54,5 +56,33 @@ describe("closing a conversation", () => {
     vi.stubGlobal("window", { location: { pathname: "/channels/@me/11" } });
     await purgeDM("10", nav);
     expect(nav).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("the developer-mode items on a conversation", () => {
+  const ctx = { nav: () => undefined, openModal: () => undefined };
+  const ids = (channelId: string) => dmMenuItems(channelId, ctx).map((i) => i.id);
+  beforeEach(() => {
+    useAuth.setState({ me: { id: "1" } as never });
+    useChannels.setState({
+      byId: {
+        "10": { ...channel("10", "dm"), recipient_ids: ["1", "2"] },
+        "30": { ...channel("30", "group_dm"), recipient_ids: ["1", "2", "3"], owner_id: "1" },
+      } as never,
+    });
+  });
+
+  it("offers the person first in a one-to-one conversation, then the conversation", () => {
+    useSettings.setState((st) => ({ settings: { ...st.settings, developerMode: true } }));
+    expect(ids("10").slice(-2)).toEqual(["copy-user", "copy"]);
+    // a group is a conversation, not a person
+    expect(ids("30")).not.toContain("copy-user");
+    expect(ids("30").at(-1)).toBe("copy");
+  });
+
+  it("offers no IDs with developer mode off", () => {
+    useSettings.setState((st) => ({ settings: { ...st.settings, developerMode: false } }));
+    expect(ids("10")).not.toContain("copy-user");
+    expect(ids("10")).not.toContain("copy");
   });
 });

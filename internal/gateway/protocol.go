@@ -33,6 +33,10 @@ const (
 	OpSubscribe   = "subscribe_members"
 	// OpActivities replaces this connection's activities (from the desktop app's Rich Presence server).
 	OpActivities = "activities"
+	// OpAway says whether the person has left this connection alone for a
+	// while. An account showing as online shows as idle while every one of its
+	// connections says so; nothing about it is stored.
+	OpAway = "away"
 )
 
 // Server events.
@@ -131,6 +135,11 @@ type presenceData struct {
 	StatusEmoji     *string `json:"status_emoji"`
 	StatusExpiresAt *int64  `json:"status_expires_at"`
 	ClearStatus     bool    `json:"clear_status"`
+}
+
+// awayData is the payload of the away op.
+type awayData struct {
+	Away bool `json:"away"`
 }
 
 // activitiesData is the payload of the activities op; an empty list clears them.

@@ -120,6 +120,10 @@ type conn struct {
 	typing map[ids.ID]time.Time
 	typMu  sync.Mutex
 
+	// away is whether the person has left this connection alone for a while
+	// (the away op); see Hub.allAway.
+	away atomic.Bool
+
 	ops      *rate.Limiter
 	presence *rate.Limiter
 	// A presence change that comes too soon waits here rather than being
@@ -365,6 +369,9 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// a guest has no presence: nobody lists them anywhere but in the call
 	if first && guest == nil {
 		h.broadcastPresence(ctx, user)
+	} else if guest == nil && h.othersAway(user.ID, c) {
+		// someone idle on every other device is back, on this one
+		h.broadcastPresence(ctx, user)
 	}
 
 	// A write or ping loop that has stopped leaves a socket nobody is draining
@@ -392,8 +399,10 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if h.OnConnClose != nil {
 		h.OnConnClose(bg, user.ID, c.id)
 	}
-	// what this connection was doing ends with it; the user's other devices may still say something
-	if c.dropActivities() && !last && guest == nil {
+	// What this connection was doing ends with it; the user's other devices
+	// may still say something. The one device in use going away leaves an
+	// account whose others are all idle showing as idle.
+	if (c.dropActivities() || !c.away.Load() && h.allAway(user.ID)) && !last && guest == nil {
 		h.broadcastUser(bg, user.ID)
 	}
 	if last && guest == nil {
@@ -615,6 +624,20 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 	case OpPresence:
 		c.beat.Store(time.Now().UnixMilli())
 		c.queuePresence(ctx, f.D)
+	case OpAway:
+		c.beat.Store(time.Now().UnixMilli())
+		var d awayData
+		if c.guest != nil || json.Unmarshal(f.D, &d) != nil {
+			return
+		}
+		before := h.allAway(c.userID)
+		if c.away.Swap(d.Away) == d.Away || h.allAway(c.userID) == before {
+			return
+		}
+		// only an account showing as online goes idle by itself
+		if u := c.user.Load(); u != nil && (u.PresencePref == "" || u.PresencePref == "online") {
+			h.broadcastUser(ctx, c.userID)
+		}
 	case OpActivities:
 		c.beat.Store(time.Now().UnixMilli())
 		var d activitiesData

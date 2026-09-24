@@ -7,7 +7,7 @@ import { packImageUrl } from "@/stores/expressions";
 import { Button } from "@/components/common/Button";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
-import { StickerView } from "@/components/stickers/StickerView";
+import { LazySticker, StickerView } from "@/components/stickers/StickerView";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
 import { useReorder } from "@/hooks/useReorder";
 import { describeError } from "@/lib/errors";
@@ -368,7 +368,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
             tabIndex={manage ? -1 : undefined}
           >
             {pack.cover_sticker_id === st.id ? <span className={s.coverBadge}>{t("server.packEditor.cover")}</span> : null}
-            <StickerView format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={s.cellImg} />
+            <LazySticker format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={s.cellImg} />
             <span className={s.cellName} title={st.name}>{st.name}</span>
             <span className={s.cellTags} title={st.tags}>{st.tags}</span>
             {manage ? (

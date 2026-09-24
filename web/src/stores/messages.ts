@@ -30,6 +30,20 @@ function resolveAuthors(msgs: { author_id: string; mentions?: string[] }[]): voi
 
 export type { DecryptedMessage };
 
+/** A message's files on their way up, shown in its place in the list until it is sent. */
+export interface PendingUpload {
+  files: { id: string; name: string; size: number; type: string; preview: string | null }[];
+  /** Bytes of the files up so far, of `total`. */
+  loaded: number;
+  total: number;
+  /** Bytes a second, smoothed. */
+  speed: number;
+  /** Every file is up; the message itself is on its way. */
+  done: boolean;
+  /** Why the files could not go up. */
+  error: string | null;
+}
+
 export interface PendingMessage {
   tmpId: string;
   nonce: string;
@@ -42,6 +56,8 @@ export interface PendingMessage {
   /** The reply's ping choice and the message flags, so a retry sends what was chosen. */
   ping?: boolean;
   flags?: number;
+  /** Files still going up with it. */
+  upload?: PendingUpload;
 }
 
 export interface ChannelMessages {
@@ -93,6 +109,7 @@ interface MessagesState {
   addPending: (p: PendingMessage) => void;
   removePending: (channelId: string, tmpId: string) => void;
   failPending: (channelId: string, tmpId: string) => void;
+  updatePending: (channelId: string, tmpId: string, patch: Partial<PendingMessage>) => void;
   resolvePendingByNonce: (channelId: string, nonce: string) => void;
   clearChannel: (channelId: string) => void;
   clearAll: (keep?: string) => void;
@@ -267,6 +284,13 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     set((s) =>
       withChannel(s, channelId, (c) => ({ ...c, pending: c.pending.map((p) => (p.tmpId === tmpId ? { ...p, status: "failed" } : p)) })),
     ),
+  updatePending: (channelId, tmpId, patch) =>
+    set((s) =>
+      withChannel(s, channelId, (c) => {
+        if (!c.pending.some((p) => p.tmpId === tmpId)) return c;
+        return { ...c, pending: c.pending.map((p) => (p.tmpId === tmpId ? { ...p, ...patch } : p)) };
+      }),
+    ),
   resolvePendingByNonce: (channelId, nonce) =>
     set((s) =>
       withChannel(s, channelId, (c) => {
@@ -286,9 +310,14 @@ export const useMessages = create<MessagesState>()((set, get) => ({
     set((s) => {
       for (const id of Object.keys(s.channels)) if (id !== keep) nextGeneration(id);
       // One channel can be spared: the one being read, so a reconnect does not
-      // throw away the reader's place in it.
-      const kept = keep ? s.channels[keep] : undefined;
-      return { channels: kept ? { [keep as string]: kept } : {} };
+      // throw away the reader's place in it. Messages still being sent stay
+      // everywhere, with their uploads, however long the reconnect took.
+      const channels: Record<string, ChannelMessages> = {};
+      for (const [id, c] of Object.entries(s.channels)) {
+        if (id === keep) channels[id] = c;
+        else if (c.pending.length) channels[id] = { ...emptyChannel(), pending: c.pending };
+      }
+      return { channels };
     }),
   returnToPresent: (channelId) => {
     nextGeneration(channelId);

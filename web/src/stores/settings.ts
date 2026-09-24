@@ -67,6 +67,8 @@ export interface Settings {
   developerMode: boolean;
   /** Show what the desktop app hears from games and music (Rich Presence) to others. */
   shareActivity: boolean;
+  /** Show as Idle after a while away, while the status chosen is Online (see lib/away.ts). */
+  autoIdle: boolean;
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
@@ -98,6 +100,7 @@ export const DEFAULT_SETTINGS: Settings = {
   imagePreviews: true,
   developerMode: false,
   shareActivity: true,
+  autoIdle: true,
   sidebarWidth: 240,
   showMembers: true,
   recentEmoji: [],

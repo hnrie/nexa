@@ -180,7 +180,15 @@ export function ChatView({ channel }: { channel: Channel }) {
           </button>
         ) : (
           <>
-            <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? (priv ? <span className={s.lockHash}><Hash size={22} /><Lock size={11} className={s.lock} /></span> : <Hash size={22} />) : <Users size={22} />}</span>
+            {mobile && channel.type === "dm" && other ? (
+              // A phone has no room for a status line beside the name, so the
+              // person's picture carries it, as a dot, and the name gets the space.
+              <span className={s.hIcon}>
+                <Avatar id={other} avatarId={users[other]?.avatar_id ?? null} name={name} size={24} status={otherStatus} />
+              </span>
+            ) : (
+              <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? (priv ? <span className={s.lockHash}><Hash size={22} /><Lock size={11} className={s.lock} /></span> : <Hash size={22} />) : <Users size={22} />}</span>
+            )}
             {channel.type === "dm" && other ? (
               // the other person's name is the way to their profile, as their avatar is
               <button className={[s.hName, s.hNameBtn].join(" ")} onClick={() => openModal("profile", { userId: other })} data-testid="dm-header-name">{name}</button>
@@ -194,7 +202,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             <ChevronLeft size={14} />
             <span className={s.hParentText}>in {channelDisplayName(convo, users, me?.id, nicknames)}</span>
           </button>
-        ) : channel.type === "dm" ? (
+        ) : channel.type === "dm" && mobile ? null : channel.type === "dm" ? (
           // the status reads in its own colour; a custom status or activity keeps a dot of it in front
           cs || act ? (
             <span className={[s.hSub, s.hStatus].join(" ")} data-testid="dm-status">

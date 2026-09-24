@@ -20,9 +20,6 @@
 .cardBtn:hover { color: var(--text); background: var(--bg-hover); }
 .cardBtn[data-on="true"] { color: var(--text-brand); }
 .cardBtn.del:hover { color: var(--danger); }
-.bar { position: absolute; inset-inline: 8px; bottom: 6px; height: 4px; border-radius: 2px; background: var(--bg-active); overflow: hidden; }
-.bar i { display: block; height: 100%; background: var(--brand); transition: width 120ms linear; }
-.err { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 8px; background: rgba(218, 62, 68, 0.85); color: #fff; font-size: 12px; text-align: center; border-radius: var(--radius-xs); }
 .box { display: flex; align-items: flex-end; background: var(--bg-composer); border-radius: var(--radius-sm); min-height: 44px; }
 .attach { flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--icon); }
 .attach:hover { color: var(--text); }

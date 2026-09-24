@@ -9,6 +9,8 @@ import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
 import { useNexa } from "@/stores/nexa";
 import { useModeration } from "@/stores/moderation";
+import { useUploads } from "@/stores/uploads";
+import { stopAllUploads } from "@/components/composer/send";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
 import { clearLock, hasLock } from "@/lib/appLock";
@@ -143,6 +145,9 @@ export async function endSession(): Promise<void> {
   // a deletion notice stays, to be read on the sign-in page
   useNexa.getState().reset();
   useModeration.getState().reset();
+  // files picked or on their way belong to the account that picked them
+  useUploads.getState().clear();
+  stopAllUploads();
 }
 
 logoutHooks.push(endSession);

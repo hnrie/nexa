@@ -2,12 +2,13 @@ import { HeadphoneOff, MicOff, MonitorUp, Video } from "lucide-react";
 import { ApiError } from "@/api/client";
 import { guests as guestsApi } from "@/api/guests";
 import { Avatar } from "@/components/common/Avatar";
+import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
 import { isGuest } from "@/lib/guestLink";
 import { P } from "@/lib/perms";
 import { memberName } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
-import { useUI } from "@/stores/ui";
+import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { setUserLocalMute, setUserVolume } from "@/voice/session";
@@ -46,20 +47,19 @@ export function VoiceParticipants({ channelId, serverId }: { channelId: string; 
               e.preventDefault();
               const vol = volumes[p.user_id] ?? 100;
               const profile = { id: "profile", label: t("profile.profile.profile"), onSelect: () => openModal("profile", { userId: p.user_id }) };
-              openContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                items:
-                  p.user_id === meId
-                    ? [profile]
-                    : [
-                        ...(guest ? [] : [{ ...profile, separatorAfter: true }]),
-                        { id: "volume", label: t("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v: number) => setUserVolume(p.user_id, v) } },
-                        { id: "mute", label: localMutes[p.user_id] ? "Unmute" : "Mute", onSelect: () => setUserLocalMute(p.user_id, !localMutes[p.user_id]) },
-                        { id: "reset", label: t("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(p.user_id, 100), separatorAfter: guest && canI(server, P.MOVE_MEMBERS, channelId) },
-                        ...(guest && canI(server, P.MOVE_MEMBERS, channelId) ? [{ id: "remove-guest", label: t("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: removeGuest }] : []),
-                      ],
-              });
+              const items: ContextMenuItem[] =
+                p.user_id === meId
+                  ? [profile]
+                  : [
+                      ...(guest ? [] : [{ ...profile, separatorAfter: true }]),
+                      { id: "volume", label: t("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v: number) => setUserVolume(p.user_id, v) } },
+                      { id: "mute", label: localMutes[p.user_id] ? t("voice.voice.unmute") : t("voice.voice.mute"), onSelect: () => setUserLocalMute(p.user_id, !localMutes[p.user_id]) },
+                      { id: "reset", label: t("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(p.user_id, 100), separatorAfter: guest && canI(server, P.MOVE_MEMBERS, channelId) },
+                      ...(guest && canI(server, P.MOVE_MEMBERS, channelId) ? [{ id: "remove-guest", label: t("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: removeGuest }] : []),
+                    ];
+              // a guest's ID lasts only as long as its link, so there is nothing to copy
+              if (!guest && developerMode()) appendSection(items, [copyIdItem("copy", t("chat.groupMemberMenu.copyUserId"), p.user_id)]);
+              openContextMenu({ x: e.clientX, y: e.clientY, items });
             }}
           >
             <Avatar id={p.user_id} avatarId={users[p.user_id]?.avatar_id ?? null} name={name} size={24} className={s.pAvatar} />

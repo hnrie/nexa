@@ -1,4 +1,4 @@
-import { Phone } from "lucide-react";
+import { BellOff, Phone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
@@ -7,12 +7,16 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { displayName, useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
-import { declineCall, joinVoice } from "@/voice/session";
+import { declineCall, ignoreCall, joinVoice } from "@/voice/session";
 import { HangUp } from "./HangUp";
 import s from "./Voice.module.css";
 
 import { t } from "@/i18n";
-/** Rings for incoming DM calls; accept joins the DM's voice, decline tells the caller. */
+/**
+ * Rings for incoming DM calls: accept joins the DM's voice, decline tells the
+ * caller, and ignore just stops the ringing here — the caller still hears it
+ * ring, and the call can be joined from the conversation until it ends.
+ */
 export function IncomingCallHost() {
   const ringing = useVoice((v) => v.ringing);
   const users = useUsers((u) => u.byId);
@@ -29,7 +33,8 @@ export function IncomingCallHost() {
     await joinVoice(channelId);
   };
   return (
-    <Modal open onClose={() => void declineCall(channelId)} width={360} closeOnOverlay={false} bare ariaLabel={t("voice.incomingCall.incomingCall")}>
+    // Escape puts the call away rather than saying no to the caller
+    <Modal open onClose={() => ignoreCall(channelId)} width={360} closeOnOverlay={false} bare ariaLabel={t("voice.incomingCall.incomingCall")}>
       <div className={s.ring} style={{ background: "var(--bg-surface)", borderRadius: "var(--radius-md)", padding: 24 }} data-testid="incoming-call">
         <div className={s.ringAvatar}>
           <Avatar id={from} avatarId={caller?.avatar_id ?? null} name={displayName(caller)} size={80} />
@@ -37,8 +42,24 @@ export function IncomingCallHost() {
         <div className={s.ringName}>{displayName(caller)}</div>
         <div className={s.ringSub}>{channel && channel.type === "group_dm" ? t("voice.incomingCall.inGroup", { name: channelDisplayName(channel, users, meId) }) : t("voice.incomingCall.incomingCall")}</div>
         <div className={s.ringBtns}>
-          <button className={[s.ringBtn, s.ringDecline].join(" ")} aria-label={t("voice.incomingCall.decline")} onClick={() => void declineCall(channelId)}><HangUp size={24} /></button>
-          <button className={[s.ringBtn, s.ringAccept].join(" ")} aria-label={t("voice.incomingCall.accept")} onClick={() => void accept()} data-testid="accept-call"><Phone size={24} /></button>
+          <button type="button" className={s.ringAction} onClick={() => void declineCall(channelId)} data-testid="decline-call">
+            <span className={[s.ringBtn, s.ringDecline].join(" ")} aria-hidden="true">
+              <HangUp size={24} />
+            </span>
+            <span className={s.ringLabel}>{t("voice.incomingCall.decline")}</span>
+          </button>
+          <button type="button" className={s.ringAction} onClick={() => ignoreCall(channelId)} title={t("voice.incomingCall.ignoreHint")} data-testid="ignore-call">
+            <span className={[s.ringBtn, s.ringIgnore].join(" ")} aria-hidden="true">
+              <BellOff size={22} />
+            </span>
+            <span className={s.ringLabel}>{t("voice.incomingCall.ignore")}</span>
+          </button>
+          <button type="button" className={s.ringAction} onClick={() => void accept()} data-testid="accept-call">
+            <span className={[s.ringBtn, s.ringAccept].join(" ")} aria-hidden="true">
+              <Phone size={24} />
+            </span>
+            <span className={s.ringLabel}>{t("voice.incomingCall.accept")}</span>
+          </button>
         </div>
       </div>
     </Modal>

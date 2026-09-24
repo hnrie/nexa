@@ -4,8 +4,7 @@ import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
 import { favoriteFile } from "@/lib/gifFavorites";
-import { fitsUploadLimit, stage, uploadLimit, uploadStaged, type Staged } from "@/lib/attachments";
-import { holdReload } from "@/lib/busy";
+import { fitsUploadLimit, stage, uploadLimit, type Staged } from "@/lib/attachments";
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
@@ -29,7 +28,8 @@ import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem } from "./Autocomplete";
 import { commands, applyCommand } from "./commands";
 import { createLinkPreviews } from "./linkPreviews";
-import { sendMessage, type SendOptions } from "./send";
+import { sendMessage, sendWithFiles, type SendOptions } from "./send";
+import { useUploads } from "@/stores/uploads";
 import { useAutosize } from "./useAutosize";
 import type { RefObject } from "react";
 import s from "./Composer.module.css";
@@ -38,6 +38,8 @@ import { t as tr_ } from "@/i18n";
 const MAX_LEN = 4000;
 /** How many files one message carries. */
 const MAX_FILES = 10;
+// a stable empty tray, so a conversation with nothing in it does not re-render on every change to another
+const NO_FILES: Staged[] = [];
 const TYPING_INTERVAL = 8000;
 /** How long Send waits for link previews that are still on their way. */
 const PREVIEW_WAIT = 1500;
@@ -94,8 +96,8 @@ export function Composer({ channel }: { channel: Channel }) {
     return () => clearInterval(t);
   }, [remaining]);
   const [text, setText] = useState(() => drafts[channel.id] ?? "");
-  const [files, setFiles] = useState<Staged[]>([]);
-  const [sending, setSending] = useState(false);
+  // this conversation's tray, which keeps going up while the box is elsewhere
+  const files = useUploads((u) => u.trays[channel.id]) ?? NO_FILES;
   const [picker, setPicker] = useState(false);
   const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: "user" | "emoji" | "command" } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -110,9 +112,6 @@ export function Composer({ channel }: { channel: Channel }) {
   textRef.current = text;
   const channelRef = useRef(channel.id);
   channelRef.current = channel.id;
-  const filesRef = useRef(files);
-  filesRef.current = files;
-  const removedFiles = useRef(new Set<string>());
   const lastSelect = useRef("");
   const linkPreviews = useSettings((st) => st.settings.linkPreviews);
   const [previews] = useState(createLinkPreviews);
@@ -164,7 +163,6 @@ export function Composer({ channel }: { channel: Channel }) {
     }
     touched.current = false;
     setText(useSettings.getState().settings.drafts[channel.id] ?? "");
-    setFiles([]);
     setAc(null);
     // On a touch screen a focus right after the tap that opened the conversation raises the keyboard over it.
     // In a split, only the pane you are actually in may take the caret.
@@ -178,9 +176,6 @@ export function Composer({ channel }: { channel: Channel }) {
         if (p) saveDraft(p.channelId, p.text);
       }
       pendingDraft.current = null;
-      // through the ref: this effect only runs on a channel change, so the
-      // cleanup React keeps closes over the empty list this one started with
-      for (const f of filesRef.current) if (f.preview) URL.revokeObjectURL(f.preview);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.id]);
@@ -336,88 +331,55 @@ export function Composer({ channel }: { channel: Channel }) {
     if (!staged.length) return;
     // Files past the limit used to be dropped without a word, and their
     // previews stayed resident for the life of the tab.
-    const room = Math.max(0, MAX_FILES - filesRef.current.length);
+    const room = Math.max(0, MAX_FILES - (useUploads.getState().trays[channel.id]?.length ?? 0));
     for (const f of staged.slice(room)) if (f.preview) URL.revokeObjectURL(f.preview);
     if (staged.length > room) toast(tr_("composer.composer.atMostFilesPerMessage", { count: MAX_FILES }), "error");
     const kept = staged.slice(0, room);
-    if (kept.length) setFiles((cur) => [...cur, ...kept].slice(0, MAX_FILES));
+    if (kept.length) useUploads.getState().add(channel.id, kept);
   };
 
-  const send = async () => {
-    if (sending) return;
+  /** Empties the box for a send: what is typed from here on is the next message. */
+  const clearForSend = (channelId: string) => {
+    setText("");
+    if (lastTyping.current) {
+      lastTyping.current = 0;
+      gateway()?.sendTypingStop(channelId);
+    }
+    // a pending save must not bring the sent words back
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = null;
+    pendingDraft.current = null;
+    saveDraft(channelId, "");
+  };
+
+  const send = () => {
     if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
     let body = text.trim();
     if (body.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
     const expanded = applyCommand(body);
     if (expanded !== null) body = expanded;
     if (!body && files.length === 0) return;
-    setSending(true);
-    // a new version of the app waits until the files and the message are through
-    const release = holdReload();
     const channelId = channel.id;
-    const sentText = text;
-    const sent = files;
-    const sentIds = new Set(sent.map((f) => f.id));
     const opts: SendOptions = {};
     const reply = replyTo && replyTo.channelId === channelId ? replyTo : null;
     if (reply) {
       opts.replyTo = reply.messageId;
       opts.ping = reply.ping;
+      setReplyTo(null);
     }
+    // The box empties now rather than when the send is through, so anything
+    // typed while it goes (files can take a while) is the next message and is
+    // never mixed up with this one. The message shows in the list at once;
+    // one with files goes out once they are up, and nothing waits for it.
+    clearForSend(channelId);
     // previews still on their way are waited for alongside the uploads, so a link pasted just before Send keeps its card
-    const embeds = linkPreviews ? previews.embedsFor(extractUrls(body), PREVIEW_WAIT) : null;
-    try {
-      if (sent.length) {
-        const uploaded: { id: string; up: Awaited<ReturnType<typeof uploadStaged>> }[] = [];
-        for (const f of sent) {
-          // removed from the tray while the files before it went up
-          if (removedFiles.current.has(f.id)) continue;
-          const up = await uploadStaged(channelId, f, (p) => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, progress: p } : x))));
-          uploaded.push({ id: f.id, up });
-        }
-        const kept = uploaded.filter((u) => !removedFiles.current.has(u.id));
-        for (const u of kept) {
-          // the spoiler switch stays usable during the upload; the latest choice is the one sent
-          const cur = filesRef.current.find((x) => x.id === u.id);
-          if (cur?.spoiler) u.up.meta.spoiler = true;
-          else if (cur) delete u.up.meta.spoiler;
-        }
-        if (kept.length) opts.attachments = kept.map((u) => u.up);
-      }
-      const got = embeds ? await embeds : [];
-      if (got.length) opts.embeds = got;
-      // Only clear what this send used: the box may be on another channel by
-      // now, or hold words typed while the files went up.
-      if (channelRef.current === channelId && textRef.current === sentText) {
-        setText("");
-        if (lastTyping.current) {
-          lastTyping.current = 0;
-          gateway()?.sendTypingStop(channelId);
-        }
-        if (draftTimer.current) clearTimeout(draftTimer.current); // a pending save must not resurrect the sent text
-        draftTimer.current = null;
-        pendingDraft.current = null;
-        saveDraft(channelId, "");
-      } else if (channelRef.current !== channelId && (useSettings.getState().settings.drafts[channelId] ?? "") === sentText) {
-        saveDraft(channelId, "");
-      }
-      const curReply = useUI.getState().replyTo;
-      if (reply && curReply?.channelId === reply.channelId && curReply.messageId === reply.messageId) setReplyTo(null);
-      for (const f of sent) if (f.preview) URL.revokeObjectURL(f.preview);
-      setFiles((cur) => cur.filter((x) => !sentIds.has(x.id)));
-      for (const id of sentIds) removedFiles.current.delete(id);
-      if (!body && !opts.attachments) return;
-      await sendMessage(channelId, body, opts);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : tr_("composer.composer.uploadFailed");
-      setFiles((cur) => cur.map((x) => (sentIds.has(x.id) ? { ...x, error: x.progress < 1 ? msg : x.error } : x)));
-      if (sent.length) toast(msg, "error");
-    } finally {
-      release();
-      setSending(false);
-      // the box keeps focus through the round trip; restore it if an upload dialog stole it
-      requestAnimationFrame(() => taRef.current?.focus({ preventScroll: true }));
+    if (linkPreviews) {
+      const urls = extractUrls(body);
+      if (urls.length) opts.embeds = previews.embedsFor(urls, PREVIEW_WAIT);
     }
+    // a message that cannot be sent stays in the list, marked, with Retry
+    if (files.length) sendWithFiles(channelId, body, useUploads.getState().take(channelId), opts).catch(() => undefined);
+    else sendMessage(channelId, body, opts).catch(() => undefined);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -534,11 +496,9 @@ export function Composer({ channel }: { channel: Channel }) {
               </div>
               <div className={s.fname} title={f.name}>{f.name}</div>
               <div className={s.fsize}>{formatBytes(f.file.size)}</div>
-              {f.progress > 0 && f.progress < 1 ? <div className={s.bar}><i style={{ width: `${Math.round(f.progress * 100)}%` }} /></div> : null}
-              {f.error ? <div className={s.err}>{f.error}</div> : null}
               <div className={s.cardBtns}>
-                <button className={s.cardBtn} data-on={f.spoiler} title={tr_("composer.composer.spoiler")} onClick={() => setFiles((cur) => cur.map((x) => (x.id === f.id ? { ...x, spoiler: !x.spoiler } : x)))}>{f.spoiler ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                <button className={[s.cardBtn, s.del].join(" ")} title={tr_("composer.composer.remove")} onClick={() => { removedFiles.current.add(f.id); if (f.preview) URL.revokeObjectURL(f.preview); setFiles((cur) => cur.filter((x) => x.id !== f.id)); }}><Trash2 size={16} /></button>
+                <button className={s.cardBtn} data-on={f.spoiler} title={tr_("composer.composer.spoiler")} onClick={() => useUploads.getState().update(channel.id, [f.id], { spoiler: !f.spoiler })}>{f.spoiler ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                <button className={[s.cardBtn, s.del].join(" ")} title={tr_("composer.composer.remove")} onClick={() => useUploads.getState().remove(channel.id, [f.id])}><Trash2 size={16} /></button>
               </div>
             </div>
           ))}
@@ -546,7 +506,7 @@ export function Composer({ channel }: { channel: Channel }) {
       ) : null}
       <div className={s.box}>
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
-        {canAttach ? <button className={s.attach} aria-label={tr_("composer.composer.uploadAFile")} onClick={() => fileRef.current?.click()} disabled={sending}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
+        {canAttach ? <button className={s.attach} aria-label={tr_("composer.composer.uploadAFile")} onClick={() => fileRef.current?.click()}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
         <textarea
           ref={taRef}
           className={s.ta}
@@ -569,7 +529,7 @@ export function Composer({ channel }: { channel: Channel }) {
         />
         <div className={s.btns}>
           <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
-          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={sending || remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
+          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
         </div>
       </div>
       {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}

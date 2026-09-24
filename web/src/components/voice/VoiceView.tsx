@@ -29,6 +29,7 @@ import { HangUp } from "./HangUp";
 import { Tooltip } from "@/components/common/Tooltip";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
+import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
 import { isGuest } from "@/lib/guestLink";
 import { P } from "@/lib/perms";
 import { CALL_PANEL_DEFAULT, CALL_PANEL_KEY, clampCallPanel, readCallPanel } from "@/lib/callPanel";
@@ -481,7 +482,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     if (t.kind === "screen" && t.me) items.push({ id: "stop-share", label: tr_("voice.voice.stopSharing"), onSelect: () => void toggleScreen() });
     if (isLive(t)) items.push({ id: "watch", label: watching[t.userId] ? tr_("voice.voice.stopWatching") : tr_("voice.voice.watchStream"), onSelect: () => setWatching(t.userId, !watching[t.userId]) });
     if (showsStream(t)) {
-      items.push({ id: "focus", label: focused === t.key ? "Unfocus" : "Focus", onSelect: () => setFocused(focused === t.key ? null : t.key) });
+      items.push({ id: "focus", label: focused === t.key ? tr_("voice.voice.unfocus") : tr_("voice.voice.focus"), onSelect: () => setFocused(focused === t.key ? null : t.key) });
       items.push({ id: "fullscreen", label: tileIsFull(t) ? tr_("voice.voice.exitFullScreen") : tr_("voice.voice.fullScreen"), onSelect: () => fullscreenTile(t) });
     }
     if (!t.me && t.kind === "screen") {
@@ -498,7 +499,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push(
         { id: "volume", label: tr_("voice.voiceParticipants.userVolume"), slider: { value: vol, min: 0, max: 200, unit: "%", onChange: (v) => setUserVolume(t.userId, v) } },
-        { id: "mute", label: localMutes[t.userId] ? "Unmute" : "Mute", onSelect: () => setUserLocalMute(t.userId, !localMutes[t.userId]) },
+        { id: "mute", label: localMutes[t.userId] ? tr_("voice.voice.unmute") : tr_("voice.voice.mute"), onSelect: () => setUserLocalMute(t.userId, !localMutes[t.userId]) },
         { id: "reset", label: tr_("voice.voiceParticipants.resetVolume"), disabled: vol === 100, onSelect: () => setUserVolume(t.userId, 100) },
       );
     }
@@ -506,6 +507,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
       if (items.length) items[items.length - 1]!.separatorAfter = true;
       items.push({ id: "remove-guest", label: tr_("voice.voiceParticipants.removeFromCall"), danger: true, onSelect: () => removeGuest(t.userId) });
     }
+    if (!guest && !guestTile && developerMode()) appendSection(items, [copyIdItem("copy-user", tr_("chat.groupMemberMenu.copyUserId"), t.userId)]);
     if (items.length === 0) return;
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };

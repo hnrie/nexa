@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import type { Channel } from "@/api/types";
 import { Spinner } from "@/components/common/Spinner";
+import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
 import { compareIds } from "@/lib/ids";
 import { selectSubchats, useChannels } from "@/stores/channels";
 import { isUnread, useReadStates } from "@/stores/readStates";
@@ -24,7 +25,7 @@ export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: 
       toast(err instanceof ApiError ? err.message : t("chat.subchat.couldNotDeleteThatSubchat"), "error");
     }
   };
-  return [
+  const items: ContextMenuItem[] = [
     {
       id: "edit",
       label: t("chat.subchat.editSubchat"),
@@ -44,6 +45,7 @@ export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: 
         }),
     },
   ];
+  return developerMode() ? appendSection(items, [copyIdItem("copy", t("sidebar.dmMenu.copyChannelId"), ch.id)]) : items;
 }
 
 interface Props {

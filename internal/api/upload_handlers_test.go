@@ -318,8 +318,13 @@ func TestSingleUploadIsCapped(t *testing.T) {
 	dm := dmBetween(t, ts, tokA, idB)
 
 	_, info := do(t, ts, "GET", "/api/v1/instance", "", nil)
-	if info["upload_single_bytes"].(float64) != float64(MaxSingleUploadBytes) {
+	// clients send one piece's worth at most in one request...
+	if info["upload_single_bytes"].(float64) != float64(SingleUploadBytes) || SingleUploadBytes != MaxChunkBytes {
 		t.Errorf("the client needs the single-request ceiling: %v", info)
+	}
+	// ...and the server still takes the larger requests older clients send
+	if MaxSingleUploadBytes < SingleUploadBytes || MaxSingleUploadBytes >= 100<<20 {
+		t.Errorf("the single-request cap must fit Cloudflare and older clients: %d", MaxSingleUploadBytes)
 	}
 
 	// the smaller of the two limits applies to one request

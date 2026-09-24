@@ -7,7 +7,7 @@ import type { StickerPack } from "@/api/types";
 
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { StickerView } from "@/components/stickers/StickerView";
+import { LazySticker, StickerView } from "@/components/stickers/StickerView";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { packCount, packCover } from "@/components/server/PackEditor";
 import { canRemovePack, removePack as removeInstalledPack, removePackQuestion } from "@/lib/packRemoval";
@@ -92,7 +92,7 @@ export default function StickerPackPage() {
             <div className={p.grid} style={{ width: "100%" }}>
               {pack.stickers.map((st) => (
                 <div key={st.id} className={p.cell} style={{ cursor: "default" }}>
-                  <StickerView format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={p.cellImg} />
+                  <LazySticker format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={p.cellImg} />
                   <span className={p.cellName}>{st.name}</span>
                 </div>
               ))}

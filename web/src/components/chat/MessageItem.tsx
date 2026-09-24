@@ -5,7 +5,7 @@ import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown"
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { formatFull, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
-import { useMessages, type DecryptedMessage } from "@/stores/messages";
+import { useMessages, type DecryptedMessage, type PendingUpload } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useRelationships } from "@/stores/relationships";
@@ -20,6 +20,7 @@ import { stickerFormatOf, useExpressions } from "@/stores/expressions";
 import { imageTarget, type ImageTarget } from "@/lib/imageActions";
 import type { MessagePayload } from "@/crypto/message";
 import { Attachments } from "./Attachments";
+import { UploadCard } from "./UploadCard";
 import { Embeds } from "./Embeds";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import type { UnfurlResult } from "@/api/types";
@@ -39,6 +40,8 @@ interface Props {
   msg: DecryptedMessage;
   groupStart: boolean;
   pending?: "sending" | "failed";
+  /** A pending message's files still going up, shown in place of its attachments. */
+  upload?: PendingUpload | undefined;
   highlight?: boolean;
   /** The topmost row in the list; its hover toolbar must not overhang out of view. */
   first?: boolean;
@@ -75,7 +78,7 @@ function ToolButton({ label, danger, onClick, children }: { label: string; dange
   );
 }
 
-export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, highlight, first }: Props) {
+export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, upload, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
   const author = useUsers((u) => u.byId[msg.author_id]);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
@@ -172,6 +175,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       data-reply={isReply}
       data-pending={pending === "sending"}
       data-failed={pending === "failed"}
+      data-uploading={!!upload || undefined}
       data-menu={menuOpen}
       data-pickable={pickable || undefined}
       data-picked={picked || undefined}
@@ -223,7 +227,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             </>
           )}
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
-          {msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
+          {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
           {embeds ? <Embeds list={embeds} /> : null}
           {pending === "failed" ? (
             <div className={s.failedRow}>

@@ -18,6 +18,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { activeTab, paneAddress, panesIn, usePanes } from "@/stores/panes";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
+import { installAway } from "@/lib/away";
 import s from "./AppShell.module.css";
 
 /** Controls a horizontal drag already means something to. */
@@ -85,6 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     installVoice();
+    installAway();
   }, []);
 
   // Going somewhere closes the drawers. Picking a server or Direct Messages in

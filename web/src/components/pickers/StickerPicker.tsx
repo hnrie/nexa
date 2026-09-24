@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type MouseEvent } from "react";
+import { memo, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
 import type { Sticker, StickerPack } from "@/api/types";
 import { moveFocusInGrid } from "@/lib/gridKeys";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
@@ -7,6 +7,8 @@ import { groupPacks, packImageUrl, searchStickers, useExpressions } from "@/stor
 import { useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { StickerView } from "@/components/stickers/StickerView";
+import { useNearScreen } from "@/hooks/useNearScreen";
+import { useSettings } from "@/stores/settings";
 import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
@@ -14,6 +16,40 @@ import { t } from "@/i18n";
 export interface StickerPick {
   sticker: Sticker;
   pack: StickerPack;
+}
+
+/**
+ * One sticker in the grid. Its picture exists only while the cell is on screen
+ * or close to it, and an animated one moves only while it is pointed at or
+ * focused: a picker holding every pack at once used to start every animation
+ * and video in them together, which is what took phones down.
+ */
+const StickerCell = memo(function StickerCell({ sticker, pack, onPick, root, still }: { sticker: Sticker; pack: StickerPack; onPick: (p: StickerPick) => void; root: RefObject<HTMLDivElement | null>; still: boolean }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const near = useNearScreen(ref, root);
+  const [hot, setHot] = useState(false);
+  return (
+    <button
+      ref={ref}
+      className={s.stickerCell}
+      title={sticker.name}
+      aria-label={sticker.name}
+      data-sticker={sticker.id}
+      tabIndex={-1}
+      onClick={() => onPick({ sticker, pack })}
+      onPointerEnter={() => setHot(true)}
+      onPointerLeave={() => setHot(false)}
+      onFocus={() => setHot(true)}
+      onBlur={() => setHot(false)}
+    >
+      {/* a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows */}
+      {near ? <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} play={hot && !still} renderer="canvas" /> : null}
+    </button>
+  );
+});
+
+function prefersStill(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 }
 
 /** The Stickers tab: this server's packs, mine, installed; searchable by name and tags. */
@@ -27,6 +63,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   const openContextMenu = useUI((u) => u.openContextMenu);
   const [q, setQ] = useState("");
   const gridRef = useRef<HTMLDivElement>(null);
+  const still = useSettings((x) => x.settings.reducedMotion) || prefersStill();
   const groups = useMemo(() => groupPacks(packs, serverId, meId), [packs, serverId, meId]);
   const all = useMemo(() => groups.flatMap((g) => g.packs), [groups]);
   const results = useMemo(() => (q.trim() ? searchStickers(all, q) : null), [all, q]);
@@ -54,12 +91,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
-  // a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows
-  const cell = (sticker: Sticker, pack: StickerPack) => (
-    <button key={sticker.id} className={s.stickerCell} title={sticker.name} aria-label={sticker.name} data-sticker={sticker.id} tabIndex={-1} onClick={() => onPick({ sticker, pack })}>
-      <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} />
-    </button>
-  );
+  const cell = (sticker: Sticker, pack: StickerPack) => <StickerCell key={sticker.id} sticker={sticker} pack={pack} onPick={onPick} root={gridRef} still={still} />;
 
   return (
     <>
@@ -72,7 +104,8 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
             const cover = p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
             return (
               <button key={p.id} className={s.cat} title={p.name} aria-label={p.name} onClick={() => jump(p.id)} onContextMenu={packMenu(p)}>
-                {cover ? <StickerView format={cover.format} src={packImageUrl(p, cover, 24)} alt="" className={s.catImg} /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
+                {/* a pack's icon stays still: a column of them all moving at once is noise, and costly */}
+                {cover ? <StickerView format={cover.format} src={packImageUrl(p, cover, 24)} alt="" className={s.catImg} play={false} renderer="canvas" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
               </button>
             );
           })}
