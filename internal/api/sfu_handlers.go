@@ -229,10 +229,15 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 	var wants []want
 	videoAllowed := true
 	checkedVideo := false
+	asked := map[string]bool{}
 	for _, t := range req.Tracks {
 		p := sfuPulled{UserID: t.UserID, Kind: t.Kind}
 		target, ok := s.Voice.Get(t.UserID)
+		key := t.UserID.String() + ":" + t.Kind
 		switch {
+		case asked[key]:
+			// the same track twice in one request is pulled once
+			p.Error = "duplicate"
 		case !realtime.ValidKind(t.Kind):
 			p.Error = "bad_kind"
 		case t.UserID == me.ID || !ok || target.ChannelID != st.ChannelID || target.SFUSession == "":
@@ -250,6 +255,7 @@ func (s *Server) handleSFUSubscribe(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
+			asked[key] = true
 			wants = append(wants, want{target: target, kind: t.Kind, name: target.Tracks.Get(t.Kind)})
 			continue
 		}

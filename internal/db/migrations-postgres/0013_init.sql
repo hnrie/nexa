@@ -6,7 +6,10 @@
 -- is a plain BIGINT with no default. Times are Unix milliseconds. Booleans are
 -- 0/1 BIGINTs, as they are in SQLite, so every query reads the same either way.
 --
--- Do not edit by hand: run tools/gen_pg_schema.sh.
+-- This is the baseline, the whole schema as of version 13, and it stays as it
+-- is: a database already at 13 never runs it again. Every later change is a
+-- numbered file beside it, written to match the SQLite migration of the same
+-- number, so an existing database moves forward one step at a time.
 
 CREATE TABLE blobs (
   id BIGINT PRIMARY KEY,

@@ -81,7 +81,8 @@ before it says it is done; nothing lands if anything fails. Then set
 file is left alone, so unsetting `DATABASE_URL` puts things back exactly as
 they were.
 
-Running more than one chatd also needs `REDIS_URL`: presence, rate limits and
-gateway events live there instead of in one process's memory, so the processes
-agree about who is online, share one allowance, and pass each other's events on
-to their own sockets.
+Run one chatd per instance. Gateway events, presence and calls live in the
+memory of the process holding the sockets, so two processes behind one address
+would each see only their own half: a message sent through one would never
+reach the people connected to the other. `REDIS_URL` only moves the rate limits
+into Redis, where they survive a restart.

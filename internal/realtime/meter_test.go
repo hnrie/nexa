@@ -2,6 +2,7 @@ package realtime
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -132,5 +133,26 @@ func TestMeterSkipsTracksThatSendNothing(t *testing.T) {
 	m.StopSession("pub")
 	if len(m.off) != 0 {
 		t.Errorf("the publisher leaving forgets its tracks: %v", m.off)
+	}
+}
+
+// Pulling one track over and over is charged as one pull, and a track stops
+// being charged when the session publishing it ends, whoever was pulling it.
+func TestMeterChargesATrackOncePerSession(t *testing.T) {
+	ctx := context.Background()
+	m, _, now := newTestMeter(1000, time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC))
+	src := Source("pub", KindAudio)
+	for i := 0; i < 50; i++ {
+		m.Start("watcher", strconv.Itoa(i), src, AudioBps)
+	}
+	*now = now.Add(10 * time.Second)
+	if got, want := m.Used(ctx), int64(80_000); got != want {
+		t.Fatalf("fifty pulls of one track: %d, want %d", got, want)
+	}
+	m.StopSession("pub")
+	before := m.Used(ctx)
+	*now = now.Add(time.Hour)
+	if got := m.Used(ctx); got != before {
+		t.Errorf("a track whose publisher left is still charged: %d then %d", before, got)
 	}
 }

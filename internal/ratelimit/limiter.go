@@ -37,17 +37,22 @@ type Limiter struct {
 	now     func() time.Time
 
 	shared Shared
-	// window and n describe the same allowance to the shared counter.
+	// window and n describe the same allowance to the shared counter, and
+	// prefix keeps this limiter's keys apart from every other's there: two
+	// limiters counting the same address must not share one count.
 	window time.Duration
 	n      int
+	prefix string
 }
 
 // Share makes this limiter count against s, in windows of the same length its
-// own bucket refills over.
-func (l *Limiter) Share(s Shared) {
+// own bucket refills over. name tells its keys apart from other limiters'
+// in s, which holds them all in one space.
+func (l *Limiter) Share(s Shared, name string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.shared = s
+	l.prefix = name + ":"
 	l.n = l.burst
 	if l.r > 0 {
 		l.window = time.Duration(float64(l.burst) / float64(l.r) * float64(time.Second))
@@ -72,11 +77,11 @@ func Every(n int, interval time.Duration) rate.Limit {
 // how long until it could.
 func (l *Limiter) Allow(key string) (bool, time.Duration) {
 	l.mu.Lock()
-	shared, n, window := l.shared, l.n, l.window
+	shared, n, window, prefix := l.shared, l.n, l.window, l.prefix
 	l.mu.Unlock()
 	if shared != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
-		ok, wait, err := shared.Allow(ctx, key, n, window)
+		ok, wait, err := shared.Allow(ctx, prefix+key, n, window)
 		cancel()
 		if err == nil {
 			return ok, wait
@@ -112,7 +117,7 @@ func (l *Limiter) Allow(key string) (bool, time.Duration) {
 // throttled, and a correct password answered 429 for the rest of the window.
 func (l *Limiter) Reset(key string) {
 	l.mu.Lock()
-	shared := l.shared
+	shared, prefix := l.shared, l.prefix
 	delete(l.entries, key)
 	l.mu.Unlock()
 	if shared == nil {
@@ -122,7 +127,7 @@ func (l *Limiter) Reset(key string) {
 	defer cancel()
 	// Nothing to do about a failure here but leave the count standing; the
 	// window runs out on its own.
-	_ = shared.ResetRate(ctx, key)
+	_ = shared.ResetRate(ctx, prefix+key)
 }
 
 // Start runs the idle-key sweeper until ctx is done.

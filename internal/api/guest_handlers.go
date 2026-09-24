@@ -540,7 +540,7 @@ func (s *Server) dropGuest(ctx context.Context, id ids.ID, reason string) {
 // StartGuests sweeps guests until ctx ends: the ones whose time is up, whose
 // link stopped working, or who closed the page.
 func (s *Server) StartGuests(ctx context.Context) {
-	go func() {
+	s.background.Go(func() {
 		t := time.NewTicker(guestSweepEvery)
 		defer t.Stop()
 		for {
@@ -551,7 +551,7 @@ func (s *Server) StartGuests(ctx context.Context) {
 				s.sweepGuests(ctx, time.Now())
 			}
 		}
-	}()
+	})
 }
 
 func (s *Server) sweepGuests(ctx context.Context, now time.Time) {

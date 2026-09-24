@@ -1,6 +1,13 @@
 #!/bin/sh
-# Regenerates the Postgres schema from the SQLite migrations, so the two cannot
-# drift. Run it after adding a SQLite migration, then commit both.
+# Prints the whole Postgres schema the SQLite migrations add up to, for
+# checking a new Postgres migration against: compare its output before and
+# after the SQLite migration, and write the difference as
+# internal/db/migrations-postgres/NNNN_<name>.sql with the same number.
+#
+# It used to replace the Postgres baseline outright. A database already at the
+# baseline's version never runs a replacement again, and one at an older
+# version would run a whole schema over tables it already has, so the baseline
+# (0013_init.sql) now stays as it is and later versions go beside it.
 set -eu
 cd "$(dirname "$0")/.."
 tmp=$(mktemp -d)
@@ -52,7 +59,5 @@ mkdir -p cmd/_schemadump
 cp "$tmp/dump.go" cmd/_schemadump/main.go
 version=$(go run ./cmd/_schemadump > "$tmp/sqlite.sql" 2>&1 >/dev/null; go run ./cmd/_schemadump 2>&1 >"$tmp/sqlite.sql")
 rm -rf cmd/_schemadump
-out=$(printf "internal/db/migrations-postgres/%04d_init.sql" "$version")
-rm -f internal/db/migrations-postgres/*_init.sql
-python3 tools/pg_schema.py "$tmp/sqlite.sql" > "$out"
-echo "wrote $out"
+python3 tools/pg_schema.py "$tmp/sqlite.sql"
+echo "-- the SQLite schema is at version $version" >&2

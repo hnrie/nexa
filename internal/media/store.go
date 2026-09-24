@@ -85,6 +85,13 @@ func (m *Store) spool(r io.Reader, max int64) (path string, sha string, size int
 	path = f.Name()
 	h := sha256.New()
 	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(r, max+1))
+	// On disk before anything points at it: the row and the message naming
+	// this file are committed durably, and a power cut that kept them but
+	// lost the bytes would leave a file that never opens — and, since
+	// uploads of the same picture share it, one no re-upload can mend.
+	if err == nil {
+		err = f.Sync()
+	}
 	cerr := f.Close()
 	if err == nil {
 		err = cerr

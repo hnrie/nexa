@@ -19,7 +19,7 @@ import (
 // 'unsafe-inline' for styles; embeds may load https images/media directly;
 // only the privacy-enhanced YouTube host may be framed, and Cloudflare
 // Turnstile may load its captcha script and frame when captchas are on.
-const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' wss: https:; frame-src 'self' https://www.youtube-nocookie.com https://challenges.cloudflare.com; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' wss: https: blob:; frame-src 'self' https://www.youtube-nocookie.com https://challenges.cloudflare.com; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 
 func init() {
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")

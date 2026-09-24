@@ -307,7 +307,7 @@ func (s *Server) finishDeletedAccounts(ctx context.Context) {
 // StartAccountSweep finishes deleted accounts now and then every hour, until
 // ctx ends.
 func (s *Server) StartAccountSweep(ctx context.Context) {
-	go func() {
+	s.background.Go(func() {
 		s.finishDeletedAccounts(ctx)
 		t := time.NewTicker(accountSweep)
 		defer t.Stop()
@@ -319,5 +319,5 @@ func (s *Server) StartAccountSweep(ctx context.Context) {
 				s.finishDeletedAccounts(ctx)
 			}
 		}
-	}()
+	})
 }

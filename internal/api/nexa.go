@@ -713,7 +713,7 @@ const restrictionSweep = 15 * time.Second
 // StartModeration makes sure the Nexa account exists and ends mutes and bans
 // as their time comes, telling the members and the staff, until ctx ends.
 func (s *Server) StartModeration(ctx context.Context) {
-	go func() {
+	s.background.Go(func() {
 		for attempt := 0; ; attempt++ {
 			if _, err := s.systemUser(ctx); err == nil {
 				break
@@ -726,8 +726,8 @@ func (s *Server) StartModeration(ctx context.Context) {
 			case <-time.After(3 * time.Second):
 			}
 		}
-	}()
-	go func() {
+	})
+	s.background.Go(func() {
 		t := time.NewTicker(restrictionSweep)
 		defer t.Stop()
 		for {
@@ -738,7 +738,7 @@ func (s *Server) StartModeration(ctx context.Context) {
 				s.sweepRestrictions(ctx)
 			}
 		}
-	}()
+	})
 }
 
 func (s *Server) sweepRestrictions(ctx context.Context) {

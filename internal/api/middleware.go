@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"time"
 
 	"evilion.xyz/chat/internal/ratelimit"
@@ -95,6 +96,16 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), geolocation=()")
+		// Browsers only honour this over HTTPS, which is how the instance is
+		// reached; it stops a first visit being quietly downgraded.
+		h.Set("Strict-Transport-Security", "max-age=31536000")
+		// A page this one opens cannot reach back into it.
+		h.Set("Cross-Origin-Opener-Policy", "same-origin")
+		// API answers carry accounts, keys and sessions: nothing in between
+		// keeps a copy. A handler that means to be cached says so itself.
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			h.Set("Cache-Control", "no-store")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

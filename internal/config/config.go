@@ -23,9 +23,10 @@ type Config struct {
 	// DatabaseURL points at a Postgres database (postgres://…). Empty keeps
 	// the SQLite file in DataDir, which is what one machine wants.
 	DatabaseURL string
-	// RedisURL points at a Redis (redis://…) that carries presence, rate
-	// limits and gateway events between chatd processes. Empty keeps all three
-	// inside this process, which is right until there is more than one.
+	// RedisURL points at a Redis (redis://…) that the rate limits count in,
+	// so a restart does not hand everyone a fresh allowance. It does not make
+	// several chatd processes one instance: gateway events, presence and calls
+	// stay inside the process that has the sockets, so run one chatd.
 	RedisURL string
 	// DesktopDir holds published desktop app installers and update manifests,
 	// served at /desktop/. It defaults to "desktop" inside DataDir.

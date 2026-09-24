@@ -178,12 +178,35 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	if count == 0 || (s.Cfg.AdminUsername != "" && req.Username == s.Cfg.AdminUsername) {
+	// The instance's first account runs it, and so may the account the
+	// operator named — but only to set the instance up. Once anyone has been
+	// an admin, the configured name is just a name: otherwise, the moment it
+	// was freed (a rename, a deletion) anyone could register it and walk in.
+	first := count == 0
+	named := false
+	if !first && s.Cfg.AdminUsername != "" && req.Username == s.Cfg.AdminUsername {
+		admins, err := s.Store.CountAdminsEver(ctx)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		named = admins == 0
+	}
+	if first || named {
 		u.Flags |= store.FlagAdmin
 	}
 	if err := s.Store.CreateUser(ctx, u); err != nil {
 		WriteError(w, err)
 		return
+	}
+	// Two first sign-ups at once both counted nobody before them; the older
+	// of the two keeps the instance, and the other becomes an ordinary account.
+	if first {
+		if oldest, err := s.Store.OldestAccountID(ctx); err == nil && oldest != u.ID {
+			if flags, err := s.Store.ChangeUserFlags(ctx, u.ID, 0, store.FlagAdmin); err == nil {
+				u.Flags = flags
+			}
+		}
 	}
 	token, err := s.newSession(r, u.ID)
 	if err != nil {

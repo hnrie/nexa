@@ -153,6 +153,11 @@ func (m *Store) variant(ctx context.Context, b *store.Blob, size int) (string, s
 	} else {
 		err = (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(tmp, small)
 	}
+	// a variant is served as immutable once it exists, so a truncated one
+	// would be served truncated for good
+	if err == nil {
+		err = tmp.Sync()
+	}
 	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}

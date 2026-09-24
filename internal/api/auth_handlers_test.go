@@ -94,11 +94,13 @@ func TestRegistrationModes(t *testing.T) {
 	if res, _ := do(t, ts, "POST", "/api/v1/auth/register", "", b); res.StatusCode != 201 {
 		t.Errorf("invite with key: %d", res.StatusCode)
 	}
+	// the first account set the instance up, so the configured admin name
+	// is an ordinary name by now
 	srv.Cfg.AdminUsername = "boss"
 	srv.Cfg.Registration = "open"
 	res, body := do(t, ts, "POST", "/api/v1/auth/register", "", registerBody("boss"))
-	if res.StatusCode != 201 || body["user"].(map[string]any)["flags"].(float64) != 1 {
-		t.Errorf("ADMIN_USERNAME should be admin: %d %v", res.StatusCode, body)
+	if res.StatusCode != 201 || body["user"].(map[string]any)["flags"].(float64) != 0 {
+		t.Errorf("ADMIN_USERNAME on a set-up instance: %d %v", res.StatusCode, body)
 	}
 }
 

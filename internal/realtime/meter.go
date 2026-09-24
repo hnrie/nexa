@@ -122,6 +122,15 @@ func (m *Meter) Start(session, mid, source string, bps int64) {
 	if old, ok := byMid[mid]; ok {
 		m.unflushed += m.charge(old, now)
 	}
+	// One session watching one track twice sees it once: a second pull of
+	// the same source replaces the first rather than being charged beside it,
+	// so asking for a track over and over cannot run the allowance down.
+	for other, p := range byMid {
+		if other != mid && p.source == source {
+			m.unflushed += m.charge(p, now)
+			delete(byMid, other)
+		}
+	}
 	byMid[mid] = pull{source: source, bps: bps, since: now}
 }
 
@@ -147,8 +156,25 @@ func (m *Meter) StopSession(session string) {
 		m.unflushed += m.charge(p, now)
 	}
 	delete(m.pulls, session)
+	ofSession := func(source string) bool {
+		return len(source) > len(session) && source[:len(session)+1] == session+":"
+	}
+	// What others pulled from this session ends with it: a track that no
+	// longer exists costs nothing, whether or not their clients have closed
+	// it yet.
+	for other, byMid := range m.pulls {
+		for mid, p := range byMid {
+			if ofSession(p.source) {
+				m.unflushed += m.charge(p, now)
+				delete(byMid, mid)
+			}
+		}
+		if len(byMid) == 0 {
+			delete(m.pulls, other)
+		}
+	}
 	for source := range m.off {
-		if len(source) > len(session) && source[:len(session)+1] == session+":" {
+		if ofSession(source) {
 			delete(m.off, source)
 		}
 	}

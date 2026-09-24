@@ -12,8 +12,8 @@ func TestSharedAllowanceIsCountedOnce(t *testing.T) {
 	shared := &fakeShared{n: map[string]int{}}
 	a := New(Every(3, time.Minute), 3, time.Hour)
 	b := New(Every(3, time.Minute), 3, time.Hour)
-	a.Share(shared)
-	b.Share(shared)
+	a.Share(shared, "test")
+	b.Share(shared, "test")
 	// three between the two of them, not three each
 	for i := 0; i < 3; i++ {
 		l := a
@@ -32,7 +32,7 @@ func TestSharedAllowanceIsCountedOnce(t *testing.T) {
 // A shared counter that cannot be reached must not let everything through.
 func TestFallsBackToItsOwnBucket(t *testing.T) {
 	l := New(Every(2, time.Minute), 2, time.Hour)
-	l.Share(&fakeShared{fail: true})
+	l.Share(&fakeShared{fail: true}, "test")
 	if ok, _ := l.Allow("ip"); !ok {
 		t.Fatal("first should be allowed")
 	}
@@ -74,7 +74,7 @@ func (f *fakeShared) ResetRate(_ context.Context, key string) error {
 func TestResetClearsTheSharedCounter(t *testing.T) {
 	shared := &fakeShared{n: map[string]int{}}
 	l := New(Every(3, time.Minute), 3, time.Hour)
-	l.Share(shared)
+	l.Share(shared, "test")
 	for i := 0; i < 3; i++ {
 		if ok, _ := l.Allow("login:alice"); !ok {
 			t.Fatalf("attempt %d should be allowed", i)
@@ -86,5 +86,21 @@ func TestResetClearsTheSharedCounter(t *testing.T) {
 	l.Reset("login:alice")
 	if ok, _ := l.Allow("login:alice"); !ok {
 		t.Error("after a successful sign-in the next attempt must be allowed again")
+	}
+}
+
+// Limiters sharing one counter keep their counts apart, even for the same key:
+// a login allowance must not be spent by loading pictures from the same address.
+func TestSharedLimitersKeepTheirOwnCounts(t *testing.T) {
+	shared := &fakeShared{n: map[string]int{}}
+	logins := New(Every(2, time.Minute), 2, time.Hour)
+	pictures := New(Every(2, time.Minute), 2, time.Hour)
+	logins.Share(shared, "auth-ip")
+	pictures.Share(shared, "proxy")
+	for i := 0; i < 2; i++ {
+		pictures.Allow("203.0.113.9")
+	}
+	if ok, _ := logins.Allow("203.0.113.9"); !ok {
+		t.Error("the pictures used up the logins")
 	}
 }

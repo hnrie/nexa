@@ -317,20 +317,30 @@ func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
 }
 
 // SetKeyFlags updates the per-conversation flags (nil leaves a flag alone).
+//
+// Each flag is written on its own, touching only its column. Read and written
+// back together, two changes at once lost one another: a rotation asked for
+// because someone lost access could vanish under an unrelated change to the
+// other flag, leaving the removed member's key working for new messages.
 func (s *Store) SetKeyFlags(ctx context.Context, conv ids.ID, needsRotation, needsOwnKey *bool) error {
-	cur, err := s.KeyFlags(ctx, conv)
-	if err != nil {
-		return err
-	}
-	if needsRotation != nil {
-		cur.NeedsRotation = *needsRotation
-	}
-	if needsOwnKey != nil {
-		cur.NeedsOwnKey = *needsOwnKey
-	}
-	_, err = s.db.W.ExecContext(ctx, `INSERT INTO key_flags (conv_id, needs_rotation, needs_own_key, updated_at) VALUES (?,?,?,?) ON CONFLICT(conv_id) DO UPDATE SET needs_rotation = excluded.needs_rotation, needs_own_key = excluded.needs_own_key, updated_at = excluded.updated_at`,
-		int64(conv), boolInt(cur.NeedsRotation), boolInt(cur.NeedsOwnKey), nowMs())
-	return err
+	now := nowMs()
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		if needsRotation != nil {
+			v := boolInt(*needsRotation)
+			if _, err := tx.ExecContext(ctx, `INSERT INTO key_flags (conv_id, needs_rotation, needs_own_key, updated_at) VALUES (?,?,0,?) ON CONFLICT(conv_id) DO UPDATE SET needs_rotation = excluded.needs_rotation, updated_at = excluded.updated_at`,
+				int64(conv), v, now); err != nil {
+				return err
+			}
+		}
+		if needsOwnKey != nil {
+			v := boolInt(*needsOwnKey)
+			if _, err := tx.ExecContext(ctx, `INSERT INTO key_flags (conv_id, needs_rotation, needs_own_key, updated_at) VALUES (?,0,?,?) ON CONFLICT(conv_id) DO UPDATE SET needs_own_key = excluded.needs_own_key, updated_at = excluded.updated_at`,
+				int64(conv), v, now); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // KeyFlags reads the flags (zero values when no row exists).

@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -129,10 +130,13 @@ func main() {
 	srv.StartModeration(ctx)
 	// whatever deleted accounts still own goes, now and every hour after
 	srv.StartAccountSweep(ctx)
+	// what runs beside the requests, waited for at shutdown: the meter
+	// writes its last minute of usage as it stops
+	var loops sync.WaitGroup
 	if srv.Meter != nil {
-		go srv.Meter.Run(ctx, time.Minute, func(err error) { log.Warn("realtime usage", "err", err) })
+		loops.Go(func() { srv.Meter.Run(ctx, time.Minute, func(err error) { log.Warn("realtime usage", "err", err) }) })
 	}
-	go maintenance(ctx, log, st, mediaStore, cfg.SessionTTL)
+	loops.Go(func() { maintenance(ctx, log, st, mediaStore, cfg.SessionTTL) })
 
 	httpSrv := &http.Server{Addr: cfg.Listen, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 120 * time.Second}
 	errc := make(chan error, 1)
@@ -165,6 +169,16 @@ func main() {
 	// disconnect hooks — so closing the database first meant a handful of
 	// "database is closed" errors on every restart and no WAL checkpoint.
 	hub.Wait(shutdownCtx)
+	srv.WaitBackground(shutdownCtx)
+	waited := make(chan struct{})
+	go func() {
+		loops.Wait()
+		close(waited)
+	}()
+	select {
+	case <-waited:
+	case <-shutdownCtx.Done():
+	}
 	if err := database.Close(); err != nil {
 		log.Warn("database close", "err", err)
 	}
@@ -234,7 +248,9 @@ func sweepTemp(ctx context.Context, st *store.Store, dir string, now time.Time) 
 	for _, e := range entries {
 		path := filepath.Join(dir, "tmp", e.Name())
 		switch {
-		case strings.HasPrefix(e.Name(), "upload-"):
+		case strings.HasPrefix(e.Name(), "upload-"), strings.HasPrefix(e.Name(), "piece-"):
+			// a piece is staged here while its request's body arrives; one
+			// left behind by a restart mid-request has nobody coming for it
 			if idle(path, time.Hour) {
 				remove(path)
 			}

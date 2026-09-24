@@ -205,6 +205,21 @@ func escapeLike(s string) string {
 // CountUsers returns the number of accounts people made. Nexa's is not one:
 // the first person to register must still find the instance empty, since
 // that is what makes them its admin.
+// CountAdminsEver counts accounts that hold the admin flag, deleted ones
+// included: whether this instance has ever been set up.
+func (s *Store) CountAdminsEver(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagSystem).Scan(&n)
+	return n, err
+}
+
+// OldestAccountID is the first account anyone made (the system account aside).
+func (s *Store) OldestAccountID(ctx context.Context) (ids.ID, error) {
+	var id int64
+	err := s.db.R.QueryRowContext(ctx, `SELECT id FROM users WHERE flags & ? = 0 ORDER BY id LIMIT 1`, FlagSystem).Scan(&id)
+	return ids.ID(id), err
+}
+
 func (s *Store) CountUsers(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? = 0`, FlagSystem).Scan(&n)
