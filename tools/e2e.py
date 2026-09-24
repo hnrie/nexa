@@ -112,7 +112,19 @@ class Session:
         p.check("input[type=checkbox]")
         p.click("text=Continue to nexa")
         p.wait_for_url("**/channels/@me", timeout=30000)
+        self.agree_terms()
         p.wait_for_selector("text=Friends", timeout=15000)
+
+    def agree_terms(self):
+        """Gets past the Terms dialog every account sees until it agrees (on this device)."""
+        p = self.page
+        try:
+            p.wait_for_selector("[data-testid=terms-gate]", timeout=5000)
+        except Exception:
+            return
+        p.check("[data-testid=terms-check]")
+        p.click("[data-testid=terms-agree]")
+        p.wait_for_selector("[data-testid=terms-gate]", state="detached", timeout=5000)
 
     def login(self):
         p = self.page
@@ -121,6 +133,7 @@ class Session:
         p.fill("input[type=password]", PASSWORD)
         p.click("button[type=submit]")
         p.wait_for_url("**/channels/@me", timeout=60000)
+        self.agree_terms()
 
     def logout(self):
         p = self.page
@@ -351,8 +364,8 @@ def expressions_flow(srv, alice, bob, server_id, link):
     a.click("[data-nav=stickers], button:has-text('Sticker Packs')")
     # the app asks for the name in its own dialog (the desktop app has no window.prompt)
     a.click("[data-testid=create-pack]")
-    a.fill("[data-testid=prompt-value]", "Test pack")
-    a.click("[data-testid=prompt-confirm]")
+    a.fill("[data-testid=create-pack-name]", "Test pack")
+    a.keyboard.press("Enter")
     a.wait_for_selector("[data-testid=pack-name]", timeout=15000)
     a.set_input_files("[data-testid=sticker-file]", {"name": "wave.png", "mimeType": "image/png", "buffer": png_bytes(96, 96, (250, 180, 60))})
     a.wait_for_selector("[data-testid=sticker-name]", timeout=10000)
@@ -606,8 +619,8 @@ def groups_flow(srv, alice, bob, phone):
     a.click("[data-nav=stickers]")
     a.click("[data-nav=packs-emoji]")
     a.click("[data-testid=create-pack]")
-    a.fill("[data-testid=prompt-value]", "My emoji")
-    a.click("[data-testid=prompt-confirm]")
+    a.fill("[data-testid=create-pack-name]", "My emoji")
+    a.keyboard.press("Enter")
     a.wait_for_selector("[data-testid=pack-name]", timeout=15000)
     a.set_input_files("[data-testid=sticker-file]", {"name": "blobby.png", "mimeType": "image/png", "buffer": png_bytes(64, 64, (120, 90, 240))})
     a.wait_for_selector("[data-testid=sticker-name]", timeout=10000)

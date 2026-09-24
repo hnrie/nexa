@@ -311,7 +311,8 @@ func TestCallSurvivesAGatewayReconnect(t *testing.T) {
 	srv.Realtime.Base = cf.URL
 	srv.Meter = realtime.NewMeter(srv.Store, 1000)
 	prev := voiceGrace
-	voiceGrace = 600 * time.Millisecond
+	// long enough for a reconnect under -race, which alone can take half a second
+	voiceGrace = 1500 * time.Millisecond
 	t.Cleanup(func() { voiceGrace = prev })
 
 	tokA, idA := register(t, ts, "alice")
@@ -343,7 +344,8 @@ func TestCallSurvivesAGatewayReconnect(t *testing.T) {
 	if ev := gb.next("voice_state", 3*time.Second); ev == nil || ev["user_id"] != idA || ev["channel_id"] != voiceCh || ev["self_mute"] != true || ev["media"] == nil {
 		t.Fatalf("bob's view after the resume: %v", ev)
 	}
-	time.Sleep(900 * time.Millisecond)
+	// well past the grace that began when the gateway dropped
+	time.Sleep(voiceGrace)
 	if st, ok := srv.Voice.Get(mustParseID(t, idA)); !ok || st.SFUSession != sess {
 		t.Fatalf("the grace running out ended a resumed call: %+v %v", st, ok)
 	}
@@ -367,7 +369,7 @@ func TestCallSurvivesAGatewayReconnect(t *testing.T) {
 	_, body = do(t, ts, "POST", "/api/v1/voice/sfu/session", tokA, nil)
 	sess2 := body["session_id"].(string)
 	ga3.close()
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(voiceGrace + 3*time.Second)
 	for {
 		ev := gb.next("voice_state", time.Until(deadline))
 		if ev == nil {
