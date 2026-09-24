@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Shield } from "lucide-react";
 import { admin as adminApi, type ClientErrorReport } from "@/api/admin";
 import { ApiError } from "@/api/client";
-import type { AdminSettings, AdminStats, AdminUser, LegalReport } from "@/api/types";
-import { Avatar } from "@/components/common/Avatar";
-import { OwnerBadge } from "@/components/common/OwnerBadge";
-import { isOwner } from "@/lib/owner";
+import type { AdminSettings, AdminStats, LegalReport } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { formatBytes, formatFull } from "@/lib/time";
-import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import st from "./Settings.module.css";
 import s from "@/components/server/ServerSettings.module.css";
@@ -17,33 +15,16 @@ import s from "@/components/server/ServerSettings.module.css";
 import { t as tr_ } from "@/i18n";
 /** User settings → Instance Admin (admins only): stats, registration policy, users. */
 export default function AdminPage() {
-  const meId = useAuth((a) => a.me?.id);
   const toast = useUI((u) => u.toast);
-  const openModal = useUI((u) => u.openModal);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [key, setKey] = useState("");
-  const [users, setUsers] = useState<AdminUser[] | null>(null);
-  const [q, setQ] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
+  const nav = useNavigate();
 
   useEffect(() => {
     adminApi.stats().then(setStats).catch(() => setStats(null));
     adminApi.settings().then(setSettings).catch(() => setSettings(null));
   }, []);
-  useEffect(() => {
-    let alive = true;
-    const t = setTimeout(() => {
-      adminApi
-        .users(q)
-        .then((list) => alive && setUsers(list))
-        .catch(() => alive && setUsers([]));
-    }, q ? 250 : 0);
-    return () => {
-      alive = false;
-      clearTimeout(t);
-    };
-  }, [q]);
 
   const setMode = async (mode: AdminSettings["registration"]) => {
     const before = settings;
@@ -72,30 +53,6 @@ export default function AdminPage() {
       toast(err instanceof ApiError ? err.message : tr_("settings.admin.couldNotClearTheKey"), "error");
     }
   };
-  const deleteUser = async (u: AdminUser) => {
-    setBusy(u.id);
-    try {
-      await adminApi.deleteUser(u.id);
-      setUsers((cur) => cur?.filter((x) => x.id !== u.id) ?? null);
-      toast(tr_("settings.admin.accountWasDeleted", { username: u.username }), "success");
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : tr_("settings.admin.couldNotDeleteThatAccount"), "error");
-    } finally {
-      setBusy(null);
-    }
-  };
-  const patchUser = async (u: AdminUser, body: { disabled?: boolean; admin?: boolean }) => {
-    setBusy(u.id);
-    try {
-      const updated = await adminApi.patchUser(u.id, body);
-      setUsers((cur) => cur?.map((x) => (x.id === u.id ? updated : x)) ?? null);
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : tr_("settings.admin.couldNotUpdateTheUser"), "error");
-    } finally {
-      setBusy(null);
-    }
-  };
-
   return (
     <>
       <h2 className={st.title}>{tr_("settings.admin.instanceAdmin")}</h2>
@@ -134,43 +91,22 @@ export default function AdminPage() {
         </>
       ) : <Spinner />}
       <h5 className={st.h5}>{tr_("settings.admin.users")}</h5>
-      <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr_("settings.admin.searchByUsernameOrDisplayName")} />
+      <div className={st.panelLink} data-testid="admin-panel-link">
+        <span className={st.panelLinkIcon} aria-hidden="true"><Shield size={22} /></span>
+        <span className={st.panelLinkText}>
+          <span className={st.panelLinkTitle}>{tr_("moderation.title")}</span>
+          <span className={st.hint} style={{ margin: 0 }}>{tr_("settings.admin.panelMoved")}</span>
+        </span>
+        <Button
+          size="sm"
+          onClick={() => {
+            useUI.getState().closeAllModals();
+            nav("/channels/@admin");
+          }}
+        >
+          {tr_("settings.admin.openPanel")}
+        </Button>
       </div>
-      {users === null ? <Spinner /> : null}
-      {users?.map((u) => (
-        <div key={u.id} className={`${s.memberRow} ${st.adminUser}`}>
-          <Avatar id={u.id} avatarId={null} name={u.display_name} size={36} />
-          <div className={s.memberText}>
-            <span className={s.memberName}>{u.display_name}{isOwner(u.id) ? <OwnerBadge /> : u.admin ? <span style={{ fontSize: 11, color: "var(--text-brand)" }}>{tr_("settings.admin.adminTag")}</span> : null}{u.disabled ? <span style={{ fontSize: 11, color: "var(--danger)" }}>{tr_("settings.admin.disabledTag")}</span> : null}</span>
-            <span className={s.memberSub}>@{u.username} · {tr_("server.members.joinedOn", { when: formatFull(u.created_at) })}</span>
-          </div>
-          {u.id !== meId ? (
-            <div className={st.adminActions}>
-              <Button size="sm" variant="secondary" disabled={busy === u.id} onClick={() => void patchUser(u, { admin: !u.admin })}>{u.admin ? tr_("settings.admin.removeAdmin") : tr_("settings.admin.makeAdmin")}</Button>
-              <Button size="sm" variant={u.disabled ? "positive" : "danger"} disabled={busy === u.id} onClick={() => (u.disabled ? void patchUser(u, { disabled: false }) : openModal("confirm", { title: tr_("settings.admin.disableNamed", { username: u.username }), body: tr_("settings.admin.theyAreLoggedOutEverywhereAnd"), confirmLabel: tr_("settings.admin.disable"), danger: true, onConfirm: () => patchUser(u, { disabled: true }) }))}>{u.disabled ? tr_("settings.admin.enable") : tr_("settings.admin.disable")}</Button>
-              <Button
-                size="sm"
-                variant="danger"
-                disabled={busy === u.id || u.admin}
-                title={u.admin ? tr_("settings.admin.removeTheirAdminAccessFirst") : undefined}
-                data-testid="admin-delete-user"
-                onClick={() =>
-                  openModal("confirm", {
-                    title: `Delete @${u.username}`,
-                    body: tr_("settings.admin.theirAccountIsDeletedForGood"),
-                    confirmLabel: tr_("settings.account.deleteAccount"),
-                    danger: true,
-                    onConfirm: () => deleteUser(u),
-                  })
-                }
-              >
-                Delete
-              </Button>
-            </div>
-          ) : <span className={s.memberSub}>you</span>}
-        </div>
-      ))}
       <LegalResponse />
       <CrashLog />
     </>

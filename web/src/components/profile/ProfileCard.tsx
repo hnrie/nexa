@@ -1,3 +1,5 @@
+import { NexaProfile } from "@/components/nexa/NexaProfile";
+import { isSystemAccount } from "@/lib/moderation";
 import { Check, Clock, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -128,6 +130,8 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
   }, [noteOpen]);
 
   if (!user) return null;
+  // the system account is not a person, and says so
+  if (isSystemAccount(user.flags)) return <NexaProfile variant={variant} onClose={onClose} />;
   const st = preview ? "online" : statusOf(presence);
   const cs = preview ? (user.status_text || user.status_emoji ? { text: user.status_text, emoji: user.status_emoji } : null) : customStatus(presence);
   const activities = preview ? [] : activitiesOf(presence);

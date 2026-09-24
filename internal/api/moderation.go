@@ -187,6 +187,9 @@ func (s *Server) modTarget(w http.ResponseWriter, r *http.Request) *store.User {
 func (s *Server) modUserDetail(ctx context.Context, me, u *store.User) (modUserView, error) {
 	now := time.Now().UnixMilli()
 	v := modUserView{PublicUser: u.Public(), AdminFlags: u.Flags, Blocked: s.moderationBlock(ctx, me, u)}
+	if seen, err := s.Store.LastSeen(ctx, u.ID); err == nil {
+		v.LastSeenAt = seen
+	}
 	mute, ban, err := s.Store.ActiveRestrictions(ctx, u.ID, now)
 	if err != nil {
 		return v, err

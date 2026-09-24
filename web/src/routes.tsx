@@ -17,6 +17,17 @@ const StickerPackPage = lazyPage(() => import("@/pages/StickerPackPage"));
 const DownloadPage = lazyPage(() => import("@/pages/DownloadPage"));
 const GuestCallPage = lazyPage(() => import("@/pages/GuestCallPage"));
 const LegalPage = lazyPage(() => import("@/pages/LegalPage"));
+const NexaPage = lazyPage(() => import("@/pages/NexaPage"));
+const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
+// The panel and its tabs come in one file; the tabs are routes of their own
+// so "@admin/cases/:caseId" outranks ":serverId/:channelId/:messageId".
+const adminPanel = () => import("@/pages/AdminPanelPage");
+const AdminPanelPage = lazyPage(adminPanel);
+const AdminUsers = lazyPage(() => adminPanel().then((m) => ({ default: m.UserGrid })));
+const AdminUser = lazyPage(() => adminPanel().then((m) => ({ default: m.UserCasesView })));
+const AdminCases = lazyPage(() => adminPanel().then((m) => ({ default: m.CasesTab })));
+const AdminLogs = lazyPage(() => adminPanel().then((m) => ({ default: m.LogsTab })));
+const AdminAnnouncements = lazyPage(() => adminPanel().then((m) => ({ default: m.AnnouncementsTab })));
 
 export function AppRoutes() {
   return (
@@ -41,6 +52,19 @@ export function AppRoutes() {
               <AppShell>
                 <Routes>
                   <Route path="@me" element={<FriendsPage />} />
+                  <Route path="@me/nexa" element={<NexaPage />} />
+                  <Route path="@me/nexa/cases/:caseId" element={<NexaCasePage />} />
+                  <Route path="@admin" element={<AdminPanelPage />}>
+                    <Route index element={<Navigate to="users" replace />} />
+                    <Route path="users" element={<AdminUsers />} />
+                    <Route path="users/:userId" element={<AdminUser />} />
+                    <Route path="users/:userId/cases/:caseId" element={<AdminUser />} />
+                    <Route path="cases" element={<AdminCases />} />
+                    <Route path="cases/:caseId" element={<AdminCases />} />
+                    <Route path="logs" element={<AdminLogs />} />
+                    <Route path="announcements" element={<AdminAnnouncements />} />
+                    <Route path="*" element={<Navigate to="users" replace />} />
+                  </Route>
                   <Route path="@me/:channelId" element={<DMPage />} />
                   <Route path="@me/:channelId/:messageId" element={<DMPage />} />
                   <Route path=":serverId" element={<ServerPage />} />

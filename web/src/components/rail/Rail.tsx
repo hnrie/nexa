@@ -1,4 +1,4 @@
-import { Plus, Users } from "lucide-react";
+import { Plus, Shield, Users } from "lucide-react";
 import { useCallback, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { iconUrl } from "@/api/users";
@@ -20,6 +20,8 @@ import { useUsers } from "@/stores/users";
 import { dmMenuItems } from "@/components/sidebar/dmMenu";
 import { serverMenuItems } from "@/components/sidebar/serverMenu";
 import { lastChannelOf } from "@/stores/serverNav";
+import { useNexa } from "@/stores/nexa";
+import { useModeration } from "@/stores/moderation";
 import s from "./Rail.module.css";
 
 import { t } from "@/i18n";
@@ -77,6 +79,13 @@ export function Rail() {
   }
   const friendRequests = useMemo(() => Object.values(rels).filter((r) => r.type === "incoming").length, [rels]);
   homeCount += friendRequests;
+  // what Nexa sent waits under home, like any conversation
+  const nexaUnread = useNexa((n) => n.state?.unread ?? 0);
+  if (nexaUnread > 0) unread = true;
+  homeCount += nexaUnread;
+  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
+  const needsReply = useModeration((m) => m.counts?.needs_reply ?? 0);
+  const inPanel = loc.pathname.startsWith("/channels/@admin");
   // like the people themselves waiting at the door: who sent something, and how much
   const waiting = unreadConversations(channels, reads, settings, openConvo).slice(0, MAX_WAITING);
 
@@ -150,6 +159,17 @@ export function Rail() {
         </Tooltip>
         {homeCount > 0 ? <span className={s.badge} aria-hidden="true" data-testid="home-count">{badgeText(homeCount)}</span> : null}
       </div>
+      {isAdmin ? (
+        <div className={s.item} data-selected={inPanel} data-unread={needsReply > 0 && !inPanel} data-testid="rail-moderation">
+          <span className={s.pill} />
+          <Tooltip text={t("moderation.title")} side="right">
+            <button className={s.btn} aria-label={needsReply > 0 ? t("moderation.railWithCount", { count: needsReply }) : t("moderation.title")} onClick={() => nav("/channels/@admin")}>
+              <Shield size={24} />
+            </button>
+          </Tooltip>
+          {needsReply > 0 ? <span className={s.badge} aria-hidden="true">{badgeText(needsReply)}</span> : null}
+        </div>
+      ) : null}
       {waiting.map(({ channel: ch, count }) => {
         const name = channelDisplayName(ch, users, meId, nicknames);
         const other = ch.type === "dm" ? (ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0] ?? "") : "";

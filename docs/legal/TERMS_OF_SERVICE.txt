@@ -1,127 +1,176 @@
 NEXA - TERMS OF SERVICE
 Site: chat.evilion.xyz
-Run by: Nora (in the app: @nora) - contact: evilionx3@proton.me
-Effective: 2026-09-20
+Run by: Nora (@nora in the app)
+Contact: evilionx3@proton.me
+Effective: 2026-09-24
 
-1. WHAT THIS IS
+These Terms are the agreement between you and Nora, who runs Nexa.
+They are short on purpose and written in plain language. The Privacy
+Policy is part of them.
 
-Nexa is a small chat service run by one person. Messages, files, and
-calls are encrypted on your device with keys the server never has. I
-cannot read them, I cannot monitor them, and there is no switch that
-would let me. That is how the software works, not a promise that can
-be waived later.
+1. WHAT NEXA IS
 
-Because of that, these Terms mostly cover the small part I can see
-and control: public profile information, community membership, and
-the delivery details the server needs to work.
+Nexa is a small, independent chat service. Your messages, files, and
+calls are encrypted on your device with keys the server never has.
+Nobody who runs Nexa can read them, monitor them, or switch that off.
+That is how the software works, not a promise that could be quietly
+waived later.
 
-By creating an account you agree to these Terms and to the Privacy
-Policy. If you do not agree, please do not create an account.
+Nexa is run by Nora, with help from a small team of moderators she
+appoints (called staff in these Terms). Staff only ever work with the
+small part of Nexa that is not encrypted: public profiles, community
+membership, moderation cases, and the delivery details the server
+needs to work.
 
-2. ACCOUNTS
+2. YOUR ACCOUNT
 
-- Signing up only asks for a username, a display name, and a
-  password. No email or phone number is needed, and none is
-  collected.
-- Please look after your password and your recovery key. The
-  recovery key is shown once at registration and never stored on
-  the server. If you lose both, your messages are gone for good.
-  There is no way for me to recover them.
-- One account per person. Please do not share passwords or sell
-  accounts.
-- I may disable accounts that break the rules in Section 4, but
-  only within the technical limits in Section 5.
+- Signing up asks only for a username, a display name, and a
+  password. No email address or phone number is needed or collected.
+- You must be at least 13 years old, or older where the law where
+  you live requires it, to create an account.
+- Please look after your password and your recovery key. The recovery
+  key is shown once, when you sign up, and is never stored anywhere.
+  If you lose both, your messages are gone for good. Nobody can
+  recover them for you.
+- One person per account. Please do not share your password, sell
+  your account, or use someone else's.
+- Your username, display name, profile picture, banner, about me,
+  pronouns, and custom status are public. Everyone can see them.
 
-3. ENCRYPTION AND NO MONITORING
+3. ENCRYPTION AND PRIVACY
 
-- Message text, file contents and file names, call audio and video,
-  and your encrypted settings are all encrypted before they reach
-  the server. The server only stores ciphertext it cannot read.
-- I do not monitor messages, calls, or files, and I have no way to
-  do so. There is no admin panel, setting, or software switch that
-  decrypts content already sent, and no way to intercept future
-  content in readable form.
-- Link previews are made by the sender's own app, so other people
-  never reveal the link address. Search runs on your device using
-  messages it already decrypted. Search words are never sent to
-  the server.
+- Message text, file contents and names, call audio and video, and
+  your settings are encrypted before they leave your device. The
+  server stores only ciphertext it cannot read.
+- Nobody who runs Nexa holds a key to any of it. There is no admin
+  panel, setting, or software switch that decrypts content already
+  sent, and no way to intercept future content in readable form.
+- A few things are not end-to-end encrypted, because the instance
+  itself has to read them: your public profile, moderation cases and
+  the threads that go with them, and announcements from Nexa. Section
+  6 explains them.
+- The Privacy Policy lists exactly what is stored and who can see it.
 
-4. A FEW RULES
+4. THE RULES
 
-Please keep this place decent:
+Please keep Nexa decent. These rules apply everywhere on it:
 
   1. Keep it legal. Do not use Nexa to break the law. That includes
      CSAM, exploiting minors, terrorism, trafficking, fraud, and
-     credible threats of violence. This applies everywhere here.
+     credible threats of violence.
   2. Respect copyright. Only share things you have the right to
-     share. Do not upload pirated material or pass off other
-     people's work as your own.
+     share. Do not upload pirated material or pass off other people's
+     work as your own.
   3. No gore or extreme graphic content. Do not post graphic images
      or video of severe injury, death, or cruelty.
-  4. No hate. Usernames, display names, avatars, banners, and profile
-     fields must not be racist, homophobic, transphobic, or otherwise
-     hateful toward a protected group. Slurs, dehumanizing attacks,
-     and harassment for someone's race, ethnicity, sex, gender
-     identity, sexual orientation, disability, religion, or age are
-     not allowed.
+  4. No hate or harassment. Usernames, display names, profile
+     pictures, banners, and other profile fields must not be racist,
+     homophobic, transphobic, or otherwise hateful toward a protected
+     group. Slurs, dehumanizing attacks, and harassment for someone's
+     race, ethnicity, sex, gender identity, sexual orientation,
+     disability, religion, or age are not allowed.
+  5. No impersonation. Do not pretend to be someone else, and never
+     pretend to be Nexa or a member of staff.
+  6. Do not abuse the service. No spam, no scraping, no trying to get
+     around access controls, rate limits, or anyone's security, and
+     no new accounts to get around a mute or a ban.
 
-5. HOW THESE RULES ARE ENFORCED
+5. HOW MODERATION WORKS
 
-Since everything is encrypted, I cannot see rule breaking in
-messages, files, or calls, and I do not go looking.
+What staff can see is limited by the encryption. They moderate what is
+public (profiles and public images) and what is reported to them. If
+someone you talk to shows staff something you sent them, staff can act
+on it. Nobody goes looking through chats, because nobody here can.
 
-- Usernames, display names, avatars, and banners ARE public and ARE
-  visible to me, like they are to everyone else. These are the only
-  things I moderate directly. An obviously hateful, slur based, or
-  impersonating username or avatar may be renamed, removed, or have
-  its account disabled.
-- Everything else only comes up if I receive a valid legal order
-  that I have to comply with. Even then I can only share what the
-  server actually holds, which is listed in the Privacy Policy.
-  Message text, file contents, and call audio still cannot be handed
-  over, because I have no way to read them.
-- So think of the rules above as what you agree to follow, plus what
-  a court can require. Day to day, nobody is watching your chats,
-  because nobody here can.
+When a rule is broken, staff can:
 
-6. THINGS YOU POST
+- Remove a profile picture or banner.
+- Reset profile text. The username, display name, about me, or
+  pronouns are replaced with MODERATOR_REMOVED_ followed by a random
+  code, and a custom status is cleared. A reset username becomes
+  moderator_removed_ followed by a random code, because usernames are
+  lowercase. Your old username keeps signing you in, and nobody else
+  can register it.
+- Mute an account for a set time. A muted account can still read
+  everything, but cannot send messages, react, join calls, or change
+  its profile until the mute ends.
+- Ban an account, for a set time or permanently. A banned account
+  sees only the ban screen and its moderation cases, where it can
+  appeal. Nothing in the account is removed while it is banned.
+- Delete an account. This permanently removes the account and
+  everything it posted and uploaded, including servers and group
+  chats it owns. See section 7.
+- In an emergency, such as an account someone else has taken over,
+  switch off sign-in for an account without a notice.
+
+Every action is taken for a reason, and you are told:
+
+- You get a notice from Nexa, both as a message and as a pop-up,
+  with the reason and the name of the member of staff who acted.
+- Each notice opens a private case thread with the moderation team,
+  where you can ask questions or appeal. Staff can lift a mute or a
+  ban early.
+- Every staff action is recorded in an append-only log that cannot be
+  edited or deleted, so what was done, by whom, and why stays on
+  record.
+
+Everything else only comes up if there is a valid legal order that
+has to be followed. Even then, only what the server actually holds
+can be handed over (see the Privacy Policy). Message text, file
+contents, and call audio still cannot be handed over, because nobody
+here has a way to read them.
+
+6. NEXA, THE OFFICIAL ACCOUNT
+
+- Nexa (@nexa, marked Official) is how the instance reaches you: it
+  sends moderation notices and announcements. Nobody can message Nexa
+  directly or add it as a friend.
+- Moderation case threads are a conversation with the moderation
+  team. They are not end-to-end encrypted, every member of staff can
+  read them, and they are kept as part of the moderation record, even
+  after an account is deleted.
+- Announcements go to everyone and show which member of staff wrote
+  them.
+- Nexa and staff will never ask for your password or your recovery
+  key. Anyone who does is not them.
+
+7. THINGS YOU POST
 
 - What you write and upload stays yours.
-- Public things you post (usernames, display names, avatars,
-  banners, server names and icons, custom emoji, stickers) are
-  stored as uploaded and are visible to other people and to me.
+- Public things (usernames, display names, profile pictures, banners,
+  server names and icons, custom emoji, stickers) are stored as
+  uploaded and are visible to everyone.
 - Encrypted things (messages and files) stay readable only to the
-  people holding the conversation key. Deleting a message deletes
-  its server row. Deleting an account overwrites its profile and
-  deletes its sessions, relationships, settings, key grants, and
-  second factor rows. Past messages stay behind, still encrypted,
+  people holding the conversation key. Deleting a message deletes its
+  server row.
+- If you delete your own account, its profile is overwritten and its
+  sessions, relationships, settings, key grants, and second factor
+  rows are deleted. Your past messages stay behind, still encrypted,
   marked as written by a deleted user.
-
-7. PLEASE DO NOT ABUSE THE SERVICE
-
-No spam, no scraping, no trying to break access controls, rate
-limits, or anyone else's security, and no interfering with the
-server or other people's apps.
+- If staff delete your account, everything it posted and uploaded is
+  removed with it, everywhere, and servers and group chats it owns are
+  deleted for everyone in them. The moderation case and the log entry
+  about it stay.
 
 8. AVAILABILITY AND CHANGES
 
-This is a one person project, provided as is, with no uptime
-guarantee. I may update, limit, or stop parts of the service, and I
-may update these Terms. If the Terms change in an important way, I
-will say so in the app with the new effective date. Keeping your
-account after that date means you accept the new Terms.
+Nexa is a small project, provided as is, with no uptime guarantee.
+Parts of the service may be updated, limited, or stopped, and these
+Terms may change. When they change in an important way, the app asks
+everyone to agree again and shows what changed, with the new
+effective date. Keeping your account after that means you accept the
+new Terms.
 
 9. CONTACT
 
-Questions, abuse reports that only include details you choose to
-share, or legal process:
+Questions, reports, appeals, or legal process:
 
   Email: evilionx3@proton.me
-  In the app: @nora
+  In the app: @nora, or reply in your case thread with Nexa
 
-Legal requests should name the account (username or account id),
+Legal requests should name the account (username or account ID),
 explain the legal basis, and include contact details for the reply.
-I will answer with exactly what is held, as listed in the Privacy
+They are answered with exactly what is held, as listed in the Privacy
 Policy. Anything not on that list does not exist to hand over.
 
 The full Terms and Privacy Policy are always available at

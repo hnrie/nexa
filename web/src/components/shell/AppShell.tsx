@@ -4,6 +4,7 @@ import { Rail } from "@/components/rail/Rail";
 import { DMSidebar } from "@/components/sidebar/DMSidebar";
 import { ServerSidebar } from "@/components/sidebar/ServerSidebar";
 import { ModalHost } from "@/components/modals/ModalHost";
+import { NexaNotices } from "@/components/nexa/NexaNotices";
 import { TermsGate } from "@/components/legal/TermsGate";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
@@ -229,6 +230,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <ModalHost />
+      <NexaNotices />
       <TermsGate />
       <Shortcuts />
       <DesktopEffects />

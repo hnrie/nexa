@@ -11,6 +11,7 @@ import { guarded } from "@/lib/captcha";
 import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, saveLock, unlockIdentity, type LockConfig } from "@/lib/appLock";
 import { acceptServerKdf } from "@/lib/serverKdf";
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
+import { useNexa } from "@/stores/nexa";
 import { storage } from "@/lib/storage";
 
 import { t } from "@/i18n";
@@ -107,6 +108,8 @@ function toParams(p: KdfParamsJson): KdfParams {
 async function finishLogin(set: (s: Partial<AuthState>) => void, me: MeUser, token: string, identity: Identity): Promise<void> {
   storage.set(TOKEN_KEY, token);
   api.setToken(token);
+  // a ban is known before the app is drawn, so it never flashes up behind the ban screen
+  useNexa.getState().setState(me.nexa);
   // With a passcode set, the only copy of the key on this device is the wrapped
   // one, so the plaintext must never go back into the key store.
   if (!hasLock(me.id)) await keystore.saveIdentity(me.id, identity);
@@ -134,6 +137,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     set(get().status === "offline" ? { token } : { status: "loading", token });
     try {
       const me = await usersApi.me();
+      useNexa.getState().setState(me.nexa);
       if (hasLock(me.id)) {
         set({ status: "pinlocked", me, identity: null, settingsKey: null });
         return;

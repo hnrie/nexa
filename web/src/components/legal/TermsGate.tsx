@@ -1,67 +1,106 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
-import { CONTACT_EMAIL, LEGAL_VERSION, acceptTerms, termsAccepted } from "@/lib/legal";
+import { Spinner } from "@/components/common/Spinner";
+import { LEGAL_VERSION, acceptTerms, previouslyAccepted, termsAccepted } from "@/lib/legal";
+import { useLegalDocs } from "@/lib/legalDocs";
 import { useAuth } from "@/stores/auth";
 import { t } from "@/i18n";
 import s from "./Legal.module.css";
-import { EncryptionNote, RulesSummary } from "./LegalContent";
+import { LegalChanges, LegalHighlights } from "./LegalContent";
+import { LegalDocument } from "./LegalDocument";
+
+type Tab = "summary" | "terms" | "privacy";
 
 /**
- * First-run gate: blocks the app until the account accepts the current Terms
- * + Privacy Policy. Persists per account in localStorage; bumping
- * LEGAL_VERSION asks everyone again. No dismiss, no Escape hatch: Agree is
- * the only way through.
+ * Blocks the app until the account agrees to the current Terms and Privacy
+ * Policy. Someone agreeing again after a change is shown what changed first.
+ * The documents can be read in full right here, and anyone who does not want
+ * to agree can sign out instead — there is no other way past.
+ *
+ * Agreement is kept per account on this device; bumping LEGAL_VERSION asks
+ * everyone again.
  */
 export function TermsGate() {
   const me = useAuth((a) => a.me);
   const status = useAuth((a) => a.status);
+  const logout = useAuth((a) => a.logout);
   const [checked, setChecked] = useState(false);
+  const [tab, setTab] = useState<Tab>("summary");
   const [, force] = useState(0);
-  const gateRef = useRef<HTMLDivElement>(null);
-  // The dialog autofocuses its first input, which here is the checkbox at the
-  // bottom; without this the terms box opens already scrolled down to it.
+  const reader = useRef<HTMLDivElement>(null);
+  const gate = useRef<HTMLDivElement>(null);
+  // a new document starts at its top
   useEffect(() => {
-    gateRef.current?.scrollTo({ top: 0 });
-  }, []);
+    reader.current?.scrollTo({ top: 0 });
+  }, [tab]);
+  // The dialog focuses its first field, the checkbox at the bottom, which
+  // scrolls the dialog to it; it should open at the top, where the reading starts.
+  const shown = status === "ready" && !!me && !termsAccepted(me.id);
+  // fetched only for someone who is being asked
+  const docs = useLegalDocs(shown);
+  useEffect(() => {
+    if (shown) gate.current?.parentElement?.scrollTo({ top: 0 });
+  }, [shown]);
+
   if (status !== "ready" || !me) return null;
   if (termsAccepted(me.id)) return null;
+  const previous = previouslyAccepted(me.id);
   const agree = () => {
     if (!checked) return;
     acceptTerms(me.id);
     force((n) => n + 1);
   };
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "summary", label: t("legal.readSummary") },
+    { id: "terms", label: t("legal.termsTitle") },
+    { id: "privacy", label: t("legal.privacyTitle") },
+  ];
   return (
     <Modal
       open
       onClose={() => undefined}
       closeOnOverlay={false}
-      title={t("legal.gateTitle")}
-      ariaLabel={t("legal.gateTitle")}
-      width={560}
+      closeButton={false}
+      title={previous ? t("legal.gateTitleUpdated") : t("legal.gateTitle")}
+      width={680}
       footer={
-        <Button variant="primary" disabled={!checked} onClick={agree}>
-          {t("legal.agreeAndContinue")}
-        </Button>
+        <div className={s.gateFoot}>
+          <Button variant="ghost" onClick={() => void logout()}>
+            {t("settings.settings.logOut")}
+          </Button>
+          <span className={s.grow} />
+          <Button variant="primary" disabled={!checked} onClick={agree} data-testid="terms-agree">
+            {t("legal.agreeAndContinue")}
+          </Button>
+        </div>
       }
     >
-      <div ref={gateRef} className={s.gate}>
-        <p className={s.body}>{t("legal.gateIntro", { version: LEGAL_VERSION })}</p>
-        <EncryptionNote />
-        <RulesSummary />
-        <p className={s.body}>{t("legal.gatePrivacy")}</p>
-        <div className={s.links}>
-          <Link to="/terms" target="_blank" rel="noreferrer noopener">
-            {t("legal.termsTitle")}
-          </Link>
-          <Link to="/privacy" target="_blank" rel="noreferrer noopener">
-            {t("legal.privacyTitle")}
-          </Link>
-          <a href={`mailto:${CONTACT_EMAIL}`}>{t("legal.contactOwner")}</a>
+      <div className={s.gate} data-testid="terms-gate" ref={gate}>
+        <p className={s.gateLead}>{previous ? t("legal.gateUpdatedIntro", { version: LEGAL_VERSION }) : t("legal.gateIntro", { version: LEGAL_VERSION })}</p>
+        {previous ? <LegalChanges /> : null}
+        <div className={s.readTabs} role="tablist" aria-label={t("legal.readSummary")}>
+          {tabs.map((x) => (
+            <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} className={s.readTab} data-selected={tab === x.id} onClick={() => setTab(x.id)}>
+              {x.label}
+            </button>
+          ))}
         </div>
+        {tab === "summary" ? (
+          <LegalHighlights />
+        ) : (
+          <div className={s.reader} ref={reader} role="tabpanel">
+            {docs ? (
+              <LegalDocument doc={tab === "terms" ? docs.terms : docs.privacy} toc={false} />
+            ) : (
+              <div className={s.loading}>
+                <Spinner />
+              </div>
+            )}
+          </div>
+        )}
         <label className={s.check}>
-          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} data-testid="terms-check" />
           <span>{t("legal.gateCheck")}</span>
         </label>
       </div>

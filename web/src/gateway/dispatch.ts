@@ -22,6 +22,12 @@ import { channels as channelsApi } from "@/api/channels";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { ring } from "@/lib/keyring";
 import type { Message, PublicUser, Relationship, ServerView } from "@/api/types";
+import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
+import { useNexa } from "@/stores/nexa";
+import { emitModEvent, useModeration } from "@/stores/moderation";
+
+/** Something from Nexa worth a sound or a notification. */
+export type NexaAlert = { kind: "notice" | "reply"; case: MemberCase } | { kind: "announcement"; announcement: Announcement } | { kind: "appeal"; caseId: string; userId: string };
 
 /** Hooks other layers register: notifications, voice, servers (later phases). */
 export const dispatchHooks: {
@@ -30,7 +36,19 @@ export const dispatchHooks: {
   onReady: (() => void)[];
   /** Someone new asked to be friends (not a request already known before). */
   onFriendRequest: ((r: Relationship) => void)[];
-} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [] };
+  /** Nexa has something new: a notice, a staff reply, an announcement, or for staff a member's appeal. */
+  onNexa: ((a: NexaAlert) => void)[];
+} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [] };
+
+/** The account's standing, and for staff what is waiting on them. */
+function applyNexaState(st: NexaState | undefined): void {
+  if (!st) return;
+  useNexa.getState().setState(st);
+  if (st.staff) {
+    useModeration.getState().setCounts(st.staff.counts);
+    useModeration.getState().setOwner(st.staff.owner_id);
+  }
+}
 
 /**
  * Which session the stores belong to.
@@ -146,6 +164,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       resetAll(active ?? undefined);
       useAuth.getState().setMe(d.user);
       useUsers.getState().upsert([...d.users, d.user]);
+      // a reconnect may have missed what Nexa said meanwhile: open views load it again
+      useNexa.setState({ feed: null, threads: {} });
+      applyNexaState(d.nexa);
       const servers = d.servers ?? [];
       const channels = [...d.channels, ...servers.flatMap((v) => v.channels)];
       useChannels.setState({ byId: Object.fromEntries(channels.map((c) => [c.id, c])) });
@@ -366,6 +387,46 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "heartbeat_ack":
     case "guest_ended":
+      return;
+    case "nexa_notice":
+      useNexa.getState().onNotice(e.d.case, e.d.people, e.d.state);
+      applyNexaState(e.d.state);
+      for (const h of dispatchHooks.onNexa) h({ kind: "notice", case: e.d.case });
+      return;
+    case "nexa_state":
+      applyNexaState(e.d);
+      return;
+    case "nexa_case":
+      useNexa.getState().onCase(e.d.case, e.d.messages, e.d.people, e.d.state);
+      applyNexaState(e.d.state);
+      if (e.d.messages.some((m) => m.kind === "staff")) for (const h of dispatchHooks.onNexa) h({ kind: "reply", case: e.d.case });
+      return;
+    case "nexa_announcement":
+      useNexa.getState().onAnnouncement(e.d.announcement, e.d.people);
+      emitModEvent({ type: "announcement", announcement: e.d.announcement, people: e.d.people });
+      for (const h of dispatchHooks.onNexa) h({ kind: "announcement", announcement: e.d.announcement });
+      return;
+    case "nexa_announcement_delete":
+      useNexa.getState().onAnnouncementGone(e.d.id);
+      emitModEvent({ type: "announcement_gone", id: e.d.id });
+      return;
+    case "mod_case":
+      useModeration.getState().setCounts(e.d.counts);
+      emitModEvent({ type: "case", case: e.d.case, messages: e.d.messages, people: e.d.people });
+      // a member writing is what the staff are waiting for
+      if (e.d.messages.some((m) => m.kind === "member")) for (const h of dispatchHooks.onNexa) h({ kind: "appeal", caseId: e.d.case.id, userId: e.d.case.user_id });
+      return;
+    case "mod_log":
+      emitModEvent({ type: "log", entry: e.d.entry, people: e.d.people });
+      return;
+    case "account_banned":
+      // the socket was shut on a ban; what the ban screen needs comes over REST
+      void nexaApi
+        .state()
+        .then((r) => {
+          if (!gone()) applyNexaState(r.state);
+        })
+        .catch(() => undefined);
       return;
     case "voice_state":
     case "voice_signal":

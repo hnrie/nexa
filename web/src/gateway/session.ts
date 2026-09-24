@@ -7,6 +7,8 @@ import { useMessages } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
+import { useNexa } from "@/stores/nexa";
+import { useModeration } from "@/stores/moderation";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
 import { clearLock, hasLock } from "@/lib/appLock";
@@ -138,6 +140,9 @@ export async function endSession(): Promise<void> {
   resetAll();
   useVoice.getState().clear();
   useUI.setState({ activeChannelId: null, replyTo: null, editing: null, editDrafts: {}, jumpTo: null, contextMenu: null, quickSwitcher: false, modals: [], modal: null });
+  // a deletion notice stays, to be read on the sign-in page
+  useNexa.getState().reset();
+  useModeration.getState().reset();
 }
 
 logoutHooks.push(endSession);

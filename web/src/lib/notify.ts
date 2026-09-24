@@ -1,6 +1,7 @@
 import type { Message, Relationship } from "@/api/types";
 import { avatarUrl } from "@/api/users";
-import { dispatchHooks } from "@/gateway/dispatch";
+import { dispatchHooks, type NexaAlert } from "@/gateway/dispatch";
+import { noticeTitle } from "@/lib/moderation";
 import { channelDisplayName } from "@/lib/names";
 import { parse, plainText } from "@/markdown";
 import { useAuth } from "@/stores/auth";
@@ -143,12 +144,43 @@ function onFriendRequest(r: Relationship): void {
   void showNotification(t("notify.friendRequest"), { body: t("notify.sentYouAFriendRequest", { name: displayName(r.user) }), tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
 }
 
+/**
+ * Something new from Nexa: a notice about this account, a staff reply in one
+ * of its cases, an announcement — or, for staff, a member writing in a case.
+ * It sounds like a message and notifies like one, and stays quiet the same
+ * ways: sounds off, Do Not Disturb, or already looking at it.
+ */
+function onNexa(a: NexaAlert): void {
+  const me = useAuth.getState().me;
+  if (!me || usePresence.getState().byUser[me.id]?.status === "dnd") return;
+  const path =
+    a.kind === "appeal" ? `/channels/@admin/cases/${a.caseId}` : a.kind === "announcement" ? "/channels/@me/nexa" : a.kind === "reply" ? `/channels/@me/nexa/cases/${a.case.id}` : "/channels/@me/nexa";
+  const onScreen = appOnScreen();
+  const viewing = typeof location !== "undefined" && (location.pathname === path || (a.kind === "appeal" && location.pathname.endsWith(`/cases/${a.caseId}`)));
+  if (onScreen && viewing) return;
+  const settings = useSettings.getState().settings;
+  if (settings.notifications.sounds) void playSound(a.kind === "notice" ? "mention" : "message");
+  if (onScreen || !notificationsEnabled(settings)) return;
+  const title = a.kind === "appeal" ? t("nexa.notify.appealTitle") : "Nexa";
+  const body =
+    a.kind === "notice"
+      ? noticeTitle(a.case.action, a.case.details)
+      : a.kind === "reply"
+        ? t("nexa.notify.reply", { number: a.case.number })
+        : a.kind === "announcement"
+          ? a.announcement.title || plainText(parse(a.announcement.body, { inline: true })).slice(0, 140)
+          : t("nexa.notify.appeal");
+  const tag = a.kind === "appeal" ? `ec-appeal-${a.caseId}` : a.kind === "announcement" ? `ec-nexa-a-${a.announcement.id}` : `ec-nexa-${a.case.id}`;
+  void showNotification(title, { body, tag, icon: "/icons/icon-192.png", silent: true }, path);
+}
+
 let installed = false;
 export function installNotifications(): void {
   if (installed) return;
   installed = true;
   dispatchHooks.onMessage.push(onMessage);
   dispatchHooks.onFriendRequest.push(onFriendRequest);
+  dispatchHooks.onNexa.push(onNexa);
   // a phone can only play sounds once a tap has let the page make noise
   installAudioUnlock();
   // the recorded sounds come down once the app has settled, so the first message is not late

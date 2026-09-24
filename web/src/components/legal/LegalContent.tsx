@@ -1,10 +1,12 @@
+import { Database, Eye, Gavel, Lock, ScrollText, Sparkles } from "lucide-react";
 import { CONTACT_EMAIL, OWNER_USERNAME } from "@/lib/legal";
 import { t } from "@/i18n";
 import s from "./Legal.module.css";
 
 /**
- * The platform rules + privacy substance, shared by Settings → About and the
- * public /terms /privacy /about pages so they can never drift apart.
+ * The pieces the consent dialog, Settings → About and the public pages share,
+ * so what they say about the Terms can never drift apart. The documents
+ * themselves are rendered whole by LegalDocument, from docs/legal.
  */
 export function ContactBlock() {
   return (
@@ -16,58 +18,46 @@ export function ContactBlock() {
   );
 }
 
-export function EncryptionNote() {
-  return (
-    <div className={s.section}>
-      <h3 className={s.h}>{t("legal.encryptionTitle")}</h3>
-      <p className={s.body}>{t("legal.encryptionBody")}</p>
-    </div>
-  );
-}
-
-export function RulesSummary() {
-  const rules = [
-    t("legal.ruleIllegal"),
-    t("legal.ruleCopyright"),
-    t("legal.ruleGore"),
-    t("legal.ruleHate"),
+/** The Terms and the Privacy Policy at a glance: what matters most, in five cards. */
+export function LegalHighlights() {
+  const cards = [
+    { icon: <Lock size={16} />, title: t("legal.hlPrivateTitle"), body: t("legal.hlPrivateBody") },
+    { icon: <Eye size={16} />, title: t("legal.hlStaffTitle"), body: t("legal.hlStaffBody") },
+    { icon: <Gavel size={16} />, title: t("legal.hlModerationTitle"), body: t("legal.hlModerationBody") },
+    { icon: <ScrollText size={16} />, title: t("legal.hlRulesTitle"), body: t("legal.hlRulesBody") },
+    { icon: <Database size={16} />, title: t("legal.hlDataTitle"), body: t("legal.hlDataBody") },
   ];
   return (
-    <div className={s.section}>
-      <h3 className={s.h}>{t("legal.rulesTitle")}</h3>
-      <ol className={s.list}>
-        {rules.map((r) => (
-          <li key={r} className={s.body}>
-            {r}
-          </li>
-        ))}
-      </ol>
-      <p className={s.body}>{t("legal.enforcementBody")}</p>
+    <div className={s.highlights}>
+      {cards.map((c) => (
+        <div key={c.title} className={s.highlight}>
+          <span className={s.hlIcon} aria-hidden="true">
+            {c.icon}
+          </span>
+          <span className={s.hlText}>
+            <span className={s.hlTitle}>{c.title}</span>
+            <span className={s.hlBody}>{c.body}</span>
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-export function TermsFull() {
+/** What changed since the version before this one, for anyone who agreed to that. */
+export function LegalChanges() {
+  const changes = [t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4")];
   return (
-    <section className={s.section}>
-      <h3 className={s.h}>{t("legal.termsTitle")}</h3>
-      <p className={s.body}>{t("legal.termsWhat")}</p>
-      <p className={s.body}>{t("legal.termsAccounts")}</p>
-      <EncryptionNote />
-      <RulesSummary />
-      <p className={s.body}>{t("legal.termsUse")}</p>
-      <ContactBlock />
-    </section>
-  );
-}
-
-export function PrivacyFull() {
-  return (
-    <section className={s.section}>
-      <h3 className={s.h}>{t("legal.privacyTitle")}</h3>
-      <p className={s.body}>{t("legal.privacySummary")}</p>
-      <p className={s.body}>{t("legal.privacyVisible")}</p>
-      <p className={s.body}>{t("legal.privacyNever")}</p>
-    </section>
+    <div className={s.news} data-testid="legal-changes">
+      <p className={s.newsTitle}>
+        <Sparkles size={14} aria-hidden="true" />
+        {t("legal.newTitle")}
+      </p>
+      <ul className={s.list}>
+        {changes.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+    </div>
   );
 }

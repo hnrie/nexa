@@ -21,6 +21,8 @@
 import { ApiError } from "@/api/client";
 import { WeakKdfError } from "@/crypto/kdf";
 import { t } from "@/i18n";
+import { bannedSentence, mutedSentence } from "@/lib/moderation";
+import { activeBan, activeMute, useNexa } from "@/stores/nexa";
 
 /**
  * The codes the client makes up when the request never reached a server that
@@ -65,6 +67,9 @@ export function describeError(err: unknown, fallback?: string): string {
   if (err instanceof ApiError) {
     const mine = codes()[err.code];
     if (mine) return mine;
+    // a mute or ban answers with a code the app can say better than the server
+    if (err.code === "account_muted") return mutedSentence(activeMute(useNexa.getState().state));
+    if (err.code === "account_banned") return bannedSentence(activeBan(useNexa.getState().state));
     // A code of the shape `http_<status>` is the one errorFrom writes when the
     // response carried no error envelope: there is no server sentence behind
     // it, only the status line, so the caller's own words win.

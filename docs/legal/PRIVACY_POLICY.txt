@@ -1,27 +1,26 @@
 NEXA - PRIVACY POLICY
 Site: chat.evilion.xyz
-Run by: Nora (in the app: @nora) - contact: evilionx3@proton.me
-Effective: 2026-09-20
+Run by: Nora (@nora in the app)
+Contact: evilionx3@proton.me
+Effective: 2026-09-24
 
-This policy lists exactly what this site holds. It is written against
-the actual database, so if something is not listed here, there is no
-place for it and nothing to hand over.
+This policy lists exactly what Nexa holds. It is written against the
+actual database, so if something is not listed here, there is no place
+for it and nothing to hand over.
 
 1. THE SHORT VERSION
 
-- Your messages, files, and calls are encrypted end to end. I cannot
-  read them and I cannot monitor anything you do inside a chat.
-- The ONLY content I can actually see is profile information you
-  choose to make public (your username, display name, avatar, banner,
-  about me, pronouns, status, and similar fields), plus the delivery
-  details the server needs (who sent what, where, and when) and
-  public images (avatars, banners, server icons, custom emoji,
-  stickers).
+- Your messages, files, and calls are encrypted end to end. Nobody who
+  runs Nexa can read them, and nobody monitors what you do in a chat.
+- What the owner and staff can see is your public profile, public
+  images, the delivery details the server needs (who sent what,
+  where, and when), and moderation records: the actions taken on an
+  account, and the case threads with Nexa that go with them.
 - No email, no phone number, no real name, no payment details, no
   location, no contacts, no analytics, and no push tokens are ever
   collected.
 
-2. WHAT IS ENCRYPTED (I CANNOT READ IT)
+2. WHAT IS ENCRYPTED (NOBODY WHO RUNS NEXA CAN READ IT)
 
 - Message text and edits. Stored only as ciphertext.
 - File contents, file names, file types, dimensions, and per file
@@ -31,101 +30,143 @@ place for it and nothing to hand over.
 - Your settings (themes, notification choices, mutes). Only the size,
   the version number, and the last written time can be seen.
 - Your password and recovery key. Your password never leaves your
-  device. Your browser only sends a derived check value. Your
-  recovery key is shown once in your browser and never stored
-  anywhere.
+  device; your browser only sends a derived check value. Your recovery
+  key is shown once in your browser and never stored anywhere.
 - Your private identity key and your conversation keys. Your private
   key sits on the server only wrapped by your password or recovery
   key. Conversation keys sit on the server only sealed separately to
-  each member. I hold no usable key of any kind. There is no spare
-  key, no master key, and no escrow.
+  each member. Nobody who runs Nexa holds a usable key of any kind.
+  There is no spare key, no master key, and no escrow.
 
-There is no setting, admin action, or software change I could make
-that would decrypt content already sent, and no way to deliver future
-content in readable form.
+There is no setting, admin action, or software change that would
+decrypt content already sent, and no way to deliver future content in
+readable form.
 
-3. WHAT I CAN SEE
+3. WHAT THE OWNER AND STAFF CAN SEE
 
-a) Profile information (public by design, typed by you):
-   username, display name, avatar and banner images, about me,
-   pronouns, accent color, custom status and expiry, presence
-   preference, DM privacy setting, per server nicknames and avatars,
-   account id, creation and last change times, admin and disabled
-   flags. None of this is identity checked.
+a) Profile information (public by design, typed by you): username,
+   display name, profile picture and banner, about me, pronouns,
+   accent colors, custom status and expiry, presence preference, DM
+   privacy setting, per server nicknames and pictures, account ID,
+   creation and last change times, and admin and disabled flags. None
+   of this is identity checked.
 
 b) Public images (stored as uploaded, can be handed over if ordered):
-   avatars, banners, server icons, custom emoji, stickers.
+   profile pictures, banners, server icons, custom emoji, stickers.
 
-c) Delivery details (needed to send and notify, not content):
-   message id, channel, author, type, timestamps, edit time, reply
-   target, mentions (user, role, and everyone flags are kept outside
-   the ciphertext so the server knows who to notify), file presence
-   and sizes, reaction values and counts, pins, read positions, and
-   poll vote positions (not the question or option text, which is
+c) Delivery details (needed to send and notify, not content): message
+   ID, channel, author, type, timestamps, edit time, reply target,
+   mentions (user, role, and everyone flags are kept outside the
+   ciphertext so the server knows who to notify), file presence and
+   sizes, reaction values and counts, pins, read positions, and poll
+   vote positions (not the question or option text, which is
    encrypted).
 
 d) Membership and structure (typed by users, stored as typed):
-   friends, requests, and blocks, server memberships and roles, DM
-   and group participants, channel names, topics, and structure,
-   invite codes you made (uses and expiry, but not who used them),
-   bans, and per community audit log entries.
+   friends, requests, and blocks, server memberships and roles, DM and
+   group participants, channel names, topics, and structure, invite
+   codes you made (uses and expiry, but not who used them), bans, and
+   per community audit log entries.
 
-e) Sessions: one entry per signed in device. That is the session id,
-   the IP address noted ONCE at sign in (never updated), the browser
-   or app description, and the sign in and last active times. Entries
-   are deleted on sign out or expiry. This is the only place an IP is
-   written. A locked subchat also notes which sessions typed its
-   password (the password itself is not kept, it only unlocks the
-   screen, messages stay encrypted under the conversation key).
-   Guest call links belong to the link, not to your account.
+e) Sessions: one entry per signed in device. That is the session ID,
+   the IP address noted once at sign in (never updated), the browser
+   or app description, and the sign in and last active times. Staff
+   see when an account was last active in the moderation panel.
+   Entries are deleted on sign out or expiry. This is the only place
+   an IP address is written. A locked subchat also notes which
+   sessions typed its password (the password itself is not kept; it
+   only unlocks the screen, and messages stay encrypted under the
+   conversation key). Guest call links belong to the link, not to
+   your account.
 
 f) Login checks (values not handed over, listed to close the point):
    the password check value, the password stretching salt and
    settings, your public key, your wrapped private key (cannot be
    opened without your password), and the wrapped recovery copy with
-   its check value. None of these is a password and none can be
+   its check value. None of these is a password, and none can be
    turned into one.
 
-g) Day to day running: unfinished upload progress (expected and
+g) Moderation records (not end-to-end encrypted, kept as the record
+   of how Nexa is moderated):
+   - Moderation cases: which action was taken on an account, the
+     reason, which member of staff took it, when, how long it lasts,
+     and the values a reset replaced (for example the old username).
+   - Case threads: the messages between a member and staff in a
+     moderation case, stored in readable form and readable by every
+     member of staff.
+   - The moderation log: an append-only record of every staff action
+     (who, to whom, what, why, and when), with the names as they were
+     at the time. Nobody can edit or delete it.
+   - Held usernames: a username reset by staff stays attached to its
+     account, so it still signs that account in, and nobody else can
+     register it.
+   - Announcements from Nexa, with who wrote them.
+   - Whether you have seen each notice, and how far you have read
+     your messages from Nexa.
+
+h) Day to day running: unfinished upload progress (expected and
    received sizes), crash reports (error kind, code location, app
-   version, message, never any chat or file content), one site wide
-   monthly data total (not per account), and server request logs
-   (page, result, size, duration, no IP recorded there).
+   version, and message, never any chat or file content), one site
+   wide monthly data total for calls (not per account), and server
+   request logs (page, result, size, and duration, with no IP
+   address recorded there).
 
 4. WHAT IS NEVER COLLECTED
 
-No email address. No phone number. No legal name, birth date, age,
-or ID documents. No payment details. No registration IP or last
-known IP field beyond the per session sign in IP above. No IP or
-access history. No online time history. No call records (who called
-whom, for how long). No device or advertising IDs and no push
-tokens. No location. No address book imports. No search words, link
-clicks, analytics, or tracking of any kind. No drafts, backups, or
-unsent copies. Search runs on your device using messages it already
+No email address. No phone number. No legal name, birth date, age, or
+ID documents. No payment details. No registration IP or last known IP
+field beyond the per session sign in IP above. No IP or access
+history. No online time history. No call records (who called whom,
+for how long). No device or advertising IDs and no push tokens. No
+location. No address book imports. No search words, link clicks,
+analytics, or tracking of any kind. No drafts, backups, or unsent
+copies. Search runs on your device, using messages it already
 decrypted.
 
 5. WHO SEES WHAT
 
 - Other people see your public profile, your messages once their app
-  decrypts them, and the communities and channels you share.
-- I (one person) see sections 3a to 3g above and nothing else.
-- No third parties, no advertisers, no analytics companies. Nothing
-  is sold or shared, except as forced by a valid legal order (see
-  Terms Section 5), and even then only what exists above. Content
-  still cannot be handed over.
+  decrypts them, and the communities and channels you share with
+  them.
+- The owner and the staff she appoints see sections 3a to 3h. Staff
+  use a moderation panel that shows public profiles, when accounts
+  were last active, moderation cases and their threads, the log, and
+  announcements. It shows nothing that is encrypted, because nothing
+  here can decrypt it.
+- No third parties, no advertisers, and no analytics companies.
+  Nothing is sold or shared, except as forced by a valid legal order
+  (see Terms section 5), and even then only what exists above.
+  Encrypted content still cannot be handed over.
 
-6. DELETION
+6. HOW LONG THINGS ARE KEPT
 
-- Deleted messages, files, and accounts are removed from the
-  database. No trash bin or archive is kept.
-- Deleting an account overwrites its profile, and deletes its
-  sessions, relationships, settings, key grants, and second factor
-  rows. Past messages stay behind, still encrypted, marked as
-  written by a deleted user.
+- Sessions: until you sign out, or after 90 days without use.
+- Messages and files: until they are deleted, by their author, by a
+  conversation or server owner, or with the author's account when
+  staff delete it.
+- Unfinished uploads, and files nothing points at any more: removed
+  after a day.
+- Crash reports: only the newest 500 are kept.
+- Moderation cases, case threads, held usernames, and the moderation
+  log: kept as the moderation record, including after an account is
+  deleted.
 - Backups, if kept for disaster recovery, hold the same encrypted
   content under the same limits.
 
-7. CONTACT
+7. DELETION
+
+- Deleted messages, files, and accounts are removed from the
+  database. No trash bin or archive is kept.
+- Deleting your own account overwrites its profile, and deletes its
+  sessions, relationships, settings, key grants, and second factor
+  rows. Your past messages stay behind, still encrypted, marked as
+  written by a deleted user.
+- When staff delete an account, everything it posted and uploaded is
+  removed with it, everywhere, and servers and group chats it owns
+  are deleted for everyone in them. The moderation case, its thread,
+  and the log entry stay.
+
+8. CONTACT
 
   Email: evilionx3@proton.me
   In the app: @nora

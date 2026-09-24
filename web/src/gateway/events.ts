@@ -19,6 +19,7 @@ import type {
   StickerPack,
   VoiceState,
 } from "@/api/types";
+import type { Announcement, CaseCounts, CaseMessage, MemberCase, ModLogEntry, NexaState, People, StaffCase } from "@/api/moderation";
 
 export type GatewayEvent =
   | { t: "ready"; d: ReadyPayload }
@@ -66,6 +67,20 @@ export type GatewayEvent =
   | { t: "session_expired"; d: unknown }
   /** A guest's time in the call is over: removed, revoked, expired, left, or the call is gone. */
   | { t: "guest_ended"; d: { reason: string } }
+  /** Staff acted on this account: the notice to show, and where the account stands now. */
+  | { t: "nexa_notice"; d: { case: MemberCase; people: People; state: NexaState } }
+  /** This account's standing changed (read, dismissed, a mute or ban ended). */
+  | { t: "nexa_state"; d: NexaState }
+  /** One of this account's cases moved: new thread lines, lifted, closed, reopened. */
+  | { t: "nexa_case"; d: { case: MemberCase; messages: CaseMessage[]; people: People; state: NexaState } }
+  | { t: "nexa_announcement"; d: { announcement: Announcement; people: People } }
+  | { t: "nexa_announcement_delete"; d: { id: Snowflake } }
+  /** Staff: a case changed, with any new lines of its thread. */
+  | { t: "mod_case"; d: { case: StaffCase; messages: CaseMessage[]; people: People; counts: CaseCounts } }
+  /** Staff: a new line in the punishment log. */
+  | { t: "mod_log"; d: { entry: ModLogEntry; people: People } }
+  /** Not from the server: the gateway was closed because the account is banned. */
+  | { t: "account_banned"; d?: undefined }
   | { t: "heartbeat_ack"; d?: undefined };
 
 export type GatewayEventType = GatewayEvent["t"];

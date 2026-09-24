@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { ContextMenuHost } from "@/components/common/ContextMenu";
 import { Toasts } from "@/components/common/Toasts";
+import { DeletedNotice } from "@/components/nexa/NexaNotices";
 import { AppLockEffect } from "@/components/shell/AppLockEffect";
 import { ErrorBoundary, markHealthy } from "@/components/shell/ErrorBoundary";
 import { markChunksHealthy } from "@/lib/lazyChunk";
@@ -22,6 +23,7 @@ export default function App() {
         <AppLockEffect />
         <AppRoutes />
         <ContextMenuHost />
+        <DeletedNotice />
         <Toasts />
       </I18nProvider>
     </ErrorBoundary>

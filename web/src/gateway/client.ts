@@ -145,6 +145,14 @@ export class GatewayClient {
         this.opts.onEvent({ t: "session_expired", d: {} });
         return;
       }
+      // Banned: the session still works for the ban screen and an appeal, so
+      // it is kept, but there is nothing to reconnect to until the ban ends.
+      if (ev.code === 4003) {
+        this.closedByUser = true;
+        this.setStatus("closed", { code: ev.code, reason: ev.reason });
+        this.opts.onEvent({ t: "account_banned" });
+        return;
+      }
       if (this.closedByUser) {
         this.setStatus("closed", { code: ev.code, reason: ev.reason });
         return;

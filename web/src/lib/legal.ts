@@ -1,17 +1,21 @@
 /**
- * Platform legal info: single source for the consent gate, the Settings →
- * About page, and the public /terms /privacy /about routes.
+ * Platform legal info for the consent gate, the Settings → About page, and
+ * the public /terms /privacy /about routes: which version is in force, who to
+ * contact, and who has agreed on this device.
  *
- * The full texts live in docs/legal/*.txt for review; this file carries the
- * same substance in a shape the UI can render. Keep them in sync — the .txt
- * files are the canonical wording.
+ * The documents themselves are docs/legal/*.txt, shown word for word (see
+ * legalDocs.ts); the summaries around them are the legal.* strings.
  *
  * Legal text stays in English on purpose (like the law-enforcement report):
  * a translated Terms is a different Terms.
  */
 
-/** Bump when the wording changes so every account is asked again. */
-export const LEGAL_VERSION = "2026-09-20";
+/**
+ * The effective date of the Terms and Privacy Policy in docs/legal. Bumped
+ * with the wording, so every account is asked again (a test holds the two to
+ * the same date).
+ */
+export const LEGAL_VERSION = "2026-09-24";
 
 export const CONTACT_EMAIL = "evilionx3@proton.me";
 
@@ -27,6 +31,16 @@ export function termsAccepted(userId: string): boolean {
     return localStorage.getItem(termsKey(userId)) === LEGAL_VERSION;
   } catch {
     return false;
+  }
+}
+
+/** The version this account agreed to before, if any: someone agreeing again is shown what changed. */
+export function previouslyAccepted(userId: string): string | null {
+  try {
+    const v = localStorage.getItem(termsKey(userId));
+    return v && v !== LEGAL_VERSION ? v : null;
+  } catch {
+    return null;
   }
 }
 

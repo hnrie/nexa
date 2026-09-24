@@ -28,12 +28,14 @@ interface Props {
    * from, so it has to be told, or it is announced as "dialog" and nothing else.
    */
   ariaLabel?: string;
+  /** Whether the title bar has an ✕; off for a dialog that has to be answered. */
+  closeButton?: boolean;
 }
 
 /** What Tab can reach, for the trap below. */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel }: Props) {
+export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const portalRoot = usePortalRoot();
@@ -121,9 +123,11 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
         {!bare && title !== undefined ? (
           <div className={s.header}>
             <h2 className={s.title} id={titleId}>{title}</h2>
-            <button className={s.close} onClick={onClose} aria-label={t("chat.attachments.close")}>
-              <X size={20} />
-            </button>
+            {closeButton ? (
+              <button className={s.close} onClick={onClose} aria-label={t("chat.attachments.close")}>
+                <X size={20} />
+              </button>
+            ) : null}
           </div>
         ) : null}
         <div className={bare ? s.bareBody : s.body}>{children}</div>

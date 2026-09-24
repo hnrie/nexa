@@ -15,6 +15,8 @@ import { useChannels } from "@/stores/channels";
 import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
 import { describeError } from "@/lib/errors";
 import { useUI } from "@/stores/ui";
+import { activeMute, useNexa } from "@/stores/nexa";
+import { mutedSentence } from "@/lib/moderation";
 import { useVoice, participantsOf } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import { SpeakingGate } from "./speaking";
@@ -313,6 +315,13 @@ function rebuildInput(s: Session): void {
 export async function joinVoice(channelId: string): Promise<void> {
   const myId = me();
   if (!myId) return;
+  // A muted account is in no call; the server refuses the join as well, but
+  // saying so here, in the reader's language, beats a refusal after a ring.
+  const mute = activeMute(useNexa.getState().state);
+  if (mute) {
+    useUI.getState().toast(mutedSentence(mute), "error");
+    return;
+  }
   // Made here, inside the tap, because iOS only lets audio start in a gesture
   // and nothing else in a call without a microphone would get it running.
   audioContext();
@@ -915,8 +924,11 @@ export function handleVoiceEvent(e: GatewayEvent): void {
         return;
       }
       store.setJoining(null);
-      store.setError(e.d.message);
-      useUI.getState().toast(e.d.message, "error");
+      {
+        const message = e.d.code === "account_muted" ? mutedSentence(activeMute(useNexa.getState().state)) : e.d.message;
+        store.setError(message);
+        useUI.getState().toast(message, "error");
+      }
       // `mine` is null for the whole window between announcing the join and the
       // server's own voice_state coming back, so this fires on a call the
       // server does think we are in. Telling it costs one redundant frame; not

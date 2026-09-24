@@ -37,6 +37,8 @@ import { lockState } from "@/lib/subchatLock";
 import { storage } from "@/lib/storage";
 import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
+import { MutedBar } from "@/components/nexa/NexaNotices";
+import { useMute } from "@/stores/nexa";
 import s from "./Chat.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -44,6 +46,7 @@ const PROFILE_PANEL_KEY = "ec:dmProfilePanel";
 
 export function ChatView({ channel }: { channel: Channel }) {
   const me = useAuth((a) => a.me);
+  const mute = useMute();
   const users = useUsers((u) => u.byId);
   const presence = usePresence((p) => p.byUser);
   const openModal = useUI((u) => u.openModal);
@@ -319,10 +322,13 @@ export function ChatView({ channel }: { channel: Channel }) {
           ) : (
             <>
               <MessageList key={channel.id} channel={channel} />
-              {/* the composer stays mounted underneath, so a draft and its attachments survive picking */}
+              {/* the composer stays mounted underneath, so a draft and its attachments survive picking — and a mute */}
               <div className={s.composerSlot} hidden={selecting}>
                 <TypingBar channelId={channel.id} />
-                <Composer channel={channel} />
+                <div hidden={!!mute} className={s.composerSlot}>
+                  <Composer channel={channel} />
+                </div>
+                {mute ? <MutedBar mute={mute} /> : null}
               </div>
               {selecting ? <SelectionBar channelId={channel.id} /> : null}
             </>

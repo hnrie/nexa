@@ -1171,6 +1171,15 @@ func (s *Store) AccountIDs(ctx context.Context) ([]ids.ID, error) {
 	return out, rows.Err()
 }
 
+// LastSeen is when any of the account's sessions was last used, or nil.
+func (s *Store) LastSeen(ctx context.Context, uid ids.ID) (*int64, error) {
+	var at sql.NullInt64
+	if err := s.db.R.QueryRowContext(ctx, `SELECT max(last_seen_at) FROM sessions WHERE user_id = ?`, int64(uid)).Scan(&at); err != nil {
+		return nil, err
+	}
+	return int64Ptr(at), nil
+}
+
 // ModUser is an account as the moderation grid shows it.
 type ModUser struct {
 	PublicUser

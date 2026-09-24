@@ -1,4 +1,4 @@
-import { Lock, MessageCircle, Plus, Users, X } from "lucide-react";
+import { Lock, MessageCircle, Plus, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { UserPanel } from "@/components/shell/UserPanel";
@@ -18,6 +18,9 @@ import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { badgeText, conversationCount } from "@/lib/unread";
 import { useSettings } from "@/stores/settings";
 import { closeDM, dmMenuItems } from "./dmMenu";
+import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
+import { useNexa } from "@/stores/nexa";
+import { useModeration } from "@/stores/moderation";
 import s from "./Sidebar.module.css";
 
 import { t } from "@/i18n";
@@ -36,6 +39,10 @@ export function DMSidebar() {
   const rels = useRelationships((r) => r.byUser);
   const nicknames = useMemo(() => friendNicknames(rels), [rels]);
   const dms = selectDMs(channels);
+  const nexa = useNexa((n) => n.state);
+  const nexaOpen = loc.pathname.startsWith("/channels/@me/nexa");
+  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
+  const needsReply = useModeration((m) => m.counts?.needs_reply ?? 0);
   const active = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
   // A subchat keeps its conversation highlighted, with its siblings listed
   // underneath, so you can see where you are.
@@ -58,13 +65,33 @@ export function DMSidebar() {
           <span className={s.navIcon}><Users size={22} /></span>
           <span>{t("sidebar.dMSidebar.friends")}</span>
         </button>
+        {isAdmin ? (
+          <button className={s.nav} data-selected={loc.pathname.startsWith("/channels/@admin")} onClick={() => go("/channels/@admin")} data-testid="nav-moderation">
+            <span className={s.navIcon}><Shield size={22} /></span>
+            <span style={{ flex: 1, textAlign: "start" }}>{t("moderation.navLabel")}</span>
+            {needsReply > 0 ? <span className={s.mention} aria-label={t("moderation.needsReplyCount", { count: needsReply })}>{badgeText(needsReply)}</span> : null}
+          </button>
+        ) : null}
         <div className={s.header}>
           <span>{t("sidebar.dMSidebar.directMessages")}</span>
           <button className={s.headerBtn} aria-label={t("sidebar.dMSidebar.createDm")} title={t("sidebar.dMSidebar.createDm")} onClick={() => openModal("createDM")}>
             <Plus size={16} />
           </button>
         </div>
-        {dms.length === 0 ? <div className={s.empty}>{t("sidebar.dMSidebar.noConversationsYetAddAFriend")}</div> : null}
+        {nexa && nexa.latest > 0 ? (
+          // Nexa's conversation sits at the top: it is how the instance reaches this account
+          <div className={s.item} data-selected={nexaOpen} data-unread={nexa.unread > 0 && !nexaOpen} data-testid="nexa-dm">
+            <button type="button" className={s.itemMain} onClick={() => go("/channels/@me/nexa")}>
+              <NexaAvatar size={32} />
+              <span className={s.text}>
+                <span className={s.name} style={{ display: "flex", alignItems: "center", gap: 6 }}>Nexa <OfficialBadge compact /></span>
+                <span className={s.sub}>{t("nexa.sidebarSub")}</span>
+              </span>
+            </button>
+            {nexa.unread > 0 && !nexaOpen ? <span className={s.mention} data-testid="nexa-unread" aria-label={t("nexa.unreadCount", { count: nexa.unread })}>{badgeText(nexa.unread)}</span> : null}
+          </div>
+        ) : null}
+        {dms.length === 0 && !(nexa && nexa.latest > 0) ? <div className={s.empty}>{t("sidebar.dMSidebar.noConversationsYetAddAFriend")}</div> : null}
         {dms.map((ch) => {
           const name = channelDisplayName(ch, users, meId, nicknames);
           const rs = reads[ch.id];

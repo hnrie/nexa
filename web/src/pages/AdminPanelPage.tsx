@@ -1,0 +1,126 @@
+import { FolderOpen, LayoutGrid, Megaphone, ScrollText, Shield } from "lucide-react";
+import { Suspense, useEffect, type KeyboardEvent } from "react";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { moderation as modApi } from "@/api/moderation";
+import { Spinner } from "@/components/common/Spinner";
+import { PageHeaderButtons } from "@/components/shell/PageHeader";
+import { FLAG_ADMIN } from "@/lib/moderation";
+import { useAuth } from "@/stores/auth";
+import { useModeration } from "@/stores/moderation";
+import { t } from "@/i18n";
+import m from "@/components/moderation/Moderation.module.css";
+
+// the tabs, routed in routes.tsx and loaded with the panel
+export { AnnouncementsTab } from "@/components/moderation/AnnouncementsTab";
+export { CasesTab, UserCasesView } from "@/components/moderation/CaseWorkspace";
+export { LogsTab } from "@/components/moderation/LogsTab";
+export { UserGrid } from "@/components/moderation/UserGrid";
+
+type Tab = "users" | "cases" | "logs" | "announcements";
+
+const BASE = "/channels/@admin";
+
+function tabOf(path: string): Tab {
+  const seg = path.slice(BASE.length + 1).split("/")[0];
+  return seg === "cases" || seg === "logs" || seg === "announcements" ? seg : "users";
+}
+
+/**
+ * The Admin & Moderation panel: every account at a glance, the cases waiting
+ * on the staff, the record of everything done, and announcements to everyone.
+ * Only instance admins get here; the server refuses everyone else anyway.
+ */
+export default function AdminPanelPage() {
+  const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & FLAG_ADMIN) !== 0);
+  const counts = useModeration((s) => s.counts);
+  const loc = useLocation();
+  const nav = useNavigate();
+  const tab = tabOf(loc.pathname);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    modApi
+      .summary()
+      .then((r) => {
+        const st = useModeration.getState();
+        st.setCounts(r.counts);
+        st.setOwner(r.owner_id);
+        st.mergePeople(r.people);
+      })
+      .catch(() => undefined);
+  }, [isAdmin]);
+
+  useEffect(() => {
+    document.title = `${t("moderation.title")} · Nexa`;
+    return () => {
+      document.title = "Nexa";
+    };
+  }, []);
+
+  if (!isAdmin) return <Navigate to="/channels/@me" replace />;
+
+  const tabs: { id: Tab; label: string; icon: JSX.Element; badge?: number }[] = [
+    { id: "users", label: t("moderation.tabs.users"), icon: <LayoutGrid size={17} /> },
+    { id: "cases", label: t("moderation.tabs.cases"), icon: <FolderOpen size={17} />, badge: counts?.needs_reply || undefined },
+    { id: "logs", label: t("moderation.tabs.logs"), icon: <ScrollText size={17} /> },
+    { id: "announcements", label: t("moderation.tabs.announcements"), icon: <Megaphone size={17} /> },
+  ];
+
+  // Left and Right across the strip, as a tablist moves
+  const onKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = tabs.findIndex((x) => x.id === tab);
+    const next = tabs[(at + step + tabs.length) % tabs.length]!;
+    nav(`${BASE}/${next.id}`);
+    const strip = e.currentTarget.parentElement;
+    strip?.querySelectorAll<HTMLElement>('[role="tab"]')[tabs.indexOf(next)]?.focus();
+  };
+
+  return (
+    <div className={m.page} data-testid="admin-panel">
+      <header className={m.header}>
+        <PageHeaderButtons />
+        <div className={m.title}>
+          <Shield size={20} aria-hidden="true" />
+          {t("moderation.title")}
+        </div>
+        <nav className={m.tabs} role="tablist" aria-label={t("moderation.title")}>
+          {tabs.map((x) => (
+            <button
+              key={x.id}
+              className={m.tab}
+              role="tab"
+              aria-selected={tab === x.id}
+              tabIndex={tab === x.id ? 0 : -1}
+              data-selected={tab === x.id}
+              onClick={() => nav(`${BASE}/${x.id}`)}
+              onKeyDown={onKey}
+              data-testid={`tab-${x.id}`}
+            >
+              {x.icon}
+              <span className={m.tabLabel}>{x.label}</span>
+              {x.badge ? (
+                <span className={m.badge} aria-label={t("moderation.needsReplyCount", { count: x.badge })}>
+                  {x.badge > 99 ? "99+" : x.badge}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </nav>
+      </header>
+      <div className={m.body}>
+        <Suspense
+          fallback={
+            <div className={m.loadingRow}>
+              <Spinner label={t("chat.pins.loading")} />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
+      </div>
+    </div>
+  );
+}

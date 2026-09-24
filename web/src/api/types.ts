@@ -7,6 +7,7 @@
  * standard base64.
  */
 
+import type { NexaState } from "./moderation";
 import type { Envelope } from "@/crypto/message";
 
 /** A 64-bit id, rendered as a decimal string so it survives JSON. */
@@ -40,6 +41,8 @@ export interface MeUser extends PublicUser {
   /** An authenticator app is required to sign in. */
   mfa_enabled?: boolean;
   backup_codes_left?: number;
+  /** The account's moderation standing: a mute or ban in force, notices to show. */
+  nexa?: NexaState;
 }
 
 export type User = PublicUser;
@@ -535,6 +538,8 @@ export interface ReadyPayload {
   voice_states: VoiceState[];
   /** Only in a guest's ready: which call they are in. */
   guest?: GuestInfo;
+  /** The account's moderation standing. */
+  nexa?: NexaState;
 }
 
 export interface UnfurlResult {

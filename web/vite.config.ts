@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, searchForWorkspaceRoot, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { createReadStream, existsSync } from "node:fs";
 import { cp, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
@@ -101,6 +101,9 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     port: 5173,
+    // the Terms and Privacy Policy are read from docs/legal, outside this app,
+    // so the app shows the canonical wording rather than a copy of it
+    fs: { allow: [searchForWorkspaceRoot(process.cwd()), fileURLToPath(new URL("../docs/legal", import.meta.url))] },
     proxy: {
       // VITE_API_TARGET points the dev server at a throwaway chatd instead of
       // the one running for real on this box.

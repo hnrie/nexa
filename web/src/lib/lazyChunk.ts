@@ -68,17 +68,23 @@ async function loadPatiently<T>(load: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Loads a file of the build, and when it is gone with an old build, reloads
+ * the page onto the new one (once) instead of failing.
+ */
+export async function loadChunk<T>(load: () => Promise<T>): Promise<T> {
+  try {
+    return await loadPatiently(load);
+  } catch (err) {
+    if (reloadedAlready()) throw err;
+    markReloaded();
+    window.location.reload();
+    // the page is on its way out; never resolve, so nothing renders an error
+    return await new Promise<T>(() => undefined);
+  }
+}
+
 /** React.lazy that survives the file it wanted being replaced by a deploy. */
 export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>): LazyExoticComponent<T> {
-  return lazy(async () => {
-    try {
-      return await loadPatiently(load);
-    } catch (err) {
-      if (reloadedAlready()) throw err;
-      markReloaded();
-      window.location.reload();
-      // the page is on its way out; never resolve, so nothing renders an error
-      return await new Promise<{ default: T }>(() => undefined);
-    }
-  });
+  return lazy(() => loadChunk(load));
 }

@@ -71,7 +71,6 @@
 /* the text takes what is left and the buttons drop below it when a phone is too narrow for both */
 .device > :first-child { flex: 1 1 180px; min-width: 0; }
 .device > :not(:first-child) { margin-inline-start: auto; }
-.adminActions { display: flex; gap: 6px; }
 .recovery { font-family: var(--font-mono); padding: 12px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; word-break: break-all; color: var(--text-strong); }
 .dangerBox { padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(218, 62, 68, 0.5); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 /* beside the nav on a tablet there is no room for the form and a 300px preview */
@@ -94,8 +93,6 @@
   .twoEqual { grid-template-columns: 1fr; }
   .cardHead { flex-wrap: wrap; row-gap: 8px; }
   .cardHead > button { margin-inline-start: auto; }
-  .adminUser { flex-wrap: wrap; }
-  .adminActions { flex-basis: 100%; flex-wrap: wrap; justify-content: flex-end; }
 }
 .hex { width: 88px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); border: 1px solid transparent; font-family: var(--font-mono); font-size: 13px; text-transform: lowercase; }
 .hex:focus { border-color: var(--brand); outline: none; }
@@ -108,3 +105,38 @@
 .language[data-on="true"] { border-color: var(--brand); background: var(--bg-active); }
 .languageName { font-size: 15px; font-weight: 600; color: var(--text-strong); }
 .languageEnglish { font-size: 12px; color: var(--text-muted); }
+
+/* Instance Admin: the way into the Admin & Moderation panel */
+.panelLink {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+.panelLinkIcon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  flex: none;
+}
+.panelLinkText {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.panelLinkTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
