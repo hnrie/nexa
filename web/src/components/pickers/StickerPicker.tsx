@@ -13,6 +13,7 @@ import { focusSearchOnOpen } from "./EmojiPicker";
 import s from "./Picker.module.css";
 
 import { t } from "@/i18n";
+import { cssValue } from "@/lib/cssEscape";
 export interface StickerPick {
   sticker: Sticker;
   pack: StickerPack;
@@ -79,7 +80,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
     }
     return out;
   }, [recents, packs]);
-  const jump = (id: string) => gridRef.current?.querySelector<HTMLElement>(`[data-pack="${id}"]`)?.scrollIntoView({ block: "start" });
+  const jump = (id: string) => gridRef.current?.querySelector<HTMLElement>(`[data-pack="${cssValue(id)}"]`)?.scrollIntoView({ block: "start" });
   const edit = (p: StickerPack) => openModal("settings", { page: "stickers", packId: p.id });
   // right click, or a long press on a phone
   const packMenu = (p: StickerPack) => (e: MouseEvent) => {

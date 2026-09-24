@@ -2,7 +2,8 @@
 .replyBar { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 16px; background: var(--bg-surface); border-radius: var(--radius-sm) var(--radius-sm) 0 0; font-size: 14px; color: var(--text-muted); }
 .replyBar + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 .replyBar b { color: var(--text); font-weight: 600; }
-.replyBtns { display: flex; align-items: center; gap: 12px; }
+.replyWho { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.replyBtns { flex: none; display: flex; align-items: center; gap: 12px; }
 .pingBtn { font-size: 12px; font-weight: 700; color: var(--text-muted); }
 .pingBtn[data-on="true"] { color: var(--text-brand); }
 .closeBtn { display: inline-flex; color: var(--text-muted); }
@@ -43,7 +44,9 @@
 .acEmojiImg { width: 22px; height: 22px; margin: 0 3px; object-fit: contain; flex: none; }
 .acSub { margin-inline-start: auto; color: var(--text-muted); font-size: 13px; }
 .sendMobile { display: none; }
-@media (max-width: 767px) { .wrap { padding: 0 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); } .sendMobile { display: flex; } .counter { display: none; } }
+@media (max-width: 767px) { .wrap { padding: 0 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); } .counter { display: none; } }
+/* every touch screen gets a send button, a tablet as much as a phone */
+@media (max-width: 767px), (pointer: coarse) { .sendMobile { display: flex; } }
 .locked { align-items: center; padding: 0 16px; color: var(--text-muted); font-size: 16px; cursor: not-allowed; }
 .attachSpacer { width: 16px; flex: none; }
 .slowmode { position: absolute; inset-inline-start: 30px; bottom: 4px; pointer-events: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }

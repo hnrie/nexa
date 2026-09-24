@@ -172,13 +172,22 @@ export const useKeys = create<KeysState>()((set, get) => ({
     const changed: string[] = [];
     for (const g of grants) {
       if (ring.get(g.conv_id, g.epoch)) continue;
+      let root: Uint8Array;
       try {
-        const root = await unwrapGrant(identity.privateKey, identity.publicKey, b64.dec(g.wrapped_key));
-        ring.set(g.conv_id, g.epoch, root);
-        await persistRoot(userId, g.conv_id, g.epoch, root);
-        changed.push(g.conv_id);
+        root = await unwrapGrant(identity.privateKey, identity.publicKey, b64.dec(g.wrapped_key));
       } catch {
         /* a grant we cannot open is ignored; another holder may send a good one */
+        continue;
+      }
+      // In memory the key works at once, whether or not the disk takes it: a
+      // dead database handle (iOS after a long time in the background) must
+      // not leave messages saying "waiting for key" with the key right here.
+      ring.set(g.conv_id, g.epoch, root);
+      changed.push(g.conv_id);
+      try {
+        await persistRoot(userId, g.conv_id, g.epoch, root);
+      } catch {
+        /* kept for this session; the next grant or sign-in stores it again */
       }
     }
     if (changed.length > 0) {
@@ -197,6 +206,10 @@ export const useKeys = create<KeysState>()((set, get) => ({
     if (latest) return latest;
     const inflight = pendingEnsure.get(conv);
     if (inflight) return inflight;
+    // Signed out or locked, there is nothing to make a key with — and a job
+    // that ended before it was stored below would be stored finished, and
+    // answer null to everyone after the unlock.
+    if (!get().userId) return null;
     const job = (async () => {
       const { userId } = get();
       // inside the try, so the finally below always takes the job back out of

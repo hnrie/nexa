@@ -608,7 +608,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           </div>
         )}
         <div className={s.tileBar}>
-          {t.kind === "screen" ? <span className={s.live}>LIVE</span> : null}
+          {t.kind === "screen" ? <span className={s.live}>{tr_("voice.voice.live")}</span> : null}
           <span className={s.tileName} style={color ? { color } : undefined}>
             {t.kind === "screen" ? (t.me ? tr_("voice.voice.yourScreen") : tr_("voice.voice.theirScreen", { name: nameOf(t.userId) })) : nameOf(t.userId)}
           </span>

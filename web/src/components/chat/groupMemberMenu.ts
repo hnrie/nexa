@@ -97,7 +97,7 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: `Leave '${group}'`,
+          title: t("sidebar.dmMenu.leaveNamed", { name: group }),
           body: isOwner
             ? t("chat.groupMemberMenu.youStopReceivingMessagesFromThis")
             : t("sidebar.dmMenu.youStopReceivingMessagesFromThis"),

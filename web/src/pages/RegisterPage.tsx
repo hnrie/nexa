@@ -53,6 +53,8 @@ export default function RegisterPage() {
           registration_closed: t("register.thisServerIsNotAcceptingNew"),
           invite_required: t("register.youNeedAnInviteOrRegistration"),
           rate_limited: t("register.tooManySignUpsFromYour"),
+          reserved_username: t("register.thatNameIsReserved"),
+          reserved_display_name: t("register.thatNameIsReserved"),
         };
         setError(map[err.code] ?? describeError(err, t("register.somethingWentWrongPleaseTryAgain")));
       } else {

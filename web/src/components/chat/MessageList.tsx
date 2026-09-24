@@ -19,6 +19,7 @@ import { MessageItem } from "./MessageItem";
 import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
+import { cssValue } from "@/lib/cssEscape";
 type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
@@ -59,7 +60,7 @@ function readAnchor(el: HTMLElement): Anchor | null {
 
 /** Puts a noted row back where it sat. False when that row has gone from the list. */
 function restoreAnchor(el: HTMLElement, a: Anchor): boolean {
-  const row = el.querySelector<HTMLElement>(`[data-id="${a.id}"]`);
+  const row = el.querySelector<HTMLElement>(`[data-id="${cssValue(a.id)}"]`);
   if (!row) return false;
   const now = row.getBoundingClientRect().top - el.getBoundingClientRect().top;
   if (now !== a.top) el.scrollTop += now - a.top;
@@ -346,7 +347,8 @@ export function MessageList({ channel }: { channel: Channel }) {
 
   useEffect(() => {
     if (!jumpTo || jumpTo.channelId !== channel.id) return;
-    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-id="${jumpTo.messageId}"]`);
+    // the id comes from the address bar, so it is escaped before it is a selector
+    const el = scrollRef.current?.querySelector<HTMLElement>(`[data-id="${cssValue(jumpTo.messageId)}"]`);
     if (el) {
       triedAround.current = null;
       atBottom.current = false;

@@ -53,6 +53,11 @@ describe("media links", () => {
   it("never loads another site's address, which would give it the reader's", () => {
     expect(mediaSrc("https://tracker.example/pixel.gif")).toBeNull();
     expect(mediaSrc("//tracker.example/pixel.gif")).toBeNull();
+    // paths that a browser resolves to another host
+    expect(mediaSrc("/\\tracker.example/pixel.gif")).toBeNull();
+    expect(mediaSrc("/\ttracker.example/pixel.gif")).toBeNull();
+    expect(mediaSrc("/\t/tracker.example/pixel.gif")).toBeNull();
+    expect(mediaSrc(" //tracker.example/pixel.gif")).toBeNull();
     expect(mediaSrc(undefined)).toBeNull();
   });
 

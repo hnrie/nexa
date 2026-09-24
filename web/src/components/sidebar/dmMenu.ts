@@ -126,7 +126,7 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
     onSelect: () =>
       group
         ? ctx.openModal("confirm", {
-            title: `Leave '${name}'`,
+            title: t("sidebar.dmMenu.leaveNamed", { name }),
             body: t("sidebar.dmMenu.youStopReceivingMessagesFromThis"),
             confirmLabel: t("chat.groupMemberMenu.leaveGroup"),
             danger: true,

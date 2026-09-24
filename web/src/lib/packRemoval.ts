@@ -41,7 +41,7 @@ export async function removePack(pack: StickerPack): Promise<boolean> {
   // the server says the same over the gateway; this just does not wait for it
   if (current?.server_id && useServers.getState().byId[current.server_id]) expressions.upsertPack({ ...current, installed: false });
   else expressions.removePack(pack.id);
-  toast(`Removed '${pack.name}'.`, "success");
+  toast(t("pickers.stickerPicker.removedNamed", { name: pack.name }), "success");
   return true;
 }
 

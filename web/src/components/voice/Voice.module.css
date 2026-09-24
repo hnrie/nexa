@@ -54,7 +54,7 @@
 
 .tileBar { position: absolute; inset-inline-start: 8px; bottom: 8px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: var(--radius-xs); background: rgba(0, 0, 0, 0.6); font-size: 13px; font-weight: 500; color: #fff; max-width: calc(100% - 16px); }
 .tile[data-place="strip"] .tileBar { inset-inline-start: 4px; bottom: 4px; padding: 2px 6px; font-size: 11px; max-width: calc(100% - 8px); }
-.live { flex: none; padding: 0 5px; border-radius: 3px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; }
+.live { flex: none; padding: 0 5px; border-radius: 3px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }
 .tileName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* someone in through a guest link */
 .guestTag { flex: none; padding: 0 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; line-height: 16px; text-transform: uppercase; }

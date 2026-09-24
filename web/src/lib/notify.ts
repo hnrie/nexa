@@ -8,6 +8,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useDesktop } from "@/stores/desktop";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
+import { useServers } from "@/stores/servers";
 import { useSettings, type Settings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
@@ -107,15 +108,23 @@ function previewOf(m: Message, decrypted?: DecryptedMessage): string {
   return t("notify.newMessage");
 }
 
+/** What a server's owner chose for members who have not chosen for themselves. */
+export function serverDefaultLevel(serverId: string): "all" | "mentions" {
+  return useServers.getState().byId[serverId]?.server.default_notifications === 1 ? "mentions" : "all";
+}
+
 function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): void {
   if (mine || m.type.startsWith("system_")) return;
   const me = useAuth.getState().me;
   if (!me) return;
   const settings = useSettings.getState().settings;
+  const { perChannel, muted } = settings.notifications;
   const chan = useChannels.getState().byId[m.channel_id];
   const serverId = chan?.server_id ?? null;
-  const level = settings.notifications.perChannel[m.channel_id] ?? (serverId ? settings.notifications.perChannel[serverId] : undefined) ?? (serverId ? "mentions" : "all");
-  if (settings.notifications.muted.includes(m.channel_id) || (serverId && settings.notifications.muted.includes(serverId)) || level === "none") return;
+  // a subchat follows the conversation it belongs to, as its sidebar row does
+  const parentId = chan?.type === "subchat" ? chan.parent_id : null;
+  const level = perChannel[m.channel_id] ?? (parentId ? perChannel[parentId] : undefined) ?? (serverId ? perChannel[serverId] : undefined) ?? (serverId ? serverDefaultLevel(serverId) : "all");
+  if (muted.includes(m.channel_id) || (parentId && muted.includes(parentId)) || (serverId && muted.includes(serverId)) || level === "none") return;
   const mentioned = m.mention_everyone || m.mentions.includes(me.id);
   if (level === "mentions" && !mentioned) return;
   const ui = useUI.getState();

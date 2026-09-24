@@ -126,9 +126,26 @@ function sanitizeAttachment(x: unknown): AttachmentMeta | null {
 const EMBED_STRINGS = ["url", "type", "title", "description", "site_name", "image", "video_id", "mime", "color", "invite_code"];
 const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count"];
 
+/**
+ * Whether a link in an embed may be followed or loaded: an http(s) address,
+ * or a path on this server. Anything else — javascript:, a data: page, a
+ * path a browser would resolve to another host — the sender wrote to do
+ * something other than show a link.
+ */
+function webLink(v: string): boolean {
+  if (/[\\\s\u0000-\u001f\u007f]/.test(v)) return false;
+  if (v.startsWith("/")) return !v.startsWith("//");
+  return /^https?:\/\//i.test(v);
+}
+
+const EMBED_LINKS = new Set(["url", "image"]);
+
 function sanitizeEmbed(e: Obj): Obj {
   const out: Obj = {};
-  for (const k of EMBED_STRINGS) if (typeof e[k] === "string") out[k] = e[k];
+  for (const k of EMBED_STRINGS) {
+    const v = e[k];
+    if (typeof v === "string" && (!EMBED_LINKS.has(k) || webLink(v))) out[k] = v;
+  }
   for (const k of EMBED_NUMBERS) if (isNum(e[k])) out[k] = e[k];
   return out;
 }
@@ -158,7 +175,7 @@ function sanitizePayload(p: Obj): MessagePayload {
     out.sticker = sticker;
   }
   if (Array.isArray(p["embeds"])) {
-    const embeds = p["embeds"].filter((e): e is Obj => isObj(e) && typeof e["url"] === "string").map(sanitizeEmbed);
+    const embeds = p["embeds"].filter((e): e is Obj => isObj(e) && typeof e["url"] === "string").map(sanitizeEmbed).filter((e) => typeof e["url"] === "string");
     if (embeds.length) out.embeds = embeds;
   }
   if (isNum(p["flags"])) out.flags = p["flags"];

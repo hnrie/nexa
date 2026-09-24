@@ -35,7 +35,7 @@ export default function DMPage() {
   }, [channelId, channel, upsert]);
 
   useEffect(() => {
-    if (channelId && messageId) setJumpTo({ channelId, messageId });
+    if (channelId && messageId && /^\d+$/.test(messageId)) setJumpTo({ channelId, messageId });
   }, [channelId, messageId, setJumpTo]);
 
   useEffect(() => {

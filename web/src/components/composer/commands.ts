@@ -1,5 +1,7 @@
 
-import { t } from "@/i18n";const KAOMOJI: Record<string, string> = {
+import { t } from "@/i18n";
+
+const KAOMOJI: Record<string, string> = {
   // markdown eats one backslash as an escape and would read the arm's _ as emphasis, so both are escaped
   shrug: "¯\\\\\\_(ツ)_/¯",
   tableflip: "(╯°□°)╯︵ ┻━┻",
@@ -9,7 +11,7 @@ import { t } from "@/i18n";const KAOMOJI: Record<string, string> = {
 
 export function commands() {
   return [
-  { name: "shrug", desc: "Appends ¯\\_(ツ)_/¯ to your message." },
+  { name: "shrug", desc: t("composer.commands.appendsShrug") },
   { name: "tableflip", desc: t("composer.commands.appendsToYourMessage") },
   { name: "unflip", desc: t("composer.commands.appendsToYourMessage2") },
   { name: "lenny", desc: t("composer.commands.appendsToYourMessage3") },

@@ -180,7 +180,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   };
   const rename = async (st: Sticker) => {
     const values = await promptFields({
-      title: `Edit ${isEmoji ? "Emoji" : "Sticker"}`,
+      title: isEmoji ? t("server.packEditor.editEmoji") : t("server.packEditor.editSticker"),
       fields: [
         { key: "name", label: t("modals.subchat.name"), initial: st.name, maxLength: 30 },
         { key: "tags", label: t("server.packEditor.tags"), hint: t("server.packEditor.spaceSeparatedUsedBySearch"), initial: st.tags, maxLength: 200 },
@@ -197,7 +197,7 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
   };
   const remove = (st: Sticker) =>
     openModal("confirm", {
-      title: `Delete '${st.name}'`,
+      title: t("server.packEditor.deleteNamed", { name: st.name }),
       body: t("server.packEditor.thisStickerIsRemovedFromThe"),
       confirmLabel: t("server.packEditor.deleteSticker"),
       danger: true,

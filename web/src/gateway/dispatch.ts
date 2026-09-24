@@ -162,7 +162,10 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // stays where they were instead of being thrown to the newest message.
       const active = useUI.getState().activeChannelId;
       resetAll(active ?? undefined);
-      useAuth.getState().setMe(d.user);
+      // Merged, not replaced: a field the gateway leaves out must not read as
+      // "none" here, or the next profile save sends that back and wipes it.
+      const was = useAuth.getState().me;
+      useAuth.getState().setMe(was && was.id === d.user.id ? { ...was, ...d.user } : d.user);
       useUsers.getState().upsert([...d.users, d.user]);
       // a reconnect may have missed what Nexa said meanwhile: open views load it again
       useNexa.setState({ feed: null, threads: {} });

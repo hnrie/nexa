@@ -45,7 +45,6 @@ export default function RecoverPage() {
       justRecovered.current = false;
       if (err instanceof ApiError) {
         if (err.code === "invalid_credentials") setError(t("recover.usernameOrRecoveryKeyIsWrong"));
-        else if (err.code === "no_recovery_key") setError(t("recover.thisAccountHasNoRecoveryKey"));
         else setError(describeError(err, t("recover.recoveryFailedCheckTheKeyAnd")));
       } else if (err instanceof Error && /invalid recovery key/i.test(err.message)) {
         setError(t("recover.thatDoesNotLookLikeARecoveryKey"));

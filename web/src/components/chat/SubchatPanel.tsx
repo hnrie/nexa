@@ -37,7 +37,7 @@ export function subchatMenuItems(ch: Channel, ctx: { openModal: (k: string, p?: 
       danger: true,
       onSelect: () =>
         ctx.openModal("confirm", {
-          title: `Delete '${ch.name}'`,
+          title: t("chat.subchat.deleteNamed", { name: ch.name }),
           body: t("chat.subchat.theSubchatAndEveryMessageIn"),
           confirmLabel: t("chat.subchat.deleteSubchat"),
           danger: true,

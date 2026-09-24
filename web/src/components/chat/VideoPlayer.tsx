@@ -291,7 +291,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
     >
       <video ref={video} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={toggleFull} />
       {!revealed ? (
-        <div className={s.spoiler} onClick={() => setRevealed(true)}><span>SPOILER</span></div>
+        <div className={s.spoiler} onClick={() => setRevealed(true)}><span>{tr_("composer.composer.spoiler")}</span></div>
       ) : null}
       {failed ? (
         <div className={s.failed}>

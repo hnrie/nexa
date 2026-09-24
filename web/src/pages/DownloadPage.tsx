@@ -11,7 +11,7 @@ import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./DownloadPage.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /** The name each build goes by, per render so it follows the language. */
 function labels(): Record<string, string> {
   return {
@@ -225,10 +225,10 @@ export default function DownloadPage() {
             <div className={s.section}>
               <h2 className={s.label}>{t("download.theFirstTimeYouOpenIt")}</h2>
               <ul className={s.notes}>
-                <li><b>{t("download.windows")}</b> may say it protected your PC, because the installer isn't signed with a paid certificate: choose <b>{t("download.moreInfo")}</b>, then <b>{t("download.runAnyway")}</b>.</li>
-                <li><b>macOS</b>: open the disk image and drag Nexa into Applications. The first time, right-click the app and choose <b>{t("chat.lockedChannel.open")}</b>.</li>
-                <li><b>{t("download.linux")}</b>: make the AppImage executable (<code>{t("download.chmodX")}</code>{t("download.andRunItItUpdatesItself")}</li>
-                {apk && !androidPaused ? <li><b>{t("download.android")}</b>: the app comes from this site rather than a store, so your phone asks once whether to allow installs from your browser. Open the downloaded file and choose <b>{t("settings.stickers.install")}</b>.</li> : null}
+                <li><Tr id="download.firstRunWindows" values={{ windows: <b>{t("download.windows")}</b>, moreInfo: <b>{t("download.moreInfo")}</b>, runAnyway: <b>{t("download.runAnyway")}</b> }} /></li>
+                <li><Tr id="download.firstRunMac" values={{ macos: <b>macOS</b>, open: <b>{t("chat.lockedChannel.open")}</b> }} /></li>
+                <li><Tr id="download.firstRunLinux" values={{ linux: <b>{t("download.linux")}</b>, chmod: <code>{t("download.chmodX")}</code> }} /></li>
+                {apk && !androidPaused ? <li><Tr id="download.firstRunAndroid" values={{ android: <b>{t("download.android")}</b>, install: <b>{t("settings.stickers.install")}</b> }} /></li> : null}
               </ul>
             </div>
           </>

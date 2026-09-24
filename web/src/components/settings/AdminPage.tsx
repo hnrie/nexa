@@ -8,6 +8,8 @@ import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { formatBytes, formatFull } from "@/lib/time";
+import { useAuth } from "@/stores/auth";
+import { useNexa } from "@/stores/nexa";
 import { useUI } from "@/stores/ui";
 import st from "./Settings.module.css";
 import s from "@/components/server/ServerSettings.module.css";
@@ -16,6 +18,8 @@ import { t as tr_ } from "@/i18n";
 /** User settings → Instance Admin (admins only): stats, registration policy, users. */
 export default function AdminPage() {
   const toast = useUI((u) => u.toast);
+  const meId = useAuth((a) => a.me?.id);
+  const isOwner = useNexa((n) => !!meId && n.state?.staff?.owner_id === meId);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [key, setKey] = useState("");
@@ -107,7 +111,8 @@ export default function AdminPage() {
           {tr_("settings.admin.openPanel")}
         </Button>
       </div>
-      <LegalResponse />
+      {/* the server compiles these for the instance owner alone */}
+      {isOwner ? <LegalResponse /> : null}
       <CrashLog />
     </>
   );

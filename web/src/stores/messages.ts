@@ -366,7 +366,9 @@ export const useMessages = create<MessagesState>()((set, get) => ({
           if (!filled) after = page[page.length - 1]!.id;
         }
         if (!filled) {
-          get().clearChannel(channelId);
+          // back to the newest page, keeping what is still being sent: its
+          // upload goes on, and the only copy of a failed message's text is here
+          get().returnToPresent(channelId);
           await get().loadInitial(channelId);
           return;
         }
@@ -406,7 +408,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       // was on screen and what arrived after it, with nothing to say so. The
       // newest page again is the same fallback a gap too wide to walk takes.
       if (generation(channelId) !== gen) return;
-      get().clearChannel(channelId);
+      get().returnToPresent(channelId);
       await get().loadInitial(channelId);
     }
   },

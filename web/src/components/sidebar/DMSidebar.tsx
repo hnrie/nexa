@@ -137,7 +137,7 @@ export function DMSidebar() {
                   {sub}
                 </span>
               </button>
-              {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-label={`${count > 99 ? "more than 99" : count} unread`}>{badgeText(count)}</span> : null}
+              {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-label={count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count })}>{badgeText(count)}</span> : null}
               <button
                 type="button"
                 className={s.close}

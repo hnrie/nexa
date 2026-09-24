@@ -10,7 +10,8 @@ import { useVoice } from "@/stores/voice";
 import { useNexa } from "@/stores/nexa";
 import { useModeration } from "@/stores/moderation";
 import { useUploads } from "@/stores/uploads";
-import { stopAllUploads } from "@/components/composer/send";
+import { forgetSends } from "@/components/composer/send";
+import { forgetUnsentAcks } from "@/stores/readStates";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
 import { clearLock, hasLock } from "@/lib/appLock";
@@ -145,9 +146,13 @@ export async function endSession(): Promise<void> {
   // a deletion notice stays, to be read on the sign-in page
   useNexa.getState().reset();
   useModeration.getState().reset();
-  // files picked or on their way belong to the account that picked them
+  // files picked or on their way belong to the account that picked them, and
+  // so do messages still being sent or left failed: the next person on this
+  // tab must neither read them nor, with Retry, send them as their own
   useUploads.getState().clear();
-  stopAllUploads();
+  forgetSends();
+  useMessages.setState({ channels: {} });
+  forgetUnsentAcks();
 }
 
 logoutHooks.push(endSession);

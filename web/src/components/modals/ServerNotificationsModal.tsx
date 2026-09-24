@@ -6,6 +6,7 @@ import { useSettings, type NotificationLevel } from "@/stores/settings";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
+import { serverDefaultLevel } from "@/lib/notify";
 function levels(): { v: NotificationLevel; label: string; desc: string }[] {
   return [
   { v: "all", label: t("server.serverOverview.allMessages"), desc: t("modals.serverNotifications.everyMessageInThisServerNotifies") },
@@ -19,7 +20,7 @@ export function ServerNotificationsModal({ onClose, serverId }: { onClose: () =>
   const settings = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
   const muted = settings.notifications.muted.includes(serverId);
-  const level = settings.notifications.perChannel[serverId] ?? "all";
+  const level = settings.notifications.perChannel[serverId] ?? serverDefaultLevel(serverId);
   const setMuted = (v: boolean) => patch({ notifications: { ...settings.notifications, muted: v ? [...settings.notifications.muted, serverId] : settings.notifications.muted.filter((x) => x !== serverId) } });
   const setLevel = (v: NotificationLevel) => patch({ notifications: { ...settings.notifications, perChannel: { ...settings.notifications.perChannel, [serverId]: v } } });
   return (

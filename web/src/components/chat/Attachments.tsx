@@ -186,7 +186,7 @@ function ImageAttachment({ att }: { att: AttachmentMeta }) {
             )}
           </div>
         )}
-        {!revealed ? <div className={s.spoilerTag}><span>SPOILER</span></div> : null}
+        {!revealed ? <div className={s.spoilerTag}><span>{tr_("composer.composer.spoiler")}</span></div> : null}
       </div>
       {open && url ? <Lightbox src={url} name={att.name} type={att.type} onClose={() => setOpen(false)} /> : null}
     </>

@@ -13,6 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useSelection } from "@/stores/selection";
 import { DropOverlay } from "./DropOverlay";
 import { useUI } from "@/stores/ui";
+import { canEdit } from "@/components/chat/messageMenu";
 import { useUsers } from "@/stores/users";
 import { canI, useServers } from "@/stores/servers";
 import { slowmodeRemaining, useSlowmode } from "@/stores/slowmode";
@@ -34,7 +35,7 @@ import { useAutosize } from "./useAutosize";
 import type { RefObject } from "react";
 import s from "./Composer.module.css";
 
-import { t as tr_ } from "@/i18n";
+import { t as tr_, Tr } from "@/i18n";
 const MAX_LEN = 4000;
 /** How many files one message carries. */
 const MAX_FILES = 10;
@@ -65,6 +66,11 @@ function acToken(text: string, caret: number): { kind: "user" | "emoji" | "comma
   return null;
 }
 
+
+/** A phone-sized touch screen, where Return starts a new line. */
+function phoneKeyboard(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse) and (max-width: 767px)").matches;
+}
 export function Composer({ channel }: { channel: Channel }) {
   const { focused: paneFocused } = usePaneScope();
   const me = useAuth((a) => a.me);
@@ -352,6 +358,20 @@ export function Composer({ channel }: { channel: Channel }) {
     saveDraft(channelId, "");
   };
 
+  /**
+   * The reply this conversation's next message answers, for a message sent
+   * any way at all — typed, a GIF, a sticker — and the reply bar closes with
+   * it. Nothing when the bar belongs to another conversation.
+   */
+  const takeReply = (): Pick<SendOptions, "replyTo" | "ping"> => {
+    // read now, not from this render: a picker's callback can outlive it
+    const current = useUI.getState().replyTo;
+    const reply = current && current.channelId === channel.id ? current : null;
+    if (!reply) return {};
+    setReplyTo(null);
+    return { replyTo: reply.messageId, ping: reply.ping };
+  };
+
   const send = () => {
     if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
     let body = text.trim();
@@ -360,13 +380,7 @@ export function Composer({ channel }: { channel: Channel }) {
     if (expanded !== null) body = expanded;
     if (!body && files.length === 0) return;
     const channelId = channel.id;
-    const opts: SendOptions = {};
-    const reply = replyTo && replyTo.channelId === channelId ? replyTo : null;
-    if (reply) {
-      opts.replyTo = reply.messageId;
-      opts.ping = reply.ping;
-      setReplyTo(null);
-    }
+    const opts: SendOptions = takeReply();
     // The box empties now rather than when the send is through, so anything
     // typed while it goes (files can take a while) is the next message and is
     // never mixed up with this one. The message shows in the list at once;
@@ -383,15 +397,20 @@ export function Composer({ channel }: { channel: Channel }) {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Keys pressed while an input method is composing (Japanese, Chinese,
+    // Korean…) belong to it: Enter confirms the word, arrows pick one. Safari
+    // sends that Enter after composition ends, marked only by keyCode 229.
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (ac) {
       if (e.key === "ArrowDown") { e.preventDefault(); setAc({ ...ac, index: (ac.index + 1) % ac.items.length }); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setAc({ ...ac, index: (ac.index - 1 + ac.items.length) % ac.items.length }); return; }
       if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickAc(ac.index); return; }
       if (e.key === "Escape") { e.preventDefault(); setAc(null); return; }
     }
-    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-      const touch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
-      if (!touch) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      // On a phone Return starts a new line and the button sends, as in
+      // every messaging app there; a tablet or a computer sends on Enter.
+      if (!phoneKeyboard()) {
         e.preventDefault();
         void send();
       }
@@ -403,7 +422,9 @@ export function Composer({ channel }: { channel: Channel }) {
       return;
     }
     if (e.key === "ArrowUp" && text === "" && me && msgs) {
-      const mine = [...msgs.ids].reverse().find((id) => msgs.byId[id]?.author_id === me.id && (msgs.byId[id]?.type === "default" || msgs.byId[id]?.type === "reply"));
+      // the newest message of one's own that can be edited — one this device
+      // could not decrypt cannot, or the edit would replace it with nothing
+      const mine = [...msgs.ids].reverse().find((id) => { const m = msgs.byId[id]; return !!m && canEdit(m); });
       if (mine) {
         e.preventDefault();
         setEditing({ channelId: channel.id, messageId: mine });
@@ -451,23 +472,17 @@ export function Composer({ channel }: { channel: Channel }) {
                 .catch(() => toast(tr_("composer.composer.uploadFailed"), "error"));
               return;
             }
-            const opts: SendOptions = { embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] };
-            // a GIF picked while replying answers that reply, like a typed message does
-            const gifReply = replyTo && replyTo.channelId === channel.id ? replyTo : null;
-            if (gifReply) {
-              opts.replyTo = gifReply.messageId;
-              opts.ping = gifReply.ping;
-            }
-            const curReply = useUI.getState().replyTo;
-            if (gifReply && curReply?.channelId === gifReply.channelId && curReply.messageId === gifReply.messageId) setReplyTo(null);
+            if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
+            const opts: SendOptions = { ...takeReply(), embeds: [{ url: g.url, type: "gif", image: g.url, ...(g.w ? { image_w: g.w } : {}), ...(g.h ? { image_h: g.h } : {}) }] };
             void sendMessage(channel.id, g.url, opts);
           }} />}
           stickers={<StickerPicker serverId={channel.server_id} onPick={({ sticker }) => {
             setPicker(false);
+            if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
             // The send settles first so a failed send never lands in recents;
             // the row updates at once here and again over the gateway, which
             // is what carries it to the account's other devices.
-            void sendMessage(channel.id, "", { sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated, format: sticker.format } })
+            void sendMessage(channel.id, "", { ...takeReply(), sticker: { id: sticker.id, blob: sticker.blob_id, name: sticker.name, ...(sticker.width ? { w: sticker.width } : {}), ...(sticker.height ? { h: sticker.height } : {}), animated: sticker.animated, format: sticker.format } })
               .then(() => {
                 useExpressions.getState().noteRecent(sticker);
                 void expressionsApi.touchRecentSticker(sticker.id).catch(() => undefined);
@@ -478,10 +493,10 @@ export function Composer({ channel }: { channel: Channel }) {
       ) : null}
       {replyTarget ? (
         <div className={s.replyBar}>
-          <span>Replying to <b>{users[replyTarget.author_id]?.display_name ?? "Unknown"}</b></span>
+          <span className={s.replyWho}><Tr id="composer.replyingTo" values={{ name: <b>{users[replyTarget.author_id]?.display_name ?? tr_("names.unknownUser")}</b> }} /></span>
           <span className={s.replyBtns}>
             {replyTarget.author_id !== me?.id ? (
-              <button className={s.pingBtn} data-on={replyTo?.ping} onClick={() => replyTo && setReplyTo({ ...replyTo, ping: !replyTo.ping })}>@ {replyTo?.ping ? "ON" : "OFF"}</button>
+              <button className={s.pingBtn} data-on={replyTo?.ping} aria-pressed={!!replyTo?.ping} aria-label={tr_("composer.composer.replyPing")} title={tr_("composer.composer.replyPing")} onClick={() => replyTo && setReplyTo({ ...replyTo, ping: !replyTo.ping })}>{replyTo?.ping ? tr_("composer.composer.pingOn") : tr_("composer.composer.pingOff")}</button>
             ) : null}
             <button className={s.closeBtn} aria-label={tr_("composer.composer.cancelReply")} onClick={() => setReplyTo(null)}><X size={16} /></button>
           </span>

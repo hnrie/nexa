@@ -155,6 +155,11 @@ const fixtures: Fixture[] = [
   { name: "masked link", src: "[text](https://example.com)", ast: [para(link("https://example.com", [t("text")], true))] },
   { name: "masked link label is parsed inline", src: "[**b**](https://x.y)", ast: [para(link("https://x.y", [strong(t("b"))], true))] },
   { name: "masked link with angle brackets suppresses the embed", src: "[text](<https://example.com>)", ast: [para(link("https://example.com", [t("text")], true, true))] },
+  { name: "masked link naming its own site stays masked", src: "[example.com/docs](https://www.example.com/docs)", ast: [para(link("https://www.example.com/docs", [t("example.com/docs")], true))] },
+  { name: "masked link naming a subdomain's parent stays masked", src: "[example.com](https://docs.example.com)", ast: [para(link("https://docs.example.com", [t("example.com")], true))] },
+  { name: "masked link naming another site shows where it goes", src: "[bank.example](https://elsewhere.example/login)", ast: [para(t("bank.example"), t(" ("), link("https://elsewhere.example/login"), t(")"))] },
+  // the address in the label becomes a link to itself, so each link goes where it says
+  { name: "masked link with a full address as its label shows where it goes", src: "[https://bank.example/login](https://elsewhere.example)", ast: [para(link("https://bank.example/login"), t(" ("), link("https://elsewhere.example"), t(")"))] },
   { name: "javascript masked link stays text", src: "[text](javascript:alert(1))", ast: [para(t("[text](javascript:alert(1))"))] },
   { name: "angle bracket url is a no-embed link", src: "<https://example.com>", ast: [para(link("https://example.com", [t("https://example.com")], false, true))] },
   { name: "url inside code is not linked", src: "`https://a.b`", ast: [para(code("https://a.b"))] },

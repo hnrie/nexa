@@ -34,6 +34,10 @@ function codes(): Record<string, string> {
     timeout: t("errors.theServerTookTooLong"),
     aborted: t("errors.thatWasCancelledBeforeItFinished"),
     bad_response: t("errors.theServerSAnswerMadeNo"),
+    rate_limited: t("errors.youAreDoingThatTooQuickly"),
+    too_many_uploads: t("errors.tooManyUploads"),
+    upload_quota: t("errors.uploadQuota"),
+    no_space: t("errors.noSpace"),
     no_fetch: t("modals.confirm.somethingWentWrong"),
     no_xhr: t("modals.confirm.somethingWentWrong"),
   };

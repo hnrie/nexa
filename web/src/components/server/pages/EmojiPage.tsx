@@ -84,7 +84,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
   };
   const remove = (e: Emoji) =>
     openModal("confirm", {
-      title: `Delete :${e.name}:`,
+      title: t("server.emoji.deleteNamed", { name: e.name }),
       body: t("server.emoji.messagesThatUsedItWillShow"),
       confirmLabel: t("server.emoji.deleteEmoji"),
       danger: true,

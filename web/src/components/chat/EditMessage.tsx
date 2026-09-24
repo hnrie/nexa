@@ -9,7 +9,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import s from "./Chat.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const endEdit = useUI((u) => u.endEdit);
@@ -26,6 +26,8 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   // Phone keyboards have no Shift+Enter, so there return adds a line, as in
   // the composer, and saving and cancelling get real buttons.
   const [touch] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches);
+  // on a phone Return is a new line, as in the message box; elsewhere Enter saves
+  const [phone] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse) and (max-width: 767px)").matches);
   useAutosize(ref, text, 400);
   useEffect(() => {
     const el = ref.current;
@@ -38,6 +40,11 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
     if (busy) return;
     const body = text.trim();
     if (!body && !msg.payload?.att?.length) return;
+    // nothing changed: close the editor without marking the message edited
+    if (body === humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId).trim()) {
+      endEdit(msg.channel_id, msg.id);
+      return;
+    }
     setBusy(true);
     try {
       await editMessage(msg.channel_id, msg.id, body);
@@ -66,10 +73,12 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
         }}
         disabled={busy}
         onKeyDown={(e) => {
+          // an input method's own Enter and Escape (keyCode 229 in Safari) are not ours
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
           if (e.key === "Escape") {
             e.preventDefault();
             cancel();
-          } else if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && !touch) {
+          } else if (e.key === "Enter" && !e.shiftKey && !phone) {
             e.preventDefault();
             void save();
           }
@@ -82,7 +91,7 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
         </div>
       ) : (
         <div className={s.editHint}>
-          escape to <b onClick={cancel}>cancel</b> • enter to <b onClick={() => void save()}>save</b>
+          <Tr id="chat.editMessage.hint" values={{ cancel: <button type="button" onClick={cancel}>{t("chat.editMessage.cancelWord")}</button>, save: <button type="button" onClick={() => void save()}>{t("chat.editMessage.saveWord")}</button> }} />
         </div>
       )}
     </div>

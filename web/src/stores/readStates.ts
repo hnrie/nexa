@@ -35,6 +35,11 @@ interface ReadStatesState {
  */
 const unsent = new Map<string, string>();
 
+/** Sign-out: acks that never went belong to the account that made them. */
+export function forgetUnsentAcks(): void {
+  unsent.clear();
+}
+
 function send(channelId: string, messageId: string): Promise<void> {
   return messagesApi.ack(channelId, messageId).then(
     () => {

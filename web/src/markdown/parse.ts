@@ -41,6 +41,30 @@ const RE_LIST = /^( *)(?:([-*])|(\d{1,9})\.) +(.*)$/;
 const RE_PUNCT = /[!-/:-@[-`{-~]/;
 const RE_WORD = /[\p{L}\p{N}_]/u;
 const RE_HTTP = /^https?:\/\/\S/i;
+/** An address written into a link's label: a host name, with or without its scheme. */
+const RE_LABEL_HOST = /(?:^|[\s(<[])(?:https?:\/\/)?((?:[\p{L}\p{N}-]+\.)+\p{L}{2,})(?=[/:\s)>\]?#]|$)/iu;
+
+function bareHost(host: string): string {
+  return host.toLowerCase().replace(/^www\./, "");
+}
+
+/**
+ * Whether a masked link's label names a different site from the one it goes
+ * to — "[bank.example](https://elsewhere.example)". Shown masked, the label
+ * is all anyone sees on a phone, where no tooltip gives the address away.
+ */
+function misleadingLabel(label: string, url: string): boolean {
+  const m = RE_LABEL_HOST.exec(label.trim());
+  if (!m) return false;
+  let real: string;
+  try {
+    real = bareHost(new URL(url).hostname);
+  } catch {
+    return true;
+  }
+  const shown = bareHost(m[1] ?? "");
+  return shown !== real && !real.endsWith("." + shown);
+}
 const RE_UNICODE_EMOJI =
   /(?:\p{RI}\p{RI}|[0-9#*]️?⃣|\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?(?:‍\p{Extended_Pictographic}(?:️|\p{Emoji_Modifier})?)*)/uy;
 
@@ -423,6 +447,16 @@ function parseLine(line: string, depth: number): Node[] {
         const url = angled ? raw.slice(1, -1) : raw;
         if (RE_HTTP.test(url)) {
           flush();
+          if (misleadingLabel(m[1] ?? "", url)) {
+            // the label says one site and the link goes to another: both are
+            // shown, the real address as the link
+            out.push(...parseLine(m[1] ?? "", depth + 1));
+            out.push({ type: "text", text: " (" });
+            out.push({ type: "link", url, children: [{ type: "text", text: url }], masked: false, noEmbed: angled });
+            out.push({ type: "text", text: ")" });
+            i = end;
+            continue;
+          }
           out.push({
             type: "link",
             url,

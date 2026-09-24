@@ -46,10 +46,18 @@ export function convForChannel(channelId: string): string {
  */
 const queues = new Map<string, Promise<void>>();
 
+/**
+ * Which signed-in account queued sends belong to. A message still waiting in
+ * a queue at sign-out must not go out afterwards — the requests would carry
+ * whoever signed in next, and post the last person's words as theirs.
+ */
+let account = 0;
+
 function enqueue(channelId: string, job: () => Promise<void>): Promise<void> {
   // a new version of the app waits until the queue is through
   const release = holdReload();
-  const run = (queues.get(channelId) ?? Promise.resolve()).then(job);
+  const mine = account;
+  const run = (queues.get(channelId) ?? Promise.resolve()).then(() => (mine === account ? job() : undefined));
   const tail = run.catch(() => undefined);
   queues.set(channelId, tail);
   void tail.then(() => {
@@ -264,8 +272,14 @@ function replyAuthor(channelId: string, messageId: string): string | undefined {
 export async function editMessage(channelId: string, messageId: string, rawText: string): Promise<void> {
   const me = useAuth.getState().me;
   const existing = useMessages.getState().channels[channelId]?.byId[messageId];
-  if (!me || !existing) return;
+  // a message this device cannot read cannot be edited from it: the edit
+  // would replace everything with the new text, files and all
+  if (!me || !existing || !existing.payload) return;
   const { text, mentions, everyone } = extractMentions(rawText, useUsers.getState().byId);
+  // A reply that pinged its author keeps pinging them: the mention came from
+  // the reply, not from the text, and the server replaces the list on edit.
+  const replied = existing.reply_to_id ? replyAuthor(channelId, existing.reply_to_id) : undefined;
+  if (replied && existing.mentions?.includes(replied) && !mentions.includes(replied)) mentions.push(replied);
   const payload: MessagePayload = { ...(existing.payload ?? {}) };
   if (text) payload.t = text;
   else delete payload.t;
@@ -338,6 +352,13 @@ export function discardPending(channelId: string, tmpId: string): void {
 }
 
 /** Stops every upload and lets go of their files (sign-out). */
+/** Sign-out: nothing queued goes out, and every upload stops. */
+export function forgetSends(): void {
+  account++;
+  queues.clear();
+  stopAllUploads();
+}
+
 export function stopAllUploads(): void {
   for (const [tmp, job] of [...uploading]) {
     job.stop?.abort();

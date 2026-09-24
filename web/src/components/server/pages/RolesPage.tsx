@@ -241,7 +241,7 @@ function DisplayTab({ role, editable, everyone, onSaved, onDeleted }: { role: Ro
       <Toggle checked={mentionable} disabled={!editable} onChange={setMentionable} label={t("server.roles.allowAnyoneToMentionThisRole")} description={t("server.roles.membersWithMentionEveryoneCanAlways")} />
       {!everyone && editable ? (
         <div>
-          <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: `Delete '${role.name}'`, body: t("server.roles.membersLoseThisRoleAndAny"), confirmLabel: t("server.roles.deleteRole"), danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> {t("server.roles.deleteRole")}</Button>
+          <Button variant="danger" size="sm" onClick={() => openModal("confirm", { title: t("server.roles.deleteNamed", { name: role.name }), body: t("server.roles.membersLoseThisRoleAndAny"), confirmLabel: t("server.roles.deleteRole"), danger: true, onConfirm: async () => { await serversApi.deleteRole(role.server_id, role.id); onDeleted(); } })} data-testid="delete-role"><Trash2 size={14} /> {t("server.roles.deleteRole")}</Button>
         </div>
       ) : null}
       <SaveBar dirty={dirty} busy={busy} onReset={() => { setName(role.name); setColor(role.color); setHoist(role.hoist); setMentionable(role.mentionable); }} onSave={() => void save()} />

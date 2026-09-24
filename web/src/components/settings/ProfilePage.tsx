@@ -19,6 +19,9 @@ function hexOf(v: number | null | undefined): string | null {
   return typeof v === "number" ? `#${v.toString(16).padStart(6, "0")}` : null;
 }
 
+/** The longest About me the server keeps (internal/api/user_handlers.go maxAboutMe). */
+const ABOUT_MAX = 1000;
+
 export default function ProfilePage() {
   const me = useAuth((a) => a.me);
   const setMe = useAuth((a) => a.setMe);
@@ -146,8 +149,8 @@ export default function ProfilePage() {
               <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} disabled={!accent} onChange={setAccent2} />
             </div>
           </div>
-          <Field label={t("settings.profile.aboutMe")} hint={t("settings.profile.markdownWorksHereThereIsNo")}>
-            <TextArea value={about} onChange={(e) => setAbout(e.target.value)} rows={6} placeholder={t("settings.profile.tellPeopleAboutYourself")} />
+          <Field label={t("settings.profile.aboutMe")} hint={t("settings.profile.aboutHint", { count: ABOUT_MAX })}>
+            <TextArea value={about} onChange={(e) => setAbout(e.target.value)} rows={6} maxLength={ABOUT_MAX} placeholder={t("settings.profile.tellPeopleAboutYourself")} />
           </Field>
         </div>
         <div className={s.preview}>

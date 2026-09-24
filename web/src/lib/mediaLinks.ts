@@ -74,9 +74,16 @@ function usableAsIs(url: string): boolean {
     const deadline = proxyDeadline(url);
     return deadline !== null && deadline - Date.now() > MARGIN_MS;
   }
-  if (url.startsWith("/") && !url.startsWith("//")) return true;
+  // Backslashes, whitespace and control characters are how a path that
+  // starts with "/" gets a browser to fetch from somewhere else — a backslash
+  // or a tab where the second slash of "//host" would be resolves to another
+  // origin. None belongs in a media link, so a link with any of them is not
+  // loaded as it is.
+  if (/[\\\s\u0000-\u001f\u007f]/.test(url)) return false;
+  // resolved the way the browser will resolve it, then compared by origin
   try {
-    return new URL(url).origin === origin();
+    const base = typeof location !== "undefined" ? location.href : origin() + "/";
+    return new URL(url, base).origin === origin();
   } catch {
     return false;
   }

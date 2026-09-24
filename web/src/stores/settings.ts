@@ -285,6 +285,15 @@ export const useSettings = create<SettingsState>()((set, get) => {
     load: async (blob, version) => {
       const key = get().key;
       const doc = blob && key ? await decryptSettings(key, blob) : null;
+      // A copy this device cannot read is not an empty one. Taken as the
+      // defaults, it would drop the passcode this device keeps (no app lock
+      // is the default) and the next save would write the defaults over
+      // every setting on the server. Nothing is decided on it: settings stay
+      // unloaded, so nothing saves, and the next ready tries again.
+      if (blob && doc === null) {
+        console.warn("settings: the saved copy could not be read on this device");
+        return;
+      }
       // a save of ours may have landed while this copy was on its way
       if (get().loaded && version < get().version) return;
       const base = doc ? mergeSettings(DEFAULT_SETTINGS, doc) : DEFAULT_SETTINGS;
