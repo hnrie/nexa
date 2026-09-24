@@ -369,6 +369,10 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "is_owner", "The group's owner cannot be removed. Transfer ownership first."))
 		return
 	}
+	// out of the group's call first: the SFU only asks the voice registry
+	// who is in it, so someone put out of the group would otherwise go on
+	// hearing and being heard until they hung up
+	s.dropVoice(r.Context(), uid, func(c *store.Channel) bool { return c.ID == ch.ID })
 	// Who is left comes back from the same transaction as the removal: a read
 	// of its own could fail, and a failed read looks exactly like an empty
 	// group — the next branch deletes the conversation and every message in it.
@@ -379,6 +383,7 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	s.subchatsLeft(r.Context(), ch.ID, subs, uid)
 	if len(remaining) == 0 {
+		s.voiceChannelDeleted(r.Context(), ch)
 		_ = s.deleteConversation(r.Context(), ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 		w.WriteHeader(http.StatusNoContent)
@@ -498,7 +503,9 @@ func (s *Server) handlePins(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePin(w http.ResponseWriter, r *http.Request) {
 	ch, me := s.channel(w, r, NeedPin)
-	if ch == nil {
+	// a pin posts a notice into the conversation, so a block stops it as it
+	// stops a message
+	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
 	}
 	mid, err := ids.Parse(r.PathValue("mid"))
@@ -521,8 +528,8 @@ func (s *Server) handlePin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUnpin(w http.ResponseWriter, r *http.Request) {
-	ch, _ := s.channel(w, r, NeedPin)
-	if ch == nil {
+	ch, me := s.channel(w, r, NeedPin)
+	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
 	}
 	mid, err := ids.Parse(r.PathValue("mid"))

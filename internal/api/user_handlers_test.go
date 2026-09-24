@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -9,15 +10,15 @@ func TestProfilePatchAndSettings(t *testing.T) {
 	_, ts := newTestServer(t)
 	tok, id := register(t, ts, "alice")
 	tokB, idB := register(t, ts, "bob")
-	res, body := do(t, ts, "PATCH", "/api/v1/users/@me", tok, map[string]any{"display_name": "  Alice  ", "about_me": strings.Repeat("long ", 2000), "pronouns": "she/her", "accent_color": 0xff00ff, "status_text": "hi", "presence_pref": "dnd", "dm_privacy": "friends"})
-	if res.StatusCode != 200 || body["display_name"] != "Alice" || body["accent_color"].(float64) != 0xff00ff || body["presence_pref"] != "dnd" || body["dm_privacy"] != "friends" || len(body["about_me"].(string)) < 9000 {
+	res, body := do(t, ts, "PATCH", "/api/v1/users/@me", tok, map[string]any{"display_name": "  Alice  ", "about_me": strings.Repeat("long ", 200), "pronouns": "she/her", "accent_color": 0xff00ff, "status_text": "hi", "presence_pref": "dnd", "dm_privacy": "friends"})
+	if res.StatusCode != 200 || body["display_name"] != "Alice" || body["accent_color"].(float64) != 0xff00ff || body["presence_pref"] != "dnd" || body["dm_privacy"] != "friends" || len(body["about_me"].(string)) < 990 {
 		t.Fatalf("patch: %d %v", res.StatusCode, body)
 	}
 	res, body = do(t, ts, "PATCH", "/api/v1/users/@me", tok, map[string]any{"accent_color": nil, "status_text": nil})
 	if res.StatusCode != 200 || body["accent_color"] != nil || body["status_text"] != "" {
 		t.Errorf("clear with null: %d %v", res.StatusCode, body)
 	}
-	for _, bad := range []map[string]any{{"username": "BAD NAME"}, {"display_name": ""}, {"accent_color": 99999999}, {"presence_pref": "away"}, {"dm_privacy": "x"}, {"pronouns": strings.Repeat("p", 41)}} {
+	for _, bad := range []map[string]any{{"username": "BAD NAME"}, {"display_name": ""}, {"accent_color": 99999999}, {"presence_pref": "away"}, {"dm_privacy": "x"}, {"pronouns": strings.Repeat("p", 41)}, {"about_me": strings.Repeat("a", maxAboutMe+1)}} {
 		if res, body = do(t, ts, "PATCH", "/api/v1/users/@me", tok, bad); res.StatusCode != 400 {
 			t.Errorf("bad patch %v: %d %v", bad, res.StatusCode, body)
 		}
@@ -79,5 +80,28 @@ func TestProfilePatchAndSettings(t *testing.T) {
 	}
 	if res, _ = do(t, ts, "POST", "/api/v1/auth/login", "", map[string]any{"username": "bob", "auth_key": b64(key32)}); res.StatusCode != 401 {
 		t.Error("deleted user cannot log in")
+	}
+}
+
+// The account in ready is the whole account /users/@me describes. A shorter
+// copy left the second accent colour out, and a profile saved after it sent
+// that colour back as "none".
+func TestReadyCarriesTheWholeAccount(t *testing.T) {
+	_, ts := newTestServer(t)
+	tok, _ := register(t, ts, "alice")
+	if res, body := do(t, ts, "PATCH", "/api/v1/users/@me", tok, map[string]any{"accent_color": 0x112233, "accent_color_2": 0x445566}); res.StatusCode != 200 {
+		t.Fatalf("patch: %d %v", res.StatusCode, body)
+	}
+	_, me := do(t, ts, "GET", "/api/v1/users/@me", tok, nil)
+	g := connectGWReady(t, ts, tok)
+	user, _ := g.ready["user"].(map[string]any)
+	for _, k := range []string{"accent_color", "accent_color_2", "mfa_enabled", "backup_codes_left", "has_recovery", "presence_pref", "dm_privacy", "flags", "nexa"} {
+		if _, ok := user[k]; !ok {
+			t.Errorf("ready user lacks %s", k)
+			continue
+		}
+		if k != "nexa" && fmt.Sprint(user[k]) != fmt.Sprint(me[k]) {
+			t.Errorf("%s: ready %v, /users/@me %v", k, user[k], me[k])
+		}
 	}
 }

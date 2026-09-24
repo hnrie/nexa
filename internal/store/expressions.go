@@ -452,7 +452,17 @@ func (s *Store) TouchRecentSticker(ctx context.Context, uid, sid ids.ID) error {
 			}
 			return err
 		}
+		// Always after the account's latest: two stickers sent within one
+		// millisecond would otherwise tie, and the tie would put whichever
+		// has the larger id first, not whichever was sent last.
 		now := nowMs()
+		var latest sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT max(used_at) FROM recent_stickers WHERE user_id = ?`, int64(uid)).Scan(&latest); err != nil {
+			return err
+		}
+		if latest.Valid && latest.Int64 >= now {
+			now = latest.Int64 + 1
+		}
 		if _, err := tx.ExecContext(ctx, `INSERT INTO recent_stickers (user_id, sticker_id, used_at) VALUES (?,?,?)
 			ON CONFLICT(user_id, sticker_id) DO UPDATE SET used_at = excluded.used_at`, int64(uid), int64(sid), now); err != nil {
 			return err

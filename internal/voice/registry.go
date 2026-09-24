@@ -39,6 +39,10 @@ type State struct {
 	SFUSession string `json:"-"`
 	Tracks     Tracks `json:"-"`
 	ScreenBps  int64  `json:"-"`
+	// Detached counts the times this call lost its connection. A grace
+	// timer ends the call only if it is still detached from the drop that
+	// set it, not from a later one it would cut short.
+	Detached uint64 `json:"-"`
 	// Name and AvatarID are how the participant looked on joining, for the
 	// guests in the call, who are told nothing else about anyone.
 	Name     string  `json:"-"`
@@ -218,6 +222,12 @@ func (r *Registry) Join(st State, keepModeration bool) (old *State, started bool
 		if keepModeration {
 			st.ServerMute, st.ServerDeaf = prev.ServerMute, prev.ServerDeaf
 		}
+		// a mute or camera toggle comes through here as a fresh state; the
+		// call's order is by when people joined it, not when they last
+		// touched a button
+		if prev.ChannelID == st.ChannelID && st.JoinedAt == 0 {
+			st.JoinedAt = prev.JoinedAt
+		}
 		// The same device staying in the same call keeps its SFU session (a
 		// mute or camera toggle comes through here too). A move or another
 		// device starts afresh, and the caller closes the old session.
@@ -244,7 +254,9 @@ func (r *Registry) SetSFU(uid, channelID, connID ids.ID, session string) (string
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	st, ok := r.byUser[uid]
-	if !ok || st.ChannelID != channelID || st.ConnID != connID {
+	// A call with no connection is waiting for its device to resume it, with
+	// the session it had; giving it another would strand the grace timer.
+	if !ok || st.ChannelID != channelID || connID.IsZero() || st.ConnID != connID {
 		return "", false
 	}
 	old := st.SFUSession
@@ -298,6 +310,7 @@ func (r *Registry) Detach(uid, connID ids.ID) (State, bool) {
 		return State{}, false
 	}
 	st.ConnID = 0
+	st.Detached++
 	return *st, true
 }
 
@@ -315,12 +328,27 @@ func (r *Registry) Resume(uid, sessionID ids.ID, sfuSession string, connID ids.I
 }
 
 // LeaveDetached ends a call nobody picked up: it is still without a
-// connection, on the same SFU session it was detached with.
-func (r *Registry) LeaveDetached(uid ids.ID, sfuSession string) (State, bool) {
+// connection, from the same drop (detached, as Detach returned it). A call
+// resumed and dropped again waits out its own grace, not what was left of
+// the first one's.
+func (r *Registry) LeaveDetached(uid ids.ID, detached uint64) (State, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	st, ok := r.byUser[uid]
-	if !ok || !st.ConnID.IsZero() || st.SFUSession != sfuSession {
+	if !ok || !st.ConnID.IsZero() || st.Detached != detached {
+		return State{}, false
+	}
+	return r.leaveLocked(uid)
+}
+
+// LeaveChannel removes a user if they are still in channelID, whichever of
+// their connections holds the call: for putting someone out of a channel they
+// lost, where a join from another tab in the meantime must not save them.
+func (r *Registry) LeaveChannel(uid, channelID ids.ID) (State, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	st, ok := r.byUser[uid]
+	if !ok || st.ChannelID != channelID {
 		return State{}, false
 	}
 	return r.leaveLocked(uid)

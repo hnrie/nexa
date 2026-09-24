@@ -37,8 +37,20 @@ func (s *Server) legalRoutes(mux *http.ServeMux) {
 
 // handleLegalReport compiles the document for one account. It is guarded and
 // rate-limited exactly as the other admin routes are, through s.admin.
+//
+// Only the instance owner may compile one. It carries what nothing else in
+// the admin tools shows — the account's addresses and devices, its private
+// relationship notes — about anyone, the owner and the other staff included,
+// whom the moderation tools deliberately keep out of each other's reach.
 func (s *Server) handleLegalReport(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
+	if owner, err := s.Store.InstanceOwnerID(r.Context()); err != nil {
+		WriteError(w, err)
+		return
+	} else if owner != me.ID {
+		WriteError(w, E(http.StatusForbidden, "owner_only", "Only the instance owner can compile a legal report."))
+		return
+	}
 	who := strings.TrimPrefix(strings.TrimSpace(r.URL.Query().Get("user")), "@")
 	if who == "" {
 		WriteError(w, E(http.StatusBadRequest, "no_account", "Name the account the request is about: a username or an account id."))

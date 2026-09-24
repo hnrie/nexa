@@ -688,11 +688,21 @@ func (s *Server) WireModeration(hub *gateway.Hub) {
 				return err
 			}
 		}
-		st, err := s.nexaState(ctx, u)
-		if err != nil {
-			return err
+		// The account in ready is the one /users/@me answers with, every
+		// field of it. The gateway's own shorter copy left out the second
+		// accent colour, two-factor state and the rest; the app took it as
+		// the whole account, and the next profile save sent the missing
+		// colour back as "none", wiping it for everyone.
+		me := s.meView(ctx, u)
+		if me.Nexa == nil {
+			st, err := s.nexaState(ctx, u)
+			if err != nil {
+				return err
+			}
+			me.Nexa = st
 		}
-		p.Nexa = st
+		p.User = me
+		p.Nexa = me.Nexa
 		return nil
 	}
 }

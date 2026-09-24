@@ -112,7 +112,7 @@ func (s *Server) WireVoice(hub *gateway.Hub) {
 		if st, ok := s.Voice.Get(uid); ok && st.ConnID == connID && st.SFUSession != "" {
 			if held, ok := s.Voice.Detach(uid, connID); ok {
 				time.AfterFunc(voiceGrace, func() {
-					if left, ok := s.Voice.LeaveDetached(uid, held.SFUSession); ok {
+					if left, ok := s.Voice.LeaveDetached(uid, held.Detached); ok {
 						s.broadcastVoiceLeave(context.Background(), left)
 					}
 				})
@@ -835,7 +835,7 @@ func (s *Server) dropVoice(ctx context.Context, uid ids.ID, losing func(*store.C
 	if err != nil || !losing(ch) {
 		return
 	}
-	if left, ok := s.Voice.LeaveConn(uid, st.ConnID); ok {
+	if left, ok := s.Voice.LeaveChannel(uid, st.ChannelID); ok {
 		s.broadcastVoiceLeave(ctx, left)
 	}
 }

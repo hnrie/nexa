@@ -36,7 +36,7 @@ func (s *Server) staticRoutes(mux *http.ServeMux) {
 // allowPublicPage meters the pages the static handler renders for a shared
 // link. It answers false having already written the refusal.
 func (s *Server) allowPublicPage(w http.ResponseWriter, r *http.Request) bool {
-	ok, retry := s.limGeneric.Allow("page:" + auth.ClientIP(r))
+	ok, retry := s.limGeneric.Allow("page:" + auth.RateKey(r))
 	if ok {
 		return true
 	}

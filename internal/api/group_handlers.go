@@ -187,6 +187,7 @@ func (s *Server) removeFromGroup(r *http.Request, ch *store.Channel, uid ids.ID)
 	}
 	s.subchatsLeft(ctx, ch.ID, subs, uid)
 	if len(remaining) == 0 {
+		s.voiceChannelDeleted(ctx, ch)
 		_ = s.deleteConversation(ctx, ch)
 		s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": ch.ID})
 		return nil

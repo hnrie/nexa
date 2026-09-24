@@ -148,6 +148,9 @@ type conn struct {
 	// arrives ahead of it.
 	live    atomic.Bool
 	revoked atomic.Bool
+	// kicked holds the close code of a kick, for a connection kicked before
+	// it went live to close with it — a ban's 4003, not a lapsed session's.
+	kicked  atomic.Pointer[kickInfo]
 	pendMu  sync.Mutex
 	pending []ServerFrame
 }
@@ -186,8 +189,13 @@ func (c *conn) goLive(ready ServerFrame) {
 	c.pendMu.Lock()
 	defer c.pendMu.Unlock()
 	if c.revoked.Load() {
-		// the session ended while ready was built: send none of it
-		c.close(CloseSessionRevoked, "session revoked")
+		// the session ended while ready was built: send none of it, and
+		// close the way whatever ended it said to
+		if k := c.kicked.Load(); k != nil {
+			c.close(k.code, k.reason)
+		} else {
+			c.close(CloseSessionRevoked, "session revoked")
+		}
 		return
 	}
 	// Nothing reached the buffer before this and nothing is draining it yet —
@@ -256,6 +264,7 @@ type kickInfo struct {
 // kick ends a connection with its own close code once what is already queued
 // has gone out, which is how the notice explaining it reaches the client.
 func (c *conn) kick(code websocket.StatusCode, reason string) {
+	c.kicked.Store(&kickInfo{code: code, reason: reason})
 	c.revoked.Store(true)
 	c.enqueue(ServerFrame{T: frameKick, D: kickInfo{code: code, reason: reason}})
 	time.AfterFunc(writeTimeout, func() {
@@ -278,7 +287,7 @@ func (c *conn) revoke() {
 
 // ServeHTTP upgrades the request and runs the connection until it ends.
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ip := auth.ClientIP(r)
+	ip := auth.RateKey(r)
 	// A socket that has not identified still costs a goroutine and a file
 	// descriptor for as long as identifyTimeout allows, and it needs no
 	// account at all, so the room for it is taken before the upgrade — a
@@ -319,7 +328,13 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	var idd identifyData
 	_ = json.Unmarshal(frame.D, &idd)
-	user, session := h.auth.Resolve(ctx, idd.Token)
+	user, session, err := h.auth.Check(ctx, idd.Token)
+	if err != nil {
+		// the database failed, not the token: the client tries again rather
+		// than signing out
+		_ = ws.Close(websocket.StatusTryAgainLater, "try again")
+		return
+	}
 	var guest *store.Guest
 	if user == nil {
 		user, session, guest = h.auth.ResolveGuest(ctx, idd.Token)
@@ -646,6 +661,12 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		if len(d.Activities) > maxActivities {
 			d.Activities = d.Activities[:maxActivities]
+		}
+		// An activity is text of the account's own choosing — names, details,
+		// buttons with links — shown to everyone who sees its presence, so a
+		// muted account may only clear what it had.
+		if len(d.Activities) > 0 && h.muted(ctx, c.userID) {
+			d.Activities = nil
 		}
 		c.queueActivities(d.Activities)
 	case OpTyping:

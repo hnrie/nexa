@@ -156,8 +156,13 @@ func TestDetachAndResume(t *testing.T) {
 	if _, ok := r.Detach(u, 999); ok {
 		t.Fatal("a connection that does not hold the call cannot detach it")
 	}
-	if st, ok := r.Detach(u, 1000); !ok || !st.ConnID.IsZero() {
-		t.Fatalf("detach: %+v %v", st, ok)
+	first, ok := r.Detach(u, 1000)
+	if !ok || !first.ConnID.IsZero() {
+		t.Fatalf("detach: %+v %v", first, ok)
+	}
+	// a call waiting for its device keeps the session it had
+	if _, ok := r.SetSFU(u, ch, 0, "s9"); ok {
+		t.Error("a detached call was given another SFU session")
 	}
 	// still in the call, with its session and tracks, for everyone else
 	if got, ok := r.Get(u); !ok || got.SFUSession != "s1" || got.Tracks.Audio != "a1" || r.Count(ch) != 1 {
@@ -174,15 +179,47 @@ func TestDetachAndResume(t *testing.T) {
 		t.Fatalf("resume: %+v %v", st, ok)
 	}
 	// a resumed call is not ended by the grace running out
-	if _, ok := r.LeaveDetached(u, "s1"); ok {
+	if _, ok := r.LeaveDetached(u, first.Detached); ok {
 		t.Error("a resumed call was ended")
 	}
-	r.Detach(u, 3000)
-	if _, ok := r.LeaveDetached(u, "s0"); ok {
-		t.Error("a detach from an older session ended the call")
+	second, _ := r.Detach(u, 3000)
+	// the first drop's timer, running out during the second drop, leaves it be
+	if _, ok := r.LeaveDetached(u, first.Detached); ok {
+		t.Error("an earlier drop's grace ended the call")
 	}
-	if st, ok := r.LeaveDetached(u, "s1"); !ok || st.UserID != u || r.Count(ch) != 0 {
+	if st, ok := r.LeaveDetached(u, second.Detached); !ok || st.UserID != u || r.Count(ch) != 0 {
 		t.Errorf("grace over: %+v %v", st, ok)
+	}
+}
+
+// A mute or camera toggle is a fresh state for the same call; it keeps the
+// person's place in it.
+func TestTogglingKeepsYourPlaceInTheCall(t *testing.T) {
+	r := New()
+	u, ch := ids.ID(1), ids.ID(10)
+	r.Join(State{UserID: u, ChannelID: ch, ConnID: 1, JoinedAt: 500}, false)
+	r.Join(State{UserID: u, ChannelID: ch, ConnID: 1, SelfMute: true}, false)
+	if st, _ := r.Get(u); st.JoinedAt != 500 || !st.SelfMute {
+		t.Errorf("after a toggle: %+v", st)
+	}
+	r.Join(State{UserID: u, ChannelID: 11, ConnID: 1}, false)
+	if st, _ := r.Get(u); st.JoinedAt == 500 {
+		t.Error("a move kept the old channel's join time")
+	}
+}
+
+// Putting someone out of a channel does not depend on which of their
+// connections holds the call.
+func TestLeaveChannelWhateverTheConnection(t *testing.T) {
+	r := New()
+	u, ch := ids.ID(1), ids.ID(10)
+	r.Join(State{UserID: u, ChannelID: ch, ConnID: 1}, false)
+	r.Join(State{UserID: u, ChannelID: ch, ConnID: 2}, false)
+	if _, ok := r.LeaveChannel(u, 99); ok {
+		t.Error("left a channel they were not in")
+	}
+	if _, ok := r.LeaveChannel(u, ch); !ok || r.Count(ch) != 0 {
+		t.Error("still in the call")
 	}
 }
 

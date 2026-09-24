@@ -497,6 +497,10 @@ func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
 		if _, err := tx.ExecContext(ctx, `UPDATE channels SET parent_id = NULL WHERE parent_id = ?`, int64(id)); err != nil {
 			return err
 		}
+		// a server's join notices stop, rather than go on pointing at nothing
+		if _, err := tx.ExecContext(ctx, `UPDATE servers SET system_channel_id = NULL WHERE system_channel_id = ?`, int64(id)); err != nil {
+			return err
+		}
 		return deleteChannelTx(ctx, tx, id)
 	})
 }

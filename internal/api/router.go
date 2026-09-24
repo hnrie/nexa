@@ -83,6 +83,8 @@ type Server struct {
 	limPass    *ratelimit.Limiter
 	limProfile *ratelimit.Limiter
 	limExpr    *ratelimit.Limiter
+	limImport  *ratelimit.Limiter
+	limCrash   *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -170,6 +172,11 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// folder of images in at once, so the burst is generous; a script
 		// filling the disk is not.
 		limExpr: ratelimit.New(ratelimit.Every(120, time.Minute), 200, 10*time.Minute),
+		// Telegram imports, per account: each pulls up to 200 files through
+		// the instance's one bot token.
+		limImport: ratelimit.New(ratelimit.Every(10, time.Hour), 6, 2*time.Hour),
+		// crash reports, per account: a broken page reports a burst, not a flood
+		limCrash: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
 	}
 }
 
@@ -226,7 +233,7 @@ func (s *Server) authed(h http.HandlerFunc) http.Handler {
 		if u := auth.UserFrom(r.Context()); u != nil {
 			return "u:" + u.ID.String()
 		}
-		return "ip:" + auth.ClientIP(r)
+		return "ip:" + auth.RateKey(r)
 	})(s.restricted(h)))
 }
 
@@ -236,7 +243,7 @@ func (s *Server) callAuthed(h http.HandlerFunc) http.Handler {
 		if u := auth.UserFrom(r.Context()); u != nil {
 			return "u:" + u.ID.String()
 		}
-		return "ip:" + auth.ClientIP(r)
+		return "ip:" + auth.RateKey(r)
 	})(s.restricted(h)))
 }
 
@@ -249,7 +256,7 @@ func (s *Server) guestAuthed(h http.HandlerFunc) http.Handler {
 
 // ipLimited wraps a public handler with a per-IP limiter.
 func ipLimited(l *ratelimit.Limiter, h http.HandlerFunc) http.Handler {
-	return RateLimit(l, func(r *http.Request) string { return auth.ClientIP(r) })(h)
+	return RateLimit(l, func(r *http.Request) string { return auth.RateKey(r) })(h)
 }
 
 // userLimited counts against the signed-in account, for routes where guessing
@@ -259,6 +266,6 @@ func (s *Server) userLimited(l *ratelimit.Limiter, h http.HandlerFunc) http.Hand
 		if u := auth.UserFrom(r.Context()); u != nil {
 			return u.ID.String()
 		}
-		return auth.ClientIP(r)
+		return auth.RateKey(r)
 	})(h).ServeHTTP)
 }

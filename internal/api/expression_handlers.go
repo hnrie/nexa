@@ -48,7 +48,7 @@ func (s *Server) expressionRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/stickers/{sid}", s.authed(s.handleStickerInfo))
 	mux.Handle("PUT /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(true)))
 	mux.Handle("DELETE /api/v1/stickers/packs/{id}/install", s.authed(s.handlePackInstall(false)))
-	mux.Handle("POST /api/v1/stickers/packs/import/telegram", s.userLimited(s.limUpload, s.handleTelegramImport))
+	mux.Handle("POST /api/v1/stickers/packs/import/telegram", s.userLimited(s.limImport, s.handleTelegramImport))
 	mux.Handle("GET /api/v1/gif/status", s.authed(s.handleGifStatus))
 	mux.Handle("GET /api/v1/gif/search", s.authed(s.handleGifSearch))
 	mux.Handle("GET /api/v1/gif/trending", s.authed(s.handleGifTrending))
@@ -85,6 +85,17 @@ func (s *Server) handleRecentTouch(w http.ResponseWriter, r *http.Request) {
 	st, err := s.Store.StickerByID(r.Context(), req.StickerID)
 	if err != nil {
 		WriteError(w, err)
+		return
+	}
+	// a sticker from a pack the person cannot see stays unseen: its name,
+	// tags and picture would otherwise come back in the recent list
+	pack, err := s.Store.PackByID(r.Context(), st.PackID)
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if view, _, err := s.packRights(r.Context(), pack, me.ID); err != nil || !view {
+		WriteError(w, ErrNotFound)
 		return
 	}
 	if err := s.Store.TouchRecentSticker(r.Context(), me.ID, st.ID); err != nil {

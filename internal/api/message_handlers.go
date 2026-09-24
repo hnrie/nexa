@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -359,6 +359,14 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			return
 		}
+		// an edit is held to what sending it would have been: without the
+		// permission, @everyone in the new text pings nobody, as it did not
+		// the first time
+		if !s.isDM(ch) && body.MentionEveryone && s.ChannelAccess != nil {
+			if ok, _ := s.ChannelAccess(r.Context(), me, ch, "mention_everyone"); !ok {
+				body.MentionEveryone = false
+			}
+		}
 		// readers open a message with the key its row names, so the row follows the new envelope
 		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), dedupeIDs(body.MentionRoles, maxMentions), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
 			WriteError(w, err)
@@ -503,16 +511,39 @@ func (s *Server) handleAck(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, states[0])
 }
 
+// parseEmoji takes a reaction key from the path, which the mux has already
+// unescaped once (unescaping it again turned "100%" into an error and a key
+// sent as "%2541" into "A"). A key is a custom emoji — `:name:id`, or
+// `a:name:id` for an animated one — or an emoji sequence; anything else is
+// text, and text is not a reaction.
 func parseEmoji(raw string) (string, bool) {
-	e, err := url.PathUnescape(raw)
-	if err != nil {
+	e := strings.TrimSpace(raw)
+	if e == "" || len(e) > maxEmojiLen {
 		return "", false
 	}
-	e = strings.TrimSpace(e)
-	if e == "" || len(e) > maxEmojiLen || strings.ContainsAny(e, " \t\n/") {
-		return "", false
+	if customReaction.MatchString(e) || isEmojiSequence(e) {
+		return e, true
 	}
-	return e, true
+	return "", false
+}
+
+var customReaction = regexp.MustCompile(`^a?:?[A-Za-z0-9_]{1,32}:[0-9]{1,20}$`)
+
+// isEmojiSequence reports whether s is made only of what emoji are made of:
+// pictographs and symbols, the joiners and selectors that combine them, skin
+// tones, flag letters and tags, and the digits and marks of keycaps.
+func isEmojiSequence(s string) bool {
+	keycap := strings.ContainsRune(s, '\u20E3')
+	for _, r := range s {
+		switch {
+		case r >= 0x1F000 && r <= 0x1FAFF, r >= 0x2000 && r <= 0x3300, r == 0x00A9, r == 0x00AE:
+		case r == 0x200D, r == 0xFE0F, r == 0xFE0E, r == 0x20E3, r >= 0xE0020 && r <= 0xE007F:
+		case keycap && (r == '#' || r == '*' || (r >= '0' && r <= '9')):
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // reactionTarget loads the channel, message and emoji of a reaction route.

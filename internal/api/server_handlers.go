@@ -204,6 +204,9 @@ func (s *Server) syncVisibility(ctx context.Context, serverID ids.ID, before vis
 			if !now[chID] {
 				s.Bcast.EmitUsers([]ids.ID{uid}, "channel_delete", map[string]any{"id": chID})
 				shrank[chID] = true
+				// a voice channel someone can no longer see is one they are
+				// no longer in: the SFU only asks the registry
+				s.dropVoice(ctx, uid, func(c *store.Channel) bool { return c.ID == chID })
 			}
 		}
 	}
@@ -554,10 +557,22 @@ func (s *Server) handleServerTransfer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "not_member", "The new owner must be a member."))
 		return
 	}
+	if heir, err := s.Store.UserByID(r.Context(), req.UserID); err != nil || heir.Flags&(store.FlagDeleted|store.FlagDisabled|store.FlagSystem) != 0 {
+		WriteError(w, E(http.StatusBadRequest, "not_member", "The new owner must be a member."))
+		return
+	}
+	// The owner sees every channel, so who that is decides who sees the
+	// private ones: the old owner may lose some, the new one gains them.
+	before, err := s.snapshotVisibility(r.Context(), srv.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
 	if err := s.Store.UpdateServer(r.Context(), srv.ID, store.ServerPatch{OwnerID: &req.UserID}); err != nil {
 		WriteError(w, err)
 		return
 	}
+	s.syncVisibility(r.Context(), srv.ID, before, nil)
 	updated, err := s.Store.ServerByID(r.Context(), srv.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -873,6 +888,18 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 		WriteError(w, err)
 		return
 	}
+	// a category's channels are left without one; only they change shape
+	var children []ids.ID
+	if ch.Type == "category" {
+		if all, err := s.Store.ServerChannels(r.Context(), *ch.ServerID); err == nil {
+			for _, c := range all {
+				if c.ParentID != nil && *c.ParentID == ch.ID {
+					children = append(children, c.ID)
+				}
+			}
+		}
+	}
+	srv, _ := s.Store.ServerByID(r.Context(), *ch.ServerID)
 	s.voiceChannelDeleted(r.Context(), ch)
 	if err := s.Store.DeleteChannel(r.Context(), ch.ID); err != nil {
 		WriteError(w, err)
@@ -880,14 +907,15 @@ func (s *Server) handleServerChannelDelete(w http.ResponseWriter, r *http.Reques
 	}
 	s.audit(r, *ch.ServerID, me.ID, "channel_delete", "channel", &ch.ID, map[string]any{"name": ch.Name}, "")
 	s.Bcast.EmitUsers(viewers, "channel_delete", map[string]any{"id": ch.ID, "server_id": ch.ServerID})
-	if ch.Type == "category" {
-		// children were unparented: tell viewers their new shape
-		if updated, err := s.Store.ServerChannels(r.Context(), *ch.ServerID); err == nil {
-			for _, c := range updated {
-				if c.ParentID == nil && c.Type != "category" {
-					s.Bcast.EmitChannel(c.ID, "channel_update", c)
-				}
-			}
+	for _, id := range children {
+		if c, err := s.Store.ChannelByID(r.Context(), id); err == nil {
+			s.Bcast.EmitChannel(c.ID, "channel_update", c)
+		}
+	}
+	// the server's join notices went to this channel, and now go nowhere
+	if srv != nil && srv.SystemChannelID != nil && *srv.SystemChannelID == ch.ID {
+		if updated, err := s.Store.ServerByID(r.Context(), srv.ID); err == nil {
+			s.emitServer(r.Context(), srv.ID, "server_update", updated)
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -998,7 +1026,18 @@ func (s *Server) canOverwrite(w http.ResponseWriter, r *http.Request, srv *store
 		}
 		return true
 	}
+	// An overwrite of one's own is a way to keep permissions after the role
+	// that granted them is taken away, or to lift a deny someone above put
+	// there; only the owner, who has everything anyway, may touch theirs.
+	if target == actor && srv.OwnerID != actor {
+		WriteError(w, E(http.StatusForbidden, "self", "You cannot set your own permissions."))
+		return false
+	}
 	if ok, _ := s.Store.IsMember(r.Context(), srv.ID, target); !ok {
+		// whatever someone who has gone left behind can always be cleared
+		if r.Method == http.MethodDelete {
+			return true
+		}
 		WriteError(w, E(http.StatusBadRequest, "invalid_target", "That user is not a member."))
 		return false
 	}
@@ -1885,6 +1924,10 @@ func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if ch.ServerID == nil {
 		WriteError(w, ErrNotFound)
+		return
+	} else if ch.Type == "category" {
+		// an invite lands its guest in a channel, and a category is not one
+		WriteError(w, E(http.StatusBadRequest, "not_text", "Invite people to a channel, not a category."))
 		return
 	} else {
 		p, _, err := s.Store.ChannelPerms(r.Context(), ch.ID, me.ID)

@@ -260,13 +260,16 @@ func TestRecoveryFlow(t *testing.T) {
 	if res, _ = do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "alice", "recovery_auth_key": b64(newRec)}); res.StatusCode != 200 {
 		t.Error("new recovery key should work")
 	}
-	// account without recovery key
+	// an account without a recovery key answers exactly as one that does not
+	// exist, so the answer says nothing about which usernames are taken
 	b := registerBody("norec")
 	delete(b, "recovery_auth_key")
 	delete(b, "enc_private_key_recovery")
 	do(t, ts, "POST", "/api/v1/auth/register", "", b)
-	if res, body = do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "norec", "recovery_auth_key": b64(key32b)}); res.StatusCode != 400 || errCode(body) != "no_recovery_key" {
-		t.Errorf("no recovery: %d %v", res.StatusCode, body)
+	res, noKey := do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "norec", "recovery_auth_key": b64(key32b)})
+	_, nobody := do(t, ts, "POST", "/api/v1/auth/recover/begin", "", map[string]any{"username": "nobody_here", "recovery_auth_key": b64(key32b)})
+	if res.StatusCode != 401 || errCode(noKey) != "invalid_credentials" || errCode(nobody) != errCode(noKey) {
+		t.Errorf("no recovery: %d %v / %v", res.StatusCode, noKey, nobody)
 	}
 }
 

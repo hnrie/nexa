@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
@@ -40,6 +41,11 @@ func telegramLimits(ts telegram.Sticker) media.Limits {
 // Static pictures, animated (.tgs) and video stickers all come over; one bad
 // file never stops the rest, and the counts say what happened to every
 // sticker.
+// telegramImportTimeout bounds an import once its pack exists: long enough
+// for the largest set over a slow link, short enough that one stuck on
+// Telegram's side gives up.
+const telegramImportTimeout = 10 * time.Minute
+
 func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	if !s.telegramEnabled() {
@@ -116,6 +122,11 @@ func (s *Server) handleTelegramImport(w http.ResponseWriter, r *http.Request) {
 		}
 		flushed()
 	}
+	// From here the import runs to the end whether or not anyone is still
+	// listening: a phone that drops its connection must not leave an empty
+	// pack behind, or a half-filled one its other devices never hear about.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), telegramImportTimeout)
+	defer cancel()
 	total := len(set.Stickers)
 	if total > telegram.MaxStickers {
 		total = telegram.MaxStickers

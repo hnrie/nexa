@@ -83,10 +83,9 @@ func (s *Server) authRoutes(mux *http.ServeMux) {
 
 func (s *Server) newSession(r *http.Request, userID ids.ID) (string, error) {
 	token, hash := auth.NewToken()
-	ua := r.UserAgent()
-	if len(ua) > maxUserAgent {
-		ua = ua[:maxUserAgent]
-	}
+	// cut to size and made valid UTF-8: a cut through a character, or a
+	// header of raw bytes, is text Postgres refuses, and the session with it
+	ua := clip(r.UserAgent(), maxUserAgent)
 	se := &store.Session{UserID: userID, TokenHash: hash, UserAgent: ua, IP: auth.ClientIP(r)}
 	if err := s.Store.CreateSession(r.Context(), se); err != nil {
 		return "", err
@@ -322,11 +321,9 @@ func (s *Server) verifyRecovery(w http.ResponseWriter, r *http.Request, username
 	if d := time.Since(start); d < minLoginTime {
 		time.Sleep(minLoginTime - d)
 	}
+	// One answer for every failure: saying that an account has no recovery
+	// key would tell anyone asking that the account exists.
 	if !valid {
-		if err == nil && u != nil && u.RecoveryAuthHash == "" {
-			WriteError(w, E(http.StatusBadRequest, "no_recovery_key", "This account has no recovery key."))
-			return nil, false
-		}
 		WriteError(w, E(http.StatusUnauthorized, "invalid_credentials", "Username or recovery key is wrong."))
 		return nil, false
 	}

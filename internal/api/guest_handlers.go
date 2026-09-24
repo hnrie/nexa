@@ -422,6 +422,16 @@ func (s *Server) guestLink(ctx context.Context, code string, forJoin bool) (*sto
 	if creator.Flags&(store.FlagDisabled|store.FlagDeleted) != 0 {
 		return link, ch, linkGone
 	}
+	// A guest speaks with the voice of whoever made the link: a muted or
+	// banned account's links stop working with it, or a private window
+	// would be the way round the mute.
+	mute, ban, err := s.Store.ActiveRestrictions(ctx, creator.ID, time.Now().UnixMilli())
+	if err != nil {
+		return link, ch, linkUnknown
+	}
+	if mute != nil || ban != nil {
+		return link, ch, linkGone
+	}
 	switch ch.Type {
 	case "dm", "group_dm":
 		for _, id := range ch.Recipients {

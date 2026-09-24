@@ -185,7 +185,9 @@ func (s *Server) handleSubchatList(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSubchatCreate(w http.ResponseWriter, r *http.Request) {
 	ch, me := s.dmForSubchats(w, r)
-	if ch == nil {
+	// a new subchat lands in the other person's sidebar, so a block between
+	// the two of them stops it as it stops a message
+	if ch == nil || s.dmBlocked(w, r, ch, me) {
 		return
 	}
 	var req struct {
@@ -248,6 +250,9 @@ func (s *Server) handleSubchatDelete(w http.ResponseWriter, r *http.Request, ch 
 
 // handleSubchatPatch renames one.
 func (s *Server) handleSubchatPatch(w http.ResponseWriter, r *http.Request, ch *store.Channel, me *store.User) {
+	if s.dmBlocked(w, r, ch, me) {
+		return
+	}
 	if !s.canManageSubchat(r, ch, me) {
 		WriteError(w, E(http.StatusForbidden, "not_allowed", "Only whoever opened this subchat can rename it."))
 		return

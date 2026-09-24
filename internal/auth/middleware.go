@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -30,30 +31,53 @@ type Authenticator struct {
 	TTL   time.Duration
 }
 
+// ErrUnavailable is a token that could not be checked: the database failed,
+// which says nothing about the token.
+var ErrUnavailable = errors.New("auth: the token could not be checked")
+
 // Resolve returns the user and session for a bearer token, or nil when the
-// token is missing, unknown, expired, or the account cannot log in.
+// token is missing, unknown, expired, or the account cannot log in — or when
+// it could not be checked; Check tells those apart.
 func (a *Authenticator) Resolve(ctx context.Context, token string) (*store.User, *store.Session) {
+	u, se, _ := a.Check(ctx, token)
+	return u, se
+}
+
+// Check is Resolve that also says when the token could not be checked at
+// all (ErrUnavailable). A client told its session is gone throws away its
+// keys and signs out, so a database that is down for a moment must not look
+// like every session ending.
+func (a *Authenticator) Check(ctx context.Context, token string) (*store.User, *store.Session, error) {
 	if token == "" || len(token) > 256 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	se, err := a.Store.SessionByTokenHash(ctx, HashToken(token))
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, nil, nil
+	}
 	if err != nil {
-		return nil, nil
+		return nil, nil, ErrUnavailable
 	}
 	now := time.Now().UnixMilli()
 	if a.TTL > 0 && se.LastSeenAt+a.TTL.Milliseconds() < now {
 		_ = a.Store.DeleteSession(ctx, se.ID)
-		return nil, nil
+		return nil, nil, nil
 	}
 	u, err := a.Store.UserByID(ctx, se.UserID)
-	if err != nil || u.Flags&(store.FlagDisabled|store.FlagDeleted) != 0 {
-		return nil, nil
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, ErrUnavailable
+	}
+	if u.Flags&(store.FlagDisabled|store.FlagDeleted) != 0 {
+		return nil, nil, nil
 	}
 	if now-se.LastSeenAt > touchInterval.Milliseconds() {
 		_ = a.Store.TouchSession(ctx, se.ID, now)
 		se.LastSeenAt = now
 	}
-	return u, se
+	return u, se, nil
 }
 
 // ResolveGuest returns the stand-in user and session for a guest's bearer
@@ -86,7 +110,12 @@ func (a *Authenticator) GuestAlive(ctx context.Context, id ids.ID) bool {
 func (a *Authenticator) CallMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := BearerToken(r)
-		if u, se := a.Resolve(r.Context(), token); u != nil {
+		u, se, err := a.Check(r.Context(), token)
+		if err != nil {
+			unavailable(w)
+			return
+		}
+		if u != nil {
 			next.ServeHTTP(w, r.WithContext(WithUser(r.Context(), u, se)))
 			return
 		}
@@ -110,6 +139,13 @@ func (a *Authenticator) GuestMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func unavailable(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", "2")
+	w.WriteHeader(http.StatusServiceUnavailable)
+	_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": "unavailable", "message": "The server could not check your session just now. Try again in a moment."}})
+}
+
 func unauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
@@ -120,7 +156,11 @@ func unauthorized(w http.ResponseWriter) {
 func (a *Authenticator) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := BearerToken(r)
-		u, se := a.Resolve(r.Context(), token)
+		u, se, err := a.Check(r.Context(), token)
+		if err != nil {
+			unavailable(w)
+			return
+		}
 		if u == nil {
 			unauthorized(w)
 			return
@@ -169,6 +209,20 @@ func SessionFrom(ctx context.Context) *store.Session {
 
 // ClientIP returns the visitor address. Cloudflare's tunnel connects from
 // loopback and sets CF-Connecting-IP; those headers are only trusted then.
+// RateKey is the client's address as rate limits count it: an IPv4 address
+// as it is, an IPv6 one by its /64. A single home or phone is handed a whole
+// /64 and may pick any address in it, so counting whole addresses would give
+// each client billions of fresh allowances.
+func RateKey(r *http.Request) string {
+	ip := ClientIP(r)
+	if a, err := netip.ParseAddr(ip); err == nil && a.Is6() && !a.Is4In6() {
+		if p, err := a.Prefix(64); err == nil {
+			return p.String()
+		}
+	}
+	return ip
+}
+
 func ClientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

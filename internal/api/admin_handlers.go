@@ -121,8 +121,21 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 	}
 	// Nobody can take the owner's access away: without this, any admin could
 	// demote the owner and then act on them like anyone else.
-	if owner, err := s.Store.InstanceOwnerID(r.Context()); err == nil && owner == id && id != me.ID {
+	owner, err := s.Store.InstanceOwnerID(r.Context())
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if owner == id && id != me.ID {
 		WriteError(w, E(http.StatusForbidden, "owner_protected", "The instance owner's access cannot be changed."))
+		return
+	}
+	// The owner is the oldest admin, so making an older account an admin
+	// makes it the owner. Only the owner may hand that on; otherwise any
+	// admin could move the owner's protection to an account of their
+	// choosing and then act on the owner like anyone else.
+	if req.Admin != nil && *req.Admin && u.Flags&store.FlagAdmin == 0 && owner != 0 && u.ID < owner && me.ID != owner {
+		WriteError(w, E(http.StatusForbidden, "owner_protected", "Only the instance owner can make this account an admin: it would become the owner."))
 		return
 	}
 	reason, ok := CleanText(req.Reason, maxModReason)
@@ -198,6 +211,9 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		s.syncVisibility(r.Context(), srv.ID, before[i], nil)
 	}
 	if req.Disabled != nil && *req.Disabled {
+		// out of any call first: closing its sockets only detaches a call,
+		// which would go on carrying its voice for the grace period
+		s.dropVoice(r.Context(), id, func(*store.Channel) bool { return true })
 		// a disabled account loses every session immediately
 		if err := s.Store.DeleteUserSessions(r.Context(), id, 0); err != nil {
 			// the account is already disabled — the middleware re-checks the

@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	// About me is shown in full on a profile and travels with every profile
-	// change to everyone who shares a server with the person, so it is long
-	// enough for a life story and no longer.
-	maxAboutMe  = 20000
+	// About me is shown on every profile card and travels with every profile
+	// change to everyone who shares a server with the person, so it stays
+	// short enough that opening a profile is never slow.
+	maxAboutMe  = 1000
 	maxPronouns = 40
 	maxStatus   = 128
 	maxSettings = 1 << 20

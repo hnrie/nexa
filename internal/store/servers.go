@@ -308,15 +308,24 @@ func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID) (*Member, e
 }
 
 // RemoveMember removes a membership (roles cascade).
+//
+// The member's own permission overwrites in the server's channels go with
+// them. Left behind, they would wait for the person to come back — through
+// an invite, after a ban is lifted — and let them straight back into private
+// channels, while nobody could edit or remove an overwrite for someone who
+// is not a member.
 func (s *Store) RemoveMember(ctx context.Context, serverID, uid ids.ID) error {
-	res, err := s.db.W.ExecContext(ctx, `DELETE FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid))
-	if err != nil {
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		res, err := tx.ExecContext(ctx, `DELETE FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid))
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
+		}
+		_, err = tx.ExecContext(ctx, `DELETE FROM channel_overwrites WHERE target_id = ? AND target_type = 'member' AND channel_id IN (SELECT id FROM channels WHERE server_id = ?)`, int64(uid), int64(serverID))
 		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	})
 }
 
 // IsMember reports membership.

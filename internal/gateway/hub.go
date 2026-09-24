@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net"
+	"net/netip"
 	"net/url"
 	"runtime/debug"
 	"strings"
@@ -233,6 +234,10 @@ func sharedAddress(ip string) bool {
 	if ip == "" {
 		return true
 	}
+	// an IPv6 client counted by its /64 (auth.RateKey)
+	if _, err := netip.ParsePrefix(ip); err == nil {
+		return false
+	}
 	parsed := net.ParseIP(ip)
 	return parsed == nil || parsed.IsLoopback() || parsed.IsUnspecified()
 }
@@ -344,6 +349,25 @@ func (h *Hub) sweepSessions(ctx context.Context) {
 		}
 		if dead {
 			c.close(CloseSessionRevoked, "session revoked")
+		}
+	}
+	// A ban shuts every door as it lands, but a socket that passed its ban
+	// check a moment before and registered a moment after is not among the
+	// ones it found; this finds it.
+	if h.Restricted != nil {
+		banned := map[ids.ID]bool{}
+		for _, c := range all {
+			if c.guest != nil {
+				continue
+			}
+			b, checked := banned[c.userID]
+			if !checked {
+				_, b = h.Restricted(ctx, c.userID)
+				banned[c.userID] = b
+			}
+			if b {
+				c.close(CloseBanned, "banned")
+			}
 		}
 	}
 }
@@ -668,6 +692,15 @@ func (h *Hub) interestedIn(ctx context.Context, uid ids.ID) []ids.ID {
 func (h *Hub) UserUpdated(u *store.User) {
 	ctx, cancel := background()
 	defer cancel()
+	// Each connection keeps its own copy of the account: the name a voice
+	// join carries to guests, and the presence choice going idle checks.
+	// One changed anywhere — on another device, by a moderator — changes it
+	// here too.
+	h.mu.RLock()
+	for c := range h.conns[u.ID] {
+		c.user.Store(u)
+	}
+	h.mu.RUnlock()
 	h.EmitUsers(h.interestedIn(ctx, u.ID), EvUserUpdate, u.Public())
 	// presence carries the custom status too
 	h.broadcastPresence(ctx, u)

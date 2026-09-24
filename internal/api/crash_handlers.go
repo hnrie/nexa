@@ -17,7 +17,10 @@ const (
 )
 
 func (s *Server) crashRoutes(mux *http.ServeMux) {
-	mux.Handle("POST /api/v1/client-errors", s.authed(s.handleCrashReport))
+	// A crash report is written to a log that keeps the latest 500, so
+	// reports are metered per account: one account cannot push everyone
+	// else's out, or fill the server log with warnings.
+	mux.Handle("POST /api/v1/client-errors", s.userLimited(s.limCrash, s.handleCrashReport))
 	mux.Handle("GET /api/v1/admin/errors", s.admin(s.handleCrashList))
 	mux.Handle("DELETE /api/v1/admin/errors", s.admin(s.handleCrashClear))
 }
