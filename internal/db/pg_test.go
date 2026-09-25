@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,5 +72,56 @@ func TestPostgresSchemaApplies(t *testing.T) {
 	var mime string
 	if err := d.R.QueryRowContext(ctx, `SELECT mime FROM blobs WHERE id = ?`, 1).Scan(&mime); err != nil || mime != "image/png" {
 		t.Fatalf("read back: %v %q", err, mime)
+	}
+}
+
+// A database a newer build migrated is refused on Postgres as on SQLite, and a
+// migration lock someone else holds is waited for, not failed on.
+func TestPostgresNewerSchemaAndLockWait(t *testing.T) {
+	url := startPostgres(t)
+	d, err := OpenPostgres(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	ctx := context.Background()
+	if _, err := d.W.ExecContext(ctx, `DROP SCHEMA public CASCADE; CREATE SCHEMA public`); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// another session holds the lock: Migrate waits, and gives up only with its context
+	holder, err := d.W.SQL().Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := holder.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrateLockKey); err != nil {
+		t.Fatal(err)
+	}
+	short, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+	err = d.Migrate(short)
+	cancel()
+	if err == nil {
+		t.Fatal("Migrate should have waited for the lock")
+	}
+	if _, err := holder.ExecContext(ctx, `SELECT pg_advisory_unlock($1)`, migrateLockKey); err != nil {
+		t.Fatal(err)
+	}
+	holder.Close()
+	if err := d.Migrate(ctx); err != nil {
+		t.Fatalf("with the lock free again: %v", err)
+	}
+
+	v, err := d.Version(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.W.ExecContext(ctx, `INSERT INTO schema_version (version) VALUES (?)`, v+1); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Migrate(ctx); !errors.Is(err, ErrNewerSchema) {
+		t.Fatalf("a newer schema should be refused, got %v", err)
 	}
 }

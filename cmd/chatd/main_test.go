@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -114,6 +115,56 @@ func TestProcessWarning(t *testing.T) {
 		if w := processWarning(c); !strings.Contains(w, "one process") {
 			t.Errorf("%+v: want the one-process warning, got %q", c, w)
 		}
+	}
+}
+
+// The log chatd writes itself stays under its limit, keeps the newest old files
+// and drops the oldest, and never splits a record between two files.
+func TestRotatingLogFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "chatd.log")
+	if err := os.WriteFile(path, []byte("from before\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	r, err := openRotating(path, 100, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line := func(i int) []byte { return []byte(fmt.Sprintf("record %03d %s\n", i, strings.Repeat("x", 20))) } // 32 bytes
+	for i := 0; i < 12; i++ {
+		if _, err := r.Write(line(i)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func(p string) string {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		return string(b)
+	}
+	cur, one, two := read(path), read(path+".1"), read(path+".2")
+	if _, err := os.Stat(path + ".3"); !os.IsNotExist(err) {
+		t.Errorf("only two old files are kept: %v", err)
+	}
+	for name, s := range map[string]string{"current": cur, ".1": one, ".2": two} {
+		if len(s) > 100 {
+			t.Errorf("%s is %d bytes, over the limit", name, len(s))
+		}
+		if len(s)%32 != 0 && !strings.HasPrefix(s, "from before") {
+			t.Errorf("%s holds a split record: %q", name, s)
+		}
+	}
+	// the newest records are in the current file, the ones before in .1
+	if !strings.Contains(cur, "record 011") || !strings.Contains(one, "record 008") {
+		t.Errorf("records landed in the wrong files:\ncurrent %q\n.1 %q", cur, one)
+	}
+	// appending to what was there, not truncating it
+	r2, err := openRotating(filepath.Join(t.TempDir(), "fresh.log"), 1<<20, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r2.size != 0 {
+		t.Errorf("a new file starts empty: %d", r2.size)
 	}
 }
 

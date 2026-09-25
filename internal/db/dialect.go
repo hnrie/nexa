@@ -13,8 +13,8 @@ import (
 //
 // chatd started on SQLite, which is still the right answer for one machine:
 // no server to run, no network hop, and a single file to back up. Postgres is
-// for when one machine stops being enough — several chatd processes writing at
-// once, a replica, a managed database somebody else keeps alive.
+// for a database kept by something else — a replica, a managed database
+// somebody else keeps alive — still behind one chatd process.
 //
 // The queries themselves are the same either way. Every difference between the
 // two that this codebase actually meets is handled here: the placeholder

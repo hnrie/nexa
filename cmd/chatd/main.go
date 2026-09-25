@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"flag"
+	"io"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -55,7 +56,7 @@ func main() {
 		slog.Error("config", "err", err)
 		os.Exit(2)
 	}
-	log := setupLogging(cfg.LogLevel)
+	log := setupLogging(cfg.LogLevel, cfg.LogFile)
 	// Before anything can generate one: the node id is part of every id, and
 	// two processes sharing a database with the same one collide.
 	if err := ids.SetNode(cfg.NodeID); err != nil {
@@ -82,6 +83,9 @@ func main() {
 	if err := database.Migrate(context.Background()); err != nil {
 		log.Error("migrate", "err", err)
 		os.Exit(1)
+	}
+	if v, err := database.Version(context.Background()); err == nil {
+		log.Info("database ready", "dialect", string(database.Dialect), "schema_version", v)
 	}
 	st := store.New(database)
 	mediaStore, err := media.New(filepath.Join(cfg.DataDir, "media"), st)
@@ -361,7 +365,9 @@ func loadOrCreateSecret(path string, sealed func() (int, error)) ([]byte, error)
 	return b, nil
 }
 
-func setupLogging(level string) *slog.Logger {
+// setupLogging logs to stdout — the journal, under systemd — or, when file is
+// set, to that file, which chatd then keeps from growing without end.
+func setupLogging(level, file string) *slog.Logger {
 	var lv slog.Level
 	switch level {
 	case "debug":
@@ -373,7 +379,19 @@ func setupLogging(level string) *slog.Logger {
 	default:
 		lv = slog.LevelInfo
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lv}))
+	var out io.Writer = os.Stdout
+	var fileErr error
+	if file != "" {
+		if f, err := openRotating(file, logFileMax, logFileKeep); err == nil {
+			out = f
+		} else {
+			fileErr = err
+		}
+	}
+	log := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{Level: lv}))
 	slog.SetDefault(log)
+	if fileErr != nil {
+		log.Warn("log file: writing to stdout instead", "path", file, "err", fileErr)
+	}
 	return log
 }

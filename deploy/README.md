@@ -67,10 +67,12 @@ editing. The database is `data/chat.db` (SQLite, WAL mode) and uploads live in
 ## Logs
 
 Under systemd chatd writes to the journal, which rotates and caps itself. Under
-launchd it appends to `logs/chatd.log`; launchd keeps that file open for as
-long as chatd runs, so chatd trims it itself: past 10 MB the contents move to
-`logs/chatd.log.1` (the older ones shift up to `.5`, and the oldest goes) and
-the file starts again, empty.
+launchd, which never rotates the file it appends a daemon's output to, chatd
+writes `logs/chatd.log` itself (`LOG_FILE`, set in the plist): past 10 MB it
+moves the log to `logs/chatd.log.1` (the older ones shift up to `.5`, and the
+oldest goes) and starts a new one. What launchd itself still catches — anything
+printed before the log is open, and a crash's stack trace — goes to
+`logs/chatd.stderr.log`.
 
 ## Backups
 
