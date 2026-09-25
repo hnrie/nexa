@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { REST_END_MS, REST_START_MS, SPEED, keyframesOf, legAt, loopLegs, resumeLegs, stateAt, totalMs, translateXOf, travelMs } from "./marquee";
+import { REST_END_MS, REST_START_MS, SPEED, keyframesOf, legAt, loopLegs, positionAt, resumeLegs, resumePlan, stateAt, totalMs, translateXOf, travelMs } from "./marquee";
 
 describe("the marquee's loop", () => {
   it("rests for the same short time however long the text is", () => {
@@ -104,5 +104,45 @@ describe("reading a transform back", () => {
     expect(translateXOf("matrix(1, 0, 0, 1, -42.5, 0)")).toBe(-42.5);
     expect(translateXOf("matrix3d(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 17, 0, 0, 1)")).toBe(17);
     expect(translateXOf("none")).toBe(0);
+  });
+});
+
+describe("entering the loop where the text already is", () => {
+  const speedAt = (legs: ReturnType<typeof loopLegs>, t: number) => (positionAt(legs, t + 20) - positionAt(legs, t)) / 20;
+
+  it("keeps the place and the speed of a trip under way when the line narrows or widens", () => {
+    const old = loopLegs(260);
+    for (const t of [REST_START_MS + 1500, REST_START_MS + 5000, REST_START_MS + old[1]!.ms + REST_END_MS + 3000]) {
+      const at = positionAt(old, t);
+      const kind = t < REST_START_MS + old[1]!.ms ? "out" : "back";
+      for (const over of [292, 240]) {
+        if (at > over) continue;
+        const plan = resumePlan({ kind, at, restLeft: 0 }, over);
+        expect(plan.loop).toBe(true);
+        expect(Math.abs(positionAt(plan.legs, plan.startAt) - at)).toBeLessThan(0.5);
+        // the same way, at nearly the same speed
+        const before = speedAt(old, t);
+        const after = speedAt(plan.legs, plan.startAt);
+        expect(Math.sign(after)).toBe(Math.sign(before));
+        expect(Math.abs(after - before)).toBeLessThan(Math.abs(before) * 0.2 + 0.002);
+      }
+    }
+  });
+
+  it("finishes the rest at the start where it was", () => {
+    const plan = resumePlan({ kind: "rest-start", at: 0, restLeft: 300 }, 300);
+    expect(plan).toMatchObject({ loop: true, startAt: REST_START_MS - 300 });
+    expect(positionAt(plan.legs, plan.startAt)).toBe(0);
+  });
+
+  it("leads in where the loop never has the text where it is", () => {
+    // wider now, and the text was already past the new end
+    const past = resumePlan({ kind: "out", at: 280, restLeft: 0 }, 250);
+    expect(past.loop).toBe(false);
+    expect(past.legs[0]).toMatchObject({ from: 280, to: 250 });
+    // the end moved while it was showing
+    const end = resumePlan({ kind: "rest-end", at: 260, restLeft: 400 }, 292);
+    expect(end.loop).toBe(false);
+    expect(positionAt(end.legs, 0)).toBe(260);
   });
 });

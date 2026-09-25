@@ -20,7 +20,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { useSettings } from "@/stores/settings";
-import { keyframesOf, loopLegs, resumeLegs, stateAt, totalMs, translateXOf, type Leg } from "./marquee";
+import { keyframesOf, loopLegs, resumeLegs, resumePlan, stateAt, totalMs, translateXOf, type Leg } from "./marquee";
 import s from "./ScrollingText.module.css";
 
 interface Motion {
@@ -151,8 +151,10 @@ export function ScrollingText({ children, className }: { children: ReactNode; cl
     const total = totalMs(cur.legs);
     const state = stateAt(cur.legs, cur.loop && total > 0 ? time % total : time, distanceNow(el, sign));
     cur.anim.cancel();
-    const legs = resumeLegs(state, over);
-    motion.current = legs.length ? play(el, motion, legs, sign, over, version, false) : play(el, motion, loopLegs(over), sign, over, version, true);
+    const plan = resumePlan(state, over);
+    const next = play(el, motion, plan.legs, sign, over, version, plan.loop);
+    next.anim.currentTime = plan.startAt;
+    motion.current = next;
   }, [over, still, rtl, version]);
 
   useEffect(
