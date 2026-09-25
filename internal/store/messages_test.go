@@ -295,6 +295,58 @@ func TestMentionsBeforeJoiningDoNotCount(t *testing.T) {
 	}
 }
 
+// A mention of a role counts for whoever holds the role when the badge is
+// worked out, and for nobody else.
+func TestRoleMentionsCountForTheirHolders(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	owner, holder, other := mkUser(t, s, "owner"), mkUser(t, s, "holder"), mkUser(t, s, "other")
+	srv, err := s.CreateServer(ctx, owner.ID, "S", DefaultNames{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []*User{holder, other} {
+		if _, err := s.AddMember(ctx, srv.ID, u.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	role, err := s.CreateRole(ctx, srv.ID, "Mods", 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMemberRole(ctx, srv.ID, holder.ID, role.ID); err != nil {
+		t.Fatal(err)
+	}
+	general := *srv.SystemChannelID
+	time.Sleep(5 * time.Millisecond) // after the joins, so the mention is not from before them
+	m := &Message{ChannelID: general, AuthorID: owner.ID, Ciphertext: json.RawMessage(`{"v":1}`), MentionRoles: []ids.ID{role.ID}}
+	if err := s.InsertMessage(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		user *User
+		want int
+	}{{holder, 1}, {other, 0}, {owner, 0}} {
+		states, err := s.ReadStatesFor(ctx, tc.user.ID, []ids.ID{general})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if states[0].MentionCount != tc.want {
+			t.Errorf("%s: %d mentions, want %d", tc.user.Username, states[0].MentionCount, tc.want)
+		}
+		if n, _ := s.CountMentionsAfter(ctx, general, tc.user.ID, 0); n != tc.want {
+			t.Errorf("%s: CountMentionsAfter %d, want %d", tc.user.Username, n, tc.want)
+		}
+	}
+	// the role taken away, the mention no longer calls for them
+	if err := s.RemoveMemberRole(ctx, srv.ID, holder.ID, role.ID); err != nil {
+		t.Fatal(err)
+	}
+	if states, _ := s.ReadStatesFor(ctx, holder.ID, []ids.ID{general}); states[0].MentionCount != 0 {
+		t.Errorf("after losing the role: %+v", states[0])
+	}
+}
+
 func TestUnreadCountStopsAtTheMost(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

@@ -15,6 +15,7 @@ import { useUsers, displayName } from "@/stores/users";
 import { desktopBridge } from "./desktopBridge";
 import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
+import { mentionsMe } from "./mentionsMe";
 
 import { t } from "@/i18n";
 let navigateTo: ((path: string) => void) | null = null;
@@ -125,7 +126,7 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
   const parentId = chan?.type === "subchat" ? chan.parent_id : null;
   const level = perChannel[m.channel_id] ?? (parentId ? perChannel[parentId] : undefined) ?? (serverId ? perChannel[serverId] : undefined) ?? (serverId ? serverDefaultLevel(serverId) : "all");
   if (muted.includes(m.channel_id) || (parentId && muted.includes(parentId)) || (serverId && muted.includes(serverId)) || level === "none") return;
-  const mentioned = m.mention_everyone || m.mentions.includes(me.id);
+  const mentioned = mentionsMe(m, me.id);
   if (level === "mentions" && !mentioned) return;
   const ui = useUI.getState();
   const alert = messageAlert(appOnScreen(), ui.activeChannelId === m.channel_id);

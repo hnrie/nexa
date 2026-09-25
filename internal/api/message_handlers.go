@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -91,6 +92,38 @@ type messageBody struct {
 	} `json:"attachments"`
 	Nonce string `json:"nonce"`
 	Flags int64  `json:"flags"`
+}
+
+// allowedRoleMentions keeps the role mentions a message may make: roles of the
+// channel's own server other than @everyone, which has a flag of its own, and
+// of those only the ones anyone may mention, unless the author may mention
+// everyone here. The list is what unread badges count, so a role nobody may
+// ping is not pinged by a client that lists it anyway. Conversations have no
+// roles.
+func (s *Server) allowedRoleMentions(ctx context.Context, me *store.User, ch *store.Channel, want []ids.ID) []ids.ID {
+	want = dedupeIDs(want, maxMentions)
+	if len(want) == 0 || s.isDM(ch) || ch.ServerID == nil {
+		return []ids.ID{}
+	}
+	roles, err := s.Store.Roles(ctx, *ch.ServerID)
+	if err != nil {
+		return []ids.ID{}
+	}
+	byID := make(map[ids.ID]*store.Role, len(roles))
+	for _, r := range roles {
+		byID[r.ID] = r
+	}
+	anyRole := false
+	if s.ChannelAccess != nil {
+		anyRole, _ = s.ChannelAccess(ctx, me, ch, "mention_everyone")
+	}
+	out := make([]ids.ID, 0, len(want))
+	for _, id := range want {
+		if r := byID[id]; r != nil && r.ID != *ch.ServerID && (r.Mentionable || anyRole) {
+			out = append(out, id)
+		}
+	}
+	return out
 }
 
 func dedupeIDs(list []ids.ID, max int) []ids.ID {
@@ -269,7 +302,7 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
-		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: dedupeIDs(body.MentionRoles, maxMentions), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds}
+		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds}
 	if body.ReplyToID != nil {
 		target, err := s.Store.MessageByID(ctx, *body.ReplyToID, me.ID)
 		if err != nil || target.ChannelID != ch.ID {
@@ -368,7 +401,7 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		// readers open a message with the key its row names, so the row follows the new envelope
-		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), dedupeIDs(body.MentionRoles, maxMentions), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
+		if err := s.Store.UpdateMessage(r.Context(), mid, body.Ciphertext, env.Conv, env.Epoch, dedupeIDs(body.Mentions, maxMentions), s.allowedRoleMentions(r.Context(), me, ch, body.MentionRoles), body.MentionEveryone, time.Now().UnixMilli()); err != nil {
 			WriteError(w, err)
 			return
 		}

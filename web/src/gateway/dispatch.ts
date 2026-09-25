@@ -26,6 +26,7 @@ import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } f
 import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
 import { usePanes } from "@/stores/panes";
+import { mentionsMe } from "@/lib/mentionsMe";
 
 /** Something from Nexa worth a sound or a notification. */
 export type NexaAlert = { kind: "notice" | "reply"; case: MemberCase } | { kind: "announcement"; announcement: Announcement } | { kind: "appeal"; caseId: string; userId: string };
@@ -138,10 +139,6 @@ async function ensureUser(id: string): Promise<void> {
   } finally {
     userFetches.delete(id);
   }
-}
-
-function mentionsMe(m: Message, meId: string): boolean {
-  return m.mention_everyone || m.mentions.includes(meId);
 }
 
 /** Whether a loaded message was one this account's mention count was bumped for. */

@@ -65,20 +65,22 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	// count walk the messages_channel index from the floor instead of scanning
 	// the whole channel. Conversations also count their unread messages, which
 	// stop at MaxUnreadCount so a long-ignored one costs no more than a short one.
+	// A mention of a role counts for whoever holds the role now.
 	mentioned := s.db.Dialect.JSONArrayHas("m.mentions")
+	roleMentioned := `m.mention_roles <> '[]' AND EXISTS (SELECT 1 FROM member_roles mr WHERE mr.server_id = f.server_id AND mr.user_id = ? AND ` + s.db.Dialect.JSONArrayHasExpr("m.mention_roles", "mr.role_id") + `)`
 	floor := s.db.Dialect.Greatest(
 		"coalesce(r.last_read_message_id, 0)",
 		"coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0)",
 	)
-	args := []any{int64(uid), uid.String(), int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
+	args := []any{int64(uid), uid.String(), int64(uid), int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
 	args = append(args, idArgs(channels)...)
 	mrows, err := s.db.R.QueryContext(ctx, `SELECT f.id,
 			(SELECT count(*) FROM messages m
 				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor
-				AND (m.mention_everyone = 1 OR `+mentioned+`)),
+				AND (m.mention_everyone = 1 OR `+mentioned+` OR (`+roleMentioned+`))),
 			CASE WHEN f.type IN ('dm', 'group_dm') THEN (SELECT count(*) FROM (SELECT 1 FROM messages m
 				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor LIMIT ?) AS capped) ELSE 0 END
-		FROM (SELECT c.id, c.type, `+floor+` AS floor
+		FROM (SELECT c.id, c.type, c.server_id, `+floor+` AS floor
 			FROM channels c
 			LEFT JOIN read_states r ON r.channel_id = c.id AND r.user_id = ?
 			LEFT JOIN server_members sm ON sm.server_id = c.server_id AND sm.user_id = ?
@@ -102,9 +104,13 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	return out, mrows.Err()
 }
 
-// CountMentionsAfter counts unread mentions of uid in a channel after afterID.
+// CountMentionsAfter counts unread mentions of uid in a channel after afterID,
+// its roles' included.
 func (s *Store) CountMentionsAfter(ctx context.Context, chID, uid, afterID ids.ID) (int, error) {
 	var n int
-	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM messages m WHERE m.channel_id = ? AND m.author_id != ? AND m.id > ? AND (m.mention_everyone = 1 OR `+s.db.Dialect.JSONArrayHas("m.mentions")+`)`, int64(chID), int64(uid), int64(afterID), uid.String()).Scan(&n)
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM messages m JOIN channels c ON c.id = m.channel_id
+		WHERE m.channel_id = ? AND m.author_id != ? AND m.id > ? AND (m.mention_everyone = 1 OR `+s.db.Dialect.JSONArrayHas("m.mentions")+`
+			OR (m.mention_roles <> '[]' AND EXISTS (SELECT 1 FROM member_roles mr WHERE mr.server_id = c.server_id AND mr.user_id = ? AND `+s.db.Dialect.JSONArrayHasExpr("m.mention_roles", "mr.role_id")+`)))`,
+		int64(chID), int64(uid), int64(afterID), uid.String(), int64(uid)).Scan(&n)
 	return n, err
 }

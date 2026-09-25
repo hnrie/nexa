@@ -37,4 +37,7 @@ func TestJSONArrayHas(t *testing.T) {
 	if got := Postgres.JSONArrayHas("m.mentions"); got == "" || got == SQLite.JSONArrayHas("m.mentions") {
 		t.Errorf("postgres needs its own form, got %s", got)
 	}
+	if got := SQLite.JSONArrayHasExpr("m.mention_roles", "mr.role_id"); got != "EXISTS (SELECT 1 FROM json_each(m.mention_roles) WHERE value = CAST(mr.role_id AS TEXT))" {
+		t.Errorf("sqlite expr: %s", got)
+	}
 }

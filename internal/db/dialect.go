@@ -36,6 +36,16 @@ func (d Dialect) JSONArrayHas(column string) string {
 	return "EXISTS (SELECT 1 FROM json_each(" + column + ") WHERE value = ?)"
 }
 
+// JSONArrayHasExpr is JSONArrayHas against another column or expression rather
+// than a parameter: the array holds ids as text, so the expression is compared
+// as text too.
+func (d Dialect) JSONArrayHasExpr(column, expr string) string {
+	if d == Postgres {
+		return "EXISTS (SELECT 1 FROM jsonb_array_elements_text(" + column + "::jsonb) AS e(value) WHERE e.value = CAST(" + expr + " AS TEXT))"
+	}
+	return "EXISTS (SELECT 1 FROM json_each(" + column + ") WHERE value = CAST(" + expr + " AS TEXT))"
+}
+
 // Greatest is the larger of two values, as a scalar. SQLite spells it max(),
 // which Postgres keeps for the aggregate and calls greatest() here.
 func (d Dialect) Greatest(a, b string) string {

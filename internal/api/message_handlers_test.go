@@ -343,3 +343,47 @@ func TestBulkDeleteTakesOnlyWhatYouMayDelete(t *testing.T) {
 	}
 	_ = idB
 }
+
+// A message pings a role only when the role is this server's, and either
+// anyone may mention it or the author may mention everyone: the list is what
+// unread badges count, so a client listing more than that pings nobody extra.
+func TestRoleMentionsAreHeldToWhoMayMakeThem(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, _ := register(t, ts, "bob")
+	view := createServer(t, ts, tokA, "S")
+	sid := view["id"].(string)
+	general := channelNamed(view, "general")["id"].(string)
+	join(t, ts, tokB, inviteFor(t, ts, tokA, general))
+	epoch := createEpoch(t, ts, tokA, sid)
+	role := func(name string, mentionable bool) string {
+		res, body := do(t, ts, "POST", "/api/v1/servers/"+sid+"/roles", tokA, map[string]any{"name": name})
+		if res.StatusCode != 201 && res.StatusCode != 200 {
+			t.Fatalf("create role: %d %v", res.StatusCode, body)
+		}
+		id := body["id"].(string)
+		if mentionable {
+			if res, body := do(t, ts, "PATCH", "/api/v1/servers/"+sid+"/roles/"+id, tokA, map[string]any{"mentionable": true}); res.StatusCode != 200 {
+				t.Fatalf("patch role: %d %v", res.StatusCode, body)
+			}
+		}
+		return id
+	}
+	closed, open := role("Mods", false), role("Everyone Welcome", true)
+	pinged := func(tok, nonce string, roles []string) []any {
+		res, body := sendMsg(t, ts, tok, general, sid, epoch, "ping", nonce, map[string]any{"mention_roles": roles})
+		if res.StatusCode != 201 {
+			t.Fatalf("send: %d %v", res.StatusCode, body)
+		}
+		got, _ := body["mention_roles"].([]any)
+		return got
+	}
+	// bob may ping the open role only; @everyone's own id and strangers are dropped
+	if got := pinged(tokB, "b1", []string{closed, open, sid, "12345"}); len(got) != 1 || got[0] != open {
+		t.Errorf("bob's role mentions: %v, want just %s", got, open)
+	}
+	// the owner may mention everyone, so any role of the server
+	if got := pinged(tokA, "a1", []string{closed}); len(got) != 1 || got[0] != closed {
+		t.Errorf("alice's role mentions: %v, want %s", got, closed)
+	}
+}
