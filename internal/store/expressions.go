@@ -156,8 +156,12 @@ func (s *Store) DeleteEmoji(ctx context.Context, id ids.ID) error {
 			}
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM emojis WHERE id = ?`, int64(id)); err != nil {
+		// Two deletes of the same emoji can both read it before either removes
+		// it; only the one whose delete took a row gives back the reference.
+		if res, err := tx.ExecContext(ctx, `DELETE FROM emojis WHERE id = ?`, int64(id)); err != nil {
 			return err
+		} else if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound
 		}
 		_, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count - 1")+` WHERE id = ?`, blob)
 		return err
@@ -553,8 +557,10 @@ func (s *Store) DeleteSticker(ctx context.Context, id ids.ID) error {
 			}
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM stickers WHERE id = ?`, int64(id)); err != nil {
+		if res, err := tx.ExecContext(ctx, `DELETE FROM stickers WHERE id = ?`, int64(id)); err != nil {
 			return err
+		} else if n, _ := res.RowsAffected(); n == 0 {
+			return ErrNotFound // deleted by a request that read it at the same time
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count - 1")+` WHERE id = ?`, blob); err != nil {
 			return err
