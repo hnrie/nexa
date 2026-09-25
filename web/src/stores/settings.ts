@@ -4,6 +4,8 @@ import { users as usersApi } from "@/api/users";
 import { ApiError } from "@/api/client";
 import { decryptSettings, encryptSettings } from "@/lib/settingsCrypto";
 import { fromStreamQuality } from "@/voice/shareQuality";
+import { sanitizeRail, type RailLayout } from "@/lib/railLayout";
+import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout";
 
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system";
 export type NotificationLevel = "all" | "mentions" | "none";
@@ -90,6 +92,19 @@ export interface Settings {
 
   // Each area added in round 4 keeps its fields under its own heading.
   // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+  /**
+   * The server rail as arranged: folders, and what is pinned to the top. Null
+   * until the first time the account is loaded after folders came in, when
+   * the order in serverPositions becomes it (see lib/railLayout.ts).
+   */
+  rail: RailLayout | null;
+  /** Pinned conversations and the groups of the DM list (see lib/dmLayout.ts). */
+  dmList: DMListLayout;
+  /**
+   * When the Nexa conversation was closed, as Nexa's latest activity then
+   * (its `latest`); 0 while it is open. Anything newer from Nexa brings it back.
+   */
+  nexaClosed: number;
 
   // --- people: blocking ---
 
@@ -147,6 +162,9 @@ export const DEFAULT_SETTINGS: Settings = {
   appLock: null,
 
   // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+  rail: null,
+  dmList: EMPTY_DM_LIST,
+  nexaClosed: 0,
 
   // --- people: blocking ---
 
@@ -167,6 +185,10 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     voice: mergeVoice(base.voice, inc.voice),
 
     // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+    // read defensively, as every version of the app may have written them
+    rail: "rail" in inc ? sanitizeRail(inc.rail) : base.rail,
+    dmList: "dmList" in inc ? sanitizeDMList(inc.dmList) : base.dmList,
+    nexaClosed: typeof inc.nexaClosed === "number" && Number.isFinite(inc.nexaClosed) ? inc.nexaClosed : base.nexaClosed,
 
     // --- people: blocking ---
 

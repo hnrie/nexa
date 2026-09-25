@@ -137,6 +137,33 @@ describe("screen share settings", () => {
   });
 });
 
+describe("how the rail and the DM list are arranged", () => {
+  it("keeps the defaults when a copy saved before them has none", async () => {
+    await loadFrom({ doc: { theme: "light", serverPositions: ["2", "1"] }, version: 1 });
+    const st = useSettings.getState().settings;
+    expect(st.rail).toBeNull();
+    expect(st.dmList).toEqual({ pins: [], groups: [] });
+    expect(st.nexaClosed).toBe(0);
+    expect(st.serverPositions).toEqual(["2", "1"]);
+  });
+
+  it("reads what another version wrote defensively", async () => {
+    await loadFrom({ doc: { rail: { pinned: ["1", { id: "fa", servers: ["2"], color: "blue" }], rest: "3" }, dmList: { pins: ["10", 11], groups: [{ id: "gx", name: "Work", ids: ["10", "12"] }] }, nexaClosed: "soon" }, version: 1 });
+    const st = useSettings.getState().settings;
+    expect(st.rail).toEqual({ pinned: ["1", { id: "fa", name: "", color: null, servers: ["2"] }], rest: [] });
+    expect(st.dmList).toEqual({ pins: ["10"], groups: [{ id: "gx", name: "Work", ids: ["12"] }] });
+    expect(st.nexaClosed).toBe(0);
+  });
+
+  it("saves a change to the rail whole", async () => {
+    const server = fakeServer({ rail: { pinned: [], rest: ["1", "2"] } });
+    await loadFrom(server);
+    useSettings.getState().patch({ rail: { pinned: ["2"], rest: [{ id: "fa", name: "Games", color: null, servers: ["1"] }] } });
+    await useSettings.getState().flush();
+    expect(server.doc["rail"]).toEqual({ pinned: ["2"], rest: [{ id: "fa", name: "Games", color: null, servers: ["1"] }] });
+  });
+});
+
 describe("device settings", () => {
   it("treats a saved Chromium alias as the system's own device", async () => {
     await loadFrom({ doc: { voice: { inputDeviceId: "communications", inputDeviceLabel: "Communications - Headset", outputDeviceId: "default", cameraDeviceId: "cam1", cameraDeviceLabel: "Webcam" } }, version: 1 });
