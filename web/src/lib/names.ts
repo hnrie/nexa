@@ -1,5 +1,5 @@
 import type { Channel, PublicUser } from "@/api/types";
-import { t } from "@/i18n";
+import { formatList, t } from "@/i18n";
 import { displayName } from "@/stores/users";
 
 /** The name shown for a DM or group DM. */
@@ -12,7 +12,8 @@ export function channelDisplayName(ch: Channel, users: Record<string, PublicUser
   if (ch.type === "group_dm") {
     if (ch.name) return ch.name;
     const names = ch.recipient_ids.filter((id) => id !== meId).map(name);
-    return names.length ? names.join(", ") : t("names.unnamedGroup");
+    // joined as the language joins a list: "Ann, Bob, Carl", "Ann、Bob、Carl", "Ann, Bob und Carl"
+    return names.length ? formatList(names) : t("names.unnamedGroup");
   }
   return ch.name;
 }

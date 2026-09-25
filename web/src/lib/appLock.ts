@@ -18,10 +18,18 @@ import { unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
 import { storage } from "./storage";
 
 import { t } from "@/i18n";
-/** Heavier than the login KDF: a four-digit passcode needs the help. */
+/** Heavier than the login KDF: a passcode of digits needs the help. */
 export const LOCK_KDF: KdfParams = { m: 65536, t: 6, p: 1, v: 1 };
 export const MAX_FAILURES = 10;
 export const MIN_PASSCODE = 4;
+/**
+ * A passcode of digits alone needs more of them. The try counter lives next
+ * to the wrapped key, so a copy of this browser's storage can be guessed at
+ * offline with no counter at all: four digits fall in minutes on a laptop,
+ * six take days. Six is also what phones settled on. Passcodes made before
+ * this keep working; only new ones are held to it.
+ */
+export const MIN_NUMERIC_PASSCODE = 6;
 
 /** Idle time before the app locks itself, in milliseconds. 0 means never. */
 export function autoLockChoices(): { label: string; ms: number }[] {
@@ -149,6 +157,7 @@ export function isNumeric(passcode: string): boolean {
 
 /** Returns why a passcode is unacceptable, or null when it is fine. */
 export function passcodeProblem(passcode: string): string | null {
+  if (isNumeric(passcode) && passcode.length < MIN_NUMERIC_PASSCODE) return t("appLock.useAtLeastDigits", { count: MIN_NUMERIC_PASSCODE });
   if (passcode.length < MIN_PASSCODE) return t("appLock.useAtLeastCharacters", { count: MIN_PASSCODE });
   if (passcode.length > 128) return t("appLock.thatIsTooLong");
   if (/^(.)\1*$/.test(passcode)) return t("appLock.pickSomethingLessGuessableThanOne");

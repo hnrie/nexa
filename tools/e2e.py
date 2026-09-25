@@ -817,8 +817,8 @@ def security_flow(srv, out, browser):
 
     # --- a device passcode ---------------------------------------------------
     p.click("[data-testid=lock-set]")
-    p.fill("[data-testid=passcode-new]", "1379")
-    p.fill("[data-testid=passcode-confirm]", "1379")
+    p.fill("[data-testid=passcode-new]", "137924")
+    p.fill("[data-testid=passcode-confirm]", "137924")
     p.click("[data-testid=passcode-save]")
     p.wait_for_selector("[data-testid=lock-row]:has-text('Passcode is on')", timeout=30000)
     dave.shot("security-app-lock")
@@ -828,10 +828,10 @@ def security_flow(srv, out, browser):
     p.reload(wait_until="domcontentloaded")
     p.wait_for_selector("[data-testid=passcode-input]", timeout=45000)
     dave.shot("security-locked")
-    p.fill("[data-testid=passcode-input]", "9999")
+    p.fill("[data-testid=passcode-input]", "999999")
     p.click("[data-testid=passcode-submit]")
     p.wait_for_selector("text=/Wrong passcode/", timeout=45000)
-    p.fill("[data-testid=passcode-input]", "1379")
+    p.fill("[data-testid=passcode-input]", "137924")
     p.click("[data-testid=passcode-submit]")
     p.wait_for_url("**/channels/@me", timeout=45000)
     p.wait_for_selector("text=Friends", timeout=20000)
@@ -840,7 +840,7 @@ def security_flow(srv, out, browser):
     dave.open_settings("security")
     p.click("[data-testid=lock-now]")
     p.wait_for_selector("[data-testid=passcode-input]", timeout=20000)
-    p.fill("[data-testid=passcode-input]", "1379")
+    p.fill("[data-testid=passcode-input]", "137924")
     p.click("[data-testid=passcode-submit]")
     p.wait_for_selector("text=Friends", timeout=45000)
 

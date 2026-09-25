@@ -13,13 +13,35 @@ import { b64, randomBytes } from "@/crypto/bytes";
 import { decryptFile, encryptedSize } from "@/crypto/file";
 import { DecryptError } from "@/crypto/keys";
 import type { AttachmentMeta } from "@/crypto/message";
+import { noDesktopBuild } from "@/lib/platform";
 
 import { t } from "@/i18n";
 /** Above this, a download streams through the service worker when it can. */
 export const STREAM_ABOVE = 64 * 1024 * 1024;
 
-/** Without the worker, the most that will be decrypted in the page to save. */
-const IN_PAGE_MAX = 1024 * 1024 * 1024;
+const MB = 1024 * 1024;
+
+/**
+ * Without the worker, the most that will be decrypted in the page to save:
+ * the encrypted copy and the plain one are both in memory at once. Chromium
+ * moves large Blobs to disk, which a gigabyte was sized for; WebKit keeps them
+ * in memory, and iOS ends a page well before two. So it follows the device:
+ * its memory where the browser says, a phone's or tablet's worth otherwise.
+ */
+export function inPageMax(): number {
+  const memory = typeof navigator !== "undefined" ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory : undefined;
+  if (typeof memory === "number" && memory > 0) return Math.min(1024, Math.max(128, memory * 128)) * MB;
+  return noDesktopBuild() ? 256 * MB : 1024 * MB;
+}
+
+/**
+ * An iOS home-screen app has no download manager for the worker's stream to
+ * land in: the browser never comes for the file, and the save would wait out
+ * the start timeout for nothing.
+ */
+function homeScreenIOS(): boolean {
+  return typeof navigator !== "undefined" && (navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
 
 /** The address the download worker answers on; download-sw.ts has the other end. */
 const DOWNLOAD_PATH = "/__download/";
@@ -203,8 +225,14 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
 /** Decrypts an attachment and saves it where the browser keeps downloads. */
 export async function saveAttachment(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
   if (att.size > STREAM_ABOVE) {
-    if ((await streamThroughWorker(att, onProgress)) === "done") return;
-    if (att.size > IN_PAGE_MAX) throw new Error(t("download.thisFileIsTooLargeTo"));
+    if (!homeScreenIOS() && (await streamThroughWorker(att, onProgress)) === "done") return;
+    // said before anything is fetched: a phone decrypting more than it can
+    // hold does not fail, it reloads the app with nothing saved
+    if (att.size > inPageMax()) {
+      // a browser that can stream just has not started its worker yet; a reload fixes that
+      const later = !homeScreenIOS() && typeof navigator !== "undefined" && !!navigator.serviceWorker;
+      throw new Error(later ? t("download.thisFileIsTooLargeTo") : t("download.tooLargeForThisDevice"));
+    }
   }
   await saveInPage(att, onProgress);
 }

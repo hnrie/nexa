@@ -6,11 +6,22 @@ export function avatarColor(id: string): string {
   return PALETTE[h % PALETTE.length] ?? PALETTE[0]!;
 }
 
+/** The first character as a reader sees it: a flag, a family emoji or an accented letter is one. */
+function firstGrapheme(text: string): string {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    const first = new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(text)[Symbol.iterator]().next();
+    if (!first.done) return first.value.segment;
+  }
+  return Array.from(text)[0] ?? "";
+}
+
 export function initials(name: string): string {
   const trimmed = name.trim();
   if (!trimmed) return "?";
-  const first = Array.from(trimmed)[0] ?? "?";
-  return first.toUpperCase();
+  const first = firstGrapheme(trimmed) || "?";
+  // "ß" upper-cases to "SS", which is two letters in a space for one
+  const upper = first.toUpperCase();
+  return upper.length === first.length ? upper : first;
 }
 
 /** The CSS background for a profile banner area: a gradient when two colours are set. */

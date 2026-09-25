@@ -19,6 +19,14 @@ describe("safeNext", () => {
     expect(safeNext(null)).toBe("/channels/@me");
   });
 
+  it("refuses a path a URL parser would turn into another site's address", () => {
+    // tabs and line breaks are dropped and a backslash reads as a slash
+    expect(safeNext("/\t/evil.example")).toBe("/channels/@me");
+    expect(safeNext("/\n/evil.example")).toBe("/channels/@me");
+    expect(safeNext("/\r\n/evil.example")).toBe("/channels/@me");
+    expect(safeNext("/channels\\..\\x")).toBe("/channels/@me");
+  });
+
   it("takes the fallback it is given", () => {
     expect(safeNext("//evil.example", "/somewhere")).toBe("/somewhere");
   });

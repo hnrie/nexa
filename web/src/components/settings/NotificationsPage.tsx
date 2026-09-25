@@ -4,11 +4,20 @@ import { Toggle } from "@/components/common/Toggle";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { showNotification } from "@/lib/notify";
 import { playSound, soundTrouble, type SoundName } from "@/lib/sounds";
-import { useSettings } from "@/stores/settings";
+import { useSettings, type NotificationPreview } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
+
+function previewChoices(): { value: NotificationPreview; label: string; desc: string }[] {
+  return [
+    { value: "full", label: t("settings.notifications.previewFull"), desc: t("settings.notifications.previewFullHint") },
+    { value: "name", label: t("settings.notifications.previewName"), desc: t("settings.notifications.previewNameHint") },
+    { value: "none", label: t("settings.notifications.previewNone"), desc: t("settings.notifications.previewNoneHint") },
+  ];
+}
+
 export default function NotificationsPage() {
   const st = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
@@ -45,6 +54,14 @@ export default function NotificationsPage() {
         <Toggle checked={st.notifications.desktop && perm === "granted"} disabled={perm === "unsupported" || perm === "denied"} onChange={(v) => void enable(v)} label={t("settings.notifications.enableDesktopNotifications")} description={perm === "denied" ? t("settings.notifications.notificationsAreBlocked") : perm === "unsupported" ? t("settings.notifications.thisBrowserDoesNotSupport") : t("settings.notifications.getANotificationWhileThisTabIsOpen")} />
       )}
       <Toggle checked={st.notifications.sounds} onChange={(v) => patch({ notifications: { ...st.notifications, sounds: v } })} label={t("settings.notifications.sounds")} description={t("settings.notifications.playASoundForNewMessages")} />
+      <h3 className={s.h5}>{t("settings.notifications.previewHeading")}</h3>
+      <p className={s.hint}>{t("settings.notifications.previewIntro")}</p>
+      {previewChoices().map((o) => (
+        <label key={o.value} className={s.radio} data-on={(st.notifications.preview ?? "full") === o.value}>
+          <input type="radio" name="notification-preview" checked={(st.notifications.preview ?? "full") === o.value} onChange={() => patch({ notifications: { ...st.notifications, preview: o.value } })} data-testid={`notification-preview-${o.value}`} />
+          <span className={s.radioText}><span className={s.radioLabel}>{o.label}</span><span className={s.radioDesc}>{o.desc}</span></span>
+        </label>
+      ))}
       <h3 className={s.h5}>{t("settings.notifications.test")}</h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <Button size="sm" variant="secondary" onClick={() => void testSound("message")}>{t("profile.profileCard.message")}</Button>

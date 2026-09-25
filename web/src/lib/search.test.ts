@@ -45,6 +45,14 @@ describe("search query parsing", () => {
     expect(isEmptyQuery(parseQuery("   "))).toBe(true);
     expect(parseQuery("has:nope").has).toEqual([]);
   });
+
+  it("refuses a date that does not exist rather than rolling it into the next month", () => {
+    expect(parseQuery("before:2026-02-30").before).toBeNull();
+    expect(parseQuery("after:2026-13-01").after).toBeNull();
+    expect(parseQuery("after:2026-04-31").after).toBeNull();
+    expect(parseQuery("before:2028-02-29").before).not.toBeNull();
+    expect(new Date(parseQuery("before:2026-03-01").before!).getDate()).toBe(1);
+  });
 });
 
 describe("matching", () => {

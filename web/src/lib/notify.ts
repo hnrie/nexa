@@ -136,10 +136,19 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
   if (!alert.popup || !notificationsEnabled(settings)) return;
   const users = useUsers.getState().byId;
   const ch = useChannels.getState().byId[m.channel_id];
+  const path = ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`;
+  // A notification is the one place a message is shown outside the app: on a
+  // locked phone's screen, in a desktop's notification history. Whoever wants
+  // less there than the whole of it can say so.
+  const preview = settings.notifications.preview ?? "full";
+  if (preview === "none") {
+    void showNotification("Nexa", { body: t("notify.newMessage"), tag: `ec-${m.channel_id}`, icon: "/icons/icon-192.png", silent: true }, path);
+    return;
+  }
   const author = displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (#${ch.name})` : author;
-  const path = ch?.server_id ? `/channels/${ch.server_id}/${m.channel_id}` : `/channels/@me/${m.channel_id}`;
-  void showNotification(title, { body: previewOf(m, decrypted), tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
+  const body = preview === "full" ? previewOf(m, decrypted) : t("notify.newMessage");
+  void showNotification(title, { body, tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
 }
 
 /** A new friend request plays its own sound, and notifies while the app is not being looked at. */
@@ -150,6 +159,11 @@ function onFriendRequest(r: Relationship): void {
   if (settings.notifications.sounds) playSound("friend");
   if (appOnScreen()) return;
   if (!notificationsEnabled(settings)) return;
+  // with nothing to be shown, not even who it is from
+  if (settings.notifications.preview === "none") {
+    void showNotification("Nexa", { body: t("notify.friendRequest"), tag: `ec-friend-${r.user.id}`, icon: "/icons/icon-192.png", silent: true }, "/channels/@me");
+    return;
+  }
   void showNotification(t("notify.friendRequest"), { body: t("notify.sentYouAFriendRequest", { name: displayName(r.user) }), tag: `ec-friend-${r.user.id}`, icon: avatarUrl(r.user.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, "/channels/@me");
 }
 
