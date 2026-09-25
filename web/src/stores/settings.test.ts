@@ -76,6 +76,24 @@ describe("settings sync", () => {
     expect(server.doc).toMatchObject({ showMembers: false, sidebarWidth: 300 });
   });
 
+  it("keeps an unmute made here when another device's copy arrives", async () => {
+    const n = { desktop: false, app: true, sounds: true, perChannel: { c5: "none", c7: "all" }, muted: ["c1", "c2"] };
+    const server = fakeServer({ notifications: n });
+    await loadFrom(server);
+    // the other device mutes c3 and sets a level on c6, and saves first
+    server.doc = { ...server.doc, notifications: { ...n, muted: ["c1", "c2", "c3"], perChannel: { ...n.perChannel, c6: "mentions", c7: "none" } } };
+    server.version += 1;
+    // this device unmutes c1 and clears c5's level
+    const mine = useSettings.getState().settings.notifications;
+    useSettings.getState().patch({ notifications: { ...mine, muted: ["c2"], perChannel: { c7: "all" } } });
+    await useSettings.getState().flush();
+    const saved = server.doc["notifications"] as typeof n;
+    expect([...saved.muted].sort()).toEqual(["c2", "c3"]);
+    // c5 cleared here, c6 set there, and c7, untouched here, keeps the other device's change
+    expect(saved.perChannel).toEqual({ c6: "mentions", c7: "none" });
+    expect(useSettings.getState().settings.notifications.muted.sort()).toEqual(["c2", "c3"]);
+  });
+
   it("tries a save that could not reach the server again later", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const server = fakeServer({ theme: "dark" });

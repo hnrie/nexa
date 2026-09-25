@@ -145,24 +145,69 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
   };
 }
 
+type NotificationSettings = Settings["notifications"];
+
+/**
+ * What this device did to the two collections inside `notifications`, entry
+ * by entry: for `muted`, true for muted here and false for unmuted here; for
+ * `levels`, true for a level set here and false for one cleared here. The
+ * lists alone cannot tell "unmuted here" from "never muted here", so merging
+ * the lists themselves brought back every unmute this device made, and an
+ * untouched level of this device's overwrote another device's new one.
+ */
+export interface ListEdits {
+  muted: Map<string, boolean>;
+  levels: Map<string, boolean>;
+}
+
+/** The entries a change to `notifications` added, removed or changed. */
+export function editsOf(before: NotificationSettings, after: Partial<NotificationSettings>): ListEdits | null {
+  const muted = new Map<string, boolean>();
+  if (after.muted) {
+    const was = new Set(before.muted);
+    const now = new Set(after.muted);
+    for (const id of now) if (!was.has(id)) muted.set(id, true);
+    for (const id of was) if (!now.has(id)) muted.set(id, false);
+  }
+  const levels = new Map<string, boolean>();
+  if (after.perChannel) {
+    for (const [id, level] of Object.entries(after.perChannel)) if (before.perChannel[id] !== level) levels.set(id, true);
+    for (const id of Object.keys(before.perChannel)) if (!(id in after.perChannel)) levels.set(id, false);
+  }
+  return muted.size || levels.size ? { muted, levels } : null;
+}
+
+/** Two batches of edits as one, the later winning entry by entry. */
+function mergeEdits(a: ListEdits | null, b: ListEdits | null): ListEdits | null {
+  if (!a || !b) return a ?? b;
+  return { muted: new Map([...a.muted, ...b.muted]), levels: new Map([...a.levels, ...b.levels]) };
+}
+
 /**
  * This device's unsaved changes, laid over the copy that just arrived.
  *
  * `perChannel` is a map and `muted` a list, and both live inside the one
  * `notifications` object, so a plain merge lets whichever side carries that
  * object throw away everything the other side put in them — and this device
- * then saves the result. They are merged entry by entry instead: what was
- * changed here wins, what was never touched here is kept.
+ * then saves the result. They are merged entry by entry instead: the entries
+ * changed here win, and every other entry is the arriving copy's.
  */
-export function layerUnsaved(base: Settings, unsaved: Partial<Settings>): Settings {
+export function layerUnsaved(base: Settings, unsaved: Partial<Settings>, edits: ListEdits | null = null): Settings {
   const merged = mergeSettings(base, unsaved);
   const mine = unsaved.notifications;
   if (!mine) return merged;
-  merged.notifications = {
-    ...merged.notifications,
-    perChannel: { ...base.notifications.perChannel, ...mine.perChannel },
-    muted: [...new Set([...base.notifications.muted, ...mine.muted])],
-  };
+  const perChannel = { ...base.notifications.perChannel };
+  const muted = new Set(base.notifications.muted);
+  for (const [id, set] of edits?.levels ?? []) {
+    const level = mine.perChannel?.[id];
+    if (set && level !== undefined) perChannel[id] = level;
+    else delete perChannel[id];
+  }
+  for (const [id, on] of edits?.muted ?? []) {
+    if (on) muted.add(id);
+    else muted.delete(id);
+  }
+  merged.notifications = { ...merged.notifications, perChannel, muted: [...muted] };
   return merged;
 }
 
@@ -216,6 +261,9 @@ let failures = 0;
 // device's (or its own echo) keeps both sides instead of one erasing the other.
 let dirty: Partial<Settings> | null = null;
 let sending: Partial<Settings> | null = null;
+// the entry-by-entry record of the same changes to the notification lists
+let dirtyEdits: ListEdits | null = null;
+let sendingEdits: ListEdits | null = null;
 let inflight: Promise<boolean> | null = null;
 let again = false;
 /** Bumped on reset, so a save from the account before it cannot land on the next one. */
@@ -246,19 +294,24 @@ export const useSettings = create<SettingsState>()((set, get) => {
     if (!key || !loaded || !dirty) return false;
     const gen = generation;
     sending = dirty;
+    sendingEdits = dirtyEdits;
     dirty = null;
+    dirtyEdits = null;
     try {
       const blob = await encryptSettings(key, settings);
       const res = await usersApi.putSettings(blob, version);
       if (gen !== generation) return false;
       sending = null;
+      sendingEdits = null;
       failures = 0;
       set({ version: res.version });
       return false;
     } catch (err) {
       if (gen !== generation) return false;
       dirty = mergeChanges(sending, dirty);
+      dirtyEdits = mergeEdits(sendingEdits, dirtyEdits);
       sending = null;
+      sendingEdits = null;
       if (err instanceof ApiError && err.status === 409 && failures < 3) {
         // someone else saved first: take theirs, put ours back on top, try again
         failures += 1;
@@ -298,7 +351,7 @@ export const useSettings = create<SettingsState>()((set, get) => {
       if (get().loaded && version < get().version) return;
       const base = doc ? mergeSettings(DEFAULT_SETTINGS, doc) : DEFAULT_SETTINGS;
       const unsaved = mergeChanges(sending, dirty);
-      set({ settings: unsaved ? layerUnsaved(base, unsaved) : base, version, loaded: true });
+      set({ settings: unsaved ? layerUnsaved(base, unsaved, mergeEdits(sendingEdits, dirtyEdits)) : base, version, loaded: true });
       if (dirty) void get().flush();
     },
     reload: async () => {
@@ -306,6 +359,7 @@ export const useSettings = create<SettingsState>()((set, get) => {
       await get().load(res?.blob ?? null, res?.version ?? 0);
     },
     patch: (partial) => {
+      if (partial.notifications) dirtyEdits = mergeEdits(dirtyEdits, editsOf(get().settings.notifications, partial.notifications));
       set((s) => ({ settings: mergeSettings(s.settings, partial) }));
       dirty = mergeChanges(dirty, partial);
       if (saveTimer) clearTimeout(saveTimer);
@@ -362,6 +416,8 @@ export const useSettings = create<SettingsState>()((set, get) => {
       generation += 1;
       dirty = null;
       sending = null;
+      dirtyEdits = null;
+      sendingEdits = null;
       inflight = null;
       again = false;
       failures = 0;
