@@ -48,14 +48,14 @@ export default function NexaCasePage() {
     <div className={s.page} data-testid="nexa-case-page">
       <header className={s.header}>
         <button className={s.back} onClick={back} aria-label={t("nexa.backToNexa")}>
-          <ChevronLeft size={22} />
+          <ChevronLeft size={22} className={s.flip} />
         </button>
         <NexaAvatar size={24} />
         <span className={s.headerName}>{thread ? t("nexa.notice.caseNumber", { number: thread.case.number }) : t("nexa.caseTitle")}</span>
         {thread ? <span className={s.headerSub}>{noticeTitle(thread.case.action, thread.case.details)}</span> : null}
         <span className={s.spacer} />
         {standing ? (
-          <span className={s.chip} data-tone={standing.tone}>
+          <span className={[s.chip, s.headerChip].join(" ")} data-tone={standing.tone}>
             {standing.label}
           </span>
         ) : null}

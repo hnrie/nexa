@@ -130,6 +130,8 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
   const [muteFor, setMuteFor] = useState<number | "permanent">(SPAN.DAY);
   const [banFor, setBanFor] = useState<number | "permanent">(SPAN.WEEK);
   const [confirm, setConfirm] = useState("");
+  // usernames are lower case, and a phone keyboard capitalises the first letter
+  const confirmed = confirm.trim().toLowerCase() === user.username;
   const [preview, setPreview] = useState<PurgeCounts | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,9 +170,9 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
       case "ban":
         return banFor === "permanent" || (banFor >= SPAN.MINUTE && banFor <= MAX_BAN);
       default:
-        return confirm === user.username;
+        return confirmed;
     }
-  }, [action, reasonOk, images, fields, muteFor, banFor, confirm, user.username]);
+  }, [action, reasonOk, images, fields, muteFor, banFor, confirmed]);
 
   const submitLabel = (): string => {
     switch (action) {
@@ -199,7 +201,7 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
       if (banFor === "permanent") body.permanent = true;
       else body.duration_ms = banFor;
     }
-    if (action === "delete") body.confirm = confirm;
+    if (action === "delete") body.confirm = user.username;
     setBusy(true);
     setError(null);
     try {
@@ -223,8 +225,8 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
       <div className={m.modal} data-testid="moderate-modal">
         <div className={m.modalTop}>
           {action && !initial ? (
-            <button type="button" className={m.modalClose} onClick={() => { setAction(null); setError(null); }} aria-label={t("moderation.back")}>
-              <ArrowLeft size={20} />
+            <button type="button" className={m.modalBack} onClick={() => { setAction(null); setError(null); }} aria-label={t("moderation.back")}>
+              <ArrowLeft size={20} className={m.flip} />
             </button>
           ) : null}
           <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={40} />
@@ -349,8 +351,9 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
                 <p style={{ margin: "8px 0 0" }}>{t("moderation.delete.kept")}</p>
               </div>
               <label className={m.section}>
-                <span className={m.sectionLabel}>{t("moderation.delete.confirmLabel", { username: user.username })}</span>
-                <TextInput value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={user.username} autoComplete="off" spellCheck={false} data-testid="delete-confirm" />
+                {/* not in capitals like the other labels: the username in it is typed exactly as shown */}
+                <span className={m.confirmLabel}>{t("moderation.delete.confirmLabel", { username: user.username })}</span>
+                <TextInput value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={user.username} autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} data-testid="delete-confirm" />
               </label>
             </div>
           ) : null}

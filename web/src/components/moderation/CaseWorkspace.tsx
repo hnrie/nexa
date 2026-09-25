@@ -1,5 +1,5 @@
 import { ChevronLeft, CircleCheck, FolderOpen, Gavel, Inbox, LockOpen, RotateCcw, UserRound } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { moderation as modApi, type CaseCounts, type CaseMessage, type CaseView, type ModUser, type People, type StaffCase } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
@@ -9,7 +9,7 @@ import { promptText } from "@/components/modals/PromptModal";
 import { CaseThread } from "@/components/nexa/CaseThread";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
 import { describeError } from "@/lib/errors";
-import { actionIcon, actionLabel, caseStanding, FLAG_ADMIN, personName, relativeTo, severity, systemLineText } from "@/lib/moderation";
+import { actionIcon, actionLabel, caseStanding, FLAG_ADMIN, FLAG_DELETED, personName, relativeTo, severity, systemLineText } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
@@ -98,7 +98,7 @@ function CaseList({ cases, people, selected, onPick, showTarget }: { cases: Staf
  * took away), its thread, and what can be done about it — reply as Nexa, lift
  * the mute or ban, close it or open it again.
  */
-function StaffCasePane({ caseId, onBack, onChanged }: { caseId: string; onBack: () => void; onChanged: (c: StaffCase) => void }) {
+function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: { caseId: string; onBack: () => void; onChanged: (c: StaffCase) => void; showMember?: boolean }) {
   const nav = useNavigate();
   const toast = useUI((u) => u.toast);
   const mergePeople = useModeration((s) => s.mergePeople);
@@ -191,7 +191,7 @@ function StaffCasePane({ caseId, onBack, onChanged }: { caseId: string; onBack: 
     <>
       <div className={m.paneHeader}>
         <button type="button" className={[m.iconBtn, m.mobileBack].join(" ")} onClick={onBack} aria-label={t("moderation.back")}>
-          <ChevronLeft size={18} />
+          <ChevronLeft size={18} className={m.flip} />
         </button>
         <span className={m.paneTitle}>
           <span className={m.caseIcon} data-tone={severity(c.action)} aria-hidden="true">
@@ -200,7 +200,8 @@ function StaffCasePane({ caseId, onBack, onChanged }: { caseId: string; onBack: 
           <span>{t("moderation.case.titled", { number: c.number, action: actionLabel(c.action) })}</span>
         </span>
         <span className={m.paneActions}>
-          {!gone ? (
+          {/* on the member's own page the way to it goes nowhere */}
+          {!gone && showMember ? (
             <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${c.user_id}`)}>
               <UserRound size={15} aria-hidden="true" /> {personName(target)}
             </Button>
@@ -369,6 +370,19 @@ export function UserCasesView() {
   const [people, setPeople] = useState<People>({});
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState(false);
+  // Whether the panel is wide enough to show a case beside the list. Its own
+  // width, as its layout goes by (Moderation.module.css), not the window's: a
+  // tablet held upright is a wide window with a phone-sized panel in it.
+  const [roomy, setRoomy] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768);
+  useLayoutEffect(() => {
+    const panel = document.querySelector<HTMLElement>("[data-testid=admin-panel]");
+    if (!panel || typeof ResizeObserver === "undefined") return;
+    const measure = () => setRoomy(panel.clientWidth > 767);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(panel);
+    return () => ro.disconnect();
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -393,9 +407,9 @@ export function UserCasesView() {
     if (e.type === "case" && e.case.user_id === userId) void load();
   });
 
-  // straight to the newest case on a wide screen, so the page is never empty
+  // straight to the newest case where there is room for it, so the page is never empty
   const newest = cases?.[0]?.id;
-  const selected = caseId ?? (typeof window !== "undefined" && window.innerWidth >= 768 ? newest : undefined);
+  const selected = caseId ?? (roomy ? newest : undefined);
   const standing = useMemo(() => {
     const out: string[] = [];
     if (user?.ban) out.push(user.ban.expires_at ? t("moderation.state.bannedUntil", { when: relativeTo(user.ban.expires_at) }) : t("moderation.state.bannedForever"));
@@ -420,12 +434,12 @@ export function UserCasesView() {
       </div>
     );
   }
-  const deleted = (user.admin_flags & 4) !== 0;
+  const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
   return (
     <>
       <div className={m.userHeader} data-testid="user-cases-header">
         <button type="button" className={m.iconBtn} onClick={() => nav("/channels/@admin/users")} aria-label={t("moderation.backToUsers")}>
-          <ChevronLeft size={18} />
+          <ChevronLeft size={18} className={m.flip} />
         </button>
         <div className={m.userWho}>
           <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={48} />
@@ -466,7 +480,7 @@ export function UserCasesView() {
           </div>
           <div className={m.pane}>
             {selected ? (
-              <StaffCasePane key={selected} caseId={selected} onBack={() => nav(`/channels/@admin/users/${userId}`)} onChanged={(c) => setCases((cur) => cur?.map((x) => (x.id === c.id ? c : x)) ?? cur)} />
+              <StaffCasePane key={selected} caseId={selected} showMember={false} onBack={() => nav(`/channels/@admin/users/${userId}`)} onChanged={(c) => setCases((cur) => cur?.map((x) => (x.id === c.id ? c : x)) ?? cur)} />
             ) : (
               <div className={m.paneEmpty}>
                 <FolderOpen size={40} aria-hidden="true" />

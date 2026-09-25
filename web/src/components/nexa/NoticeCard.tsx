@@ -72,7 +72,7 @@ export function NoticeCard({ c, people, perspective, onOpenThread, bare = false 
                 {staff && d.old?.[f] ? (
                   <>
                     <span className={s.oldValue} title={d.old[f]}>{d.old[f]}</span>
-                    <ArrowRight size={14} aria-hidden="true" className={s.fieldArrow} />
+                    <ArrowRight size={14} aria-hidden="true" className={[s.fieldArrow, s.flip].join(" ")} />
                   </>
                 ) : null}
                 <span className={s.newValue}>{f === "status" ? t("nexa.notice.cleared") : f === "username" ? `@${d.new?.[f] ?? ""}` : d.new?.[f]}</span>

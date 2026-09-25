@@ -27,6 +27,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { cameraMenuItems, micMenuItems } from "./deviceMenus";
 import { HangUp } from "./HangUp";
 import { Tooltip } from "@/components/common/Tooltip";
+import { useIsMobile, useMediaQuery } from "@/hooks/useIsMobile";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { fitGrid } from "@/lib/callLayout";
 import { appendSection, copyIdItem, developerMode } from "@/lib/copyId";
@@ -108,11 +109,48 @@ function useBoxSize(ref: React.RefObject<HTMLElement | null>, active: boolean): 
   return size;
 }
 
+/**
+ * The shape of a grid tile. A wide stage keeps the 16:9 a camera sends; a
+ * stage taller than it is wide (a phone held upright, a tablet's column)
+ * takes squarer tiles, never narrower than square, so the people fill the
+ * screen rather than a band across the middle of it.
+ */
+function gridAspect(count: number, w: number, h: number): number {
+  if (count <= 0 || h <= w) return 16 / 9;
+  let best = { area: 0, aspect: 16 / 9 };
+  for (let cols = 1; cols <= count; cols++) {
+    const rows = Math.ceil(count / cols);
+    const cellW = (w - GAP * (cols - 1)) / cols;
+    const cellH = (h - GAP * (rows - 1)) / rows;
+    const aspect = Math.min(16 / 9, Math.max(1, cellW / cellH));
+    const tileW = Math.min(cellW, cellH * aspect);
+    const area = (tileW * tileW) / aspect;
+    if (area > best.area) best = { area, aspect };
+  }
+  return best.aspect;
+}
+
 function ControlButton({ label, onClick, children, on, off, danger, testId, className, menu }: { label: string; onClick: () => void; children: ReactNode; on?: boolean; off?: boolean; danger?: boolean; testId?: string; className?: string; menu?: { label: string; open: (anchor: DOMRect) => void; testId?: string } }) {
   const button = (
     <Tooltip text={label} side="top">
       {/* The label flips between "Mute" and "Unmute", which is the whole state; adding aria-pressed on top of it announced "Unmute, pressed" for a muted mic and no state at all for a live one. */}
-      <button className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")} data-on={on || undefined} data-off={off || undefined} aria-label={label} onClick={onClick} data-testid={testId}>
+      <button
+        className={[s.ctl, danger ? s.leave : "", className ?? ""].join(" ")}
+        data-on={on || undefined}
+        data-off={off || undefined}
+        aria-label={label}
+        onClick={onClick}
+        // a right click, or a long press on a touch screen, opens the same choices as the arrow, which is a small target for a finger
+        onContextMenu={
+          menu
+            ? (e) => {
+                e.preventDefault();
+                menu.open((e.currentTarget.closest(`.${s.ctlGroup}`) ?? e.currentTarget).getBoundingClientRect());
+              }
+            : undefined
+        }
+        data-testid={testId}
+      >
         {children}
       </button>
     </Tooltip>
@@ -265,6 +303,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const openContextMenu = useUI((u) => u.openContextMenu);
   const openModal = useUI((u) => u.openModal);
   const [canFlip, setCanFlip] = useState(false);
+  const mobile = useIsMobile();
+  const short = useMediaQuery("(max-height: 520px)");
   const quality = useVoice((v) => (v.mine?.channel_id === channel.id ? v.quality : null));
   /** What the browser has full screen, if anything. */
   const [fsEl, setFsEl] = useState<Element | null>(null);
@@ -339,7 +379,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const stage = useBoxSize(stageRef, connected && !!focusedTile);
   // a focused screen share has the stage to itself; people stay a click away on Unfocus
   const showStrip = tiles.length > 1 && stage.h >= 240 && focusedTile?.kind !== "screen";
-  const layout = fitGrid(tiles.length, grid.w, grid.h, GAP);
+  const layout = fitGrid(tiles.length, grid.w, grid.h, GAP, gridAspect(tiles.length, grid.w, grid.h));
   // the focused stream is a frame of its own shape, as large as fits, so its label and buttons sit on the picture
   const focusBox = useBoxSize(focusRef, connected && !!focusedTile);
   const focusAspect = Math.min(21 / 9, Math.max(9 / 21, (focusedTile && aspects[focusedTile.key]) || 16 / 9));
@@ -381,6 +421,24 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const removeGuest = (uid: string) =>
     void guestsApi.remove(channel.id, uid).catch((err) => useUI.getState().toast(err instanceof ApiError ? err.message : tr_("voice.voiceParticipants.couldNotRemoveTheGuest"), "error"));
   const callFull = (!!fsEl && fsEl === rootRef.current) || pageFull;
+
+  // The control bar lays itself out by the call's own width rather than the
+  // screen's: beside a sidebar on a tablet, or above a conversation with a
+  // panel open, the call is narrow on a wide screen, and the side columns ran
+  // into the row in the middle. Where the full bar does not fit, the side
+  // columns go, full screen and inviting guests join the row (a phone has the
+  // invite in the conversation's menu instead), and the buttons shrink to fit.
+  const rootBox = useBoxSize(rootRef, connected);
+  const mainCount = 4 + (localVideo && canFlip ? 1 : 0) + (canShareScreen ? 1 : 0);
+  const fullBarWidth = 2 * Math.max(64, (canInviteGuests ? 2 : 1) * 40) + mainCount * 52 + (mainCount - 1) * 12 + 2 * 12 + 32;
+  const compact = mobile || (rootBox.w > 0 && rootBox.w < fullBarWidth);
+  const inviteInRow = compact && canInviteGuests && !mobile;
+  const rowCount = mainCount + (compact ? 1 + (inviteInRow ? 1 : 0) : 0);
+  const rowGap = Math.max(6, Math.min(12, rootBox.w * 0.022));
+  const rowStyle =
+    compact && rootBox.w > 0
+      ? ({ "--ctl": `${Math.floor(Math.max(32, Math.min(short ? 42 : 52, rootBox.w * 0.115, (rootBox.w - 16 - (rowCount - 1) * rowGap) / rowCount)))}px`, "--ctl-gap": `${Math.round(rowGap)}px` } as CSSProperties)
+      : undefined;
 
   const toggleCallFull = () => {
     if (fullscreenElement()) {
@@ -470,7 +528,8 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
 
   const openDeviceMenu = async (kind: "mic" | "camera", anchor: DOMRect) => {
     const items = kind === "mic" ? await micMenuItems(openModal, { settings: !guest }) : await cameraMenuItems(openModal, { settings: !guest });
-    openContextMenu({ x: anchor.left, y: anchor.top - 8, above: true, items });
+    // the menu opens from the group's start edge: its left, or its right in a right-to-left language
+    openContextMenu({ x: document.documentElement.dir === "rtl" ? anchor.right : anchor.left, y: anchor.top - 8, above: true, items });
   };
 
   const tileMenu = (e: MouseEvent, t: Tile) => {
@@ -678,7 +737,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
 
   const level = quality ? (quality.loss > 0.05 || quality.rtt > 400 ? "bad" : quality.rtt > 150 ? "ok" : "good") : "unknown";
   return (
-    <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="" data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined}>
+    <div className={s.root} ref={rootRef} data-embedded={embedded} data-dark-scope="" data-full={callFull || undefined} data-page-full={pageFull || undefined} data-no-swipe={callFull || undefined} data-compact={compact || undefined}>
       <div
         className={s.stage}
         ref={stageRef}
@@ -702,12 +761,15 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           </div>
         )}
       </div>
-      <div className={s.controls}>
+      <div className={s.controls} style={rowStyle}>
         <div className={s.controlsSide}>
-          <span className={s.quality} data-level={level} title={quality ? tr_("voice.voiceView.qualityLine", { rtt: Math.round(quality.rtt), loss: (quality.loss * 100).toFixed(1) }) : tr_("voice.voiceView.measuring")}>
-            <i className={s.qualityDot} />
-            {quality ? `${Math.round(quality.rtt)} ms` : "…"}
-          </span>
+          {/* alone in a call between people there is no connection to measure yet, and "…" there never went away */}
+          {quality || participants.length > 1 ? (
+            <span className={s.quality} data-level={level} title={quality ? tr_("voice.voiceView.qualityLine", { rtt: Math.round(quality.rtt), loss: (quality.loss * 100).toFixed(1) }) : tr_("voice.voiceView.measuring")}>
+              <i className={s.qualityDot} />
+              {quality ? `${Math.round(quality.rtt)} ms` : "…"}
+            </span>
+          ) : null}
         </div>
         <div className={s.controlsMain}>
           <ControlButton label={micBlocked ? tr_("voice.voice.microphoneBlocked") : muted ? tr_("voice.voice.unmute") : tr_("voice.voice.mute")} off={muted || micBlocked} onClick={toggleMute} testId="voice-mute" menu={{ label: tr_("voice.voice.microphoneOptions"), open: (r) => void openDeviceMenu("mic", r), testId: "mic-menu" }}>{muted || micBlocked ? <MicOff size={22} /> : <Mic size={22} />}</ControlButton>
@@ -719,8 +781,13 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           {canShareScreen ? (
             <ControlButton label={localScreen ? tr_("voice.voice.stopSharing") : tr_("voice.voice.shareYourScreen")} on={!!localScreen} onClick={() => (localScreen ? void toggleScreen() : openModal("shareScreen"))} testId="screen-share">{localScreen ? <MonitorX size={22} /> : <MonitorUp size={22} />}</ControlButton>
           ) : null}
-          {/* phones have no side column for it, so full screen joins the row there */}
-          <ControlButton label={callFull ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} on={callFull} onClick={toggleCallFull} className={s.narrowOnly} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
+          {/* a narrow call has no side columns, so what they hold joins the row */}
+          {inviteInRow ? (
+            <ControlButton label={tr_("voice.voice.inviteGuests")} onClick={() => openModal("guestLink", { channelId: channel.id })} testId="invite-guests-narrow"><Link2 size={22} /></ControlButton>
+          ) : null}
+          {compact ? (
+            <ControlButton label={callFull ? tr_("chat.videoPlayer.exitFullScreen") : tr_("chat.videoPlayer.fullScreen")} on={callFull} onClick={toggleCallFull} testId="call-fullscreen-narrow">{callFull ? <Minimize size={22} /> : <Maximize size={22} />}</ControlButton>
+          ) : null}
           <ControlButton label={tr_("voice.voiceStatus.disconnect")} danger onClick={() => void leaveVoice()} testId="voice-leave"><HangUp size={22} /></ControlButton>
         </div>
         <div className={[s.controlsSide, s.controlsEnd].join(" ")}>

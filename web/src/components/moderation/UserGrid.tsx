@@ -129,7 +129,8 @@ export function UserGrid() {
     const disabled = (u.admin_flags & FLAG_DISABLED) !== 0;
     const owner = u.id === ownerId;
     openContextMenu({
-      x: e.type === "contextmenu" ? e.clientX : r.left,
+      // from the button's start edge, which is its right one in a right-to-left language
+      x: e.type === "contextmenu" ? e.clientX : document.documentElement.dir === "rtl" ? r.right : r.left,
       y: e.type === "contextmenu" ? e.clientY : r.bottom + 4,
       label: u.display_name,
       items: [

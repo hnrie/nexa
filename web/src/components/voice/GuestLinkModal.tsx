@@ -98,7 +98,7 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!state} data-testid="guest-link-copy">{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>
-        {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
+        {error ? <p className={s.hint} style={{ color: "var(--text-danger)" }}>{error}</p> : null}
         <div className={s.keyNote}>
           <ShieldCheck size={16} />
           <span>{t("voice.guestLink.theCallStaysEndToEnd")}</span>

@@ -83,7 +83,6 @@
 .ctlMenu:hover { background: color-mix(in srgb, var(--bg-floating), #fff 14%); }
 .ctl[data-off="true"], .ctl[data-on="true"] { background: #fff; color: #000; }
 .ctl[data-off="true"]:hover, .ctl[data-on="true"]:hover { background: #e3e3e6; }
-.narrowOnly { display: none; }
 .leave { background: var(--danger); color: #fff; }
 /* the handset points down, and the icon stays centred in the button */
 .hangUp { transform: rotate(135deg); }
@@ -120,7 +119,7 @@
 .statusRow { display: flex; align-items: center; gap: 8px; }
 .statusText { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
 .statusHead { font-size: 13px; font-weight: 600; color: var(--positive); display: flex; align-items: center; gap: 4px; }
-.statusHead[data-level="bad"] { color: var(--danger); }
+.statusHead[data-level="bad"] { color: var(--text-danger); }
 .statusHead[data-level="ok"] { color: var(--warning); }
 .statusHead[data-level="unknown"], .statusHead[data-connecting="true"] { color: var(--text-muted); }
 .statusSub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
@@ -219,15 +218,16 @@
   .stage { padding: 6px; gap: 6px; }
   .strip { height: 72px; }
   .tile[data-place="strip"] { width: 128px; height: 72px; }
-  /* one row of controls that shrinks to fit rather than wrapping over itself */
-  .controls { grid-template-columns: minmax(0, 1fr); padding: 6px 8px calc(10px + env(safe-area-inset-bottom)); }
-  .root[data-embedded="true"]:not([data-full="true"]) .controls { padding-bottom: 10px; }
-  .controlsSide { display: none; }
-  .narrowOnly { display: flex; }
-  .controlsMain { gap: clamp(6px, 2.2vw, 12px); }
-  .ctl { width: clamp(40px, 11.5vw, 52px); height: clamp(40px, 11.5vw, 52px); }
-  .ctl svg { width: 20px; height: 20px; }
 }
+/* A call too narrow for the side columns (a phone, a tablet's column beside
+   the sidebar, a small window): one row of controls, sized by VoiceView to the
+   call's width, that shrinks to fit rather than running into itself. */
+.root[data-compact] .controls { grid-template-columns: minmax(0, 1fr); padding: 6px 8px calc(10px + env(safe-area-inset-bottom)); }
+.root[data-compact][data-embedded="true"]:not([data-full="true"]) .controls { padding-bottom: 10px; }
+.root[data-compact] .controlsSide { display: none; }
+.root[data-compact] .controlsMain { gap: var(--ctl-gap, 8px); }
+.root[data-compact] .ctl { width: var(--ctl, 44px); height: var(--ctl, 44px); }
+.root[data-compact] .ctl svg { width: 20px; height: 20px; }
 /* a phone on its side is wide but short: the controls and strip give the picture its height back */
 @media (max-height: 520px) {
   .stage { padding: 4px 6px; gap: 4px; }
@@ -238,5 +238,7 @@
   .ctl { width: 42px; height: 42px; }
   .ctl svg { width: 20px; height: 20px; }
   .controlsMain { gap: 10px; }
+  .root[data-compact] .controls { padding: 4px 8px calc(6px + env(safe-area-inset-bottom)); }
+  .root[data-compact][data-embedded="true"]:not([data-full="true"]) .controls { padding-bottom: 6px; }
 }
-.lobbyError { max-width: 320px; font-size: 13px; color: var(--danger); text-align: center; }
+.lobbyError { max-width: 320px; font-size: 13px; color: var(--text-danger); text-align: center; }

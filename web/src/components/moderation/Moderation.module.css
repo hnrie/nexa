@@ -1,11 +1,16 @@
 /* The Admin & Moderation panel. Built on the theme tokens like the rest of
    the app, and laid out to work from a phone up to a wide monitor. */
 
+/* The panel lays itself out by its own width rather than the screen's: beside
+   the sidebar on a tablet held upright it is as narrow as a phone, and the
+   phone layout is the one that fits there. (Its dialogs and menus float
+   outside it, so they still follow the screen.) */
 .page {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  container: panel / inline-size;
 }
 .header {
   flex: none;
@@ -328,12 +333,18 @@
 .cardActions > :not(.iconBtn) {
   flex: 1;
   min-width: 0;
+}
+/* the padding is the buttons' own; given to the tooltip wrapper round a disabled
+   Moderate button as well, it made that button narrower than its neighbours */
+.cardActions > button:not(.iconBtn),
+.tipWrap > button {
   padding-inline: 10px;
 }
 /* a disabled button hears no pointer, so its wrapper takes the hover for the tooltip */
 .tipWrap {
+  flex: 1;
   display: flex;
-  padding-inline: 0 !important;
+  min-width: 0;
 }
 .tipWrap > button {
   flex: 1;
@@ -933,6 +944,24 @@ td.logReason {
   color: var(--text);
   background: var(--bg-hover);
 }
+/* back to the list of actions: at the start of the row, where the close
+   button's automatic margin had pushed it and the title into the middle */
+.modalBack {
+  flex: none;
+  color: var(--text-muted);
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  align-self: flex-start;
+}
+.modalBack:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+/* arrows and chevrons that mean "back" point the other way in a right-to-left language */
+[dir="rtl"] .flip {
+  transform: scaleX(-1);
+}
 .modalScroll {
   flex: 1;
   min-height: 0;
@@ -965,6 +994,12 @@ td.logReason {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+/* the label that holds the username to type, which capitals would misspell */
+.confirmLabel {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-subtle);
 }
 .actionList {
   display: grid;
@@ -1129,7 +1164,7 @@ td.logReason {
   color: var(--text);
 }
 .danger strong {
-  color: var(--danger);
+  color: var(--text-danger);
 }
 .danger ul {
   margin: 8px 0 0;
@@ -1174,12 +1209,27 @@ td.logReason {
 
 /* --- small screens ---------------------------------------------------------------- */
 
-@media (max-width: 900px) {
+@container panel (max-width: 900px) {
   .annLayout {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 767px) {
+/* not room for every tab's name in one row: the open tab keeps its name, the others show their icon */
+@container panel (max-width: 1000px) {
+  .tab:not([data-selected="true"]) {
+    min-width: 40px;
+    justify-content: center;
+  }
+  .tab:not([data-selected="true"]) .tabLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+@container panel (max-width: 767px) {
   /* the title on one row, the tabs under it: the open tab named, the others as icons */
   .header {
     flex-wrap: wrap;
@@ -1290,12 +1340,52 @@ td.logReason {
     padding: 12px;
   }
 }
+@media (max-width: 767px) {
+  /* the dialog is a bottom sheet here, and no taller than the sheet, so its
+     own list scrolls and the buttons stay in view below it */
+  .modal {
+    max-height: 92vh;
+    max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px));
+  }
+  /* the sentence gets a line of its own above the buttons rather than a
+     column a few words wide beside them */
+  .modalFoot {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .summary {
+    flex: 1 0 100%;
+  }
+}
+/* finger-sized targets */
 @media (pointer: coarse) {
-  .chip {
-    height: 34px;
+  .tab,
+  .chip,
+  .listTools .chip {
+    height: 40px;
+  }
+  .search input {
+    height: 42px;
   }
   .iconBtn {
-    width: 38px;
-    height: 38px;
+    width: 40px;
+    height: 40px;
+  }
+  .cardActions button,
+  .paneActions button,
+  .userActions button,
+  .annFooter button,
+  .modalFoot button,
+  .quick button {
+    min-height: 40px;
+  }
+  .modalBack {
+    padding: 10px;
+    margin: -6px;
+  }
+  .modalClose {
+    padding: 10px;
+    margin-block: -6px;
+    margin-inline-end: -6px;
   }
 }

@@ -183,7 +183,7 @@
   background: color-mix(in srgb, var(--warning) 14%, transparent);
 }
 .chip[data-tone="danger"] {
-  color: var(--danger);
+  color: var(--text-danger);
   background: color-mix(in srgb, var(--danger) 14%, transparent);
 }
 .chip[data-tone="done"] {
@@ -341,6 +341,7 @@
   flex-wrap: wrap;
 }
 .pill {
+  margin-inline-start: 6px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -371,11 +372,13 @@
 .threadHeader {
   padding: 0 16px 8px;
 }
+/* in line with the notice above it, as the lines that follow will be */
 .threadEmpty {
-  margin: 16px;
+  margin: 8px 16px 16px;
+  max-width: 640px;
   font-size: 14px;
+  line-height: 1.45;
   color: var(--text-muted);
-  text-align: center;
 }
 .lines {
   list-style: none;
@@ -485,6 +488,17 @@
 .inlineLink:hover {
   text-decoration: underline;
 }
+/* a writer's name is a link too, and keeps a name's size and weight; the
+   plain inherit above took them away, so names read like the text under them */
+.lineName.inlineLink {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+/* arrows and chevrons that point along the line point the other way in a right-to-left language */
+[dir="rtl"] .flip {
+  transform: scaleX(-1);
+}
 .systemLine {
   display: flex;
   align-items: center;
@@ -576,7 +590,7 @@
   padding: 9px 2px;
 }
 .counter[data-over] {
-  color: var(--danger);
+  color: var(--text-danger);
 }
 .send {
   flex: none;
@@ -911,7 +925,7 @@
   gap: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--danger);
+  color: var(--text-danger);
 }
 .banThread {
   display: flex;
@@ -946,6 +960,10 @@
 @media (max-width: 767px) {
   .notice {
     padding: 14px 14px 12px 16px;
+  }
+  /* the notice just below says where the case stands; the header has no room to say it twice */
+  .headerChip {
+    display: none;
   }
   .fieldRow {
     grid-template-columns: 1fr;
@@ -1034,6 +1052,19 @@
   font-size: 14.5px;
   line-height: 1.5;
   color: var(--text);
+}
+/* finger-sized targets */
+@media (pointer: coarse) {
+  .back,
+  .send {
+    width: 40px;
+    height: 40px;
+  }
+  .noticeActions button,
+  .modalFoot button,
+  .mutedBar button {
+    min-height: 40px;
+  }
 }
 .nexaProfileFine {
   margin: 0 0 10px;
