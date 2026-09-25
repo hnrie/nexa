@@ -203,4 +203,35 @@ describe("keystore clear", () => {
     expect(rows.length).toBe(10);
     expect(rows.map((r) => r.epoch).sort((x, y) => x - y)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
+
+  it("writes many roots in one transaction", async () => {
+    const userId = freshUser();
+    const roots = Array.from({ length: 40 }, (_, i) => ({ conv: `c${i}`, epoch: i % 3, root: newRootKey() }));
+    await keystore.saveRoots(userId, roots);
+    const rows = await keystore.loadRoots(userId);
+    expect(rows).toHaveLength(40);
+    const byConv = new Map(rows.map((r) => [r.conv, r]));
+    for (const r of roots) expect(equal(byConv.get(r.conv)!.root, r.root)).toBe(true);
+  });
+});
+
+describe("a database that stops answering", () => {
+  it("gives up after a while instead of waiting for ever, and works again once it answers", async () => {
+    const userId = freshUser();
+    await keystore.saveIdentity(userId, generateIdentity());
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    // a request WebKit never answers: nothing ever fires on it
+    const stuck = vi.spyOn(IDBObjectStore.prototype, "get").mockImplementation(() => ({}) as IDBRequest);
+    try {
+      const loading = keystore.loadIdentity(userId);
+      const outcome = loading.catch((e: unknown) => e);
+      // the store gives up after ten seconds
+      await vi.advanceTimersByTimeAsync(10_010);
+      expect(await outcome).toBeInstanceOf(Error);
+    } finally {
+      stuck.mockRestore();
+      vi.useRealTimers();
+    }
+    expect(await keystore.loadIdentity(userId)).not.toBeNull();
+  });
 });

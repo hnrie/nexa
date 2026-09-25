@@ -28,6 +28,32 @@ interface RootRecord extends StoredRoot {
 
 let dbHandle: Promise<IDBDatabase> | null = null;
 
+/**
+ * How long one piece of work may take. WebKit is known to leave an open, a
+ * request or a transaction unanswered for good (after a long stay in the
+ * background, or with a database held open by an old tab), and with no limit
+ * signing in, reconnecting and signing out each waited on it for ever: the
+ * app sat on its spinner, or "ready" with no connection. Past this the work
+ * counts as failed, which every caller already copes with.
+ */
+const DB_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("keystore: the database did not answer")), ms);
+    work.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (err: unknown) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
 function openDb(): Promise<IDBDatabase> {
   dbHandle ??= new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -103,17 +129,20 @@ function asRoot(v: unknown): StoredRoot | null {
 async function withDb<T>(fn: (db: IDBDatabase) => Promise<T>): Promise<T> {
   const handle = openDb();
   try {
-    return await fn(await handle);
+    return await withTimeout(
+      handle.then((db) => fn(db)),
+      DB_TIMEOUT_MS,
+    );
   } catch (err) {
     if (dbHandle === handle) dbHandle = null;
     // Dropping the handle is not the same as closing it. Every abandoned
     // connection stays open, and an open connection blocks a version change,
     // so a later DB_VERSION bump would be refused for the life of the tab.
-    try {
-      (await handle).close();
-    } catch {
-      /* it never opened, or is already closed */
-    }
+    // Not waited for: a handle that never opened would hold this up for good.
+    handle.then(
+      (db) => db.close(),
+      () => undefined,
+    );
     throw err;
   }
 }
@@ -152,6 +181,20 @@ export const keystore = {
       const tx = db.transaction(STORE_ROOTS, "readwrite");
       const value: RootRecord = { userId, conv, epoch, root };
       tx.objectStore(STORE_ROOTS).put(value, rootKeyOf(userId, conv, epoch));
+      await committed(tx);
+    });
+  },
+
+  /** Several roots in one transaction: a first sign-in brings every grant the account holds at once. */
+  saveRoots(userId: string, roots: StoredRoot[]): Promise<void> {
+    if (roots.length === 0) return Promise.resolve();
+    return withDb(async (db) => {
+      const tx = db.transaction(STORE_ROOTS, "readwrite");
+      const store = tx.objectStore(STORE_ROOTS);
+      for (const r of roots) {
+        const value: RootRecord = { userId, conv: r.conv, epoch: r.epoch, root: r.root };
+        store.put(value, rootKeyOf(userId, r.conv, r.epoch));
+      }
       await committed(tx);
     });
   },
