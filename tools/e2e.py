@@ -716,7 +716,7 @@ def files_flow(srv, alice, bob, browser, out):
         raise AssertionError("the download worker never started")
     started = time.time()
     with bob.page.expect_download(timeout=120000) as info:
-        bob.page.locator("[data-id]:has-text('big.bin') button[aria-label=Download]").click()
+        bob.page.locator("[data-id]:has-text('big.bin') button[aria-label^='Download']").click()
     dl = info.value
     assert dl.suggested_filename == "big.bin", dl.suggested_filename
     assert sha256_file(dl.path()) == big_sum, "streamed download differs from what was sent"
@@ -724,7 +724,7 @@ def files_flow(srv, alice, bob, browser, out):
     print(f"  100 MB streamed down and matched in {time.time() - started:.1f}s")
 
     with bob.page.expect_download(timeout=60000) as info:
-        bob.page.locator("[data-id]:has-text('small.bin') button[aria-label=Download]").click()
+        bob.page.locator("[data-id]:has-text('small.bin') button[aria-label^='Download']").click()
     assert sha256_file(info.value.path()) == small_sum, "small download differs from what was sent"
 
     before = len(fetched)
@@ -742,7 +742,7 @@ def files_flow(srv, alice, bob, browser, out):
     plain.login()
     plain.open_dm_from_sidebar("Alice")
     with plain.page.expect_download(timeout=120000) as info:
-        plain.page.locator("[data-id]:has-text('big.bin') button[aria-label=Download]").click()
+        plain.page.locator("[data-id]:has-text('big.bin') button[aria-label^='Download']").click()
     assert sha256_file(info.value.path()) == big_sum, "in-page download differs from what was sent"
     print("  100 MB saved in-page without a worker and matched")
     return plain
