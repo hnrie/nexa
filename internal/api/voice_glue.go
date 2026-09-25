@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	urlpkg "net/url"
@@ -50,6 +51,9 @@ type voiceStatePayload struct {
 	// Guest marks someone in through a guest link, with the key epoch their
 	// link carried, so the people in the call can hand them newer keys.
 	Guest *guestMark `json:"guest,omitempty"`
+	// Reason is "moved" on the leave sent to a device whose call another
+	// device of the same account picked up, so it can say where it went.
+	Reason string `json:"reason,omitempty"`
 }
 
 type callUser struct {
@@ -83,6 +87,7 @@ func (s *Server) voiceRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/voice/ice", s.callAuthed(s.handleVoiceICE))
 	mux.Handle("GET /api/v1/channels/{id}/voice", s.authed(s.handleVoiceParticipants))
 	mux.Handle("POST /api/v1/channels/{id}/call/decline", s.authed(s.handleCallDecline))
+	mux.Handle("PUT /api/v1/channels/{id}/messages/{mid}/call", s.authed(s.handleCallSummary))
 	mux.Handle("PATCH /api/v1/servers/{id}/members/{uid}/voice", s.authed(s.handleVoiceModerate))
 	s.sfuRoutes(mux)
 }
@@ -260,7 +265,12 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 		}
 		// guests waiting in a call do not make it one: the first account to join still starts it
 		wasEmpty := s.Voice.MemberCount(ch.ID) == 0
-		resumed := req.Resume || (s.Voice.RecentlyActive(ch.ID) && s.Voice.Count(ch.ID) == s.Voice.MemberCount(ch.ID))
+		// Only a device rejoining the call it was in (after a reconnect or a
+		// restart) carries on the call before. Calling again after a call
+		// ended is a new call with its own line: folded into the last one, a
+		// second try that was answered left history saying only that the
+		// first went unanswered.
+		resumed := req.Resume
 		cur, had := s.Voice.Get(me.ID)
 		inSame := had && cur.ChannelID == ch.ID
 		// Everyone in a call has to connect the same way. A page set up for
@@ -316,7 +326,9 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			// the call moved to this connection (another device or tab picked
 			// it up): the one that held it hears that it is no longer in it
 			s.closeSFUSession(old.SFUSession)
-			s.emitConn(me.ID, old.ConnID, "voice_state", leavePayload(*old))
+			moved := leavePayload(*old)
+			moved.Reason = "moved"
+			s.emitConn(me.ID, old.ConnID, "voice_state", moved)
 		}
 		st, ok := s.Voice.Get(me.ID)
 		if !ok {
@@ -348,7 +360,14 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 				}
 				others = append(others, id)
 			}
-			s.Bcast.EmitUsers(others, "call_ring", map[string]any{"channel_id": ch.ID, "from": me.ID})
+			// A device that still holds the call's SFU session is picking up a
+			// call already going on, after the server restarted and forgot it:
+			// ringing then buzzed the others' phones on every deploy. A resume
+			// without one is a call that ended while the device was away, and
+			// rings like any other.
+			if !(req.Resume && req.SFUSession != "") {
+				s.Bcast.EmitUsers(others, "call_ring", map[string]any{"channel_id": ch.ID, "from": me.ID})
+			}
 			// a rejoin after a reconnect or a restart is the same call
 			if !resumed {
 				m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "system_call", Mentions: []ids.ID{}}
@@ -472,10 +491,14 @@ func (s *Server) handleVoiceICE(w http.ResponseWriter, r *http.Request) {
 }
 
 // turnTTL is how long a minted relay credential lasts, and turnReuse how long
-// this server hands the same one back before asking for another.
+// this server hands the same one back before asking for another. A call keeps
+// the credential it joined with for every reconnect until it asks again, so a
+// credential handed out always has most of its life left: at three hours of
+// four, one reused near the end expired an hour into the call, and a network
+// that needs the relay could not reconnect after that.
 const (
 	turnTTL   = 4 * time.Hour
-	turnReuse = 3 * time.Hour
+	turnReuse = time.Hour
 )
 
 // turnCred is one account's minted relay credential and when it was minted.
@@ -609,6 +632,67 @@ func (s *Server) handleCallDecline(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// maxCallSummaryBytes bounds a call summary's envelope: an outcome, a length
+// and the ids of who picked up or said no, in a group of fifty.
+const maxCallSummaryBytes = 8 << 10
+
+// handleCallSummary takes the caller's encrypted summary of a call that has
+// ended (answered or not, for how long, who picked up) and seals it onto the
+// line that says the call started, so the conversation can show "Missed call
+// from Alice" or "Call with Bob · 12 minutes". The server keeps no call
+// records: it cannot read the summary, the line is not marked edited, and when
+// it arrived is not written down.
+func (s *Server) handleCallSummary(w http.ResponseWriter, r *http.Request) {
+	ch, me := s.channel(w, r, NeedView)
+	if ch == nil {
+		return
+	}
+	if !s.isDM(ch) {
+		WriteError(w, E(http.StatusBadRequest, "not_dm", "Only calls in conversations have a summary."))
+		return
+	}
+	mid, err := ids.Parse(r.PathValue("mid"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	var body messageBody
+	if err := ReadJSON(w, r, &body, maxCallSummaryBytes+1<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	if len(body.Ciphertext) > maxCallSummaryBytes {
+		WriteError(w, E(http.StatusBadRequest, "too_large", "The call summary is too large."))
+		return
+	}
+	ctx := r.Context()
+	m, err := s.Store.MessageByID(ctx, mid, me.ID)
+	if err != nil || m.ChannelID != ch.ID || m.Type != "system_call" {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	if m.AuthorID != me.ID {
+		WriteError(w, E(http.StatusForbidden, "not_caller", "Only whoever started the call can say how it went."))
+		return
+	}
+	env, ok := s.checkEnvelope(w, r, ch, &body, nil)
+	if !ok {
+		return
+	}
+	if err := s.Store.SealCallSummary(ctx, mid, me.ID, body.Ciphertext, env.Conv, env.Epoch); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			WriteError(w, E(http.StatusConflict, "already_summarized", "This call already has its summary."))
+			return
+		}
+		WriteError(w, err)
+		return
+	}
+	if shared, err := s.Store.MessageByID(ctx, mid, 0); err == nil {
+		s.Bcast.EmitChannel(ch.ID, "message_update", messageUpdateEvent{shared, mentionsBefore{m.Mentions, m.MentionRoles, m.MentionEveryone}})
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handleVoiceModerate server-mutes, deafens, moves or disconnects a member.
 func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 	srv, me, actorPerms := s.serverCtx(w, r, 0)
@@ -738,6 +822,7 @@ func (s *Server) handleVoiceModerate(w http.ResponseWriter, r *http.Request) {
 		if g, err := s.Store.GuestByID(r.Context(), uid); st.Guest && err == nil {
 			// a guest disconnected would only join again: they are let go
 			s.endGuest(r.Context(), g, "removed")
+			s.rotateAfterGuests(r.Context(), cur)
 		} else if left, ok := s.Voice.Leave(uid); ok {
 			s.broadcastVoiceLeave(r.Context(), left)
 		}

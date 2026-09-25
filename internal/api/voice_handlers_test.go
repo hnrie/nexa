@@ -327,8 +327,8 @@ func TestVoiceBelongsToOneConnection(t *testing.T) {
 	// a reconnect picks the call up on a new socket; the old one is told
 	ga3 := connectGW(t, ts, tokA)
 	ga3.op(t, "voice_state", map[string]any{"channel_id": voiceCh, "resume": true})
-	if ev := ga1.next("voice_state", 3*time.Second); ev == nil || ev["channel_id"] != nil || ev["old_channel_id"] != voiceCh {
-		t.Errorf("the socket that lost the call hears it left: %v", ev)
+	if ev := ga1.next("voice_state", 3*time.Second); ev == nil || ev["channel_id"] != nil || ev["old_channel_id"] != voiceCh || ev["reason"] != "moved" {
+		t.Errorf("the socket that lost the call hears it left, and why: %v", ev)
 	}
 	if ev := gb.next("voice_state", 3*time.Second); ev == nil || ev["channel_id"] != voiceCh {
 		t.Errorf("others only see alice still in the call: %v", ev)
@@ -380,6 +380,27 @@ func TestDMCallResumeAndBlock(t *testing.T) {
 	}
 	if ev := gb.next("message_create", 500*time.Millisecond); ev != nil {
 		t.Errorf("a resumed call posts no second message: %v", ev)
+	}
+	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.next("call_end", 3*time.Second)
+	// a device that still holds its SFU session is picking up a call the
+	// server forgot (a restart): nobody is rung again, and no line is posted
+	ga.op(t, "voice_state", map[string]any{"channel_id": dm, "resume": true, "sfu_session": "held"})
+	if ev := gb.next("call_ring", 500*time.Millisecond); ev != nil {
+		t.Errorf("a call picked up after a restart rang again: %v", ev)
+	}
+	if ev := gb.next("message_create", 300*time.Millisecond); ev != nil {
+		t.Errorf("a call picked up after a restart posted a line: %v", ev)
+	}
+	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.next("call_end", 3*time.Second)
+	// calling again once the call is over is a new call, with a line of its own
+	ga.op(t, "voice_state", map[string]any{"channel_id": dm})
+	if ev := gb.next("call_ring", 3*time.Second); ev == nil {
+		t.Error("calling again rings")
+	}
+	if ev := gb.next("message_create", 3*time.Second); ev == nil || ev["type"] != "system_call" {
+		t.Errorf("calling again posts its own line: %v", ev)
 	}
 	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
 	gb.next("call_end", 3*time.Second)
@@ -459,4 +480,62 @@ func TestVoiceModerationScope(t *testing.T) {
 		t.Errorf("no ghost after a kick: %d %v", res.StatusCode, body)
 	}
 	_ = ga
+}
+
+// TestCallSummary checks that the caller alone can seal an encrypted summary
+// onto a call's line, once, and that it neither marks the line edited nor
+// leaves anything readable about the call on the server.
+func TestCallSummary(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	friend(t, ts, tokA, "bob", tokB, idA)
+	_, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB}})
+	dm := body["id"].(string)
+	epoch := createEpoch(t, ts, tokA, dm)
+	ga := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+
+	ga.op(t, "voice_state", map[string]any{"channel_id": dm})
+	line := gb.next("message_create", 3*time.Second)
+	if line == nil || line["type"] != "system_call" {
+		t.Fatalf("call line: %v", line)
+	}
+	mid := line["id"].(string)
+	ga.op(t, "voice_state", map[string]any{"channel_id": nil})
+	gb.next("call_end", 3*time.Second)
+
+	summary := map[string]any{"ciphertext": envelopeFor(dm, epoch, "summary"), "key_conv_id": dm, "key_epoch": epoch}
+	path := "/api/v1/channels/" + dm + "/messages/" + mid + "/call"
+	if res, body := do(t, ts, "PUT", path, tokB, summary); res.StatusCode != 403 {
+		t.Errorf("only the caller writes the summary: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PUT", path, tokA, map[string]any{"ciphertext": envelopeFor(dm, epoch+5, "x"), "key_conv_id": dm, "key_epoch": epoch + 5}); res.StatusCode != 400 {
+		t.Errorf("a summary under a key that does not exist: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PUT", path, tokA, summary); res.StatusCode != 204 {
+		t.Fatalf("seal the summary: %d %v", res.StatusCode, body)
+	}
+	ev := gb.next("message_update", 3*time.Second)
+	if ev == nil || ev["id"] != mid || ev["ciphertext"] == nil || ev["edited_at"] != nil || ev["type"] != "system_call" {
+		t.Errorf("the summary reaches the conversation, unedited: %v", ev)
+	}
+	if res, body := do(t, ts, "PUT", path, tokA, summary); res.StatusCode != 409 {
+		t.Errorf("a summary is written once: %d %v", res.StatusCode, body)
+	}
+	// an ordinary message has no summary to write
+	res, sent := sendMsg(t, ts, tokA, dm, dm, epoch, "hello", "n1", nil)
+	if res.StatusCode != 201 {
+		t.Fatalf("send: %d %v", res.StatusCode, sent)
+	}
+	if res, body := do(t, ts, "PUT", "/api/v1/channels/"+dm+"/messages/"+sent["id"].(string)+"/call", tokA, summary); res.StatusCode != 404 {
+		t.Errorf("summary on a message that is not a call: %d %v", res.StatusCode, body)
+	}
+	_, page := do(t, ts, "GET", "/api/v1/channels/"+dm+"/messages?limit=10", tokB, nil)
+	for _, x := range page["_list"].([]any) {
+		m := x.(map[string]any)
+		if m["id"] == mid && (m["ciphertext"] == nil || m["edited_at"] != nil || m["key_conv_id"] != dm) {
+			t.Errorf("the stored line: %v", m)
+		}
+	}
 }
