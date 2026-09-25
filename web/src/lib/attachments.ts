@@ -196,15 +196,6 @@ export const sendInWorker: PieceSender = async (job, onProgress, signal) => {
   });
 };
 
-/**
- * Above this a file goes up through a resumable session even when one request
- * could carry it. A single request that dies at 95% — a phone moving from
- * Wi-Fi to cellular, a minute's stall — starts again from nothing, and most
- * photos and videos people send are exactly that size; the session costs one
- * request more and resumes from what the server already holds.
- */
-export const RESUMABLE_ABOVE = 8 * 1024 * 1024;
-
 /** A failure a second try might get past: the connection or the server, not the request itself. */
 function worthAnotherTry(err: unknown): boolean {
   if (!(err instanceof ApiError)) return false;
@@ -230,7 +221,9 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   // a new version of the app waits for the upload rather than reloading over it
   const release = holdReload();
   try {
-    if (total <= Math.min(limits.single, RESUMABLE_ABOVE)) {
+    // One request up to the server's single-request limit, pieces only above it:
+    // the owner chose fewer requests over resuming mid-file for files that fit in one.
+    if (total <= limits.single) {
       const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
       const once = async () => (await send(job, (loaded) => onProgress(loaded / total), signal)) as { blob_id: string; size: number };
       try {

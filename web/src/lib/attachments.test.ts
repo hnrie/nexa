@@ -3,7 +3,7 @@ import { b64 } from "@/crypto/bytes";
 import { decryptFile } from "@/crypto/file";
 import { CHUNK, FRAME_LEN, HEADER_LEN, encryptChunks, encryptedSize } from "@/crypto/fileChunks";
 import { ApiError } from "@/api/client";
-import { RESUMABLE_ABOVE, fitsUploadLimit, setUploadLimits, uploadStaged, type PieceJob, type PieceSender, type Staged } from "./attachments";
+import { fitsUploadLimit, setUploadLimits, uploadStaged, type PieceJob, type PieceSender, type Staged } from "./attachments";
 
 const MiB = 1024 * 1024;
 
@@ -131,15 +131,14 @@ describe("uploadStaged", () => {
     expect(server.jobs).toHaveLength(1);
   });
 
-  it("sends a file above a few megabytes through a resumable session even when one request could carry it", { timeout: 20_000 }, async () => {
+  it("sends a file that fits the single-request limit in one request", { timeout: 20_000 }, async () => {
     setUploadLimits({ max: 100 * MiB, single: 90 * MiB, chunk: 32 * MiB });
-    const data = pattern(RESUMABLE_ABOVE + 1);
+    const data = pattern(9 * MiB);
     const { server, send } = fakeServer();
     const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
-    expect(uploads.create).toHaveBeenCalledWith(encryptedSize(data.length));
-    expect(server.single).toBeNull();
-    expect(server.jobs.every((j) => j.method === "PATCH")).toBe(true);
-    expect(await same(server.stored(), meta.key, data)).toBe(true);
+    expect(uploads.create).not.toHaveBeenCalled();
+    expect(server.jobs).toHaveLength(1);
+    expect(await same(server.single!, meta.key, data)).toBe(true);
   });
 
   describe("above the single-request limit", { timeout: 20_000 }, () => {
