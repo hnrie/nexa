@@ -99,7 +99,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
   const section = (label: string, list: Emoji[]) =>
     list.length === 0 ? null : (
       <>
-        <h5 className={st.h5}>{label} — {list.length}</h5>
+        <h3 className={st.h5}>{label} — {list.length}</h3>
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>

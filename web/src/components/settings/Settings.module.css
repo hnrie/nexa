@@ -87,6 +87,7 @@
 .previewTime { font-size: 0.75rem; color: var(--text-muted); }
 .device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 8px; }
 .deviceName { font-size: 16px; font-weight: 500; color: var(--text); }
+.thisDevice { display: inline-block; margin-inline-start: 8px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--positive) 18%, transparent); color: var(--text); font-size: 12px; font-weight: 600; vertical-align: 2px; }
 .deviceSub { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 /* the text takes what is left and the buttons drop below it when a phone is too narrow for both */
 .device > :first-child { flex: 1 1 180px; min-width: 0; }
@@ -184,6 +185,15 @@
 .purgeList li + li { border-top: 1px solid var(--border-subtle); }
 .purgeCount { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-strong); }
 .purgeLoading { display: flex; justify-content: center; padding: 12px 0; }
+
+/* this account's own safety number: named, with a way to copy it and a code to scan */
+.safety { margin-top: 12px; padding: 12px 16px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; flex-direction: column; gap: 12px; }
+.safetyHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.safetyHead > :first-child { flex: 1 1 220px; min-width: 0; }
+.safetyBtns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* where the registration choice comes from, and the way back to the config file */
+.configNote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 4px 0 24px; }
 
 /* a crash report's heading, which opens its stack */
 .crashToggle { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; text-align: start; }

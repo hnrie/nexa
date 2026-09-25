@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { bannerUrl, users as usersApi } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
+import { profileTheme } from "@/lib/avatarColor";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -86,7 +87,11 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
     <>
       <h2 className={s.title}>{t("settings.account.myAccount")}</h2>
       <div className={s.card}>
-        <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : me.accent_color !== null ? { background: `#${me.accent_color.toString(16).padStart(6, "0")}` } : undefined} />
+        {/* The banner everyone else sees on the profile card: its colours, or
+            without them the avatar's own colour. Here it used to fall back to
+            the app's accent at full strength, a third of the page of raw purple
+            that no other screen showed for this account. */}
+        <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : { background: profileTheme(me.accent_color, me.accent_color_2, me.id) }} />
         <div className={s.cardHead}>
           <div className={s.cardAvatar}><Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={80} status={myStatus} /></div>
           <div className={s.cardText}>

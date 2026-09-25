@@ -326,6 +326,8 @@ export interface AdminStats {
   blob_bytes: number;
   online: number;
   version: string;
+  /** This month's estimated call traffic against the instance's allowance; absent when calls are not metered. */
+  realtime?: { month: string; used_bytes: number; limit_bytes: number; video_paused: boolean; calls_paused: boolean } | null;
 }
 
 export interface AdminSettings {

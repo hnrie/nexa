@@ -4,14 +4,15 @@ import type { Session } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
 import { describeError } from "@/lib/errors";
-import { formatRelative } from "@/lib/time";
+import { formatDateDivider, formatRelative } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
 function describe(ua: string): string {
   if (!ua) return t("settings.devices.unknownDevice");
-  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : t("settings.devices.browser");
+  // the desktop app is a browser inside, but nobody thinks of it as Chrome
+  const browser = /Electron\//.test(ua) ? t("settings.desktop.desktopApp") : /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : t("settings.devices.browser");
   const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
   return os ? t("settings.devices.browserOnSystem", { browser, system: os }) : browser;
 }
@@ -66,6 +67,8 @@ export default function DevicesPage() {
     }
   };
   const others = list?.filter((se) => !se.current).length ?? 0;
+  // this device first, then the rest by when they were last used
+  const sorted = list ? [...list].sort((a, b) => Number(b.current) - Number(a.current) || b.last_seen_at - a.last_seen_at) : null;
   const confirmSweep = () =>
     useUI.getState().openModal("confirm", {
       title: t("settings.devices.logOutAllOtherDevices"),
@@ -78,20 +81,32 @@ export default function DevicesPage() {
     <>
       <h2 className={s.title}>{t("settings.devices.devices")}</h2>
       <p className={s.hint}>{t("settings.devices.everyDeviceThatIsLoggedInto")}</p>
+      {/* The one action that needs no device to be recognised comes first: it
+          used to wait under every row, out of sight once there were a few. */}
+      {others > 0 ? (
+        <div className={s.dangerBox} style={{ marginTop: 16 }} data-testid="devices-sweep">
+          <span className={s.hint} style={{ margin: 0 }}>{t("settings.devices.otherDevicesCount", { count: others })}</span>
+          <Button variant="danger" size="sm" loading={sweeping} onClick={confirmSweep}>{t("settings.devices.logOutAllOtherDevices")}</Button>
+        </div>
+      ) : null}
       <div style={{ marginTop: 16 }}>
         {list === null && !failed ? <p className={s.hint}>{t("chat.pins.loading")}</p> : null}
         {failed ? <LoadError message={t("settings.devices.yourDevicesCouldNotBeLoaded")} onRetry={() => void load()} /> : null}
-        {list?.map((se) => (
-          <div key={se.id} className={s.device}>
+        {sorted?.map((se) => (
+          <div key={se.id} className={s.device} data-current={se.current || undefined}>
             <div>
-              <div className={s.deviceName}>{describe(se.user_agent)}{se.current ? ` · ${t("settings.devices.thisDevice")}` : ""}</div>
-              <div className={s.deviceSub}>{se.ip} · {t("settings.devices.lastActive", { when: formatRelative(se.last_seen_at) })}</div>
+              <div className={s.deviceName}>
+                {describe(se.user_agent)}
+                {se.current ? <span className={s.thisDevice}>{t("settings.devices.thisDevice")}</span> : null}
+              </div>
+              <div className={s.deviceSub}>
+                {se.ip} · {t("settings.devices.signedIn", { date: formatDateDivider(se.created_at) })} · {se.current ? t("settings.devices.activeNow") : t("settings.devices.lastActive", { when: formatRelative(se.last_seen_at) })}
+              </div>
             </div>
             {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>{t("settings.devices.logOut")}</Button> : null}
           </div>
         ))}
       </div>
-      {others > 0 ? <Button variant="danger" loading={sweeping} onClick={confirmSweep}>{t("settings.devices.logOutAllOtherDevices")}</Button> : null}
     </>
   );
 }

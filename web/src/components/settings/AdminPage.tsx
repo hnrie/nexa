@@ -15,7 +15,7 @@ import { copyText } from "@/lib/copyText";
 import st from "./Settings.module.css";
 import s from "@/components/server/ServerSettings.module.css";
 
-import { t as tr_ } from "@/i18n";
+import { t as tr_, translator } from "@/i18n";
 import { LoadError } from "@/components/common/LoadError";
 /** User settings → Instance Admin (admins only): stats, registration policy, users. */
 export default function AdminPage() {
@@ -36,9 +36,10 @@ export default function AdminPage() {
   }, []);
   useEffect(() => loadAll(), [loadAll]);
 
-  const setMode = async (mode: AdminSettings["registration"]) => {
+  // "" hands the choice back to the config file
+  const setMode = async (mode: AdminSettings["registration"] | "") => {
     const before = settings;
-    setSettings((cur) => (cur ? { ...cur, registration: mode } : cur)); // optimistic: the radio moves at once
+    if (mode) setSettings((cur) => (cur ? { ...cur, registration: mode } : cur)); // optimistic: the radio moves at once
     try {
       setSettings(await adminApi.patchSettings({ registration: mode }));
     } catch (err) {
@@ -67,7 +68,7 @@ export default function AdminPage() {
     <>
       <h2 className={st.title}>{tr_("settings.admin.instanceAdmin")}</h2>
       <p className={st.hint}>{tr_("settings.admin.youRunThisInstanceTheseSettings")}</p>
-      <h5 className={st.h5}>{tr_("server.channelSettings.overview")}</h5>
+      <h3 className={st.h5}>{tr_("server.channelSettings.overview")}</h3>
       {stats ? (
         // on the page's own background the box was invisible, and each value sat 600px from its name
         <div className={st.rows} style={{ margin: 0, background: "var(--bg-surface)" }}>
@@ -76,21 +77,32 @@ export default function AdminPage() {
           <div className={st.row}><span className={st.rowLabel}>{tr_("modals.quickSwitcher.messages")}</span><span className={st.rowValue}>{stats.messages}</span></div>
           <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.storedFiles")}</span><span className={st.rowValue}>{stats.blobs} · {formatBytes(stats.blob_bytes)}</span></div>
           <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.version")}</span><span className={st.rowValue}>{stats.version}</span></div>
+          {stats.realtime && stats.realtime.limit_bytes > 0 ? <CallUsage usage={stats.realtime} /> : null}
         </div>
       ) : failed ? <LoadError message={tr_("moderation.loadFailed")} onRetry={loadAll} /> : <Spinner />}
-      <h5 className={st.h5}>{tr_("settings.admin.registration")}</h5>
+      <h3 className={st.h5}>{tr_("settings.admin.registration")}</h3>
       {settings ? (
         <>
-          {(["open", "invite", "closed"] as const).map((m) => (
-            <label key={m} className={st.radio} data-on={settings.registration === m}>
-              <input type="radio" name="registration" checked={settings.registration === m} onChange={() => void setMode(m)} />
-              <span className={st.radioText}>
-                <span className={st.radioLabel}>{m === "open" ? tr_("settings.admin.open") : m === "invite" ? tr_("settings.admin.inviteOnly") : tr_("settings.admin.closed")}</span>
-                <span className={st.radioDesc}>{m === "open" ? tr_("settings.admin.regOpen") : m === "invite" ? tr_("settings.admin.regInvite") : tr_("settings.admin.regClosed")}</span>
-              </span>
-            </label>
-          ))}
-          <p className={st.hint} style={{ marginBottom: 16 }}>{tr_("settings.admin.configSays", { value: settings.config_registration })}</p>
+          <div role="radiogroup" aria-label={tr_("settings.admin.registration")}>
+            {(["open", "invite", "closed"] as const).map((m) => (
+              <label key={m} className={st.radio} data-on={settings.registration === m}>
+                <input type="radio" name="registration" checked={settings.registration === m} onChange={() => void setMode(m)} />
+                <span className={st.radioText}>
+                  <span className={st.radioLabel}>{m === "open" ? tr_("settings.admin.open") : m === "invite" ? tr_("settings.admin.inviteOnly") : tr_("settings.admin.closed")}</span>
+                  <span className={st.radioDesc}>{m === "open" ? tr_("settings.admin.regOpen") : m === "invite" ? tr_("settings.admin.regInvite") : tr_("settings.admin.regClosed")}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {/* Where the choice comes from, under the choices it is about: it sat
+              over the key field and read as that field's help, and the way
+              back to the config file's value was not offered at all. */}
+          <div className={st.configNote}>
+            <span className={st.hint} style={{ margin: 0 }}>
+              {settings.overrides?.["registration"] ? tr_("settings.admin.overridesConfig", { value: settings.config_registration }) : tr_("settings.admin.followsConfig", { value: settings.config_registration })}
+            </span>
+            {settings.overrides?.["registration"] ? <Button size="sm" variant="secondary" onClick={() => void setMode("")}>{tr_("settings.admin.useConfigFile")}</Button> : null}
+          </div>
           <Field label={settings.registration_key_set ? tr_("settings.admin.registrationKeySet") : tr_("settings.admin.registrationKeyNotSet")} hint={tr_("settings.admin.shareThisWithPeopleYouWant")}>
             <div style={{ display: "flex", gap: 8 }}>
               <TextInput value={key} onChange={(e) => setKey(e.target.value)} placeholder={tr_("settings.admin.newKey")} maxLength={128} />
@@ -101,7 +113,7 @@ export default function AdminPage() {
           <p className={st.hint} style={{ marginTop: 12 }}>{tr_("settings.admin.configLimits", { uploads: formatBytes(settings.max_upload_bytes), avatars: formatBytes(settings.max_avatar_bytes), emoji: formatBytes(settings.max_emoji_bytes), stickers: formatBytes(settings.max_sticker_bytes), gif: settings.gif_search ? tr_("settings.admin.on") : tr_("settings.admin.off"), turn: settings.turn ? tr_("settings.admin.configured") : tr_("settings.admin.notConfigured") })}</p>
         </>
       ) : failed ? <LoadError message={tr_("moderation.loadFailed")} onRetry={loadAll} /> : <Spinner />}
-      <h5 className={st.h5}>{tr_("settings.admin.users")}</h5>
+      <h3 className={st.h5}>{tr_("settings.admin.users")}</h3>
       <div className={st.panelLink} data-testid="admin-panel-link">
         <span className={st.panelLinkIcon} aria-hidden="true"><Shield size={22} /></span>
         <span className={st.panelLinkText}>
@@ -181,7 +193,7 @@ function LegalResponse() {
 
   return (
     <>
-      <h5 className={st.h5}>{tr_("settings.admin.legal.lawEnforcementResponse")}</h5>
+      <h3 className={st.h5}>{tr_("settings.admin.legal.lawEnforcementResponse")}</h3>
       <p className={st.hint}>{tr_("settings.admin.legal.compileWhatThisInstanceHolds")}</p>
       <div className={s.searchRow} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
         <TextInput
@@ -220,9 +232,14 @@ function LegalResponse() {
 /** What has been breaking, for whoever runs this instance. */
 function CrashLog() {
   const [list, setList] = useState<ClientErrorReport[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const toast = useUI((u) => u.toast);
-  const load = () => adminApi.errors(100).then(setList).catch(() => setList([]));
+  // A failed request is not an empty log: it used to say "nothing has crashed".
+  const load = () => {
+    setFailed(false);
+    return adminApi.errors(100).then(setList, () => setFailed(true));
+  };
   useEffect(() => {
     void load();
   }, []);
@@ -237,14 +254,14 @@ function CrashLog() {
   };
   return (
     <>
-      <h5 className={st.h5}>{tr_("settings.admin.crashes")}</h5>
+      <h3 className={st.h5}>{tr_("settings.admin.crashes")}</h3>
       {/* This was English in every language, and ended "The newest 0 are kept" on an empty log. */}
       <p className={st.hint}>{tr_("settings.admin.crashesHint")}</p>
       <div style={{ display: "flex", gap: 8, margin: "12px 0 8px" }}>
         <Button size="sm" variant="secondary" onClick={() => void load()}>{tr_("settings.admin.refresh")}</Button>
         {list?.length ? <Button size="sm" variant="danger" onClick={() => void clear()}>{tr_("modals.quickSwitcher.clear")}</Button> : null}
       </div>
-      {list === null ? <Spinner /> : null}
+      {failed ? <LoadError message={tr_("moderation.loadFailed")} onRetry={() => void load()} /> : list === null ? <Spinner /> : null}
       {list?.length === 0 ? <p className={st.hint}>{tr_("settings.admin.nothingHasCrashedGood")}</p> : null}
       {list?.map((e) => (
         <div key={e.id} className={s.memberRow} style={{ alignItems: "flex-start" }}>
@@ -263,5 +280,31 @@ function CrashLog() {
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * This month's call traffic against the allowance. The server starts pausing
+ * video at 90% and calls at 99%, and until this row the operator's first sign
+ * of it was video quietly refusing to start.
+ */
+function CallUsage({ usage }: { usage: NonNullable<AdminStats["realtime"]> }) {
+  // gigabytes as the allowance is set in the config, in thousands rather than 1024s
+  const gb = (n: number) => {
+    try {
+      return new Intl.NumberFormat(translator().locale, { style: "unit", unit: "gigabyte", maximumFractionDigits: n < 10e9 ? 1 : 0 }).format(n / 1e9);
+    } catch {
+      return `${Math.round(n / 1e9)} GB`;
+    }
+  };
+  const warn = usage.calls_paused ? tr_("settings.admin.callsPaused") : usage.video_paused ? tr_("settings.admin.callsVideoPaused") : null;
+  return (
+    <div className={st.row} data-testid="admin-call-usage">
+      <span className={st.rowLabel}>
+        {tr_("settings.admin.callsThisMonth")}
+        {warn ? <span className={st.deviceSub} style={{ display: "block", textTransform: "none", fontWeight: 400, color: "var(--text-warning)" }}>{warn}</span> : null}
+      </span>
+      <span className={st.rowValue} style={warn ? { color: "var(--text-warning)" } : undefined}>{tr_("settings.admin.callUsage", { used: gb(usage.used_bytes), limit: gb(usage.limit_bytes) })}</span>
+    </div>
   );
 }
