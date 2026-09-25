@@ -10,7 +10,7 @@ import { relationships as relationshipsApi } from "@/api/relationships";
 import { users as usersApi } from "@/api/users";
 import type { Channel, Message } from "@/api/types";
 import { decryptForStore } from "@/lib/decrypt";
-import { REQUEST_GAP_MS, backoffFor } from "@/lib/fullSearch";
+import { REQUEST_GAP_MS, backoffFor } from "@/search/pacing";
 import { ReadableError } from "@/lib/readableError";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";

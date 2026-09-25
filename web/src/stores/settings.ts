@@ -98,6 +98,14 @@ export interface Settings {
   // --- shell: what's new ---
 
   // --- search ---
+  /**
+   * Keep a search index on each of this account's devices: every message it
+   * can read, decrypted there and stored there encrypted. Off, search walks
+   * history only while it searches and keeps nothing once the app closes.
+   */
+  searchIndex: boolean;
+  /** The last few searches, newest first, for the search box to offer again. Inside the encrypted settings like everything here. */
+  searchRecent: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -155,6 +163,8 @@ export const DEFAULT_SETTINGS: Settings = {
   // --- shell: what's new ---
 
   // --- search ---
+  searchIndex: true,
+  searchRecent: [],
 };
 
 function mergeSettings(base: Settings, incoming: unknown): Settings {
@@ -175,6 +185,9 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     // --- shell: what's new ---
 
     // --- search ---
+    searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,
+    // no more than search/recent.ts keeps, whatever an older or odd copy holds
+    searchRecent: Array.isArray(inc.searchRecent) ? inc.searchRecent.filter((q): q is string => typeof q === "string" && q.length <= 200).slice(0, 8) : base.searchRecent,
   };
 }
 

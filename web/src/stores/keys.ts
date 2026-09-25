@@ -9,7 +9,6 @@ import { keystore } from "@/crypto/keystore";
 import { unwrapGrant, wrapGrant, type Identity } from "@/crypto/keys";
 import { hasLock } from "@/lib/appLock";
 import { checkRecipients } from "@/lib/convMembers";
-import { clearSearchIndex } from "@/lib/fullSearch";
 import { closePins, openPins } from "@/lib/keyPins";
 import { clearKeyring, ring } from "@/lib/keyring";
 import { judgeKey, useKeyAlerts } from "./keyAlerts";
@@ -31,6 +30,14 @@ interface KeysState {
 }
 
 const pendingEnsure = new Map<string, Promise<{ epoch: number; root: Uint8Array } | null>>();
+
+/**
+ * Called when the keys are forgotten (a lock, a sign-out). The search index
+ * holds decrypted messages; it registers here and closes with them, or the
+ * next person on this tab could read a conversation they have no grant for by
+ * typing a word into search.
+ */
+export const keysGoneHooks: (() => void)[] = [];
 
 /**
  * The key to seal to, as base64 — the shape the pin file keeps, so the two can
@@ -291,10 +298,7 @@ export const useKeys = create<KeysState>()((set, get) => ({
   markWaiting: (conv) => set((s) => (s.waiting[conv] ? s : { waiting: { ...s.waiting, [conv]: true } })),
   reset: () => {
     clearKeyring();
-    // The search index holds plaintext. Without the keys it must go too, or
-    // the next person on this tab could read a conversation they have no
-    // grant for by typing a word into search.
-    clearSearchIndex();
+    for (const h of keysGoneHooks) h();
     pendingEnsure.clear();
     // The pins themselves stay on the device — that is the point of them — but
     // this session's unanswered questions and its log go with the session.

@@ -47,6 +47,13 @@ function voice(): Promise<VoiceModule> {
 /** Something from Nexa worth a sound or a notification. */
 export type NexaAlert = { kind: "notice" | "reply"; case: MemberCase } | { kind: "announcement"; announcement: Announcement } | { kind: "appeal"; caseId: string; userId: string };
 
+/** A message edited or deleted, or conversations gone, for what keeps its own copy (the search index). */
+export type MessageChange =
+  | { kind: "update"; msg: DecryptedMessage }
+  | { kind: "delete"; channelId: string; ids: string[] }
+  | { kind: "pin"; channelId: string; id: string; pinned: boolean }
+  | { kind: "channelsGone"; channelIds: string[] };
+
 /** Hooks other layers register: notifications, voice, servers (later phases). */
 export const dispatchHooks: {
   onMessage: ((m: Message, mine: boolean, decrypted: DecryptedMessage) => void)[];
@@ -56,7 +63,9 @@ export const dispatchHooks: {
   onFriendRequest: ((r: Relationship) => void)[];
   /** Nexa has something new: a notice, a staff reply, an announcement, or for staff a member's appeal. */
   onNexa: ((a: NexaAlert) => void)[];
-} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [] };
+  /** A message was edited or deleted, or conversations went away. */
+  onMessageChange: ((c: MessageChange) => void)[];
+} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [], onMessageChange: [] };
 
 /** The account's standing, and for staff what is waiting on them. */
 function applyNexaState(st: NexaState | undefined): void {
@@ -273,6 +282,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         else if (!before && after) useReadStates.getState().addMention(e.d.channel_id, e.d.id);
       }
       useMessages.getState().update(e.d.channel_id, decrypted);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "update", msg: decrypted });
       return;
     }
     case "message_delete": {
@@ -283,6 +293,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useMessages.getState().remove(e.d.channel_id, e.d.id);
       useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
       if (counted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "delete", channelId: e.d.channel_id, ids: [e.d.id] });
       return;
     }
     case "message_delete_bulk": {
@@ -291,6 +302,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
       for (const id of e.d.ids) useReadStates.getState().dropUnread(e.d.channel_id, id);
       for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "delete", channelId: e.d.channel_id, ids: e.d.ids });
       return;
     }
     case "reaction_add":
@@ -313,6 +325,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useMessages.getState().clearChannel(e.d.id);
       // split panes still showing it close (the focused one follows the address)
       usePanes.getState().forgetChannel(e.d.id);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: [e.d.id] });
       return;
     case "channel_positions":
       useChannels.getState().applyPositions(e.d.channels);
@@ -327,16 +340,19 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "server_delete": {
       const chans = useChannels.getState();
+      const gone: string[] = [];
       for (const ch of Object.values(chans.byId)) {
         if (ch.server_id === e.d.id) {
           chans.remove(ch.id);
           useMessages.getState().clearChannel(ch.id);
           usePanes.getState().forgetChannel(ch.id);
+          gone.push(ch.id);
         }
       }
       useServers.getState().remove(e.d.id);
       useExpressions.getState().removeServer(e.d.id);
       for (const h of dispatchHooks.onUnhandled) h(e);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: gone });
       return;
     }
     case "emoji_update":
@@ -421,6 +437,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const ch = useMessages.getState().channels[e.d.channel_id];
       const m = ch?.byId[e.d.message_id];
       if (m) useMessages.getState().setFlags(e.d.channel_id, e.d.message_id, e.d.pinned ? m.flags | 1 : m.flags & ~1);
+      for (const h of dispatchHooks.onMessageChange) h({ kind: "pin", channelId: e.d.channel_id, id: e.d.message_id, pinned: e.d.pinned });
       return;
     }
     case "settings_update":
