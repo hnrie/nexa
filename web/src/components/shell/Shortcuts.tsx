@@ -51,7 +51,8 @@ export function Shortcuts() {
       }
       if (mod && e.key === "/") {
         e.preventDefault();
-        ui.openModal("shortcuts");
+        // once is enough: pressed again, the list used to stack a second copy on the first
+        if (!ui.modals.some((m) => m.kind === "shortcuts")) ui.openModal("shortcuts");
         return;
       }
       if (mod && e.code === "KeyE" && !ui.modal) {

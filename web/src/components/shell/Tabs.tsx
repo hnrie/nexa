@@ -12,6 +12,9 @@ import { useUsers } from "@/stores/users";
 import { t } from "@/i18n";
 import s from "./Panes.module.css";
 
+/** The page under the tab strip, which the open tab names as what it controls. */
+export const TAB_PANEL_ID = "shell-tab-panel";
+
 /**
  * The tab strip, which behaves the way a browser's does: click to switch,
  * middle-click or × to close, drag to reorder, and a + on the end.
@@ -38,71 +41,100 @@ export function Tabs() {
   // address bar to match, so every way of switching tab goes through one path.
   const go = (tab: Tab) => select(tab.id);
 
+  // One stop in the tab order for the whole strip, on the tab that is open;
+  // the arrows move between tabs and Enter opens one, as a tab strip does.
+  // Delete closes the tab with focus, the keyboard's way to its close button.
+  const onKey = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const list = e.currentTarget.closest('[role="tablist"]');
+    const buttons = list ? [...list.querySelectorAll<HTMLButtonElement>('[role="tab"]')] : [];
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const next = e.key === (rtl ? "ArrowLeft" : "ArrowRight") ? (i + 1) % tabs.length : e.key === (rtl ? "ArrowRight" : "ArrowLeft") ? (i - 1 + tabs.length) % tabs.length : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : -1;
+    if (next >= 0) {
+      e.preventDefault();
+      buttons[next]?.focus();
+      return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && tabs.length > 1) {
+      e.preventDefault();
+      close(tabs[i]!.id);
+      // focus stays in the strip, on the neighbour that took its place
+      requestAnimationFrame(() => buttons[Math.min(i, buttons.length - 2)]?.focus());
+    }
+  };
+
   return (
-    <div className={s.tabs} role="tablist" data-no-swipe="">
-      {tabs.map((tab, i) => (
-        <div
-          key={tab.id}
-          className={s.tab}
-          role="tab"
-          tabIndex={0}
-          aria-selected={tab.id === active}
-          data-selected={tab.id === active}
-          data-drop={over === i || undefined}
-          draggable
-          onDragStart={(e) => {
-            from.current = i;
-            e.dataTransfer.effectAllowed = "move";
-            // Firefox will not start a drag without something on the transfer.
-            e.dataTransfer.setData("text/plain", tab.id);
-          }}
-          onDragOver={(e) => {
-            if (from.current === null) return;
-            e.preventDefault();
-            setOver(i);
-          }}
-          onDragLeave={() => setOver((o) => (o === i ? null : o))}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (from.current !== null) move(from.current, i);
-            from.current = null;
-            setOver(null);
-          }}
-          onDragEnd={() => {
-            from.current = null;
-            setOver(null);
-          }}
-          onClick={() => go(tab)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
+    <div className={s.tabs} data-no-swipe="">
+      <div className={s.tabList} role="tablist" aria-label={t("panes.tabs")}>
+        {tabs.map((tab, i) => (
+          <div
+            key={tab.id}
+            className={s.tab}
+            data-selected={tab.id === active}
+            data-drop={over === i || undefined}
+            draggable
+            onDragStart={(e) => {
+              from.current = i;
+              e.dataTransfer.effectAllowed = "move";
+              // Firefox will not start a drag without something on the transfer.
+              e.dataTransfer.setData("text/plain", tab.id);
+            }}
+            onDragOver={(e) => {
+              if (from.current === null) return;
               e.preventDefault();
-              go(tab);
-            }
-          }}
-          onAuxClick={(e) => {
-            if (e.button === 1) {
+              setOver(i);
+            }}
+            onDragLeave={() => setOver((o) => (o === i ? null : o))}
+            onDrop={(e) => {
               e.preventDefault();
-              close(tab.id);
-            }
-          }}
-        >
-          <TabLabel tab={tab} />
-          {tabs.length > 1 ? (
-            <button
-              className={s.tabClose}
-              aria-label={t("panes.closeTab")}
-              title={t("panes.closeTab")}
-              onClick={(e) => {
-                e.stopPropagation();
+              if (from.current !== null) move(from.current, i);
+              from.current = null;
+              setOver(null);
+            }}
+            onDragEnd={() => {
+              from.current = null;
+              setOver(null);
+            }}
+            onAuxClick={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
                 close(tab.id);
-              }}
+              }
+            }}
+          >
+            <button
+              type="button"
+              className={s.tabBtn}
+              role="tab"
+              id={`tab-${tab.id}`}
+              aria-selected={tab.id === active}
+              aria-controls={tab.id === active ? TAB_PANEL_ID : undefined}
+              aria-keyshortcuts={tabs.length > 1 ? "Delete" : undefined}
+              tabIndex={tab.id === active ? 0 : -1}
+              onClick={() => go(tab)}
+              onKeyDown={(e) => onKey(e, i)}
             >
-              <X size={13} />
+              <TabLabel tab={tab} />
             </button>
-          ) : null}
-        </div>
-      ))}
+            {/* Beside the tab rather than inside it (a button in a button is
+                not allowed), and out of the tab order: Delete on the tab does
+                the same from the keyboard. */}
+            {tabs.length > 1 ? (
+              <button
+                type="button"
+                className={s.tabClose}
+                tabIndex={-1}
+                aria-label={t("panes.closeTab")}
+                title={t("panes.closeTab")}
+                onClick={() => close(tab.id)}
+              >
+                <X size={13} />
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
       <button
+        type="button"
         className={s.tabAdd}
         aria-label={t("panes.newTab")}
         title={t("panes.newTab")}

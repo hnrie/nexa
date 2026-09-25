@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import { servers as serversApi } from "@/api/servers";
 import { ChatView } from "@/components/chat/ChatView";
+import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
@@ -25,7 +27,12 @@ export function PaneView({ paneId }: { paneId: string }) {
   const channel = useChannels((c) => (pane?.channelId ? c.byId[pane.channelId] : undefined));
   const upsert = useChannels((c) => c.upsert);
   const closePane = usePanes((p) => p.closePane);
-  const [missing, setMissing] = useState(false);
+  // Only a refusal or a not-found means the conversation is gone. Anything
+  // else — offline on a train, a server restarting, a token being refreshed —
+  // used to say so too, for the life of the tab, and the only button closed
+  // the pane and lost the layout.
+  const [state, setState] = useState<"loading" | "missing" | "failed">("loading");
+  const [attempt, setAttempt] = useState(0);
 
   const channelId = pane?.channelId ?? null;
   const serverId = pane?.serverId ?? null;
@@ -34,7 +41,7 @@ export function PaneView({ paneId }: { paneId: string }) {
   useEffect(() => {
     if (!channelId || known) return;
     let alive = true;
-    setMissing(false);
+    setState("loading");
     // A pane restored from a previous visit can name a channel in a server this
     // session has not loaded yet, so the server is asked for first and the
     // channel only as a fallback.
@@ -44,19 +51,32 @@ export function PaneView({ paneId }: { paneId: string }) {
           useUsers.getState().upsert(res.users);
           useChannels.getState().upsert(res.server.channels);
           useServers.getState().setFromView(res.server);
+          // the server is there, but this channel is not among the ones it shows us
+          if (!res.server.channels.some((c) => c.id === channelId)) setState("missing");
         })
       : channelsApi.get(channelId).then((ch) => alive && upsert(ch));
-    fetched.catch(() => alive && setMissing(true));
+    fetched.catch((err: unknown) => {
+      if (!alive) return;
+      setState(err instanceof ApiError && (err.status === 403 || err.status === 404) ? "missing" : "failed");
+    });
     return () => {
       alive = false;
     };
-  }, [channelId, serverId, known, upsert]);
+  }, [channelId, serverId, known, upsert, attempt]);
+
+  // back online, a pane that failed tries again by itself
+  useEffect(() => {
+    if (state !== "failed") return;
+    const again = () => setAttempt((n) => n + 1);
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, [state]);
 
   if (!pane) return null;
-  if (!channelId || missing) {
+  if (!channelId || state === "missing") {
     return (
       <div className={s.gone}>
-        <p>{missing ? t("panes.thatConversationIsNoLongerHere") : t("panes.nothingOpenHere")}</p>
+        <p>{channelId ? t("panes.thatConversationIsNoLongerHere") : t("panes.nothingOpenHere")}</p>
         <button className={s.goneBtn} onClick={() => closePane(paneId)}>{t("panes.closePane")}</button>
       </div>
     );
@@ -64,7 +84,7 @@ export function PaneView({ paneId }: { paneId: string }) {
   if (!channel) {
     return (
       <div className={s.gone}>
-        <Spinner size={24} />
+        {state === "failed" ? <LoadError message={t("dM.thatConversationCouldNotBeOpened")} onRetry={() => setAttempt((n) => n + 1)} center /> : <Spinner size={24} />}
       </div>
     );
   }

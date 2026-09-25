@@ -56,7 +56,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <Modal open onClose={onClose} title={tr_("modals.customStatus.setACustomStatus")} width={440} footer={<><Button variant="ghost" onClick={onClose}>{tr_("chat.editMessage.cancel")}</Button><Button onClick={save}>{tr_("chat.editMessage.save")}</Button></>}>
+    <Modal open onClose={onClose} title={tr_("modals.customStatus.setACustomStatus")} width={440} onSubmit={save} footer={<><Button variant="ghost" onClick={onClose}>{tr_("chat.editMessage.cancel")}</Button><Button onClick={save}>{tr_("chat.editMessage.save")}</Button></>}>
       <div className={s.form}>
         <div className={s.row}>
           <Field label={tr_("modals.customStatus.emoji")} className={s.emoji}>
@@ -82,7 +82,7 @@ export function CustomStatusModal({ onClose }: { onClose: () => void }) {
             </div>
           </Field>
           <Field label={tr_("modals.customStatus.whatSCookin", { name: me?.display_name ?? "" })} className={s.textField}>
-            <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder={tr_("modals.customStatus.supportHasArrived")} maxLength={128} autoFocus />
+            <TextInput value={text} onChange={(e) => setText(e.target.value)} placeholder={tr_("modals.customStatus.supportHasArrived")} maxLength={128} autoFocus enterKeyHint="done" />
           </Field>
         </div>
         {picker ? (

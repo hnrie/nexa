@@ -13,7 +13,7 @@ import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { PaneGrid } from "@/components/shell/PaneGrid";
 import { PaneView } from "@/components/shell/PaneView";
-import { Tabs } from "@/components/shell/Tabs";
+import { TAB_PANEL_ID, Tabs } from "@/components/shell/Tabs";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { activeTab, paneAddress, panesIn, usePanes } from "@/stores/panes";
 import { useUI } from "@/stores/ui";
@@ -46,6 +46,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const tab = usePanes(activeTab);
   const panes = panesIn(tab.root);
   const setPaneChannel = usePanes((p) => p.setPaneChannel);
+  // the strip is only drawn once there is more than one tab or pane (see Tabs)
+  const tabCount = usePanes((p) => p.tabs.length);
+  const tabbed = tabCount > 1 || panes.length > 1;
 
   // The address bar and the focused pane are kept as one thing, and only one
   // of them is ever in charge at a time.
@@ -222,7 +225,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <DownloadBanner />
         <Tabs />
         {/* the page takes what the banner leaves */}
-        <div className={s.page}>
+        <div className={s.page} {...(tabbed ? { role: "tabpanel", id: TAB_PANEL_ID, "aria-labelledby": `tab-${tab.id}` } : {})}>
           {/* The grid is here even for a single pane, so that pane is measured
               and the menu knows whether there is room to split it. `split` is
               what turns on the chrome — the close button and the focus ring —

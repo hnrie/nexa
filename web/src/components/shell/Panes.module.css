@@ -16,26 +16,27 @@
 }
 .tabs::-webkit-scrollbar { display: none; }
 
+.tabList { display: flex; align-items: stretch; gap: 2px; min-width: 0; }
 .tab {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   min-width: 96px;
   max-width: 220px;
-  padding-block: 0;
-  padding-inline: 10px 6px;
+  padding-inline-end: 6px;
   border-start-start-radius: var(--radius-sm);
   border-start-end-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 13px;
-  cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
 .tab:hover { background: var(--bg-hover); color: var(--text); }
 .tab[data-selected="true"] { background: var(--bg-raised); color: var(--text-strong); }
-.tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+/* the button fills the tab, so the whole tab is the thing to press */
+.tabBtn { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; padding-inline: 10px 4px; color: inherit; font: inherit; text-align: start; cursor: pointer; border-radius: inherit; }
+.tabBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 /* where a dragged tab would land; a shadow has no logical form, so the
    mirrored case is spelled out rather than landing on the wrong edge */
 .tab[data-drop] { box-shadow: inset 2px 0 0 var(--brand); }
@@ -72,7 +73,10 @@
 }
 .tab:hover .tabClose,
 .tab[data-selected="true"] .tabClose,
-.tabClose:focus-visible { opacity: 1; pointer-events: auto; }
+.tab:focus-within .tabClose { opacity: 1; pointer-events: auto; }
+/* No hover on a touch screen to reveal it, which left a background tab with no
+   way to close it but switching to it first: there it simply shows. */
+@media (hover: none) { .tabClose { opacity: 1; pointer-events: auto; } }
 @media (pointer: coarse) { .tabClose { width: 32px; height: 32px; } }
 .tabClose:hover { background: var(--bg-active); color: var(--text-strong); }
 
@@ -88,6 +92,7 @@
   color: var(--text-muted);
 }
 .tabAdd:hover { background: var(--bg-hover); color: var(--text-strong); }
+@media (pointer: coarse) { .tabAdd { width: 40px; height: 32px; } }
 
 /* --- the tiles ---------------------------------------------------------- */
 

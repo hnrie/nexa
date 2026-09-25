@@ -192,6 +192,12 @@ function Split({ tile, focus, split, renderPane }: GridProps & { tile: Tile & { 
               role="separator"
               tabIndex={0}
               aria-orientation={tile.dir === "row" ? "vertical" : "horizontal"}
+              // A focusable separator is a slider in all but name: without a
+              // value it was announced as "separator" with no hint the arrows move it.
+              aria-label={t("panes.resizePanes")}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(tile.sizes.slice(0, i + 1).reduce((a, b) => a + b, 0) * 100)}
               onPointerDown={grab(i)}
               onKeyDown={nudge(i)}
             />
