@@ -87,6 +87,17 @@ export interface Settings {
   collapsedCategories: string[];
   userNotes: Record<string, string>;
   appLock: AppLockPolicy | null;
+
+  // Each area added in round 4 keeps its fields under its own heading.
+  // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+
+  // --- people: blocking ---
+
+  // --- look: themes, custom CSS, plugins ---
+
+  // --- shell: what's new ---
+
+  // --- search ---
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -134,6 +145,16 @@ export const DEFAULT_SETTINGS: Settings = {
   collapsedCategories: [],
   userNotes: {},
   appLock: null,
+
+  // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+
+  // --- people: blocking ---
+
+  // --- look: themes, custom CSS, plugins ---
+
+  // --- shell: what's new ---
+
+  // --- search ---
 };
 
 function mergeSettings(base: Settings, incoming: unknown): Settings {
@@ -144,6 +165,16 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     ...inc,
     notifications: { ...base.notifications, ...(inc.notifications ?? {}) },
     voice: mergeVoice(base.voice, inc.voice),
+
+    // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+
+    // --- people: blocking ---
+
+    // --- look: themes, custom CSS, plugins ---
+
+    // --- shell: what's new ---
+
+    // --- search ---
   };
 }
 
