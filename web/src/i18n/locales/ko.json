@@ -181,6 +181,9 @@
   "chat.messageList.messagesCouldNotBeLoaded": "메시지를 불러오지 못했습니다.",
   "chat.messageList.new": "새 메시지",
   "chat.messageList.newMessages": "새 메시지",
+  "chat.messageList.newMessagesSince": {
+    "other": "{time} 이후 새 메시지 {count}개"
+  },
   "chat.messageList.subchatStart": "{where} 안의 서브챗으로, 이미 들어와 있는 모두를 위한 것입니다. 자체 키가 있어서 여기서 오간 이야기는 따로 암호화됩니다.",
   "chat.messageList.thatMessageCouldNotBeFound": "그 메시지를 찾지 못했습니다.",
   "chat.messageList.thisConversation": "이 대화",

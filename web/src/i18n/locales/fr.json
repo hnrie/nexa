@@ -188,6 +188,11 @@
   "chat.messageList.messagesCouldNotBeLoaded": "Les messages n’ont pas pu être chargés.",
   "chat.messageList.new": "Nouveau",
   "chat.messageList.newMessages": "Nouveaux messages",
+  "chat.messageList.newMessagesSince": {
+    "one": "{count} nouveau message depuis {time}",
+    "many": "{count} nouveaux messages depuis {time}",
+    "other": "{count} nouveaux messages depuis {time}"
+  },
   "chat.messageList.subchatStart": "Une sous-discussion à l’intérieur de {where}, pour toutes les personnes déjà présentes. Elle a sa propre clé, donc ce qui se dit ici est chiffré séparément.",
   "chat.messageList.thatMessageCouldNotBeFound": "Ce message est introuvable.",
   "chat.messageList.thisConversation": "cette conversation",

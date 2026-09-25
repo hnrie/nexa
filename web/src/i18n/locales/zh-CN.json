@@ -181,6 +181,9 @@
   "chat.messageList.messagesCouldNotBeLoaded": "无法加载消息。",
   "chat.messageList.new": "新消息",
   "chat.messageList.newMessages": "新消息",
+  "chat.messageList.newMessagesSince": {
+    "other": "自 {time} 起有 {count} 条新消息"
+  },
   "chat.messageList.subchatStart": "{where} 里的一个子聊天，面向已经在其中的所有人。它有自己的密钥，所以这里说的话会单独加密。",
   "chat.messageList.thatMessageCouldNotBeFound": "找不到那条消息。",
   "chat.messageList.thisConversation": "这个对话",

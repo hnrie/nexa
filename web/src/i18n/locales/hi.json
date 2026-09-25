@@ -186,6 +186,10 @@
   "chat.messageList.messagesCouldNotBeLoaded": "संदेश लोड नहीं हो सके।",
   "chat.messageList.new": "नया",
   "chat.messageList.newMessages": "नए संदेश",
+  "chat.messageList.newMessagesSince": {
+    "one": "{time} से {count} नया संदेश",
+    "other": "{time} से {count} नए संदेश"
+  },
   "chat.messageList.subchatStart": "{where} के भीतर एक उपचैट, उन सबके लिए जो पहले से इसमें हैं। इसकी अपनी कुंजी है, इसलिए यहाँ कही गई बातें अलग से एन्क्रिप्ट होती हैं।",
   "chat.messageList.thatMessageCouldNotBeFound": "वह संदेश नहीं मिला।",
   "chat.messageList.thisConversation": "इस बातचीत",

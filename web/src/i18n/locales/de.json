@@ -186,6 +186,10 @@
   "chat.messageList.messagesCouldNotBeLoaded": "Nachrichten konnten nicht geladen werden.",
   "chat.messageList.new": "Neu",
   "chat.messageList.newMessages": "Neue Nachrichten",
+  "chat.messageList.newMessagesSince": {
+    "one": "{count} neue Nachricht seit {time}",
+    "other": "{count} neue Nachrichten seit {time}"
+  },
   "chat.messageList.subchatStart": "Ein Unterchat innerhalb von {where}, für alle, die schon drin sind. Er hat seinen eigenen Schlüssel, deshalb wird alles hier separat verschlüsselt.",
   "chat.messageList.thatMessageCouldNotBeFound": "Diese Nachricht wurde nicht gefunden.",
   "chat.messageList.thisConversation": "dieser Unterhaltung",

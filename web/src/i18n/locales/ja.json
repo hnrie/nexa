@@ -181,6 +181,9 @@
   "chat.messageList.messagesCouldNotBeLoaded": "メッセージを読み込めませんでした。",
   "chat.messageList.new": "新着",
   "chat.messageList.newMessages": "新しいメッセージ",
+  "chat.messageList.newMessagesSince": {
+    "other": "{time} 以降の新着メッセージ {count} 件"
+  },
   "chat.messageList.subchatStart": "{where} の中のサブチャットで、すでに参加している全員が対象です。専用の鍵があるため、ここでの発言は個別に暗号化されます。",
   "chat.messageList.thatMessageCouldNotBeFound": "そのメッセージは見つかりませんでした。",
   "chat.messageList.thisConversation": "この会話",

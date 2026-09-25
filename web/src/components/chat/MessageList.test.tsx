@@ -401,6 +401,7 @@ describe("MessageList behaviours the anchoring must not cost", () => {
 
     expect(scroller.scrollTop).toBe(600);
     expect(topOf(keeping)).toBe(was);
-    expect(document.body.textContent).toContain("New messages");
+    // it counts what came in, and says since when
+    expect(document.body.textContent).toMatch(/1 new message since \d{1,2}:\d{2}/);
   });
 });

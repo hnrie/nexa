@@ -191,6 +191,14 @@
   "chat.messageList.messagesCouldNotBeLoaded": "تعذّر تحميل الرسائل.",
   "chat.messageList.new": "جديد",
   "chat.messageList.newMessages": "رسائل جديدة",
+  "chat.messageList.newMessagesSince": {
+    "zero": "لا رسائل جديدة منذ {time}",
+    "one": "رسالة جديدة واحدة منذ {time}",
+    "two": "رسالتان جديدتان منذ {time}",
+    "few": "{count} رسائل جديدة منذ {time}",
+    "many": "{count} رسالة جديدة منذ {time}",
+    "other": "{count} رسالة جديدة منذ {time}"
+  },
   "chat.messageList.subchatStart": "محادثة فرعية داخل {where}، لكل من هم فيها بالفعل. لها مفتاحها الخاص، لذا يُشفَّر ما يُقال هنا على حدة.",
   "chat.messageList.thatMessageCouldNotBeFound": "لم يُعثر على تلك الرسالة.",
   "chat.messageList.thisConversation": "هذه المحادثة",

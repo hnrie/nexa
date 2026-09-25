@@ -188,6 +188,11 @@
   "chat.messageList.messagesCouldNotBeLoaded": "No se pudieron cargar los mensajes.",
   "chat.messageList.new": "Nuevo",
   "chat.messageList.newMessages": "Mensajes nuevos",
+  "chat.messageList.newMessagesSince": {
+    "one": "{count} mensaje nuevo desde las {time}",
+    "many": "{count} mensajes nuevos desde las {time}",
+    "other": "{count} mensajes nuevos desde las {time}"
+  },
   "chat.messageList.subchatStart": "Una subconversación dentro de {where}, para todos los que ya están aquí. Tiene su propia clave, así que lo que se dice aquí se cifra aparte.",
   "chat.messageList.thatMessageCouldNotBeFound": "No se encontró ese mensaje.",
   "chat.messageList.thisConversation": "esta conversación",

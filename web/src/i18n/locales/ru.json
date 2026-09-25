@@ -190,6 +190,12 @@
   "chat.messageList.messagesCouldNotBeLoaded": "Не удалось загрузить сообщения.",
   "chat.messageList.new": "Новое",
   "chat.messageList.newMessages": "Новые сообщения",
+  "chat.messageList.newMessagesSince": {
+    "one": "{count} новое сообщение с {time}",
+    "few": "{count} новых сообщения с {time}",
+    "many": "{count} новых сообщений с {time}",
+    "other": "{count} нового сообщения с {time}"
+  },
   "chat.messageList.subchatStart": "Подчат внутри {where}, для всех, кто уже в нём. У него собственный ключ, поэтому сказанное здесь шифруется отдельно.",
   "chat.messageList.thatMessageCouldNotBeFound": "Это сообщение не найдено.",
   "chat.messageList.thisConversation": "этом разговоре",

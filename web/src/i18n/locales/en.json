@@ -186,6 +186,10 @@
   "chat.messageList.messagesCouldNotBeLoaded": "Messages could not be loaded.",
   "chat.messageList.new": "New",
   "chat.messageList.newMessages": "New messages",
+  "chat.messageList.newMessagesSince": {
+    "one": "{count} new message since {time}",
+    "other": "{count} new messages since {time}"
+  },
   "chat.messageList.subchatStart": "A subchat inside {where}, for everyone already in it. It has its own key, so what is said here is encrypted separately.",
   "chat.messageList.thatMessageCouldNotBeFound": "That message could not be found.",
   "chat.messageList.thisConversation": "this conversation",

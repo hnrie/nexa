@@ -6,7 +6,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { channelDisplayName } from "@/lib/names";
 import { compareIds } from "@/lib/ids";
 import { setReadingPresent } from "@/lib/readPosition";
-import { formatDateDivider, sameDay } from "@/lib/time";
+import { formatDateDivider, formatTime, sameDay } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingMessage } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
@@ -164,6 +164,13 @@ export function MessageList({ channel }: { channel: Channel }) {
   const olderBusy = useRef(false);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [newBelow, setNewBelow] = useState(false);
+  // The newest message there was when news started arriving below the reader:
+  // the pill counts what came after it, and says since when.
+  const newFrom = useRef<string | null>(null);
+  const clearNewBelow = useCallback(() => {
+    newFrom.current = null;
+    setNewBelow(false);
+  }, []);
   // Scrolling only moves refs, so whether the jump button shows has to be state of its own.
   const [showJump, setShowJump] = useState(false);
   const [reachedBottom, setReachedBottom] = useState(0);
@@ -264,7 +271,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     prevPending.current = pending.length;
     if (atBottom.current) {
       el.scrollTop = el.scrollHeight;
-      setNewBelow(false);
+      clearNewBelow();
     } else {
       // Older messages are inserted above the viewport, so everything being
       // read is pushed down the list by however tall they turned out to be.
@@ -275,6 +282,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       if (newest && prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current && byId[newest]?.author_id !== me?.id) {
         // A list that stopped short of the present only grows downwards by
         // loading pages the reader scrolled to, which are not news.
+        if (!newFrom.current) newFrom.current = prevNewest.current;
         setNewBelow(true);
       }
     }
@@ -363,7 +371,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (atBottom.current && !wasAtBottom) setReachedBottom((n) => n + 1);
     setShowJump(!atBottom.current);
     if (atBottom.current) {
-      setNewBelow(false);
+      clearNewBelow();
       // Nothing to hold: the bottom is where this list puts itself anyway.
       hold.current = null;
     } else if (hold.current || olderBusy.current) {
@@ -464,12 +472,19 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
   }, [jumpTo, channel.id, rows, loading, setJumpTo, dropHold]);
 
+  // "3 new messages since 4:32 PM": what came in below the reader since the news began
+  const newSince = (): string => {
+    const from = newFrom.current;
+    const fresh = from ? ids.filter((id) => compareIds(id, from) > 0 && byId[id]?.author_id !== me?.id) : [];
+    const first = fresh.length ? byId[fresh[0]!] : undefined;
+    return first ? t("chat.messageList.newMessagesSince", { count: fresh.length, time: formatTime(first.created_at) }) : t("chat.messageList.newMessages");
+  };
   const jumpToPresent = () => {
     const el = scrollRef.current;
     if (!el) return;
     atBottom.current = true;
     setShowJump(false);
-    setNewBelow(false);
+    clearNewBelow();
     dropHold();
     // The newest messages are not loaded after a jump far back, so they are fetched again.
     if (hasNewer) returnToPresent(channel.id);
@@ -560,7 +575,7 @@ export function MessageList({ channel }: { channel: Channel }) {
 
   return (
     <div className={[s.listWrap, compact ? s.compact : ""].join(" ")} data-selecting={selecting || undefined}>
-      {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>{t("chat.messageList.newMessages")}</span><span>{t("chat.messageList.jumpToPresent")}</span></div> : null}
+      {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>{newSince()}</span><span>{t("chat.messageList.jumpToPresent")}</span></div> : null}
       <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="" tabIndex={0} aria-label={t("modals.quickSwitcher.messages")} onKeyDown={onListKey}>
         <div className={s.inner}>
           {!hasOlder ? (
