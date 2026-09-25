@@ -57,7 +57,7 @@
 .locked { align-items: center; padding: 0 16px; color: var(--text-muted); font-size: 16px; cursor: not-allowed; }
 .attachSpacer { width: 16px; flex: none; }
 .slowmode { position: absolute; inset-inline-start: 30px; bottom: 4px; pointer-events: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
-.slowmode[data-active="true"] { color: var(--warning); font-weight: 600; }
+.slowmode[data-active="true"] { color: var(--text-warning); font-weight: 600; }
 /* the phone layout has no bottom padding to hold the label, so it goes under the box */
 @media (max-width: 767px) { .slowmode { position: static; display: flex; margin: 4px 0 0; margin-inline-start: 8px; } }
 /* finger-sized targets for the reply bar's small controls, and for a staged file's spoiler and remove buttons */

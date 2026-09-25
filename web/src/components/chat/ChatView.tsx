@@ -15,7 +15,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { conversationOf, useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
-import { useIsMobile, useIsNarrow } from "@/hooks/useIsMobile";
+import { useIsMobile, useIsNarrow, useMediaQuery } from "@/hooks/useIsMobile";
 import { useMemo } from "react";
 import { useServers } from "@/stores/servers";
 import { isPrivateChannel } from "@/lib/perms";
@@ -67,6 +67,10 @@ export function ChatView({ channel }: { channel: Channel }) {
   const [profileNarrow, setProfileNarrow] = useState(false);
   const mobile = useIsMobile();
   const drawer = useIsNarrow();
+  // A tablet standing up has finger-sized buttons and about 500px of header:
+  // with the search box as well, the name was down to its first letter. It
+  // searches the way a phone does, from a button, with the box in the panel.
+  const compactSearch = useMediaQuery("(max-width: 1099px) and (pointer: coarse)") || mobile;
   const profileOpen = drawer ? profileNarrow : profileWide;
   const toggleProfile = () => {
     if (drawer) {
@@ -240,7 +244,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             </Tooltip>
           </>
         ) : null}
-        {mobile ? (
+        {compactSearch ? (
           <Tooltip text={tr_("chat.chat.search")} side="bottom">
             <button className={s.hBtn} data-on={searchOpen} aria-label={tr_("chat.chat.searchMessages")} onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
           </Tooltip>
@@ -344,7 +348,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}
-        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} inline={mobile} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} inline={compactSearch} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
         {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}

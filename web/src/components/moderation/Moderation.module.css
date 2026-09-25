@@ -570,7 +570,7 @@
   background: var(--danger);
 }
 .tag[data-tone="warn"] {
-  color: var(--warning);
+  color: var(--text-warning);
   background: color-mix(in srgb, var(--warning) 16%, transparent);
 }
 .tag[data-tone="done"] {

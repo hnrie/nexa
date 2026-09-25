@@ -32,7 +32,9 @@
    to wait, history left unread because the index filled. Said once, above the
    footer, rather than as a toast that interrupts the reading. */
 .notes { flex: none; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 0; font-size: 12px; line-height: 1.35; color: var(--text-muted); }
-.searchBox { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); width: 180px; transition: width 150ms ease; }
+/* In a tight header it gives way first, down to its magnifier, and grows back while it is used. */
+.searchBox { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); width: 180px; min-width: 32px; flex: 0 1 auto; overflow: hidden; transition: width 150ms ease; }
+.searchBox > svg { flex: none; }
 .searchBox:focus-within { width: 260px; color: var(--text); }
 .searchBox input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
 .searchBox input::placeholder { color: var(--text-placeholder); }

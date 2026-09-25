@@ -4,8 +4,10 @@
 .hName { font-size: 16px; font-weight: 600; color: var(--text-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hNameBtn { min-width: 0; }
 .hNameBtn:hover { text-decoration: underline; }
-/* the line after the name gives way first, so a narrow header still shows who it is */
-.hSub { font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-inline-start: 8px; flex-shrink: 4; }
+/* The line after the name gives way first, so a narrow header still shows who
+   it is: its weight is large enough that the name gives up nothing (not even
+   the fraction of a pixel that turns "Bob" into "B…") until it is gone. */
+.hSub { font-size: 14px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-inline-start: 8px; flex-shrink: 1000; }
 .hSub[data-status="online"] { color: var(--status-online); }
 .hSub[data-status="idle"] { color: var(--status-idle); }
 .hSub[data-status="dnd"] { color: var(--status-dnd); }
@@ -256,6 +258,12 @@
 .compact .content { display: inline; }
 .compact .gutterTime { opacity: 1; top: 4px; }
 .membersBackdrop { position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.5); }
+/* a tablet standing up fits six finger-sized buttons beside the name only at a phone's spacing */
+@media (min-width: 768px) and (max-width: 1099px) and (pointer: coarse) { .header { gap: 4px; } }
+/* In a narrow header the name holds its width, up to a third of the header,
+   and the line after it gives way first: shrinking both together, however
+   unevenly, cut even a short name to its first letters. */
+@media (min-width: 768px) and (max-width: 1099px) { .hNameBtn, .hGroup { flex-shrink: 0; max-width: 32%; } }
 @media (max-width: 767px) {
   /* A phone's header holds four buttons beside the name; at the usual spacing
      a small phone had room for one letter of it. */

@@ -37,6 +37,7 @@
   --positive: #3d9e60;
   --positive-hover: #2f7f4c;
   --warning: #fdb833;
+  --text-warning: #fdb833;
   --danger: #da3e44;
   --danger-hover: #b5343a;
   /* --danger as text: the fill colour reads at under 3:1 on these panels,
@@ -129,6 +130,8 @@
   --positive: #269153;
   --positive-hover: #1f7a45;
   --warning: #bb7300;
+  /* the fill colour reads at about 3:1 as text on the light panels */
+  --text-warning: #8a5500;
   --danger: #d6363f;
   --danger-hover: #b52d35;
   --text-danger: #c33139;
@@ -198,6 +201,7 @@
   --positive: #3d9e60;
   --positive-hover: #2f7f4c;
   --warning: #fdb833;
+  --text-warning: #fdb833;
   --danger: #da3e44;
   --danger-hover: #b5343a;
   /* --danger as text: the fill colour reads at under 3:1 on these panels,
