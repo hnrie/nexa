@@ -132,7 +132,7 @@ export default function MembersPage({ serverId }: { serverId: string }) {
                   );
                 })}
                 {/* "+" alone was all a screen reader had to say for it */}
-                {canRoles && (above || m.user_id === meId) ? <button className={r.chip} title={t("server.members.editRoles")} aria-label={t("server.members.editRoles")} onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}>+</button> : null}
+                {canRoles && (above || m.user_id === meId) ? <button className={r.chip} title={t("server.channelSettings.addRole")} aria-label={t("server.channelSettings.addRole")} onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}>+</button> : null}
               </span>
             </div>
             <div className={s.memberActions}>
