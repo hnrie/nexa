@@ -1765,6 +1765,8 @@
   "server.auditLog.aDeletedChannel": "قناة محذوفة",
   "server.auditLog.aDeletedRole": "رتبة محذوفة",
   "server.auditLog.auditLog": "سجل التدقيق",
+  "server.auditLog.category": "فئة",
+  "server.auditLog.disconnected": "مفصول",
   "server.auditLog.everyModerationAndConfigurationChangeIn": "كل تغييرات الإشراف والإعدادات في هذا الخادم، الأحدث أولًا.",
   "server.auditLog.itemsCount": {
     "other": "{count} عنصرًا"
@@ -1772,9 +1774,11 @@
   "server.auditLog.loadMore": "تحميل المزيد",
   "server.auditLog.loadingTheAuditLog": "جارٍ تحميل سجلّ التدقيق",
   "server.auditLog.nothingHasHappenedYet": "لم يحدث شيء بعد.",
+  "server.auditLog.on": "تشغيل",
   "server.auditLog.reason": "السبب: {reason}",
   "server.auditLog.theAuditLogCouldNotBe": "تعذّر تحميل سجلّ التدقيق، فهذا ليس دليلًا على أن شيئًا لم يحدث.",
   "server.auditLog.theRestOfTheLogCould": "تعذّر تحميل بقية السجلّ.",
+  "server.auditLog.userLimit": "حد الأعضاء",
   "server.auditLog.verb.channel_create": "أنشأ القناة",
   "server.auditLog.verb.channel_delete": "حذف القناة",
   "server.auditLog.verb.channel_positions": "أعاد ترتيب القنوات",

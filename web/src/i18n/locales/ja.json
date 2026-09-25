@@ -1535,6 +1535,8 @@
   "server.auditLog.aDeletedChannel": "削除済みのチャンネル",
   "server.auditLog.aDeletedRole": "削除済みのロール",
   "server.auditLog.auditLog": "監査ログ",
+  "server.auditLog.category": "カテゴリー",
+  "server.auditLog.disconnected": "切断",
   "server.auditLog.everyModerationAndConfigurationChangeIn": "このサーバーでのすべてのモデレーションと設定の変更を、新しい順に表示します。",
   "server.auditLog.itemsCount": {
     "other": "{count} 件"
@@ -1542,9 +1544,11 @@
   "server.auditLog.loadMore": "さらに読み込む",
   "server.auditLog.loadingTheAuditLog": "監査ログを読み込んでいます",
   "server.auditLog.nothingHasHappenedYet": "まだ何も起きていません。",
+  "server.auditLog.on": "オン",
   "server.auditLog.reason": "理由: {reason}",
   "server.auditLog.theAuditLogCouldNotBe": "監査ログを読み込めませんでした。何も起きていないという記録ではありません。",
   "server.auditLog.theRestOfTheLogCould": "ログの残りを読み込めませんでした。",
+  "server.auditLog.userLimit": "人数制限",
   "server.auditLog.verb.channel_create": "がチャンネルを作成しました:",
   "server.auditLog.verb.channel_delete": "がチャンネルを削除しました:",
   "server.auditLog.verb.channel_positions": "がチャンネルを並べ替えました",

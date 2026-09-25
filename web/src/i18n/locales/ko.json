@@ -1535,6 +1535,8 @@
   "server.auditLog.aDeletedChannel": "삭제된 채널",
   "server.auditLog.aDeletedRole": "삭제된 역할",
   "server.auditLog.auditLog": "감사 로그",
+  "server.auditLog.category": "카테고리",
+  "server.auditLog.disconnected": "연결 끊김",
   "server.auditLog.everyModerationAndConfigurationChangeIn": "이 서버의 모든 관리 및 설정 변경을 최신순으로 보여 줍니다.",
   "server.auditLog.itemsCount": {
     "other": "{count}개 항목"
@@ -1542,9 +1544,11 @@
   "server.auditLog.loadMore": "더 불러오기",
   "server.auditLog.loadingTheAuditLog": "감사 기록을 불러오는 중",
   "server.auditLog.nothingHasHappenedYet": "아직 아무 일도 없었습니다.",
+  "server.auditLog.on": "켬",
   "server.auditLog.reason": "사유: {reason}",
   "server.auditLog.theAuditLogCouldNotBe": "감사 기록을 불러오지 못했습니다. 아무 일도 없었다는 기록이 아닙니다.",
   "server.auditLog.theRestOfTheLogCould": "기록의 나머지를 불러오지 못했습니다.",
+  "server.auditLog.userLimit": "인원 제한",
   "server.auditLog.verb.channel_create": "님이 채널을 만들었습니다:",
   "server.auditLog.verb.channel_delete": "님이 채널을 삭제했습니다:",
   "server.auditLog.verb.channel_positions": "님이 채널 순서를 바꿨습니다",

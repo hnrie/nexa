@@ -5,8 +5,9 @@ import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
+import { formatSpan } from "@/lib/moderation";
 import { P, has, parsePerm, permGroups } from "@/lib/perms";
-import { formatFull } from "@/lib/time";
+import { formatFull, formatShortDuration } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
 import { useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
@@ -47,6 +48,11 @@ function verbs(): Record<string, string> {
     invite_create: t("server.auditLog.verb.invite_create"),
     invite_delete: t("server.auditLog.verb.invite_delete"),
   };
+}
+
+/** A channel by the name its row shows: text channels with their "#", voice channels and categories without. */
+function shownChannel(ch: { type: string; name: string }): string {
+  return ch.type === "text" ? `#${ch.name}` : ch.name;
 }
 
 export default function AuditLogPage({ serverId }: { serverId: string }) {
@@ -90,7 +96,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     if (e.target_type === "channel") {
       const ch = channels[e.target_id];
       const changes = e.changes as { name?: string } | null;
-      return isolate(ch ? (ch.type === "category" ? ch.name : `#${ch.name}`) : changes?.name ? `#${changes.name}` : t("server.auditLog.aDeletedChannel"));
+      return isolate(ch ? shownChannel(ch) : changes?.name ? `#${changes.name}` : t("server.auditLog.aDeletedChannel"));
     }
     if (e.target_type === "role") {
       const changes = e.changes as { name?: string } | null;
@@ -113,34 +119,106 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
   const roleName = (id: string): string | undefined => (id === serverId ? isolate("@everyone") : server?.roles[id]?.name);
   const channelName = (id: string): string | undefined => {
     const ch = channels[id];
-    return ch ? isolate(ch.type === "category" ? ch.name : `#${ch.name}`) : undefined;
+    return ch ? isolate(shownChannel(ch)) : undefined;
   };
   const userName = (id: string): string | undefined => (users[id] ? displayName(users[id]) : undefined);
   const permNames = (v: unknown): string => {
     const bits = parsePerm(v as string);
-    if (bits === 0n) return "—";
+    if (bits === 0n) return none();
     return permGroups()
       .flatMap((g) => g.items)
       .filter((it) => has(bits, P[it.name]))
       .map((it) => it.label)
       .join(", ");
   };
+  const none = () => t("settings.profile.none");
+  const onOff = (v: unknown) => (v ? t("server.auditLog.on") : t("server.channelSettings.slowmodeOff"));
+  // What each recorded field is called on the screens where it is set, and its
+  // value in the words those screens use: "max_age: 604800" was the invite's
+  // lifetime in seconds, and "hoist: true" a checkbox a moderator knows by
+  // another name.
+  const field = (k: string, v: unknown, e: AuditEntry, obj: Record<string, unknown>): [string, string] | null => {
+    const str = typeof v === "string" ? v : undefined;
+    const num = typeof v === "number" ? v : undefined;
+    switch (k) {
+      case "name":
+        return [t("modals.subchat.name"), str || none()];
+      case "description":
+        return [t("server.serverOverview.serverDescription"), str || none()];
+      case "topic":
+        return [t("server.channelSettings.channelTopic"), str || none()];
+      case "type":
+        return [t("modals.createChannel.channelType"), str === "voice" ? t("modals.createChannel.voice") : str === "category" ? t("server.auditLog.category") : t("modals.createChannel.text")];
+      case "system_channel_id":
+        return [t("server.serverOverview.systemMessagesChannel"), (str && channelName(str)) || t("server.serverOverview.noSystemMessages")];
+      case "default_notifications":
+        return [t("server.serverOverview.defaultNotificationSettings"), num === 1 ? t("server.serverOverview.onlyMentions") : t("server.serverOverview.allMessages")];
+      case "nsfw":
+        return [t("server.channelSettings.ageRestrictedChannel"), onOff(v)];
+      case "slowmode_seconds":
+        return [t("server.channelSettings.slowmode"), num ? formatShortDuration(num) : t("server.channelSettings.slowmodeOff")];
+      case "user_limit":
+        return [t("server.auditLog.userLimit"), num ? String(num) : t("server.channelSettings.noLimit")];
+      case "color":
+        return [t("server.roles.roleColour"), num ? `#${num.toString(16).padStart(6, "0")}` : t("server.roles.default")];
+      case "hoist":
+        return [t("server.roles.displayRoleMembersSeparatelyFromOnline"), onOff(v)];
+      case "mentionable":
+        return [t("server.roles.allowAnyoneToMentionThisRole"), onOff(v)];
+      case "permissions":
+        return [t("server.channelSettings.permissions"), permNames(v)];
+      case "allow":
+        return [t("server.permissionGrid.allow"), permNames(v)];
+      case "deny":
+        return [t("server.permissionGrid.deny"), permNames(v)];
+      case "target_id":
+      case "target": {
+        // an overwrite names who it is for; a member's own entry already does
+        if (!str) return null;
+        const member = obj["target_type"] === "member";
+        return [member ? t("server.channelSettings.member") : t("server.channelSettings.role"), (member ? userName(str) : (roleName(str) ?? userName(str))) ?? str];
+      }
+      case "role":
+        return [t("server.channelSettings.role"), (str && roleName(str)) || t("server.auditLog.aDeletedRole")];
+      case "roles":
+        return [t("server.members.roles"), Array.isArray(v) && v.length ? v.map((id) => roleName(String(id)) ?? t("server.auditLog.aDeletedRole")).join(", ") : none()];
+      case "nick":
+        return [t("modals.serverProfile.nickname"), str || none()];
+      case "timeout_until":
+        return [t("server.members.timedOut"), num && num > 0 ? formatFull(num) : none()];
+      case "mute":
+        return [t("voice.voice.mute"), onOff(v)];
+      case "deaf":
+        return [t("shell.user.deafen"), onOff(v)];
+      case "channel_id":
+        // the channel an entry is about is its own target; a voice move names where to
+        if (v === e.target_id) return null;
+        return [t("server.invites.channel"), (str && channelName(str)) || t("server.auditLog.disconnected")];
+      case "parent_id":
+        return [t("server.auditLog.category"), (str && channelName(str)) || none()];
+      case "code":
+        return [t("server.invites.code"), str ?? ""];
+      case "max_age":
+        return [t("modals.groupInvite.expireAfter"), num ? formatSpan(num * 1000) : t("server.invites.never")];
+      case "max_uses":
+        return [t("modals.groupInvite.maxNumberOfUses"), num ? String(num) : t("modals.invite.noLimit")];
+      case "delete_message_days":
+        return [t("server.memberAction.deleteMessageHistory"), num ? formatSpan(num * 86_400_000) : none()];
+      case "target_type":
+        return null;
+      default:
+        return [k, Array.isArray(v) ? t("server.auditLog.itemsCount", { count: v.length }) : str ?? JSON.stringify(v)];
+    }
+  };
   const changesText = (e: AuditEntry): string => {
     if (!e.changes || typeof e.changes !== "object") return "";
+    // the reorders record the whole new order, which says nothing read as text
+    if (Array.isArray(e.changes)) return t("server.auditLog.itemsCount", { count: e.changes.length });
     const obj = e.changes as Record<string, unknown>;
     const parts: string[] = [];
     for (const [k, v] of Object.entries(obj)) {
-      // the kind of target goes without saying once the target has a name, and the channel is the entry's own
-      if (k === "target_type" || (k === "channel_id" && v === e.target_id)) continue;
-      let shown: string | undefined;
-      if (typeof v === "string" && (k === "role" || ((k === "target_id" || k === "target") && obj["target_type"] !== "member"))) shown = roleName(v) ?? userName(v);
-      else if (typeof v === "string" && (k === "target_id" || k === "target")) shown = userName(v);
-      else if (typeof v === "string" && (k === "channel_id" || k === "system_channel_id" || k === "parent_id")) shown = channelName(v);
-      else if (k === "allow" || k === "deny" || k === "permissions") shown = permNames(v);
-      else if (k === "color" && typeof v === "number") shown = v ? `#${v.toString(16).padStart(6, "0")}` : "—";
-      else if (k === "timeout_until") shown = typeof v === "number" ? formatFull(v) : "—";
-      if (shown === undefined) shown = Array.isArray(v) && v.length > 3 ? t("server.auditLog.itemsCount", { count: v.length }) : typeof v === "string" ? v : JSON.stringify(v);
-      parts.push(`${k}: ${shown}`);
+      const shown = field(k, v, e, obj);
+      if (shown) parts.push(`${shown[0]}: ${shown[1]}`);
     }
     const text = parts.join(" · ");
     return text.length > 300 ? `${text.slice(0, 299)}…` : text;

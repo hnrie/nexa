@@ -1535,6 +1535,8 @@
   "server.auditLog.aDeletedChannel": "一个已删除的频道",
   "server.auditLog.aDeletedRole": "一个已删除的身份组",
   "server.auditLog.auditLog": "审计日志",
+  "server.auditLog.category": "分类",
+  "server.auditLog.disconnected": "已断开",
   "server.auditLog.everyModerationAndConfigurationChangeIn": "这个服务器里的每一次管理和配置改动，最新的在最前面。",
   "server.auditLog.itemsCount": {
     "other": "{count} 项"
@@ -1542,9 +1544,11 @@
   "server.auditLog.loadMore": "加载更多",
   "server.auditLog.loadingTheAuditLog": "正在加载审计日志",
   "server.auditLog.nothingHasHappenedYet": "还什么都没发生。",
+  "server.auditLog.on": "开启",
   "server.auditLog.reason": "原因：{reason}",
   "server.auditLog.theAuditLogCouldNotBe": "审计日志加载失败，所以这并不代表什么都没发生。",
   "server.auditLog.theRestOfTheLogCould": "无法加载日志的其余部分。",
+  "server.auditLog.userLimit": "人数上限",
   "server.auditLog.verb.channel_create": "创建了频道",
   "server.auditLog.verb.channel_delete": "删除了频道",
   "server.auditLog.verb.channel_positions": "调整了频道顺序",
