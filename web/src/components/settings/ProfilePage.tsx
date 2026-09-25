@@ -131,26 +131,27 @@ export default function ProfilePage() {
             <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.profileTheme")}</div>
             <p className={s.hint} style={{ margin: "0 0 6px" }}>{t("settings.profile.topColourOnItsOwnIt")}</p>
             <div className={s.swatches}>
-              <button className={s.swatch} data-on={accent === null} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")} onClick={() => { setAccent(null); setAccent2(null); }} />
-              {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent === c} style={{ background: c }} title={c} onClick={() => setAccent(c)} />)}
+              <button className={s.swatch} data-on={accent === null} aria-pressed={accent === null} style={{ background: "var(--bg-active)" }} title={t("server.roles.default")} aria-label={t("server.roles.default")} onClick={() => { setAccent(null); setAccent2(null); }} />
+              {PRESETS.map((c, i) => <button key={c} className={s.swatch} data-on={accent === c} aria-pressed={accent === c} style={{ background: c }} title={c} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: PRESETS.length })} onClick={() => setAccent(c)} />)}
               <label className={s.swatch} data-on={!!accent && !PRESETS.includes(accent)} title={t("settings.appearance.custom")}>
                 <CustomColorIcon color={accent && !PRESETS.includes(accent) ? accent : null} />
-                <input type="color" value={accent ?? "#8000ff"} onChange={(e) => setAccent(e.target.value)} />
+                <input type="color" value={accent ?? "#8000ff"} aria-label={t("settings.appearance.custom")} onChange={(e) => setAccent(e.target.value)} />
               </label>
-              <HexInput value={accent} fallback="#8000ff" label={t("settings.profile.primaryColourHex")} onChange={setAccent} />
+              <HexInput value={accent} fallback="#8000ff" label={t("settings.profile.primaryColourHex")} testId="accent-hex" onChange={setAccent} />
             </div>
             <p className={s.hint} style={{ margin: "12px 0 6px" }}>{t("settings.profile.bottomColourPickOneTooAnd")}</p>
             <div className={s.swatches}>
-              <button className={s.swatch} data-on={accent2 === null} style={{ background: "var(--bg-active)" }} title={t("settings.profile.none")} onClick={() => setAccent2(null)} disabled={!accent} />
-              {PRESETS.map((c) => <button key={c} className={s.swatch} data-on={accent2 === c} style={{ background: c }} title={c} onClick={() => setAccent2(c)} disabled={!accent} />)}
+              <button className={s.swatch} data-on={accent2 === null} aria-pressed={accent2 === null} style={{ background: "var(--bg-active)" }} title={t("settings.profile.none")} aria-label={t("settings.profile.none")} onClick={() => setAccent2(null)} disabled={!accent} />
+              {PRESETS.map((c, i) => <button key={c} className={s.swatch} data-on={accent2 === c} aria-pressed={accent2 === c} style={{ background: c }} title={c} aria-label={t("server.roles.colourIndexOfCount", { index: i + 1, count: PRESETS.length })} onClick={() => setAccent2(c)} disabled={!accent} />)}
               <label className={s.swatch} data-on={!!accent2 && !PRESETS.includes(accent2)} style={{ opacity: accent ? 1 : 0.4 }} title={t("settings.appearance.custom")}>
                 <CustomColorIcon color={accent2 && !PRESETS.includes(accent2) ? accent2 : null} />
-                <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} onChange={(e) => setAccent2(e.target.value)} />
+                <input type="color" value={accent2 ?? "#eb459e"} disabled={!accent} aria-label={t("settings.appearance.custom")} onChange={(e) => setAccent2(e.target.value)} />
               </label>
-              <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} disabled={!accent} onChange={setAccent2} />
+              <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} testId="accent2-hex" disabled={!accent} onChange={setAccent2} />
             </div>
           </div>
-          <Field label={t("settings.profile.aboutMe")} hint={t("settings.profile.aboutHint", { count: ABOUT_MAX })}>
+          {/* counts down as it is typed, as the channel topic does, rather than only naming the cap */}
+          <Field label={t("settings.profile.aboutMe")} hint={t("settings.profile.aboutHintLeft", { count: ABOUT_MAX - about.length })}>
             <TextArea value={about} onChange={(e) => setAbout(e.target.value)} rows={6} maxLength={ABOUT_MAX} placeholder={t("settings.profile.tellPeopleAboutYourself")} />
           </Field>
         </div>
@@ -183,7 +184,7 @@ export default function ProfilePage() {
 }
 
 /** A hex field for people who know the colour they want. */
-function HexInput({ value, fallback, label, disabled, onChange }: { value: string | null; fallback: string; label: string; disabled?: boolean; onChange: (v: string) => void }) {
+function HexInput({ value, fallback, label, testId, disabled, onChange }: { value: string | null; fallback: string; label: string; testId: string; disabled?: boolean; onChange: (v: string) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? value ?? "";
   const commit = (raw: string) => {
@@ -207,7 +208,7 @@ function HexInput({ value, fallback, label, disabled, onChange }: { value: strin
       maxLength={7}
       placeholder={fallback}
       aria-label={label}
-      data-testid={label.startsWith("Primary") ? "accent-hex" : "accent2-hex"}
+      data-testid={testId}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={(e) => commit(e.target.value)}
       onKeyDown={(e) => {

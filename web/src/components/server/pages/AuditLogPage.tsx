@@ -5,6 +5,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
+import { P, has, parsePerm, permGroups } from "@/lib/perms";
 import { formatFull } from "@/lib/time";
 import { useChannels } from "@/stores/channels";
 import { useExpressions } from "@/stores/expressions";
@@ -14,6 +15,7 @@ import st from "@/components/settings/Settings.module.css";
 import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
+import { isolate } from "../bidi";
 /** What each audited action says, looked up per render so it follows the language. */
 function verbs(): Record<string, string> {
   return {
@@ -88,7 +90,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     if (e.target_type === "channel") {
       const ch = channels[e.target_id];
       const changes = e.changes as { name?: string } | null;
-      return ch ? (ch.type === "category" ? ch.name : `#${ch.name}`) : changes?.name ? `#${changes.name}` : t("server.auditLog.aDeletedChannel");
+      return isolate(ch ? (ch.type === "category" ? ch.name : `#${ch.name}`) : changes?.name ? `#${changes.name}` : t("server.auditLog.aDeletedChannel"));
     }
     if (e.target_type === "role") {
       const changes = e.changes as { name?: string } | null;
@@ -96,7 +98,7 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     }
     if (e.target_type === "emoji") {
       const changes = e.changes as { name?: string } | null;
-      return changes?.name ? `:${changes.name}:` : "";
+      return changes?.name ? isolate(`:${changes.name}:`) : "";
     }
     if (e.target_type === "sticker_pack") {
       // pack updates record no changes, so the pack's current name is the only one there is
@@ -105,15 +107,43 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     }
     return "";
   };
+  // What an id in the changes stands for, where this client knows: a row
+  // reading "role: 96767107336765440" told a moderator nothing about which
+  // role was handed out.
+  const roleName = (id: string): string | undefined => (id === serverId ? isolate("@everyone") : server?.roles[id]?.name);
+  const channelName = (id: string): string | undefined => {
+    const ch = channels[id];
+    return ch ? isolate(ch.type === "category" ? ch.name : `#${ch.name}`) : undefined;
+  };
+  const userName = (id: string): string | undefined => (users[id] ? displayName(users[id]) : undefined);
+  const permNames = (v: unknown): string => {
+    const bits = parsePerm(v as string);
+    if (bits === 0n) return "—";
+    return permGroups()
+      .flatMap((g) => g.items)
+      .filter((it) => has(bits, P[it.name]))
+      .map((it) => it.label)
+      .join(", ");
+  };
   const changesText = (e: AuditEntry): string => {
     if (!e.changes || typeof e.changes !== "object") return "";
     const obj = e.changes as Record<string, unknown>;
     const parts: string[] = [];
     for (const [k, v] of Object.entries(obj)) {
-      if (Array.isArray(v) && v.length > 3) parts.push(`${k}: ${t("server.auditLog.itemsCount", { count: v.length })}`);
-      else parts.push(`${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`);
+      // the kind of target goes without saying once the target has a name, and the channel is the entry's own
+      if (k === "target_type" || (k === "channel_id" && v === e.target_id)) continue;
+      let shown: string | undefined;
+      if (typeof v === "string" && (k === "role" || ((k === "target_id" || k === "target") && obj["target_type"] !== "member"))) shown = roleName(v) ?? userName(v);
+      else if (typeof v === "string" && (k === "target_id" || k === "target")) shown = userName(v);
+      else if (typeof v === "string" && (k === "channel_id" || k === "system_channel_id" || k === "parent_id")) shown = channelName(v);
+      else if (k === "allow" || k === "deny" || k === "permissions") shown = permNames(v);
+      else if (k === "color" && typeof v === "number") shown = v ? `#${v.toString(16).padStart(6, "0")}` : "—";
+      else if (k === "timeout_until") shown = typeof v === "number" ? formatFull(v) : "—";
+      if (shown === undefined) shown = Array.isArray(v) && v.length > 3 ? t("server.auditLog.itemsCount", { count: v.length }) : typeof v === "string" ? v : JSON.stringify(v);
+      parts.push(`${k}: ${shown}`);
     }
-    return parts.join(" · ").slice(0, 300);
+    const text = parts.join(" · ");
+    return text.length > 300 ? `${text.slice(0, 299)}…` : text;
   };
 
   return (

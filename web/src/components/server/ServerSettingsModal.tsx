@@ -59,7 +59,7 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     page === "delete" ? <DeleteServerPage serverId={serverId} onDone={() => { onClose(); nav("/channels/@me"); }} /> :
     <EncryptionPage serverId={serverId} />;
   return (
-    <SettingsLayer label={t("server.serverSettings.serverSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose}>
+    <SettingsLayer label={t("server.serverSettings.serverSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose} startOnList={!initial}>
       {/* A blank panel on a slow link is indistinguishable from a crash. */}
       <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{body}</Suspense>
     </SettingsLayer>

@@ -16,13 +16,19 @@ function themes(): { id: Theme; name: string; colors: string[] }[] {
     { id: "system", name: tr_("settings.appearance.themeSystem"), colors: ["#2c2d32", "#f3f3f4", "#8000ff"] },
   ];
 }
-const ACCENTS = ["#8000ff", "#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#3498db", "#e91e63"];
+/** The accent the app uses until one is picked; the Default swatch stands for it. */
+const DEFAULT_ACCENT = "#8000ff";
+// Default is drawn in the first swatch, so it is not in this list as well:
+// listed twice, it was two identical purple squares side by side.
+const ACCENTS = ["#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#1abc9c", "#e67e22", "#3498db", "#e91e63"];
 
 export default function AppearancePage() {
   const me = useAuth((a) => a.me);
   const st = useSettings((x) => x.settings);
   const patch = useSettings((x) => x.patch);
   const px = Math.round(st.fontScale * 16);
+  // the default picked by hand is still the default
+  const accent = st.accent === DEFAULT_ACCENT ? null : st.accent;
   return (
     <>
       <h2 className={s.title}>{tr_("settings.appearance.appearance")}</h2>
@@ -38,7 +44,7 @@ export default function AppearancePage() {
       <h3 className={s.h5}>{tr_("settings.appearance.language")}</h3>
       <p className={s.hint}>{tr_("settings.appearance.languageHint")}</p>
       <div className={s.languages}>
-        <button className={s.language} data-on={st.locale === null} onClick={() => patch({ locale: null })} data-testid="language-auto">
+        <button className={s.language} data-on={st.locale === null} aria-pressed={st.locale === null} onClick={() => patch({ locale: null })} data-testid="language-auto">
           {tr_("settings.appearance.matchMyBrowser")}
         </button>
         {LANGUAGES.map((l) => (
@@ -46,6 +52,7 @@ export default function AppearancePage() {
             key={l.tag}
             className={s.language}
             data-on={st.locale === l.tag}
+            aria-pressed={st.locale === l.tag}
             lang={l.tag}
             dir={l.rtl ? "rtl" : "ltr"}
             onClick={() => patch({ locale: l.tag })}
@@ -59,7 +66,7 @@ export default function AppearancePage() {
       <h3 className={s.h5}>{tr_("settings.appearance.theme")}</h3>
       <div className={s.themes}>
         {themes().map((t) => (
-          <button key={t.id} className={s.themeCard} data-on={st.theme === t.id} onClick={() => patch({ theme: t.id })}>
+          <button key={t.id} className={s.themeCard} data-on={st.theme === t.id} aria-pressed={st.theme === t.id} onClick={() => patch({ theme: t.id })}>
             <div className={s.themeSwatch}>{t.colors.map((c, i) => <i key={i} style={{ background: c }} />)}</div>
             <div className={s.themeName}>{t.name}</div>
           </button>
@@ -67,10 +74,11 @@ export default function AppearancePage() {
       </div>
       <h3 className={s.h5}>{tr_("settings.appearance.accentColour")}</h3>
       <div className={s.swatches}>
-        <button className={s.swatch} data-on={st.accent === null} style={{ background: "#8000ff" }} title={tr_("server.roles.default")} onClick={() => patch({ accent: null })} />
-        {ACCENTS.map((c) => <button key={c} className={s.swatch} data-on={st.accent === c} style={{ background: c }} title={c} onClick={() => patch({ accent: c })} />)}
-        <label className={s.swatch} data-on={!!st.accent && !ACCENTS.includes(st.accent)} title={tr_("settings.appearance.custom")} style={{ background: st.accent && !ACCENTS.includes(st.accent) ? st.accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
-          <input type="color" value={st.accent ?? "#8000ff"} onChange={(e) => patch({ accent: e.target.value })} />
+        {/* Named and marked as pressed: a title of "#5865f2" was all a screen reader had, and which one was chosen was only a border. */}
+        <button className={s.swatch} data-on={accent === null} aria-pressed={accent === null} style={{ background: DEFAULT_ACCENT }} title={tr_("server.roles.default")} aria-label={tr_("server.roles.default")} onClick={() => patch({ accent: null })} />
+        {ACCENTS.map((c, i) => <button key={c} className={s.swatch} data-on={accent === c} aria-pressed={accent === c} style={{ background: c }} title={c} aria-label={tr_("server.roles.colourIndexOfCount", { index: i + 1, count: ACCENTS.length })} onClick={() => patch({ accent: c })} />)}
+        <label className={s.swatch} data-on={!!accent && !ACCENTS.includes(accent)} title={tr_("settings.appearance.custom")} style={{ background: accent && !ACCENTS.includes(accent) ? accent : "linear-gradient(135deg,#f00,#0f0,#00f)" }}>
+          <input type="color" value={accent ?? DEFAULT_ACCENT} aria-label={tr_("settings.appearance.custom")} onChange={(e) => patch({ accent: e.target.value })} />
         </label>
       </div>
       <h3 className={s.h5}>{tr_("settings.appearance.messageDisplay")}</h3>

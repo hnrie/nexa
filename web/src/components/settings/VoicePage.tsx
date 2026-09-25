@@ -193,15 +193,22 @@ export default function VoicePage() {
             {diag ? <pre className={v.diag} data-testid="mic-diagnostics">{diag}</pre> : null}
           </div>
         </Field>
-        <h3 className={st.h5}>{tr_("settings.voice.inputMode")}</h3>
+      </div>
+      {/* Headings and radio cards sat in the form's 20px-gap column, so each
+          heading floated 28px above what it named and the two cards stood
+          28px apart; everywhere else they are 8px. */}
+      <h3 className={st.h5}>{tr_("settings.voice.inputMode")}</h3>
+      <div role="radiogroup" aria-label={tr_("settings.voice.inputMode")}>
         <label className={st.radio} data-on={settings.mode === "vad"}>
-          <input type="radio" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
+          <input type="radio" name="voice-input-mode" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
           <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.voiceActivity")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitWheneverYouTalk")}</span></span>
         </label>
         <label className={st.radio} data-on={settings.mode === "ptt"}>
-          <input type="radio" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
+          <input type="radio" name="voice-input-mode" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
           <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
         </label>
+      </div>
+      <div className={st.form} style={{ marginTop: 12 }}>
         {settings.mode === "ptt" ? (
           <Field label={tr_("settings.voice.pushToTalkKey")} hint={tr_("settings.voice.clickTheBoxThenPressThe")}>
             <button type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing(true)}>
@@ -219,10 +226,12 @@ export default function VoicePage() {
             ) : null}
           </>
         )}
-        <h3 className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h3>
-        <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label={tr_("settings.voice.noiseSuppression")} description={tr_("settings.voice.filtersKeyboardClatterAndFansWith")} />
-        <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label={tr_("settings.voice.echoCancellation")} />
-        <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label={tr_("settings.voice.automaticGainControl")} />
+      </div>
+      <h3 className={st.h5}>{tr_("settings.voice.voiceProcessing")}</h3>
+      <Toggle checked={settings.noiseSuppression} onChange={(on) => set({ noiseSuppression: on })} label={tr_("settings.voice.noiseSuppression")} description={tr_("settings.voice.filtersKeyboardClatterAndFansWith")} />
+      <Toggle checked={settings.echoCancellation} onChange={(on) => set({ echoCancellation: on })} label={tr_("settings.voice.echoCancellation")} />
+      <Toggle checked={settings.autoGain} onChange={(on) => set({ autoGain: on })} label={tr_("settings.voice.automaticGainControl")} />
+      <div className={st.form} style={{ marginTop: 24 }}>
         <Field label={tr_("settings.voice.camera")}>
           <Select
             value={settings.cameraDeviceId ?? ""}

@@ -2,18 +2,28 @@
 @keyframes fadeIn { from { opacity: 0; transform: scale(1.02); } to { opacity: 1; transform: none; } }
 .navWrap { flex: 1 0 218px; display: flex; justify-content: flex-end; background: var(--bg-base); overflow-y: auto; }
 .nav { width: 218px; padding-block: 60px; padding-inline: 20px 6px; display: flex; flex-direction: column; gap: 2px; }
+.navSection, .navGroup { display: flex; flex-direction: column; }
 .navHead { padding: 6px 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-channel); margin-top: 8px; }
-.navItem { display: flex; align-items: center; justify-content: space-between; height: 32px; padding: 0 10px; border-radius: var(--radius-xs); font-size: 16px; font-weight: 500; color: var(--text-channel); width: 100%; text-align: start; }
+/* A label that runs to two lines (German has a few) makes its row taller rather than spilling into the next. */
+.navItem { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; padding: 4px 10px; border-radius: var(--radius-xs); font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--text-channel); width: 100%; text-align: start; }
+.navLabel { min-width: 0; overflow-wrap: anywhere; }
 .navItem:hover { background: var(--bg-hover); color: var(--text); }
 .navItem[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
+.navChevron { flex: none; color: var(--text-muted); }
 .navSep { height: 1px; margin: 8px 10px; background: var(--border); }
-.danger { color: var(--danger); }
+/* red whether or not it is the page on screen: Delete Server lost its warning colour once opened */
+.danger, .navItem.danger, .navItem.danger:hover, .navItem.danger[data-selected="true"] { color: var(--danger); }
+/* A chevron or arrow that points along the reading direction turns round with it. */
+[dir="rtl"] .flip { transform: scaleX(-1); }
+@media (pointer: coarse) {
+  .navItem { min-height: 40px; }
+}
 .contentWrap { flex: 1 1 800px; display: flex; overflow-y: auto; background: var(--bg-raised); }
 /* Generous room under the last setting, so it never ends pressed against the window edge (or under a save
    bar). The page grows with what it holds (flex-start): stretched to the window's height, as it was, its
    content ran out past its own padding and the room under the last setting never existed. */
 .content { width: 740px; max-width: 100%; padding: 60px 40px 160px; align-self: flex-start; }
-.closeCol { position: sticky; top: 60px; align-self: flex-start; padding-block: 60px 0; padding-inline: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.closeCol { position: sticky; top: 60px; align-self: flex-start; padding-block: 60px 0; padding-inline: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .close { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--text-muted); color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
 .close:hover { color: var(--text); border-color: var(--text); background: var(--bg-hover); }
 .esc { font-size: 13px; font-weight: 600; color: var(--text-muted); }
@@ -35,13 +45,18 @@
 .sep { height: 1px; background: var(--border); margin: 24px 0; }
 .form { display: flex; flex-direction: column; gap: 20px; }
 .hint { font-size: 14px; color: var(--text-muted); margin: 4px 0 0; }
-.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: #fff; }
-.shake :global(button) { color: inherit; }
+/* a card straight under the sentence that introduces it had 4px between them */
+.hint + .device { margin-top: 12px; }
+/* .saveBar comes later in this file and set its own background over this one, so the bar shook but never went red */
+.saveBar.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: #fff; }
+.saveBar.shake :global(button) { color: inherit; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 15%, 55% { transform: translateX(-8px); } 35%, 75% { transform: translateX(8px); } }
-@media (prefers-reduced-motion: reduce) { .shake { animation: none; } }
-.saveBar { position: sticky; bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 10px; padding-inline: 16px 10px; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); margin-top: 24px; font-size: 14px; color: var(--text); animation: slideUp 150ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .saveBar.shake { animation: none; } }
+/* The buttons drop under the sentence when a phone (or a long language) has no room for both on one line. */
+.saveBar { position: sticky; bottom: 16px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-block: 10px; padding-inline: 16px 10px; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); margin-top: 24px; font-size: 14px; color: var(--text); animation: slideUp 150ms ease-out; }
+.saveText { flex: 1 1 200px; min-width: 0; }
 @keyframes slideUp { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
-.saveBtns { display: flex; gap: 8px; }
+.saveBtns { display: flex; gap: 8px; margin-inline-start: auto; }
 .twoCol { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 24px; }
 .twoEqual { grid-template-columns: 1fr 1fr; }
 .preview { align-self: start; position: sticky; top: 60px; }
@@ -84,17 +99,28 @@
   .preview { position: static; }
 }
 @media (max-width: 767px) {
-  .layer { flex-direction: column; }
-  .navWrap { flex: none; overflow-x: auto; justify-content: flex-start; background: var(--bg-base); border-bottom: 1px solid var(--border-subtle); padding-inline-end: 48px; }
-  .nav { flex-direction: row; width: max-content; padding: 10px 8px; gap: 4px; }
-  .nav > div { display: contents; }
-  .navHead, .navSep { display: none; }
-  .navItem { height: 36px; white-space: nowrap; }
-  .contentWrap { flex: 1; }
+  /* Clear of the notch and the home bar, and on iOS of the keyboard too, which
+     covers the page rather than shortening it (lib/keyboardInset.ts): the save
+     bar sticks to the bottom of what is left, above the keys. */
+  .layer { flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--kb-inset, 0px) env(safe-area-inset-left); background: var(--bg-raised); }
+  .topBar { display: flex; align-items: center; gap: 8px; flex: none; min-height: 52px; padding-inline: 4px; border-bottom: 1px solid var(--border-subtle); }
+  .topTitle { flex: 1; min-width: 0; margin: 0; padding-inline: 12px; font-size: 18px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .back { display: flex; align-items: center; gap: 2px; min-width: 0; height: 44px; padding-inline: 4px 12px; margin-inline-end: auto; border-radius: var(--radius-xs); font-size: 16px; font-weight: 600; color: var(--text-strong); }
+  .back:hover { background: var(--bg-hover); }
+  .backLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topBar .close { flex: none; width: 44px; height: 44px; border: 0; }
+  /* the list: its groups as cards, one row per page, each wide and tall enough for a thumb */
+  .navWrap { flex: 1; min-height: 0; justify-content: center; background: transparent; overscroll-behavior: contain; }
+  .nav { width: 100%; max-width: 600px; padding-block: 4px calc(24px + env(safe-area-inset-bottom)); padding-inline: 16px; gap: 0; }
+  .navHead { padding: 20px 4px 8px; margin: 0; }
+  .navSep { height: 0; margin: 20px 0 0; background: none; }
+  .navGroup { background: var(--bg-surface); border-radius: var(--radius-md); overflow: hidden; }
+  .navItem { min-height: 50px; padding: 12px 14px; border-radius: 0; color: var(--text); }
+  .navItem + .navItem { border-top: 1px solid var(--border-subtle); }
+  .navItem:hover, .navItem:active { background: var(--bg-hover); }
+  .contentWrap { flex: 1; min-height: 0; }
   .content { padding: 16px 16px calc(120px + env(safe-area-inset-bottom)); }
-  .closeCol { position: fixed; top: 8px; inset-inline-end: 8px; padding: 0; z-index: 3; }
-  .closeCol .close { width: 32px; height: 32px; background: var(--bg-surface); }
-  .esc { display: none; }
+  .saveBar { bottom: max(12px, env(safe-area-inset-bottom)); }
   .twoEqual { grid-template-columns: 1fr; }
   .cardHead { flex-wrap: wrap; row-gap: 8px; }
   .cardHead > button { margin-inline-start: auto; }
@@ -152,3 +178,6 @@
 .purgeList li + li { border-top: 1px solid var(--border-subtle); }
 .purgeCount { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-strong); }
 .purgeLoading { display: flex; justify-content: center; padding: 12px 0; }
+
+/* a crash report's heading, which opens its stack */
+.crashToggle { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; text-align: start; }

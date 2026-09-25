@@ -7,6 +7,7 @@ import { Modal } from "@/components/common/Modal";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { memberName } from "@/lib/names";
+import { formatFull } from "@/lib/time";
 import { canManageRole } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { memberHighest, rolesByPosition, useServers } from "@/stores/servers";
@@ -62,7 +63,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
       <Avatar id={userId} avatarId={member?.avatar_id ?? user?.avatar_id ?? null} name={name} size={40} />
       <div>
         <div className={s.typeLabel}>{name}</div>
-        <div className={s.typeDesc}>@{user?.username ?? userId}</div>
+        <div className={s.typeDesc}><bdi>@{user?.username ?? userId}</bdi></div>
       </div>
     </div>
   );
@@ -134,7 +135,7 @@ export default function MemberActionModal({ onClose, serverId, userId, action }:
         <div className={s.form}>
           {head}
           {timedOut ? (
-            <p className={s.hint}>{t("server.memberAction.timedOutUntil", { when: new Date(member!.timeout_until!).toLocaleString() })}</p>
+            <p className={s.hint}>{t("server.memberAction.timedOutUntil", { when: formatFull(member!.timeout_until!) })}</p>
           ) : (
             <>
               <p className={s.hint}>{t("server.memberAction.timedOutMembersCannotSendMessages")}</p>

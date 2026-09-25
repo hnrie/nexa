@@ -68,7 +68,8 @@ export default function AdminPage() {
       <p className={st.hint}>{tr_("settings.admin.youRunThisInstanceTheseSettings")}</p>
       <h5 className={st.h5}>{tr_("server.channelSettings.overview")}</h5>
       {stats ? (
-        <div className={st.rows} style={{ margin: 0 }}>
+        // on the page's own background the box was invisible, and each value sat 600px from its name
+        <div className={st.rows} style={{ margin: 0, background: "var(--bg-surface)" }}>
           <div className={st.row}><span className={st.rowLabel}>{tr_("settings.admin.users")}</span><span className={st.rowValue}>{tr_("settings.admin.usersOnline", { users: stats.users, online: stats.online })}</span></div>
           <div className={st.row}><span className={st.rowLabel}>{tr_("rail.rail.servers")}</span><span className={st.rowValue}>{stats.servers}</span></div>
           <div className={st.row}><span className={st.rowLabel}>{tr_("modals.quickSwitcher.messages")}</span><span className={st.rowValue}>{stats.messages}</span></div>
@@ -81,14 +82,14 @@ export default function AdminPage() {
         <>
           {(["open", "invite", "closed"] as const).map((m) => (
             <label key={m} className={st.radio} data-on={settings.registration === m}>
-              <input type="radio" checked={settings.registration === m} onChange={() => void setMode(m)} />
+              <input type="radio" name="registration" checked={settings.registration === m} onChange={() => void setMode(m)} />
               <span className={st.radioText}>
                 <span className={st.radioLabel}>{m === "open" ? tr_("settings.admin.open") : m === "invite" ? tr_("settings.admin.inviteOnly") : tr_("settings.admin.closed")}</span>
                 <span className={st.radioDesc}>{m === "open" ? tr_("settings.admin.regOpen") : m === "invite" ? tr_("settings.admin.regInvite") : tr_("settings.admin.regClosed")}</span>
               </span>
             </label>
           ))}
-          <p className={st.hint}>{tr_("settings.admin.configSays", { value: settings.config_registration })}</p>
+          <p className={st.hint} style={{ marginBottom: 16 }}>{tr_("settings.admin.configSays", { value: settings.config_registration })}</p>
           <Field label={settings.registration_key_set ? tr_("settings.admin.registrationKeySet") : tr_("settings.admin.registrationKeyNotSet")} hint={tr_("settings.admin.shareThisWithPeopleYouWant")}>
             <div style={{ display: "flex", gap: 8 }}>
               <TextInput value={key} onChange={(e) => setKey(e.target.value)} placeholder={tr_("settings.admin.newKey")} maxLength={128} />
@@ -182,7 +183,7 @@ function LegalResponse() {
     <>
       <h5 className={st.h5}>{tr_("settings.admin.legal.lawEnforcementResponse")}</h5>
       <p className={st.hint}>{tr_("settings.admin.legal.compileWhatThisInstanceHolds")}</p>
-      <div className={s.searchRow} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div className={s.searchRow} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
         <TextInput
           value={who}
           onChange={(e) => setWho(e.target.value)}
@@ -237,20 +238,22 @@ function CrashLog() {
   return (
     <>
       <h5 className={st.h5}>{tr_("settings.admin.crashes")}</h5>
-      <p className={st.hint}>
-        What the app reported from people's browsers: the error, where in the code it happened and which build it was. Nothing from a conversation is sent. The newest {list?.length ?? 0} are kept.
-      </p>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      {/* This was English in every language, and ended "The newest 0 are kept" on an empty log. */}
+      <p className={st.hint}>{tr_("settings.admin.crashesHint")}</p>
+      <div style={{ display: "flex", gap: 8, margin: "12px 0 8px" }}>
         <Button size="sm" variant="secondary" onClick={() => void load()}>{tr_("settings.admin.refresh")}</Button>
         {list?.length ? <Button size="sm" variant="danger" onClick={() => void clear()}>{tr_("modals.quickSwitcher.clear")}</Button> : null}
       </div>
       {list === null ? <Spinner /> : null}
       {list?.length === 0 ? <p className={st.hint}>{tr_("settings.admin.nothingHasCrashedGood")}</p> : null}
       {list?.map((e) => (
-        <div key={e.id} className={s.memberRow} style={{ alignItems: "flex-start", cursor: "pointer" }} onClick={() => setOpen(open === e.id ? null : e.id)}>
+        <div key={e.id} className={s.memberRow} style={{ alignItems: "flex-start" }}>
           <div className={s.memberText}>
-            <span className={s.memberName} style={{ color: "var(--danger)" }}>{e.message}</span>
-            <span className={s.memberSub}>{e.kind} · {e.path || "/"} · {tr_("settings.admin.buildVersion", { version: e.version || tr_("settings.admin.unknown") })} · {formatFull(e.created_at)}</span>
+            {/* a button, so the stack opens from the keyboard too: the row was a div with an onClick */}
+            <button type="button" className={st.crashToggle} aria-expanded={open === e.id} onClick={() => setOpen(open === e.id ? null : e.id)}>
+              <span className={s.memberName} style={{ color: "var(--danger)" }}>{e.message}</span>
+              <span className={s.memberSub}>{e.kind} · {e.path || "/"} · {tr_("settings.admin.buildVersion", { version: e.version || tr_("settings.admin.unknown") })} · {formatFull(e.created_at)}</span>
+            </button>
             {open === e.id ? (
               <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontSize: 11, lineHeight: 1.5, color: "var(--text-muted)", margin: "8px 0 0", maxHeight: 260, overflow: "auto" }}>
                 {e.stack || tr_("settings.admin.noStack")}{e.component ? `\n\ncomponents:${e.component}` : ""}{`\n\n${e.user_agent}`}

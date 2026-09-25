@@ -29,13 +29,19 @@
 .cellTags { font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 14px; }
 .cellBtns { position: absolute; top: 6px; inset-inline-end: 6px; display: none; gap: 4px; }
 .cell:hover .cellBtns, .cell:focus-within .cellBtns { display: flex; }
-/* no hover on a touch screen: the buttons stay in sight */
-@media (hover: none) { .cellBtns, .packRemove { display: flex; } }
+/* No hover on a touch screen: the buttons stay in sight, in a row of their
+   own under the name, each big enough for a thumb, instead of three 22px dots
+   over the corner of the sticker. */
+@media (hover: none) {
+  .cellBtns, .packRemove { display: flex; }
+  .cellBtns { position: static; justify-content: flex-end; gap: 6px; }
+}
 .cellBtn { display: flex; padding: 4px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; }
 .cellBtn:hover { background: var(--brand); color: var(--on-brand); }
 .cellBtn[data-danger="true"]:hover { background: var(--danger); }
 .coverBadge { position: absolute; top: 6px; inset-inline-start: 6px; padding: 2px 6px; border-radius: var(--radius-xs); background: var(--brand); color: var(--on-brand); font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .dropzone { margin-top: 16px; padding: 24px; border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); text-align: center; color: var(--text-muted); font-size: 14px; cursor: pointer; }
+.dropzone:hover { color: var(--text); border-color: var(--text-muted); }
 .dropzone[data-over="true"] { border-color: var(--brand); color: var(--text); background: var(--bg-hover); }
 .uploadRow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; margin-top: 12px; }
 .pending { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-top: 8px; }
@@ -56,3 +62,7 @@
 .tab { padding: 10px 2px; font-size: 15px; font-weight: 500; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tab[data-on="true"] { color: var(--text-strong); border-bottom-color: var(--brand); }
 @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .list { position: static; } .uploadRow { grid-template-columns: 1fr; } }
+@media (hover: none) {
+  .cellBtn { padding: 9px; background: var(--bg-raised); color: var(--text-muted); }
+  .packRemove { width: 40px; height: 40px; top: 2px; }
+}

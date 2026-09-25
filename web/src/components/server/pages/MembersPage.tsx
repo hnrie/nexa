@@ -9,7 +9,7 @@ import { LoadError } from "@/components/common/LoadError";
 import { TextInput } from "@/components/common/TextInput";
 import { memberName } from "@/lib/names";
 import { P } from "@/lib/perms";
-import { formatFull } from "@/lib/time";
+import { formatDateDivider } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
@@ -119,7 +119,7 @@ export default function MembersPage({ serverId }: { serverId: string }) {
                 {server.server.owner_id === m.user_id ? (isOwner(m.user_id) ? <OwnerCrown /> : <Crown size={14} style={{ color: "var(--warning)" }} aria-label={t("server.members.owner")} />) : null}
                 {timedOut ? <Clock size={14} style={{ color: "var(--danger)" }} aria-label={t("server.members.timedOut")} /> : null}
               </span>
-              <span className={s.memberSub}>@{username} · {t("server.members.joinedOn", { when: formatFull(m.joined_at) })}</span>
+              <span className={s.memberSub}><bdi>@{username}</bdi> · {t("server.members.joinedOn", { when: formatDateDivider(m.joined_at) })}</span>
               <span className={r.chips}>
                 {m.role_ids.map((id) => {
                   const ro = server.roles[id];
@@ -131,7 +131,8 @@ export default function MembersPage({ serverId }: { serverId: string }) {
                     </span>
                   );
                 })}
-                {canRoles && (above || m.user_id === meId) ? <button className={r.chip} onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}>+</button> : null}
+                {/* "+" alone was all a screen reader had to say for it */}
+                {canRoles && (above || m.user_id === meId) ? <button className={r.chip} title={t("server.members.editRoles")} aria-label={t("server.members.editRoles")} onClick={() => openModal("memberAction", { serverId, userId: m.user_id, action: "roles" })}>+</button> : null}
               </span>
             </div>
             <div className={s.memberActions}>

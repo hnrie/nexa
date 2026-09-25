@@ -14,6 +14,7 @@ import { describeError } from "@/lib/errors";
 import { useAuth } from "@/stores/auth";
 import { useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
+import { unlessUnsaved } from "@/stores/unsaved";
 import { SaveBar } from "./SettingsLayer";
 import s from "./PackEditor.module.css";
 import { promptFields } from "@/components/modals/PromptModal";
@@ -55,14 +56,15 @@ export function PackEditor({ packs, selectedId, onSelect, canManage, canRemove, 
   return (
     <div className={s.layout}>
       <div className={s.list}>
-        {onCreate ? <Button size="sm" variant="secondary" onClick={onCreate} style={{ marginBottom: 8 }} data-testid="create-pack">{createLabel}</Button> : null}
+        {/* Opening another pack, or a new one, drops the open one's editor: with unsaved edits in it, it asks first (the save bar shakes). */}
+        {onCreate ? <Button size="sm" variant="secondary" onClick={unlessUnsaved(onCreate)} style={{ marginBottom: 8 }} data-testid="create-pack">{createLabel}</Button> : null}
         {packs.length === 0 ? <div className={s.empty}>{emptyText}</div> : null}
         {packs.map((p) => {
           const cover = packCover(p);
           const removable = canRemove?.(p) ?? false;
           return (
             <div key={p.id} className={s.packItem}>
-              <button className={s.packRow} data-selected={selected?.id === p.id} data-removable={removable || undefined} onClick={() => onSelect(p.id)} data-pack={p.id}>
+              <button className={s.packRow} data-selected={selected?.id === p.id} aria-current={selected?.id === p.id ? "true" : undefined} data-removable={removable || undefined} onClick={selected?.id === p.id ? undefined : unlessUnsaved(() => onSelect(p.id))} data-pack={p.id}>
                 <span className={s.cover}>{cover ? <StickerView format={cover.format} src={packImageUrl(p, cover)} alt="" /> : p.name.slice(0, 1).toUpperCase()}</span>
                 <span className={s.packText}>
                   <span className={s.packName}>{p.name}</span>

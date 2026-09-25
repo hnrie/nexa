@@ -112,9 +112,12 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
                   <td className={s.code}>:{e.name}:</td>
                   <td>{displayName(users[e.creator_id])}</td>
                   {manage ? (
-                    <td style={{ textAlign: "end", whiteSpace: "nowrap" }}>
-                      <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title={t("server.packEditor.rename")} aria-label={t("server.packEditor.rename")} onClick={() => void rename(e)}><Pencil size={16} /></button>
-                      <button className={p.cellBtn} style={{ background: "transparent", color: "var(--text-muted)" }} title={t("chat.messageItem.delete")} aria-label={t("server.emoji.deleteEmoji")} onClick={() => remove(e)}><Trash2 size={16} /></button>
+                    <td style={{ textAlign: "end" }}>
+                      {/* side by side: the sticker grid's round overlay buttons, borrowed here, stacked one over the other */}
+                      <span className={s.rowActions}>
+                        <button className={s.iconBtn} title={t("server.packEditor.rename")} aria-label={t("server.packEditor.rename")} onClick={() => void rename(e)}><Pencil size={16} /></button>
+                        <button className={s.iconBtn} data-danger="true" title={t("chat.messageItem.delete")} aria-label={t("server.emoji.deleteEmoji")} onClick={() => remove(e)}><Trash2 size={16} /></button>
+                      </span>
                     </td>
                   ) : null}
                 </tr>
@@ -130,18 +133,23 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
       <h2 className={st.title}>{t("modals.customStatus.emoji")}</h2>
       <p className={st.hint}>{t("server.emoji.addUpToAsManyEmoji")}</p>
       {manage ? (
-        <div
-          className={p.dropzone}
-          data-over={over}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-          onDragLeave={() => setOver(false)}
-          onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}
-          data-drop-zone
-        >
-          <Upload size={20} /> {busy ? t("server.emoji.uploading") : t("server.emoji.dropImagesHere")}
+        <>
+          {/* A button, as the sticker packs' drop zone is: a div with an onClick could not be reached from the keyboard. */}
+          <button
+            type="button"
+            className={p.dropzone}
+            style={{ display: "block", width: "100%" }}
+            data-over={over}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+            onDragLeave={() => setOver(false)}
+            onDrop={(e) => { e.preventDefault(); setOver(false); if (e.dataTransfer.files.length) void upload(e.dataTransfer.files); }}
+            data-drop-zone
+          >
+            <Upload size={20} /> {busy ? t("server.emoji.uploading") : t("server.emoji.dropImagesHere")}
+          </button>
           <input ref={fileRef} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) void upload(e.target.files); e.target.value = ""; }} data-testid="emoji-file" />
-        </div>
+        </>
       ) : null}
       {emojis.length === 0 ? <p className={st.hint} style={{ marginTop: 16 }}>{t("server.emoji.noCustomEmojiYet")}</p> : null}
       {section(t("server.emoji.emoji"), still)}

@@ -14,6 +14,7 @@ import { useAuth } from "@/stores/auth";
 import { useExpressions, packImageUrl } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
+import { unlessUnsaved } from "@/stores/unsaved";
 import st from "./Settings.module.css";
 import s from "@/components/server/PackEditor.module.css";
 
@@ -89,14 +90,49 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
     }
   };
 
+  // Left and Right move along the tabs, as a tab strip does everywhere else.
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const strip = e.currentTarget.parentElement;
+    const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
+    // in a right-to-left page, Right goes back
+    const dir = document.documentElement.dir === "rtl" ? -step : step;
+    const next = buttons[Math.min(buttons.length - 1, Math.max(0, buttons.indexOf(e.currentTarget) + dir))];
+    next?.click();
+    next?.focus();
+  };
+
   return (
     <>
       <h2 className={st.title}>{tr_("settings.stickers.expressionPacks")}</h2>
       <p className={st.hint}>{tr_("settings.stickers.buildYourOwnEmojiAndSticker")}</p>
-      <div className={s.tabs} style={{ marginTop: 16 }}>
-        <button className={s.tab} data-on={tab === "stickers"} onClick={() => { setTab("stickers"); setSelected(null); }} data-nav="packs-stickers">{tr_("pickers.expressionPicker.stickers")}</button>
-        <button className={s.tab} data-on={tab === "emoji"} onClick={() => { setTab("emoji"); setSelected(null); }} data-nav="packs-emoji">{tr_("modals.customStatus.emoji")}</button>
-        <button className={s.tab} data-on={tab === "discover"} onClick={() => setTab("discover")}>{tr_("settings.stickers.discover")}</button>
+      {/* A tab strip, said as one: which of the three is open was only a colour. */}
+      <div className={s.tabs} style={{ marginTop: 16 }} role="tablist" aria-label={tr_("settings.stickers.expressionPacks")}>
+        {([
+          ["stickers", tr_("pickers.expressionPicker.stickers"), "packs-stickers"],
+          ["emoji", tr_("modals.customStatus.emoji"), "packs-emoji"],
+          ["discover", tr_("settings.stickers.discover"), "packs-discover"],
+        ] as const).map(([id, label, nav]) => (
+          <button
+            key={id}
+            className={s.tab}
+            role="tab"
+            aria-selected={tab === id}
+            tabIndex={tab === id ? 0 : -1}
+            data-on={tab === id}
+            data-nav={nav}
+            onKeyDown={onTabKey}
+            // a pack's unsaved name or description would go with the pack editor, so the tabs ask first, as pages do
+            onClick={tab === id ? undefined : unlessUnsaved(() => {
+              setTab(id);
+              if (id !== "discover") setSelected(null);
+            })}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       {tab !== "discover" ? (
         <PackEditor
@@ -105,7 +141,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
           onSelect={setSelected}
           canManage={(p) => p.owner_user_id === meId}
           canRemove={(p) => canRemovePack(p, meId)}
-          onCreate={() => setCreating(kind)}
+          onCreate={unlessUnsaved(() => setCreating(kind))}
           createLabel={kind === "emoji" ? tr_("settings.stickers.createEmojiPack") : tr_("settings.stickers.createStickerPack")}
           emptyText={kind === "emoji" ? tr_("settings.stickers.noEmojiPacksYet") : tr_("settings.stickers.noStickerPacksYet")}
         />

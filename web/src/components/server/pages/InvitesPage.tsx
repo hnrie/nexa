@@ -77,18 +77,19 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
       {invites && invites.length === 0 ? <p className={st.hint}>{t("server.invites.thereAreNoActiveInvites")}</p> : null}
       {invites && invites.length > 0 ? (
         <div className={s.tableWrap}>
-          <table className={s.table}>
+          {/* data-label names each value when a phone draws a row as a card */}
+          <table className={[s.table, s.stack].join(" ")}>
             <thead>
               <tr><th>{t("server.invites.inviter")}</th><th>{t("server.invites.code")}</th><th>{t("server.invites.channel")}</th><th>{t("server.invites.uses")}</th><th>{t("server.invites.expires")}</th><th /></tr>
             </thead>
             <tbody>
               {invites.map((i) => (
-                <tr key={i.code}>
-                  <td>{displayName(users[i.inviter_id])}</td>
-                  <td className={s.code}>{i.code}</td>
-                  <td>{i.channel_id && channels[i.channel_id] ? `#${channels[i.channel_id]!.name}` : "—"}</td>
-                  <td>{i.uses}{i.max_uses ? ` / ${i.max_uses}` : ""}</td>
-                  <td>{i.expires_at ? formatFull(i.expires_at) : t("server.invites.never")}</td>
+                <tr key={i.code} data-invite={i.code}>
+                  <td data-label={t("server.invites.inviter")}>{displayName(users[i.inviter_id])}</td>
+                  <td data-label={t("server.invites.code")} className={s.code} dir="ltr">{i.code}</td>
+                  <td data-label={t("server.invites.channel")}>{i.channel_id && channels[i.channel_id] ? <bdi>#{channels[i.channel_id]!.name}</bdi> : "—"}</td>
+                  <td data-label={t("server.invites.uses")}>{i.uses}{i.max_uses ? ` / ${i.max_uses}` : ""}</td>
+                  <td data-label={t("server.invites.expires")}>{i.expires_at ? formatFull(i.expires_at) : t("server.invites.never")}</td>
                   <td><Button size="sm" variant="ghost" loading={busy === i.code} onClick={() => void revoke(i.code)}>{t("server.invites.revoke")}</Button></td>
                 </tr>
               ))}

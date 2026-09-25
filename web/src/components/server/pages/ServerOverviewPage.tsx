@@ -15,6 +15,7 @@ import { SaveBar } from "../SettingsLayer";
 import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
+import { isolate } from "../bidi";
 export default function ServerOverviewPage({ serverId }: { serverId: string }) {
   const server = useServers((x) => x.byId[serverId]?.server);
   const updateServer = useServers((x) => x.updateServer);
@@ -107,11 +108,11 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
         <Field label={t("server.serverOverview.systemMessagesChannel")} hint={t("server.serverOverview.joinMessagesArePostedHere")}>
           <Select value={system} onChange={(e) => setSystem(e.target.value)}>
             <option value="">{t("server.serverOverview.noSystemMessages")}</option>
-            {texts.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
+            {texts.map((c) => <option key={c.id} value={c.id}>{isolate(`#${c.name}`)}</option>)}
           </Select>
         </Field>
         <Field as="div" label={t("server.serverOverview.defaultNotificationSettings")} hint={t("server.serverOverview.whatNewMembersGetUntilThey")}>
-          <div className={st.form} style={{ gap: 8 }} role="radiogroup" aria-label={t("server.serverOverview.defaultNotificationSettings")}>
+          <div role="radiogroup" aria-label={t("server.serverOverview.defaultNotificationSettings")}>
             <label className={st.radio} data-on={notif === 0}><input type="radio" name="server-default-notifications" checked={notif === 0} onChange={() => setNotif(0)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.allMessages")}</span></span></label>
             <label className={st.radio} data-on={notif === 1}><input type="radio" name="server-default-notifications" checked={notif === 1} onChange={() => setNotif(1)} /><span className={st.radioText}><span className={st.radioLabel}>{t("server.serverOverview.onlyMentions")}</span></span></label>
           </div>

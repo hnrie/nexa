@@ -15,7 +15,8 @@ import { t } from "@/i18n";
 import { statusOf, usePresence } from "@/stores/presence";
 type Dialog = null | "username" | "displayName" | "password" | "recovery" | "delete";
 
-export default function AccountPage({ onClose }: { onClose: () => void }) {
+/** `onEditProfile` opens the Profiles page beside it, in the same settings. */
+export default function AccountPage({ onEditProfile }: { onEditProfile: () => void }) {
   const me = useAuth((a) => a.me);
   // the status the account actually shows, Do Not Disturb or Invisible included
   const myStatus = usePresence((p) => statusOf(me ? p.byUser[me.id] : undefined));
@@ -23,7 +24,6 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
   const changePassword = useAuth((a) => a.changePassword);
   const newRecoveryKey = useAuth((a) => a.newRecoveryKey);
   const toast = useUI((u) => u.toast);
-  const openModal = useUI((u) => u.openModal);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [value, setValue] = useState("");
   const [pw, setPw] = useState("");
@@ -77,7 +77,7 @@ export default function AccountPage({ onClose }: { onClose: () => void }) {
             <div className={s.cardName}>{me.display_name}</div>
             <div className={s.cardUser}>{me.username}</div>
           </div>
-          <Button size="sm" onClick={() => { onClose(); openModal("settings", { page: "profiles" }); }}>{t("settings.account.editUserProfile")}</Button>
+          <Button size="sm" onClick={onEditProfile}>{t("settings.account.editUserProfile")}</Button>
         </div>
         <div className={s.rows}>
           <div className={s.row}>

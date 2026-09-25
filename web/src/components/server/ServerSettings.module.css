@@ -3,7 +3,11 @@
 .iconInput input { padding-inline-start: 32px; }
 .permLayout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 24px; margin-top: 16px; }
 .permList { display: flex; flex-direction: column; gap: 2px; align-self: start; position: sticky; top: 60px; }
-.permListHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
+/* The heading keeps its line and the two Add buttons drop under it when the
+   column is too narrow for both: squeezed together, "Roles / Members" broke
+   in two beside them. */
+.permListHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
+.permListHead > :first-child { white-space: nowrap; }
 .permAdd { display: flex; gap: 4px; }
 .smallBtn { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 6px; border-radius: var(--radius-xs); background: var(--bg-surface); color: var(--text); font-size: 12px; font-weight: 600; }
 .smallBtn:hover { background: var(--bg-hover); }
@@ -22,7 +26,9 @@
 .permRemove:hover { color: var(--danger); }
 .permEditor { min-width: 0; }
 .privateRow { padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; flex-direction: column; gap: 8px; }
-.lockNote { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-muted); }
+/* the switch's own divider ran under it with nothing below to divide it from; the note under it draws one when there is a note */
+.privateRow > label { border-bottom: 0; padding-block: 4px; }
+.lockNote { display: flex; align-items: center; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border-subtle); font-size: 13px; color: var(--text-muted); }
 
 .rolesLayout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; margin-top: 16px; }
 .roleList { display: flex; flex-direction: column; gap: 2px; align-self: start; position: sticky; top: 60px; }
@@ -46,14 +52,25 @@
 .swatch:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .preview { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: var(--radius-xs); background: var(--bg-surface); font-size: 15px; font-weight: 500; }
 
-.memberRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 6px; }
-.memberText { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+/* On a phone the four moderation buttons take a line of their own under the
+   name rather than squeezing it into a column three words wide. */
+.memberRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 6px; }
+.memberText { min-width: 0; flex: 1 1 180px; display: flex; flex-direction: column; gap: 2px; }
 .memberName { display: flex; align-items: center; gap: 6px; font-size: 16px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .memberSub { font-size: 13px; color: var(--text-muted); }
-.memberActions { display: flex; gap: 4px; flex: none; }
+.memberActions { display: flex; gap: 4px; flex: none; margin-inline-start: auto; }
 .memberActions button { display: flex; padding: 6px; border-radius: var(--radius-xs); color: var(--text-muted); }
 .memberActions button:hover { color: var(--text-strong); background: var(--bg-hover); }
 .memberActions button[data-danger="true"]:hover { color: var(--danger); }
+/* icon buttons in a table row: side by side, each big enough to hit */
+.rowActions { display: inline-flex; gap: 4px; }
+.iconBtn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-xs); color: var(--text-muted); }
+.iconBtn:hover { color: var(--text-strong); background: var(--bg-hover); }
+.iconBtn[data-danger="true"]:hover { color: var(--danger); }
+@media (pointer: coarse) {
+  .memberActions button { padding: 11px; }
+  .iconBtn { width: 40px; height: 40px; }
+}
 .searchRow { display: flex; gap: 8px; margin-bottom: 12px; }
 .loadMore { margin: 12px 0; display: flex; justify-content: center; }
 
@@ -62,6 +79,17 @@
 .table td { padding: 10px; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
 .code { font-family: var(--font-mono); font-size: 13px; }
 .tableWrap { overflow-x: auto; }
+/* A table that becomes a card per row on a phone, each value under its column's
+   name: sideways, its last column (Revoke) was off the screen. */
+@media (max-width: 767px) {
+  .stack thead { display: none; }
+  .stack, .stack tbody, .stack tr { display: block; }
+  .stack tr { padding: 8px 12px; margin-bottom: 8px; border-radius: var(--radius-sm); background: var(--bg-surface); }
+  .stack td { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; border: 0; text-align: end; overflow-wrap: anywhere; }
+  .stack td::before { content: attr(data-label); flex: none; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); text-align: start; }
+  .stack td:last-child { justify-content: flex-end; padding-top: 8px; }
+  .stack td:last-child::before { content: none; }
+}
 
 .auditRow { display: flex; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 6px; align-items: flex-start; }
 .auditText { flex: 1; min-width: 0; font-size: 15px; color: var(--text); line-height: 1.4; }
@@ -79,3 +107,10 @@
 .serverIcon { width: 100px; height: 100px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); font-size: 28px; font-weight: 600; overflow: hidden; flex: none; }
 .serverIcon img { width: 100%; height: 100%; object-fit: cover; }
 @media (max-width: 900px) { .permLayout, .rolesLayout { grid-template-columns: 1fr; } .permList, .roleList { position: static; } }
+/* rows and small buttons a thumb can land on (placed last, so they win over the sizes above) */
+@media (pointer: coarse) {
+  .smallBtn { height: 36px; padding: 0 10px; font-size: 13px; }
+  .permTargetBtn { height: 44px; }
+  .permRemove { padding: 10px; }
+  .roleRow { height: 44px; }
+}

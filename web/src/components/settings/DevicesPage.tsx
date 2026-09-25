@@ -4,15 +4,16 @@ import type { Session } from "@/api/types";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
 import { describeError } from "@/lib/errors";
+import { formatRelative } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
 function describe(ua: string): string {
   if (!ua) return t("settings.devices.unknownDevice");
-  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "Browser";
+  const browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) && !/Chrome/.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : t("settings.devices.browser");
   const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
-  return os ? `${browser} on ${os}` : browser;
+  return os ? t("settings.devices.browserOnSystem", { browser, system: os }) : browser;
 }
 
 export default function DevicesPage() {
@@ -84,7 +85,7 @@ export default function DevicesPage() {
           <div key={se.id} className={s.device}>
             <div>
               <div className={s.deviceName}>{describe(se.user_agent)}{se.current ? ` · ${t("settings.devices.thisDevice")}` : ""}</div>
-              <div className={s.deviceSub}>{se.ip} · {t("settings.devices.lastActive", { when: new Date(se.last_seen_at).toLocaleString() })}</div>
+              <div className={s.deviceSub}>{se.ip} · {t("settings.devices.lastActive", { when: formatRelative(se.last_seen_at) })}</div>
             </div>
             {!se.current ? <Button size="sm" variant="secondary" onClick={() => void drop(se.id)}>{t("settings.devices.logOut")}</Button> : null}
           </div>

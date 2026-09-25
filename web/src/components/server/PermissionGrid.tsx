@@ -34,7 +34,7 @@ export function RoleGrid({ value, onChange, editable, filter, grantable }: { val
             {items.map((it) => {
               const bit = P[it.name];
               return (
-                <div key={it.name} className={s.row} data-perm={it.name}>
+                <div key={it.name} className={s.toggleRow} data-perm={it.name}>
                   <Toggle checked={has(value, bit)} disabled={!editable || (grantable !== undefined && !has(grantable, bit))} onChange={(on) => onChange(on ? value | bit : value & ~bit)} label={it.label} description={it.description} />
                 </div>
               );

@@ -128,7 +128,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
       <p className={st.hint}>{t("server.roles.useRolesToGroupYourMembers")}</p>
       <div className={s.rolesLayout}>
         <div className={s.roleList}>
-          <Button size="sm" variant="secondary" onClick={() => void create()} loading={busy} style={{ marginBottom: 8 }} data-testid="create-role"><Plus size={14} /> {t("server.roles.createRole")}</Button>
+          <Button size="sm" variant="secondary" onClick={unlessUnsaved(() => void create())} loading={busy} style={{ marginBottom: 8 }} data-testid="create-role"><Plus size={14} /> {t("server.roles.createRole")}</Button>
           {movable.length > 1 ? <p className={st.hint} style={{ margin: "0 0 8px" }}>{reorder.hint}</p> : null}
           {reorder.live}
           {roles.map((r) => {
@@ -158,7 +158,7 @@ export default function RolesPage({ serverId }: { serverId: string }) {
                 onClick={r.id === selected ? undefined : unlessUnsaved(() => { setSelected(r.id); if (r.id === serverId && tab === "members") setTab("display"); })}
               >
                 <span className={s.dot} style={{ background: r.color ? hex(r.color) : "var(--text-muted)" }} />
-                <span className={s.roleName}>{r.name}</span>
+                <span className={s.roleName} dir="auto">{r.name}</span>
                 <span className={s.roleCount}>{memberCount(r.id)}</span>
               </button>
             );
@@ -318,7 +318,7 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
           <Avatar id={m.user_id} avatarId={m.avatar_id ?? users[m.user_id]?.avatar_id ?? null} name={name} size={32} />
           <div className={s.memberText}>
             <span className={s.memberName}>{name}</span>
-            <span className={s.memberSub}>@{username}</span>
+            <span className={s.memberSub}><bdi>@{username}</bdi></span>
           </div>
           <Button size="sm" variant={has ? "secondary" : "primary"} disabled={!editable || busy === m.user_id} onClick={() => void toggle(m.user_id, !has)}>{has ? t("server.packEditor.remove") : t("server.roles.addMember")}</Button>
         </div>

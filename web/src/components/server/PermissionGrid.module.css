@@ -2,7 +2,9 @@
 .group { display: flex; flex-direction: column; }
 .groupHead { margin: 20px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
 .row { padding: 12px 0; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.row > label { width: 100%; }
+/* A role's switch draws its own padding and divider; wrapped in .row as well
+   it drew both twice, two lines under every permission. */
+.toggleRow > label { width: 100%; }
 .text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .label { font-size: 16px; color: var(--text); }
 .desc { font-size: 13px; color: var(--text-muted); line-height: 1.35; }
@@ -11,6 +13,12 @@
 .triBtn + .triBtn { border-inline-start: 1px solid var(--border); }
 .triBtn:hover:not(:disabled) { color: var(--text-strong); }
 .triBtn:disabled { cursor: not-allowed; opacity: 0.6; }
+/* inside the ring: the group clips its corners round, and with them any outline drawn outside a button */
+.triBtn:focus-visible { outline-offset: -2px; border-radius: 0; }
 .triBtn[data-kind="deny"][data-on="true"] { background: var(--danger); color: #fff; }
 .triBtn[data-kind="neutral"][data-on="true"] { background: var(--bg-active); color: var(--text-strong); }
 .triBtn[data-kind="allow"][data-on="true"] { background: var(--positive); color: #fff; }
+/* a thumb needs more than a 32px sliver to land on one of three */
+@media (pointer: coarse) {
+  .triBtn { width: 44px; height: 40px; }
+}

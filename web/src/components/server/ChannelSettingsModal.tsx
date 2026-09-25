@@ -24,6 +24,7 @@ import s from "./ServerSettings.module.css";
 import { t as tr_ } from "@/i18n";
 import { formatShortDuration } from "@/lib/time";
 import { unlessUnsaved } from "@/stores/unsaved";
+import { isolate } from "./bidi";
 const SLOWMODE = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600];
 
 function slowLabel(v: number): string {
@@ -40,11 +41,11 @@ export default function ChannelSettingsModal({ onClose, channelId, page: initial
   if (!channel || !channel.server_id) return null;
   const isCat = channel.type === "category";
   const groups: NavGroup[] = [
-    { head: (isCat ? "" : "#") + channel.name, items: [{ id: "overview", label: tr_("server.channelSettings.overview") }, { id: "permissions", label: tr_("server.channelSettings.permissions") }] },
+    { head: isolate((isCat ? "" : "#") + channel.name), items: [{ id: "overview", label: tr_("server.channelSettings.overview") }, { id: "permissions", label: tr_("server.channelSettings.permissions") }] },
     { head: "", items: [{ id: "delete", label: isCat ? tr_("server.channelSettings.deleteCategory") : tr_("server.channelSettings.deleteChannel"), danger: true }] },
   ];
   return (
-    <SettingsLayer label={tr_("server.channelSettings.channelSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose}>
+    <SettingsLayer label={tr_("server.channelSettings.channelSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose} startOnList={!initial}>
       {page === "permissions" ? <PermissionsPage channel={channel} serverId={channel.server_id} /> : page === "delete" ? <DeletePage channel={channel} onDone={() => { onClose(); nav(`/channels/${channel.server_id}`); }} /> : <OverviewPage channel={channel} />}
     </SettingsLayer>
   );
@@ -214,6 +215,8 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
       setBusy(false);
     }
   };
+  // Adding or removing an entry re-reads every overwrite, which resets the
+  // grid on screen: with unsaved changes in it, both ask first (see below).
   const add = async (targetId: string, type: "role" | "member") => {
     setAdding(null);
     setQuery("");
@@ -257,7 +260,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
             <div className={s.picker}>
               {candidateRoles.length === 0 ? <div className={s.pickerEmpty}>{tr_("server.channelSettings.everyRoleAlreadyHasAnOverwrite")}</div> : null}
               {candidateRoles.map((r) => (
-                <button key={r.id} className={s.pickerRow} onClick={() => void add(r.id, "role")}>
+                <button key={r.id} className={s.pickerRow} onClick={unlessUnsaved(() => void add(r.id, "role"))}>
                   <span className={s.dot} style={{ background: r.color ? `#${r.color.toString(16).padStart(6, "0")}` : "var(--text-muted)" }} />
                   {r.name}
                 </button>
@@ -268,10 +271,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
             <div className={s.picker}>
               <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("server.channelSettings.searchMembers")} autoFocus />
               {candidateMembers.map((m) => (
-                <button key={m.id} className={s.pickerRow} onClick={() => void add(m.id, "member")}>
+                <button key={m.id} className={s.pickerRow} onClick={unlessUnsaved(() => void add(m.id, "member"))}>
                   <Avatar id={m.id} avatarId={users[m.id]?.avatar_id ?? null} name={m.name} size={20} />
                   <span>{m.name}</span>
-                  <span className={s.muted}>@{m.username}</span>
+                  <span className={s.muted}><bdi>@{m.username}</bdi></span>
                 </button>
               ))}
             </div>
@@ -280,10 +283,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
             <div key={t.id} className={s.permTarget} data-selected={t.id === selectedTarget.id}>
               <button className={s.permTargetBtn} onClick={t.id === selectedTarget.id ? undefined : unlessUnsaved(() => setSelected(t.id))} data-target={t.id}>
                 {t.type === "role" ? <span className={s.dot} style={{ background: t.color ?? "var(--text-muted)" }} /> : <Avatar id={t.id} avatarId={users[t.id]?.avatar_id ?? null} name={t.name} size={20} />}
-                <span className={s.permTargetName}>{t.name}</span>
+                <span className={s.permTargetName} dir="auto">{t.name}</span>
               </button>
               {editable && t.id !== serverId ? (
-                <button className={s.permRemove} aria-label={tr_("server.channelSettings.removeOverwrite")} onClick={() => void remove(t.id)} disabled={busy}><X size={14} /></button>
+                <button className={s.permRemove} aria-label={tr_("server.channelSettings.removeOverwrite")} onClick={unlessUnsaved(() => void remove(t.id))} disabled={busy}><X size={14} /></button>
               ) : null}
             </div>
           ))}
