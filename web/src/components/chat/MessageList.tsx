@@ -21,6 +21,12 @@ import s from "./Chat.module.css";
 import { t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
+import { usePaneScope } from "@/components/shell/paneScope";
+import { parse, plainText } from "@/markdown";
+import { useRelationships } from "@/stores/relationships";
+import { useServers } from "@/stores/servers";
+import { displayName } from "@/stores/users";
+import { ActiveRows, ActiveRowsProvider, rowIdOf } from "./activeRow";
 import { dispatchGeneration, dispatchHooks } from "@/gateway/dispatch";
 type Row =
   | { kind: "date"; key: string; ts: number }
@@ -177,6 +183,11 @@ export function MessageList({ channel }: { channel: Channel }) {
   // one render context for every row, rather than every row subscribing to
   // every user, channel and server itself
   const renderCtx = useRenderCtx();
+  // which row is pointed at or focused: only that one draws its toolbar
+  const [activeRows] = useState(() => new ActiveRows());
+  const { focused: paneFocused } = usePaneScope();
+  // what a screen reader is told about a message arriving (see announce below)
+  const [said, setSaid] = useState<{ n: number; text: string } | null>(null);
   // Newer pages load below the reader; the loader at the top is for older ones.
   const [newerBusy, setNewerBusy] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -255,9 +266,36 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (!restoreAnchor(el, a)) hold.current = readAnchor(el);
   }, []);
 
+  /**
+   * Says a message that just arrived, the way a sighted reader sees it land:
+   * who and what, in a polite live region of its own. Rows added any other way
+   * — a page of history above, a jump — are not news and say nothing, which a
+   * live region over the whole list could not tell apart.
+   */
+  const announce = useCallback(
+    (m: DecryptedMessage) => {
+      if (!paneFocused || typeof document === "undefined" || document.visibilityState !== "visible") return;
+      const st = channel.server_id ? useServers.getState().byId[channel.server_id] : undefined;
+      const name = st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
+      const body = m.payload?.t ? plainText(parse(m.payload.t, { inline: true }), renderCtx).slice(0, 300) : "";
+      const text = body
+        ? t("chat.messageList.announce", { name, text: body })
+        : m.payload?.sticker
+          ? t("chat.messageList.announceSticker", { name })
+          : m.payload?.att?.length
+            ? t("chat.messageList.announceFile", { name })
+            : "";
+      if (text) setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text }));
+    },
+    [paneFocused, channel.server_id, users, renderCtx],
+  );
+
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    // Something new at the end that was not paged in: a message arriving live.
+    const arrived = !!newest && !!prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current;
+    if (arrived && byId[newest!] && byId[newest!]!.author_id !== me?.id) announce(byId[newest!]!);
     // Your own message always gets shown, wherever you were reading. When the
     // list stops short of the present it would land after old history, so the
     // newest page is loaded again first.
@@ -288,7 +326,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     prevNewest.current = newest;
     prevHasNewer.current = hasNewer;
-  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id, dropHold, keepHold]);
+  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id, dropHold, keepHold, announce]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -575,8 +613,30 @@ export function MessageList({ channel }: { channel: Channel }) {
 
   return (
     <div className={[s.listWrap, compact ? s.compact : ""].join(" ")} data-selecting={selecting || undefined}>
-      {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>{newSince()}</span><span>{t("chat.messageList.jumpToPresent")}</span></div> : null}
-      <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="" tabIndex={0} aria-label={t("modals.quickSwitcher.messages")} onKeyDown={onListKey}>
+      {newBelow ? (
+        <button type="button" className={s.newPill} onClick={jumpToPresent} data-testid="new-messages">
+          <span className={s.newPillText}>{newSince()}</span>
+          <span className={s.newPillJump}>{t("chat.messageList.jumpToPresent")}</span>
+        </button>
+      ) : null}
+      <div className="visually-hidden" role="status">{said ? <span key={said.n}>{said.text}</span> : null}</div>
+      <div
+        className={s.scroll}
+        ref={scrollRef}
+        onScroll={onScroll}
+        data-scroller=""
+        role="region"
+        tabIndex={0}
+        aria-label={t("modals.quickSwitcher.messages")}
+        onKeyDown={onListKey}
+        // a finger has no hover: only a mouse or a pen points at a row
+        onPointerOver={(e) => e.pointerType !== "touch" && activeRows.hover(rowIdOf(e.target))}
+        onPointerLeave={() => activeRows.hover(null)}
+        onFocus={(e) => activeRows.focus(rowIdOf(e.target))}
+        onBlur={(e) => {
+          if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) activeRows.focus(null);
+        }}
+      >
         <div className={s.inner}>
           {!hasOlder ? (
             intro
@@ -591,12 +651,14 @@ export function MessageList({ channel }: { channel: Channel }) {
             <div style={{ height: 24 }} />
           )}
           <RenderCtxProvider value={renderCtx}>
+            <ActiveRowsProvider value={activeRows}>
             {rows.map((row, i) => {
               if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
               if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
               if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} upload={row.p.upload} />;
               return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
             })}
+            </ActiveRowsProvider>
           </RenderCtxProvider>
           {hasNewer && loaded ? <div className={s.loader}><Spinner size={24} /></div> : null}
         </div>

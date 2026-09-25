@@ -169,7 +169,7 @@ export function Composer({ channel }: { channel: Channel }) {
     return () => window.removeEventListener("ec:insert-text", onInsert);
   });
   useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
-  useKeepFocused(taRef);
+  useKeepFocused(taRef, paneFocused);
 
   const name = channelDisplayName(channel, users, me?.id);
   const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
@@ -619,12 +619,17 @@ function inOwnLayer(el: Element | null): boolean {
 
 /**
  * Keeps the message box ready to type in. Clicking around the app puts the
- * caret back, and a key pressed with nothing else focused lands in the box
+ * caret back, and a letter typed with nothing else taking it lands in the box
  * rather than nowhere. Another text field, a dialog or a picker keeps what it
  * takes until you click away from it.
+ *
+ * Only the box of the pane in focus does this: with two conversations side by
+ * side both boxes listened, the second one mounted won every time, and words
+ * meant for the conversation being read went to the other one.
  */
-function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>): void {
+export function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>, enabled = true): void {
   useEffect(() => {
+    if (!enabled) return;
     // On a touch screen this would summon the keyboard over and over.
     if (typeof window === "undefined" || !window.matchMedia?.("(pointer: fine)").matches) return;
     const focus = () => {
@@ -641,8 +646,12 @@ function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>): void {
       focus();
     };
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      if (e.key.length !== 1 && e.key !== "Backspace") return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      // Only a letter, digit or sign that would be typed. Space and Enter press
+      // the focused button, and Backspace is not writing: taken from a button
+      // they typed a space into the draft, or deleted from it, and the button
+      // never went off.
+      if (e.key.length !== 1 || e.key === " ") return;
       if (wantsKeyboard(document.activeElement) || inOwnLayer(document.activeElement)) return;
       if (document.querySelector("[role=dialog], [data-modal-layer]")) return;
       focus();
@@ -653,5 +662,5 @@ function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>): void {
       document.removeEventListener("pointerup", onPointerUp);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [ref]);
+  }, [ref, enabled]);
 }
