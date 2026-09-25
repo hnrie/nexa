@@ -6,7 +6,7 @@ import { Button } from "@/components/common/Button";
 import { FullScreenSpinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
-import { AuthLayout } from "./AuthLayout";
+import { AuthLayout, CopyKeyButton, RecoveryKey, usePageTitle } from "./AuthLayout";
 import OfflinePage from "./OfflinePage";
 import s from "./Auth.module.css";
 
@@ -25,8 +25,13 @@ export default function RecoverPage() {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // a key or name that did not match is said on the key's field, and goes when either is edited
+  const [wrongKey, setWrongKey] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const keyInput = useRef<HTMLInputElement>(null);
+  const confirmInput = useRef<HTMLInputElement>(null);
+  usePageTitle(fresh ? t("recover.passwordReset") : t("recover.recoverYourAccount"), status !== "offline" || !!fresh);
 
   useEffect(() => {
     if (status === "idle") void bootstrap();
@@ -34,9 +39,14 @@ export default function RecoverPage() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (busy || password.length < 8 || password !== confirm) return;
+    if (busy) return;
+    if (password.length < 8 || password !== confirm) {
+      confirmInput.current?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
+    setWrongKey(null);
     justRecovered.current = true;
     try {
       const res = await recover(username.trim().toLowerCase(), key, password);
@@ -44,10 +54,13 @@ export default function RecoverPage() {
     } catch (err) {
       justRecovered.current = false;
       if (err instanceof ApiError) {
-        if (err.code === "invalid_credentials") setError(t("recover.usernameOrRecoveryKeyIsWrong"));
-        else setError(describeError(err, t("recover.recoveryFailedCheckTheKeyAnd")));
+        if (err.code === "invalid_credentials") {
+          setWrongKey(t("recover.usernameOrRecoveryKeyIsWrong"));
+          keyInput.current?.focus();
+        } else setError(describeError(err, t("recover.recoveryFailedCheckTheKeyAnd")));
       } else if (err instanceof Error && /invalid recovery key/i.test(err.message)) {
-        setError(t("recover.thatDoesNotLookLikeARecoveryKey"));
+        setWrongKey(t("recover.thatDoesNotLookLikeARecoveryKey"));
+        keyInput.current?.focus();
       } else {
         setError(t("recover.recoveryFailedCheckTheKeyAnd"));
       }
@@ -66,8 +79,8 @@ export default function RecoverPage() {
   if (fresh) {
     return (
       <AuthLayout title={t("recover.passwordReset")} subtitle={t("recover.hereIsYourNewRecoveryKey")}>
-        <div className={s.recovery}>{fresh}</div>
-        <Button variant="secondary" block onClick={() => void navigator.clipboard?.writeText(fresh)}>{t("modals.groupInvite.copy")}</Button>
+        <RecoveryKey value={fresh} />
+        <CopyKeyButton text={fresh} />
         <label className={s.check}>
           <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
           <span>{t("recover.iHaveSavedMyNewRecovery")}</span>
@@ -82,16 +95,16 @@ export default function RecoverPage() {
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.account.username")} required>
-          <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" required />
+          <TextInput value={username} onChange={(e) => { setUsername(e.target.value); setWrongKey(null); }} autoComplete="username" autoCapitalize="none" spellCheck={false} invalid={!!wrongKey} aria-invalid={wrongKey ? true : undefined} required />
         </Field>
-        <Field label={t("settings.account.recoveryKey")} required hint={t("recover.eightGroupsOfEightCharactersDashes")}>
-          <TextInput value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" spellCheck={false} required />
+        <Field label={t("settings.account.recoveryKey")} required error={wrongKey} hint={t("recover.eightGroupsOfEightCharactersDashes")}>
+          <TextInput ref={keyInput} value={key} onChange={(e) => { setKey(e.target.value); setWrongKey(null); }} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
         </Field>
         <Field label={t("settings.account.newPassword")} required>
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>
         <Field label={t("settings.account.confirmNewPassword")} required error={confirm && confirm !== password ? t("settings.account.passwordsDoNotMatch") : null}>
-          <TextInput type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+          <TextInput ref={confirmInput} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
         <Button type="submit" size="lg" block loading={busy}>{t("recover.resetPassword")}</Button>
         <div className={s.foot}>

@@ -91,6 +91,16 @@ function Loop({ name, alt, width, height }: { name: string; alt: string; width: 
   );
 }
 
+/** A tick or a cross in the comparison, which a screen reader says as a word rather than as "check mark". */
+function Mark({ yes }: { yes: boolean }) {
+  return (
+    <>
+      <span aria-hidden="true">{yes ? "✓" : "✕"}</span>
+      <span className="visually-hidden">{yes ? t("home.compare.yes") : t("home.compare.no")}</span>
+    </>
+  );
+}
+
 const POINTS = () => [
   { icon: Lock, title: t("home.point.encryptedTitle"), body: t("home.point.encryptedBody") },
   { icon: MessagesSquare, title: t("home.point.subchatsTitle"), body: t("home.point.subchatsBody") },
@@ -230,8 +240,8 @@ export default function HomePage() {
               ].map(([key, ours, theirs]) => (
                 <tr key={String(key)}>
                   <td>{t(String(key))}</td>
-                  <td data-yes={ours || undefined}>{ours ? "✓" : "✕"}</td>
-                  <td data-yes={theirs || undefined}>{theirs ? "✓" : "✕"}</td>
+                  <td data-yes={ours || undefined}><Mark yes={!!ours} /></td>
+                  <td data-yes={theirs || undefined}><Mark yes={!!theirs} /></td>
                 </tr>
               ))}
             </tbody>
@@ -240,7 +250,7 @@ export default function HomePage() {
       </section>
 
       <section className={s.end}>
-        <Reveal>
+        <Reveal className={s.endInner}>
           <NexaWordmark height={44} className={s.endMark} />
           <p className={s.body}>{t("home.end.body")}</p>
           <div className={s.actions}>

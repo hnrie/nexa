@@ -4,6 +4,7 @@ import { useLocation, useParams } from "react-router-dom";
 import { ApiError, api } from "@/api/client";
 import { guests as guestsApi } from "@/api/guests";
 import { GUEST_FLAG, type Channel, type GuestInfo, type MeUser } from "@/api/types";
+import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
@@ -255,7 +256,9 @@ export default function GuestCallPage() {
 
   return (
     <div className={s.page}>
-      <div className={s.card} data-testid="guest-landing">
+      {/* A plain link, like "Back to Nexa": leaving starts the next page afresh. */}
+      <a className={s.brand} href="/" aria-label="Nexa"><NexaWordmark height={32} /></a>
+      <main className={s.card} data-testid="guest-landing">
         <div className={s.icon} data-state={phase === "invalid" || (phase === "ended" && !ending?.again) ? "off" : undefined}>
           <PhoneCall size={32} />
         </div>
@@ -273,7 +276,7 @@ export default function GuestCallPage() {
           <>
             <h1 className={s.title}>{ending?.text ?? t("guestCall.theCallIsOver")}</h1>
             {ending?.again ? (
-              <Button onClick={() => { setEnding(null); setPhase("checking"); void guestsApi.check(code).then(() => setPhase("form"), () => { setError(t("guestCall.thisLinkIsInvalidOrHas")); setPhase("invalid"); }); }} data-testid="guest-again">
+              <Button size="lg" onClick={() => { setEnding(null); setPhase("checking"); void guestsApi.check(code).then(() => setPhase("form"), () => { setError(t("guestCall.thisLinkIsInvalidOrHas")); setPhase("invalid"); }); }} data-testid="guest-again">
                 {t("guestCall.joinAgain")}
               </Button>
             ) : null}
@@ -287,7 +290,7 @@ export default function GuestCallPage() {
                 <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={32} autoFocus autoComplete="nickname" placeholder={t("guestCall.whatShouldWeCallYou")} data-testid="guest-name" />
               </Field>
               {error ? <p className={s.error}>{error}</p> : null}
-              <Button type="submit" block disabled={!name.trim()} data-testid="guest-join">{t("guestCall.joinCall")}</Button>
+              <Button type="submit" size="lg" block disabled={!name.trim()} data-testid="guest-join">{t("guestCall.joinCall")}</Button>
             </form>
             <p className={s.fine}>
               <ShieldCheck size={14} /> {t("guestCall.guestNote")}
@@ -295,7 +298,7 @@ export default function GuestCallPage() {
           </>
         )}
         {signedIn && phase !== "checking" && phase !== "joining" ? <a className={s.back} href="/channels/@me">{t("guestCall.backToNexa")}</a> : null}
-      </div>
+      </main>
     </div>
   );
 }

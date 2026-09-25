@@ -7,6 +7,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { currentPlatform, noDesktopBuild, pickDownload, type DesktopTarget } from "@/lib/platform";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
+import { usePageTitle } from "./AuthLayout";
 import s from "./DownloadPage.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -26,6 +27,8 @@ function arches(): Record<DesktopFile["arch"], Record<DesktopFile["os"], string>
   };
 }
 const ORDER: DesktopFile["os"][] = ["windows", "mac", "linux"];
+/** Most Windows and Linux computers are x86-64 and most Macs sold now are Apple's own chips, so each system lists its common build first. */
+const archRank = (f: DesktopFile) => (f.os === "mac" ? (f.arch === "arm64" ? 0 : 1) : f.arch === "x64" ? 0 : 1);
 
 function icon(os: DesktopFile["os"]) {
   return os === "mac" ? <Laptop size={22} /> : os === "linux" ? <Terminal size={22} /> : <Monitor size={22} />;
@@ -46,8 +49,8 @@ export default function DownloadPage() {
     desktop.latest().then(setRel, () => setFailed(true));
   };
 
+  usePageTitle(t("home.nav.download"));
   useEffect(() => {
-    document.title = t("download.downloadNexa");
     void currentPlatform().then(setTarget);
     loadDesktop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,7 +59,7 @@ export default function DownloadPage() {
   const mine = rel ? pickDownload(rel, target) : null;
   // a Mac that would not say which chip it has gets the other one offered too
   const otherMac = rel && mine && target.os === "mac" && target.arch === null ? rel.files.find((f) => f.os === "mac" && f.kind === "installer" && f.arch !== mine.arch) : undefined;
-  const shown = rel ? rel.files.filter((f) => f.kind !== "zip").sort((a, b) => ORDER.indexOf(a.os) - ORDER.indexOf(b.os) || a.kind.localeCompare(b.kind) || a.arch.localeCompare(b.arch)) : [];
+  const shown = rel ? rel.files.filter((f) => f.kind !== "zip").sort((a, b) => ORDER.indexOf(a.os) - ORDER.indexOf(b.os) || a.kind.localeCompare(b.kind) || archRank(a) - archRank(b)) : [];
   // A clipboard write rejects in a non-secure context and when the permission
   // is refused; with no catch the success toast simply never came and nothing
   // was said at all.
@@ -88,7 +91,7 @@ export default function DownloadPage() {
         ) : failed ? (
           <div className={s.empty} role="alert">
             {t("download.theDownloadsCouldNotBeLoaded")}
-            <div style={{ marginTop: 8 }}><Button size="sm" variant="secondary" onClick={loadDesktop}>{t("chat.messageList.tryAgain")}</Button></div>
+            <div style={{ marginTop: 8 }}><Button size="sm" variant="secondary" className={s.touchButton} onClick={loadDesktop}>{t("chat.messageList.tryAgain")}</Button></div>
           </div>
         ) : !rel ? (
           <div className={s.empty}>{t("download.theDesktopAppHasNotBeen")}</div>
@@ -118,10 +121,10 @@ export default function DownloadPage() {
                     <span className={s.fileText}>
                       <span className={s.fileName}>{labels()[`${f.os}:${f.kind}`] ?? f.name} · {arches()[f.arch][f.os]}</span>
                       <span className={s.fileSub}>
-                        {formatBytes(f.size)} · <button type="button" className={s.hash} title={t("download.copySha256")} aria-label={t("download.copySha256")} onClick={() => copyHash(f)}>SHA-256 {f.sha256.slice(0, 16)}…</button>
+                        {formatBytes(f.size)} · <button type="button" className={s.hash} dir="ltr" title={t("download.copySha256")} aria-label={t("download.copySha256")} onClick={() => copyHash(f)}>SHA-256 {f.sha256.slice(0, 16)}…</button>
                       </span>
                     </span>
-                    <Button size="sm" variant={mine?.name === f.name ? "primary" : "secondary"} onClick={() => { location.href = desktop.fileUrl(f.name); }}>
+                    <Button size="sm" variant={mine?.name === f.name ? "primary" : "secondary"} className={s.touchButton} onClick={() => { location.href = desktop.fileUrl(f.name); }}>
                       <Download size={16} /> {t("chat.attachments.download")}
                     </Button>
                   </div>

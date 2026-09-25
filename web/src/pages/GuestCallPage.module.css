@@ -1,6 +1,9 @@
-/* the landing card: the page scrolls, and auto margins centre the card when it fits */
-.page { height: 100%; display: flex; align-items: flex-start; padding: 24px 16px; background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
-.card { margin: auto; flex-shrink: 0; width: 100%; max-width: 420px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+/* the landing card: the page scrolls, and auto margins centre the wordmark and
+   the card when they fit, as on the invite and sign-in pages */
+.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
+.brand { margin-top: auto; flex-shrink: 0; display: flex; color: var(--text-strong); border-radius: var(--radius-xs); }
+.card { margin-bottom: auto; flex-shrink: 0; width: 100%; max-width: 420px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+@media (max-width: 480px) { .card { padding: 24px 20px; } }
 .icon { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--positive); color: #fff; margin-bottom: 4px; }
 .icon[data-state="off"] { background: var(--bg-active); color: var(--text-muted); }
 .title { margin: 0; font-size: 22px; font-weight: 700; color: var(--text-strong); }
@@ -11,10 +14,12 @@
 .fine svg { flex: none; margin-top: 1px; color: var(--positive); }
 .back { margin-top: 4px; font-size: 14px; color: var(--link); }
 .back:hover { text-decoration: underline; }
+@media (pointer: coarse) { .back { display: inline-flex; align-items: center; min-height: 40px; margin-block: -4px; } }
 
 /* in the call: a thin bar over the call, which takes the rest of the screen */
 .call { position: fixed; inset: 0; display: flex; flex-direction: column; background: #000; padding-top: env(safe-area-inset-top); }
-.bar { flex: none; height: 48px; display: flex; align-items: center; gap: 10px; padding-block: 0; padding-inline: 16px 12px; background: var(--bg-raised); border-bottom: 1px solid var(--border-subtle); color: var(--text); }
+/* a phone on its side has its notch at one end of the bar */
+.bar { flex: none; height: 48px; display: flex; align-items: center; gap: 10px; padding-block: 0; padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); background: var(--bg-raised); border-bottom: 1px solid var(--border-subtle); color: var(--text); }
 .barIcon { flex: none; color: var(--positive); }
 .barTitle { font-size: 15px; font-weight: 700; color: var(--text-strong); }
 .barWho { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 14px; color: var(--text-muted); }

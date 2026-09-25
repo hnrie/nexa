@@ -5,6 +5,7 @@ import { describeError } from "@/lib/errors";
 import { servers as serversApi } from "@/api/servers";
 import type { InvitePreview } from "@/api/types";
 import { iconUrl } from "@/api/users";
+import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { startSession } from "@/gateway/session";
@@ -21,6 +22,7 @@ import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
 import { useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
+import { usePageTitle } from "./AuthLayout";
 import s from "./InvitePage.module.css";
 import { guarded } from "@/lib/captcha";
 
@@ -56,6 +58,8 @@ export default function InvitePage() {
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fragment = parseInviteFragment(loc.hash) ? loc.hash : storedFragment(code);
+  // the lock and offline screens drawn in its place name the tab themselves
+  usePageTitle(error ? t("invite.inviteInvalid") : (preview?.server ?? preview?.group)?.name, status !== "locked" && status !== "pinlocked" && status !== "offline");
 
   useEffect(() => {
     if (!parseInviteFragment(loc.hash)) return;
@@ -138,7 +142,9 @@ export default function InvitePage() {
   const member = isGroup ? inGroup : alreadyIn;
   return (
     <div className={s.page}>
-      <div className={s.card}>
+      {/* what this is, for someone who has never heard of it, and a way on from a dead link */}
+      <Link to="/" className={s.brand} aria-label="Nexa"><NexaWordmark height={32} /></Link>
+      <main className={s.card}>
         {!preview && !error ? <Spinner /> : null}
         {error ? (
           <>
@@ -160,16 +166,16 @@ export default function InvitePage() {
             </div>
             {status === "ready" ? (
               member ? (
-                <Button block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>{t("invite.youReAlreadyInOpen")}</Button>
+                <Button size="lg" block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>{t("invite.youReAlreadyInOpen")}</Button>
               ) : (
                 <>
-                  <Button block loading={busy} onClick={() => void accept()}>{isGroup ? t("invite.joinGroup") : t("invite.acceptInvite")}</Button>
+                  <Button size="lg" block loading={busy} onClick={() => void accept()}>{isGroup ? t("invite.joinGroup") : t("invite.acceptInvite")}</Button>
                   {acceptError ? <p className={s.acceptError} role="alert">{acceptError}</p> : null}
                 </>
               )
             ) : status === "anonymous" ? (
               <div className={s.authRow}>
-                <Button block onClick={() => nav(`/login?next=${next}`)}>{t("invite.logInToAccept")}</Button>
+                <Button size="lg" block onClick={() => nav(`/login?next=${next}`)}>{t("invite.logInToAccept")}</Button>
                 <Link to={`/register?next=${next}&invite=${encodeURIComponent(code)}`} className={s.link}>{t("invite.needAnAccountRegister")}</Link>
               </div>
             ) : (
@@ -179,7 +185,7 @@ export default function InvitePage() {
             {isGroup ? <p className={s.note}>{t("invite.groupChatsAreEndToEnd")}</p> : null}
           </>
         ) : null}
-      </div>
+      </main>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { useAuth } from "@/stores/auth";
 import { useBan, useNexa } from "@/stores/nexa";
 import { t } from "@/i18n";
 import s from "@/components/nexa/Nexa.module.css";
+import { usePageTitle } from "./AuthLayout";
 
 /** How often the ban screen asks whether the ban still holds, and for new replies. */
 const STANDING_EVERY = 30_000;
@@ -30,6 +31,7 @@ export default function BannedPage() {
   const thread = useNexa((n) => (caseId ? n.threads[caseId] : undefined));
   const people = useNexa((n) => n.people);
   const pendingBan = useNexa((n) => !!caseId && !!n.state?.pending.some((c) => c.id === caseId));
+  usePageTitle(t("nexa.ban.title"));
 
   useEffect(() => {
     const refresh = () =>

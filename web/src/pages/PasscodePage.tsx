@@ -4,7 +4,7 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { hasLock, loadLock, MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
 import { describeError } from "@/lib/errors";
-import { AuthLayout } from "./AuthLayout";
+import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -16,6 +16,8 @@ export default function PasscodePage() {
   const [passcode, setPasscode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // a wrong passcode is said on its field, which moves nothing; the rest goes above
+  const [wrong, setWrong] = useState<string | null>(null);
   const [left, setLeft] = useState(() => (me ? triesLeft(me.id) : MAX_FAILURES));
   // A device that has never been given the passcode is being set up, not unlocked.
   const [adopting] = useState(() => !!me && !hasLock(me.id));
@@ -25,12 +27,14 @@ export default function PasscodePage() {
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => input.current?.focus(), []);
+  usePageTitle(adopting ? t("passcode.thisAccountHasAPasscode") : t("passcode.locked"));
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (busy || !passcode) return;
     setBusy(true);
     setError(null);
+    setWrong(null);
     try {
       await unlockWithPasscode(passcode);
     } catch (err) {
@@ -39,7 +43,8 @@ export default function PasscodePage() {
       if (err instanceof WrongPasscode) {
         // null means this device counts nothing, so the warning below stays away
         if (err.left !== null) setLeft(err.left);
-        setError(err.left === null || err.left > 0 ? err.message : t("passcode.tooManyWrongTriesLogIn"));
+        if (err.left === null || err.left > 0) setWrong(err.message);
+        else setError(t("passcode.tooManyWrongTriesLogIn"));
       } else {
         // Anything that is not a wrong passcode is a WebCrypto OperationError
         // or an IndexedDB InvalidStateError, whose message is written for
@@ -65,13 +70,16 @@ export default function PasscodePage() {
     >
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
-        <Field label={t("settings.security.passcode")} required>
+        <Field label={t("settings.security.passcode")} required error={wrong}>
           <TextInput
             ref={input}
             type="password"
             inputMode={numeric ? "numeric" : "text"}
             value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
+            onChange={(e) => {
+              setPasscode(e.target.value);
+              setWrong(null);
+            }}
             autoComplete="off"
             data-testid="passcode-input"
             required
@@ -79,7 +87,7 @@ export default function PasscodePage() {
         </Field>
         {left <= 3 ? <div className={s.warn}>{t("passcode.triesLeft", { count: left })} {t("passcode.thenSignInWithPassword")}</div> : null}
         <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">{adopting ? t("passcode.setUpThisDevice") : t("lock.unlock")}</Button>
-        <Button type="button" variant="link" onClick={() => void logout()}>{t("lock.logOutInstead")}</Button>
+        <Button type="button" variant="link" className={s.textButton} onClick={() => void logout()}>{t("lock.logOutInstead")}</Button>
       </form>
     </AuthLayout>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { useAuth } from "@/stores/auth";
-import { AuthLayout } from "./AuthLayout";
+import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -20,6 +20,7 @@ export default function OfflinePage() {
   const error = useAuth((a) => a.error);
   const [busy, setBusy] = useState(false);
   const retryNow = useRef<() => void>(() => {});
+  usePageTitle(t("offline.canTConnect"));
 
   useEffect(() => {
     let alive = true;

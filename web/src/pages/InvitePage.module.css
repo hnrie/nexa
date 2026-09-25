@@ -1,18 +1,33 @@
 /* The page is the scroller, since body hides overflow: a long description or a
-   big sticker grid scrolls here. The card's auto margins centre it when it fits. */
-.page { height: 100%; display: flex; align-items: flex-start; padding: 24px 16px; background: var(--bg-base); overflow-y: auto; overscroll-behavior: contain; }
-.card { margin: auto; flex-shrink: 0; width: 100%; max-width: 440px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+   big sticker grid scrolls here. Auto margins centre the wordmark and the card
+   when they fit, as on the sign-in pages these links lead to and from. */
+.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
+.brand { margin-top: auto; flex-shrink: 0; display: flex; color: var(--text-strong); border-radius: var(--radius-xs); }
+.brand:hover { text-decoration: none; }
+.card { margin-bottom: auto; flex-shrink: 0; width: 100%; max-width: 440px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.wide { max-width: 640px; }
+@media (max-width: 480px) { .card { padding: 24px 20px; } }
 .kicker { margin: 0; font-size: 14px; color: var(--text-muted); }
 .iconBox { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); font-size: 24px; font-weight: 600; overflow: hidden; margin: 8px 0; }
 .iconBox [data-sticker-media] { width: 100%; height: 100%; object-fit: cover; }
 .iconBox[data-invalid="true"] { background: var(--danger); color: #fff; font-size: 40px; }
-.title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); }
-.sub { margin: 0; font-size: 16px; color: var(--text-muted); }
-.counts { display: flex; gap: 16px; margin: 4px 0 16px; font-size: 14px; color: var(--text-muted); }
+.title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.sub { margin: 0; font-size: 16px; color: var(--text-muted); overflow-wrap: anywhere; }
+.counts { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 4px 0 16px; font-size: 14px; color: var(--text-muted); }
 .counts i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-inline-end: 4px; }
 .online { background: var(--status-online); }
 .offline { background: var(--status-offline); }
 .authRow { width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .link { color: var(--link); font-size: 14px; }
 .note { margin: 12px 0 0; font-size: 13px; color: var(--text-muted); }
-.acceptError { margin: 4px 0 0; font-size: 14px; color: var(--danger); }
+/* The danger red itself is under 3:1 as text on this card in the dark themes;
+   drawn toward the text colour it keeps its meaning and reads at 4.5:1. */
+.acceptError { margin: 4px 0 0; font-size: 14px; color: color-mix(in srgb, var(--danger) 60%, var(--text-strong)); }
+/* A pack of three stickers sits in the middle like everything else on the
+   card, rather than in the first columns of a grid laid out for thirty. */
+.card .stickers { width: 100%; grid-template-columns: repeat(auto-fit, minmax(112px, 136px)); justify-content: center; }
+.card .sticker { cursor: default; }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 16px; margin-top: 16px; }
+@media (pointer: coarse) {
+  .link { display: inline-flex; align-items: center; min-height: 40px; }
+}

@@ -66,11 +66,14 @@
 .item .list {
   margin-top: 6px;
 }
+/* bordered like .item and .toc: on a card of the same colour, a fill alone
+   left an invisible box whose padding read as a stray indent */
 .lines {
   margin: 0 0 12px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
   font-size: 14.5px;
   line-height: 1.7;
   color: var(--text);
@@ -133,6 +136,37 @@
 }
 .toc a:hover {
   color: var(--link);
+}
+@media (pointer: coarse) {
+  /* a finger-sized row per section; the list is one column on a phone anyway */
+  .toc ol {
+    line-height: 1.4;
+  }
+  .toc a {
+    display: inline-block;
+    padding-block: 10px;
+  }
+}
+
+/* the ways on from a public legal page, in a row that wraps */
+.pageLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 15px;
+}
+.pageLinks a {
+  color: var(--link);
+}
+@media (pointer: coarse) {
+  .pageLinks a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
 }
 
 /* --- the consent dialog ----------------------------------------------------- */
@@ -236,6 +270,13 @@
   background: var(--brand);
   border-color: var(--brand);
   color: var(--on-brand);
+}
+@media (pointer: coarse) {
+  .readTab {
+    height: 40px;
+    padding: 0 16px;
+    border-radius: 20px;
+  }
 }
 .reader {
   max-height: min(42vh, 420px);

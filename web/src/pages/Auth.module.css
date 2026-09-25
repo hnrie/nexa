@@ -1,25 +1,52 @@
 /* The page is the scroller: body hides overflow, so a form taller than a short
    phone screen must scroll here. Auto margins centre it when it fits and let it
    start at the top when it does not. */
-.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
+.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
 .brand { margin-top: auto; flex-shrink: 0; color: var(--text-strong); display: flex; }
+/* The legal pages make the wordmark a way home; as a link it would take the
+   link colour, and the mark is meant to be the brand's own. */
+.brand a { display: flex; color: inherit; border-radius: var(--radius-xs); }
 @media (max-width: 480px) { .brand svg { height: 32px; } }
-.card { margin-bottom: auto; flex-shrink: 0; max-width: 100%; padding: 32px; background: var(--bg-raised); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); display: flex; flex-direction: column; gap: 20px; }
+.card { margin-bottom: auto; flex-shrink: 0; max-width: 100%; padding: 32px; background: var(--bg-raised); border-radius: var(--radius-md); box-shadow: var(--shadow-high); display: flex; flex-direction: column; gap: 20px; }
+/* A phone has little width to give, and 32px of padding on each side of it is
+   most of what a long German label needs. */
+@media (max-width: 480px) { .card { padding: 24px 20px; } }
 .title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); text-align: center; }
 .subtitle { margin: -12px 0 0; color: var(--text-muted); text-align: center; font-size: 16px; }
 .form { display: flex; flex-direction: column; gap: 20px; }
 .row { display: flex; gap: 12px; }
 .foot { font-size: 14px; color: var(--text-muted); }
 .foot a { color: var(--link); }
+/* two links that read as one name each: "Terms of / Service" helps nobody */
+.foot .nowrap { white-space: nowrap; }
 .error { padding: 10px 12px; border-radius: var(--radius-xs); background: rgba(218, 62, 68, 0.15); color: var(--text); font-size: 14px; border: 1px solid rgba(218, 62, 68, 0.5); }
+/* A field and what hangs under it (a strength meter, a link), spaced as one
+   field is inside, since the form's own gap is for the space between fields. */
+.group { display: flex; flex-direction: column; gap: 8px; }
+.forgot { align-self: flex-start; font-size: 14px; color: var(--link); }
 .strength { display: flex; gap: 4px; align-items: center; }
 .strength i { flex: 1; height: 4px; border-radius: 2px; background: var(--bg-active); }
 .strength i[data-on="true"] { background: var(--positive); }
 .strength[data-score="1"] i[data-on="true"] { background: var(--danger); }
 .strength[data-score="2"] i[data-on="true"] { background: var(--warning); }
 .strengthLabel { font-size: 12px; color: var(--text-muted); min-width: 60px; text-align: end; }
-.recovery { font-family: var(--font-mono); font-size: 15px; line-height: 1.7; letter-spacing: 0.04em; padding: 16px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; user-select: all; word-break: break-all; color: var(--text-strong); border: 1px solid var(--border); }
+.hint { font-size: 12px; color: var(--text-muted); }
+/* A recovery key breaks between its groups only (the markup offers a break
+   after each dash), so no group is ever split across two lines to be copied
+   out by hand wrong. */
+.recovery { font-family: var(--font-mono); font-size: 15px; line-height: 1.7; letter-spacing: 0.04em; padding: 16px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; color: var(--text-strong); border: 1px solid var(--border); }
 .warn { padding: 12px; border-radius: var(--radius-xs); background: rgba(253, 184, 51, 0.12); border: 1px solid rgba(253, 184, 51, 0.5); font-size: 14px; color: var(--text); }
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
-.check input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--brand); }
-.progress { font-size: 14px; color: var(--text-muted); text-align: center; }
+.check input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
+.progress { margin: 0; font-size: 14px; color: var(--text-muted); text-align: center; }
+/* a margin rather than a flex gap, which a closed <details> still leaves under its summary */
+.invite summary { cursor: pointer; }
+.invite[open] > summary { margin-bottom: 12px; }
+
+/* On a touch screen the small text controls get a finger-sized height. */
+@media (pointer: coarse) {
+  .textButton { min-height: 40px; }
+  .forgot { display: inline-flex; align-items: center; min-height: 40px; margin-block: -8px; }
+  /* padding rather than flex: a summary that is not a list item loses its triangle */
+  .invite summary { padding-block: 11px; margin-block: -11px; }
+}

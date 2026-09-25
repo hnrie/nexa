@@ -1,5 +1,8 @@
-import type { ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
+import { Check } from "lucide-react";
 import { NexaWordmark } from "../components/common/Brand";
+import { Button } from "@/components/common/Button";
+import { useUI } from "@/stores/ui";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -15,6 +18,69 @@ export function AuthLayout({ title, subtitle, children, width = 480 }: { title: 
         {children}
       </main>
     </div>
+  );
+}
+
+/**
+ * Names the tab after the page ("Log In · Nexa") and gives the plain name back
+ * when the page goes. The app's own title only takes over once the app is
+ * running, so a title left behind here followed someone from page to page.
+ *
+ * `when` is false while the page shows another page in its place (the lock
+ * screen over an invite, say): a parent's effect runs after its child's, so
+ * it would otherwise put its own name over the one on screen.
+ */
+export function usePageTitle(title: string | null | undefined, when = true): void {
+  useEffect(() => {
+    if (!when || typeof document === "undefined") return;
+    document.title = title ? `${title} · Nexa` : "Nexa";
+    return () => {
+      document.title = "Nexa";
+    };
+  }, [title, when]);
+}
+
+/**
+ * A recovery key as it is shown to be written down: it may only break between
+ * its groups, never inside one, and it still copies as the one string.
+ */
+export function RecoveryKey({ value, testId }: { value: string; testId?: string }) {
+  const groups = value.split("-");
+  return (
+    <div className={s.recovery} data-testid={testId}>
+      {groups.map((g, i) => (
+        <Fragment key={i}>
+          {i ? "-" : null}
+          {i ? <wbr /> : null}
+          {g}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
+/** Copies a recovery key, and says so: a copy that answers nothing leaves people unsure it worked. */
+export function CopyKeyButton({ text }: { text: string }) {
+  const toast = useUI((u) => u.toast);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const h = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(h);
+  }, [copied]);
+  const copy = () => {
+    const failed = () => toast(t("register.copyFailed"), "error");
+    if (!navigator.clipboard) {
+      failed();
+      return;
+    }
+    navigator.clipboard.writeText(text).then(() => setCopied(true), failed);
+  };
+  return (
+    <Button variant="secondary" block onClick={copy} data-copied={copied || undefined}>
+      {copied ? <><Check size={16} aria-hidden="true" style={{ verticalAlign: "-3px" }} />{" "}</> : null}
+      <span aria-live="polite">{copied ? t("modals.groupInvite.copied") : t("modals.groupInvite.copy")}</span>
+    </Button>
   );
 }
 

@@ -77,16 +77,24 @@ function Block({ b }: { b: LegalBlock }) {
 /**
  * One of the legal documents, whole: its title and effective date, a table of
  * contents, and every section as written.
+ *
+ * `page` is for where the document is the whole page (/terms, /privacy): its
+ * title is then the page's one h1, not a second-level heading under nothing.
  */
-export function LegalDocument({ doc, showTitle = true, toc = true }: { doc: LegalDoc; showTitle?: boolean; toc?: boolean }) {
+export function LegalDocument({ doc, showTitle = true, toc = true, page = false }: { doc: LegalDoc; showTitle?: boolean; toc?: boolean; page?: boolean }) {
+  const Title = page ? "h1" : "h2";
+  const Heading = page ? "h2" : "h3";
   const meta = (label: string) => doc.meta.find((m) => m.label.toLowerCase() === label)?.value;
   const runBy = meta("run by");
   const contact = meta("contact");
   return (
-    <article className={s.doc} lang="en">
+    // English whatever the interface is in, so it also reads left to right:
+    // in an Arabic page it inherited the page's direction, and every full stop
+    // and colon was drawn at the wrong end of its line.
+    <article className={s.doc} lang="en" dir="ltr">
       {showTitle ? (
         <header className={s.docHead}>
-          <h2 className={s.docTitle}>{doc.title}</h2>
+          <Title className={s.docTitle}>{doc.title}</Title>
           <p className={s.docMeta}>
             <span className={s.effective}>Effective {doc.effective}</span>
             {runBy ? <span>Run by {linkify(runBy)}</span> : null}
@@ -110,9 +118,9 @@ export function LegalDocument({ doc, showTitle = true, toc = true }: { doc: Lega
       ) : null}
       {doc.sections.map((sec) => (
         <section key={sec.id} id={sec.id} className={s.section} aria-labelledby={`${sec.id}-h`}>
-          <h3 className={s.h} id={`${sec.id}-h`}>
+          <Heading className={s.h} id={`${sec.id}-h`}>
             <span className={s.num}>{sec.number}.</span> {sec.title}
-          </h3>
+          </Heading>
           {sec.blocks.map((b, i) => (
             <Block key={i} b={b} />
           ))}

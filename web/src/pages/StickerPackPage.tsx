@@ -5,6 +5,7 @@ import { describeError } from "@/lib/errors";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { StickerPack } from "@/api/types";
 
+import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { LazySticker, StickerView } from "@/components/stickers/StickerView";
@@ -14,6 +15,7 @@ import { canRemovePack, removePack as removeInstalledPack, removePackQuestion } 
 import { useAuth } from "@/stores/auth";
 import { useExpressions, packImageUrl } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
+import { usePageTitle } from "./AuthLayout";
 import s from "./InvitePage.module.css";
 import p from "@/components/server/PackEditor.module.css";
 
@@ -32,6 +34,7 @@ export default function StickerPackPage() {
   // this page is outside the app, where its dialogs live, so it shows its own
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
+  usePageTitle(error ? t("stickerPack.packUnavailable") : pack?.name);
 
   useEffect(() => {
     let alive = true;
@@ -72,7 +75,8 @@ export default function StickerPackPage() {
   const mine = !!pack && pack.owner_user_id === meId;
   return (
     <div className={s.page}>
-      <div className={s.card} style={{ maxWidth: 640 }}>
+      <Link to="/" className={s.brand} aria-label="Nexa"><NexaWordmark height={32} /></Link>
+      <main className={[s.card, s.wide].join(" ")}>
         {!pack && !error ? <Spinner /> : null}
         {error ? (
           <>
@@ -89,21 +93,21 @@ export default function StickerPackPage() {
             <h1 className={s.title}>{pack.name}</h1>
             {pack.description ? <p className={s.sub}>{pack.description}</p> : null}
             <p className={s.sub}>{packCount(pack)}{pack.public ? "" : " · " + t("settings.stickers.privateTag")}</p>
-            <div className={p.grid} style={{ width: "100%" }}>
+            <div className={[p.grid, s.stickers].join(" ")}>
               {pack.stickers.map((st) => (
-                <div key={st.id} className={p.cell} style={{ cursor: "default" }}>
+                <div key={st.id} className={[p.cell, s.sticker].join(" ")}>
                   <LazySticker format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={p.cellImg} />
                   <span className={p.cellName}>{st.name}</span>
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", justifyContent: "center" }}>
-              {mine ? <Button onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>{t("stickerPack.editPack")}</Button> : <Button loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? t("stickerPack.removeFromMyStickers") : t("stickerPack.installPack")}</Button>}
-              <Link to="/channels/@me" className={s.link} style={{ alignSelf: "center" }}>{t("stickerPack.backToTheApp")}</Link>
+            <div className={s.actions}>
+              {mine ? <Button size="lg" onClick={() => { navigate("/channels/@me"); openModal("settings", { page: "stickers", packId: pack.id }); }}>{t("stickerPack.editPack")}</Button> : <Button size="lg" loading={busy} variant={pack.installed ? "secondary" : "primary"} onClick={() => void toggle()}>{pack.installed ? t("stickerPack.removeFromMyStickers") : t("stickerPack.installPack")}</Button>}
+              <Link to="/channels/@me" className={s.link}>{t("stickerPack.backToTheApp")}</Link>
             </div>
           </>
         ) : null}
-      </div>
+      </main>
       {confirming && pack ? (
         <ConfirmModal
           {...removePackQuestion(pack)}

@@ -52,6 +52,9 @@
 .table td:not([data-yes]):not(:first-child) { color: var(--danger); }
 
 .end { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 72px 24px; text-align: center; }
+/* the block that fades in is what lays the mark, the line and the buttons out:
+   as a plain block it left the mark at its start edge and the three touching */
+.endInner { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .endMark { color: var(--text-strong); flex: none; }
 
 .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); border-top: 1px solid var(--border-subtle); font-size: 14px; color: var(--text-muted); }
@@ -96,4 +99,18 @@
 @media (max-width: 860px) {
   .list li { text-align: start; }
   .numbers { justify-content: center; gap: 20px; }
+}
+/* On a phone the two tick columns give up width to the feature they are
+   about, which otherwise wrapped to three or four lines. */
+@media (max-width: 480px) {
+  .compare { padding-inline: 16px; }
+  .table th { padding-inline: 6px; font-size: 12px; letter-spacing: 0.02em; }
+  .table td { padding-inline: 8px; }
+  .table td:not(:first-child) { width: 72px; }
+}
+/* finger-sized links on a touch screen, in the header and the footer */
+@media (pointer: coarse) {
+  .quiet, .cta { display: inline-flex; align-items: center; min-height: 40px; }
+  .footLinks a { display: inline-flex; align-items: center; min-height: 40px; }
+  .footLinks { row-gap: 0; }
 }

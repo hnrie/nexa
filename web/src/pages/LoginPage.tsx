@@ -7,7 +7,7 @@ import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
-import { AuthLayout } from "./AuthLayout";
+import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -20,14 +20,20 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  // A general failure (no connection, too many tries) sits above the form; a
+  // wrong password or code is said on its own field, where it takes no room
+  // and so moves nothing, and goes as soon as that field is edited.
   const [error, setError] = useState<string | null>(null);
+  const [wrong, setWrong] = useState<string | null>(null);
   const [step, setStep] = useState<"password" | "code">("password");
   const [useBackup, setUseBackup] = useState(false);
   const [code, setCode] = useState("");
   const [codesLeft, setCodesLeft] = useState(0);
   const codeInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
   const next = new URLSearchParams(loc.search).get("next") || "/channels/@me";
   const go = () => nav(safeNext(next), { replace: true });
+  usePageTitle(step === "code" ? t("login.oneMoreStep") : t("login.logIn"));
 
   useEffect(() => {
     if (step === "code") codeInput.current?.focus();
@@ -56,6 +62,7 @@ export default function LoginPage() {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setWrong(null);
     try {
       const out = await login(username.trim().toLowerCase(), password);
       if (out.mfa) {
@@ -65,7 +72,13 @@ export default function LoginPage() {
       }
       go();
     } catch (err) {
-      setError(describe(err, t("login.couldNotDecryptYourKeysWith")));
+      if (err instanceof ApiError && err.code === "invalid_credentials") {
+        setWrong(t("login.usernameOrPasswordIsWrong"));
+        passwordInput.current?.focus();
+        passwordInput.current?.select();
+      } else {
+        setError(describe(err, t("login.couldNotDecryptYourKeysWith")));
+      }
     } finally {
       setBusy(false);
     }
@@ -76,6 +89,7 @@ export default function LoginPage() {
     if (busy) return;
     setBusy(true);
     setError(null);
+    setWrong(null);
     try {
       await completeMfa(useBackup ? { backupCode: code.trim() } : { code });
       go();
@@ -86,6 +100,9 @@ export default function LoginPage() {
         setStep("password");
         setPassword("");
         setError(describeError(err, t("login.thatCodeDidNotWork")));
+      } else if (err instanceof ApiError && err.code === "invalid_code") {
+        setWrong(t("login.thatCodeDidNotWork"));
+        codeInput.current?.focus();
       } else {
         setError(describe(err, t("login.thatCodeDidNotWork")));
       }
@@ -100,6 +117,7 @@ export default function LoginPage() {
     setCode("");
     setPassword("");
     setError(null);
+    setWrong(null);
     setUseBackup(false);
   };
 
@@ -112,11 +130,14 @@ export default function LoginPage() {
       >
         <form className={s.form} onSubmit={(e) => void onCode(e)}>
           {error ? <div className={s.error} role="alert">{error}</div> : null}
-          <Field label={useBackup ? t("login.backupCode") : t("login.authenticationCode")} required>
+          <Field label={useBackup ? t("login.backupCode") : t("login.authenticationCode")} required error={wrong}>
             <TextInput
               ref={codeInput}
               value={code}
-              onChange={(e) => setCode(useBackup ? e.target.value.toUpperCase().slice(0, 20) : e.target.value.replace(/[^\d\s]/g, "").slice(0, 7))}
+              onChange={(e) => {
+                setWrong(null);
+                setCode(useBackup ? e.target.value.toUpperCase().slice(0, 20) : e.target.value.replace(/[^\d\s]/g, "").slice(0, 7));
+              }}
               inputMode={useBackup ? "text" : "numeric"}
               autoComplete="one-time-code"
               autoCapitalize="characters"
@@ -126,11 +147,12 @@ export default function LoginPage() {
               required
             />
           </Field>
-          <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">{t("login.signIn")}</Button>
-          <Button type="button" variant="link" onClick={() => { setUseBackup((v) => !v); setCode(""); setError(null); }}>
+          {/* the same words as the button on the step before, since it finishes the same thing */}
+          <Button type="submit" size="lg" block loading={busy} data-testid="mfa-submit">{t("login.logIn")}</Button>
+          <Button type="button" variant="link" className={s.textButton} onClick={() => { setUseBackup((v) => !v); setCode(""); setError(null); setWrong(null); }}>
             {useBackup ? t("login.useYourAuthenticatorInstead") : codesLeft ? t("login.useABackupCodeLeft", { count: codesLeft }) : t("login.useABackupCode")}
           </Button>
-          <Button type="button" variant="link" onClick={backToPassword}>{t("modals.createServer.back")}</Button>
+          <Button type="button" variant="link" className={s.textButton} onClick={backToPassword}>{t("modals.createServer.back")}</Button>
         </form>
       </AuthLayout>
     );
@@ -141,12 +163,16 @@ export default function LoginPage() {
       <form className={s.form} onSubmit={(e) => void onPassword(e)}>
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.account.username")} required>
-          <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus required />
+          <TextInput value={username} onChange={(e) => { setUsername(e.target.value); setWrong(null); }} autoComplete="username" autoCapitalize="none" spellCheck={false} invalid={!!wrong} aria-invalid={wrong ? true : undefined} autoFocus required />
         </Field>
-        <Field label={t("chat.lockedChannel.password")} required>
-          <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-          <Link to="/recover" className={s.foot}>{t("login.forgotYourPassword")}</Link>
-        </Field>
+        {/* The link sits outside the field's label: inside it, it became part
+            of the password box's name ("Password, Forgot your password?"). */}
+        <div className={s.group}>
+          <Field label={t("chat.lockedChannel.password")} required error={wrong}>
+            <TextInput ref={passwordInput} type="password" value={password} onChange={(e) => { setPassword(e.target.value); setWrong(null); }} autoComplete="current-password" required />
+          </Field>
+          <Link to="/recover" className={s.forgot}>{t("login.forgotYourPassword")}</Link>
+        </div>
         <Button type="submit" size="lg" block loading={busy}>{t("login.logIn")}</Button>
         <div className={s.foot}>
           {t("login.needAnAccount")} <Link to="/register">{t("login.register")}</Link>

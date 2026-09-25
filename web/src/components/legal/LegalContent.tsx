@@ -7,10 +7,15 @@ import s from "./Legal.module.css";
  * The pieces the consent dialog, Settings → About and the public pages share,
  * so what they say about the Terms can never drift apart. The documents
  * themselves are rendered whole by LegalDocument, from docs/legal.
+ *
+ * The legal.* strings are English in every language on purpose (lib/legal.ts),
+ * so each block takes its direction from its own text (`dir="auto"`): inside
+ * an Arabic page, English laid out right to left put every full stop at the
+ * start of its line. A string that is ever translated still lays out right.
  */
 export function ContactBlock() {
   return (
-    <p className={s.body}>
+    <p className={s.body} dir="auto">
       {t("legal.contactOwner")}: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
       {" · "}
       {t("legal.inApp", { user: `@${OWNER_USERNAME}` })}
@@ -30,7 +35,7 @@ export function LegalHighlights() {
   return (
     <div className={s.highlights}>
       {cards.map((c) => (
-        <div key={c.title} className={s.highlight}>
+        <div key={c.title} className={s.highlight} dir="auto">
           <span className={s.hlIcon} aria-hidden="true">
             {c.icon}
           </span>
@@ -48,7 +53,7 @@ export function LegalHighlights() {
 export function LegalChanges() {
   const changes = [t("legal.new1"), t("legal.new2"), t("legal.new3"), t("legal.new4")];
   return (
-    <div className={s.news} data-testid="legal-changes">
+    <div className={s.news} data-testid="legal-changes" dir="auto">
       <p className={s.newsTitle}>
         <Sparkles size={14} aria-hidden="true" />
         {t("legal.newTitle")}

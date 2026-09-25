@@ -18,8 +18,9 @@
 .fileIcon { color: var(--icon); display: flex; justify-content: center; }
 .fileText { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .fileName { font-size: 15px; font-weight: 600; color: var(--text-strong); }
-.fileSub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hash { font-family: var(--font-mono); cursor: pointer; }
+/* the hash moves to a line of its own when the row is narrow, rather than being cut to "…" */
+.fileSub { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.hash { font-family: var(--font-mono); cursor: pointer; white-space: nowrap; text-decoration: underline dotted; text-underline-offset: 3px; }
 .hash:hover { color: var(--text); }
 .notes { margin: 0; padding-block: 12px; padding-inline: 32px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text); font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 6px; }
 .notes b { color: var(--text-strong); }
@@ -28,7 +29,12 @@
 .empty { text-align: center; color: var(--text-muted); font-size: 15px; }
 /* a phone or a tablet is told the browser is its app before the installers it cannot use */
 .handheld { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text); font-size: 15px; line-height: 1.45; }
-.handheld svg { flex: none; margin-top: 1px; color: var(--brand); }
+.handheld svg { flex: none; margin-top: 1px; color: var(--text-brand); }
+/* finger-sized buttons on a touch screen; the hash grows its hit area without moving its line */
+@media (pointer: coarse) {
+  .touchButton { min-height: 40px; }
+  .hash { padding-block: 12px; margin-block: -12px; }
+}
 @media (max-width: 600px) {
   .card { padding: 20px 16px; }
   .file { grid-template-columns: minmax(0, 1fr) auto; }

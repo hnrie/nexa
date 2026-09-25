@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Spinner } from "@/components/common/Spinner";
@@ -11,6 +11,7 @@ import { LegalChanges, LegalHighlights } from "./LegalContent";
 import { LegalDocument } from "./LegalDocument";
 
 type Tab = "summary" | "terms" | "privacy";
+const TABS: Tab[] = ["summary", "terms", "privacy"];
 
 /**
  * Blocks the app until the account agrees to the current Terms and Privacy
@@ -30,6 +31,9 @@ export function TermsGate() {
   const [, force] = useState(0);
   const reader = useRef<HTMLDivElement>(null);
   const gate = useRef<HTMLDivElement>(null);
+  const baseId = useId();
+  const tabId = (x: Tab) => `${baseId}-tab-${x}`;
+  const panelId = `${baseId}-panel`;
   // a new document starts at its top
   useEffect(() => {
     reader.current?.scrollTo({ top: 0 });
@@ -50,6 +54,19 @@ export function TermsGate() {
     if (!checked) return;
     acceptTerms(me.id);
     force((n) => n + 1);
+  };
+  // Tabs as the pattern has them: one stop for the row, the arrows move
+  // along it (mirrored when the page reads right to left), Home and End jump.
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    const i = TABS.indexOf(tab);
+    // the row's own direction, which follows its (English) labels rather than the page
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const step = e.key === "ArrowRight" ? (rtl ? -1 : 1) : e.key === "ArrowLeft" ? (rtl ? 1 : -1) : 0;
+    const to = step ? TABS[(i + step + TABS.length) % TABS.length] : e.key === "Home" ? TABS[0] : e.key === "End" ? TABS[TABS.length - 1] : undefined;
+    if (!to) return;
+    e.preventDefault();
+    setTab(to);
+    document.getElementById(tabId(to))?.focus();
   };
   const tabs: { id: Tab; label: string }[] = [
     { id: "summary", label: t("legal.readSummary") },
@@ -76,20 +93,36 @@ export function TermsGate() {
         </div>
       }
     >
-      <div className={s.gate} data-testid="terms-gate" ref={gate}>
+      {/* the legal text is English on purpose; it lays itself out as English (see LegalContent) */}
+      <div className={s.gate} data-testid="terms-gate" ref={gate} dir="auto">
         <p className={s.gateLead}>{previous ? t("legal.gateUpdatedIntro", { version: LEGAL_EFFECTIVE }) : t("legal.gateIntro", { version: LEGAL_EFFECTIVE })}</p>
         {previous ? <LegalChanges /> : null}
         <div className={s.readTabs} role="tablist" aria-label={t("legal.readSummary")}>
           {tabs.map((x) => (
-            <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} className={s.readTab} data-selected={tab === x.id} onClick={() => setTab(x.id)}>
+            <button
+              key={x.id}
+              id={tabId(x.id)}
+              type="button"
+              role="tab"
+              aria-selected={tab === x.id}
+              aria-controls={panelId}
+              tabIndex={tab === x.id ? 0 : -1}
+              className={s.readTab}
+              data-selected={tab === x.id}
+              onClick={() => setTab(x.id)}
+              onKeyDown={onTabKey}
+            >
               {x.label}
             </button>
           ))}
         </div>
         {tab === "summary" ? (
-          <LegalHighlights />
+          <div role="tabpanel" id={panelId} aria-labelledby={tabId(tab)}>
+            <LegalHighlights />
+          </div>
         ) : (
-          <div className={s.reader} ref={reader} role="tabpanel">
+          // focusable, so the document can be scrolled from the keyboard too
+          <div className={s.reader} ref={reader} role="tabpanel" id={panelId} aria-labelledby={tabId(tab)} tabIndex={0}>
             {docs ? (
               <LegalDocument doc={tab === "terms" ? docs.terms : docs.privacy} toc={false} />
             ) : (
