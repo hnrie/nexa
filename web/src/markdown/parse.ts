@@ -732,7 +732,7 @@ function nodeText(node: Node, names?: PlainTextNames): string {
         case "here":
           return "@here";
         case "channel":
-          return "#" + (names ? names.channels[node.id]?.name || t("render.deletedChannel") : node.id);
+          return "#" + (names ? names.channels[node.id]?.name || t("render.unknownChannel") : node.id);
         case "user": {
           if (!names) return "@" + node.id;
           const user = names.users[node.id];

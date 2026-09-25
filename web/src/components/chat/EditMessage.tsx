@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { humanizeMentions } from "@/components/composer/mentions";
-import { editMessage } from "@/components/composer/send";
+import { editMessage, editNames } from "@/components/composer/send";
 import { useAutosize } from "@/components/composer/useAutosize";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
@@ -18,7 +18,7 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   // an edit left behind in another conversation comes back with what was typed
   const [text, setText] = useState(() => {
     const parked = useUI.getState().editDrafts[msg.channel_id];
-    return parked?.messageId === msg.id && parked.text !== null ? parked.text : humanizeMentions(msg.payload?.t ?? "", users);
+    return parked?.messageId === msg.id && parked.text !== null ? parked.text : humanizeMentions(msg.payload?.t ?? "", users, editNames(msg.channel_id));
   });
   const [busy, setBusy] = useState(false);
   const spellcheck = useSettings((st) => st.settings.spellcheck !== false);
@@ -41,7 +41,7 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
     const body = text.trim();
     if (!body && !msg.payload?.att?.length) return;
     // nothing changed: close the editor without marking the message edited
-    if (body === humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId).trim()) {
+    if (body === humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, editNames(msg.channel_id)).trim()) {
       endEdit(msg.channel_id, msg.id);
       return;
     }

@@ -52,7 +52,7 @@
 .sectionRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .sectionLink { font-size: 12px; font-weight: 600; color: var(--text-brand); text-transform: none; }
 .sectionLink:hover { text-decoration: underline; }
-.sectionLink[data-danger="true"] { color: var(--danger); }
+.sectionLink[data-danger="true"] { color: var(--text-danger); }
 .sectionName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stickerGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; padding: 4px 8px 12px; }
 .stickerCell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; overflow: hidden; }

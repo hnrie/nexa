@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { EmojiPicker, focusSearchOnOpen, type EmojiPick } from "./EmojiPicker";
 import s from "./Picker.module.css";
+import { useLayerPresence } from "@/components/chat/useLayerPresence";
 
 import { t } from "@/i18n";
 export type PickerTab = "emoji" | "gif" | "sticker";
@@ -54,6 +55,8 @@ function openedOver(picker: HTMLElement, el: Element | null): boolean {
 
 /** Tabbed popover above the composer (or anchored anywhere); closes on outside click or Escape. */
 export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId }: Props) {
+  // drawn in place over the message box, it tells the back gesture itself (a portalled one is seen anyway)
+  useLayerPresence(!anchor);
   const [active, setActive] = useState<PickerTab>(tab === "gif" && !gifs ? "emoji" : tab === "sticker" && !stickers ? "emoji" : tab);
   const ref = useRef<HTMLDivElement>(null);
   // Where focus came from. Escape used to drop it on `<body>` — and on touch
@@ -128,7 +131,8 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
   };
 
   const body = (
-    <div className={s.pop} ref={ref} role="dialog" aria-modal="true" aria-label={t("pickers.expressionPicker.expressionPicker")} onKeyDown={onKeyDown} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor}>
+    // a layer, so the back gesture on a phone closes the picker (through the Escape it answers) instead of leaving the page
+    <div className={s.pop} ref={ref} role="dialog" aria-modal="true" aria-label={t("pickers.expressionPicker.expressionPicker")} onKeyDown={onKeyDown} style={anchor && !mobile ? anchoredStyle(anchor) : undefined} data-anchored={!!anchor} data-modal-layer="">
       {/* A tab with nothing behind it was rendered `disabled` forever with no
           reason given — two dead controls on the most-opened popover in the
           app, implying a feature that is not coming. Where the caller has no

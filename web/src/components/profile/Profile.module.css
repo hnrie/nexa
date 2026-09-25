@@ -61,6 +61,11 @@
   -webkit-mask-image: radial-gradient(circle at calc(var(--av-left) + var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
   mask-image: radial-gradient(circle at calc(var(--av-left) + var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
 }
+/* the hole follows the avatar to the right-hand side in a right-to-left language */
+[dir="rtl"] .banner {
+  -webkit-mask-image: radial-gradient(circle at calc(100% - var(--av-left) - var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
+  mask-image: radial-gradient(circle at calc(100% - var(--av-left) - var(--av) / 2) calc(100% - var(--av) * 0.1), transparent var(--hole), #000 calc(var(--hole) + 0.5px));
+}
 .bannerBtns { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 2; display: flex; gap: 8px; }
 .bannerBtn { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); color: #fff; transition: background var(--transition); }
 .bannerBtn:hover { background: rgba(0, 0, 0, 0.72); }
@@ -144,12 +149,19 @@
   -webkit-mask-image: radial-gradient(circle at calc(100% + 4px) 50%, transparent 12px, #000 12.5px);
   mask-image: radial-gradient(circle at calc(100% + 4px) 50%, transparent 12px, #000 12.5px);
 }
+[dir="rtl"] .stackItem:not(:last-child) {
+  -webkit-mask-image: radial-gradient(circle at -4px 50%, transparent 12px, #000 12.5px);
+  mask-image: radial-gradient(circle at -4px 50%, transparent 12px, #000 12.5px);
+}
 
 .section { min-width: 0; }
 .section h3 { margin: 0 0 4px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-strong); }
 .section p { margin: 0; font-size: 14px; line-height: 18px; color: var(--text); }
 .sinceRow { display: flex; flex-wrap: wrap; gap: 12px 40px; }
 .about { font-size: 14px; line-height: 18px; color: var(--text); overflow-wrap: anywhere; }
+/* an about me reads in the direction of its own words, lined up on the interface's side */
+.about :global(.md-paragraph), .about :global(.md-quote), .about :global(.md-list-item), .about :global(.md-h1), .about :global(.md-h2), .about :global(.md-h3) { unicode-bidi: plaintext; text-align: left; }
+[dir="rtl"] .about :global(.md-paragraph), [dir="rtl"] .about :global(.md-quote), [dir="rtl"] .about :global(.md-list-item), [dir="rtl"] .about :global(.md-h1), [dir="rtl"] .about :global(.md-h2), [dir="rtl"] .about :global(.md-h3) { text-align: right; }
 .about[data-clamp] { max-height: 108px; overflow: hidden; }
 .about[data-overflow] {
   -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);

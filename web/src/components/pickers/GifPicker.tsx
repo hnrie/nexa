@@ -7,6 +7,8 @@ import { removeFavoriteGifs, toggleFavoriteGif, type FavoriteGif } from "@/lib/g
 import { attachmentObjectURL } from "@/lib/mediaCache";
 import { BLANK_IMAGE, mediaKey, useMediaLinks } from "@/lib/mediaLinks";
 import { useExpressions } from "@/stores/expressions";
+import { useAuth } from "@/stores/auth";
+import { isInstanceAdmin } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { GifGrid, type GifTileData } from "./GifGrid";
@@ -28,6 +30,8 @@ interface FavoriteTile extends GifTileData {
 export function GifPicker({ onPick }: { onPick: Pick }) {
   const favs = useSettings((st) => st.settings.favoriteGifs);
   const enabled = useExpressions((x) => x.gifEnabled);
+  const meId = useAuth((a) => a.me?.id);
+  const admin = !!meId && isInstanceAdmin(meId);
   const setEnabled = useExpressions((x) => x.setGifEnabled);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const [tab, setTab] = useState<"favorites" | "search">("favorites");
@@ -260,7 +264,8 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
           }
         />
       )}
-      {!enabled && enabled !== null ? <div className={s.gifNote}>{tr_("pickers.gifPicker.gifSearchIsOffOnThis")}</div> : null}
+      {/* how to turn it on is for whoever runs the server; everyone else just learns it is not there */}
+      {!enabled && enabled !== null ? <div className={s.gifNote}>{tr_(admin ? "pickers.gifPicker.gifSearchIsOffOnThis" : "pickers.gifPicker.gifSearchUnavailable")}</div> : null}
     </div>
   );
 }

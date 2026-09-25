@@ -133,7 +133,8 @@ export function Lightbox({ src, name, type, onClose }: { src: string; name: stri
   const zoomedIn = useRef(false);
   zoomedIn.current = scale > 1;
   return createPortal(
-    <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name} data-zoomed={scale > 1 || undefined}>
+    // a layer, so the back gesture on a phone puts the picture away rather than leaving the page under it
+    <div className={s.lightbox} onClick={onClose} role="dialog" aria-label={name} data-zoomed={scale > 1 || undefined} data-modal-layer="">
       <button className={s.lbClose} aria-label={tr_("chat.attachments.close")} onClick={onClose}><X size={22} /></button>
       <ZoomPan className={s.lbStage} handle={zoom} onZoom={setScale} onIdleClick={onClose}>
         <img

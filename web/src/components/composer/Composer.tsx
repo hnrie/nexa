@@ -15,7 +15,8 @@ import { DropOverlay } from "./DropOverlay";
 import { useUI } from "@/stores/ui";
 import { canEdit } from "@/components/chat/messageMenu";
 import { useUsers } from "@/stores/users";
-import { canI, useServers } from "@/stores/servers";
+import { canI, rolesByPosition, useServers } from "@/stores/servers";
+import { useChannels } from "@/stores/channels";
 import { slowmodeRemaining, useSlowmode } from "@/stores/slowmode";
 import { P } from "@/lib/perms";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
@@ -55,16 +56,26 @@ function saveDraft(channelId: string, text: string): void {
   if (st.loaded) st.setDraft(channelId, text);
 }
 
-function acToken(text: string, caret: number): { kind: "user" | "emoji" | "command"; query: string; start: number } | null {
+type AcKind = "user" | "emoji" | "command" | "channel";
+
+/** The word being typed at the caret, when it asks for suggestions: @someone, #channel (in a server), :emoji or a /command. */
+function acToken(text: string, caret: number, channels: boolean): { kind: AcKind; query: string; start: number } | null {
   const before = text.slice(0, caret);
-  const m = /(?:^|\s)(@[a-z0-9_.]*|:[\w+-]{2,}|^\/\w*)$/i.exec(before);
+  // names in any script: someone called Émile or سارة is found by typing their name
+  const m = /(?:^|\s)(@[\p{L}\p{N}_.-]*|#[\p{L}\p{N}_-]*|:[\w+-]{2,}|^\/\w*)$/iu.exec(before);
   if (!m) return null;
   const token = m[1]!;
   const start = caret - token.length;
   if (token.startsWith("@")) return { kind: "user", query: token.slice(1).toLowerCase(), start };
+  if (token.startsWith("#")) return channels ? { kind: "channel", query: token.slice(1).toLowerCase(), start } : null;
   if (token.startsWith(":")) return { kind: "emoji", query: token.slice(1).toLowerCase(), start };
   if (start === 0 && token.startsWith("/")) return { kind: "command", query: token.slice(1).toLowerCase(), start };
   return null;
+}
+
+/** Matches that start with what was typed come before ones that only contain it. */
+function byPrefix(query: string, ...names: string[]): number {
+  return names.some((n) => n.toLowerCase().startsWith(query)) ? 0 : 1;
 }
 
 
@@ -106,7 +117,7 @@ export function Composer({ channel }: { channel: Channel }) {
   // this conversation's tray, which keeps going up while the box is elsewhere
   const files = useUploads((u) => u.trays[channel.id]) ?? NO_FILES;
   const [picker, setPicker] = useState(false);
-  const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: "user" | "emoji" | "command" } | null>(null);
+  const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: AcKind } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const lastTyping = useRef(0);
@@ -208,7 +219,7 @@ export function Composer({ channel }: { channel: Channel }) {
   }, [settingsLoaded]);
 
   const refreshAc = useCallback((value: string, caret: number) => {
-    const tok = acToken(value, caret);
+    const tok = acToken(value, caret, !!serverState);
     if (!tok) return setAc(null);
     let items: AcItem[] = [];
     if (tok.kind === "user") {
@@ -224,12 +235,32 @@ export function Composer({ channel }: { channel: Channel }) {
           if (u) pool.set(id, u);
         }
       }
+      const q = tok.query;
+      const nick = (id: string) => serverState?.members[id]?.nickname ?? "";
       items = [...pool.values()]
-        .filter((u) => !tok.query || u.username.includes(tok.query) || u.display_name.toLowerCase().includes(tok.query) || (serverState?.members[u.id]?.nickname ?? "").toLowerCase().includes(tok.query))
+        .filter((u) => !q || u.username.includes(q) || u.display_name.toLowerCase().includes(q) || nick(u.id).toLowerCase().includes(q))
+        .sort((a, b) => byPrefix(q, a.username, a.display_name, nick(a.id)) - byPrefix(q, b.username, b.display_name, nick(b.id)))
         .slice(0, 8)
         .map((u) => ({ kind: "user", user: u }));
-      if (canEveryone && isServer && "everyone".startsWith(tok.query)) items.unshift({ kind: "command", name: "everyone", desc: tr_("composer.composer.notifyEveryoneWhoCanSeeThis") });
-      if (canEveryone && isServer && tok.query && "here".startsWith(tok.query)) items.unshift({ kind: "command", name: "here", desc: tr_("composer.composer.notifyEveryoneOnlineInThisChannel") });
+      // Roles anyone may ping, or every role for those who may ping @everyone.
+      // @everyone itself is not a role here: it has its own row.
+      if (serverState) {
+        const roles = rolesByPosition(serverState)
+          .filter((r) => r.id !== serverState.server.id && (r.mentionable || canEveryone) && (!q || r.name.toLowerCase().includes(q)))
+          .sort((a, b) => byPrefix(q, a.name) - byPrefix(q, b.name))
+          .slice(0, 5);
+        for (const role of roles) items.push({ kind: "role", role });
+      }
+      if (canEveryone && isServer && "everyone".startsWith(q)) items.unshift({ kind: "command", name: "everyone", desc: tr_("composer.composer.notifyEveryoneWhoCanSeeThis") });
+      if (canEveryone && isServer && q && "here".startsWith(q)) items.unshift({ kind: "command", name: "here", desc: tr_("composer.composer.notifyEveryoneOnlineInThisChannel") });
+    } else if (tok.kind === "channel") {
+      const q = tok.query;
+      const all = useChannels.getState().byId;
+      items = Object.values(all)
+        .filter((c) => c.server_id === channel.server_id && c.type === "text" && (!q || c.name.toLowerCase().includes(q)) && canI(serverState, P.VIEW_CHANNEL, c.id))
+        .sort((a, b) => byPrefix(q, a.name) - byPrefix(q, b.name) || a.position - b.position)
+        .slice(0, 8)
+        .map((c) => ({ kind: "channel", channel: c, category: c.parent_id ? all[c.parent_id]?.name : undefined }));
     } else if (tok.kind === "emoji") {
       // Re-read from the box rather than reusing the keystroke that started
       // the load: by the time the set arrives the text may be gone, or belong
@@ -246,7 +277,11 @@ export function Composer({ channel }: { channel: Channel }) {
         );
       }
       const ex = useExpressions.getState();
-      const custom = searchCustomEmoji(ex.emojis, tok.query, 4).map((e) => ({ kind: "customEmoji" as const, emoji: e }));
+      // this server's own emoji first: its :name: is the one a message here gets
+      const sid = channel.server_id;
+      const others = Object.fromEntries(Object.entries(ex.emojis).filter(([id]) => id !== sid));
+      const own = sid ? searchCustomEmoji({ [sid]: ex.emojis[sid] ?? [] }, tok.query, 4) : [];
+      const custom = [...own, ...searchCustomEmoji(others, tok.query, 4 - own.length)].map((e) => ({ kind: "customEmoji" as const, emoji: e }));
       const fromPacks = searchPackEmoji(ex.packs, tok.query, 4 - Math.min(custom.length, 4)).map((r) => ({
         kind: "customEmoji" as const,
         emoji: { id: r.sticker.id, server_id: "", name: r.sticker.name, blob_id: r.sticker.blob_id, animated: r.sticker.animated, creator_id: r.sticker.creator_id, created_at: r.sticker.created_at },
@@ -260,7 +295,7 @@ export function Composer({ channel }: { channel: Channel }) {
     // serverState, canEveryone and isServer are read above and change on their
     // own: without them a role that just granted @everyone, or members that
     // arrived after this was built, never showed up in the list.
-  }, [users, rels, channel.recipient_ids, serverState, canEveryone, isServer]);
+  }, [users, rels, channel.recipient_ids, channel.server_id, serverState, canEveryone, isServer]);
 
   const onChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -314,6 +349,8 @@ export function Composer({ channel }: { channel: Channel }) {
     if (!it) return;
     const caret = taRef.current?.selectionStart ?? text.length;
     if (it.kind === "user") insertAt(ac.start, caret, `@${it.user.username} `);
+    else if (it.kind === "role") insertAt(ac.start, caret, `@${it.role.name} `);
+    else if (it.kind === "channel") insertAt(ac.start, caret, `#${it.channel.name} `);
     else if (it.kind === "command" && ac.kind === "user") insertAt(ac.start, caret, `@${it.name} `);
     else if (it.kind === "emoji") insertAt(ac.start, caret, `${withTone(it.entry, tone)} `);
     else if (it.kind === "customEmoji") insertAt(ac.start, caret, `${emojiToken(it.emoji)} `);
@@ -322,7 +359,7 @@ export function Composer({ channel }: { channel: Channel }) {
 
   const addFiles = (list: FileList | File[]) => {
     if (!canAttach) {
-      toast(tr_("composer.composer.youDoNotHavePermissionTo"), "error");
+      toast(tr_("composer.composer.noUploadPermission"), "error");
       return;
     }
     const staged: Staged[] = [];
@@ -458,7 +495,7 @@ export function Composer({ channel }: { channel: Channel }) {
           listened to the whole window, so the first one mounted took every
           drop while all of them drew their scrim. */}
       {paneFocused ? <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} /> : null}
-      {ac ? <Autocomplete items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
+      {ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
       {picker ? (
         <ExpressionPicker
           onClose={() => setPicker(false)}
@@ -561,7 +598,7 @@ export function Composer({ channel }: { channel: Channel }) {
       {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
         <span className={s.slowmode} data-active={remaining > 0} title={tr_("composer.composer.slowModeIsEnabled")}>
-          <Timer size={14} /> {remaining > 0 ? formatShortDuration(remaining) : tr_("composer.composer.slowmodeIsEnabled")}
+          <Timer size={14} /> {remaining > 0 ? formatShortDuration(remaining) : tr_("composer.composer.slowModeIsEnabled")}
         </span>
       ) : null}
     </div>

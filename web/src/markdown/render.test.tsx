@@ -80,21 +80,29 @@ describe("mentions", () => {
     expect(onUserClick.mock.calls[0]?.[1]).toBe(el);
   });
 
-  it("resolves channels and falls back to deleted-channel", () => {
+  it("resolves channels and falls back to a quiet unknown-channel", () => {
     const onChannelClick = vi.fn();
     const { container } = render(<Markdown source="<#10> <#11>" ctx={makeCtx({ onChannelClick })} />);
     const nodes = [...container.querySelectorAll(".md-mention")];
-    expect(nodes.map((n) => n.textContent)).toEqual(["#general", "#deleted-channel"]);
+    expect(nodes.map((n) => n.textContent)).toEqual(["#general", "#unknown-channel"]);
+    expect((nodes[1] as HTMLElement).getAttribute("role")).toBeNull();
     fireEvent.click(nodes[0] as Element);
     expect(onChannelClick).toHaveBeenCalledWith("10");
   });
 
-  it("colours role mentions", () => {
+  it("colours role mentions, mixed toward the theme's text so they read in either theme", () => {
     const { container } = render(<Markdown source="<@&20>" ctx={makeCtx()} />);
     const el = container.querySelector(".md-mention") as HTMLElement;
     expect(el.textContent).toBe("@admin");
-    expect(el.style.color).toBe("rgb(255, 0, 0)");
-    expect(el.style.backgroundColor).toBe("rgba(255, 0, 0, 0.1)");
+    expect(el.getAttribute("style") ?? "").toContain("color-mix(in srgb, #ff0000 72%, var(--text-strong))");
+    expect(el.style.backgroundColor).toBe("rgba(255, 0, 0, 0.16)");
+  });
+
+  it("shows a role nobody here knows as a quiet placeholder", () => {
+    const { container } = render(<Markdown source="<@&99>" ctx={makeCtx()} />);
+    const el = container.querySelector(".md-mention") as HTMLElement;
+    expect(el.textContent).toBe("@unknown-role");
+    expect(el.dataset["roleMention"]).toBe("unknown");
   });
 
   it("leaves role mentions without a colour to the mention style", () => {

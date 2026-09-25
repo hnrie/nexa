@@ -13,6 +13,7 @@ import { rangeBetween, useSelection } from "@/stores/selection";
 import { useUsers, displayName } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
+import { mentionsMe } from "@/lib/mentionsMe";
 import { useShiftHeld } from "@/hooks/useShiftHeld";
 import { stickerUrl } from "@/api/users";
 import { StickerView as StickerMedia } from "@/components/stickers/StickerView";
@@ -116,7 +117,10 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const picked = useSelection((x) => x.channelId === msg.channel_id && !!x.picked[msg.id]);
   const pickable = selecting && !pending && canPick(msg);
 
-  const mentioned = !!me && (msg.mention_everyone || msg.mentions.includes(me.id)) && msg.author_id !== me.id;
+  // A role of mine in the server counts too. The row listens to my roles
+  // there, so its tint follows a role given or taken away.
+  useServers((st) => (serverId ? st.byId[serverId]?.me?.role_ids : undefined));
+  const mentioned = !!me && msg.author_id !== me.id && mentionsMe(msg, me.id);
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
   const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
   // a GIF or picture link shows only the picture, the way an uploaded one does

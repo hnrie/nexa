@@ -20,6 +20,9 @@
 .resultChan { color: var(--text-muted); }
 .resultTime { margin-inline-start: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .resultText { font-size: 14px; line-height: 1.375; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+/* a result reads in the direction of its own words, lined up on the interface's side */
+.resultText { unicode-bidi: plaintext; text-align: left; }
+[dir="rtl"] .resultText { text-align: right; }
 .resultText mark { background: var(--mention-bg-hover); color: var(--mention-fg); border-radius: 2px; padding: 0 1px; }
 .empty { padding: 24px 12px; text-align: center; color: var(--text-muted); font-size: 14px; }
 .foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border-subtle); font-size: 12px; color: var(--text-muted); }
@@ -36,6 +39,12 @@
 /* Tablets and narrow windows have no room for a 420px column beside the chat,
    which would squeeze the messages and composer to nothing: search opens over it. */
 @media (max-width: 1099px) { .panel { position: absolute; top: 0; inset-inline-end: 0; bottom: 0; z-index: 5; width: min(420px, 100%); max-width: none; box-shadow: var(--shadow-high); } }
+/* Where the sidebars stay (a tablet held upright) the chat beside them is
+   narrow, and a 420px panel over it left a strip of cut-off messages showing:
+   the results cover the chat, and the box grows less, so the channel's name
+   in the header is not cut to a few letters while searching. */
+@media (min-width: 768px) and (max-width: 971px) { .panel { width: 100%; } }
+@media (min-width: 768px) and (max-width: 1099px) { .searchBox:focus-within { width: 200px; } }
 @media (max-width: 767px) { .panel { position: absolute; inset: 0; width: 100%; max-width: none; z-index: 5; } .searchBox { width: 120px; } .searchBox:focus-within { width: 180px; } }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }
 

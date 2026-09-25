@@ -14,8 +14,11 @@ import { useMessages, type PendingMessage, type PendingUpload } from "@/stores/m
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useSlowmode } from "@/stores/slowmode";
+import { canI, P, useServers } from "@/stores/servers";
+import { emojiToken, packEmoji, useExpressions } from "@/stores/expressions";
+import { emojiByShortcode, emojiLoaded } from "@/components/pickers/emojiIndex";
 import { extractUrls } from "@/markdown";
-import { extractMentions } from "./mentions";
+import { extractMentions, type HumanNames, type MentionScope } from "./mentions";
 
 import { t } from "@/i18n";
 export interface SendOptions {
@@ -71,17 +74,75 @@ function enqueue(channelId: string, job: () => Promise<void>): Promise<void> {
 interface Written {
   payload: MessagePayload;
   mentions: string[];
+  roles: string[];
   everyone: boolean;
 }
 
-function written(rawText: string, opts: SendOptions): Written {
-  const { text, mentions, everyone } = extractMentions(rawText, useUsers.getState().byId);
+/** The conversation a channel belongs to: a subchat's people are those of the chat it is in. */
+function conversation(channelId: string) {
+  const byId = useChannels.getState().byId;
+  const ch = byId[channelId];
+  return ch?.type === "subchat" && ch.parent_id ? (byId[ch.parent_id] ?? ch) : ch;
+}
+
+/**
+ * Who and what a message in this channel can name: its people, the roles one
+ * may mention there (the mentionable ones, or all of them with Mention
+ * @everyone), the server's text channels one can see, and the custom emoji,
+ * this server's own first.
+ */
+export function mentionScope(channelId: string): MentionScope {
+  const ch = conversation(channelId);
+  const users = useUsers.getState().byId;
+  const me = useAuth.getState().me;
+  const nameOf = (id: string) => (id === me?.id ? me.display_name : users[id]?.display_name) ?? "";
+  const serverId = ch?.server_id ?? null;
+  const st = serverId ? useServers.getState().byId[serverId] : undefined;
+  const scope: MentionScope = {};
+  if (st) {
+    scope.members = Object.values(st.members).map((m) => ({ id: m.user_id, names: [nameOf(m.user_id), m.nickname] }));
+    const everyRole = canI(st, P.MENTION_EVERYONE, channelId);
+    scope.roles = Object.values(st.roles)
+      .filter((r) => r.id !== st.server.id && (r.mentionable || everyRole))
+      .map((r) => ({ id: r.id, name: r.name }));
+    scope.channels = Object.values(useChannels.getState().byId)
+      .filter((c) => c.server_id === serverId && c.type === "text" && canI(st, P.VIEW_CHANNEL, c.id))
+      .map((c) => ({ id: c.id, name: c.name }));
+  } else if (ch) {
+    const ids = new Set([...ch.recipient_ids, ...(me ? [me.id] : [])]);
+    scope.members = [...ids].map((id) => ({ id, names: [nameOf(id)] }));
+  }
+  const ex = useExpressions.getState();
+  const emoji: NonNullable<MentionScope["emoji"]> = [];
+  if (serverId) for (const e of ex.emojis[serverId] ?? []) emoji.push({ name: e.name, token: emojiToken(e) });
+  for (const [sid, list] of Object.entries(ex.emojis)) if (sid !== serverId) for (const e of list) emoji.push({ name: e.name, token: emojiToken(e), fallback: true });
+  for (const { items } of packEmoji(ex.packs)) for (const e of items) emoji.push({ name: e.name, token: emojiToken(e), fallback: true });
+  scope.emoji = emoji;
+  // until the emoji set is here nobody can say a name is free, so nothing borrowed stands in for it
+  scope.isShortcode = (name) => !emojiLoaded() || !!emojiByShortcode(name);
+  return scope;
+}
+
+/** The names mentions in an edit go back to: only those that turn into the same mention again when it is saved. */
+export function editNames(channelId: string): HumanNames {
+  const scope = mentionScope(channelId);
+  const once = (list: { id: string; name: string }[] | undefined) => {
+    const count = new Map<string, number>();
+    for (const x of list ?? []) count.set(x.name.toLowerCase(), (count.get(x.name.toLowerCase()) ?? 0) + 1);
+    return Object.fromEntries((list ?? []).filter((x) => count.get(x.name.toLowerCase()) === 1).map((x) => [x.id, x.name]));
+  };
+  // a custom emoji reads as its :name: when saving that name brings back the very same emoji
+  return { roles: once(scope.roles), channels: once(scope.channels), emoji: (token, name) => extractMentions(`:${name}:`, {}, scope).text === token };
+}
+
+function written(channelId: string, rawText: string, opts: SendOptions): Written {
+  const { text, mentions, roles, everyone } = extractMentions(rawText, useUsers.getState().byId, mentionScope(channelId));
   const payload: MessagePayload = {};
   if (text) payload.t = text;
   if (opts.attachments?.length) payload.att = opts.attachments.map((a) => a.meta);
   if (Array.isArray(opts.embeds) && opts.embeds.length) payload.embeds = opts.embeds;
   if (opts.sticker) payload.sticker = opts.sticker;
-  return { payload, mentions, everyone };
+  return { payload, mentions, roles, everyone };
 }
 
 /** What a pending copy keeps of the options, so a retry sends what was chosen. */
@@ -97,7 +158,7 @@ function pendingOf(channelId: string, tmp: string): PendingMessage | undefined {
 export function sendMessage(channelId: string, rawText: string, opts: SendOptions = {}): Promise<void> {
   const me = useAuth.getState().me;
   if (!me) return Promise.resolve();
-  const w = written(rawText, opts);
+  const w = written(channelId, rawText, opts);
   if (!w.payload.t && !w.payload.att && !w.payload.sticker) return Promise.resolve();
   const nonce = newNonce();
   const tmp = tmpId();
@@ -133,7 +194,7 @@ function forget(tmp: string): void {
 export function sendWithFiles(channelId: string, rawText: string, files: Staged[], opts: SendOptions = {}): Promise<void> {
   const me = useAuth.getState().me;
   if (!me) return Promise.resolve();
-  const w = written(rawText, opts);
+  const w = written(channelId, rawText, opts);
   const nonce = newNonce();
   const tmp = tmpId();
   const upload: PendingUpload = {
@@ -221,7 +282,7 @@ async function uploadThenSend(channelId: string, meId: string, tmp: string, nonc
 
 /** Sends one message whose pending copy is already showing, and settles or fails that copy. */
 async function deliver(channelId: string, meId: string, w: Written, tmp: string, nonce: string, opts: SendOptions): Promise<void> {
-  const { mentions, everyone } = w;
+  const { mentions, roles, everyone } = w;
   let payload = w.payload;
   try {
     if (opts.embeds && !Array.isArray(opts.embeds)) {
@@ -242,6 +303,7 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
       if (opts.ping !== false && author && author !== meId && !body.mentions.includes(author)) body.mentions = [...body.mentions, author];
     }
     if (everyone) body.mention_everyone = true;
+    if (roles.length) body.mention_roles = roles;
     if (opts.attachments?.length) body.attachments = opts.attachments.map((a) => ({ blob_id: a.blob_id, size: a.size }));
     if (opts.flags) body.flags = opts.flags;
     const sent = await messagesApi.send(channelId, body);
@@ -275,7 +337,7 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   // a message this device cannot read cannot be edited from it: the edit
   // would replace everything with the new text, files and all
   if (!me || !existing || !existing.payload) return;
-  const { text, mentions, everyone } = extractMentions(rawText, useUsers.getState().byId);
+  const { text, mentions, roles, everyone } = extractMentions(rawText, useUsers.getState().byId, mentionScope(channelId));
   // A reply that pinged its author keeps pinging them: the mention came from
   // the reply, not from the text, and the server replaces the list on edit.
   const replied = existing.reply_to_id ? replyAuthor(channelId, existing.reply_to_id) : undefined;
@@ -306,7 +368,7 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   }
   if (!chanKey) throw new Error("waiting_for_key");
   const ciphertext = await encryptMessage(chanKey, { conv, epoch: useEpoch, channelId, authorId: me.id }, payload);
-  const updated = await messagesApi.edit(channelId, messageId, { ciphertext, key_conv_id: conv, key_epoch: useEpoch, mentions, mention_everyone: everyone });
+  const updated = await messagesApi.edit(channelId, messageId, { ciphertext, key_conv_id: conv, key_epoch: useEpoch, mentions, mention_roles: roles, mention_everyone: everyone });
   const decrypted = await decryptForStore(updated);
   useMessages.getState().update(channelId, decrypted);
 }
@@ -326,7 +388,7 @@ export async function retryPending(channelId: string, tmpId: string): Promise<vo
   if (p.upload && !p.upload.done && uploading.has(tmpId)) {
     // its files never made it up: they go up again, in the same place in the list
     store.updatePending(channelId, tmpId, { status: "sending", upload: { ...p.upload, loaded: 0, speed: 0, error: null } });
-    await uploadThenSend(channelId, me.id, tmpId, p.nonce, written(p.payload.t ?? "", opts), opts).catch(() => undefined);
+    await uploadThenSend(channelId, me.id, tmpId, p.nonce, written(channelId, p.payload.t ?? "", opts), opts).catch(() => undefined);
     return;
   }
   opts.replaces = tmpId;

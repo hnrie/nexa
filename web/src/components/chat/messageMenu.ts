@@ -1,7 +1,7 @@
 import { channels as channelsApi } from "@/api/channels";
 import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
 import { MSG_FLAG_PINNED } from "@/api/types";
-import { humanizeMentions } from "@/components/composer/mentions";
+import { humanizeMentions, type HumanNames } from "@/components/composer/mentions";
 import { compareIds } from "@/lib/ids";
 import { copyImage, saveImage, type ImageTarget } from "@/lib/imageActions";
 import { useAuth } from "@/stores/auth";
@@ -13,6 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { canI, isInstanceAdmin, P, useServers } from "@/stores/servers";
 import { useUsers } from "@/stores/users";
+import { mentionsMe } from "@/lib/mentionsMe";
 
 import { t } from "@/i18n";
 export interface MenuHooks {
@@ -69,7 +70,7 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
     id: "copy",
     label: t("chat.messageMenu.copyText"),
     disabled: !msg.payload?.t,
-    onSelect: () => void navigator.clipboard?.writeText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId)),
+    onSelect: () => void navigator.clipboard?.writeText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, knownNames())),
   });
   if (canPin(msg)) items.push({
     id: "pin",
@@ -105,6 +106,15 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
   return items;
 }
 
+/** Every role and channel name this device knows, so copied text reads the way the message does. */
+function knownNames(): HumanNames {
+  const roles: Record<string, string> = {};
+  for (const st of Object.values(useServers.getState().byId)) for (const r of Object.values(st.roles)) roles[r.id] = r.name;
+  const channels: Record<string, string> = {};
+  for (const c of Object.values(useChannels.getState().byId)) if (c.server_id && c.name) channels[c.id] = c.name;
+  return { roles, channels, emoji: () => true };
+}
+
 async function fetchForcedAck(channelId: string, prev: string): Promise<void> {
   // The regular ack never moves backwards; "mark unread" needs the manual flag.
   const { api } = await import("@/api/client");
@@ -128,7 +138,7 @@ export function markUnread(msg: DecryptedMessage): void {
   if (meId && idx >= 0) {
     for (const id of ids.slice(idx)) {
       const m = ch?.byId[id];
-      if (m && m.author_id !== meId && (m.mention_everyone || m.mentions.includes(meId))) mentions += 1;
+      if (m && m.author_id !== meId && mentionsMe(m, meId)) mentions += 1;
     }
   }
   useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: mentions });

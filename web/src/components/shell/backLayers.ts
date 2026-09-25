@@ -29,6 +29,18 @@ import { useUI } from "@/stores/ui";
  */
 
 const MARK = "nexaLayer";
+
+/** The running tracker's re-check, while one is installed. */
+let recheck: (() => void) | null = null;
+
+/**
+ * Tells the tracker a layer drawn inside the page has opened or closed. Those
+ * portalled into the body are noticed on their own; one drawn in place (the
+ * emoji picker over the message box, the subchat panel) changes nothing there.
+ */
+export function layersChanged(): void {
+  recheck?.();
+}
 /** How long a change is left to settle (a dialog swapped for another, a close followed by a navigation) before history follows it. */
 const SETTLE_MS = 60;
 
@@ -117,6 +129,7 @@ export function installBackLayers(): () => void {
   };
 
   window.addEventListener("popstate", onPop);
+  recheck = schedule;
   const stopUI = useUI.subscribe((s, prev) => {
     if (s.modals !== prev.modals || s.contextMenu !== prev.contextMenu || s.quickSwitcher !== prev.quickSwitcher || s.leftOpen !== prev.leftOpen || s.rightOpen !== prev.rightOpen) schedule();
   });
@@ -128,6 +141,7 @@ export function installBackLayers(): () => void {
   schedule();
 
   return () => {
+    recheck = null;
     window.removeEventListener("popstate", onPop);
     stopUI();
     observer.disconnect();

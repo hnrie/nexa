@@ -11,6 +11,7 @@ import { selectSubchats, useChannels } from "@/stores/channels";
 import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import s from "./Chat.module.css";
+import { useLayerPresence } from "./useLayerPresence";
 
 import { t } from "@/i18n";
 /** Menu for one subchat row: edit its name and password, or delete for everyone. */
@@ -57,6 +58,7 @@ interface Props {
 
 /** The list of side conversations inside a DM, with a box to start another. */
 export function SubchatPanel({ parent, activeId, onClose }: Props) {
+  useLayerPresence();
   const nav = useNavigate();
   const byId = useChannels((c) => c.byId);
   const upsert = useChannels((c) => c.upsert);
@@ -95,8 +97,11 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
       if (e.key !== "Escape") return;
       // A dialog opened from this panel is on top of it and Escape belongs to
       // that dialog; taking it in the capture phase closed the panel behind it
-      // and left the dialog standing.
-      if (document.querySelector("[data-modal-layer]")) return;
+      // and left the dialog standing. (The panel is a layer itself, so the
+      // back gesture on a phone closes it: only one later in the page counts.)
+      const panel = box.current;
+      const over = [...document.querySelectorAll("[data-modal-layer]")].some((el) => el !== panel && !!panel && !!(panel.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING));
+      if (over) return;
       e.stopPropagation();
       onClose();
     };
@@ -126,7 +131,7 @@ export function SubchatPanel({ parent, activeId, onClose }: Props) {
   };
 
   return (
-    <div className={s.subPanel} ref={box} role="dialog" aria-label={t("chat.chat.subchats")} data-testid="subchat-panel">
+    <div className={s.subPanel} ref={box} role="dialog" aria-label={t("chat.chat.subchats")} data-testid="subchat-panel" data-modal-layer="">
       <div className={s.subHead}>
         <MessageCircle size={16} />
         <span>{t("chat.chat.subchats")}</span>

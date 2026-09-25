@@ -21,6 +21,7 @@ import s from "./Chat.module.css";
 import { t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
+import { dispatchGeneration, dispatchHooks } from "@/gateway/dispatch";
 type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
@@ -28,6 +29,35 @@ type Row =
   | { kind: "pending"; key: string; p: PendingMessage; groupStart: boolean };
 
 const GROUP_MS = 7 * 60 * 1000;
+
+/**
+ * The session whose ready has been applied. A conversation opened straight
+ * from the address bar can load its messages before ready arrives, while
+ * nothing is known yet about how far it was read: the "new" line was placed
+ * against nothing (so never shown) and the newest message acked at once,
+ * which undid Mark Unread and every unread message waiting there.
+ */
+let readyIn = -1;
+const readyWatchers = new Set<() => void>();
+dispatchHooks.onReady.push(() => {
+  readyIn = dispatchGeneration();
+  for (const fn of readyWatchers) fn();
+});
+
+/** Whether this session's read positions are in. */
+function useReadStatesKnown(): boolean {
+  const [known, setKnown] = useState(() => readyIn === dispatchGeneration());
+  useEffect(() => {
+    if (known) return;
+    const check = () => setKnown(readyIn === dispatchGeneration());
+    readyWatchers.add(check);
+    check();
+    return () => {
+      readyWatchers.delete(check);
+    };
+  }, [known]);
+  return known;
+}
 
 /**
  * How long the reading position goes on being held after a page of older
@@ -110,6 +140,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   const loadInitial = useMessages((m) => m.loadInitial);
   const returnToPresent = useMessages((m) => m.returnToPresent);
   const readState = useReadStates((r) => r.byChannel[channel.id]);
+  const readKnown = useReadStatesKnown();
   const ack = useReadStates((r) => r.ack);
   const focused = useUI((u) => u.focused);
   const jumpTo = useUI((u) => u.jumpTo);
@@ -156,7 +187,16 @@ export function MessageList({ channel }: { channel: Channel }) {
   const loaded = state?.loaded ?? false;
   const failed = state?.failed ?? 0;
 
-  if (unreadFrom.current === undefined && loaded) unreadFrom.current = readState?.lastReadId ?? null;
+  if (unreadFrom.current === undefined && loaded && readKnown) unreadFrom.current = readState?.lastReadId ?? null;
+  // Marked unread (here or on another device): the read position moves back,
+  // and the "new" line moves up with it at once rather than on the next visit.
+  const lastRead = readState?.lastReadId ?? null;
+  const seenLastRead = useRef(lastRead);
+  if (seenLastRead.current !== lastRead) {
+    const before = seenLastRead.current;
+    seenLastRead.current = lastRead;
+    if (unreadFrom.current !== undefined && before !== null && (lastRead === null || compareIds(lastRead, before) < 0)) unreadFrom.current = lastRead ?? "0";
+  }
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -182,8 +222,8 @@ export function MessageList({ channel }: { channel: Channel }) {
       prev = asMessage;
     }
     return out;
-    // loaded is listed so the rows are built again once the unread point is captured
-  }, [ids, byId, pending, me?.id, loaded]);
+    // loaded, readKnown and lastRead are listed so the rows are built again when the unread point is captured or moves
+  }, [ids, byId, pending, me?.id, loaded, readKnown, lastRead]);
 
   const newest = ids[ids.length - 1];
   const prevNewest = useRef<string | undefined>(undefined);
@@ -372,12 +412,12 @@ export function MessageList({ channel }: { channel: Channel }) {
     // Wait for the first page: the unread point is taken from the read state
     // on that render, and acking earlier would move it to the newest message.
     // A list that stops short of the present has not shown the newest message.
-    if (!loaded || hasNewer || !newest || !focused || !atBottom.current || typeof document === "undefined" || document.visibilityState !== "visible") return;
+    if (!loaded || !readKnown || hasNewer || !newest || !focused || !atBottom.current || typeof document === "undefined" || document.visibilityState !== "visible") return;
     if (lastAcked.current === newest) return;
     if (readState?.lastReadId && compareIds(readState.lastReadId, newest) >= 0 && readState.mentions === 0) return;
     lastAcked.current = newest;
     void ack(channel.id, newest);
-  }, [loaded, hasNewer, newest, focused, readState, ack, channel.id, reachedBottom]);
+  }, [loaded, readKnown, hasNewer, newest, focused, readState, ack, channel.id, reachedBottom]);
 
   // A list too short to scroll never sends the scroll that asks for older
   // messages — after most of a page was deleted, or on a tall screen — so it

@@ -11,8 +11,12 @@
 .hSub[data-status="dnd"] { color: var(--status-dnd); }
 .hStatus { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .hStatusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hTopic { text-align: start; min-width: 0; flex: 0 4 auto; color: var(--text-muted); border-inline-start: 1px solid var(--border); padding-inline-start: 8px; }
+.hTopic { text-align: start; min-width: 0; flex: 0 4 auto; color: var(--text-muted); border-inline-start: 1px solid var(--border); padding-inline-start: 8px; unicode-bidi: plaintext; }
 .hTopic:hover { color: var(--text); }
+/* In a narrow header the search box grows while it is used, and the topic
+   makes way for it rather than both it and the channel's name being cut to
+   a letter or two. */
+@media (max-width: 1099px) { .header:has([data-header-search]:focus-within) .hTopic { display: none; } }
 .lockHash { position: relative; display: flex; }
 .lock { position: absolute; inset-inline-end: -5px; bottom: -3px; background: var(--bg-raised); border-radius: 2px; }
 .authorNick { font-weight: 500; }
@@ -30,6 +34,9 @@
 /* the person a DM is with, beside the conversation (ProfileCard's panel) */
 .profilePanel { width: 340px; flex: none; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-inline-start: 1px solid var(--border-subtle); background: var(--bg-raised); }
 @media (max-width: 1099px) { .profilePanel { position: absolute; top: 0; inset-inline-end: 0; bottom: 0; z-index: 5; width: min(340px, 100%); box-shadow: var(--shadow-high); } }
+/* A tablet held upright keeps its sidebars, and a 340px panel over what is left
+   of the chat showed a strip of cut-off messages beside it: it covers the chat instead. */
+@media (min-width: 768px) and (max-width: 899px) { .profilePanel { width: 100%; } }
 .listWrap { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; position: relative; }
 /* a pull past the top stays in the list instead of reaching the page, where Chrome on Android reloads */
 .scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; overflow-anchor: none; padding-bottom: 8px; }
@@ -65,7 +72,7 @@
 .msg[data-pending="true"] { opacity: 0.55; }
 /* a message waiting on its files is dimmed a little less, so its progress can be read */
 .msg[data-pending="true"][data-uploading="true"] { opacity: 0.8; }
-.msg[data-failed="true"] .content { color: var(--danger); }
+.msg[data-failed="true"] .content { color: var(--text-danger); }
 .avatar { position: absolute; inset-inline-start: 16px; top: 2px; cursor: pointer; }
 /* a reply preview occupies the first line, so the avatar drops to the author row */
 .msg[data-reply="true"] .avatar { top: 26px; }
@@ -80,13 +87,19 @@
 .content { font-size: 16px; line-height: 22px; color: var(--text); word-break: break-word; }
 .edited { font-size: 10px; color: var(--text-muted); margin-inline-start: 4px; }
 .content > :global(.md-paragraph):last-of-type { display: inline; }
+/* Each paragraph reads in the direction of its own words, so an English
+   message in an Arabic interface (or an Arabic one in English) keeps its
+   question mark at the end of the sentence. It still lines up under the name,
+   on the interface's side. */
+.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-subtext), .pinText { unicode-bidi: plaintext; text-align: left; }
+[dir="rtl"] .content :global(.md-paragraph), [dir="rtl"] .content :global(.md-quote), [dir="rtl"] .content :global(.md-list-item), [dir="rtl"] .content :global(.md-h1), [dir="rtl"] .content :global(.md-h2), [dir="rtl"] .content :global(.md-h3), [dir="rtl"] .content :global(.md-subtext), [dir="rtl"] .pinText { text-align: right; }
 .waiting { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }
 .replyLine { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; height: 22px; font-size: 14px; color: var(--text-muted); position: relative; cursor: pointer; }
 /* the spine hooks up from the avatar column into this line; the avatar sits below it */
 .replyLine::before { content: ""; position: absolute; inset-inline-start: -38px; top: 11px; bottom: -6px; width: 32px; border-inline-start: 2px solid var(--border-strong); border-top: 2px solid var(--border-strong); border-start-start-radius: 6px; pointer-events: none; }
 .replyLine > span:first-of-type { flex: none; }
 .replyName { font-weight: 500; color: var(--text); min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.replyText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+.replyText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; unicode-bidi: plaintext; }
 .replyLine:hover .replyText { color: var(--text); }
 /* The toolbar stays inside the row it belongs to. Hanging it into the gap
    above put it over the message before, which is worse than covering the
@@ -132,6 +145,7 @@
 .sysLink { color: var(--link); cursor: pointer; }
 .edit { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; }
 .editTa { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-composer); color: var(--text); border: 0; outline: none; resize: none; font: inherit; font-family: var(--font-with-emoji); font-size: 16px; line-height: 22px; }
+.editTa { unicode-bidi: plaintext; }
 .editHint { font-size: 12px; color: var(--text-muted); }
 .editHint button { color: var(--link); font: inherit; padding: 0; }
 .editHint button:hover { text-decoration: underline; }
@@ -202,10 +216,15 @@
 .lbStage[data-zoomed="true"]:active { cursor: grabbing; }
 .lbBar button:disabled { opacity: 0.55; cursor: default; text-decoration: none; }
 .lbBar button { display: inline-flex; align-items: center; gap: 4px; min-width: 44px; justify-content: center; }
-.lbBar { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 16px; }
+/* across the whole width, centred: pinned to the middle with a transform, the
+   bar was only allowed half the screen, and on a phone "Open original" broke
+   over two lines */
+.lbBar { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); inset-inline: 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; pointer-events: none; }
+/* the bar's empty ends are still backdrop, which closes the picture when clicked */
+.lbBar > * { pointer-events: auto; }
 .lbClose { position: absolute; top: 12px; inset-inline-end: 12px; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 0, 0, 0.5); color: #fff; }
 .lbClose:hover { background: rgba(255, 255, 255, 0.15); }
-.lbBar a, .lbBar button { color: #fff; font-size: 14px; font-weight: 600; opacity: 0.85; }
+.lbBar a, .lbBar button { color: #fff; font-size: 14px; font-weight: 600; opacity: 0.85; white-space: nowrap; }
 .lbBar a:hover, .lbBar button:hover { opacity: 1; text-decoration: underline; }
 /* picking messages to delete: every row moves over for a round check in the gutter */
 .composerSlot { flex: none; display: flex; flex-direction: column; }
@@ -238,6 +257,10 @@
 .compact .gutterTime { opacity: 1; top: 4px; }
 .membersBackdrop { position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.5); }
 @media (max-width: 767px) {
+  /* A phone's header holds four buttons beside the name; at the usual spacing
+     a small phone had room for one letter of it. */
+  .header { gap: 4px; }
+  .hKey { margin-inline-start: 4px; }
   .msg { padding-block: 2px; padding-inline: 64px 16px; }
   /* the gutter time is hidden on phones, so compact rows need no gutter for it */
   .compact .msg { padding-inline-start: 16px; }
@@ -260,7 +283,7 @@
 .videoLoading { display: inline-flex; align-items: center; gap: 8px; }
 .videoLoad { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 14px; font-weight: 600; }
 .videoLoad:hover { background: var(--brand); color: var(--on-brand); }
-.failedRow { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 13px; color: var(--danger); }
+.failedRow { display: flex; align-items: center; gap: 8px; margin-top: 2px; font-size: 13px; color: var(--text-danger); }
 .retry { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 12px; font-weight: 600; }
 .retry:hover { background: var(--brand); color: var(--on-brand); }
 .retry[data-danger="true"]:hover { background: var(--danger); color: #fff; }
@@ -319,7 +342,7 @@
 .upload[data-failed="true"] .uploadBar i { background: var(--danger); }
 .uploadStats { display: flex; justify-content: space-between; gap: 8px; min-width: 0; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .uploadStats > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.uploadError { color: var(--danger); }
+.uploadError { color: var(--text-danger); }
 .uploadCancel { flex: none; align-self: flex-start; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
 .uploadCancel:hover { background: var(--bg-hover); color: var(--danger); }
 @media (prefers-reduced-motion: reduce) { .uploadBar i { transition: none; } }

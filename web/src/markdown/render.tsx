@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { ensureShortcodes, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import { formatStamp, type StampStyle } from "@/lib/time";
@@ -195,9 +195,9 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
     case "mention":
       switch (node.kind) {
         case "everyone":
-          return <span className="md-mention">{t("render.everyone")}</span>;
+          return <span className="md-mention" style={STATIC}>{t("render.everyone")}</span>;
         case "here":
-          return <span className="md-mention">{t("render.here")}</span>;
+          return <span className="md-mention" style={STATIC}>{t("render.here")}</span>;
         case "user":
           return <UserMention id={node.id} ctx={ctx} />;
         case "channel":
@@ -280,7 +280,17 @@ function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
 
 function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const channel = props.ctx.channels[props.id];
-  const name = channel ? channel.name || t("render.deletedChannel") : t("render.deletedChannel");
+  // A channel this device does not know was deleted, or is private and not
+  // for this reader: which one cannot be told, so it says neither, and it
+  // leads nowhere.
+  if (!channel?.name) {
+    return (
+      <span className="md-mention" style={UNKNOWN_MENTION} data-channel-mention="unknown">
+        {"#" + t("render.unknownChannel")}
+      </span>
+    );
+  }
+  const name = channel.name;
   return (
     <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)} onKeyDown={(e) => pressed(e) && props.ctx.onChannelClick?.(props.id)}>
       {"#" + name}
@@ -288,14 +298,32 @@ function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   );
 }
 
+/** Mentions that only say something: nothing happens when they are clicked, so they do not look as if it would. */
+const STATIC: CSSProperties = { cursor: "default" };
+
+/** A role or channel we know nothing about (deleted, or not ours to see) reads as a quiet placeholder, not as a live mention. */
+const UNKNOWN_MENTION: CSSProperties = { ...STATIC, color: "var(--text-muted)", backgroundColor: "color-mix(in srgb, var(--text-muted) 14%, transparent)" };
+
 function RoleMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const role = props.ctx.roles?.[props.id];
-  const name = role ? role.name || t("render.unknownRole") : t("render.unknownRole");
-  // colour 0 is a role without a colour, which looks like any other mention
-  const style = role && role.color !== 0 ? { color: hexColor(role.color), backgroundColor: rgbaColor(role.color, 0.1) } : undefined;
+  if (!role) {
+    return (
+      <span className="md-mention" style={UNKNOWN_MENTION} data-role-mention="unknown">
+        {"@" + t("render.unknownRole")}
+      </span>
+    );
+  }
+  // Colour 0 is a role without a colour, which looks like any other mention.
+  // A coloured one is mixed a little toward the theme's strongest text, which
+  // is light on a dark theme and dark on a light one, so a pale yellow role
+  // still reads on white and a deep blue one on black.
+  const style: CSSProperties =
+    role.color !== 0
+      ? { ...STATIC, color: `color-mix(in srgb, ${hexColor(role.color)} 72%, var(--text-strong))`, backgroundColor: rgbaColor(role.color, 0.16) }
+      : STATIC;
   return (
-    <span className="md-mention" style={style}>
-      {"@" + name}
+    <span className="md-mention" style={style} data-role-mention={props.id}>
+      {"@" + (role.name || t("render.unknownRole"))}
     </span>
   );
 }

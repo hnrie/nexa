@@ -3,6 +3,7 @@ import { useState } from "react";
 import { messages as messagesApi } from "@/api/messages";
 import { emojiUrl } from "@/api/users";
 import { Twemoji } from "@/components/common/Twemoji";
+import { Tooltip } from "@/components/common/Tooltip";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import type { EmojiPick } from "@/components/pickers/EmojiPicker";
 import { useAuth } from "@/stores/auth";
@@ -23,10 +24,16 @@ export function reactionKeyOf(e: EmojiPick): string {
   return m ? `${m[1]}:${m[2]}:${m[3]}` : e.unicode;
 }
 
-function isCustom(emoji: string): { id: string; animated: boolean } | null {
+function isCustom(emoji: string): { id: string; name: string; animated: boolean } | null {
   const m = /^(a?):?([\w]+):(\d+)$/.exec(emoji);
   if (!m) return null;
-  return { id: m[3]!, animated: m[1] === "a" };
+  return { id: m[3]!, name: m[2]!, animated: m[1] === "a" };
+}
+
+/** How a reaction is named to people: a custom emoji by its :name:, not by the key the server stores. */
+function emojiLabel(emoji: string): string {
+  const custom = isCustom(emoji);
+  return custom ? `:${custom.name}:` : emoji;
 }
 
 /** Toggles a reaction with optimistic UI; reverts on failure. */
@@ -78,27 +85,30 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
     e.preventDefault();
     e.stopPropagation();
     const names = await lookup(emoji, count);
-    if (names) useUI.getState().toast(t("chat.reactions.reactedWith", { who: names, emoji }), "info");
+    if (names) useUI.getState().toast(t("chat.reactions.reactedWith", { who: names, emoji: emojiLabel(emoji) }), "info");
   };
   return (
     <div className={s.reactions}>
       {msg.reactions.map((r) => {
         const custom = isCustom(r.emoji);
+        const label = emojiLabel(r.emoji);
+        const names = who[`${r.emoji}:${r.count}`];
+        // the app's own tooltip, as on the toolbar above: it says who, once they are known
         return (
-          <button
-            key={r.emoji}
-            className={s.pill}
-            data-me={r.me}
-            aria-pressed={r.me}
-            title={who[`${r.emoji}:${r.count}`] ? t("chat.reactions.reactedWith", { who: who[`${r.emoji}:${r.count}`]!, emoji: r.emoji }) : t("chat.reactions.reactWith", { emoji: r.emoji })}
-            onMouseEnter={() => void lookup(r.emoji, r.count)}
-            onFocus={() => void lookup(r.emoji, r.count)}
-            onContextMenu={(e) => void tell(e, r.emoji, r.count)}
-            onClick={() => void toggleReaction(msg, r.emoji)}
-          >
-            {custom ? <img src={emojiUrl(custom.id, custom.animated, 24)} alt={r.emoji} /> : <Twemoji text={r.emoji} className={s.pillImg} fallbackClassName={s.pillEmoji} title="" />}
-            <span>{r.count}</span>
-          </button>
+          <Tooltip key={r.emoji} text={names ? t("chat.reactions.reactedWith", { who: names, emoji: label }) : t("chat.reactions.reactWith", { emoji: label })} side="top">
+            <button
+              className={s.pill}
+              data-me={r.me}
+              aria-pressed={r.me}
+              onMouseEnter={() => void lookup(r.emoji, r.count)}
+              onFocus={() => void lookup(r.emoji, r.count)}
+              onContextMenu={(e) => void tell(e, r.emoji, r.count)}
+              onClick={() => void toggleReaction(msg, r.emoji)}
+            >
+              {custom ? <img src={emojiUrl(custom.id, custom.animated, 24)} alt={label} /> : <Twemoji text={r.emoji} className={s.pillImg} fallbackClassName={s.pillEmoji} title="" />}
+              <span>{r.count}</span>
+            </button>
+          </Tooltip>
         );
       })}
       {msg.reactions.length > 0 ? (

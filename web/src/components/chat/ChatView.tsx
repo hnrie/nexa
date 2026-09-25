@@ -245,7 +245,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             <button className={s.hBtn} data-on={searchOpen} aria-label={tr_("chat.chat.searchMessages")} onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
           </Tooltip>
         ) : (
-          <label className={sc.searchBox} title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")}>
+          <label className={sc.searchBox} title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")} data-header-search="">
             <Search size={16} />
             <input
               value={searchQuery}
