@@ -13,13 +13,24 @@ import (
 
 const inviteAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
 
-func newInviteCode() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	for i := range b {
-		b[i] = inviteAlphabet[int(b[i])%len(inviteAlphabet)]
+func newInviteCode() string { return randomCode(8) }
+
+// randomCode is n characters drawn evenly from inviteAlphabet. A byte taken
+// modulo the alphabet's 56 letters would favour the first 32 of them (256 is
+// not a multiple of 56), so bytes past the last whole multiple are drawn again.
+func randomCode(n int) string {
+	const limit = 256 - 256%len(inviteAlphabet)
+	out := make([]byte, 0, n)
+	buf := make([]byte, n+n/2)
+	for len(out) < n {
+		_, _ = rand.Read(buf)
+		for _, c := range buf {
+			if int(c) < limit && len(out) < n {
+				out = append(out, inviteAlphabet[int(c)%len(inviteAlphabet)])
+			}
+		}
 	}
-	return string(b)
+	return string(out)
 }
 
 const inviteCols = `code, server_id, channel_id, inviter_id, max_uses, uses, expires_at, created_at`
@@ -39,12 +50,21 @@ func scanInvite(r rowScanner) (*Invite, error) {
 
 // CreateInvite makes a new invite; maxAge is seconds (0 = never), maxUses 0 = unlimited.
 func (s *Store) CreateInvite(ctx context.Context, serverID *ids.ID, channelID *ids.ID, inviter ids.ID, maxAge int64, maxUses int) (*Invite, error) {
-	in := &Invite{Code: newInviteCode(), ServerID: serverID, ChannelID: channelID, InviterID: inviter, MaxUses: maxUses, CreatedAt: nowMs()}
+	in := &Invite{ServerID: serverID, ChannelID: channelID, InviterID: inviter, MaxUses: maxUses, CreatedAt: nowMs()}
 	if maxAge > 0 {
 		exp := in.CreatedAt + maxAge*1000
 		in.ExpiresAt = &exp
 	}
-	_, err := s.db.W.ExecContext(ctx, `INSERT INTO invites (`+inviteCols+`) VALUES (?,?,?,?,?,?,?,?)`, in.Code, nullID(serverID), nullID(channelID), int64(inviter), in.MaxUses, 0, nullInt64(in.ExpiresAt), in.CreatedAt)
+	// A code that is already taken — one in 10^14, but a refusal would be a
+	// 500 for nothing the person did — is simply drawn again.
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		in.Code = newInviteCode()
+		_, err = s.db.W.ExecContext(ctx, `INSERT INTO invites (`+inviteCols+`) VALUES (?,?,?,?,?,?,?,?)`, in.Code, nullID(serverID), nullID(channelID), int64(inviter), in.MaxUses, 0, nullInt64(in.ExpiresAt), in.CreatedAt)
+		if !db.IsUniqueViolation(err) {
+			break
+		}
+	}
 	if err != nil {
 		return nil, err
 	}

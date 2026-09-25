@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"flag"
+	"io"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -55,12 +56,15 @@ func main() {
 		slog.Error("config", "err", err)
 		os.Exit(2)
 	}
-	log := setupLogging(cfg.LogLevel)
+	log := setupLogging(cfg.LogLevel, cfg.LogFile)
 	// Before anything can generate one: the node id is part of every id, and
 	// two processes sharing a database with the same one collide.
 	if err := ids.SetNode(cfg.NodeID); err != nil {
 		log.Error("node id", "err", err)
 		os.Exit(2)
+	}
+	if w := processWarning(cfg); w != "" {
+		log.Warn(w, "node_id", cfg.NodeID, "redis", cfg.RedisURL != "")
 	}
 
 	if err := os.MkdirAll(cfg.DataDir, 0o750); err != nil {
@@ -80,13 +84,18 @@ func main() {
 		log.Error("migrate", "err", err)
 		os.Exit(1)
 	}
+	if v, err := database.Version(context.Background()); err == nil {
+		log.Info("database ready", "dialect", string(database.Dialect), "schema_version", v)
+	}
 	st := store.New(database)
 	mediaStore, err := media.New(filepath.Join(cfg.DataDir, "media"), st)
 	if err != nil {
 		log.Error("media dir", "err", err)
 		os.Exit(1)
 	}
-	secret, err := loadOrCreateSecret(filepath.Join(cfg.DataDir, "server.secret"))
+	secret, err := loadOrCreateSecret(filepath.Join(cfg.DataDir, "server.secret"), func() (int, error) {
+		return st.CountTwoFactorAccounts(context.Background())
+	})
 	if err != nil {
 		log.Error("server secret", "err", err)
 		os.Exit(1)
@@ -185,6 +194,21 @@ func main() {
 	log.Info("stopped")
 }
 
+// processWarning is what startup says about a configuration that asks for a
+// second chatd process, or "" when there is nothing to say.
+//
+// A node id is only ever needed by a second process, and a second process is
+// not something chatd can be: events, presence and calls live in the memory of
+// the process holding the sockets, and REDIS_URL shares nothing but the rate
+// limits. Said where the operator will look, rather than letting two
+// processes each quietly serve half of every conversation.
+func processWarning(cfg config.Config) string {
+	if cfg.NodeID == 0 {
+		return ""
+	}
+	return "NODE_ID is set, but chatd runs as one process per instance: a second process would never see the first one's events, presence or calls, REDIS_URL or not. Run one chatd (deploy/README.md, \"Moving to Postgres\")."
+}
+
 // maintenance runs periodic cleanups: unreferenced blobs and expired sessions.
 func maintenance(ctx context.Context, log *slog.Logger, st *store.Store, m *media.Store, sessionTTL time.Duration) {
 	run := func() {
@@ -277,7 +301,13 @@ func sweepTemp(ctx context.Context, st *store.Store, dir string, now time.Time) 
 // secret seals every two-factor seed, so a file that exists but cannot be read
 // or is too short stops startup instead of being replaced: a new secret would
 // lock every 2FA user out and destroy the one that still works.
-func loadOrCreateSecret(path string) ([]byte, error) {
+//
+// A missing file is only a first start when nothing was sealed with it yet.
+// sealed counts what was — the accounts with a second factor on — and when
+// there are any, the database came from somewhere this file did not (a restore
+// that left it behind), so startup stops and says where to find it rather than
+// minting a new one that could never open theirs.
+func loadOrCreateSecret(path string, sealed func() (int, error)) ([]byte, error) {
 	b, err := os.ReadFile(path)
 	if err == nil {
 		if len(b) < 32 {
@@ -287,6 +317,15 @@ func loadOrCreateSecret(path string) ([]byte, error) {
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
+	}
+	if sealed != nil {
+		n, err := sealed()
+		if err != nil {
+			return nil, fmt.Errorf("%s is missing and the database could not say whether anything depends on it: %w", path, err)
+		}
+		if n > 0 {
+			return nil, fmt.Errorf("%s is missing, but %d account(s) have two-factor sign-in sealed with it: put it back from the backup the database came from (backup.sh keeps it as backup/secret-*); a new one would lock them out for good", path, n)
+		}
 	}
 	b = make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -326,7 +365,9 @@ func loadOrCreateSecret(path string) ([]byte, error) {
 	return b, nil
 }
 
-func setupLogging(level string) *slog.Logger {
+// setupLogging logs to stdout — the journal, under systemd — or, when file is
+// set, to that file, which chatd then keeps from growing without end.
+func setupLogging(level, file string) *slog.Logger {
 	var lv slog.Level
 	switch level {
 	case "debug":
@@ -338,7 +379,19 @@ func setupLogging(level string) *slog.Logger {
 	default:
 		lv = slog.LevelInfo
 	}
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lv}))
+	var out io.Writer = os.Stdout
+	var fileErr error
+	if file != "" {
+		if f, err := openRotating(file, logFileMax, logFileKeep); err == nil {
+			out = f
+		} else {
+			fileErr = err
+		}
+	}
+	log := slog.New(slog.NewJSONHandler(out, &slog.HandlerOptions{Level: lv}))
 	slog.SetDefault(log)
+	if fileErr != nil {
+		log.Warn("log file: writing to stdout instead", "path", file, "err", fileErr)
+	}
 	return log
 }

@@ -31,8 +31,8 @@ Unlimited custom server emoji (static and animated, usable in every channel and 
 because the token carries the image id), sticker packs owned by users or servers with
 public share links, install/uninstall, reordering, covers and tags, the unified
 GIF/Stickers/Emoji picker with search and shortcode autocomplete, sticker rendering in
-messages, custom-emoji reactions, and a Tenor proxy that stays off unless
-`TENOR_API_KEY` is set.
+messages, custom-emoji reactions, and GIF search through Klipy that stays off unless
+`KLIPY_API_KEY` is set.
 
 ## Phase 4 — voice, video, screen share ✅
 

@@ -39,6 +39,11 @@
     <string>@PATH@</string>
     <key>HOME</key>
     <string>@HOME@</string>
+    <!-- chatd writes and rotates its own log: launchd keeps the file it
+         appends stdout to open for as long as chatd runs, so nothing else can
+         rotate that one (see LOG_FILE in chatd.env.example) -->
+    <key>LOG_FILE</key>
+    <string>@ROOT@/logs/chatd.log</string>
   </dict>
 
   <key>RunAtLoad</key>
@@ -61,9 +66,11 @@
     <integer>8192</integer>
   </dict>
 
+  <!-- only what chatd says before its log is open, and what the Go runtime
+       prints if chatd crashes, lands here -->
   <key>StandardOutPath</key>
-  <string>@ROOT@/logs/chatd.log</string>
+  <string>@ROOT@/logs/chatd.stderr.log</string>
   <key>StandardErrorPath</key>
-  <string>@ROOT@/logs/chatd.log</string>
+  <string>@ROOT@/logs/chatd.stderr.log</string>
 </dict>
 </plist>

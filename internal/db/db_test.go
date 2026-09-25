@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +48,31 @@ func TestOpenMigrateIdempotent(t *testing.T) {
 		if err := d.R.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?", tbl).Scan(&n); err != nil || n != 1 {
 			t.Errorf("table %s missing", tbl)
 		}
+	}
+}
+
+// A rollback to a build older than the database stops at startup, saying why,
+// instead of serving a schema the build was never compiled against.
+func TestMigrateRefusesANewerDatabase(t *testing.T) {
+	d, err := Open(filepath.Join(t.TempDir(), "chat.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	ctx := context.Background()
+	if err := d.Migrate(ctx); err != nil {
+		t.Fatal(err)
+	}
+	v, err := d.Version(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.W.Exec("PRAGMA user_version = " + strconv.Itoa(v+1)); err != nil {
+		t.Fatal(err)
+	}
+	err = d.Migrate(ctx)
+	if !errors.Is(err, ErrNewerSchema) || !strings.Contains(err.Error(), strconv.Itoa(v+1)) {
+		t.Fatalf("want a refusal naming version %d, got %v", v+1, err)
 	}
 }
 

@@ -1,8 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"evilion.xyz/chat/internal/db"
@@ -63,6 +70,161 @@ func TestCopyOrderRespectsForeignKeys(t *testing.T) {
 		}
 		rows.Close()
 	}
+}
+
+// Every value whose loss locks someone out has to be in the byte-for-byte
+// check: a column added later that holds a key, a salt, a secret or a hash is
+// caught here until it is listed.
+func TestKeyColumnsCoverEveryCredential(t *testing.T) {
+	d := schemaDB(t)
+	ctx := context.Background()
+	listed := map[string]map[string]bool{}
+	for _, c := range keyColumns {
+		if listed[c.table] == nil {
+			listed[c.table] = map[string]bool{}
+		}
+		for _, col := range strings.Split(c.cols, ",") {
+			listed[c.table][strings.TrimSpace(col)] = true
+		}
+	}
+	tables, err := tableOrder(ctx, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range tables {
+		rows, err := d.R.QueryContext(ctx, `SELECT name, upper(type) FROM pragma_table_info(?)`, table)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var name, typ string
+			if err := rows.Scan(&name, &typ); err != nil {
+				rows.Close()
+				t.Fatal(err)
+			}
+			// keys themselves are BLOBs; hashes, salts and secrets can be text
+			credential := typ == "BLOB"
+			for _, suffix := range []string{"_hash", "_salt", "_secret"} {
+				credential = credential || strings.HasSuffix(name, suffix)
+			}
+			if credential && !listed[table][name] {
+				t.Errorf("%s.%s holds key material but the copy does not check it byte for byte; add it to keyColumns", table, name)
+			}
+		}
+		rows.Close()
+	}
+	// and every listed column exists, or the check would fail on every copy
+	for _, c := range keyColumns {
+		rows, err := d.R.QueryContext(ctx, `SELECT `+c.cols+` FROM `+c.table+` LIMIT 0`)
+		if err != nil {
+			t.Errorf("keyColumns names something the schema does not have: %v", err)
+			continue
+		}
+		rows.Close()
+	}
+}
+
+// The check does not depend on the order either side returns rows in, and it
+// notices one byte of one sealed secret changing.
+func TestDigestIgnoresOrderButNotBytes(t *testing.T) {
+	d := schemaDB(t)
+	ctx := context.Background()
+	if _, err := d.W.ExecContext(ctx, `INSERT INTO users (id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, created_at, updated_at)
+		VALUES (1,'b','B','h',x'01','{}',x'02',x'03',1,1), (2,'a','A','h',x'04','{}',x'05',x'06',2,2)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.W.ExecContext(ctx, `INSERT INTO user_mfa (user_id, totp_secret, last_step, enabled, created_at) VALUES (1, x'aabbcc', 0, 1, 1), (2, x'ddeeff', 0, 1, 1)`); err != nil {
+		t.Fatal(err)
+	}
+	a, err := digest(ctx, d, "user_mfa", "user_id, totp_secret, last_step, enabled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := digest(ctx, d, "(SELECT * FROM user_mfa ORDER BY user_id DESC)", "user_id, totp_secret, last_step, enabled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(a) != string(b) {
+		t.Error("the same rows in another order hash differently")
+	}
+	if _, err := d.W.ExecContext(ctx, `UPDATE user_mfa SET totp_secret = x'aabbcd' WHERE user_id = 1`); err != nil {
+		t.Fatal(err)
+	}
+	c, err := digest(ctx, d, "user_mfa", "user_id, totp_secret, last_step, enabled")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(a) == string(c) {
+		t.Error("a changed byte in a sealed secret went unnoticed")
+	}
+}
+
+// A database another process still has open is refused before anything is
+// read: chatd writing on while the copy is taken would lose what it wrote.
+func TestRefusesADatabaseStillInUse(t *testing.T) {
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		t.Skip("the lock probe is for Linux and macOS")
+	}
+	path := filepath.Join(t.TempDir(), "chat.db")
+	d, err := db.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	d.Close()
+	if busy, err := sqliteInUse(path); err != nil || busy {
+		t.Fatalf("a closed database reads as in use: %v %v", busy, err)
+	}
+
+	holder := exec.Command(os.Args[0], "-test.run=^TestHelperHoldDatabase$")
+	holder.Env = append(os.Environ(), "CHATMIGRATE_HOLD="+path)
+	stdin, err := holder.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := holder.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := holder.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		stdin.Close()
+		_ = holder.Wait()
+	}()
+	if line, err := bufio.NewReader(stdout).ReadString('\n'); err != nil || !strings.Contains(line, "holding") {
+		t.Fatalf("the helper did not open the database: %q %v", line, err)
+	}
+	if busy, err := sqliteInUse(path); err != nil || !busy {
+		t.Fatalf("a database another process has open reads as free: %v %v", busy, err)
+	}
+	err = run(path, "postgres://nobody@127.0.0.1:1/none", false, 500)
+	if err == nil || !strings.Contains(err.Error(), "Stop it first") {
+		t.Fatalf("want a refusal telling the operator to stop chatd, got %v", err)
+	}
+}
+
+// TestHelperHoldDatabase is the other process for the test above: it opens the
+// database the way chatd does and keeps it open until its input closes.
+func TestHelperHoldDatabase(t *testing.T) {
+	path := os.Getenv("CHATMIGRATE_HOLD")
+	if path == "" {
+		t.Skip("only run as a helper")
+	}
+	d, err := db.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := d.R.QueryRow(`SELECT count(*) FROM users`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println("holding")
+	_, _ = io.Copy(io.Discard, os.Stdin)
+	d.Close()
 }
 
 // The whole point is that nothing is left behind, so the copy has to carry

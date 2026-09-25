@@ -10,11 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
@@ -168,8 +170,8 @@ func (d *DB) Migrate(ctx context.Context) error {
 			return err
 		}
 		defer conn.Close()
-		if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock($1)`, migrateLockKey); err != nil {
-			return fmt.Errorf("take migration lock: %w", err)
+		if err := waitForLock(ctx, conn); err != nil {
+			return err
 		}
 		defer func() {
 			// the lock is session-scoped, and the session goes back to the
@@ -182,22 +184,36 @@ func (d *DB) Migrate(ctx context.Context) error {
 		return err
 	}
 	names := make([]string, 0, len(entries))
+	known := 0
 	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".sql") {
-			names = append(names, e.Name())
+		if !strings.HasSuffix(e.Name(), ".sql") {
+			continue
 		}
+		numStr, _, _ := strings.Cut(e.Name(), "_")
+		n, err := strconv.Atoi(numStr)
+		if err != nil {
+			return fmt.Errorf("migration %s: name must start with a number", e.Name())
+		}
+		known = max(known, n)
+		names = append(names, e.Name())
 	}
 	sort.Strings(names)
 	current, err := d.Version(ctx)
 	if err != nil {
 		return err
 	}
+	// A database a newer build has migrated is one this build was never
+	// compiled against: a column it does not know may be NOT NULL, a table it
+	// reads may have been reshaped. Serving it anyway fails later, per feature
+	// and at request time — which is exactly what rolling back to
+	// bin/chatd.prev after a release that changed the schema would do. So it
+	// stops here, where the reason is plain.
+	if current > known {
+		return fmt.Errorf("%w: the database is at schema version %d and this build knows up to %d; it was last run by a newer chatd, so start that build (or a later one) instead", ErrNewerSchema, current, known)
+	}
 	for _, name := range names {
 		numStr, _, _ := strings.Cut(name, "_")
-		n, err := strconv.Atoi(numStr)
-		if err != nil {
-			return fmt.Errorf("migration %s: name must start with a number", name)
-		}
+		n, _ := strconv.Atoi(numStr)
 		if n <= current {
 			continue
 		}
@@ -240,3 +256,36 @@ func (d *DB) Close() error {
 // ErrNoMigrations is returned when a Postgres database has no schema yet and
 // none is embedded, which only happens in a broken build.
 var ErrNoMigrations = errors.New("no migrations for this dialect")
+
+// ErrNewerSchema says the database was migrated by a newer build than this one.
+var ErrNewerSchema = errors.New("database is newer than this build")
+
+// lockWaitNotice is how often waitForLock says it is still waiting.
+var lockWaitNotice = 10 * time.Second
+
+// waitForLock takes the migration lock on Postgres, saying so while another
+// process holds it. pg_advisory_lock would simply block, and a process stuck
+// holding the lock — a migration that hung, a chatmigrate left running — then
+// looked like a chatd that never finished starting and never said why.
+func waitForLock(ctx context.Context, conn *sql.Conn) error {
+	started := time.Now()
+	lastNotice := started
+	for {
+		var got bool
+		if err := conn.QueryRowContext(ctx, `SELECT pg_try_advisory_lock($1)`, migrateLockKey).Scan(&got); err != nil {
+			return fmt.Errorf("take migration lock: %w", err)
+		}
+		if got {
+			return nil
+		}
+		if time.Since(lastNotice) >= lockWaitNotice || lastNotice == started {
+			slog.Warn("waiting for another process to finish migrating the database (it holds the migration lock)", "waited", time.Since(started).Round(time.Second).String())
+			lastNotice = time.Now()
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("take migration lock: %w", ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}

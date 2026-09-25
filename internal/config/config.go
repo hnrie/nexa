@@ -75,11 +75,15 @@ type Config struct {
 	// it is off unless asked for (development and tests).
 	GuestLinksP2P bool
 	LogLevel      string
-	SessionTTL    time.Duration
-	// NodeID tells this process apart from the others when several of them
-	// share one database. The ids they hand out carry it, so two processes
-	// cannot mint the same one; each needs a number of its own, 0–1023. One
-	// process can leave it at 0.
+	// LogFile, when set, is where chatd writes its log instead of stdout,
+	// starting a new file past 10 MB and keeping five old ones. It is for a
+	// service manager that appends stdout to a file and never rotates it
+	// (launchd); under systemd the journal already does this.
+	LogFile    string
+	SessionTTL time.Duration
+	// NodeID would tell processes sharing one database apart in the ids they
+	// hand out, 0–1023. chatd runs as one process per instance, so it stays 0
+	// and startup warns when it is not.
 	NodeID int
 }
 
@@ -128,6 +132,7 @@ func Load(getenv func(string) string) (Config, error) {
 	str("REALTIME_APP_ID", &c.RealtimeAppID)
 	str("REALTIME_APP_SECRET", &c.RealtimeAppSecret)
 	str("LOG_LEVEL", &c.LogLevel)
+	str("LOG_FILE", &c.LogFile)
 	c.GuestLinksP2P = strings.TrimSpace(getenv("GUEST_LINKS_P2P")) == "1"
 	// Usernames are stored lowercase, so a name written with capitals would
 	// otherwise never match the account it means.

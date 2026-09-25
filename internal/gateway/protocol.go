@@ -4,6 +4,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"sync"
 
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
@@ -20,6 +21,31 @@ type ServerFrame struct {
 	T string `json:"t"`
 	S uint64 `json:"s,omitempty"`
 	D any    `json:"d,omitempty"`
+	// shared, when set, is the frame's encoding, made by whichever of its
+	// connections writes it first and reused by all the others: an event for
+	// two thousand people is encoded once, not two thousand times.
+	shared *frameBytes
+}
+
+type frameBytes struct {
+	once sync.Once
+	b    []byte
+	err  error
+}
+
+// fanOut marks a frame as going to many connections, so its encoding is shared.
+func (f ServerFrame) fanOut() ServerFrame {
+	f.shared = &frameBytes{}
+	return f
+}
+
+// encode is the frame as JSON, made once when the frame is shared.
+func (f *ServerFrame) encode() ([]byte, error) {
+	if f.shared == nil {
+		return json.Marshal(f)
+	}
+	f.shared.once.Do(func() { f.shared.b, f.shared.err = json.Marshal(f) })
+	return f.shared.b, f.shared.err
 }
 
 // Client ops.
@@ -87,6 +113,22 @@ const (
 	EvGuestEnded = "guest_ended"
 	// EvVoiceResumed answers a device resuming its call after a reconnect: kept, or start over.
 	EvVoiceResumed = "voice_resumed"
+	// EvVoiceError says why a voice op this device sent was refused.
+	EvVoiceError = "voice_error"
+	// EvKeyRotationNeeded asks holders of a conversation's key to replace it:
+	// someone lost access.
+	EvKeyRotationNeeded = "key_rotation_needed"
+	// EvStickerRecent carries the account's recently used stickers to its other devices.
+	EvStickerRecent = "sticker_recent"
+	// Moderation, delivered through Nexa: the account's own state, a notice to
+	// show, one of its cases, announcements, and for staff the queue and the log.
+	EvNexaState              = "nexa_state"
+	EvNexaNotice             = "nexa_notice"
+	EvNexaCase               = "nexa_case"
+	EvNexaAnnouncement       = "nexa_announcement"
+	EvNexaAnnouncementDelete = "nexa_announcement_delete"
+	EvModCase                = "mod_case"
+	EvModLog                 = "mod_log"
 )
 
 // Presence is a user's visible status.

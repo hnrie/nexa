@@ -54,6 +54,20 @@ const readyMemberLimit = 500
 
 // serverView assembles a member's view of a server (only channels they can see).
 func (s *Server) serverView(ctx context.Context, srv *store.Server, uid ids.ID) (*ServerView, []store.PublicUser, error) {
+	view, full, err := s.serverViewUsers(ctx, srv, uid)
+	if err != nil {
+		return nil, nil, err
+	}
+	var users []store.PublicUser
+	for _, u := range full {
+		users = append(users, u.Public())
+	}
+	return view, users, nil
+}
+
+// serverViewUsers is serverView with the listed members' whole accounts, which
+// ready builds their presence from instead of reading each one again.
+func (s *Server) serverViewUsers(ctx context.Context, srv *store.Server, uid ids.ID) (*ServerView, []*store.User, error) {
 	me, err := s.Store.Member(ctx, srv.ID, uid)
 	if err != nil {
 		return nil, nil, err
@@ -85,7 +99,7 @@ func (s *Server) serverView(ctx context.Context, srv *store.Server, uid ids.ID) 
 	if err != nil {
 		return nil, nil, err
 	}
-	var users []store.PublicUser
+	var users []*store.User
 	if count <= readyMemberLimit {
 		members, err := s.Store.Members(ctx, srv.ID, 0, readyMemberLimit, "")
 		if err != nil {
@@ -102,7 +116,7 @@ func (s *Server) serverView(ctx context.Context, srv *store.Server, uid ids.ID) 
 		}
 		for _, id := range list {
 			if u := byID[id]; u != nil {
-				users = append(users, u.Public())
+				users = append(users, u)
 			}
 		}
 	}
@@ -112,7 +126,8 @@ func (s *Server) serverView(ctx context.Context, srv *store.Server, uid ids.ID) 
 // WireServers installs the server-aware hooks on the API server and the hub.
 func (s *Server) WireServers(hub *gateway.Hub) {
 	s.ChannelAccess = func(ctx context.Context, u *store.User, ch *store.Channel, need string) (bool, error) {
-		p, _, err := s.Store.ChannelPerms(ctx, ch.ID, u.ID)
+		// the channel is the one the request already read
+		p, err := s.Store.PermsIn(ctx, ch, u.ID)
 		if err != nil {
 			return false, err
 		}
@@ -166,39 +181,22 @@ func (s *Server) WireServers(hub *gateway.Hub) {
 	if hub == nil {
 		return
 	}
-	hub.ViewerResolver = func(ctx context.Context, channelID ids.ID) ([]ids.ID, error) {
-		return s.Store.ChannelViewers(ctx, channelID)
-	}
-	hub.Access = func(ctx context.Context, uid, channelID ids.ID) (bool, error) {
-		p, _, err := s.Store.ChannelPerms(ctx, channelID, uid)
+	hub.Access = func(ctx context.Context, uid ids.ID, ch *store.Channel) (bool, error) {
+		p, err := s.Store.PermsIn(ctx, ch, uid)
 		if err != nil {
 			return false, err
 		}
 		return p.Has(perms.ViewChannel), nil
 	}
 	// typing is a promise of a message, so it needs the same right as sending one
-	hub.SendAccess = func(ctx context.Context, uid, channelID ids.ID) (bool, error) {
-		p, _, err := s.Store.ChannelPerms(ctx, channelID, uid)
+	hub.SendAccess = func(ctx context.Context, uid ids.ID, ch *store.Channel) (bool, error) {
+		p, err := s.Store.PermsIn(ctx, ch, uid)
 		if err != nil {
 			return false, err
 		}
 		return p.Has(needBits(NeedSend)), nil
 	}
-	hub.Interested = func(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
-		servers, err := s.Store.ServersForUser(ctx, uid)
-		if err != nil {
-			return nil, err
-		}
-		out := []ids.ID{}
-		for _, srv := range servers {
-			ids_, err := s.Store.MemberIDs(ctx, srv.ID)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, ids_...)
-		}
-		return out, nil
-	}
+	hub.Interested = s.Store.CoMembers
 	hub.ExtraChannels = func(ctx context.Context, uid ids.ID) ([]ids.ID, error) { return s.Store.ChannelsForUser(ctx, uid) }
 	hub.ReadyExtras = func(ctx context.Context, u *store.User, p *gateway.ReadyPayload) error {
 		servers, err := s.Store.ServersForUser(ctx, u.ID)
@@ -216,19 +214,33 @@ func (s *Server) WireServers(hub *gateway.Hub) {
 			seen[usr.ID] = true
 		}
 		for _, srv := range servers {
-			view, users, err := s.serverView(ctx, srv, u.ID)
+			view, users, err := s.serverViewUsers(ctx, srv, u.ID)
 			if err != nil {
 				return err
 			}
 			p.Servers = append(p.Servers, view)
+			var fresh []*store.User
 			for _, usr := range users {
 				if !seen[usr.ID] {
 					seen[usr.ID] = true
-					p.Users = append(p.Users, usr)
-					if hub.Online(usr.ID) {
-						if full, err := s.Store.UserByID(ctx, usr.ID); err == nil {
-							p.Presences = append(p.Presences, hub.PresenceOf(ctx, full))
-						}
+					p.Users = append(p.Users, usr.Public())
+					fresh = append(fresh, usr)
+				}
+			}
+			// presence is built from the accounts just read, asking the hub
+			// who is online once per server rather than once per member
+			list := make([]ids.ID, len(fresh))
+			for i, usr := range fresh {
+				list[i] = usr.ID
+			}
+			online := map[ids.ID]bool{}
+			for _, id := range hub.OnlineAmong(list) {
+				online[id] = true
+			}
+			for _, usr := range fresh {
+				if online[usr.ID] {
+					if pr := hub.PresenceOf(ctx, usr); pr.Status != "offline" {
+						p.Presences = append(p.Presences, pr)
 					}
 				}
 			}

@@ -283,6 +283,8 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]ids.ID, er
 // name taken away by a moderator stays out of anyone else's hands.
 func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 	id := int64(uid)
+	// its overwrites, in whichever servers they were
+	defer s.everythingChanged()
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL`, id); err != nil {
 			return err

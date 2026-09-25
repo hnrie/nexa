@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -118,6 +119,14 @@ func main() {
 
 func run(from, to string, wipe bool, batch int) error {
 	ctx := context.Background()
+	// A copy taken while chatd is still writing misses whatever it writes
+	// after the read began — and the row counts at the end may even agree,
+	// having counted the same moving target on both sides.
+	if busy, err := sqliteInUse(from); err != nil {
+		return fmt.Errorf("check whether %s is in use: %w", from, err)
+	} else if busy {
+		return fmt.Errorf("%s is open in another process — chatd is still running on it. Stop it first (sudo systemctl stop xyz.evilion.chat, or on macOS sudo launchctl bootout system/xyz.evilion.chat) and run this again", from)
+	}
 	src, err := db.Open(from)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", from, err)
@@ -191,28 +200,42 @@ func run(from, to string, wipe bool, batch int) error {
 	return nil
 }
 
-// keyColumns are the values that have to survive exactly: a key or a session
-// token that came across wrong would lock somebody out, and a row count would
-// not notice. Each is read from both databases in the same order and hashed.
-var keyColumns = []struct{ table, order, cols string }{
-	{"users", "id", "kdf_salt, public_key, enc_private_key, enc_private_key_recovery, auth_hash"},
-	{"key_epochs", "conv_id, epoch", "created_by, created_at"},
-	{"key_grants", "conv_id, epoch, user_id", "wrapped_key"},
-	{"messages", "id", "ciphertext, key_conv_id, key_epoch"},
-	{"user_settings", "user_id", "blob, version"},
-	{"blobs", "id", "sha256, size, mime, kind"},
-	{"sessions", "id", "token_hash"},
-	{"attachments", "id", "blob_id, size"},
+// keyColumns are the values that have to survive exactly: a key, a salt, a
+// session token or a code that came across wrong would lock somebody out, and
+// a row count would not notice. Each row is read with what identifies it, so a
+// value cannot move between rows unnoticed either. A test holds this list to
+// the schema: every BLOB column and every *_hash, *_salt and *_secret column
+// has to be here.
+var keyColumns = []struct{ table, cols string }{
+	{"users", "id, username, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, auth_hash, recovery_auth_hash, flags"},
+	{"key_epochs", "conv_id, epoch, created_by, created_at"},
+	{"key_grants", "conv_id, epoch, user_id, wrapped_key, wrapped_by"},
+	{"messages", "id, ciphertext, key_conv_id, key_epoch"},
+	{"user_settings", "user_id, blob, version"},
+	{"blobs", "id, sha256, size, mime, kind"},
+	{"sessions", "id, user_id, token_hash"},
+	{"attachments", "id, blob_id, size"},
+	// the second factor: a sealed secret or a backup code that came across
+	// wrong is an account nobody can sign in to
+	{"user_mfa", "user_id, totp_secret, last_step, enabled"},
+	{"mfa_backup_codes", "user_id, code_hash, used_at"},
+	// a locked subchat's salt and hash are what its password is checked against
+	{"channels", "id, lock_salt, lock_params, lock_hash"},
+	// the codes people already hold, in links and in the names they sign in with
+	{"invites", "code, server_id, channel_id"},
+	{"guest_links", "code, channel_id, epoch"},
+	{"guests", "id, token_hash"},
+	{"username_holds", "username, user_id"},
 }
 
 // sameBytes checks that the values that matter are identical on both sides.
 func sameBytes(ctx context.Context, src, dst *db.DB) error {
 	for _, c := range keyColumns {
-		a, err := digest(ctx, src, c.table, c.order, c.cols)
+		a, err := digest(ctx, src, c.table, c.cols)
 		if err != nil {
 			return err
 		}
-		b, err := digest(ctx, dst, c.table, c.order, c.cols)
+		b, err := digest(ctx, dst, c.table, c.cols)
 		if err != nil {
 			return err
 		}
@@ -223,8 +246,12 @@ func sameBytes(ctx context.Context, src, dst *db.DB) error {
 	return nil
 }
 
-func digest(ctx context.Context, d *db.DB, table, order, cols string) ([]byte, error) {
-	rows, err := d.R.QueryContext(ctx, `SELECT `+cols+` FROM `+table+` ORDER BY `+order)
+// digest hashes every row of the columns, independent of their order: the two
+// databases sort text by different rules (SQLite byte by byte, Postgres by its
+// collation), so the rows are hashed one by one and the hashes sorted instead
+// of asking either side for an ORDER BY.
+func digest(ctx context.Context, d *db.DB, table, cols string) ([]byte, error) {
+	rows, err := d.R.QueryContext(ctx, `SELECT `+cols+` FROM `+table)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", table, err)
 	}
@@ -233,7 +260,7 @@ func digest(ctx context.Context, d *db.DB, table, order, cols string) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	h := sha256.New()
+	var each [][]byte
 	for rows.Next() {
 		cells := make([]any, len(names))
 		ptrs := make([]any, len(names))
@@ -243,6 +270,7 @@ func digest(ctx context.Context, d *db.DB, table, order, cols string) ([]byte, e
 		if err := rows.Scan(ptrs...); err != nil {
 			return nil, err
 		}
+		h := sha256.New()
 		for _, v := range cells {
 			switch t := v.(type) {
 			case []byte:
@@ -256,8 +284,17 @@ func digest(ctx context.Context, d *db.DB, table, order, cols string) ([]byte, e
 			}
 			h.Write([]byte{0xff})
 		}
+		each = append(each, h.Sum(nil))
 	}
-	return h.Sum(nil), rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	sort.Slice(each, func(i, j int) bool { return bytes.Compare(each[i], each[j]) < 0 })
+	all := sha256.New()
+	for _, e := range each {
+		all.Write(e)
+	}
+	return all.Sum(nil), nil
 }
 
 // copyTable reads one table out of SQLite and writes it into Postgres in

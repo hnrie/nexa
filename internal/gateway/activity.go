@@ -446,7 +446,7 @@ func (h *Hub) activitiesChanged(c *conn) {
 		c.actMu.Unlock()
 		ctx, cancel := background()
 		defer cancel()
-		h.broadcastUser(ctx, c.userID)
+		h.broadcastUser(ctx, c)
 		return
 	}
 	c.actTimer = time.AfterFunc(delay, func() {
@@ -456,7 +456,7 @@ func (h *Hub) activitiesChanged(c *conn) {
 		c.actMu.Unlock()
 		ctx, cancel := background()
 		defer cancel()
-		h.broadcastUser(ctx, c.userID)
+		h.broadcastUser(ctx, c)
 	})
 	c.actMu.Unlock()
 }
@@ -478,9 +478,12 @@ func (h *Hub) activitiesOf(uid ids.ID) []Activity {
 	return best
 }
 
-// broadcastUser sends a user's presence as it stands now.
-func (h *Hub) broadcastUser(ctx context.Context, uid ids.ID) {
-	if u, err := h.st.UserByID(ctx, uid); err == nil {
+// broadcastUser sends a user's presence as it stands now, from the account as
+// the connection holds it: every change to the account reaches every one of
+// its connections (Hub.refreshUser), so there is nothing to read again — and a
+// Rich Presence flush every few seconds used to read it every time.
+func (h *Hub) broadcastUser(ctx context.Context, c *conn) {
+	if u := c.currentUser(); u != nil {
 		h.broadcastPresence(ctx, u)
 	}
 }

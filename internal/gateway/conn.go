@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -418,12 +419,10 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// may still say something. The one device in use going away leaves an
 	// account whose others are all idle showing as idle.
 	if (c.dropActivities() || !c.away.Load() && h.allAway(user.ID)) && !last && guest == nil {
-		h.broadcastUser(bg, user.ID)
+		h.broadcastUser(bg, c)
 	}
 	if last && guest == nil {
-		if u, err := h.st.UserByID(bg, user.ID); err == nil {
-			h.broadcastArrival(bg, u)
-		}
+		h.broadcastArrival(bg, c.currentUser())
 		if h.OnDisconnect != nil {
 			h.OnDisconnect(bg, user.ID)
 		}
@@ -473,7 +472,7 @@ func (c *conn) writeLoop() {
 				c.close(k.code, k.reason)
 				return
 			}
-			b, err := json.Marshal(f)
+			b, err := f.encode()
 			if err != nil {
 				continue
 			}
@@ -619,7 +618,9 @@ func (c *conn) applyPresence(ctx context.Context, raw json.RawMessage) {
 	if err != nil {
 		return
 	}
-	c.user.Store(u)
+	// every device's copy, not only this one's: another device going idle
+	// or flushing activities builds its presence from its own copy
+	h.refreshUser(u)
 	h.broadcastPresence(ctx, u)
 }
 
@@ -651,7 +652,7 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		// only an account showing as online goes idle by itself
 		if u := c.user.Load(); u != nil && (u.PresencePref == "" || u.PresencePref == "online") {
-			h.broadcastUser(ctx, c.userID)
+			h.broadcastUser(ctx, c)
 		}
 	case OpActivities:
 		c.beat.Store(time.Now().UnixMilli())
@@ -670,10 +671,6 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		}
 		c.queueActivities(d.Activities)
 	case OpTyping:
-		// a muted account cannot post, so it has nothing to be typing
-		if h.muted(ctx, c.userID) {
-			return
-		}
 		var d typingData
 		if err := json.Unmarshal(f.D, &d); err != nil || d.ChannelID.IsZero() {
 			return
@@ -692,6 +689,16 @@ func (c *conn) handle(ctx context.Context, f ClientFrame) {
 		last, seen := c.typing[d.ChannelID]
 		c.typMu.Unlock()
 		if seen && time.Since(last) < typingCooldown {
+			return
+		}
+		// Past the cooldown each indicator costs a permission check and an
+		// audience; the account's budget bounds how often, whatever channels
+		// it rotates through.
+		if !h.typingAllowed(c.userID) {
+			return
+		}
+		// a muted account cannot post, so it has nothing to be typing
+		if h.muted(ctx, c.userID) {
 			return
 		}
 		// Access is checked before the channel is remembered, so made-up ids
@@ -735,10 +742,23 @@ func (h *Hub) muted(ctx context.Context, uid ids.ID) bool {
 	return m
 }
 
+// typingAllowed spends one of the account's typing budget, across every
+// channel and device (see Hub.typingRate).
+func (h *Hub) typingAllowed(uid ids.ID) bool {
+	if h.typingRate == nil {
+		return true
+	}
+	ok, _ := h.typingRate.Allow("typing:" + uid.String())
+	return ok
+}
+
 // TypingStop clears a typing indicator immediately (the author sent or cleared the box).
 func (h *Hub) TypingStop(ctx context.Context, uid, channelID ids.ID) {
-	ok, err := h.CanAccess(ctx, uid, channelID)
-	if err != nil || !ok {
+	ch, err := h.st.ChannelForAccess(ctx, channelID)
+	if err != nil {
+		return
+	}
+	if ok, err := h.canAccess(ctx, uid, ch); err != nil || !ok {
 		return
 	}
 	viewers, err := h.Viewers(ctx, channelID)
@@ -756,6 +776,9 @@ func (h *Hub) TypingStop(ctx context.Context, uid, channelID ids.ID) {
 
 // Typing broadcasts a typing indicator after checking access.
 func (h *Hub) Typing(ctx context.Context, uid, channelID ids.ID) {
+	if !h.typingAllowed(uid) {
+		return
+	}
 	others, ok := h.typingAudience(ctx, uid, channelID)
 	if !ok {
 		return
@@ -766,13 +789,13 @@ func (h *Hub) Typing(ctx context.Context, uid, channelID ids.ID) {
 // typingAudience reports whether uid may type in a channel, which in a server
 // channel means being allowed to send there, and lists who else sees it.
 func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.ID, bool) {
-	ch, err := h.st.ChannelByID(ctx, channelID)
+	ch, err := h.st.ChannelForAccess(ctx, channelID)
 	if err != nil {
 		return nil, false
 	}
 	var viewers []ids.ID
 	if store.IsDMLike(ch.Type) {
-		if ok, err := h.st.IsParticipant(ctx, channelID, uid); err != nil || !ok {
+		if !slices.Contains(ch.Recipients, uid) {
 			return nil, false
 		}
 		// a block closes a 1:1 conversation both ways, typing included
@@ -781,13 +804,13 @@ func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.
 		}
 		viewers = ch.Recipients
 	} else {
-		if h.SendAccess == nil || h.ViewerResolver == nil {
+		if h.SendAccess == nil {
 			return nil, false
 		}
-		if ok, err := h.SendAccess(ctx, uid, channelID); err != nil || !ok {
+		if ok, err := h.SendAccess(ctx, uid, ch); err != nil || !ok {
 			return nil, false
 		}
-		if viewers, err = h.ViewerResolver(ctx, channelID); err != nil {
+		if viewers, err = h.Viewers(ctx, channelID); err != nil {
 			return nil, false
 		}
 	}
@@ -865,12 +888,22 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 	if err != nil {
 		return nil, err
 	}
+	// Whose presence this account may see: the same rule as the other way
+	// round (Hub.presenceAudience), friends and co-members, blocks excepted.
+	sees, err := h.presenceVisibleTo(ctx, u.ID, rels)
+	if err != nil {
+		return nil, err
+	}
+	online := map[ids.ID]bool{}
+	for _, id := range h.OnlineAmong(userIDs) {
+		online[id] = true
+	}
 	for _, id := range userIDs {
 		if usr := users[id]; usr != nil {
 			p.Users = append(p.Users, usr.Public())
 			// only people who show as here: an "offline" entry for someone
 			// connected would mark them out as invisible
-			if h.Online(id) {
+			if online[id] && sees(id) {
 				if pr := h.PresenceOf(ctx, usr); pr.Status != "offline" {
 					p.Presences = append(p.Presences, pr)
 				}
@@ -889,7 +922,42 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 			return nil, err
 		}
 	}
+	// the extras add co-members' presences; someone blocked either way is
+	// left out of those too
+	kept := p.Presences[:0]
+	for _, pr := range p.Presences {
+		if pr.UserID == u.ID || sees(pr.UserID) {
+			kept = append(kept, pr)
+		}
+	}
+	p.Presences = kept
 	return p, nil
+}
+
+// presenceVisibleTo reports, for the account uid, whose presence it may see:
+// its friends' and its co-members', unless either has blocked the other. rels
+// are uid's relationships, already read.
+func (h *Hub) presenceVisibleTo(ctx context.Context, uid ids.ID, rels []*store.Relationship) (func(ids.ID) bool, error) {
+	blocked, err := h.st.BlockedEitherWay(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	allowed := map[ids.ID]bool{}
+	for _, r := range rels {
+		if r.Type == "friend" {
+			allowed[r.TargetID] = true
+		}
+	}
+	if h.Interested != nil {
+		co, err := h.Interested(ctx, uid)
+		if err != nil {
+			return nil, err
+		}
+		for _, id := range co {
+			allowed[id] = true
+		}
+	}
+	return func(id ids.ID) bool { return allowed[id] && !blocked[id] }, nil
 }
 
 var errClosed = errors.New("connection closed")

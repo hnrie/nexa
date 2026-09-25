@@ -280,10 +280,35 @@ func (s *Store) packsQuery(ctx context.Context, where string, args ...any) ([]*S
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// every listed pack's stickers in one query per 500 packs, rather than one
+	// per pack: every connect lists the account's packs, and a public search
+	// lists up to a hundred
+	byPack := make(map[ids.ID]*StickerPack, len(out))
+	list := make([]ids.ID, 0, len(out))
 	for _, p := range out {
-		if p.Stickers, err = s.PackStickers(ctx, p.ID); err != nil {
-			return nil, err
+		p.Stickers = []*Sticker{}
+		byPack[p.ID] = p
+		list = append(list, p.ID)
+	}
+	err = chunked(list, func(part []ids.ID) error {
+		rows, err := s.db.R.QueryContext(ctx, `SELECT `+stickerCols+` FROM stickers s JOIN blobs b ON b.id = s.blob_id WHERE s.pack_id IN (`+placeholders(len(part))+`) ORDER BY s.pack_id, s.position, s.id`, idArgs(part)...)
+		if err != nil {
+			return err
 		}
+		defer rows.Close()
+		for rows.Next() {
+			st, err := scanSticker(rows)
+			if err != nil {
+				return err
+			}
+			if p := byPack[st.PackID]; p != nil {
+				p.Stickers = append(p.Stickers, st)
+			}
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }

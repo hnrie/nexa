@@ -63,8 +63,11 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	// @everyone. The join time becomes the lowest snowflake of that millisecond
 	// (ids keep the millisecond above 22 bits). Counting per channel lets each
 	// count walk the messages_channel index from the floor instead of scanning
-	// the whole channel. Conversations also count their unread messages, which
-	// stop at MaxUnreadCount so a long-ignored one costs no more than a short one.
+	// the whole channel. Conversations also count their unread messages. Both
+	// counts stop at MaxUnreadCount — past it a badge says 99+ either way — so
+	// a long-ignored channel costs no more than a short one: this runs inside
+	// ready, on every connect, for every channel, and uncapped the mention count
+	// parsed the mentions of every message since the person joined.
 	// A mention of a role counts for whoever holds the role now.
 	mentioned := s.db.Dialect.JSONArrayHas("m.mentions")
 	roleMentioned := `m.mention_roles <> '[]' AND EXISTS (SELECT 1 FROM member_roles mr WHERE mr.server_id = f.server_id AND mr.user_id = ? AND ` + s.db.Dialect.JSONArrayHasExpr("m.mention_roles", "mr.role_id") + `)`
@@ -72,13 +75,13 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 		"coalesce(r.last_read_message_id, 0)",
 		"coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0)",
 	)
-	args := []any{int64(uid), uid.String(), int64(uid), int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
+	args := []any{int64(uid), uid.String(), int64(uid), MaxUnreadCount, int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
 	args = append(args, idArgs(channels)...)
 	mrows, err := s.db.R.QueryContext(ctx, `SELECT f.id,
-			(SELECT count(*) FROM messages m
+			(SELECT count(*) FROM (SELECT 1 FROM messages m
 				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor
-				AND (m.mention_everyone = 1 OR `+mentioned+` OR (`+roleMentioned+`))),
-			CASE WHEN f.type IN ('dm', 'group_dm') THEN (SELECT count(*) FROM (SELECT 1 FROM messages m
+				AND (m.mention_everyone = 1 OR `+mentioned+` OR (`+roleMentioned+`)) LIMIT ?) AS mentions_capped),
+			CASE WHEN f.type IN ('dm', 'group_dm', 'subchat') THEN (SELECT count(*) FROM (SELECT 1 FROM messages m
 				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor LIMIT ?) AS capped) ELSE 0 END
 		FROM (SELECT c.id, c.type, c.server_id, `+floor+` AS floor
 			FROM channels c

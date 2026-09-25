@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 // Memory keeps everything in this process. It is the whole answer while chatd
@@ -13,16 +11,31 @@ import (
 type Memory struct {
 	mu      sync.Mutex
 	marks   map[string]map[string]time.Time // user -> node -> expiry
-	buckets map[string]*rate.Limiter
-	subs    map[string][]func([]byte)
-	now     func() time.Time
+	windows map[string]*window
+	// allows counts Allow calls, so the expired windows are swept every so
+	// often: the keys are callers' strings — addresses, usernames — and
+	// without a sweep each one would stay in memory for good
+	allows int
+	subs   map[string]map[int]func([]byte)
+	nextID int
+	now    func() time.Time
 }
+
+// window is one key's count in its current window, as Redis keeps it: a
+// counter that starts with the first request and expires with the window.
+type window struct {
+	count int
+	until time.Time
+}
+
+// sweepEvery is how many Allow calls pass between sweeps of expired windows.
+const sweepEvery = 1024
 
 func NewMemory() *Memory {
 	return &Memory{
 		marks:   map[string]map[string]time.Time{},
-		buckets: map[string]*rate.Limiter{},
-		subs:    map[string][]func([]byte){},
+		windows: map[string]*window{},
+		subs:    map[string]map[int]func([]byte){},
 		now:     time.Now,
 	}
 }
@@ -88,38 +101,46 @@ func (m *Memory) aliveLocked(userID string) bool {
 	return true
 }
 
-func (m *Memory) Allow(_ context.Context, key string, n int, window time.Duration) (bool, time.Duration, error) {
+// Allow counts n requests per window for key, the way the Redis backend does:
+// a fixed window that opens with the first request and gives everything back
+// when it expires. A limit of zero or less allows nothing.
+func (m *Memory) Allow(_ context.Context, key string, n int, per time.Duration) (bool, time.Duration, error) {
 	m.mu.Lock()
-	lim, ok := m.buckets[key]
-	if !ok {
-		lim = rate.NewLimiter(rate.Every(window/time.Duration(n)), n)
-		m.buckets[key] = lim
-	}
-	m.mu.Unlock()
+	defer m.mu.Unlock()
 	now := m.now()
-	if lim.AllowN(now, 1) {
-		return true, 0, nil
+	if m.allows++; m.allows%sweepEvery == 0 {
+		for k, w := range m.windows {
+			if !now.Before(w.until) {
+				delete(m.windows, k)
+			}
+		}
 	}
-	res := lim.ReserveN(now, 1)
-	delay := res.DelayFrom(now)
-	res.CancelAt(now)
-	if delay <= 0 {
-		delay = time.Second
+	w := m.windows[key]
+	if w == nil || !now.Before(w.until) {
+		w = &window{until: now.Add(per)}
+		m.windows[key] = w
 	}
-	return false, delay, nil
+	w.count++
+	if w.count > n {
+		return false, w.until.Sub(now), nil
+	}
+	return true, 0, nil
 }
 
-// ResetRate forgets a key's bucket.
+// ResetRate forgets a key's count.
 func (m *Memory) ResetRate(_ context.Context, key string) error {
 	m.mu.Lock()
-	delete(m.buckets, key)
+	delete(m.windows, key)
 	m.mu.Unlock()
 	return nil
 }
 
 func (m *Memory) Publish(_ context.Context, channel string, payload []byte) error {
 	m.mu.Lock()
-	fns := append([]func([]byte){}, m.subs[channel]...)
+	fns := make([]func([]byte), 0, len(m.subs[channel]))
+	for _, fn := range m.subs[channel] {
+		fns = append(fns, fn)
+	}
 	m.mu.Unlock()
 	for _, fn := range fns {
 		fn(payload)
@@ -127,16 +148,23 @@ func (m *Memory) Publish(_ context.Context, channel string, payload []byte) erro
 	return nil
 }
 
+// Subscribe delivers what is published on channel until ctx ends, and then
+// forgets the subscription entirely.
 func (m *Memory) Subscribe(ctx context.Context, channel string, fn func([]byte)) error {
 	m.mu.Lock()
-	m.subs[channel] = append(m.subs[channel], fn)
-	at := len(m.subs[channel]) - 1
+	m.nextID++
+	id := m.nextID
+	if m.subs[channel] == nil {
+		m.subs[channel] = map[int]func([]byte){}
+	}
+	m.subs[channel][id] = fn
 	m.mu.Unlock()
 	go func() {
 		<-ctx.Done()
 		m.mu.Lock()
-		if list := m.subs[channel]; at < len(list) {
-			list[at] = func([]byte) {}
+		delete(m.subs[channel], id)
+		if len(m.subs[channel]) == 0 {
+			delete(m.subs, channel)
 		}
 		m.mu.Unlock()
 	}()
