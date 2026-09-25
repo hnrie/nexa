@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { desktop, type DesktopFile, type DesktopRelease } from "@/api/desktop";
 import { Button } from "@/components/common/Button";
+import b from "@/components/common/Button.module.css";
 import { Spinner } from "@/components/common/Spinner";
 import { currentPlatform, noDesktopBuild, pickDownload, type DesktopTarget } from "@/lib/platform";
-import { formatBytes } from "@/lib/time";
+import { formatBytes, formatDateDivider } from "@/lib/time";
+import { copyText } from "@/lib/copyText";
 import { useUI } from "@/stores/ui";
 import { usePageTitle } from "./AuthLayout";
 import s from "./DownloadPage.module.css";
@@ -42,6 +44,13 @@ export default function DownloadPage() {
   // A phone or a tablet runs Nexa in its browser; the page still lists every
   // installer, for the computer the visitor may be choosing one for.
   const [handheld] = useState(noDesktopBuild);
+  // how a home-screen app is made differs by system, and the page can say which steps apply here
+  const [homeSteps] = useState(() => {
+    const ua = typeof navigator === "undefined" ? "" : navigator.userAgent;
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return t("download.iosSteps");
+    if (/Android/.test(ua)) return t("download.androidSteps");
+    return null;
+  });
   const toast = useUI((u) => u.toast);
 
   const loadDesktop = () => {
@@ -63,12 +72,8 @@ export default function DownloadPage() {
   // A clipboard write rejects in a non-secure context and when the permission
   // is refused; with no catch the success toast simply never came and nothing
   // was said at all.
-  const copyText = (text: string) =>
-    void navigator.clipboard?.writeText(text).then(
-      () => toast(t("download.sha256Copied"), "success"),
-      () => toast(t("download.theHashCouldNotBeCopied"), "error"),
-    );
-  const copyHash = (f: DesktopFile) => copyText(f.sha256);
+  const copyHash = (f: DesktopFile) =>
+    void copyText(f.sha256).then((ok) => (ok ? toast(t("download.sha256Copied"), "success") : toast(t("download.theHashCouldNotBeCopied"), "error")));
 
   return (
     <div className={s.page}>
@@ -82,7 +87,10 @@ export default function DownloadPage() {
         {handheld ? (
           <div className={s.handheld} data-testid="download-handheld">
             <Smartphone size={20} aria-hidden />
-            <span>{t("download.onAPhoneOrTablet")}</span>
+            <span>
+              {t("download.onAPhoneOrTablet")}
+              {homeSteps ? <span className={s.steps}>{homeSteps}</span> : null}
+            </span>
           </div>
         ) : null}
 
@@ -102,7 +110,8 @@ export default function DownloadPage() {
                 <a className={s.bigButton} href={desktop.fileUrl(mine.name)} data-testid="download-primary">
                   <Download size={20} /> {t("download.downloadFor", { what: labels()[`${mine.os}:${mine.kind}`]?.split(" (")[0] ?? mine.os })}
                 </a>
-                <span className={s.meta}>{t("download.versionLine", { version: rel.version })} · {arches()[mine.arch][mine.os]} · {formatBytes(mine.size)}</span>
+                {/* when it came out: the one fact that says whether a project is alive, on the page where a stranger decides to trust an installer */}
+                <span className={s.meta}>{t("download.versionLine", { version: rel.version })}{rel.released_at ? ` · ${t("download.released", { date: formatDateDivider(rel.released_at) })}` : ""} · {arches()[mine.arch][mine.os]} · {formatBytes(mine.size)}</span>
                 {otherMac ? (
                   <span className={s.meta}>
                     {otherMac.arch === "x64" ? `${t("download.onIntelMac")} ` : `${t("download.onAppleSilicon")} `}
@@ -124,9 +133,10 @@ export default function DownloadPage() {
                         {formatBytes(f.size)} · <button type="button" className={s.hash} dir="ltr" title={t("download.copySha256")} aria-label={t("download.copySha256")} onClick={() => copyHash(f)}>SHA-256 {f.sha256.slice(0, 16)}…</button>
                       </span>
                     </span>
-                    <Button size="sm" variant={mine?.name === f.name ? "primary" : "secondary"} className={s.touchButton} onClick={() => { location.href = desktop.fileUrl(f.name); }}>
+                    {/* A link to the file, as the big button is: it can be opened in a new tab, its address copied, and a screen reader calls it a link. */}
+                    <a className={[b.btn, b.sm, mine?.name === f.name ? b.primary : b.secondary, s.touchButton, s.fileLink].join(" ")} href={desktop.fileUrl(f.name)} download>
                       <Download size={16} /> {t("chat.attachments.download")}
-                    </Button>
+                    </a>
                   </div>
                 ))}
               </div>

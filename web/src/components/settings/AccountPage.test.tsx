@@ -15,9 +15,9 @@ afterEach(cleanup);
 async function generateKey() {
   render(<AccountPage onEditProfile={() => {}} />);
   fireEvent.click(screen.getByRole("button", { name: /new recovery key/i }));
-  fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "hunter22" } });
+  fireEvent.change(screen.getByLabelText(/password/i, { selector: "input" }), { target: { value: "hunter22" } });
   // Enter in the password box generates, as the button does
-  fireEvent.keyDown(screen.getByLabelText(/password/i), { key: "Enter" });
+  fireEvent.keyDown(screen.getByLabelText(/password/i, { selector: "input" }), { key: "Enter" });
   await waitFor(() => expect(screen.getByTestId("recovery-key")).toBeTruthy());
 }
 

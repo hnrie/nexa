@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Field, TextInput } from "./TextInput";
 
@@ -66,5 +66,21 @@ describe("Field", () => {
       </Field>,
     );
     expect(screen.getByTestId("row").getAttribute("aria-labelledby")).toBeNull();
+  });
+});
+
+describe("TextInput with reveal", () => {
+  it("shows and hides a password, keeping the field's name and error on the input", () => {
+    render(
+      <Field label="Password" error="Wrong">
+        <TextInput type="password" reveal defaultValue="hunter22" />
+      </Field>,
+    );
+    const input = screen.getByLabelText("Password", { selector: "input" }) as HTMLInputElement;
+    expect(input.type).toBe("password");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    expect(input.type).toBe("text");
+    expect(screen.getByRole("button", { name: "Hide password" }).getAttribute("aria-pressed")).toBe("true");
   });
 });

@@ -298,7 +298,7 @@ export default function SecurityPage() {
               <>
                 <p className={s.hint}>{t("settings.security.confirmYourPasswordToStart")}</p>
                 <Field label={t("chat.lockedChannel.password")} required>
-                  <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
+                  <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
                 <Button block loading={busy} disabled={!password} onClick={() => void beginSetup()}>{t("settings.security.continue")}</Button>
               </>
@@ -337,7 +337,7 @@ export default function SecurityPage() {
               <>
                 <p className={s.hint}>{t("settings.security.backupCodesHint")} {t("settings.security.backupCodesLeft", { count: left })}</p>
                 <Field label={t("chat.lockedChannel.password")} required>
-                  <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
+                  <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
                 <Button block loading={busy} disabled={!password} onClick={() => void regenerate()}>{t("settings.security.generateNewCodes")}</Button>
               </>
@@ -354,7 +354,7 @@ export default function SecurityPage() {
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             <p className={s.hint}>{t("settings.security.yourPasswordAloneWillGetInto")}</p>
             <Field label={t("chat.lockedChannel.password")} required>
-              <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
+              <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
             </Field>
             <Button block variant="danger" loading={busy} disabled={!password} onClick={() => void disable()}>{t("settings.security.turnItOff")}</Button>
           </div>
@@ -367,10 +367,10 @@ export default function SecurityPage() {
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             <p className={s.hint}>{t("settings.security.digitsOrAPhraseAtLeast")}</p>
             <Field label={t("settings.security.passcode")} required>
-              <TextInput type="password" value={pin} onChange={(e) => { setPin(e.target.value); setError(null); }} autoComplete="new-password" autoFocus data-testid="passcode-new" />
+              <TextInput type="password" reveal value={pin} onChange={(e) => { setPin(e.target.value); setError(null); }} autoComplete="new-password" autoFocus data-testid="passcode-new" />
             </Field>
             <Field label={t("settings.security.passcodeAgain")} required>
-              <TextInput type="password" value={pin2} onChange={(e) => { setPin2(e.target.value); setError(null); }} autoComplete="new-password" data-testid="passcode-confirm" />
+              <TextInput type="password" reveal value={pin2} onChange={(e) => { setPin2(e.target.value); setError(null); }} autoComplete="new-password" data-testid="passcode-confirm" />
             </Field>
             <Button block loading={busy} disabled={!pin || !pin2} onClick={savePasscode} data-testid="passcode-save">{lock ? t("settings.security.changeIt") : t("settings.security.turnItOn")}</Button>
           </div>

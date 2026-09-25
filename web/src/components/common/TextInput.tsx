@@ -1,4 +1,6 @@
-import { cloneElement, forwardRef, isValidElement, useId, type InputHTMLAttributes, type ReactElement, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import { cloneElement, forwardRef, isValidElement, useId, useState, type InputHTMLAttributes, type ReactElement, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { t } from "@/i18n";
 import { Select } from "./Select";
 import s from "./TextInput.module.css";
 
@@ -60,10 +62,28 @@ export function Field({ label, error, hint, required, children, className, as }:
   );
 }
 
-type InputProps = InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean };
+type InputProps = InputHTMLAttributes<HTMLInputElement> & {
+  invalid?: boolean;
+  /**
+   * On a password box, an eye that shows what was typed. A password here is
+   * also what unlocks the keys, so a typo reads as a wrong password; on a
+   * phone it was typed blind with no way to check it.
+   */
+  reveal?: boolean;
+};
 
-export const TextInput = forwardRef<HTMLInputElement, InputProps>(function TextInput({ invalid, className, ...rest }, ref) {
-  return <input ref={ref} className={[s.input, invalid ? s.invalid : "", className ?? ""].join(" ")} {...rest} />;
+export const TextInput = forwardRef<HTMLInputElement, InputProps>(function TextInput({ invalid, className, reveal = false, type, ...rest }, ref) {
+  const [shown, setShown] = useState(false);
+  const input = <input ref={ref} className={[s.input, invalid ? s.invalid : "", reveal ? s.withReveal : "", className ?? ""].join(" ")} type={reveal && shown ? "text" : type} {...(reveal && shown ? { autoCorrect: "off", autoCapitalize: "none", spellCheck: false } : {})} {...rest} />;
+  if (!reveal || type !== "password") return input;
+  return (
+    <span className={s.revealWrap}>
+      {input}
+      <button type="button" className={s.reveal} aria-pressed={shown} aria-label={shown ? t("common.hidePassword") : t("common.showPassword")} title={shown ? t("common.hidePassword") : t("common.showPassword")} onClick={() => setShown((v) => !v)} onMouseDown={(e) => e.preventDefault()}>
+        {shown ? <EyeOff size={18} aria-hidden /> : <Eye size={18} aria-hidden />}
+      </button>
+    </span>
+  );
 });
 
 type AreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & { invalid?: boolean };

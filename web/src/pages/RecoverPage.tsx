@@ -53,7 +53,8 @@ export default function RecoverPage() {
     } catch (err) {
       justRecovered.current = false;
       if (err instanceof ApiError) {
-        if (err.code === "invalid_credentials") {
+        if (err.code === "account_disabled") setError(t("login.accountDisabled"));
+        else if (err.code === "invalid_credentials") {
           setWrongKey(t("recover.usernameOrRecoveryKeyIsWrong"));
           keyInput.current?.focus();
         } else setError(describeError(err, t("recover.recoveryFailedCheckTheKeyAnd")));
@@ -98,10 +99,10 @@ export default function RecoverPage() {
           <TextInput ref={keyInput} value={key} onChange={(e) => { setKey(e.target.value); setWrongKey(null); }} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
         </Field>
         <Field label={t("settings.account.newPassword")} required>
-          <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
+          <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>
         <Field label={t("settings.account.confirmNewPassword")} required error={confirm && confirm !== password ? t("settings.account.passwordsDoNotMatch") : null}>
-          <TextInput ref={confirmInput} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+          <TextInput ref={confirmInput} type="password" reveal value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
         <p className={s.note}>{t("recover.whatAResetDoes")}</p>
         <Button type="submit" size="lg" block loading={busy}>{t("recover.resetPassword")}</Button>

@@ -19,7 +19,7 @@ import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
 import { useReveal } from "@/hooks/useReveal";
 import { currentPlatform } from "@/lib/platform";
-import { t } from "@/i18n";
+import { t, translator } from "@/i18n";
 import s from "./Home.module.css";
 import { CONTACT_EMAIL } from "@/lib/legal";
 
@@ -55,12 +55,15 @@ function Reveal({ children, delay = 0, className }: { children: ReactNode; delay
  * by one each shove the page down under whoever is reading it — and under the
  * observer that decides when a block has been scrolled to.
  */
-function Shot({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
+function Shot({ src, alt, width, height, eager = false }: { src: string; alt: string; width: number; height: number; eager?: boolean }) {
   return (
     <FloatingPlane>
       <figure className={s.shot}>
         <div className={s.chrome}><i /><i /><i /></div>
-        <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+        {/* The first picture is the largest thing on the page and in view as
+            it opens: asked for with the page rather than once laid out, which
+            is what "lazy" would do to it. The rest wait to be scrolled to. */}
+        <img src={src} alt={alt} width={width} height={height} {...(eager ? ({ fetchpriority: "high" } as Record<string, string>) : { loading: "lazy" as const })} decoding="async" />
       </figure>
     </FloatingPlane>
   );
@@ -81,9 +84,11 @@ function Loop({ name, alt, width, height }: { name: string; alt: string; width: 
         {still ? (
           <img src={`/home/${name}.png`} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
         ) : (
+          // Every browser that runs the app plays video, so the GIF that sat
+          // inside as a fallback was never fetched by anyone; the poster is what
+          // shows until the loop arrives.
           <video autoPlay muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt} width={width} height={height}>
             <source src={`/home/${name}.webm`} type="video/webm" />
-            <img src={`/home/${name}.gif`} alt={alt} width={width} height={height} loading="lazy" />
           </video>
         )}
       </figure>
@@ -116,10 +121,26 @@ const POINTS = () => [
   { icon: Languages, title: t("home.point.languagesTitle"), body: t("home.point.languagesBody") },
 ];
 
+/**
+ * The most the app takes to load, gzipped: the script and styles every page
+ * starts with. tools/app_size.py measures each build against it, so the claim
+ * on this page cannot drift from the truth unnoticed, as "264 KB" had.
+ */
+export const LOAD_KB_LIMIT = 500;
+
+/** A number with its unit, as the reader's language writes it. */
+function amount(value: number, unit: "kilobyte" | "millisecond" | "megabyte"): string {
+  try {
+    return new Intl.NumberFormat(translator().locale, { style: "unit", unit }).format(value);
+  } catch {
+    return `${value} ${unit === "kilobyte" ? "KB" : unit === "megabyte" ? "MB" : "ms"}`;
+  }
+}
+
 const NUMBERS = () => [
-  { value: "264 KB", label: t("home.speed.size") },
-  { value: "50 ms", label: t("home.speed.switch") },
-  { value: "50 MB", label: t("home.speed.memory") },
+  { value: t("home.speed.under", { size: amount(LOAD_KB_LIMIT, "kilobyte") }), label: t("home.speed.size") },
+  { value: amount(50, "millisecond"), label: t("home.speed.switch") },
+  { value: amount(50, "megabyte"), label: t("home.speed.memory") },
 ];
 
 export default function HomePage() {
@@ -164,7 +185,7 @@ export default function HomePage() {
           <p className={s.fine}>{t("home.hero.fine")}</p>
         </Reveal>
         <Reveal delay={90} className={s.heroShot}>
-          <Shot src="/home/app.png" alt={t("home.shot.app")} width={1440} height={900} />
+          <Shot src="/home/app.png" alt={t("home.shot.app")} width={1440} height={900} eager />
         </Reveal>
       </section>
 

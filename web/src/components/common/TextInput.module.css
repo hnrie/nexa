@@ -8,4 +8,11 @@
 .input::placeholder { color: var(--text-placeholder); }
 .input:focus { border-color: var(--brand); }
 .invalid, .hasError .input { border-color: var(--danger); }
+/* the eye sits inside the box, at its end */
+.revealWrap { position: relative; display: block; width: 100%; }
+.withReveal { padding-inline-end: 44px; }
+.reveal { position: absolute; inset-block: 0; inset-inline-end: 0; width: 40px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border-radius: var(--radius-xs); }
+.reveal:hover { color: var(--text); }
+.reveal:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+@media (pointer: coarse) { .reveal { width: 44px; } }
 .area { height: auto; min-height: 88px; padding: 10px; resize: vertical; line-height: 1.375; }

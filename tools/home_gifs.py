@@ -28,12 +28,13 @@ TALK = {
 
 
 def clip(src: Path, stem: Path, tail: float, fps: int = 16, width: int = 900) -> None:
-    """The last `tail` seconds of the recording, in three shapes.
+    """The last `tail` seconds of the recording, in two shapes.
 
-    A page gets the webm, which is small and smooth; anything that cannot play
-    video falls back to the GIF, which costs more and looks worse but always
-    works; and the first frame becomes the poster, so the box is never empty
-    while the loop loads.
+    A page gets the webm, which is small and smooth, and the first frame
+    becomes the poster, so the box is never empty while the loop loads and a
+    reader who asked for less movement sees it on its own. (A GIF used to be
+    made too, as a fallback inside the video element; every browser that runs
+    the app plays video, so none ever fetched it.)
     """
     common = f"fps={fps},scale={width}:-1:flags=lanczos"
     run = lambda cmd: subprocess.run(cmd, check=True, capture_output=True)
@@ -42,16 +43,8 @@ def clip(src: Path, stem: Path, tail: float, fps: int = 16, width: int = 900) ->
         "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "36", "-row-mt", "1",
         "-pix_fmt", "yuv420p", "-an", str(stem.with_suffix(".webm")),
     ])
-    pal = stem.with_suffix(".pal.png")
-    run(["ffmpeg", "-y", "-sseof", f"-{tail}", "-i", str(src), "-vf", f"fps=12,scale=700:-1:flags=lanczos,palettegen=stats_mode=diff:max_colors=96", str(pal)])
-    run([
-        "ffmpeg", "-y", "-sseof", f"-{tail}", "-i", str(src), "-i", str(pal),
-        "-lavfi", "fps=12,scale=700:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
-        "-loop", "0", str(stem.with_suffix(".gif")),
-    ])
-    pal.unlink(missing_ok=True)
     run(["ffmpeg", "-y", "-sseof", f"-{tail}", "-i", str(src), "-vf", f"scale={width}:-1:flags=lanczos", "-frames:v", "1", str(stem.with_suffix(".png"))])
-    for ext in (".webm", ".gif", ".png"):
+    for ext in (".webm", ".png"):
         f = stem.with_suffix(ext)
         print(f"  {f.name}: {f.stat().st_size / 1024:.0f} KB")
 

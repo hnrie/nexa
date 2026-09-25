@@ -1,4 +1,5 @@
-import { useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { admin as adminApi } from "@/api/admin";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { describeError } from "@/lib/errors";
@@ -37,6 +38,21 @@ export default function RegisterPage() {
   const passwordInput = useRef<HTMLInputElement>(null);
   const confirmInput = useRef<HTMLInputElement>(null);
   const strengthId = useId();
+  // Whether this instance takes sign-ups at all, asked before the form is
+  // filled in: it used to be learned after a whole form and a key derivation,
+  // with the field it needed folded away under "Have an invite?".
+  const [policy, setPolicy] = useState<"open" | "invite" | "closed" | null>(null);
+  useEffect(() => {
+    let alive = true;
+    adminApi.instance().then(
+      (info) => alive && setPolicy(info.registration),
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const needsInvite = policy === "invite";
   usePageTitle(recovery ? t("register.saveYourRecoveryKey") : t("register.createAnAccount"));
 
   const uname = username.trim().toLowerCase();
@@ -95,6 +111,15 @@ export default function RegisterPage() {
     return <Navigate to="/channels/@me" replace />;
   }
 
+  if (policy === "closed" && !recovery) {
+    return (
+      <AuthLayout title={t("register.createAnAccount")}>
+        <p className={s.note} role="status" style={{ textAlign: "center" }}>{t("register.thisServerIsNotAcceptingNew")}</p>
+        <Link to="/login" className={s.center}>{t("register.alreadyHaveAnAccount")}</Link>
+      </AuthLayout>
+    );
+  }
+
   if (recovery) {
     return (
       <AuthLayout title={t("register.saveYourRecoveryKey")} subtitle={t("register.yourMessagesAreEndToEnd")}>
@@ -118,7 +143,7 @@ export default function RegisterPage() {
             label so the box's name is not remade on every key. */}
         <div className={s.group}>
           <Field label={t("chat.lockedChannel.password")} required>
-            <TextInput ref={passwordInput} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} aria-describedby={strengthId} required />
+            <TextInput ref={passwordInput} type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} aria-describedby={strengthId} required />
           </Field>
           <div className={s.strength} data-score={password ? strength.score : 0} id={strengthId}>
             {[1, 2, 3, 4].map((n) => <i key={n} data-on={!!password && strength.score >= n} />)}
@@ -126,14 +151,21 @@ export default function RegisterPage() {
           </div>
         </div>
         <Field label={t("register.confirmPassword")} required error={mismatch ? t("settings.account.passwordsDoNotMatch") : null}>
-          <TextInput ref={confirmInput} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+          <TextInput ref={confirmInput} type="password" reveal value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
-        <details className={s.invite} open={inviteOpen || undefined}>
-          <summary className={s.foot}>{t("register.haveAnInviteOrRegistrationKey")}</summary>
-          <Field label={t("register.inviteRegistrationKey")}>
-            <TextInput value={inviteKey} onChange={(e) => setInviteKey(e.target.value)} autoCapitalize="none" spellCheck={false} />
+        {needsInvite ? (
+          // this instance only takes people who were invited, so the field is part of the form
+          <Field label={t("register.inviteRegistrationKey")} required hint={t("register.youNeedAnInviteOrRegistration")}>
+            <TextInput value={inviteKey} onChange={(e) => setInviteKey(e.target.value)} autoCapitalize="none" spellCheck={false} required />
           </Field>
-        </details>
+        ) : (
+          <details className={s.invite} open={inviteOpen || undefined}>
+            <summary className={s.foot}>{t("register.haveAnInviteOrRegistrationKey")}</summary>
+            <Field label={t("register.inviteRegistrationKey")}>
+              <TextInput value={inviteKey} onChange={(e) => setInviteKey(e.target.value)} autoCapitalize="none" spellCheck={false} />
+            </Field>
+          </details>
+        )}
         <Button type="submit" size="lg" block loading={busy}>{t("settings.security.continue")}</Button>
         {/* under the button, so the button does not move while it is being pressed */}
         {progress ? <p className={s.progress} role="status">{progress}</p> : null}
