@@ -92,6 +92,13 @@ export interface Settings {
   // --- organize: server folders, pins, DM groups, the Nexa conversation ---
 
   // --- people: blocking ---
+  /**
+   * What becomes of messages from people this account has blocked (see
+   * lib/blocked.ts). hideMessages: they leave no trace at all, instead of
+   * folding into a "blocked messages" row. hideReplies: messages that reply to
+   * theirs go too; it only counts while hideMessages is on.
+   */
+  blocking: { hideMessages: boolean; hideReplies: boolean };
 
   // --- look: themes, custom CSS, plugins ---
 
@@ -149,6 +156,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // --- organize: server folders, pins, DM groups, the Nexa conversation ---
 
   // --- people: blocking ---
+  blocking: { hideMessages: false, hideReplies: false },
 
   // --- look: themes, custom CSS, plugins ---
 
@@ -169,6 +177,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     // --- organize: server folders, pins, DM groups, the Nexa conversation ---
 
     // --- people: blocking ---
+    blocking: { ...base.blocking, ...(typeof inc.blocking === "object" && inc.blocking !== null ? inc.blocking : {}) },
 
     // --- look: themes, custom CSS, plugins ---
 

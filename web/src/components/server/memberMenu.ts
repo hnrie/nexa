@@ -5,6 +5,7 @@ import { useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
 import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
+import { relationshipMenuItems } from "@/lib/friendship";
 
 import { t } from "@/i18n";
 /** Whether the current user outranks a member (or is that member). */
@@ -36,6 +37,12 @@ export function memberMenuItems(serverId: string, userId: string, ctx: { openMod
       separatorAfter: true,
     },
   ];
+  // being friends, and blocking: the same choices a profile offers
+  const people = relationshipMenuItems(userId);
+  if (people.length) {
+    items.push(...people);
+    items[items.length - 1]!.separatorAfter = true;
+  }
   const canNick = self ? canI(st, P.CHANGE_NICKNAME) || canI(st, P.MANAGE_NICKNAMES) : canI(st, P.MANAGE_NICKNAMES) && above;
   if (canNick) items.push({ id: "nick", label: self ? t("perms.changeNickname") : t("server.memberMenu.changeTheirNickname"), onSelect: () => ctx.openModal("serverProfile", { serverId, userId }) });
   if (canI(st, P.MANAGE_ROLES) && above) items.push({ id: "roles", label: t("server.members.roles"), onSelect: () => ctx.openModal("memberAction", { serverId, userId, action: "roles" }) });

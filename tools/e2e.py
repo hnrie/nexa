@@ -165,15 +165,15 @@ class Session:
         p.click("text=Add Friend")
         p.fill("input[aria-label=Username]", username)
         p.click("text=Send Friend Request")
-        p.wait_for_selector("text=/Success|now friends/", timeout=15000)
+        p.wait_for_selector("text=/was sent|now friends/", timeout=15000)
 
     def accept_friend(self, display):
         p = self.page
         p.goto(self.base + "/channels/@me", wait_until="networkidle")
         p.click("button:has-text('Pending')")
         row = p.locator(f"div:has(> div > span:has-text('{display}'))").first
-        p.wait_for_selector("button[aria-label=Accept]", timeout=15000)
-        p.click("button[aria-label=Accept]")
+        p.wait_for_selector("[data-testid=friend-accept]", timeout=15000)
+        p.click("[data-testid=friend-accept]")
         # accepting opens the new conversation, so come back for the list
         for _ in range(20):
             p.wait_for_timeout(300)

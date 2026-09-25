@@ -1,11 +1,12 @@
 import { NexaProfile } from "@/components/nexa/NexaProfile";
 import { isSystemAccount } from "@/lib/moderation";
-import { Check, Clock, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
+import { LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserPlus, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
+import { confirmRemoveFriend, openBlockDialog, sendFriendRequest, unblockUser, useBusyWith } from "@/lib/friendship";
 import type { PublicUser } from "@/api/types";
 import { bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
@@ -16,8 +17,8 @@ import { Tooltip } from "@/components/common/Tooltip";
 import { Twemoji } from "@/components/common/Twemoji";
 import { promptFields } from "@/components/modals/PromptModal";
 import { KeyStatusChip } from "./KeyVerify";
+import { RelationshipBar, relationshipLine } from "./RelationshipBar";
 import { profileTheme, profileThemeOf } from "@/lib/avatarColor";
-import { guarded } from "@/lib/captcha";
 import { copyText } from "@/lib/clipboard";
 import { formatShortDate } from "@/lib/time";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -46,10 +47,10 @@ interface Props {
 }
 
 /** A round button laid over the banner, as Discord's preview has them. */
-function BannerButton({ label, onClick, children, testId }: { label: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; children: ReactNode; testId?: string }) {
+function BannerButton({ label, onClick, children, testId, busy }: { label: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; children: ReactNode; testId?: string; busy?: boolean }) {
   return (
     <Tooltip text={label} side="bottom">
-      <button className={s.bannerBtn} aria-label={label} onClick={onClick} data-testid={testId}>
+      <button className={s.bannerBtn} aria-label={label} onClick={onClick} data-testid={testId} disabled={busy} aria-busy={busy || undefined}>
         {children}
       </button>
     </Tooltip>
@@ -71,7 +72,8 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
   const users = useUsers((u) => u.byId);
   const rel = useRelationships((r) => r.byUser[userId]);
   const setRel = useRelationships((r) => r.set);
-  const removeRel = useRelationships((r) => r.remove);
+  // a friend request can wait on a captcha check: the button says it is on its way
+  const busy = useBusyWith(userId);
   const presence = usePresence((p) => p.byUser[userId]);
   const servers = useServers((st) => st.byId);
   const upsertChannel = useChannels((c) => c.upsert);
@@ -158,23 +160,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
       toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotOpenAConversation"), "error");
     }
   };
-  const addFriend = async () => {
-    try {
-      const res = await guarded("friend_request", (captcha) => relApi.request(user.username, captcha));
-      setRel({ user: res.user, type: res.type as "friend" | "outgoing", nickname: "", created_at: Date.now() });
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotSendTheRequest"), "error");
-    }
-  };
-  const accept = async () => {
-    try {
-      const res = await relApi.accept(userId);
-      setRel({ user: res.user, type: "friend", nickname: "", created_at: Date.now() });
-    } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotAccept"), "error");
-    }
-  };
-  const failed = (err: unknown) => toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotUpdateThisPerson"), "error");
+  const addFriend = () => void sendFriendRequest(user);
   const editNickname = async () => {
     if (!rel || rel.type !== "friend") return;
     const values = await promptFields({ title: t("profile.profileCard.friendNickname"), fields: [{ key: "nickname", label: t("modals.serverProfile.nickname"), initial: rel.nickname, placeholder: user.display_name, maxLength: 32, hint: t("profile.profileCard.onlyYouSeeIt") }], confirmLabel: t("chat.editMessage.save"), allowEmpty: true });
@@ -193,35 +179,11 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
     if (friend) {
       items.push({ id: "nick", label: rel.nickname ? t("profile.profileCard.editFriendNickname") : t("profile.profileCard.addFriendNickname"), onSelect: () => void editNickname() });
       // asked first, as the friends list asks: neither is quick to take back
-      items.push({
-        id: "rm",
-        label: t("profile.profileCard.removeFriend"),
-        danger: true,
-        onSelect: () =>
-          openModal("confirm", {
-            title: t("profile.profileCard.removeFriend"),
-            body: t("friends.removeNameFromYourFriends", { name: user.display_name }),
-            confirmLabel: t("profile.profileCard.removeFriend"),
-            danger: true,
-            onConfirm: () => relApi.remove(userId).then(() => removeRel(userId), failed),
-          }),
-      });
+      items.push({ id: "rm", label: t("profile.profileCard.removeFriend"), danger: true, onSelect: () => confirmRemoveFriend(user) });
     }
-    if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), onSelect: () => void relApi.unblock(userId).then(() => removeRel(userId), failed) });
-    else
-      items.push({
-        id: "block",
-        label: t("profile.profileCard.block"),
-        danger: true,
-        onSelect: () =>
-          openModal("confirm", {
-            title: t("profile.profileCard.block"),
-            body: t("friends.blockNameTheyWillNotBe", { name: user.display_name }),
-            confirmLabel: t("profile.profileCard.block"),
-            danger: true,
-            onConfirm: () => relApi.block(userId).then(() => setRel({ user, type: "blocked", nickname: "", created_at: Date.now() }), failed),
-          }),
-      });
+    // one block dialog everywhere, with its choices about their messages
+    if (rel?.type === "blocked") items.push({ id: "unblock", label: t("friends.unblock"), onSelect: () => void unblockUser(userId) });
+    else items.push({ id: "block", label: t("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(userId) });
     items[items.length - 1]!.separatorAfter = true;
     items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) });
     openContextMenu({ x: r.left, y: r.bottom + 4, items });
@@ -240,16 +202,15 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
   const buttons = interactive && !panel;
 
   // the full profile leads with one clear action; the preview keeps its buttons on the banner
+  // (a request either way, or a block, is said by the bar under the names, with its own buttons)
   const primary = !buttons ? null : isMe ? (
     <button className={s.primary} onClick={() => { onClose?.(); openModal("settings", { page: "profiles" }); }}><Pencil size={16} /> {t("profile.profileCard.editProfile")}</button>
-  ) : friend ? (
+  ) : rel?.type === "blocked" ? null : rel ? (
     <button className={s.primary} onClick={() => void message()}><MessageCircle size={16} /> {t("profile.profileCard.message")}</button>
-  ) : rel?.type === "incoming" ? (
-    <button className={s.primary} onClick={() => void accept()}><Check size={16} /> {t("profile.profileCard.acceptRequest")}</button>
-  ) : rel?.type === "outgoing" ? (
-    <button className={s.primary} disabled><Clock size={16} /> {t("profile.profileCard.requestSent")}</button>
-  ) : rel?.type === "blocked" ? null : (
-    <button className={s.primary} onClick={() => void addFriend()}><UserPlus size={16} /> {t("profile.profileCard.addFriend")}</button>
+  ) : (
+    <button className={s.primary} onClick={addFriend} disabled={busy} aria-busy={busy || undefined} data-testid="profile-add-friend">
+      {busy ? <LoaderCircle size={16} className={s.spin} aria-hidden="true" /> : <UserPlus size={16} aria-hidden="true" />} {busy ? t("people.request.sending") : t("profile.profileCard.addFriend")}
+    </button>
   );
 
   return (
@@ -262,8 +223,11 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
               <BannerButton label={t("profile.profileCard.editProfile")} onClick={() => openModal("settings", { page: "profiles" })}><Pencil size={16} /></BannerButton>
             ) : (
               <>
-                {rel?.type === "incoming" ? <BannerButton label={t("profile.profileCard.acceptFriendRequest")} onClick={() => void accept()}><Check size={18} /></BannerButton> : null}
-                {!rel ? <BannerButton label={t("profile.profileCard.addFriend")} onClick={() => void addFriend()}><UserPlus size={18} /></BannerButton> : null}
+                {!rel ? (
+                  <BannerButton label={busy ? t("people.request.sending") : t("profile.profileCard.addFriend")} onClick={addFriend} busy={busy} testId="profile-add-friend">
+                    {busy ? <LoaderCircle size={18} className={s.spin} /> : <UserPlus size={18} />}
+                  </BannerButton>
+                ) : null}
                 <BannerButton label={t("chat.chat.more")} onClick={more} testId="profile-more"><MoreHorizontal size={18} /></BannerButton>
               </>
             )
@@ -321,10 +285,14 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
         </div>
         </div>
 
+        {interactive && !isMe ? <RelationshipBar user={user} rel={rel} /> : null}
+        {/* read out when it changes: the button pressed has gone, and this is what took its place */}
+        {interactive && !isMe ? <span className="visually-hidden" aria-live="polite">{relationshipLine(rel)}</span> : null}
+
         {buttons && (primary || !isMe) ? (
           <div className={s.actions}>
             {primary}
-            {!isMe && !friend ? (
+            {!isMe && !rel ? (
               <Tooltip text={t("profile.profileCard.message")} side="top">
                 <button className={s.square} aria-label={t("profile.profileCard.message")} onClick={() => void message()}><MessageCircle size={18} /></button>
               </Tooltip>

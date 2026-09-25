@@ -3,9 +3,10 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
+import { acceptFriendRequest, confirmRemoveFriend, dropFriendRequest, openBlockDialog, requestError, unblockUser, useBusyWith } from "@/lib/friendship";
 import type { Relationship } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
-import { ApiError } from "@/api/client";
+import { StatusLine } from "@/components/activity/StatusLine";
 import { Button } from "@/components/common/Button";
 import { Tooltip } from "@/components/common/Tooltip";
 import { audioContext } from "@/voice/media";
@@ -13,7 +14,6 @@ import { joinVoice } from "@/voice/session";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
-import { activityLine } from "@/lib/activity";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { copyAndSay } from "@/lib/copyText";
@@ -206,12 +206,12 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   const toast = useUI((u) => u.toast);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const upsertChannel = useChannels((c) => c.upsert);
-  const setRel = useRelationships((r) => r.set);
-  const removeRel = useRelationships((r) => r.remove);
+  const busy = useBusyWith(rel.user.id);
   const status = statusOf(p);
   const cs = customStatus(p);
-  const act = activitiesOf(p)[0];
-  const sub = rel.type === "incoming" ? tr_("friends.incomingFriendRequest") : rel.type === "outgoing" ? tr_("friends.outgoingFriendRequest") : rel.type === "blocked" ? tr_("friends.blocked") : cs ? `${cs.emoji ? cs.emoji + " " : ""}${cs.text}` : act ? activityLine(act) : statusLabel(status);
+  const acts = activitiesOf(p);
+  const name = presenceUser.display_name;
+  const profile = () => useUI.getState().openModal("profile", { userId: rel.user.id });
 
   /** Opens (or makes) the DM with them; returns its id, or null when that failed. */
   const openDM = async (): Promise<string | null> => {
@@ -243,54 +243,10 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
     }
   };
   const accept = async () => {
-    try {
-      const res = await relApi.accept(rel.user.id);
-      setRel({ user: res.user, type: "friend", nickname: rel.nickname, created_at: Date.now() });
-      // the server opens the conversation as part of accepting; go straight to it
-      if (res.channel) {
-        useChannels.getState().upsert([res.channel]);
-        nav(`/channels/@me/${res.channel.id}`);
-      }
-    } catch (err) {
-      toast(describeError(err, tr_("profile.profileCard.couldNotAccept")), "error");
-    }
+    const ch = await acceptFriendRequest(rel.user);
+    // the server opens the conversation as part of accepting; go straight to it
+    if (ch) nav(`/channels/@me/${ch.id}`);
   };
-  const remove = async (label: string) => {
-    try {
-      if (rel.type === "blocked") await relApi.unblock(rel.user.id);
-      else await relApi.remove(rel.user.id);
-      removeRel(rel.user.id);
-      toast(label, "success");
-    } catch (err) {
-      toast(describeError(err, tr_("friends.couldNotUpdate")), "error");
-    }
-  };
-  const block = async () => {
-    try {
-      await relApi.block(rel.user.id);
-      setRel({ ...rel, type: "blocked" });
-    } catch (err) {
-      toast(describeError(err, tr_("friends.couldNotUpdate")), "error");
-    }
-  };
-  // Both sit in a menu beside "Copy user ID" and both used to fire on the way
-  // past. Blocking in particular is socially hard to undo.
-  const confirmBlock = () =>
-    useUI.getState().openModal("confirm", {
-      title: tr_("profile.profileCard.block"),
-      body: tr_("friends.blockNameTheyWillNotBe", { name: rel.user.display_name }),
-      confirmLabel: tr_("profile.profileCard.block"),
-      danger: true,
-      onConfirm: () => block(),
-    });
-  const confirmRemove = () =>
-    useUI.getState().openModal("confirm", {
-      title: tr_("profile.profileCard.removeFriend"),
-      body: tr_("friends.removeNameFromYourFriends", { name: rel.user.display_name }),
-      confirmLabel: tr_("profile.profileCard.removeFriend"),
-      danger: true,
-      onConfirm: () => remove(tr_("friends.friendRemoved")),
-    });
   const more = (e: React.MouseEvent) => {
     e.preventDefault();
     // Opened from the keyboard there is no pointer, and the click lands at
@@ -301,29 +257,39 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       x: fromKeys ? (document.documentElement.dir === "rtl" ? r.right : r.left) : e.clientX,
       y: fromKeys ? r.bottom + 4 : e.clientY,
       items: [
-        { id: "profile", label: tr_("profile.profile.profile"), onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
+        { id: "profile", label: tr_("profile.profile.profile"), onSelect: profile },
         { id: "msg", label: tr_("profile.profileCard.message"), onSelect: () => void message(), separatorAfter: rel.type !== "friend" },
         ...(rel.type === "friend" ? [{ id: "call", label: tr_("chat.chat.startVoiceCall"), onSelect: () => void call(), separatorAfter: true }] : []),
-        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: confirmRemove }] : []),
+        ...(rel.type === "friend" ? [{ id: "rm", label: tr_("profile.profileCard.removeFriend"), danger: true, onSelect: () => confirmRemoveFriend(rel.user) }] : []),
+        // the one block dialog, with its choices about their messages
         ...(rel.type !== "blocked"
-          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: confirmBlock }]
-          : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
+          ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: () => openBlockDialog(rel.user.id) }]
+          : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void unblockUser(rel.user.id) }]),
         { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")) },
       ],
     });
   };
 
-  // The row lit up under the pointer and did nothing when pressed; only the
-  // small circles at its end were live. The row opens the conversation with a
-  // friend, as Discord's does, and anyone else's profile.
-  const open = rel.type === "friend" ? () => void message() : () => useUI.getState().openModal("profile", { userId: rel.user.id });
+  // A friend's line is their status or what they are doing, which scrolls when
+  // it is long, as it does in the sidebar; anyone else's says where things stand.
+  const sub =
+    rel.type === "friend" && (cs || acts[0]) ? (
+      <StatusLine className={s.subStatus} status={cs} activity={acts[0]} more={Math.max(0, acts.length - 1)} />
+    ) : (
+      <span className={s.subText}>{rel.type === "incoming" ? tr_("friends.incomingFriendRequest") : rel.type === "outgoing" ? tr_("friends.outgoingFriendRequest") : rel.type === "blocked" ? tr_("friends.blocked") : statusLabel(status)}</span>
+    );
+
+  // The whole row opens their profile: the name and picture are one button,
+  // and its hit area is stretched over the row (the space around the action
+  // buttons included), while the buttons sit above it and keep their own
+  // jobs. Siblings rather than buttons inside a button, as the DM list does.
   return (
-    <div className={s.row} data-user={rel.user.username} onContextMenu={more}>
-      <button type="button" className={s.rowMain} onClick={open}>
-        <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={presenceUser.display_name} size={32} status={rel.type === "friend" ? status : null} />
+    <div className={s.row} data-user={rel.user.username} data-kind={rel.type} onContextMenu={more}>
+      <button type="button" className={s.rowMain} onClick={profile} aria-haspopup="dialog" data-testid="friend-row">
+        <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={name} size={32} status={rel.type === "friend" ? status : null} />
         <span className={s.rowText}>
           <span className={s.rowName}>
-            <span className={s.rowDisplay} dir="auto">{presenceUser.display_name}</span>
+            <span className={s.rowDisplay} dir="auto">{name}</span>
             <span className={s.rowUser}>{presenceUser.username}</span>
           </span>
           {/* On a touch screen the username is never hovered into view, and it
@@ -334,19 +300,19 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       <div className={s.actions}>
         {rel.type === "friend" ? (
           <>
-            <Tooltip text={tr_("profile.profileCard.message")}><button className={s.act} aria-label={tr_("profile.profileCard.message")} onClick={() => void message()}><MessageSquare size={20} /></button></Tooltip>
+            <Tooltip text={tr_("profile.profileCard.message")}><button className={s.act} aria-label={tr_("profile.profileCard.message")} onClick={() => void message()} data-testid="friend-message"><MessageSquare size={20} /></button></Tooltip>
             <Tooltip text={tr_("chat.chat.startVoiceCall")}><button className={s.act} aria-label={tr_("chat.chat.startVoiceCall")} onClick={() => void call()} data-testid="friend-call"><Phone size={20} /></button></Tooltip>
-            <Tooltip text={tr_("chat.chat.more")}><button className={s.act} aria-label={tr_("chat.chat.more")} onClick={more}><MoreVertical size={20} /></button></Tooltip>
+            <Tooltip text={tr_("chat.chat.more")}><button className={s.act} aria-label={tr_("chat.chat.more")} onClick={more} data-testid="friend-more"><MoreVertical size={20} /></button></Tooltip>
           </>
         ) : rel.type === "incoming" ? (
           <>
-            <Tooltip text={tr_("voice.incomingCall.accept")}><button className={[s.act, s.ok].join(" ")} aria-label={tr_("voice.incomingCall.accept")} onClick={() => void accept()}><Check size={20} /></button></Tooltip>
-            <Tooltip text={tr_("friends.ignore")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.ignore")} onClick={() => void remove(tr_("friends.requestIgnored"))}><X size={20} /></button></Tooltip>
+            <Tooltip text={tr_("profile.profileCard.acceptFriendRequest")}><button className={[s.act, s.ok].join(" ")} aria-label={tr_("profile.profileCard.acceptFriendRequest")} disabled={busy} onClick={() => void accept()} data-testid="friend-accept"><Check size={20} /></button></Tooltip>
+            <Tooltip text={tr_("people.menu.ignoreRequest")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("people.menu.ignoreRequest")} disabled={busy} onClick={() => void dropFriendRequest(rel.user.id)} data-testid="friend-ignore"><X size={20} /></button></Tooltip>
           </>
         ) : rel.type === "outgoing" ? (
-          <Tooltip text={tr_("chat.editMessage.cancel")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("chat.editMessage.cancel")} onClick={() => void remove(tr_("friends.requestCancelled"))}><X size={20} /></button></Tooltip>
+          <Tooltip text={tr_("people.menu.cancelRequest")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("people.menu.cancelRequest")} disabled={busy} onClick={() => void dropFriendRequest(rel.user.id)} data-testid="friend-cancel"><X size={20} /></button></Tooltip>
         ) : (
-          <Tooltip text={tr_("friends.unblock")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove(tr_("friends.unblocked"))}><X size={20} /></button></Tooltip>
+          <Tooltip text={tr_("friends.unblock")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} disabled={busy} onClick={() => void unblockUser(rel.user.id)} data-testid="friend-unblock"><X size={20} /></button></Tooltip>
         )}
       </div>
     </div>
@@ -370,14 +336,7 @@ function AddFriend() {
       setMsg({ ok: true, text: res.type === "friend" ? tr_("friends.youAreNowFriends", { name: res.user.display_name }) : tr_("friends.friendRequestSent", { name: res.user.display_name }) });
       setValue("");
     } catch (err) {
-      const map: Record<string, string> = {
-        user_not_found: tr_("friends.hmDidnTWorkDoubleCheck"),
-        self: tr_("friends.youCanTAddYourselfBut"),
-        blocked: tr_("friends.youCanTSendARequest"),
-        already_friends: tr_("friends.youReAlreadyFriendsWithThat"),
-        already_sent: tr_("friends.youAlreadySentARequestTo"),
-      };
-      setMsg({ ok: false, text: err instanceof ApiError && map[err.code] ? map[err.code]! : describeError(err, tr_("friends.thatFriendRequestCouldNotBe")) });
+      setMsg({ ok: false, text: requestError(err) });
     } finally {
       setBusy(false);
     }
