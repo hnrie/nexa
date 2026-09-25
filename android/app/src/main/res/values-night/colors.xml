@@ -1,9 +1,0 @@
-<resources>
-    <!--
-      Only the "system" theme follows the phone's night mode. The others are
-      the account's choice, whatever the phone is set to, so a night variant
-      of window_background made every launch of the default dark theme on a
-      light phone flash light first.
-    -->
-    <color name="window_background_system">#2C2D32</color>
-</resources>

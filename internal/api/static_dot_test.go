@@ -19,7 +19,7 @@ func TestHiddenPath(t *testing.T) {
 		{"/assets/.DS_Store", true},
 		{"/.vite/manifest.json", true},
 		{"/.env", true},
-		{"/.well-known/assetlinks.json", false},
+		{"/.well-known/security.txt", false},
 		{"/assets/main-abc.js", false},
 		{"/", false},
 		{"/channels/@me", false},

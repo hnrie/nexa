@@ -1,5 +1,4 @@
-import { detectAndroid, detectAndroidAbi, detectDesktop, pickAndroid, pickDownload } from "./platform";
-import { builds, type AndroidRelease } from "@/api/android";
+import { detectDesktop, pickDownload } from "./platform";
 import type { DesktopRelease } from "@/api/desktop";
 
 const WIN = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
@@ -61,80 +60,5 @@ describe("pickDownload", () => {
     expect(pickDownload(rel, { os: "mac", arch: null })?.name).toBe("arm.dmg");
     expect(pickDownload(rel, { os: null, arch: null })).toBeNull();
     expect(pickDownload({ ...rel, files: [] }, { os: "windows", arch: "x64" })).toBeNull();
-  });
-});
-
-describe("detectAndroid", () => {
-  const PIXEL = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36";
-  const TABLET = "Mozilla/5.0 (Linux; Android 13; SM-X900) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
-  const CHROMEBOOK = "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
-  const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
-  const WINDOWS = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36";
-
-  it("knows a phone and a tablet", () => {
-    expect(detectAndroid({ ua: PIXEL })).toBe(true);
-    expect(detectAndroid({ ua: TABLET })).toBe(true);
-    expect(detectAndroid({ ua: WINDOWS, platform: "Android" })).toBe(true);
-  });
-
-  it("leaves everything else alone", () => {
-    expect(detectAndroid({ ua: CHROMEBOOK })).toBe(false);
-    expect(detectAndroid({ ua: IPHONE })).toBe(false);
-    expect(detectAndroid({ ua: WINDOWS })).toBe(false);
-  });
-
-  it("offers a phone no desktop installer", () => {
-    expect(detectDesktop({ ua: PIXEL })).toEqual({ os: null, arch: null });
-  });
-});
-
-describe("Android builds", () => {
-  const PIXEL = "Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
-  const WINDOWS = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
-  // The values Chromium really reports, checked against a UA-metadata override
-  // in a headless Chrome rather than taken on trust.
-  const split: AndroidRelease = {
-    version: "1.0.3",
-    version_code: 4,
-    released_at: 0,
-    name: "evilion-chat-1.0.3.apk",
-    size: 41_000_000,
-    sha256: "u".repeat(64),
-    min_sdk: 26,
-    files: [
-      { abi: "universal", name: "evilion-chat-1.0.3.apk", size: 41_000_000, sha256: "u".repeat(64) },
-      { abi: "arm64-v8a", name: "evilion-chat-1.0.3-arm64-v8a.apk", size: 16_900_000, sha256: "a".repeat(64) },
-      { abi: "armeabi-v7a", name: "evilion-chat-1.0.3-armeabi-v7a.apk", size: 11_100_000, sha256: "b".repeat(64) },
-      { abi: "x86_64", name: "evilion-chat-1.0.3-x86_64.apk", size: 20_700_000, sha256: "c".repeat(64) },
-    ],
-  };
-  // What the server sent before the split, and still sends for 1.0.2.
-  const flat: AndroidRelease = { version: "1.0.2", version_code: 3, released_at: 0, name: "evilion-chat-1.0.2.apk", size: 40_977_625, sha256: "d".repeat(64), min_sdk: 26 };
-
-  it("reads the processor Chromium reports", () => {
-    expect(detectAndroidAbi({ ua: PIXEL, architecture: "arm", bitness: "64" })).toBe("arm64-v8a");
-    expect(detectAndroidAbi({ ua: PIXEL, architecture: "arm", bitness: "32" })).toBe("armeabi-v7a");
-    expect(detectAndroidAbi({ ua: PIXEL, architecture: "x86", bitness: "64" })).toBe("x86_64");
-    expect(detectAndroidAbi({ ua: PIXEL, architecture: "x86", bitness: "32" })).toBe("x86");
-  });
-
-  it("treats a browser that will not say as the ordinary case", () => {
-    // Firefox and Safari offer no high-entropy hints at all
-    expect(detectAndroidAbi({ ua: PIXEL })).toBeNull();
-    expect(detectAndroidAbi({ ua: PIXEL, architecture: "arm" })).toBeNull();
-    expect(detectAndroidAbi({ ua: WINDOWS, architecture: "arm", bitness: "64" })).toBeNull();
-  });
-
-  it("offers the build for the processor, and the universal one otherwise", () => {
-    expect(pickAndroid(split, "arm64-v8a").name).toBe("evilion-chat-1.0.3-arm64-v8a.apk");
-    expect(pickAndroid(split, "x86_64").size).toBe(20_700_000);
-    expect(pickAndroid(split, null).abi).toBe("universal");
-    // a processor with no build published falls back rather than offering nothing
-    expect(pickAndroid(split, "x86").abi).toBe("universal");
-  });
-
-  it("still has something to offer for a release published before the split", () => {
-    expect(builds(flat)).toEqual([{ abi: "universal", name: "evilion-chat-1.0.2.apk", size: 40_977_625, sha256: "d".repeat(64) }]);
-    expect(pickAndroid(flat, "arm64-v8a").name).toBe("evilion-chat-1.0.2.apk");
   });
 });

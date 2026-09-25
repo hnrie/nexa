@@ -27,7 +27,7 @@ interface Catalogue {
 }
 
 // tools/licenses.py writes this out of the lockfiles. TypeScript would otherwise
-// infer the shape of all three hundred entries, and a field only some of them carry
+// infer the shape of every entry, and a field only some of them carry
 // would come back as a union nothing can read.
 const data = catalogue as unknown as Catalogue;
 
@@ -40,8 +40,6 @@ function partName(part: string): string {
       return t("settings.licenses.desktopApp");
     case "server":
       return t("settings.licenses.server");
-    case "android":
-      return t("settings.licenses.androidApp");
     case "assets":
       return t("settings.licenses.fontsAndArtwork");
     default:

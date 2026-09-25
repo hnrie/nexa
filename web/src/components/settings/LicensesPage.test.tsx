@@ -50,7 +50,9 @@ describe("the licence catalogue", () => {
     // Every MIT package shares a text, so the file stays a hundred kilobytes rather
     // than becoming a megabyte of the same paragraph with different names in it.
     const texts = new Set(Object.values(data.licenses).map((l) => l.text));
-    expect(texts.size).toBeLessThan(data.packages.length / 10);
+    // one text per licence, however many packages share it
+    expect(texts.size).toBe(Object.keys(data.licenses).length);
+    expect(texts.size).toBeLessThan(data.packages.length / 5);
   });
 
   it("carries each package's own copyright instead of somebody else's", () => {
@@ -62,8 +64,7 @@ describe("the licence catalogue", () => {
       expect([id, [...notices].filter((n) => licence.text.includes(n))]).toEqual([id, []]);
     }
     // And where a package ships a licence file, the notice in it came along: every
-    // Go module does. Maven publishes a licence's name and not its text, so the
-    // Android list has nothing to lift a notice out of and invents none.
+    // Go module does.
     expect(data.packages.filter((p) => p.part === "server" && !p.copyright)).toEqual([]);
   });
 
@@ -73,7 +74,7 @@ describe("the licence catalogue", () => {
       expect([tool, names.has(tool)]).toEqual([tool, false]);
     }
     // ... while the things that do are all there
-    for (const shipped of ["react", "ws", "golang.org/x/crypto", "androidx.core:core-ktx"]) {
+    for (const shipped of ["react", "ws", "golang.org/x/crypto"]) {
       expect([shipped, names.has(shipped)]).toEqual([shipped, true]);
     }
   });

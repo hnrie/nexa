@@ -1,7 +1,0 @@
-cmake_minimum_required(VERSION 3.22)
-project(evilionframecrypto CXX)
-
-add_library(evilion_frame_crypto SHARED aes_gcm.cc sealed_frame.cc frame_crypto.cc)
-target_compile_features(evilion_frame_crypto PRIVATE cxx_std_17)
-set_target_properties(evilion_frame_crypto PROPERTIES CXX_VISIBILITY_PRESET hidden)
-target_link_libraries(evilion_frame_crypto log)

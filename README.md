@@ -9,10 +9,10 @@ HD screen share.
 ```
 chat/
 ├── cmd/chatd/        the Go server: REST API, WebSocket gateway, media, and the built web app
-├── internal/         config, ids, db (SQLite + migrations), store, auth, api, gateway, media, unfurl
+├── internal/         config, ids, db (SQLite or Postgres + migrations), store, auth, api, gateway, media, voice, unfurl
 ├── web/              the React/TypeScript app (Vite); web/dist is what chatd serves
-├── android/          the Android app (Kotlin, Jetpack Compose, WebRTC; see android/README.md)
-├── deploy/           launchd template, installer, DNS helper
+├── desktop/          the desktop app (Electron)
+├── deploy/           systemd and launchd templates, installer, DNS helper
 ├── tools/            screenshot.py and e2e.py (Playwright)
 ├── docs/             design spec, implementation plans, STATUS.md, Discord UI reference captures
 ├── data/             runtime (SQLite database, media blobs) — not in git
@@ -27,7 +27,8 @@ make test           # go vet + go test -race + tsc + vitest
 ./bin/chatd         # listens on 127.0.0.1:8090 (see chatd.env.example for every setting)
 ```
 
-Install as a LaunchDaemon and wire it into the tunnel (idempotent, needs sudo):
+Install as a service (a systemd unit on Linux, a LaunchDaemon on macOS) and wire it
+into the tunnel (idempotent, needs sudo):
 
 ```
 sudo bash deploy/install.sh
@@ -49,19 +50,20 @@ and for restart/stop/update/backup commands.
   over the history this device has decrypted.
 - **Expressions**: unlimited custom server emoji (animated ones too), sticker packs that
   any user can create and share by link, and GIF search when a Tenor key is configured.
-- **Voice and video**: peer-to-peer voice channels and DM calls with ringing, camera,
+- **Voice and video**: voice channels and DM calls with ringing, camera,
   screen share up to source resolution at 60 fps, push-to-talk or voice activity,
   per-user volume to 200 %, server mute/deafen/move, and a link-quality readout.
 - **Instance admin**: stats, registration policy, and enabling or disabling accounts.
-- **Apps**: a desktop app (Electron) and a native Android app, both offered to whoever
-  the download page recognises; the web app runs everywhere else.
+- **Apps**: a desktop app (Electron) for Windows, macOS and Linux, offered by the
+  download page; the web app runs everywhere else, phones included.
 - **Your data**: a one-click zip export of everything this device can decrypt.
 
 ## How it works
 
 - **One process.** `chatd` serves `/api/v1` (JSON), `/gateway` (WebSocket), `/media/*`
-  and the SPA from `web/dist`. SQLite in WAL mode with a single writer; blobs on disk,
-  content-addressed. No nginx, no external database.
+  and the SPA from `web/dist`. SQLite in WAL mode with a single writer, or Postgres
+  when `DATABASE_URL` names one (`chatmigrate` moves a database across); blobs on disk,
+  content-addressed. No nginx.
 - **End-to-end encryption.** The password is stretched with Argon2id in the browser; from
   it come an auth key (the only thing the server ever sees, hashed again server-side)
   and an encryption key that wraps the account's X25519 identity. Each conversation has
@@ -74,28 +76,11 @@ and for restart/stop/update/backup commands.
 - **Realtime.** Clients hold one WebSocket; the hub fans events out to the members who
   may see them and tracks presence and typing. Heartbeats every 25 s keep Cloudflare
   from dropping idle sockets.
-- **Calls** are peer-to-peer WebRTC (encrypted by construction); the tunnel only carries
+- **Calls** are WebRTC with every frame sealed with the conversation's key. Without
+  further setup they run peer to peer; with Cloudflare Realtime configured
+  (`REALTIME_APP_ID`) every call goes through its SFU, which forwards media it cannot
+  read, so nobody in a call learns another person's address. The tunnel only carries
   HTTP, so there is no media server on this box.
-
-## The Android app
-
-`android/` is a native Kotlin app, not a wrapper around the web one: Jetpack
-Compose for the interface, OkHttp for the API and the gateway, and libwebrtc
-for calls. It does the same end-to-end encryption — argon2id, x25519 sealed
-boxes, AES-256-GCM messages and files — and its tests check that against
-ciphertext the web client produced. Call frames are sealed in the same format
-the browser uses, by a small C++ library in `android/app/src/main/cpp`, because
-the hook WebRTC gives Android for that takes native code.
-
-```
-make android          # the signed APK (needs android/keystore.properties)
-make publish-android  # copies it where chatd serves it, with its checksum
-make test-android     # the crypto, markdown, invite link and mention tests
-```
-
-The download page and the banner offer the app to phones that visit the site,
-and `/.well-known/assetlinks.json` lets Android open this instance's invite
-links in the app once it is installed.
 
 ## Development
 

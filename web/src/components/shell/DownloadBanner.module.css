@@ -14,6 +14,5 @@
 .tagline { display: inline; }
 @media (max-width: 560px) { .tagline { display: none; } }
 
-/* "No thanks" is a button in the Android banner, where the row is tight */
-button.other { background: none; border: 0; cursor: pointer; font-family: inherit; }
-@media (max-width: 900px) { a.other { display: none; } }
+/* where the row is tight, the other platforms are one click away on the download page anyway */
+@media (max-width: 900px) { .other { display: none; } }

@@ -2,7 +2,6 @@
 # Everything that has to be true before any of this is published.
 #
 #   tools/check.sh            web, server and desktop
-#   tools/check.sh --android  those, and the Android app as well (slow)
 #
 # Nothing here writes to web/dist, data/ or any live directory: the web build
 # goes to a scratch directory, because web/dist is what chat.evilion.xyz serves
@@ -10,9 +9,6 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 [ -f "$HOME/.local/toolchain/env.sh" ] && . "$HOME/.local/toolchain/env.sh"
-
-android=0
-[ "${1:-}" = "--android" ] && android=1
 
 fails=()
 run() {
@@ -40,17 +36,6 @@ run "desktop bundle"    bash -c 'cd desktop && node build.mjs >/dev/null'
 
 # Every visible string has to exist in the catalogues, in all eleven languages.
 run "i18n keys" bash -c 'python3 tools/i18n_keys_used.py | tee /dev/stderr | grep -q "0 missing"'
-
-# libwebrtc's Java PeerConnection disposes every transceiver it handed out
-# before whenever it is asked to list them again, including the call's own
-# senders; one such call left every call unable to recover from a dropped
-# network. Nothing in the app may ask. Only a real outage shows the damage.
-run "no transceiver listing" bash -c '! grep -rnE "\.(transceivers|receivers)\b|get(Transceivers|Receivers|Senders)\(" android/app/src/main/java'
-
-if [ "$android" = 1 ]; then
-  run "android compile" bash -c 'cd android && gradle :app:compileDebugKotlin -q'
-  run "android tests"   bash -c 'cd android && gradle :app:testDebugUnitTest -q'
-fi
 
 printf '\n'
 if [ ${#fails[@]} -eq 0 ]; then

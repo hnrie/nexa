@@ -66,10 +66,10 @@ func (s *Server) staticHandler() http.Handler {
 		}
 		// Nothing beginning with a dot is part of the app. A build directory
 		// picks up .DS_Store, .vite and the like, and this handler served them
-		// with a sniffed content type — /desktop/ and /android/ have always
-		// refused dotfiles through their filename patterns, and this is the
-		// same rule. `.well-known` is the exception every site has: those paths
-		// are answered by routes of their own, and one that is not belongs to
+		// with a sniffed content type — /desktop/ has always refused dotfiles
+		// through its filename pattern, and this is the same rule.
+		// `.well-known` is the exception every site has: those paths are
+		// answered by routes of their own, and one that is not belongs to
 		// nobody either.
 		if hiddenPath(p) {
 			WriteError(w, ErrNotFound)

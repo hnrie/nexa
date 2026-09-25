@@ -1,12 +1,10 @@
 import { Download, Laptop, Monitor, Smartphone, Terminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { android, androidPaused, androidVersionName, builds, type AndroidFile, type AndroidRelease } from "@/api/android";
 import { desktop, type DesktopFile, type DesktopRelease } from "@/api/desktop";
 import { Button } from "@/components/common/Button";
-import { Modal } from "@/components/common/Modal";
 import { Spinner } from "@/components/common/Spinner";
-import { currentAndroidAbi, currentPlatform, isAndroid, pickAndroid, pickDownload, type DesktopTarget } from "@/lib/platform";
+import { currentPlatform, noDesktopBuild, pickDownload, type DesktopTarget } from "@/lib/platform";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "./DownloadPage.module.css";
@@ -29,22 +27,6 @@ function arches(): Record<DesktopFile["arch"], Record<DesktopFile["os"], string>
 }
 const ORDER: DesktopFile["os"][] = ["windows", "mac", "linux"];
 
-/**
- * What each Android build is for, in words somebody can act on. The APK's own
- * name for a processor — `armeabi-v7a` — tells a reader nothing about whether
- * it is the one their phone wants.
- */
-function abiLabel(abi: string): string {
-  const named: Record<string, string> = {
-    universal: t("download.abi.universal"),
-    "arm64-v8a": t("download.abi.arm64"),
-    "armeabi-v7a": t("download.abi.arm32"),
-    x86_64: t("download.abi.x64"),
-    x86: t("download.abi.x86"),
-  };
-  return named[abi] ?? abi;
-}
-
 function icon(os: DesktopFile["os"]) {
   return os === "mac" ? <Laptop size={22} /> : os === "linux" ? <Terminal size={22} /> : <Monitor size={22} />;
 }
@@ -52,49 +34,22 @@ function icon(os: DesktopFile["os"]) {
 /** Every desktop download, with the visitor's own first. Needs no account. */
 export default function DownloadPage() {
   const [rel, setRel] = useState<DesktopRelease | null | undefined>(undefined);
-  const [apk, setApk] = useState<AndroidRelease | null | undefined>(undefined);
   const [target, setTarget] = useState<DesktopTarget>({ os: null, arch: null });
   const [failed, setFailed] = useState(false);
-  // Which APK this phone wants. Asking the browser is a promise that most
-  // browsers never answer, so the page starts on the universal build — which
-  // runs anywhere — and narrows to the right one if an answer arrives.
-  const [abi, setAbi] = useState<string | null>(null);
-  // Offline, a 500 and a CORS refusal all used to collapse into `apk === null`,
-  // which the page then stated as a fact about the product: "The Android app is
-  // being worked on and is not available to download at the moment." It is
-  // published, so that sentence is now simply untrue. A request that failed
-  // says it failed.
-  const [apkFailed, setApkFailed] = useState(false);
-  // The Android build the visitor tapped. Set while the rough-edges warning is
-  // up; downloading only starts from that dialog's own button.
-  const [warnApk, setWarnApk] = useState<AndroidFile | null>(null);
-  const onAndroid = isAndroid();
+  // A phone or a tablet runs Nexa in its browser; the page still lists every
+  // installer, for the computer the visitor may be choosing one for.
+  const [handheld] = useState(noDesktopBuild);
   const toast = useUI((u) => u.toast);
 
   const loadDesktop = () => {
     setFailed(false);
     desktop.latest().then(setRel, () => setFailed(true));
   };
-  const loadAndroid = () => {
-    setApkFailed(false);
-    android.latest().then(
-      (r) => {
-        setApk(r);
-        setApkFailed(false);
-      },
-      () => {
-        setApk(null);
-        setApkFailed(true);
-      },
-    );
-  };
 
   useEffect(() => {
     document.title = t("download.downloadNexa");
     void currentPlatform().then(setTarget);
-    void currentAndroidAbi().then(setAbi);
     loadDesktop();
-    loadAndroid();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -111,45 +66,20 @@ export default function DownloadPage() {
       () => toast(t("download.theHashCouldNotBeCopied"), "error"),
     );
   const copyHash = (f: DesktopFile) => copyText(f.sha256);
-  // The universal build is 39 MB; the one for a phone's own processor is about
-  // a third of that, and so is every update after it. The server publishes all
-  // four and this page used to offer only the big one.
-  const apkFiles: AndroidFile[] = apk ? builds(apk) : [];
-  const myApk = apk ? pickAndroid(apk, abi) : null;
 
   return (
     <div className={s.page}>
       <main className={s.card}>
         <div className={s.head}>
           <img className={s.logo} src="/icons/icon-192.png" alt="" />
-          <h1 className={s.title}>{onAndroid ? t("download.nexaForAndroid") : t("download.nexaForYourComputer")}</h1>
-          <p className={s.sub}>{onAndroid ? t("download.callsNotificationsAndARealApp") : t("download.rpcSupportAndABetterExperience")}</p>
+          <h1 className={s.title}>{t("download.nexaForYourComputer")}</h1>
+          <p className={s.sub}>{t("download.rpcSupportAndABetterExperience")}</p>
         </div>
 
-        {/* The fetch failed; the app may well be published and this page simply could not ask. */}
-        {onAndroid && apkFailed ? (
-          <div className={s.empty} data-testid="android-failed" role="alert">
-            {t("download.theAndroidDownloadCouldNotBe")}
-            <div style={{ marginTop: 8 }}><Button size="sm" variant="secondary" onClick={loadAndroid}>{t("chat.messageList.tryAgain")}</Button></div>
-          </div>
-        ) : null}
-
-        {/* Nothing published for Android right now, or downloads paused: say so rather than leave a page with no download on it. */}
-        {onAndroid && (androidPaused || (apk === null && !apkFailed && apk !== undefined)) ? (
-          <div className={s.empty} data-testid="android-paused">
-            {t("download.theAndroidAppIsBeingWorked")}
-          </div>
-        ) : null}
-
-        {apk && myApk && onAndroid && !androidPaused ? (
-          <div className={s.primary}>
-            <a className={s.bigButton} href={android.fileUrl(myApk.name)} data-testid="download-android" data-abi={myApk.abi} onClick={(e) => { e.preventDefault(); setWarnApk(myApk); }}>
-              <Download size={20} /> {t("download.downloadForAndroid")}
-            </a>
-            <span className={s.meta}>
-              {t("download.versionLine", { version: apk.version })} · {formatBytes(myApk.size)} · {t("download.androidMin", { version: androidVersionName(apk.min_sdk) })}
-              {myApk.abi === "universal" ? "" : ` · ${abiLabel(myApk.abi)}`}
-            </span>
+        {handheld ? (
+          <div className={s.handheld} data-testid="download-handheld">
+            <Smartphone size={20} aria-hidden />
+            <span>{t("download.onAPhoneOrTablet")}</span>
           </div>
         ) : null}
 
@@ -199,36 +129,12 @@ export default function DownloadPage() {
               </div>
             </div>
 
-            {apk && !androidPaused ? (
-              <div className={s.section}>
-                <h2 className={s.label}>{t("download.android")}</h2>
-                {apkFiles.length > 1 ? <p className={s.meta} style={{ textAlign: "start", margin: 0 }}>{t("download.aBuildForYourOwnProcessor")}</p> : null}
-                <div className={s.files}>
-                  {apkFiles.map((f) => (
-                    <div key={f.name} className={s.file} data-mine={onAndroid && myApk?.name === f.name} data-abi={f.abi} data-testid="download-file">
-                      <span className={s.fileIcon}><Smartphone size={22} /></span>
-                      <span className={s.fileText}>
-                        <span className={s.fileName}>{t("download.android")} · {abiLabel(f.abi)}</span>
-                        <span className={s.fileSub}>
-                          {formatBytes(f.size)} · {t("download.androidMin", { version: androidVersionName(apk.min_sdk) })} · <button type="button" className={s.hash} title={t("download.copySha256")} aria-label={t("download.copySha256")} onClick={() => copyText(f.sha256)}>SHA-256 {f.sha256.slice(0, 16)}…</button>
-                        </span>
-                      </span>
-                      <Button size="sm" variant={onAndroid && myApk?.name === f.name ? "primary" : "secondary"} onClick={() => setWarnApk(f)}>
-                        <Download size={16} /> {t("chat.attachments.download")}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
             <div className={s.section}>
               <h2 className={s.label}>{t("download.theFirstTimeYouOpenIt")}</h2>
               <ul className={s.notes}>
                 <li><Tr id="download.firstRunWindows" values={{ windows: <b>{t("download.windows")}</b>, moreInfo: <b>{t("download.moreInfo")}</b>, runAnyway: <b>{t("download.runAnyway")}</b> }} /></li>
                 <li><Tr id="download.firstRunMac" values={{ macos: <b>macOS</b>, open: <b>{t("chat.lockedChannel.open")}</b> }} /></li>
                 <li><Tr id="download.firstRunLinux" values={{ linux: <b>{t("download.linux")}</b>, chmod: <code>{t("download.chmodX")}</code> }} /></li>
-                {apk && !androidPaused ? <li><Tr id="download.firstRunAndroid" values={{ android: <b>{t("download.android")}</b>, install: <b>{t("settings.stickers.install")}</b> }} /></li> : null}
               </ul>
             </div>
           </>
@@ -238,38 +144,6 @@ export default function DownloadPage() {
           <Link to="/channels/@me">{t("download.openNexaInYourBrowser")}</Link>
         </div>
 
-        {/* Android is not polished yet: nobody starts that download without
-            being told so first, in the same dialog style as everywhere else. */}
-        {warnApk ? (
-          <Modal
-            open
-            onClose={() => setWarnApk(null)}
-            title={t("download.androidWarningTitle")}
-            width={460}
-            footer={
-              <>
-                <Button variant="ghost" onClick={() => setWarnApk(null)}>{t("chat.editMessage.cancel")}</Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    location.href = android.fileUrl(warnApk.name);
-                    setWarnApk(null);
-                  }}
-                >
-                  {t("download.androidWarningDownload")}
-                </Button>
-              </>
-            }
-          >
-            <div style={{ color: "var(--text)", fontSize: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-              <span>{t("download.androidWarningBody")}</span>
-              <span>
-                {t("download.androidWarningWeb")}{" "}
-                <a href="https://evilion.xyz/login" target="_blank" rel="noreferrer noopener">{t("download.androidWarningWebLink")}</a>
-              </span>
-            </div>
-          </Modal>
-        ) : null}
       </main>
     </div>
   );

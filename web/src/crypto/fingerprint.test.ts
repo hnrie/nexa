@@ -2,11 +2,9 @@ import { b64 } from "./bytes";
 import { fingerprint, fingerprintOfB64 } from "./fingerprint";
 
 /**
- * The same key `android/app/src/test/java/xyz/evilion/chat/CryptoTest.kt` pins
- * as `identityPub`, so the two platforms are checked against one value rather
- * than each against itself. If this expectation and the Kotlin one ever
- * disagree, two people comparing safety numbers across a phone and a browser
- * would be told they are talking to an impostor when they are not.
+ * A fixed identity key and the digits every client has always printed for it.
+ * If this expectation ever moves, two people who compared safety numbers before
+ * the change would be told they are talking to an impostor when they are not.
  */
 const IDENTITY_PUB = "cy7fq5I66k0o8YehEg1rHNCyrLM3Y+RQ1915E+EiYE0=";
 const IDENTITY_FP = "84234 17400 39277 85751 92324 02841";
@@ -16,11 +14,11 @@ const COUNTING_KEY = new Uint8Array(32).map((_, i) => i);
 const COUNTING_FP = "61271 82505 00669 17367 22914 44410";
 
 describe("fingerprint", () => {
-  it("matches the Android test vector for the same key", () => {
+  it("matches the pinned vector for a real identity key", () => {
     expect(fingerprint(b64.dec(IDENTITY_PUB))).toBe(IDENTITY_FP);
   });
 
-  it("matches the second cross-platform vector", () => {
+  it("matches the second pinned vector", () => {
     expect(fingerprint(COUNTING_KEY)).toBe(COUNTING_FP);
   });
 

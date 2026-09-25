@@ -7,16 +7,8 @@
 # web
 /web/node_modules/
 /web/dist/
-# android
-/android/.gradle/
-/android/build/
-/android/app/build/
-/android/app/.cxx/
-/android/local.properties
-/android/release.jks
 # the key desktop releases are signed with; losing it stops every installed app updating
 /desktop/update-key.pem
-/android/keystore.properties
 
 # tooling
 /.tools/

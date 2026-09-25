@@ -5,28 +5,23 @@ settings page reads.
 The point of generating this rather than writing it by hand is that a hand-written
 list is wrong the day after it is written, and being wrong here is the kind of wrong
 that gets a notice from someone's lawyer. Every name, version and licence below comes
-out of the lockfiles — `web/package-lock.json`, `desktop/package-lock.json`, `go.mod`
-and Gradle's resolved release classpath — so the page cannot claim a dependency the
-build does not have, or miss one it does.
+out of the lockfiles — `web/package-lock.json`, `desktop/package-lock.json` and
+`go.mod` — so the page cannot claim a dependency the build does not have, or miss one
+it does.
 
 Only what actually ends up in a build is listed. A test runner, a bundler, a type
 definition: none of them reach a reader's machine, so none of them are here. For npm
 that means the production closure (npm's own `dev` flag agrees with the walk we do);
-for Go the modules the `chatd` binary links, not the ones only its tests import; for
-Android the release runtime classpath rather than everything the build file mentions.
+and for Go the modules the `chatd` binary links, not the ones only its tests import.
 
 The licence *text* is read from the copy that ships — `node_modules/<pkg>/LICENSE`,
-the module cache, the POM — because that is the copy the licence talks about. Storing
+the module cache — because that is the copy the licence talks about. Storing
 one of those per package would be tens of thousands of lines of near-identical MIT, so
 each SPDX id keeps one text with the copyright lines lifted out of it, and every
 package carries its own copyright line beside its entry. That is the same set of
 words, at a twentieth of the size.
 
     tools/licenses.py                  # regenerate web/src/data/licenses.json
-    tools/licenses.py --skip-android   # ... without the Android toolchain sourced
-
-The Android part needs Gradle, which is not on PATH by default on this Mac:
-`source ~/.local/toolchain/env.sh` first.
 """
 import argparse
 import json
@@ -34,7 +29,6 @@ import re
 import shutil
 import subprocess
 import sys
-import zipfile
 from collections import Counter
 from pathlib import Path
 
@@ -42,9 +36,8 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "web/src/data/licenses.json"
 
 # The builds, in the order the page shows them. Whoever opens this is reading it in
-# the web client, so that is what comes first; the Android list is ten times the
-# length of any other and would bury everything if it led.
-PARTS = ["web", "desktop", "server", "android", "assets"]
+# the web client, so that is what comes first.
+PARTS = ["web", "desktop", "server", "assets"]
 
 # The files a package may keep its licence in, most specific first. `LICENSE-MIT`
 # and friends are how a dual-licensed package names them.
@@ -71,34 +64,7 @@ SIGNATURES: list[tuple[str, str]] = [
     ("MIT", "Permission is hereby granted, free of charge"),
     ("Zlib", "This software is provided 'as-is', without any express or implied"),
     ("BSL-1.0", "Boost Software License"),
-    ("Bouncy-Castle", "Copyright (c) 2000 - 2025 The Legion of the Bouncy Castle"),
 ]
-
-# What a Maven POM calls a licence, and what the SPDX list calls the same thing.
-POM_LICENSE_NAMES = {
-    "the apache software license, version 2.0": "Apache-2.0",
-    "the apache license, version 2.0": "Apache-2.0",
-    "apache license, version 2.0": "Apache-2.0",
-    "apache-2.0": "Apache-2.0",
-    "apache 2.0": "Apache-2.0",
-    "the mit license": "MIT",
-    "mit license": "MIT",
-    "mit": "MIT",
-    "the 3-clause bsd license": "BSD-3-Clause",
-    "bsd-3-clause": "BSD-3-Clause",
-    "the 2-clause bsd license": "BSD-2-Clause",
-    "bouncy castle licence": "Bouncy-Castle",
-    "eclipse public license 1.0": "EPL-1.0",
-    "common public license version 1.0": "CPL-1.0",
-}
-
-# Modules whose own descriptor says nothing. Guava keeps its licence in the parent
-# POM Gradle never downloads; the two shims beside it are Google's too.
-POM_LICENSE_FALLBACK = {
-    "com.google.guava:guava": "Apache-2.0",
-    "com.google.guava:failureaccess": "Apache-2.0",
-    "com.google.guava:listenablefuture": "Apache-2.0",
-}
 
 # Human names for the ids, so a page can show "MIT License" over "MIT".
 LICENSE_NAMES = {
@@ -108,7 +74,6 @@ LICENSE_NAMES = {
     "BSD-3-Clause": "BSD 3-Clause License",
     "BSL-1.0": "Boost Software License 1.0",
     "BlueOak-1.0.0": "Blue Oak Model License 1.0.0",
-    "Bouncy-Castle": "Bouncy Castle Licence",
     "CC-BY-4.0": "Creative Commons Attribution 4.0 International",
     "CPL-1.0": "Common Public License 1.0",
     "EPL-1.0": "Eclipse Public License 1.0",
@@ -350,92 +315,6 @@ def go_part(collector: Collector) -> int:
     return len(modules)
 
 
-# ------------------------------------------------------------------------ Android
-
-GRADLE_ROW = re.compile(r"^[|\\+ ]*[\\+]--- ")
-GRADLE_COORD = re.compile(r"^(?P<group>[\w.\-]+):(?P<name>[\w.\-]+)(?::(?P<version>[^ ]+))?(?: -> (?P<resolved>[^ ]+))?\s*$")
-META_INF_LICENSE = re.compile(r"^META-INF/LICEN[CS]E(\.\w+)?$", re.I)
-
-
-def artifact_license_text(directory: Path) -> str | None:
-    """The licence a published jar or aar carries inside it, if it carries one.
-
-    Maven descriptors only name a licence; the text, where a publisher ships one at
-    all, is inside the artifact. Bouncy Castle is the one that does here, and its
-    licence is its own rather than a text some other package also ships.
-    """
-    for artifact in sorted(directory.glob("*/*.jar")) + sorted(directory.glob("*/*.aar")):
-        try:
-            with zipfile.ZipFile(artifact) as bundle:
-                for entry in bundle.namelist():
-                    if META_INF_LICENSE.match(entry):
-                        return bundle.read(entry).decode("utf-8", errors="replace")
-        except (zipfile.BadZipFile, OSError):
-            continue
-    return None
-
-
-def gradle_tree() -> str:
-    if not shutil.which("gradle"):
-        die("gradle is not on PATH; `source ~/.local/toolchain/env.sh`, or pass --skip-android")
-    done = subprocess.run(
-        ["gradle", "-q", "--console=plain", ":app:dependencies", "--configuration", "releaseRuntimeClasspath"],
-        cwd=ROOT / "android", capture_output=True, text=True,
-    )
-    if done.returncode != 0:
-        die(f"gradle could not resolve the release classpath:\n{done.stderr.strip()[-2000:]}")
-    return done.stdout
-
-
-def android_part(collector: Collector) -> int:
-    cache = Path.home() / ".gradle/caches/modules-2/files-2.1"
-    modules: dict[tuple[str, str], str] = {}
-    for raw in gradle_tree().splitlines():
-        if not GRADLE_ROW.match(raw):
-            continue
-        row = GRADLE_ROW.sub("", raw).strip()
-        # "(c)" is a constraint a platform publishes, not a dependency anyone took,
-        # and "(n)" was never resolved. "(*)" is a subtree already printed above.
-        if row.endswith("(c)") or row.endswith("(n)"):
-            continue
-        parsed = GRADLE_COORD.match(row.replace(" (*)", "").strip())
-        if not parsed:
-            continue
-        version = parsed.group("resolved") or parsed.group("version")
-        if not version:
-            continue
-        modules[(parsed.group("group"), parsed.group("name"))] = version
-    for (group, name), version in sorted(modules.items()):
-        directory = cache / group / name / version
-        poms = sorted(directory.glob("*/*.pom")) if directory.is_dir() else []
-        spdx, url = POM_LICENSE_FALLBACK.get(f"{group}:{name}"), ""
-        if poms:
-            pom = read_text(poms[0])
-            declared = re.search(r"<licenses>(.*?)</licenses>", pom, re.S)
-            if declared:
-                named = re.search(r"<name>(.*?)</name>", declared.group(1), re.S)
-                if named:
-                    label = " ".join(named.group(1).split()).lower()
-                    spdx = POM_LICENSE_NAMES.get(label, spdx)
-            # The project's own page, and only that: a POM's <licenses> and <scm>
-            # blocks carry a <url> each, and a module with no page of its own would
-            # otherwise be linked to the text of the licence it is under.
-            outer = re.sub(r"<(licenses|scm|developers|organization|issueManagement)>.*?</\1>", "", pom, flags=re.S)
-            project_url = re.search(r"<url>(.*?)</url>", outer, re.S)
-            if project_url and project_url.group(1).strip().startswith("http"):
-                # Whoever follows this is on an https page; leaving a publisher's old
-                # http address as it was only downgrades the hop.
-                url = re.sub(r"^http://", "https://", project_url.group(1).strip())
-        if not spdx:
-            print(f"licenses: no licence in the POM for {group}:{name}:{version}", file=sys.stderr)
-        collector.add(
-            part="android", name=f"{group}:{name}", version=version, license_=spdx,
-            url=url or f"https://mvnrepository.com/artifact/{group}/{name}/{version}",
-            text=artifact_license_text(directory),
-        )
-    return len(modules)
-
-
 # ------------------------------------------------------------------------- assets
 
 
@@ -467,7 +346,6 @@ def assets_part(collector: Collector) -> int:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--skip-android", action="store_true", help="leave out the Android app (its Gradle toolchain is not always sourced)")
     ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
 
@@ -481,8 +359,6 @@ def main() -> None:
         "desktop": npm_part(collector, "desktop", ROOT / "desktop", ["electron", "electron-updater", "ws", "koffi"]),
         "server": go_part(collector),
     }
-    if not args.skip_android:
-        counts["android"] = android_part(collector)
     counts["assets"] = assets_part(collector)
 
     licenses = {}

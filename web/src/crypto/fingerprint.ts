@@ -22,16 +22,16 @@
  *   group or two: grinding an x25519 key whose fingerprint merely *starts* the
  *   same costs 5200 SHA-256 evaluations per attempt instead of one.
  *
- * The exact bytes matter, because web, desktop and Android must print the same
- * digits for the same key or the comparison means nothing. The definition is:
+ * The exact bytes matter, because every client must print the same digits for
+ * the same key or the comparison means nothing. The definition is:
  *
  *     h = SHA-256("evilion-chat/fingerprint/v1" ‖ key)
  *     h = SHA-256(h ‖ key), repeated until 5200 hashes have been taken
  *     digits = for g in 0..5: uint40be(h[5g .. 5g+5]) mod 100000, zero-padded
  *
- * mirrored in `android/app/src/main/java/xyz/evilion/chat/crypto/Fingerprint.kt`.
- * A test vector pinning those digits lives in both `fingerprint.test.ts` and
- * `CryptoTest.kt`; change one and the other fails.
+ * `fingerprint.test.ts` pins those digits with two test vectors. Anyone who
+ * has already compared numbers with a contact relies on them staying put, so a
+ * change that moves them is a new version of the format, not a fix.
  */
 
 import { sha256 } from "@noble/hashes/sha256";

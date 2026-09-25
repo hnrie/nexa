@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Every key the apps ask for has to exist, or a screen shows the key itself.
 
-Checks the web client, and the Android app, against the English catalogue.
+Checks the web client against the English catalogue.
 Keys built at runtime are listed as dynamic rather than reported missing.
 """
 import json, re, sys
@@ -31,7 +31,6 @@ def keys_in(root: Path, suffixes: tuple[str, ...]) -> dict[str, list[str]]:
 bad = 0
 for label, root, suffixes in (
     ("web", ROOT / "web/src", (".ts", ".tsx")),
-    ("android", ROOT / "android/app/src/main/java", (".kt",)),
 ):
     used = keys_in(root, suffixes)
     missing = {k: v for k, v in used.items() if k not in EN}
@@ -51,7 +50,7 @@ def literals_in(root: Path, suffixes: tuple[str, ...]) -> set[str]:
         out |= set(ANY.findall(p.read_text()))
     return out
 
-used_all = literals_in(ROOT / "web/src", (".ts", ".tsx")) | literals_in(ROOT / "android/app/src/main/java", (".kt",))
+used_all = literals_in(ROOT / "web/src", (".ts", ".tsx"))
 orphans = sorted(k for k in EN if k not in used_all)
 print(f"{len(orphans)} keys nothing asks for")
 for k in orphans[:20]:

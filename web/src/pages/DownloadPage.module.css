@@ -26,6 +26,9 @@
 .foot { display: flex; justify-content: center; gap: 16px; font-size: 14px; }
 .foot a { color: var(--link); }
 .empty { text-align: center; color: var(--text-muted); font-size: 15px; }
+/* a phone or a tablet is told the browser is its app before the installers it cannot use */
+.handheld { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text); font-size: 15px; line-height: 1.45; }
+.handheld svg { flex: none; margin-top: 1px; color: var(--brand); }
 @media (max-width: 600px) {
   .card { padding: 20px 16px; }
   .file { grid-template-columns: minmax(0, 1fr) auto; }
