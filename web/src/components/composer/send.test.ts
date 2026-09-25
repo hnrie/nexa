@@ -147,6 +147,19 @@ describe("sending with files", () => {
     expect(pending("9")).toEqual([]);
   });
 
+  it("sends again only the files that did not go up", async () => {
+    // the first file goes, the second fails; the retry must not send the first again
+    vi.mocked(uploadStaged).mockReset();
+    vi.mocked(uploadStaged).mockResolvedValueOnce(blob("b1")).mockRejectedValueOnce(new Error("Upload failed")).mockResolvedValue(blob("b2"));
+    await sendWithFiles("9", "two", [file("a"), file("b")]);
+    const failed = pending("9")[0]!;
+    expect(failed.status).toBe("failed");
+    await retryPending("9", failed.tmpId);
+    expect(vi.mocked(uploadStaged)).toHaveBeenCalledTimes(3);
+    const body = vi.mocked(messagesApi.send).mock.calls.at(-1)![1] as { attachments?: { blob_id: string }[] };
+    expect(body.attachments?.map((a) => a.blob_id)).toEqual(["b1", "b2"]);
+  });
+
   it("keeps every conversation's unsent messages through a reconnect", async () => {
     vi.mocked(uploadStaged).mockImplementation(() => new Promise(() => undefined));
     void sendWithFiles("9", "big file", [file("a")]);

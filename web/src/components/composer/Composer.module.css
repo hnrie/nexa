@@ -8,9 +8,26 @@
 .pingBtn[data-on="true"] { color: var(--text-brand); }
 .closeBtn { display: inline-flex; color: var(--text-muted); }
 .closeBtn:hover { color: var(--text); }
-.tray { display: flex; gap: 12px; padding: 16px 16px 0; overflow-x: auto; background: var(--bg-composer); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
-.tray + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-top: 1px solid var(--border-subtle); }
-.card { position: relative; width: 200px; flex: none; padding: 8px; border-radius: var(--radius-xs); background: var(--bg-surface); border: 1px solid var(--border-subtle); }
+/* the files waiting to go: how many of how many, then a strip that scrolls sideways */
+.trayWrap { background: var(--bg-composer); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.trayHead { display: flex; justify-content: space-between; gap: 8px; padding: 10px 16px 0; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.traySize { font-weight: 500; font-variant-numeric: tabular-nums; }
+.tray { display: flex; gap: 12px; padding: 12px 16px 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
+.trayWrap + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-top: 1px solid var(--border-subtle); }
+.card { position: relative; width: 200px; flex: none; padding: 8px; border-radius: var(--radius-xs); background: var(--bg-surface); border: 1px solid var(--border-subtle); scroll-snap-align: start; }
+/* what the box has to say before it goes on: a paste too long for a message, files that did not fit */
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 40px; padding-block: 6px; padding-inline: 16px 8px; background: var(--bg-surface); border-radius: var(--radius-sm) var(--radius-sm) 0 0; border-inline-start: 3px solid var(--warning); font-size: 14px; color: var(--text); }
+.noticeText { flex: 1 1 0; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+.noticeActions { order: 1; flex: none; display: flex; align-items: center; gap: 6px; }
+.noticeClose { order: 2; }
+.noticeMain, .noticeAlt { min-height: 32px; padding: 0 12px; border-radius: var(--radius-xs); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.noticeMain { background: var(--brand); color: var(--on-brand); }
+.noticeMain:hover { background: var(--brand-hover); }
+.noticeAlt { background: var(--bg-active); color: var(--text); }
+.noticeAlt:hover { background: var(--bg-hover); }
+/* stacked bars share one rounded outline with the box under them */
+.notice + .replyBar, .notice + .trayWrap, .replyBar + .trayWrap { border-radius: 0; }
+.notice + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 .thumb { width: 100%; height: 130px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-input); display: flex; align-items: center; justify-content: center; color: var(--text-muted); overflow: hidden; }
 .thumb img, .thumb video { width: 100%; height: 100%; object-fit: contain; }
 .thumb[data-spoiler="true"] img, .thumb[data-spoiler="true"] video { filter: blur(20px); }
@@ -51,7 +68,20 @@
 .acEmojiImg { width: 22px; height: 22px; margin: 0 3px; object-fit: contain; flex: none; }
 .acSub { flex: 1 1 0; min-width: 0; padding-inline-start: 8px; text-align: end; color: var(--text-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sendMobile { display: none; }
-@media (max-width: 767px) { .wrap { padding: 0 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); } .counter { display: none; } }
+/* A phone has no padding under the box to hold the counter, so it goes on a
+   line of its own under the box rather than being hidden: it is how one learns
+   a message is too long before Send refuses it. The tray shows more files. */
+@media (max-width: 767px) {
+  .wrap { padding: 0 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .counter { position: static; display: block; margin: 4px 8px 0; text-align: end; }
+  .card { width: 150px; }
+  .thumb { height: 100px; }
+  /* the words and the close button on the first line, the choices under them */
+  .notice { padding-inline-start: 12px; }
+  .noticeText { flex: 1 1 calc(100% - 56px); }
+  .noticeClose { order: 1; }
+  .noticeActions { order: 2; flex-basis: 100%; justify-content: flex-end; }
+}
 /* every touch screen gets a send button, a tablet as much as a phone */
 @media (max-width: 767px), (pointer: coarse) { .sendMobile { display: flex; } }
 .locked { align-items: center; padding: 0 16px; color: var(--text-muted); font-size: 16px; cursor: not-allowed; }
@@ -64,6 +94,8 @@
 @media (pointer: coarse) {
   .closeBtn, .pingBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 36px; }
   .cardBtn { width: 40px; height: 40px; }
-  /* the emoji and send buttons beside the box */
-  .iconBtn { width: 40px; height: 40px; }
+  /* the emoji and send buttons beside the box: Send is the most-tapped control there is */
+  .iconBtn { width: 44px; height: 44px; }
+  .btns { gap: 4px; padding-inline-end: 2px; }
+  .noticeMain, .noticeAlt { min-height: 40px; }
 }

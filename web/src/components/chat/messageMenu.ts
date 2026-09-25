@@ -120,15 +120,19 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
   return items;
 }
 
-/** Asks before deleting a message, as the menu's Delete does. */
-export function confirmDelete(msg: DecryptedMessage): void {
+/** Asks before deleting a message, as the menu's Delete does; `deleted` runs once it is gone. */
+export function confirmDelete(msg: DecryptedMessage, deleted?: () => void): void {
   const ui = useUI.getState();
   ui.openModal("confirm", {
     title: t("chat.messageMenu.deleteMessage"),
     body: t("chat.messageMenu.areYouSureYouWantTo"),
     confirmLabel: t("chat.messageItem.delete"),
     danger: true,
-    onConfirm: () => messagesApi.remove(msg.channel_id, msg.id).catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotDelete"), "error")),
+    onConfirm: () =>
+      messagesApi
+        .remove(msg.channel_id, msg.id)
+        .then(() => deleted?.())
+        .catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotDelete"), "error")),
   });
 }
 
