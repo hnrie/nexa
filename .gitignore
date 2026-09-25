@@ -2,6 +2,8 @@
 /data/
 /logs/
 /bin/
+# `go build ./cmd/chatmigrate` from the top leaves its binary here
+/chatmigrate
 /chatd.env
 /backup/
 # web
