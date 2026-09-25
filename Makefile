@@ -3,7 +3,7 @@ NODE_BIN ?= /usr/local/lib/nodejs/current/bin
 VERSION ?= $(shell git describe --always --dirty 2>/dev/null || echo dev)
 export PATH := $(NODE_BIN):$(PATH)
 
-.PHONY: build web server test test-go test-web test-desktop desktop publish-desktop licenses run clean
+.PHONY: build web server test test-go test-web test-desktop desktop publish-desktop licenses run clean clean-deploy
 
 # A build runs the typechecker (inside the web build) but not the test
 # suites unless asked with `make build TEST=1`. The suites are timing
@@ -42,8 +42,10 @@ test-go:
 test-web:
 	cd web && npm run typecheck && npm test -- --run
 
+# The desktop app's source is not in every checkout; the rest of the suite
+# still runs without it.
 test-desktop:
-	cd desktop && npm run typecheck && npm test
+	@if [ -d desktop/src ]; then cd desktop && npm run typecheck && npm test; else echo "  desktop/ is not here; skipping its tests"; fi
 
 # the desktop app's installers for every platform, into desktop/dist (runs on macOS)
 desktop: test-desktop
@@ -58,8 +60,19 @@ publish-desktop:
 licenses:
 	python3 tools/licenses.py
 
-run: server
-	./bin/chatd
+# Runs the server from source. It used to build bin/chatd first, which is the
+# deploy (see server above): trying the server out replaced the live binary.
+run:
+	$(GO) run ./cmd/chatd
 
+# What builds leave lying around, and nothing else. bin/ and web/dist are not
+# leftovers: they are what is running (and bin/chatd.prev the way back), so one
+# reflexive `make clean` used to take the site down with no way back short of
+# a full rebuild. `make clean-deploy DEPLOY=1` still removes them, on purpose.
 clean:
+	rm -rf chatmigrate tools/out web/node_modules/.vite
+
+clean-deploy:
+	@echo "  this removes the running deploy: bin/ (chatd and the chatd.prev rollback copy) and web/dist"
+	@if [ "$(DEPLOY)" != 1 ]; then echo "  nothing removed; run it as: make clean-deploy DEPLOY=1"; exit 1; fi
 	rm -rf bin web/dist
