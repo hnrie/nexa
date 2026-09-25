@@ -18,6 +18,7 @@ import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { b64, randomBytes, utf8 } from "@/crypto/bytes";
 import { storage } from "@/lib/storage";
+import { deleteIndex } from "./persist";
 
 const INFO = utf8.enc("evilion-chat/search-index/v1");
 const PREFIX = "ec.searchKey.";
@@ -93,4 +94,13 @@ export async function indexKeyFor(userId: string, identityPrivateKey: Uint8Array
 /** Forgets the key, which makes the index on disk unreadable for good. */
 export function forgetIndexKey(userId: string): void {
   storage.remove(slot(userId));
+}
+
+/**
+ * Takes an account's index off this device: the key at once, then the
+ * database, which goes as soon as nothing still has it open.
+ */
+export function wipeSearchIndex(userId: string): Promise<void> {
+  forgetIndexKey(userId);
+  return deleteIndex(userId);
 }

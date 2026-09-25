@@ -1,203 +1,304 @@
 /**
- * What to type next. As a filter is being typed — `from:`, `in:`, `has:`,
- * `before:` — the people, channels or kinds that would match are offered with
- * their pictures, and a date filter opens a calendar rather than asking for
- * the exact spelling of a date. The list works from the search box itself:
- * ↓ and ↑ move through it and Enter takes the one chosen, as the message box's
- * suggestions do; it was reachable by pointer only.
+ * The suggestions under a search box (search/suggest.ts decides what they
+ * are). They are worked from the box itself: ↓ and ↑ move through them, Enter
+ * or Tab takes the one chosen and Escape puts them away, while the caret stays
+ * where it was typing; a click does the same.
  */
-import { CalendarDays } from "lucide-react";
-import { useEffect, useImperativeHandle, useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
-import type { Channel, PublicUser } from "@/api/types";
+import { AtSign, CalendarDays, Clock, File, FileArchive, FileAudio, FileCode, FileSpreadsheet, FileText, Film, Hash, Image as ImageIcon, Link as LinkIcon, Music, Newspaper, Paperclip, Pin, Sticker, Users, X, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Avatar } from "@/components/common/Avatar";
-import { t } from "@/i18n";
+import { t, translator } from "@/i18n";
+import type { HasKind } from "@/lib/search";
+import { forgetSearch } from "@/search/recent";
+import { useChannels } from "@/stores/channels";
+import type { Names } from "./scope";
+import { flat, type Suggestion, type SuggestionGroup } from "./suggest";
 import s from "./Search.module.css";
-import { channelDisplayName } from "@/lib/names";
-import { useAuth } from "@/stores/auth";
 
-/** The filter being typed at the end of a query, if any. */
-export interface PartialToken {
-  key: "from" | "in" | "has" | "mentions" | "before" | "after";
-  /** What has been typed after the colon. */
-  value: string;
-  /** Where the token starts in the raw query. */
-  at: number;
+export const HAS_ICONS: Record<HasKind, LucideIcon> = { link: LinkIcon, image: ImageIcon, video: Film, audio: Music, file: Paperclip, embed: Newspaper, sticker: Sticker };
+
+/** The chosen suggestion and the keys that move it; `key` says whether it used the key. */
+export function useSuggestionKeys(groups: SuggestionGroup[], onPick: (s: Suggestion) => void, onDismiss: () => void) {
+  const items = useMemo(() => flat(groups), [groups]);
+  const [active, setActive] = useState(-1);
+  // different suggestions start with nothing chosen, so Enter still searches;
+  // the same ones worked out again keep the choice
+  const sig = items.map((i) => i.id).join("\n");
+  useEffect(() => setActive(-1), [sig]);
+  const key = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>): boolean => {
+      if (items.length === 0) return false;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const step = e.key === "ArrowDown" ? 1 : -1;
+        setActive((a) => (a < 0 ? (step > 0 ? 0 : items.length - 1) : (a + step + items.length) % items.length));
+        return true;
+      }
+      if ((e.key === "Enter" || e.key === "Tab") && active >= 0 && items[active] && !e.nativeEvent.isComposing) {
+        const chosen = items[active]!;
+        // the calendar row is chosen with its own date field
+        if (chosen.kind === "pickDate") return false;
+        e.preventDefault();
+        onPick(chosen);
+        return true;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onDismiss();
+        return true;
+      }
+      return false;
+    },
+    [items, active, onPick, onDismiss],
+  );
+  return { items, active, setActive, key, activeId: active >= 0 ? items[active]?.id : undefined };
 }
 
-const KEYS = ["from", "in", "has", "mentions", "before", "after"] as const;
+const GROUP_TITLE: Record<SuggestionGroup["kind"], string> = {
+  recent: "search.suggest.recent",
+  keys: "search.suggest.options",
+  people: "search.suggest.people",
+  conversations: "search.suggest.conversations",
+  kinds: "search.suggest.kinds",
+  dates: "search.suggest.dates",
+  pinned: "search.suggest.pins",
+  filters: "search.suggest.filters",
+};
 
-export function partialToken(query: string, caret = query.length): PartialToken | null {
-  const upto = query.slice(0, caret);
-  const start = Math.max(upto.lastIndexOf(" ") + 1, 0);
-  const tok = upto.slice(start);
-  const colon = tok.indexOf(":");
-  if (colon <= 0) return null;
-  const key = tok.slice(0, colon).toLowerCase();
-  if (!(KEYS as readonly string[]).includes(key)) return null;
-  return { key: key as PartialToken["key"], value: tok.slice(colon + 1), at: start };
+const KEY_HINT: Record<string, string> = {
+  from: "search.suggest.keyFrom",
+  in: "search.suggest.keyIn",
+  mentions: "search.suggest.keyMentions",
+  has: "search.suggest.keyHas",
+  before: "search.suggest.keyBefore",
+  after: "search.suggest.keyAfter",
+  during: "search.suggest.keyDuring",
+  pinned: "search.suggest.keyPinned",
+};
+
+const HAS_LABEL: Record<HasKind, string> = {
+  link: "search.has.link",
+  image: "search.has.image",
+  video: "search.has.video",
+  audio: "search.has.audio",
+  file: "search.has.file",
+  embed: "search.has.embed",
+  sticker: "search.has.sticker",
+};
+
+export function hasLabel(h: HasKind): string {
+  return t(HAS_LABEL[h]);
 }
 
-/** Replaces the filter being typed with a finished one. */
-export function completeToken(query: string, tok: PartialToken, value: string): string {
-  const after = query.slice(tok.at + tok.key.length + 1 + tok.value.length);
-  return `${query.slice(0, tok.at)}${tok.key}:${value}${after.startsWith(" ") ? after : ` ${after.trimStart()}`}`;
+/** A day, a month or a year, written out in the reader's language. */
+export function formatPeriod(start: number, unit: "day" | "month" | "year"): string {
+  const opts: Intl.DateTimeFormatOptions = unit === "day" ? { day: "numeric", month: "short", year: "numeric" } : unit === "month" ? { month: "long", year: "numeric" } : { year: "numeric" };
+  try {
+    return new Intl.DateTimeFormat(translator().locale, opts).format(new Date(start));
+  } catch {
+    return new Date(start).toDateString();
+  }
 }
 
-const HAS = ["link", "image", "file", "sticker", "embed"];
+const RELATIVE: Record<string, string> = {
+  today: "search.date.today",
+  yesterday: "search.date.yesterday",
+  thisMonth: "search.date.thisMonth",
+  lastMonth: "search.date.lastMonth",
+  thisYear: "search.date.thisYear",
+};
 
-/** The keys the search box hands the list; true when the list used the key. */
-export interface SuggestHandle {
-  key: (e: KeyboardEvent<HTMLInputElement>) => boolean;
+function ChannelGlyph({ ch, names }: { ch: NonNullable<Suggestion["channel"]>; names: Names }) {
+  if (ch.type === "dm") {
+    const other = ch.recipient_ids.find((id) => id !== names.meId) ?? "";
+    const u = names.users[other];
+    return <Avatar id={other} avatarId={u?.avatar_id ?? null} name={names.person(other)} size={24} />;
+  }
+  if (ch.type === "group_dm") return <span className={s.glyph}><Users size={16} /></span>;
+  return <span className={s.glyph}><Hash size={16} /></span>;
 }
 
-/** One row: what it puts in the query, and how it looks. */
-interface Option {
-  id: string;
-  value: string;
-  body: ReactNode;
+/** The title of a group of suggestions. */
+export function groupTitle(kind: SuggestionGroup["kind"]): string {
+  return t(GROUP_TITLE[kind]);
+}
+
+/** What one suggestion looks like, wherever it is listed. */
+export function SuggestionRow({ item, names, onDate }: { item: Suggestion; names: Names; onDate: (key: string, value: string) => void }) {
+  const byId = useChannels((c) => c.byId);
+  switch (item.kind) {
+    case "recent":
+      return (
+        <>
+          <span className={s.glyph}><Clock size={16} /></span>
+          <span className={s.optMain} dir="auto">{item.recent}</span>
+          <button
+            type="button"
+            className={s.optRemove}
+            tabIndex={-1}
+            aria-label={t("search.suggest.forget", { query: item.recent ?? "" })}
+            title={t("search.suggest.forgetShort")}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              forgetSearch(item.recent ?? "");
+            }}
+          >
+            <X size={14} />
+          </button>
+        </>
+      );
+    case "key":
+      return (
+        <>
+          <span className={s.optKey} dir="ltr">{item.key}:</span>
+          <span className={s.optSub}>{t(KEY_HINT[item.key!] ?? "")}</span>
+        </>
+      );
+    case "person": {
+      const u = item.userId ? names.users[item.userId] : undefined;
+      const me = item.value === "me";
+      return (
+        <>
+          <Avatar id={item.userId ?? ""} avatarId={u?.avatar_id ?? null} name={names.person(item.userId ?? "")} size={24} />
+          <span className={s.optMain} dir="auto">{me ? t("search.suggest.me") : names.person(item.userId ?? "")}</span>
+          <span className={s.optSub} dir="ltr">@{u?.username ?? item.value}</span>
+        </>
+      );
+    }
+    case "everyone":
+      return (
+        <>
+          <span className={s.glyph}><AtSign size={16} /></span>
+          <span className={s.optMain}>{t("search.suggest.everyone")}</span>
+        </>
+      );
+    case "channel": {
+      const ch = item.channel!;
+      const where = ch.server_id ? names.serverName(ch.server_id) : ch.type === "subchat" && ch.parent_id && byId[ch.parent_id] ? names.channel(byId[ch.parent_id]!) : ch.type === "dm" ? t("search.suggest.directMessage") : t("search.suggest.group");
+      return (
+        <>
+          <ChannelGlyph ch={ch} names={names} />
+          <span className={s.optMain} dir="auto">{names.channel(ch).replace(/^#/, "")}</span>
+          {where ? <span className={s.optSub} dir="auto">{where}</span> : null}
+        </>
+      );
+    }
+    case "has": {
+      const Icon = HAS_ICONS[item.has!];
+      return (
+        <>
+          <span className={s.glyph}><Icon size={16} /></span>
+          <span className={s.optMain}>{hasLabel(item.has!)}</span>
+        </>
+      );
+    }
+    case "date":
+      return (
+        <>
+          <span className={s.glyph}><CalendarDays size={16} /></span>
+          <span className={s.optMain}>{t(RELATIVE[item.date!.relative ?? ""] ?? "")}</span>
+          <span className={s.optSub}>{formatPeriod(item.date!.start, item.date!.unit)}</span>
+        </>
+      );
+    case "pickDate":
+      return (
+        <label className={s.optDate} onMouseDown={(e) => e.stopPropagation()}>
+          <span className={s.glyph}><CalendarDays size={16} /></span>
+          <span className={s.optMain}>{t("search.suggest.pickDate")}</span>
+          <input
+            type="date"
+            className={s.dateInput}
+            aria-label={t("search.suggest.pickDate")}
+            data-testid="search-date"
+            onChange={(e) => e.target.value && onDate(item.key!, e.target.value)}
+          />
+        </label>
+      );
+    case "pinned":
+      return (
+        <>
+          <span className={s.glyph}><Pin size={16} /></span>
+          <span className={s.optMain}>{item.value === "yes" ? t("search.chip.pinned") : t("search.chip.notPinned")}</span>
+        </>
+      );
+  }
 }
 
 export function SearchSuggestions({
-  query,
-  users,
-  channels,
-  nicknames,
+  groups,
+  active,
+  listId,
+  names,
   onPick,
-  handle,
-  listId = "search-suggestions",
-  onActive,
+  onHover,
+  onDate,
+  onClearRecent,
+  floating = true,
 }: {
-  query: string;
-  users: Record<string, PublicUser>;
-  channels: Channel[];
-  nicknames?: Record<string, string>;
-  onPick: (next: string) => void;
-  handle?: Ref<SuggestHandle>;
-  listId?: string;
-  /** The row ↑ and ↓ have reached, for the box's aria-activedescendant. */
-  onActive?: (optionId: string | undefined) => void;
+  groups: SuggestionGroup[];
+  active: number;
+  listId: string;
+  names: Names;
+  onPick: (s: Suggestion) => void;
+  onHover: (index: number) => void;
+  /** A date picked from the calendar row, for that filter. */
+  onDate: (key: string, value: string) => void;
+  onClearRecent?: () => void;
+  /** Over what is below it (under a search box), or part of the page (a dialog's body). */
+  floating?: boolean;
 }) {
-  const tok = useMemo(() => partialToken(query), [query]);
-  const wanted = tok?.value.replace(/^[@#]/, "").toLowerCase() ?? "";
-
-  const people = useMemo(() => {
-    if (!tok || (tok.key !== "from" && tok.key !== "mentions")) return [];
-    return Object.values(users)
-      .filter((u) => !wanted || u.username.toLowerCase().includes(wanted) || u.display_name.toLowerCase().includes(wanted) || (nicknames?.[u.id] ?? "").includes(wanted))
-      .slice(0, 8);
-  }, [tok, users, wanted, nicknames]);
-
-  // A DM has no name of its own; it is offered as the people in it and put in
-  // the query by id (which in: also takes), as is anything with a space in
-  // its name — "in:Weekend plans" would search for "plans" in "Weekend".
-  const chans = useMemo(() => {
-    if (!tok || tok.key !== "in") return [];
-    const meId = useAuth.getState().me?.id;
-    return channels
-      .map((c) => ({ c, label: channelDisplayName(c, users, meId), dm: c.type === "dm" || c.type === "group_dm" || c.type === "subchat" }))
-      .filter((x) => !wanted || x.label.toLowerCase().includes(wanted))
-      .slice(0, 8);
-  }, [tok, channels, users, wanted]);
-
-  const options = useMemo<Option[]>(() => {
-    if (!tok) return [];
-    if (tok.key === "has") {
-      return HAS.filter((h) => h.startsWith(wanted)).map((h) => ({ id: `${listId}-${h}`, value: h, body: <span className={s.suggestName}>{h}</span> }));
-    }
-    if (tok.key === "in") {
-      return chans.map(({ c, label, dm }) => ({
-        id: `${listId}-${c.id}`,
-        value: dm || /\s/.test(c.name) ? c.id : c.name,
-        body: (
-          <>
-            <span className={s.suggestHash}>{dm ? "@" : "#"}</span>
-            <span className={s.suggestName} dir="auto">{label}</span>
-          </>
-        ),
-      }));
-    }
-    if (tok.key === "from" || tok.key === "mentions") {
-      return people.map((u) => ({
-        id: `${listId}-${u.id}`,
-        value: u.username,
-        body: (
-          <>
-            <Avatar id={u.id} avatarId={u.avatar_id} name={u.display_name} size={20} />
-            <span className={s.suggestName} dir="auto">{u.display_name}</span>
-            <span className={s.suggestSub}>@{u.username}</span>
-          </>
-        ),
-      }));
-    }
-    return [];
-  }, [tok, wanted, chans, people, listId]);
-
-  const [active, setActive] = useState(-1);
-  // a new query starts the choosing over
-  useEffect(() => setActive(-1), [query]);
-  useEffect(() => onActive?.(active >= 0 ? options[active]?.id : undefined), [active, options, onActive]);
-
-  useImperativeHandle(
-    handle,
-    () => ({
-      key: (e) => {
-        if (!tok || options.length === 0) return false;
-        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-          e.preventDefault();
-          const step = e.key === "ArrowDown" ? 1 : -1;
-          setActive((a) => (a < 0 ? (step > 0 ? 0 : options.length - 1) : (a + step + options.length) % options.length));
-          return true;
-        }
-        if ((e.key === "Enter" || e.key === "Tab") && active >= 0 && options[active]) {
-          e.preventDefault();
-          onPick(completeToken(query, tok, options[active]!.value));
-          return true;
-        }
-        return false;
-      },
-    }),
-    [tok, options, active, onPick, query],
-  );
-
-  if (!tok) return null;
-
-  if (tok.key === "before" || tok.key === "after") {
-    return (
-      <div className={s.suggest} data-testid="search-suggest">
-        <label className={s.suggestDate}>
-          <CalendarDays size={16} />
-          <span>{tok.key === "before" ? t("search.suggestions.sentBefore") : t("search.suggestions.sentAfter")}</span>
-          <input
-            type="date"
-            value={/^\d{4}-\d{2}-\d{2}$/.test(tok.value) ? tok.value : ""}
-            aria-label={tok.key === "before" ? t("search.suggestions.sentBefore") : t("search.suggestions.sentAfter")}
-            data-testid="search-date"
-            onChange={(e) => e.target.value && onPick(completeToken(query, tok, e.target.value))}
-          />
-        </label>
-      </div>
-    );
-  }
-
-  if (options.length === 0) return null;
+  if (groups.length === 0) return null;
+  let index = -1;
   return (
-    <div className={s.suggest} id={listId} role="listbox" aria-label={t("chat.chat.search")} data-testid="search-suggest">
-      {options.map((o, i) => (
-        <button
-          key={o.id}
-          id={o.id}
-          role="option"
-          aria-selected={i === active}
-          data-active={i === active || undefined}
-          tabIndex={-1}
-          className={s.suggestRow}
-          onMouseDown={(e) => e.preventDefault()}
-          onMouseEnter={() => setActive(i)}
-          onClick={() => onPick(completeToken(query, tok, o.value))}
-        >
-          {o.body}
-        </button>
+    <div className={floating ? s.suggest : s.suggestInline} id={listId} role="listbox" aria-label={t("search.suggest.label")} data-testid="search-suggest">
+      {groups.map((g) => (
+        <div key={g.kind} role="group" aria-label={groupTitle(g.kind)} className={s.optGroup}>
+          <div className={s.optHead} aria-hidden="true">
+            <span>{groupTitle(g.kind)}</span>
+            {g.kind === "recent" && onClearRecent ? (
+              <button type="button" className={s.optClear} tabIndex={-1} onMouseDown={(e) => e.preventDefault()} onClick={onClearRecent}>
+                {t("search.suggest.clearRecent")}
+              </button>
+            ) : null}
+          </div>
+          {g.items.map((item) => {
+            index += 1;
+            const i = index;
+            return (
+              <div
+                key={item.id}
+                id={`${listId}-${item.id}`}
+                role="option"
+                aria-selected={i === active}
+                data-active={i === active || undefined}
+                data-kind={item.kind}
+                className={s.opt}
+                onMouseDown={(e) => {
+                  // the box keeps focus, and its caret, while a row is clicked
+                  if (item.kind !== "pickDate") e.preventDefault();
+                }}
+                onMouseEnter={() => onHover(i)}
+                onClick={() => item.kind !== "pickDate" && onPick(item)}
+              >
+                <SuggestionRow item={item} names={names} onDate={onDate} />
+              </div>
+            );
+          })}
+        </div>
       ))}
     </div>
   );
+}
+
+/** For a file row: a glyph that says what kind of file it is. */
+export function fileGlyph(type: string, name: string): LucideIcon {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (type.startsWith("audio/")) return FileAudio;
+  if (["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz"].includes(ext)) return FileArchive;
+  if (["csv", "tsv", "xls", "xlsx", "ods", "numbers"].includes(ext)) return FileSpreadsheet;
+  if (["js", "ts", "tsx", "jsx", "py", "go", "rs", "c", "cpp", "h", "java", "kt", "rb", "php", "sh", "json", "yaml", "yml", "toml", "html", "css", "sql"].includes(ext)) return FileCode;
+  if (type === "application/pdf" || type.startsWith("text/") || ["pdf", "doc", "docx", "txt", "md", "rtf", "odt", "pages", "epub"].includes(ext)) return FileText;
+  return File;
 }

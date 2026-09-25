@@ -14,6 +14,7 @@ import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { useNexa } from "@/stores/nexa";
 import { ReadableError } from "@/lib/readableError";
 import { storage } from "@/lib/storage";
+import { wipeSearchIndex } from "@/search/keys";
 
 import { t } from "@/i18n";
 /** "offline": a token is stored, but the server or this device's key store could not be reached. */
@@ -402,6 +403,9 @@ export const useAuth = create<AuthState>()((set, get) => ({
     try {
       if (me) {
         clearLock(me.id);
+        // the search index's key goes at once; its database follows once
+        // nothing has it open (search/keys.ts)
+        void wipeSearchIndex(me.id);
         await keystore.clear(me.id);
       }
     } finally {

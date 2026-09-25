@@ -29,9 +29,8 @@ import type { Mutation, OpenResult } from "./core";
 import { Crawler, type ChannelCrawl, type CrawlState } from "./crawler";
 import { toDoc, type SearchDoc } from "./doc";
 import { EMPTY_RESULT, type EngineRequest, type EngineResult } from "./engine";
-import { forgetIndexKey, indexKeyFor } from "./keys";
+import { indexKeyFor, wipeSearchIndex } from "./keys";
 import { sleep } from "./pacing";
-import { deleteIndex } from "./persist";
 
 /**
  * The most messages the index holds before it stops reaching further back.
@@ -218,34 +217,42 @@ function shutdown(flush: boolean): void {
   void Promise.race([writes, sleep(2_000)]).then(done, done);
 }
 
+/** Opens the index for the signed-in account, as its settings say to keep it. */
 async function open(): Promise<void> {
   const auth = useAuth.getState();
   const me = auth.me;
   const identity = auth.identity;
   if (!me || !identity || auth.status !== "ready" || !useSettings.getState().loaded) return;
+  await openSearchIndex({ userId: me.id, identityPrivateKey: identity.privateKey, keep: useSettings.getState().settings.searchIndex !== false });
+}
+
+/**
+ * Opens the index for an account: kept on this device (sealed under a key
+ * derived from `identityPrivateKey`), or with `keep` false in memory only.
+ */
+export async function openSearchIndex(opts: { userId: string; identityPrivateKey: Uint8Array | null; keep: boolean }): Promise<void> {
   shutdown(true);
   const g = gen;
-  openFor = me.id;
+  const userId = opts.userId;
+  openFor = userId;
   useSearchIndex.setState({ ...CLOSED, mode: "opening" });
-  const keep = useSettings.getState().settings.searchIndex !== false;
   const be = createBackend();
   backend = be;
   let key: Awaited<ReturnType<typeof indexKeyFor>> = null;
-  if (keep) {
+  if (opts.keep && opts.identityPrivateKey) {
     try {
-      key = await indexKeyFor(me.id, identity.privateKey);
+      key = await indexKeyFor(userId, opts.identityPrivateKey);
     } catch (err) {
       console.warn("search index: no key for it on this device", err);
     }
-  } else {
+  } else if (!opts.keep) {
     // Turned off, perhaps on another device: nothing is kept here either.
-    forgetIndexKey(me.id);
-    await deleteIndex(me.id);
+    await wipeSearchIndex(userId);
   }
   if (g !== gen) return;
   let res: OpenResult;
   try {
-    res = await be.call<OpenResult>({ op: "open", userId: me.id, key: key?.key ?? null, reset: key?.fresh ?? false });
+    res = await be.call<OpenResult>({ op: "open", userId, key: key?.key ?? null, reset: key?.fresh ?? false });
   } catch (err) {
     console.warn("search index: could not open", err);
     if (g === gen) shutdown(false);
@@ -288,6 +295,11 @@ async function open(): Promise<void> {
   c.setDemand(currentDemand());
   c.start();
   refresh();
+}
+
+/** Closes the index, ending its worker; what it holds on disk stays. */
+export function closeSearchIndex(): void {
+  shutdown(false);
 }
 
 /** Every ready: the first opens the index, one after a reconnect catches it up. */
@@ -345,23 +357,20 @@ function onHistory(channelId: string, page: DecryptedMessage[]): void {
   mutate({ op: "reconcile", channel: channelId, low: ids[0]!, high: ids[ids.length - 1]!, present: ids });
 }
 
-/** Signing out: nothing of this account's index stays on the device. */
+/**
+ * Signing out: the worker goes at once, without writing anything more. The
+ * sign-out itself wipes what is on disk (stores/auth.ts), whether or not the
+ * index was ever opened in this tab.
+ */
 async function onLogout(): Promise<void> {
-  const id = useAuth.getState().me?.id ?? openFor;
   shutdown(false);
-  if (!id) return;
-  forgetIndexKey(id);
-  await deleteIndex(id);
 }
 
 /** Wipes the index here and starts it again, walking everything afresh. */
 export async function rebuildSearchIndex(): Promise<void> {
   const id = useAuth.getState().me?.id;
   shutdown(false);
-  if (id) {
-    forgetIndexKey(id);
-    await deleteIndex(id);
-  }
+  if (id) await wipeSearchIndex(id);
   await open();
 }
 
@@ -375,7 +384,8 @@ export function installSearchIndex(): void {
   dispatchHooks.onMessage.push(onLive);
   dispatchHooks.onMessageChange.push(onChange);
   historyHooks.push(onHistory);
-  logoutHooks.push(onLogout);
+  // first, before the session's own teardown forgets the keys and would have it write out what it holds
+  logoutHooks.unshift(onLogout);
   // the keys going (a lock, a sign-out) takes the index with them
   keysGoneHooks.push(() => shutdown(true));
   // the setting, changed here or on another device

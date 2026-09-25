@@ -160,6 +160,32 @@ export function termTokens(folded: string): Token[] {
   return out;
 }
 
+/**
+ * A long message cut down to the part around its first match, so the match is
+ * on screen in a result that shows a few lines: "…the part that matters and
+ * what follows it…". Short text, or text whose match is near its start, comes
+ * back whole.
+ */
+export function excerptAround(text: string, needles: string[], max = 280): string {
+  if (text.length <= max) return text;
+  const { shown, folded, map } = foldWithMap(text);
+  let first = -1;
+  for (const n of needles) {
+    if (!n) continue;
+    const at = folded.indexOf(n);
+    if (at >= 0 && (first < 0 || at < first)) first = at;
+  }
+  const hit = first < 0 ? 0 : map[first]!;
+  // a little of what comes before, starting at a word
+  let start = Math.max(0, hit - Math.floor(max / 4));
+  if (start > 0) {
+    const space = shown.lastIndexOf(" ", start + 12);
+    if (space > start - 24 && space < hit) start = space + 1;
+  }
+  const end = Math.min(shown.length, start + max);
+  return `${start > 0 ? "…" : ""}${shown.slice(start, end).trim()}${end < shown.length ? "…" : ""}`;
+}
+
 /** A run of text, and whether it is part of a match. */
 export interface Run {
   text: string;

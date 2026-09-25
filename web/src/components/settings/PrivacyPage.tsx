@@ -4,6 +4,7 @@ import { users as usersApi } from "@/api/users";
 import type { MeUser } from "@/api/types";
 import { Toggle } from "@/components/common/Toggle";
 import { Button } from "@/components/common/Button";
+import { SearchSettings } from "@/components/search/SearchSettings";
 import { useState } from "react";
 import { downloadBytes, exportMyData } from "@/lib/export";
 import { useAuth } from "@/stores/auth";
@@ -60,6 +61,7 @@ export default function PrivacyPage() {
       ))}
       <h3 className={s.h5}>{t("server.encryption.encryption")}</h3>
       <p className={s.hint}>{t("settings.privacy.everyMessageAndFileYouSend")}</p>
+      <SearchSettings />
       <h3 className={s.h5}>{t("settings.privacy.linkPreviews")}</h3>
       <Toggle checked={settings.linkPreviews} onChange={(v) => patch({ linkPreviews: v })} label={t("settings.privacy.fetchLinkPreviewsWhenISend")} description={t("settings.privacy.yourDeviceAsksTheServerTo")} />
       <Toggle checked={settings.imagePreviews} onChange={(v) => patch({ imagePreviews: v })} label={t("settings.privacy.showEmbeddedImagesAndGifsFrom")} description={t("settings.privacy.picturesGifsAndVideosFromLinks")} />
