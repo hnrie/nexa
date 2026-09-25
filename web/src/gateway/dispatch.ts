@@ -25,7 +25,7 @@ import type { Message, PublicUser, Relationship, ServerView } from "@/api/types"
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
-import { usePanes } from "@/stores/panes";
+import { channelsOnScreen, usePanes } from "@/stores/panes";
 import { mentionsMe } from "@/lib/mentionsMe";
 
 /** Something from Nexa worth a sound or a notification. */
@@ -74,10 +74,10 @@ export function dispatchGeneration(): number {
 
 // Channels are not cleared here: ready replaces them in one step, because a
 // call whose channel vanished from the store even for a moment is ended.
-export function resetAll(keepMessagesIn?: string): void {
+export function resetAll(keepMessagesIn: string[] = []): void {
   useMessages.getState().clearAll(keepMessagesIn);
-  // Ready does not bring back everyone the kept conversation shows (people in
-  // a large server, people who left), and its messages are never looked up
+  // Ready does not bring back everyone the kept conversations show (people in
+  // a large server, people who left), and their messages are never looked up
   // again, so their authors would turn into "Unknown User".
   useUsers.setState({ byId: usersShownIn(keepMessagesIn) });
   usePresence.getState().clear();
@@ -88,17 +88,19 @@ export function resetAll(keepMessagesIn?: string): void {
   useExpressions.getState().clear();
 }
 
-function usersShownIn(channelId: string | undefined): Record<string, PublicUser> {
+function usersShownIn(channelIds: string[]): Record<string, PublicUser> {
   const known = useUsers.getState().byId;
   const kept: Record<string, PublicUser> = {};
   const keep = (id: string): void => {
     const u = known[id];
     if (u) kept[id] = u;
   };
-  const ch = channelId ? useMessages.getState().channels[channelId] : undefined;
-  for (const m of Object.values(ch?.byId ?? {})) {
-    keep(m.author_id);
-    for (const id of m.mentions) keep(id);
+  for (const channelId of channelIds) {
+    const ch = useMessages.getState().channels[channelId];
+    for (const m of Object.values(ch?.byId ?? {})) {
+      keep(m.author_id);
+      for (const id of m.mentions) keep(id);
+    }
   }
   return kept;
 }
@@ -162,10 +164,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "ready": {
       const d = e.d;
       // A reconnect re-sends ready. Everything else is rebuilt from the
-      // payload, but the open conversation keeps its messages so the reader
-      // stays where they were instead of being thrown to the newest message.
+      // payload, but the conversations on screen — the open one and those in
+      // the split panes beside it — keep their messages, so each reader stays
+      // where they were instead of being thrown to the newest message.
       const active = useUI.getState().activeChannelId;
-      resetAll(active ?? undefined);
+      const shown = [...new Set([...(active ? [active] : []), ...channelsOnScreen()])];
+      resetAll(shown);
       // Merged, not replaced: a field the gateway leaves out must not read as
       // "none" here, or the next profile save sends that back and wipes it.
       const was = useAuth.getState().me;
@@ -202,7 +206,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       if (gone()) return;
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();
-      if (active) void useMessages.getState().syncGap(active);
+      for (const id of shown) void useMessages.getState().syncGap(id);
       return;
     }
     case "message_create": {

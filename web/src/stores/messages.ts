@@ -112,7 +112,8 @@ interface MessagesState {
   updatePending: (channelId: string, tmpId: string, patch: Partial<PendingMessage>) => void;
   resolvePendingByNonce: (channelId: string, nonce: string) => void;
   clearChannel: (channelId: string) => void;
-  clearAll: (keep?: string) => void;
+  /** Forgets every conversation's messages but those of the channels in `keep`. */
+  clearAll: (keep?: Iterable<string>) => void;
   loadInitial: (channelId: string) => Promise<void>;
   /** Fills in whatever arrived while the socket was down, keeping what is on screen. */
   syncGap: (channelId: string) => Promise<void>;
@@ -326,13 +327,14 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   },
   clearAll: (keep) =>
     set((s) => {
-      for (const id of Object.keys(s.channels)) if (id !== keep) nextGeneration(id);
-      // One channel can be spared: the one being read, so a reconnect does not
-      // throw away the reader's place in it. Messages still being sent stay
+      const spared = new Set(keep ?? []);
+      for (const id of Object.keys(s.channels)) if (!spared.has(id)) nextGeneration(id);
+      // The channels on screen can be spared, so a reconnect does not throw
+      // away the reader's place in them. Messages still being sent stay
       // everywhere, with their uploads, however long the reconnect took.
       const channels: Record<string, ChannelMessages> = {};
       for (const [id, c] of Object.entries(s.channels)) {
-        if (id === keep) channels[id] = c;
+        if (spared.has(id)) channels[id] = c;
         else if (c.pending.length) channels[id] = { ...emptyChannel(), pending: c.pending };
       }
       return { channels };

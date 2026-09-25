@@ -35,6 +35,21 @@ export interface Tab {
   focus: string;
 }
 
+/** The channels on screen: those of the panes in the active tab. */
+export function channelsOnScreen(): string[] {
+  const s = usePanes.getState();
+  const tab = s.tabs.find((t) => t.id === s.active);
+  const out: string[] = [];
+  const walk = (tile: Tile): void => {
+    if (tile.kind === "pane") {
+      const id = s.panes[tile.id]?.channelId;
+      if (id && !out.includes(id)) out.push(id);
+    } else tile.children.forEach(walk);
+  };
+  if (tab) walk(tab.root);
+  return out;
+}
+
 /**
  * A chat narrower than this is not a chat any more: the composer wraps to
  * three lines, avatars and names collide, and every message becomes a column
