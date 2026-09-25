@@ -25,6 +25,11 @@ function statusOptions(): { value: "online" | "idle" | "dnd" | "invisible"; labe
 ];
 }
 
+/** Starts fetching the settings' code as the gear is pressed, so it is usually there by the time the press ends. */
+function warmSettings(): void {
+  void import("@/components/settings/SettingsModal").catch(() => undefined);
+}
+
 export function UserPanel() {
   const me = useAuth((a) => a.me);
   const presence = usePresence((p) => (me ? p.byUser[me.id] : undefined));
@@ -136,7 +141,7 @@ export function UserPanel() {
           </Tooltip>
         ) : null}
         <Tooltip text={t("settings.settings.userSettings")}>
-          <button className={s.icon} onClick={() => openModal("settings", { page: "account" })} aria-label={t("settings.settings.userSettings")} data-testid="user-settings">
+          <button className={s.icon} onPointerDown={warmSettings} onClick={() => openModal("settings", { page: "account" })} aria-label={t("settings.settings.userSettings")} data-testid="user-settings">
             <Settings size={20} />
           </button>
         </Tooltip>

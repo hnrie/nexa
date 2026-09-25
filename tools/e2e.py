@@ -780,7 +780,9 @@ def security_flow(srv, out, browser):
     codes = [c.strip() for c in p.locator("[data-testid=backup-codes]").inner_text().splitlines() if c.strip()]
     assert len(codes) == 10, codes
     dave.shot("security-backup-codes")
-    p.click("[role=dialog] button:has-text('Done')")
+    # the codes are shown once, so Done waits until they are said to be saved
+    p.check("[data-testid=backup-codes-saved]")
+    p.click("[data-testid=backup-codes-done]")
     p.wait_for_selector("[data-testid=mfa-row]:has-text('Authenticator app is on')", timeout=15000)
     dave.close_settings()
 

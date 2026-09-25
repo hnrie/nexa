@@ -123,6 +123,11 @@ func (s *Server) staticHandler() http.Handler {
 				return
 			}
 		}
+		// The front page is what gets shared when someone recommends Nexa, and
+		// it was the one public page that unfurled as a bare address.
+		if p == "/" && s.serveHomePage(w, r, dist) {
+			return
+		}
 		index := filepath.Join(dist, "index.html")
 		f, err := os.Open(index)
 		if err != nil {
@@ -215,6 +220,54 @@ func (s *Server) serveInvitePage(w http.ResponseWriter, r *http.Request, dist, c
 	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
 	tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
 
+	body := string(raw)
+	if i := strings.Index(body, "</head>"); i >= 0 {
+		body = body[:i] + tags.String() + "\n" + body[i:]
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-cache, must-revalidate")
+	h.Set("CDN-Cache-Control", "no-store")
+	h.Set("Content-Security-Policy", CSP)
+	if r.Method == http.MethodHead {
+		w.WriteHeader(http.StatusOK)
+		return true
+	}
+	_, _ = w.Write([]byte(body))
+	return true
+}
+
+// serveHomePage renders the front page with preview tags of its own: a title,
+// what Nexa is, and a picture of the app. They are written here rather than
+// into index.html, which every page shares — an invite page carrying the
+// front page's tags ahead of its own would unfurl as the front page.
+func (s *Server) serveHomePage(w http.ResponseWriter, r *http.Request, dist string) bool {
+	raw, err := os.ReadFile(filepath.Join(dist, "index.html"))
+	if err != nil {
+		return false
+	}
+	const title = "Nexa — chat that nobody else can read"
+	const desc = "Messages, files and calls encrypted on your device with keys the server never holds. No email address, no phone number."
+	var tags strings.Builder
+	meta := func(prop, content string) {
+		tags.WriteString("\n<meta property=\"" + prop + "\" content=\"" + escapeAttr(content) + "\">")
+	}
+	meta("og:type", "website")
+	meta("og:site_name", s.issuer())
+	meta("og:title", title)
+	meta("og:description", desc)
+	// A preview's picture has to be a whole address; without the public one
+	// there is no picture rather than a broken one.
+	if base := strings.TrimRight(s.Cfg.PublicURL, "/"); base != "" {
+		meta("og:url", base+"/")
+		meta("og:image", base+"/home/app.png")
+		meta("og:image:width", "1440")
+		meta("og:image:height", "900")
+		meta("og:image:alt", "The Nexa app: a server's channels, a conversation and who is online")
+		tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary_large_image\">")
+	} else {
+		tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
+	}
 	body := string(raw)
 	if i := strings.Index(body, "</head>"); i >= 0 {
 		body = body[:i] + tags.String() + "\n" + body[i:]

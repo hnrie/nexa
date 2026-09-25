@@ -118,4 +118,23 @@ describe("Modal", () => {
     expect(inner).toHaveBeenCalledTimes(1);
     expect(outer).not.toHaveBeenCalled();
   });
+
+  it("does its main action on Enter in a text box, and nowhere else", () => {
+    const submit = vi.fn();
+    render(
+      <Modal open onClose={() => {}} title="Change your display name" onSubmit={submit}>
+        <input aria-label="Display name" />
+        <textarea aria-label="About me" />
+        <input type="checkbox" aria-label="Remember" />
+      </Modal>,
+    );
+    fireEvent.keyDown(screen.getByLabelText("Display name"), { key: "Enter" });
+    expect(submit).toHaveBeenCalledTimes(1);
+    // a new line, a word being composed, and Enter on a checkbox are not a submit
+    fireEvent.keyDown(screen.getByLabelText("About me"), { key: "Enter" });
+    fireEvent.keyDown(screen.getByLabelText("Display name"), { key: "Enter", shiftKey: true });
+    fireEvent.keyDown(screen.getByLabelText("Display name"), { key: "Enter", keyCode: 229 });
+    fireEvent.keyDown(screen.getByLabelText("Remember"), { key: "Enter" });
+    expect(submit).toHaveBeenCalledTimes(1);
+  });
 });

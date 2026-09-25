@@ -8,4 +8,4 @@
 .emojiBtn:hover { background: var(--bg-active); color: var(--text); }
 .emojiImg { width: 24px; height: 24px; object-fit: contain; display: block; }
 .emojiClear { position: absolute; top: -6px; inset-inline-end: -6px; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-raised); color: var(--text-muted); box-shadow: var(--shadow-low); }
-.emojiClear:hover { background: var(--danger); color: #fff; }
+.emojiClear:hover { background: var(--danger); color: var(--on-danger); }

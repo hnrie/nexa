@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { NexaWordmark } from "../components/common/Brand";
 import { Button } from "@/components/common/Button";
+import { copyText } from "@/lib/copyText";
 import { useUI } from "@/stores/ui";
 import s from "./Auth.module.css";
 
@@ -68,19 +69,52 @@ export function CopyKeyButton({ text }: { text: string }) {
     const h = setTimeout(() => setCopied(false), 2000);
     return () => clearTimeout(h);
   }, [copied]);
-  const copy = () => {
-    const failed = () => toast(t("register.copyFailed"), "error");
-    if (!navigator.clipboard) {
-      failed();
-      return;
-    }
-    navigator.clipboard.writeText(text).then(() => setCopied(true), failed);
-  };
+  const copy = () => void copyText(text).then((ok) => (ok ? setCopied(true) : toast(t("register.copyFailed"), "error")));
   return (
     <Button variant="secondary" block onClick={copy} data-copied={copied || undefined}>
       {copied ? <><Check size={16} aria-hidden="true" style={{ verticalAlign: "-3px" }} />{" "}</> : null}
       <span aria-live="polite">{copied ? t("modals.groupInvite.copied") : t("modals.groupInvite.copy")}</span>
     </Button>
+  );
+}
+
+/** Hands the browser a small text file to save, as a link to a download would. */
+export function downloadText(filename: string, body: string): void {
+  const url = URL.createObjectURL(new Blob([body], { type: "text/plain;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * A recovery key at the one moment it is shown: the key, Copy and a file to
+ * keep, what it is, and a box to tick before going on.
+ *
+ * Signing up, resetting a password and making a new key in settings all show
+ * the same secret with the same consequence if it is lost, and they used to
+ * push three different amounts: the settings dialog had a Copy button and
+ * nothing else, and Escape closed it with the old key already dead. One panel
+ * says it the same way everywhere.
+ */
+export function RecoveryKeyPanel({ value, username, warning, confirm, doneLabel, onDone }: { value: string; username: string; warning?: string; confirm: string; doneLabel: string; onDone: () => void }) {
+  const [saved, setSaved] = useState(false);
+  const download = () => downloadText(`nexa-recovery-key-${username}.txt`, `${t("register.recoveryKeyFileHeading", { username })}\n\n${value}\n\n${t("register.keepThisSomewhereSafe")}\n`);
+  return (
+    <>
+      <RecoveryKey value={value} testId="recovery-key" />
+      <div className={s.row}>
+        <CopyKeyButton text={value} />
+        <Button variant="secondary" block onClick={download}>{t("register.downloadTxt")}</Button>
+      </div>
+      <div className={s.warn}>{warning ?? t("register.weCannotShowThisKeyAgain")}</div>
+      <label className={s.check}>
+        <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} data-testid="recovery-saved" />
+        <span>{confirm}</span>
+      </label>
+      <Button size="lg" block disabled={!saved} onClick={onDone} data-testid="recovery-done">{doneLabel}</Button>
+    </>
   );
 }
 

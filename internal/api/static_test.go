@@ -77,6 +77,33 @@ func TestStaticServing(t *testing.T) {
 	}
 }
 
+func TestFrontPagePreview(t *testing.T) {
+	srv, _ := newTestServer(t)
+	dist := t.TempDir()
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><html><head><title>Nexa</title></head><body></body></html>"), 0o644)
+	srv.Cfg.WebDist = dist
+	srv.Cfg.PublicURL = "https://chat.example.org"
+	ts := newHTTPTestServer(t, srv)
+	get := func(path string) (int, string) {
+		res, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	// the front page unfurls with a title and a picture at a whole address
+	code, body := get("/")
+	if code != 200 || !strings.Contains(body, `<meta property="og:image" content="https://chat.example.org/home/app.png">`) || !strings.Contains(body, `summary_large_image`) {
+		t.Errorf("front page: %d %q", code, body)
+	}
+	// and only the front page: the app's other pages keep the shared head
+	if _, body = get("/channels/@me"); strings.Contains(body, "og:image") {
+		t.Errorf("an app page took the front page's preview: %q", body)
+	}
+}
+
 func TestGuestCallLinkPreview(t *testing.T) {
 	srv, _ := newTestServer(t)
 	dist := t.TempDir()

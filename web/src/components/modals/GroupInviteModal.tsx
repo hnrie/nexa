@@ -14,6 +14,7 @@ import { ring } from "@/lib/keyring";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
+import { copyText } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
 import s from "./ServerModals.module.css";
 
@@ -65,7 +66,11 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
   const link = invite ? inviteUrl(invite.code, key) : "";
   const copy = () => {
     if (!link) return;
-    void navigator.clipboard?.writeText(link).then(() => {
+    void copyText(link).then((ok) => {
+      if (!ok) {
+        useUI.getState().toast(t("common.copyFailed"), "error");
+        return;
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

@@ -1,4 +1,6 @@
 import { Suspense, useCallback } from "react";
+import { Modal } from "@/components/common/Modal";
+import { Spinner } from "@/components/common/Spinner";
 import { lazyPage } from "@/lib/lazyChunk";
 import { useUI, type ModalState } from "@/stores/ui";
 import { ConfirmModal } from "./ConfirmModal";
@@ -32,6 +34,17 @@ const MemberActionModal = lazyPage(() => import("@/components/server/MemberActio
 const SubchatModal = lazyPage(() => import("./SubchatModal"));
 const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
 const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
+
+/** Stands in for a dialog whose code is still on its way. */
+function Loading({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal open bare onClose={onClose} ariaLabel={t("chat.pins.loading")} width={120}>
+      <div style={{ display: "flex", justifyContent: "center", padding: 32 }}>
+        <Spinner size={28} label={t("chat.pins.loading")} />
+      </div>
+    </Modal>
+  );
+}
 
 /** Renders every modal on the ui store's stack; later ones overlay earlier ones. */
 export function ModalHost() {
@@ -87,7 +100,10 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "channelTopic" ? <ChannelTopicModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "stickerPack" ? <StickerPackModal onClose={close} info={modal.props?.["info"] as StickerInfo} stickerId={String(modal.props?.["stickerId"])} /> : null}
       {modal?.kind === "serverProfile" ? <ServerProfileModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={modal.props?.["userId"] as string | undefined} /> : null}
-      <Suspense fallback={null}>
+      {/* The first opening of each of these waits for its code to arrive, and
+          on a slow phone connection a tap that shows nothing for seconds is a
+          tap people repeat: the dialog's place is taken at once instead. */}
+      <Suspense fallback={<Loading onClose={close} />}>
         {modal?.kind === "settings" ? <SettingsModal onClose={close} page={(modal.props?.["page"] as string | undefined) ?? "account"} packId={modal.props?.["packId"] as string | undefined} /> : null}
         {modal?.kind === "profile" ? <ProfileModal onClose={close} userId={modal.props?.["userId"] as string} /> : null}
         {modal?.kind === "screenPermission" ? <ScreenPermission stale={Boolean(modal.props?.["stale"])} onClose={close} /> : null}

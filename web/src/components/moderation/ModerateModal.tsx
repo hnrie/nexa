@@ -373,7 +373,8 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
               </div>
               <div className={m.reasonMeta}>
                 <span>{t("moderation.form.reasonVisible")}</span>
-                <span>{[...reason].length}/{MAX_REASON}</span>
+                {/* Submit waited for three characters and never said so. */}
+                {[...reason.trim()].length < 3 ? <span data-short="">{t("moderation.form.reasonTooShort", { min: 3 })}</span> : <span>{[...reason].length}/{MAX_REASON}</span>}
               </div>
             </div>
           ) : null}

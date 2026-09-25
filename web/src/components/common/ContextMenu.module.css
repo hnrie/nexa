@@ -13,7 +13,7 @@
 .radio { flex: none; width: 14px; height: 14px; margin-inline-start: 12px; border-radius: 50%; border: 2px solid currentColor; opacity: 0.7; }
 .radio[data-on="true"] { opacity: 1; background: radial-gradient(circle, currentColor 0 3px, transparent 3.5px); }
 .danger { color: var(--text-danger); }
-.danger:hover:not(:disabled), .danger:focus-visible { background: var(--danger); color: #fff; }
+.danger:hover:not(:disabled), .danger:focus-visible { background: var(--danger); color: var(--on-danger); }
 .sep { height: 1px; margin: 4px; background: var(--border); }
 .slider { padding: 6px 8px 8px; }
 .sliderHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); margin-bottom: 6px; }

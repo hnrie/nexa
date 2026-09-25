@@ -11,4 +11,4 @@
 .icon:not(:has(img)):not(:disabled) .initials { display: none; }
 /* someone who cannot change it sees the initials, without the upload hint */
 .remove { position: absolute; top: -2px; right: -2px; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-medium); }
-.remove:hover { background: var(--danger); color: #fff; }
+.remove:hover { background: var(--danger); color: var(--on-danger); }

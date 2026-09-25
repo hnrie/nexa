@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -62,6 +63,23 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
     <Modal open onClose={onClose} title={t("modals.createDM.selectFriends")} width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={picked.length === 0}>{group ? t("modals.createDM.addToGroup") : picked.length > 1 ? t("modals.createDM.createGroupDm") : t("modals.createDM.createDm")}</Button>}>
       <p className={s.hint}>{group ? t("modals.createDM.addAnyoneYouAreFriendsWith") : picked.length >= MAX ? t("modals.createDM.addTheRestWithAnInvite") : t("modals.createDM.pickFriendsToStartAGroup")}</p>
       <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("modals.createDM.typeTheUsernameOfAFriend")} aria-label={t("modals.createDM.typeTheUsernameOfAFriend")} autoFocus />
+      {/* Picked friends as chips: a search that filtered someone's row out
+          used to take the only sign they were chosen with it. */}
+      {picked.length > 0 ? (
+        <div className={s.chips} role="group" aria-label={t("modals.createDM.chosen")}>
+          {picked.map((id) => {
+            const u = rels[id]?.user;
+            const shownName = u?.display_name ?? id;
+            return (
+              <button key={id} type="button" className={s.chip} onClick={() => toggle(id)} aria-label={t("modals.createDM.removeName", { name: shownName })} title={t("modals.createDM.removeName", { name: shownName })}>
+                <Avatar id={id} avatarId={u?.avatar_id ?? null} name={shownName} size={16} />
+                <span className={s.chipName}>{shownName}</span>
+                <X size={12} aria-hidden="true" />
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} aria-label={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
       <div className={s.list}>
         {shown.length === 0 ? <div className={s.empty}>{friends.length === 0 ? t("modals.createDM.addSomeFriendsFirst") : t("modals.createDM.noFriendsMatch")}</div> : null}

@@ -53,12 +53,13 @@ export default function AppearancePage() {
             className={s.language}
             data-on={st.locale === l.tag}
             aria-pressed={st.locale === l.tag}
-            lang={l.tag}
-            dir={l.rtl ? "rtl" : "ltr"}
             onClick={() => patch({ locale: l.tag })}
             data-testid={`language-${l.tag}`}
           >
-            <span className={s.languageName}>{l.endonym}</span>
+            {/* Only the name is in its own language and direction. The whole
+                tile used to be, which set the Arabic one flush against the
+                other edge of the grid, its English gloss with it. */}
+            <span className={s.languageName} lang={l.tag} dir={l.rtl ? "rtl" : "ltr"}>{l.endonym}</span>
             <span className={s.languageEnglish}>{l.english}</span>
           </button>
         ))}

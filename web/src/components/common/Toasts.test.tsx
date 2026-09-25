@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { useUI } from "@/stores/ui";
 import { Toasts } from "./Toasts";
 
@@ -25,6 +25,23 @@ describe("Toasts", () => {
     act(() => useUI.getState().toast("Message could not be sent.", "error"));
     expect(screen.getByRole("status")).toBe(region);
     expect(region.textContent).toContain("Message could not be sent.");
+  });
+
+  it("stays while it is being read, and goes after", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Toasts />);
+      act(() => useUI.getState().toast("Saved.", "success"));
+      fireEvent.mouseEnter(screen.getByRole("button"));
+      act(() => vi.advanceTimersByTime(7000));
+      expect(screen.queryByText("Saved.", { exact: false })).toBeTruthy();
+      fireEvent.mouseLeave(screen.getByRole("button"));
+      act(() => vi.advanceTimersByTime(1500));
+      expect(screen.queryByText("Saved.", { exact: false })).toBeNull();
+    } finally {
+      vi.useRealTimers();
+      useUI.setState({ toastsHeld: false });
+    }
   });
 
   it("says which kind of toast it is, since the colour of a border is the only other signal", () => {

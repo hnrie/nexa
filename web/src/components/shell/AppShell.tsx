@@ -13,9 +13,11 @@ import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { PaneGrid } from "@/components/shell/PaneGrid";
 import { PaneView } from "@/components/shell/PaneView";
-import { Tabs } from "@/components/shell/Tabs";
+import { TAB_PANEL_ID, Tabs } from "@/components/shell/Tabs";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { activeTab, paneAddress, panesIn, usePanes } from "@/stores/panes";
+import { useChannels } from "@/stores/channels";
+import { GridChatCtx } from "./paneScope";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import { installAway } from "@/lib/away";
@@ -40,6 +42,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const openModal = useUI((u) => u.openModal);
   const touch = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+  // The browser knows the moment the network goes; the socket only finds out
+  // when a heartbeat goes unanswered, and for up to half a minute the app
+  // looked perfectly healthy while nothing could arrive.
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
   /** Which settings page the query has already opened, so one run does it once. */
   const openedSettings = useRef<string | null>(null);
   const serverId = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
@@ -47,6 +63,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const tab = usePanes(activeTab);
   const panes = panesIn(tab.root);
   const setPaneChannel = usePanes((p) => p.setPaneChannel);
+  // the strip is only drawn once there is more than one tab or pane (see Tabs)
+  const tabCount = usePanes((p) => p.tabs.length);
+  const tabbed = tabCount > 1 || panes.length > 1;
+  // In a split, a conversation in the focused pane is drawn by the grid like
+  // every other pane (see GridChatCtx), so focus can move without a remount.
+  // Only a conversation: a voice room, Friends, the Nexa page and the admin
+  // panel are still the routed page's to draw.
+  const routedChannelId = loc.pathname.match(/^\/channels\/(?:@me|\d+)\/(\d+)$/)?.[1];
+  const routedChannel = useChannels((c) => (routedChannelId ? c.byId[routedChannelId] : undefined));
+  const gridChat = !mobile && panes.length > 1 && !!routedChannel && routedChannel.type !== "voice" && routedChannel.type !== "category";
 
   // The address bar and the focused pane are kept as one thing, and only one
   // of them is ever in charge at a time.
@@ -215,7 +241,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </>
       )}
       <div className={s.main}>
-        {connection !== "open" && connection !== "idle" ? (
+        {offline ? (
+          <div className={s.connection} data-state="closed" role="status" data-testid="offline-banner">{t("shell.appShell.offline")}</div>
+        ) : connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection} role="status">{connectionNote ?? (connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting"))}</div>
         ) : null}
         <UpdateBanner />
@@ -223,7 +251,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <DownloadBanner />
         <Tabs />
         {/* the page takes what the banner leaves */}
-        <div className={s.page}>
+        <div className={s.page} {...(tabbed ? { role: "tabpanel", id: TAB_PANEL_ID, "aria-labelledby": `tab-${tab.id}` } : {})}>
           {/* The grid is here even for a single pane, so that pane is measured
               and the menu knows whether there is room to split it. `split` is
               what turns on the chrome — the close button and the focus ring —
@@ -236,9 +264,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               tile={tab.root}
               focus={tab.focus}
               split={panes.length > 1}
-              renderPane={(paneId) => (paneId === tab.focus ? children : <PaneView key={paneId} paneId={paneId} />)}
+              renderPane={(paneId) => (paneId === tab.focus && !gridChat ? children : <PaneView key={paneId} paneId={paneId} />)}
             />
           )}
+          {/* the routed page still runs, for what it does besides drawing */}
+          {!mobile && gridChat ? (
+            <div hidden>
+              <GridChatCtx.Provider value={true}>{children}</GridChatCtx.Provider>
+            </div>
+          ) : null}
         </div>
       </div>
       <ModalHost />

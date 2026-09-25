@@ -51,7 +51,7 @@ export default function LockPage() {
         {/* the account's name rides along, hidden, so a password manager knows which password this is */}
         <input type="text" autoComplete="username" value={me?.username ?? ""} readOnly hidden />
         <Field label={t("chat.lockedChannel.password")} required error={wrong}>
-          <TextInput ref={input} type="password" value={password} onChange={(e) => { setPassword(e.target.value); setWrong(null); }} autoComplete="current-password" autoFocus required />
+          <TextInput ref={input} type="password" reveal value={password} onChange={(e) => { setPassword(e.target.value); setWrong(null); }} autoComplete="current-password" autoFocus required />
         </Field>
         <Button type="submit" size="lg" block loading={busy}>{t("lock.unlock")}</Button>
         <Button type="button" variant="link" className={s.textButton} onClick={() => void logout()}>{t("lock.logOutInstead")}</Button>

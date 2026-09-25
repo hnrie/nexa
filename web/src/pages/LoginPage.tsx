@@ -47,6 +47,9 @@ export default function LoginPage() {
     if (err instanceof ApiError) {
       if (err.code === "invalid_credentials") return t("login.usernameOrPasswordIsWrong");
       if (err.code === "rate_limited") return t("login.tooManyAttempts");
+      // Said only once the password is known to be right (the server's rule),
+      // so a disabled account stops being told its password is wrong.
+      if (err.code === "account_disabled") return t("login.accountDisabled");
       return describeError(err, fallback);
     }
     // fetch rejects with a TypeError when the request never got an answer
@@ -169,11 +172,14 @@ export default function LoginPage() {
             of the password box's name ("Password, Forgot your password?"). */}
         <div className={s.group}>
           <Field label={t("chat.lockedChannel.password")} required error={wrong}>
-            <TextInput ref={passwordInput} type="password" value={password} onChange={(e) => { setPassword(e.target.value); setWrong(null); }} autoComplete="current-password" required />
+            <TextInput ref={passwordInput} type="password" reveal value={password} onChange={(e) => { setPassword(e.target.value); setWrong(null); }} autoComplete="current-password" required />
           </Field>
           <Link to="/recover" className={s.forgot}>{t("login.forgotYourPassword")}</Link>
         </div>
         <Button type="submit" size="lg" block loading={busy}>{t("login.logIn")}</Button>
+        {/* Sessions are long, and nothing said so: someone on a shared
+            computer had no reason to think they should log out. */}
+        <p className={s.note}>{t("login.staySignedIn")}</p>
         <div className={s.foot}>
           {t("login.needAnAccount")} <Link to="/register">{t("login.register")}</Link>
         </div>

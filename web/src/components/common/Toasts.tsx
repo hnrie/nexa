@@ -7,6 +7,7 @@ import { t } from "@/i18n";
 export function Toasts() {
   const toasts = useUI((st) => st.toasts);
   const dismiss = useUI((st) => st.dismissToast);
+  const hold = useUI((st) => st.holdToasts);
   const root = usePortalRoot();
   // The stack is always here, empty or not. A screen reader only announces
   // changes to a live region that was already in the accessibility tree, and
@@ -17,7 +18,7 @@ export function Toasts() {
   return createPortal(
     <div className={s.stack} role="status" aria-live="polite" aria-relevant="additions text">
       {toasts.map((x) => (
-        <button key={x.id} className={[s.toast, s[x.kind]].join(" ")} onClick={() => dismiss(x.id)}>
+        <button key={x.id} className={[s.toast, s[x.kind]].join(" ")} onClick={() => dismiss(x.id)} onMouseEnter={() => hold(true)} onMouseLeave={() => hold(false)} onFocus={() => hold(true)} onBlur={() => hold(false)}>
           {/* Severity was carried by a 4px border colour and nothing else. */}
           <span className="visually-hidden">{x.kind === "error" ? t("toasts.error") : x.kind === "success" ? t("toasts.done") : t("toasts.note")}{": "}</span>
           {/* An error is worth interrupting for; the rest wait for a pause.

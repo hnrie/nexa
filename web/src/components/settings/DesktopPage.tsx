@@ -88,7 +88,7 @@ export default function DesktopPage() {
     <>
       <h2 className={st.title}>{tr_("settings.desktop.desktopApp")}</h2>
       <div className={st.form}>
-        <h5 className={st.h5}>{tr_("settings.desktop.richPresence")}</h5>
+        <h3 className={st.h5}>{tr_("settings.desktop.richPresence")}</h3>
         <Toggle
           checked={!!rpc?.enabled}
           onChange={(on) => void bridge.rpc.setEnabled(on)}
@@ -115,7 +115,7 @@ export default function DesktopPage() {
           </div>
         </div>
 
-        <h5 className={st.h5}>{tr_("settings.desktop.programs")}</h5>
+        <h3 className={st.h5}>{tr_("settings.desktop.programs")}</h3>
         {!rpc || rpc.apps.length === 0 ? (
           <p className={st.hint}>{tr_("settings.desktop.nothingIsUsingRichPresenceRight")}</p>
         ) : (
@@ -126,7 +126,7 @@ export default function DesktopPage() {
           </div>
         )}
 
-        <h5 className={st.h5}>{tr_("settings.desktop.startupAndWindow")}</h5>
+        <h3 className={st.h5}>{tr_("settings.desktop.startupAndWindow")}</h3>
         {app ? (
           <>
             <Toggle checked={app.launchAtLogin} onChange={(v) => setApp_({ launchAtLogin: v })} label={tr_("settings.desktop.openNexaWhenISignIn")} description={tr_("settings.desktop.startingBeforeDiscordLetsProgramsReach")} />
@@ -136,7 +136,7 @@ export default function DesktopPage() {
           </>
         ) : null}
 
-        <h5 className={st.h5}>{tr_("settings.desktop.updates")}</h5>
+        <h3 className={st.h5}>{tr_("settings.desktop.updates")}</h3>
         <UpdateRow version={bridge.version} update={update} />
       </div>
     </>

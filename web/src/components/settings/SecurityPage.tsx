@@ -13,10 +13,11 @@ import { b64 } from "@/crypto/bytes";
 import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
 import { acceptServerKdf } from "@/lib/serverKdf";
 import { users as usersApi } from "@/api/users";
-import { ReadableError } from "@/lib/readableError";
 import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
 import { EncryptionSection } from "./EncryptionSection";
 import { describeError } from "@/lib/errors";
+import { copyText } from "@/lib/copyText";
+import { downloadText } from "@/pages/AuthLayout";
 import { formatDateDivider } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
@@ -105,12 +106,14 @@ export default function SecurityPage() {
   };
 
   const beginSetup = () =>
+    password && !busy &&
     run(async () => {
       setSetup(await authApi.totpSetup(await authKeyFor(password)));
       setPassword("");
     });
 
   const finishSetup = () =>
+    code.replace(/\s/g, "").length === 6 && !busy &&
     run(async () => {
       if (!setup) return;
       const res = await authApi.totpEnable(setup.ticket, code.replace(/\s/g, ""));
@@ -122,6 +125,7 @@ export default function SecurityPage() {
     });
 
   const disable = () =>
+    password && !busy &&
     run(async () => {
       await authApi.mfaDisable(await authKeyFor(password));
       await refresh();
@@ -130,6 +134,7 @@ export default function SecurityPage() {
     });
 
   const regenerate = () =>
+    password && !busy &&
     run(async () => {
       const res = await authApi.newBackupCodes(await authKeyFor(password));
       setCodes(res.backup_codes);
@@ -137,17 +142,23 @@ export default function SecurityPage() {
       await refresh();
     });
 
-  const savePasscode = () =>
-    run(async () => {
-      // said as written: a plain Error reads as "Something went wrong"
-      const problem = passcodeProblem(pin);
-      if (problem) throw new ReadableError(problem);
-      if (pin !== pin2) throw new ReadableError(t("settings.security.thoseTwoPasscodesAreDifferent"));
+  const savePasscode = () => {
+    if (!pin || !pin2 || busy) return;
+    // Said here rather than thrown: a thrown sentence reached the dialog as
+    // "Something went wrong", since describeError only passes on the ones it
+    // knows are written for a reader.
+    const problem = passcodeProblem(pin) ?? (pin !== pin2 ? t("settings.security.thoseTwoPasscodesAreDifferent") : null);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    void run(async () => {
       await setPasscode(pin, lock ?? DEFAULT_LOCK);
       setLock(loadLock(me.id));
       close();
       toast(t("settings.security.thisDeviceNowAsksForYour"), "success");
     });
+  };
 
   const dropPasscode = () =>
     run(async () => {
@@ -167,24 +178,17 @@ export default function SecurityPage() {
 
   const copyCodes = async () => {
     if (!codes) return;
-    try {
-      await navigator.clipboard.writeText(codes.join("\n"));
+    if (await copyText(codes.join("\n"))) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
+    } else {
       toast(t("settings.security.couldNotReachTheClipboardSelect"), "error");
     }
   };
 
   const downloadCodes = () => {
     if (!codes) return;
-    const body = `${t("settings.security.backupCodesFileHeading", { username: me.username })}\n${t("settings.security.eachCodeWorksOnce")}\n\n${codes.join("\n")}\n`;
-    const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `evilion-chat-backup-codes-${me.username}.txt`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadText(`nexa-backup-codes-${me.username}.txt`, `${t("settings.security.backupCodesFileHeading", { username: me.username })}\n${t("settings.security.eachCodeWorksOnce")}\n\n${codes.join("\n")}\n`);
   };
 
   const on = status?.enabled ?? false;
@@ -285,7 +289,7 @@ export default function SecurityPage() {
       <EncryptionSection />
 
       {dialog === "enable" ? (
-        <Modal title={codes ? t("settings.security.saveYourBackupCodes") : setup ? t("settings.security.scanThisWithYourAuthenticator") : t("settings.security.setUpTwoFactorAuthentication")} open onClose={close} closeOnOverlay={!codes} width={460}>
+        <Modal title={codes ? t("settings.security.saveYourBackupCodes") : setup ? t("settings.security.scanThisWithYourAuthenticator") : t("settings.security.setUpTwoFactorAuthentication")} open onClose={codes ? () => undefined : close} closeOnOverlay={!codes} closeButton={!codes} onSubmit={codes ? undefined : setup ? () => void finishSetup() : () => void beginSetup()} width={460}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             {codes ? (
@@ -294,7 +298,7 @@ export default function SecurityPage() {
               <>
                 <p className={s.hint}>{t("settings.security.confirmYourPasswordToStart")}</p>
                 <Field label={t("chat.lockedChannel.password")} required>
-                  <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
+                  <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
                 <Button block loading={busy} disabled={!password} onClick={() => void beginSetup()}>{t("settings.security.continue")}</Button>
               </>
@@ -310,7 +314,7 @@ export default function SecurityPage() {
                 <Field label={t("settings.security.enterTheSixDigitCodeIt")} required>
                   <TextInput
                     value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/[^\d\s]/g, "").slice(0, 7))}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     placeholder="123456"
@@ -326,14 +330,14 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "codes" ? (
-        <Modal title={t("settings.security.backupCodes")} open onClose={close} closeOnOverlay={!codes} width={460}>
+        <Modal title={codes ? t("settings.security.saveYourBackupCodes") : t("settings.security.backupCodes")} open onClose={codes ? () => undefined : close} closeOnOverlay={!codes} closeButton={!codes} onSubmit={codes ? undefined : () => void regenerate()} width={460}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             {!codes ? (
               <>
                 <p className={s.hint}>{t("settings.security.backupCodesHint")} {t("settings.security.backupCodesLeft", { count: left })}</p>
                 <Field label={t("chat.lockedChannel.password")} required>
-                  <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
+                  <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
                 </Field>
                 <Button block loading={busy} disabled={!password} onClick={() => void regenerate()}>{t("settings.security.generateNewCodes")}</Button>
               </>
@@ -345,12 +349,12 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "disable" ? (
-        <Modal title={t("settings.security.turnOffTwoFactorAuthentication")} open onClose={close} width={440}>
+        <Modal title={t("settings.security.turnOffTwoFactorAuthentication")} open onClose={close} onSubmit={() => void disable()} width={440}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             <p className={s.hint}>{t("settings.security.yourPasswordAloneWillGetInto")}</p>
             <Field label={t("chat.lockedChannel.password")} required>
-              <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
+              <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
             </Field>
             <Button block variant="danger" loading={busy} disabled={!password} onClick={() => void disable()}>{t("settings.security.turnItOff")}</Button>
           </div>
@@ -358,17 +362,17 @@ export default function SecurityPage() {
       ) : null}
 
       {dialog === "passcode" ? (
-        <Modal title={lock ? t("settings.security.changeYourPasscode") : t("settings.security.setAPasscode")} open onClose={close} width={440}>
+        <Modal title={lock ? t("settings.security.changeYourPasscode") : t("settings.security.setAPasscode")} open onClose={close} onSubmit={savePasscode} width={440}>
           <div className={s.form}>
             {error ? <div className={s.dangerBox}>{error}</div> : null}
             <p className={s.hint}>{t("settings.security.digitsOrAPhraseAtLeast")}</p>
             <Field label={t("settings.security.passcode")} required>
-              <TextInput type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="new-password" autoFocus data-testid="passcode-new" />
+              <TextInput type="password" reveal value={pin} onChange={(e) => { setPin(e.target.value); setError(null); }} autoComplete="new-password" autoFocus data-testid="passcode-new" />
             </Field>
             <Field label={t("settings.security.passcodeAgain")} required>
-              <TextInput type="password" value={pin2} onChange={(e) => setPin2(e.target.value)} autoComplete="new-password" data-testid="passcode-confirm" />
+              <TextInput type="password" reveal value={pin2} onChange={(e) => { setPin2(e.target.value); setError(null); }} autoComplete="new-password" data-testid="passcode-confirm" />
             </Field>
-            <Button block loading={busy} disabled={!pin || !pin2} onClick={() => void savePasscode()} data-testid="passcode-save">{lock ? t("settings.security.changeIt") : t("settings.security.turnItOn")}</Button>
+            <Button block loading={busy} disabled={!pin || !pin2} onClick={savePasscode} data-testid="passcode-save">{lock ? t("settings.security.changeIt") : t("settings.security.turnItOn")}</Button>
           </div>
         </Modal>
       ) : null}
@@ -387,6 +391,9 @@ export default function SecurityPage() {
 }
 
 function BackupCodes({ codes, copied, onCopy, onDownload, onDone }: { codes: string[]; copied: boolean; onCopy: () => void; onDownload: () => void; onDone: () => void }) {
+  // Two-factor is already on by the time these show, so putting them away
+  // unsaved leaves an account whose way back in was never seen.
+  const [saved, setSaved] = useState(false);
   return (
     <>
       <div className={s.dangerBox} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -396,11 +403,15 @@ function BackupCodes({ codes, copied, onCopy, onDownload, onDone }: { codes: str
       <div className={s.recovery} data-testid="backup-codes">
         {codes.map((c) => <div key={c}>{c}</div>)}
       </div>
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className={s.codeActions}>
         <Button variant="secondary" onClick={onCopy}>{copied ? <Check size={15} /> : <Copy size={15} />} {copied ? t("modals.groupInvite.copied") : t("modals.groupInvite.copy")}</Button>
         <Button variant="secondary" onClick={onDownload}><Download size={15} /> {t("chat.attachments.download")}</Button>
-        <Button onClick={onDone} style={{ marginInlineStart: "auto" }}>{t("modals.serverNotifications.done")}</Button>
       </div>
+      <label className={s.check}>
+        <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} data-testid="backup-codes-saved" />
+        <span>{t("settings.security.iHaveSavedTheseCodes")}</span>
+      </label>
+      <Button block disabled={!saved} onClick={onDone} data-testid="backup-codes-done">{t("modals.serverNotifications.done")}</Button>
     </>
   );
 }

@@ -7,6 +7,7 @@ import { isOwner } from "@/lib/owner";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
 import { TextInput } from "@/components/common/TextInput";
+import { NoMatches } from "../NoMatches";
 import { memberName } from "@/lib/names";
 import { P } from "@/lib/perms";
 import { formatDateDivider } from "@/lib/time";
@@ -107,6 +108,7 @@ export default function MembersPage({ serverId }: { serverId: string }) {
       </div>
       {failed ? <LoadError message={t("server.members.notEveryMemberCouldBeLoaded")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
       {!complete && !failed ? <p className={st.hint} role="status">{capped ? t("server.members.showingFirstMembers") : t("server.members.stillLoadingTheRestOfThe")}</p> : null}
+      {rows.length === 0 && q.trim() && (complete || failed) ? <NoMatches people query={q} onClear={() => setQ("")} /> : null}
       {rows.slice(0, shown).map(({ m, name, username }) => {
         const above = m.user_id !== meId && outranks(serverId, m.user_id);
         const timedOut = !!m.timeout_until && m.timeout_until > Date.now();

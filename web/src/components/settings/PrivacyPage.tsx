@@ -14,7 +14,7 @@ import s from "./Settings.module.css";
 import { t } from "@/i18n";
 function dmChoices(): { value: MeUser["dm_privacy"]; label: string; desc: string }[] {
   return [
-  { value: "everyone", label: t("settings.privacy.everyone"), desc: t("settings.privacy.anyoneOnThisServerCanMessage") },
+  { value: "everyone", label: t("settings.privacy.everyone"), desc: t("settings.privacy.anyoneWithAnAccountCanMessage") },
   { value: "friends", label: t("settings.privacy.friendsOnly"), desc: t("settings.privacy.onlyYourFriendsCanStartA") },
   { value: "nobody", label: t("settings.privacy.nobody"), desc: t("settings.privacy.nobodyCanStartANewDirect") },
 ];

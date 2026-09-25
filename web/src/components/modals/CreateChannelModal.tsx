@@ -15,8 +15,19 @@ import { useUI } from "@/stores/ui";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
-function slug(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, "-");
+/**
+ * A text channel's name as it is typed: lower case, with a dash for a space,
+ * the way the server will store it. The field used to show "Plans For The
+ * Weekend" and the sidebar then "#plans-for-the-weekend", so people did not
+ * recognise the channel they had just made.
+ */
+export function typedChannelName(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, "-").replace(/-{2,}/g, "-");
+}
+
+/** The finished name: as typed, without dashes left hanging at either end. */
+export function slug(name: string): string {
+  return typedChannelName(name.trim()).replace(/^-+|-+$/g, "");
 }
 
 export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: () => void; serverId: string; parentId?: string | undefined }) {
@@ -24,7 +35,12 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
   const parent = useChannels((c) => (parentId ? c.byId[parentId] : undefined));
   const upsert = useChannels((c) => c.upsert);
   const toast = useUI((u) => u.toast);
-  const [type, setType] = useState<"text" | "voice">("text");
+  const [type, setTypeState] = useState<"text" | "voice">("text");
+  // a name typed as a voice channel's becomes a text channel's when the type changes
+  const setType = (next: "text" | "voice") => {
+    setTypeState(next);
+    if (next === "text") setName((n) => typedChannelName(n));
+  };
   const [name, setName] = useState("");
   const [priv, setPriv] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -94,7 +110,7 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
         <Field label={t("modals.createChannel.channelName")} required>
           <div className={s.hashInput}>
             {type === "text" ? <Hash size={16} /> : <Volume2 size={16} />}
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createChannel.namePlaceholder")} maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
+            <TextInput value={name} onChange={(e) => setName(type === "text" ? typedChannelName(e.target.value) : e.target.value)} placeholder={t("modals.createChannel.namePlaceholder")} maxLength={100} autoFocus autoCapitalize={type === "text" ? "none" : undefined} onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
           </div>
         </Field>
         <Toggle checked={priv} onChange={setPriv} label={t("modals.createChannel.privateChannel")} description={t("modals.createChannel.onlySelectedMembersAndRolesWill")} />

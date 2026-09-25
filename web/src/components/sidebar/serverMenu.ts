@@ -2,11 +2,13 @@ import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
-import { selectServerChannels, useChannels } from "@/stores/channels";
+import { channelTree, selectServerChannels, useChannels } from "@/stores/channels";
+import type { Channel } from "@/api/types";
 import { useReadStates, isUnread } from "@/stores/readStates";
 import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 import { openMenuItems } from "./openMenu";
 
 import { t } from "@/i18n";
@@ -47,7 +49,7 @@ export async function leaveServer(serverId: string, nav: (p: string) => void): P
 }
 
 function copy(text: string): void {
-  void navigator.clipboard?.writeText(text).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success"));
+  copyAndSay(text);
 }
 
 export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem[] {
@@ -90,6 +92,52 @@ export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem
   return items;
 }
 
+/** The list a channel is ordered within: its category's channels, the loose ones, or the categories themselves. */
+function siblingsOf(ch: Channel, byId: Record<string, Channel>): Channel[] {
+  const tree = channelTree(byId, ch.server_id ?? "");
+  if (ch.type === "category") return tree.categories.map((c) => c.category);
+  const inCategory = ch.parent_id ? tree.categories.find((c) => c.category.id === ch.parent_id) : undefined;
+  return inCategory ? inCategory.children : tree.loose;
+}
+
+/**
+ * Moves a channel (or a category) one place up or down among its siblings,
+ * as dropping it there would. Dragging was the only way before, and a touch
+ * screen and a keyboard cannot drag.
+ */
+async function moveChannel(channelId: string, delta: -1 | 1): Promise<void> {
+  const byId = useChannels.getState().byId;
+  const ch = byId[channelId];
+  if (!ch?.server_id) return;
+  const serverId = ch.server_id;
+  const list = [...siblingsOf(ch, byId)];
+  const at = list.findIndex((c) => c.id === channelId);
+  const to = at + delta;
+  if (at < 0 || to < 0 || to >= list.length) return;
+  list.splice(at, 1);
+  list.splice(to, 0, ch);
+  const positions = list.map((c, i) => ({ id: c.id, position: i }));
+  useChannels.getState().applyPositions(positions.map((p) => ({ ...p, parent_id: byId[p.id]?.parent_id ?? null })));
+  try {
+    useChannels.getState().upsert(await serversApi.setChannelPositions(serverId, positions));
+  } catch (err) {
+    useUI.getState().toast(err instanceof ApiError ? err.message : t("sidebar.serverSidebar.couldNotReorderChannels"), "error");
+    // put back what the server has
+    await serversApi.channels(serverId).then((all) => useChannels.getState().upsert(all), () => undefined);
+  }
+}
+
+/** Move up and Move down, where there is somewhere to move to. */
+function moveItems(ch: Channel): ContextMenuItem[] {
+  const list = siblingsOf(ch, useChannels.getState().byId);
+  const at = list.findIndex((c) => c.id === ch.id);
+  const items: ContextMenuItem[] = [];
+  if (at > 0) items.push({ id: "move-up", label: t("reorder.moveUp"), onSelect: () => void moveChannel(ch.id, -1) });
+  if (at >= 0 && at < list.length - 1) items.push({ id: "move-down", label: t("reorder.moveDown"), onSelect: () => void moveChannel(ch.id, 1) });
+  if (items.length) items[items.length - 1]!.separatorAfter = true;
+  return items;
+}
+
 export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuItem[] {
   const ch = useChannels.getState().byId[channelId];
   if (!ch || !ch.server_id) return [];
@@ -114,6 +162,7 @@ export function channelMenuItems(channelId: string, ctx: MenuCtx): ContextMenuIt
   items.push({ id: "link", label: t("sidebar.serverMenu.copyLink"), onSelect: () => copy(`${window.location.origin}/channels/${ch.server_id}/${ch.id}`), separatorAfter: true });
   if (ch.type === "text") items.push({ id: "mute", label: muted ? t("sidebar.serverMenu.unmuteChannel") : t("sidebar.serverMenu.muteChannel"), onSelect: () => toggleMuted(channelId), separatorAfter: true });
   if (canI(st, P.MANAGE_CHANNELS, channelId)) {
+    if (canI(st, P.MANAGE_CHANNELS)) items.push(...moveItems(ch));
     items.push({ id: "edit", label: t("sidebar.serverSidebar.editChannel"), onSelect: () => ctx.openModal("channelSettings", { channelId }) });
     items.push({
       id: "delete",
@@ -143,6 +192,7 @@ export function categoryMenuItems(categoryId: string, ctx: MenuCtx & { collapsed
   const settings = useSettings.getState().settings;
   const items: ContextMenuItem[] = [{ id: "collapse", label: ctx.collapsed ? t("sidebar.serverMenu.expandCategory") : t("sidebar.serverMenu.collapseCategory"), onSelect: ctx.toggle, separatorAfter: true }];
   if (canI(st, P.MANAGE_CHANNELS)) {
+    items.push(...moveItems(ch));
     items.push({ id: "create", label: t("modals.createChannel.createChannel"), onSelect: () => ctx.openModal("createChannel", { serverId: ch.server_id, parentId: categoryId }) });
     items.push({ id: "edit", label: t("sidebar.serverMenu.editCategory"), onSelect: () => ctx.openModal("channelSettings", { channelId: categoryId }) });
     items.push({

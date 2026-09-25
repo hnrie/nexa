@@ -6,7 +6,7 @@ import { Button } from "@/components/common/Button";
 import { FullScreenSpinner } from "@/components/common/Spinner";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
-import { AuthLayout, CopyKeyButton, RecoveryKey, usePageTitle } from "./AuthLayout";
+import { AuthLayout, RecoveryKeyPanel, usePageTitle } from "./AuthLayout";
 import OfflinePage from "./OfflinePage";
 import s from "./Auth.module.css";
 
@@ -28,7 +28,6 @@ export default function RecoverPage() {
   // a key or name that did not match is said on the key's field, and goes when either is edited
   const [wrongKey, setWrongKey] = useState<string | null>(null);
   const [fresh, setFresh] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
   const keyInput = useRef<HTMLInputElement>(null);
   const confirmInput = useRef<HTMLInputElement>(null);
   usePageTitle(fresh ? t("recover.passwordReset") : t("recover.recoverYourAccount"), status !== "offline" || !!fresh);
@@ -54,7 +53,8 @@ export default function RecoverPage() {
     } catch (err) {
       justRecovered.current = false;
       if (err instanceof ApiError) {
-        if (err.code === "invalid_credentials") {
+        if (err.code === "account_disabled") setError(t("login.accountDisabled"));
+        else if (err.code === "invalid_credentials") {
           setWrongKey(t("recover.usernameOrRecoveryKeyIsWrong"));
           keyInput.current?.focus();
         } else setError(describeError(err, t("recover.recoveryFailedCheckTheKeyAnd")));
@@ -79,13 +79,11 @@ export default function RecoverPage() {
   if (fresh) {
     return (
       <AuthLayout title={t("recover.passwordReset")} subtitle={t("recover.hereIsYourNewRecoveryKey")}>
-        <RecoveryKey value={fresh} />
-        <CopyKeyButton text={fresh} />
-        <label className={s.check}>
-          <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-          <span>{t("recover.iHaveSavedMyNewRecovery")}</span>
-        </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav("/channels/@me", { replace: true })}>{t("settings.security.continue")}</Button>
+        {/* The reset turned the authenticator off (the key it just used already
+            unwraps everything), which nothing used to mention: the account was
+            left on a password alone without the person knowing. */}
+        <p className={s.note}>{t("recover.twoFactorIsOffNow")}</p>
+        <RecoveryKeyPanel value={fresh} username={username.trim().toLowerCase()} confirm={t("recover.iHaveSavedMyNewRecovery")} doneLabel={t("settings.security.continue")} onDone={() => nav("/channels/@me", { replace: true })} />
       </AuthLayout>
     );
   }
@@ -101,11 +99,12 @@ export default function RecoverPage() {
           <TextInput ref={keyInput} value={key} onChange={(e) => { setKey(e.target.value); setWrongKey(null); }} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} required />
         </Field>
         <Field label={t("settings.account.newPassword")} required>
-          <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
+          <TextInput type="password" reveal value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>
         <Field label={t("settings.account.confirmNewPassword")} required error={confirm && confirm !== password ? t("settings.account.passwordsDoNotMatch") : null}>
-          <TextInput ref={confirmInput} type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
+          <TextInput ref={confirmInput} type="password" reveal value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
+        <p className={s.note}>{t("recover.whatAResetDoes")}</p>
         <Button type="submit" size="lg" block loading={busy}>{t("recover.resetPassword")}</Button>
         <div className={s.foot}>
           <Link to="/login">{t("recover.backToLogIn")}</Link>

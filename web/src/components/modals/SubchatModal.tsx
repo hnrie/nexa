@@ -13,14 +13,12 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { newLock, passwordProblem } from "@/lib/subchatLock";
 import { useChannels } from "@/stores/channels";
-import { useUI } from "@/stores/ui";
 
 import { t } from "@/i18n";
 const MAX_NAME = 48;
 
 export default function SubchatModal({ onClose, channel, parentId }: { onClose: () => void; channel?: Channel; parentId?: string }) {
   const editing = !!channel;
-  const toast = useUI((u) => u.toast);
   const upsert = useChannels((c) => c.upsert);
   const [name, setName] = useState(channel?.name ?? "");
   // editing: a subchat that already has one keeps it unless this is switched
@@ -34,6 +32,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
   const removingPassword = editing && !!channel?.locked && !wantsPassword;
 
   const save = async () => {
+    if (busy) return;
     const trimmed = name.trim();
     if (!trimmed) return setError(t("modals.subchat.giveTheSubchatAName"));
     if (changingPassword) {
@@ -66,6 +65,8 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
       open
       onClose={onClose}
       width={440}
+      // Enter in any of its boxes, the name or a password, saves
+      onSubmit={() => void save()}
       // Cancel and the action at the foot, as in every other dialog that makes something
       footer={
         <>
@@ -78,7 +79,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Field label={t("modals.subchat.name")} required>
-          <TextInput value={name} maxLength={MAX_NAME} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} data-testid="subchat-modal-name" />
+          <TextInput value={name} maxLength={MAX_NAME} autoFocus onChange={(e) => setName(e.target.value)} data-testid="subchat-modal-name" />
         </Field>
         <Toggle
           checked={wantsPassword}
@@ -109,7 +110,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
             ) : null}
           </>
         ) : null}
-        {error ? <div role="alert" style={{ color: "var(--danger)", fontSize: 14 }}>{error}</div> : null}
+        {error ? <div role="alert" style={{ color: "var(--text-danger)", fontSize: 14 }}>{error}</div> : null}
       </div>
     </Modal>
   );

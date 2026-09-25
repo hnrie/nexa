@@ -23,3 +23,19 @@ export const PaneCtx = createContext<PaneScope>({ id: null, focused: true });
 export function usePaneScope(): PaneScope {
   return useContext(PaneCtx);
 }
+
+/**
+ * True while the pane grid draws the focused conversation itself, and the
+ * routed page is kept only for what belongs to the page — the active channel,
+ * a jump to a message, leaving a channel that has gone — and draws nothing.
+ *
+ * The focused pane used to be the routed page and every other pane a
+ * PaneView: two different components in the same place, so moving focus from
+ * one pane to another unmounted and remounted both chats, throwing away their
+ * scroll positions, an open reply and whatever was playing.
+ */
+export const GridChatCtx = createContext(false);
+
+export function useGridDrawsChat(): boolean {
+  return useContext(GridChatCtx);
+}

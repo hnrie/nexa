@@ -2,10 +2,11 @@ import { useState } from "react";
 import { ApiError } from "@/api/client";
 import { bannerUrl, users as usersApi } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
+import { profileTheme } from "@/lib/avatarColor";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Field, TextInput } from "@/components/common/TextInput";
-import { usernameProblem } from "@/pages/AuthLayout";
+import { RecoveryKeyPanel, usernameProblem } from "@/pages/AuthLayout";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
@@ -65,12 +66,32 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
       close();
     });
   const banner = bannerUrl(me.banner_id, 600);
+  const submitName = () => {
+    if (!busy) void saveName(dialog === "username" ? "username" : "display_name");
+  };
+  const passwordReady = value.length > 0 && pw.length >= 8 && pw === pw2;
+  const submitPassword = () => {
+    if (!passwordReady || busy) return;
+    void run(async () => {
+      await changePassword(value, pw);
+      toast(t("settings.account.passwordChangedOtherDevicesWereLogged"), "success");
+      close();
+    });
+  };
+  const generate = () => {
+    if (!value || busy) return;
+    void run(async () => setRecovery(await newRecoveryKey(value)));
+  };
 
   return (
     <>
       <h2 className={s.title}>{t("settings.account.myAccount")}</h2>
       <div className={s.card}>
-        <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : me.accent_color !== null ? { background: `#${me.accent_color.toString(16).padStart(6, "0")}` } : undefined} />
+        {/* The banner everyone else sees on the profile card: its colours, or
+            without them the avatar's own colour. Here it used to fall back to
+            the app's accent at full strength, a third of the page of raw purple
+            that no other screen showed for this account. */}
+        <div className={s.cardBanner} style={banner ? { backgroundImage: `url(${banner})` } : { background: profileTheme(me.accent_color, me.accent_color_2, me.id) }} />
         <div className={s.cardHead}>
           <div className={s.cardAvatar}><Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={80} status={myStatus} /></div>
           <div className={s.cardText}>
@@ -108,37 +129,46 @@ export default function AccountPage({ onEditProfile }: { onEditProfile: () => vo
       </div>
 
       {dialog === "displayName" || dialog === "username" ? (
-        <Modal open onClose={close} title={dialog === "username" ? t("settings.account.changeYourUsername") : t("settings.account.changeYourDisplayName")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} onClick={() => void saveName(dialog === "username" ? "username" : "display_name")}>{t("modals.serverNotifications.done")}</Button></>}>
+        <Modal open onClose={close} title={dialog === "username" ? t("settings.account.changeYourUsername") : t("settings.account.changeYourDisplayName")} onSubmit={submitName} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} onClick={submitName}>{t("modals.serverNotifications.done")}</Button></>}>
           <Field label={dialog === "username" ? t("settings.account.username") : t("settings.account.displayName")} error={error}>
-            <TextInput value={value} onChange={(e) => setValue(e.target.value)} autoFocus maxLength={32} autoCapitalize={dialog === "username" ? "none" : undefined} />
+            <TextInput value={value} onChange={(e) => setValue(e.target.value)} autoFocus maxLength={32} autoCapitalize={dialog === "username" ? "none" : undefined} enterKeyHint="done" />
           </Field>
         </Modal>
       ) : null}
 
       {dialog === "password" ? (
-        <Modal open onClose={close} title={t("settings.account.updateYourPassword")} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={value.length < 1 || pw.length < 8 || pw !== pw2} onClick={() => void run(async () => { await changePassword(value, pw); toast(t("settings.account.passwordChangedOtherDevicesWereLogged"), "success"); close(); })}>{t("modals.serverNotifications.done")}</Button></>}>
+        <Modal open onClose={close} title={t("settings.account.updateYourPassword")} onSubmit={submitPassword} footer={<><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={!passwordReady} onClick={submitPassword}>{t("modals.serverNotifications.done")}</Button></>}>
           <div className={s.form}>
-            {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
-            <Field label={t("settings.account.currentPassword")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
-            <Field label={t("settings.account.newPassword")} required hint={t("settings.account.atLeast8Characters")}><TextInput type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
-            <Field label={t("settings.account.confirmNewPassword")} required error={pw2 && pw2 !== pw ? t("settings.account.passwordsDoNotMatch") : null}><TextInput type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" /></Field>
+            {error ? <p className={s.hint} style={{ color: "var(--text-danger)" }} role="alert">{error}</p> : null}
+            <Field label={t("settings.account.currentPassword")} required><TextInput type="password" reveal value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+            <Field label={t("settings.account.newPassword")} required hint={t("settings.account.atLeast8Characters")}><TextInput type="password" reveal value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" /></Field>
+            <Field label={t("settings.account.confirmNewPassword")} required error={pw2 && pw2 !== pw ? t("settings.account.passwordsDoNotMatch") : null}><TextInput type="password" reveal value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" enterKeyHint="done" /></Field>
           </div>
         </Modal>
       ) : null}
 
       {dialog === "recovery" ? (
-        <Modal open onClose={close} closeOnOverlay={!recovery} title={t("settings.account.recoveryKey")} footer={recovery ? <Button onClick={close}>{t("modals.serverNotifications.done")}</Button> : <><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={!value} onClick={() => void run(async () => setRecovery(await newRecoveryKey(value)))}>{t("settings.account.generate")}</Button></>}>
+        // Once the key is on screen the old one has stopped working, so only the
+        // panel's own Done puts it away: Escape, a tap outside and the close
+        // button each used to lose the only copy there would ever be.
+        <Modal
+          open
+          onClose={recovery ? () => undefined : close}
+          closeOnOverlay={!recovery}
+          closeButton={!recovery}
+          title={recovery ? t("register.saveYourRecoveryKey") : t("settings.account.recoveryKey")}
+          onSubmit={recovery ? undefined : generate}
+          footer={recovery ? undefined : <><Button variant="ghost" onClick={close}>{t("chat.editMessage.cancel")}</Button><Button loading={busy} disabled={!value} onClick={generate}>{t("settings.account.generate")}</Button></>}
+        >
           {recovery ? (
             <div className={s.form}>
-              <p className={s.hint}>{t("settings.account.saveThisKeyNowItWill")}</p>
-              <div className={s.recovery}>{recovery}</div>
-              <Button variant="secondary" onClick={() => void navigator.clipboard?.writeText(recovery)}>{t("modals.groupInvite.copy")}</Button>
+              <RecoveryKeyPanel value={recovery} username={me.username} warning={t("settings.account.newKeyWarning")} confirm={t("register.iHaveSavedMyRecoveryKey")} doneLabel={t("modals.serverNotifications.done")} onDone={close} />
             </div>
           ) : (
             <div className={s.form}>
-              {error ? <p className={s.hint} style={{ color: "var(--danger)" }}>{error}</p> : null}
+              {error ? <p className={s.hint} style={{ color: "var(--text-danger)" }} role="alert">{error}</p> : null}
               <p className={s.hint}>{t("settings.account.confirmYourPasswordToGenerateA")}</p>
-              <Field label={t("chat.lockedChannel.password")} required><TextInput type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus /></Field>
+              <Field label={t("chat.lockedChannel.password")} required><TextInput type="password" reveal value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" autoFocus enterKeyHint="done" /></Field>
             </div>
           )}
         </Modal>

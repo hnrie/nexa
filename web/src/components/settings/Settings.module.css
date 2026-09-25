@@ -48,7 +48,7 @@
 /* a card straight under the sentence that introduces it had 4px between them */
 .hint + .device { margin-top: 12px; }
 /* .saveBar comes later in this file and set its own background over this one, so the bar shook but never went red */
-.saveBar.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: #fff; }
+.saveBar.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: var(--on-danger); }
 .saveBar.shake :global(button) { color: inherit; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 15%, 55% { transform: translateX(-8px); } 35%, 75% { transform: translateX(8px); } }
 @media (prefers-reduced-motion: reduce) { .saveBar.shake { animation: none; } }
@@ -77,6 +77,8 @@
 .radio { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; margin-bottom: 8px; }
 .radio[data-on="true"] { outline: 2px solid var(--brand); }
 .radio input { accent-color: var(--brand); width: 18px; height: 18px; }
+.radio[data-disabled] { cursor: default; }
+.radio[data-disabled] .radioLabel { color: var(--text-muted); }
 .radioText { display: flex; flex-direction: column; }
 .radioLabel { font-size: 16px; color: var(--text); }
 .radioDesc { font-size: 13px; color: var(--text-muted); }
@@ -87,11 +89,18 @@
 .previewTime { font-size: 0.75rem; color: var(--text-muted); }
 .device { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 8px; }
 .deviceName { font-size: 16px; font-weight: 500; color: var(--text); }
+.thisDevice { display: inline-block; margin-inline-start: 8px; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--positive) 18%, transparent); color: var(--text); font-size: 12px; font-weight: 600; vertical-align: 2px; }
 .deviceSub { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 /* the text takes what is left and the buttons drop below it when a phone is too narrow for both */
 .device > :first-child { flex: 1 1 180px; min-width: 0; }
 .device > :not(:first-child) { margin-inline-start: auto; }
 .recovery { font-family: var(--font-mono); padding: 12px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; word-break: break-all; color: var(--text-strong); }
+/* Copy and Download under a set of backup codes, sharing the row on a phone too */
+.codeActions { display: flex; gap: 8px; }
+.codeActions > * { flex: 1; }
+/* "I have saved these": the tick that has to come before Done */
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
+.check input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
 .dangerBox { padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(218, 62, 68, 0.5); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 /* beside the nav on a tablet there is no room for the form and a 300px preview */
 @media (max-width: 1023px) {
@@ -178,6 +187,18 @@
 .purgeList li + li { border-top: 1px solid var(--border-subtle); }
 .purgeCount { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-strong); }
 .purgeLoading { display: flex; justify-content: center; padding: 12px 0; }
+
+/* this account's own safety number: named, with a way to copy it and a code to scan */
+.safety { margin-top: 12px; padding: 12px 16px 16px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; flex-direction: column; gap: 12px; }
+.safetyHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.safetyHead > :first-child { flex: 1 1 220px; min-width: 0; }
+.safetyBtns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* a search that matched nothing, with the way back */
+.noMatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 0; }
+
+/* where the registration choice comes from, and the way back to the config file */
+.configNote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 4px 0 24px; }
 
 /* a crash report's heading, which opens its stack */
 .crashToggle { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; text-align: start; }

@@ -1,4 +1,4 @@
-import { Check, MessageSquare, MoreVertical, Phone, Search, UserPlus, Users, X } from "lucide-react";
+import { Check, Copy, MessageSquare, MoreVertical, Phone, Plus, Search, UserPlus, Users, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
@@ -16,13 +16,43 @@ import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/pres
 import { activityLine } from "@/lib/activity";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
+import { useAuth } from "@/stores/auth";
 import s from "@/components/friends/Friends.module.css";
 import { guarded } from "@/lib/captcha";
 import { describeError } from "@/lib/errors";
 
-import { t as tr_ } from "@/i18n";
+import { t as tr_, translator } from "@/i18n";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
+
+/** Online first, then idle, then busy: who can answer soonest heads the list. */
+const PRESENCE_ORDER: Record<string, number> = { online: 0, idle: 1, dnd: 2 };
+
+/**
+ * The order a tab lists people in. It used to be the order the friendships
+ * were made — oldest first — which moved everyone as people were added and
+ * made the list a history rather than a directory. By name, in the reader's
+ * language; the Online tab by who is most available first; Pending with the
+ * requests to answer before the ones waiting on someone else.
+ */
+export function sortRelationships(list: Relationship[], tab: Tab, presenceOf: (id: string) => string, locale: string): Relationship[] {
+  let collator: Intl.Collator;
+  try {
+    collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
+  } catch {
+    collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
+  }
+  const byName = (a: Relationship, b: Relationship) => collator.compare(a.user.display_name, b.user.display_name) || collator.compare(a.user.username, b.user.username);
+  return [...list].sort((a, b) => {
+    if (tab === "online") {
+      const d = (PRESENCE_ORDER[presenceOf(a.user.id)] ?? 3) - (PRESENCE_ORDER[presenceOf(b.user.id)] ?? 3);
+      if (d) return d;
+    }
+    if (tab === "pending" && a.type !== b.type) return a.type === "incoming" ? -1 : 1;
+    return byName(a, b);
+  });
+}
 
 export default function FriendsPage() {
   const [tab, setTab] = useState<Tab>("online");
@@ -32,21 +62,23 @@ export default function FriendsPage() {
   const users = useUsers((u) => u.byId);
   const list = useMemo(() => {
     const all = Object.values(rels);
-    const q = query.trim().toLowerCase();
+    const q = query.trim().toLowerCase().replace(/^@/, "");
     const match = (r: Relationship) => !q || r.user.display_name.toLowerCase().includes(q) || r.user.username.includes(q);
-    switch (tab) {
-      case "online":
-        return all.filter((r) => r.type === "friend" && statusOf(presence[r.user.id]) !== "offline" && match(r));
-      case "all":
-        return all.filter((r) => r.type === "friend" && match(r));
-      case "pending":
-        return all.filter((r) => (r.type === "incoming" || r.type === "outgoing") && match(r));
-      case "blocked":
-        return all.filter((r) => r.type === "blocked" && match(r));
-      default:
-        return [];
-    }
+    const shown =
+      tab === "online"
+        ? all.filter((r) => r.type === "friend" && statusOf(presence[r.user.id]) !== "offline" && match(r))
+        : tab === "all"
+          ? all.filter((r) => r.type === "friend" && match(r))
+          : tab === "pending"
+            ? all.filter((r) => (r.type === "incoming" || r.type === "outgoing") && match(r))
+            : tab === "blocked"
+              ? all.filter((r) => r.type === "blocked" && match(r))
+              : [];
+    return sortRelationships(shown, tab, (id) => statusOf(presence[id]), translator().locale);
   }, [rels, tab, query, presence]);
+  // Nobody at all yet — no friend, no request either way: the first thing a
+  // new account sees, which used to be "Nobody is online right now".
+  const alone = Object.keys(rels).length === 0;
   const pendingCount = Object.values(rels).filter((r) => r.type === "incoming").length;
 
   // The count used to be glued onto the label in English and then stripped off
@@ -99,7 +131,11 @@ export default function FriendsPage() {
               <Search size={20} />
             </div>
             <h3 className={s.section}>{activeTab?.label} — <span role="status">{list.length}</span></h3>
-            {list.length === 0 ? <Empty tab={tab} query={query} onClear={() => setQuery("")} /> : list.map((r) => <FriendRow key={r.user.id} rel={r} presenceUser={users[r.user.id] ?? r.user} />)}
+            {list.length === 0 ? (
+              alone && !query.trim() && (tab === "online" || tab === "all") ? <FirstRun onAdd={() => setTab("add")} /> : <Empty tab={tab} query={query} onClear={() => setQuery("")} />
+            ) : (
+              list.map((r) => <FriendRow key={r.user.id} rel={r} presenceUser={users[r.user.id] ?? r.user} />)
+            )}
           </>
         )}
       </div>
@@ -127,6 +163,40 @@ function Empty({ tab, query, onClear }: { tab: Tab; query: string; onClear: () =
       <p>{searching ? tr_("friends.nobodyHereMatches", { query: query.trim() }) : text[tab]}</p>
       {searching ? <Button size="sm" variant="secondary" onClick={onClear}>{tr_("friends.clearTheSearch")}</Button> : null}
     </div>
+  );
+}
+
+/**
+ * The first screen of a new account. It said "Nobody is online right now",
+ * which is about friends the account does not have, and offered nothing to do:
+ * the two ways in — a friend, or a server — are offered here, with the
+ * account's own username to send to someone.
+ */
+function FirstRun({ onAdd }: { onAdd: () => void }) {
+  const openModal = useUI((u) => u.openModal);
+  return (
+    <div className={s.firstRun} data-testid="friends-first-run">
+      <div className={s.firstIcon} aria-hidden="true"><Users size={32} /></div>
+      <h2 className={s.firstTitle}>{tr_("friends.firstRunTitle")}</h2>
+      <p className={s.firstBody}>{tr_("friends.firstRunBody")}</p>
+      <div className={s.firstActions}>
+        <Button onClick={onAdd}><UserPlus size={16} /> {tr_("profile.profileCard.addFriend")}</Button>
+        <Button variant="secondary" onClick={() => openModal("createServer")}><Plus size={16} /> {tr_("friends.createAServer")}</Button>
+      </div>
+      <YourUsername />
+    </div>
+  );
+}
+
+/** The account's own username, which is what someone needs to add it. */
+function YourUsername() {
+  const username = useAuth((a) => a.me?.username);
+  if (!username) return null;
+  return (
+    <p className={s.yourName}>
+      <span>{tr_("friends.yourUsername", { username: `@${username}` })}</span>
+      <Button size="sm" variant="ghost" onClick={() => copyAndSay(username)} aria-label={tr_("friends.copyYourUsername")}><Copy size={14} /></Button>
+    </p>
   );
 }
 
@@ -238,21 +308,29 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         ...(rel.type !== "blocked"
           ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: confirmBlock }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
-        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(rel.user.id).then(() => toast(tr_("friends.userIdCopied"), "success"), () => toast(tr_("friends.theUserIdCouldNotBe"), "error")) },
+        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")) },
       ],
     });
   };
 
+  // The row lit up under the pointer and did nothing when pressed; only the
+  // small circles at its end were live. The row opens the conversation with a
+  // friend, as Discord's does, and anyone else's profile.
+  const open = rel.type === "friend" ? () => void message() : () => useUI.getState().openModal("profile", { userId: rel.user.id });
   return (
     <div className={s.row} data-user={rel.user.username} onContextMenu={more}>
-      <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={presenceUser.display_name} size={32} status={rel.type === "friend" ? status : null} />
-      <div className={s.rowText}>
-        <span className={s.rowName}>
-          <span className={s.rowDisplay}>{presenceUser.display_name}</span>
-          <span className={s.rowUser}>{presenceUser.username}</span>
+      <button type="button" className={s.rowMain} onClick={open}>
+        <Avatar id={rel.user.id} avatarId={presenceUser.avatar_id} name={presenceUser.display_name} size={32} status={rel.type === "friend" ? status : null} />
+        <span className={s.rowText}>
+          <span className={s.rowName}>
+            <span className={s.rowDisplay} dir="auto">{presenceUser.display_name}</span>
+            <span className={s.rowUser}>{presenceUser.username}</span>
+          </span>
+          {/* On a touch screen the username is never hovered into view, and it
+              is what tells two people with the same display name apart. */}
+          <span className={s.rowSub}><span className={s.subUser}>{presenceUser.username} · </span>{sub}</span>
         </span>
-        <span className={s.rowSub}>{sub}</span>
-      </div>
+      </button>
       <div className={s.actions}>
         {rel.type === "friend" ? (
           <>
@@ -310,10 +388,11 @@ function AddFriend() {
       <p className={s.addSub}>{tr_("friends.youCanAddFriendsWithTheir")}</p>
       <form className={s.addForm} onSubmit={(e) => void submit(e)}>
         <UserPlus size={20} style={{ color: "var(--text-muted)" }} />
-        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr_("friends.youCanAddFriendsWithTheir")} aria-label={tr_("settings.account.username")} autoCapitalize="none" spellCheck={false} />
+        <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr_("friends.addFriendPlaceholder")} aria-label={tr_("settings.account.username")} autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" />
         <Button type="submit" size="sm" loading={busy} disabled={!value.trim()}>{tr_("friends.sendFriendRequest")}</Button>
       </form>
       {msg ? <div className={[s.addMsg, msg.ok ? s.ok : s.err].join(" ")} role={msg.ok ? "status" : "alert"}>{msg.text}</div> : null}
+      <YourUsername />
     </div>
   );
 }

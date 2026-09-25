@@ -6,6 +6,7 @@ import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { TextInput } from "@/components/common/TextInput";
+import { NoMatches } from "../NoMatches";
 import { dispatchHooks } from "@/gateway/dispatch";
 import type { GatewayEvent } from "@/gateway/events";
 import { describeError } from "@/lib/errors";
@@ -79,6 +80,7 @@ export default function BansPage({ serverId }: { serverId: string }) {
       {bans === null && !failed ? <Spinner label={t("server.bans.loadingBans")} /> : null}
       {failed ? <LoadError message={t("server.bans.theBanListCouldNotBe")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
       {bans && bans.length === 0 ? <p className={st.hint}>{t("server.bans.noOneIsBannedKeepIt")}</p> : null}
+      {bans && bans.length > 0 && shown.length === 0 ? <NoMatches people query={q} onClear={() => setQ("")} /> : null}
       {shown.map((b) => (
         <div key={b.user_id} className={s.memberRow}>
           <Avatar id={b.user_id} avatarId={users[b.user_id]?.avatar_id ?? null} name={displayName(users[b.user_id])} size={40} />

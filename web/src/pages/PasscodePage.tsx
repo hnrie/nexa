@@ -96,6 +96,7 @@ export default function PasscodePage() {
           <TextInput
             ref={input}
             type="password"
+            reveal
             inputMode={numeric ? "numeric" : "text"}
             value={passcode}
             onChange={(e) => {
@@ -109,7 +110,10 @@ export default function PasscodePage() {
         </Field>
         {left <= 3 ? <div className={s.warn}>{t("passcode.triesLeft", { count: left })} {t("passcode.thenSignInWithPassword")}</div> : null}
         <Button type="submit" size="lg" block loading={busy} data-testid="passcode-submit">{adopting ? t("passcode.setUpThisDevice") : t("lock.unlock")}</Button>
-        <Button type="button" variant="link" className={s.textButton} onClick={() => void logout()}>{t("lock.logOutInstead")}</Button>
+        {/* A forgotten passcode costs nothing that signing in again does not
+            give back, but the only way past it read "Log out instead", which
+            sounds like giving up the account. It says what it is for. */}
+        <Button type="button" variant="link" className={s.textButton} onClick={() => void logout()} data-testid="passcode-use-password">{t("passcode.useMyPasswordInstead")}</Button>
       </form>
     </AuthLayout>
   );

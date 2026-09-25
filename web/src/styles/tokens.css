@@ -33,6 +33,12 @@
   --brand-hover: #6a00d6;
   --brand-active: #5600ac;
   --on-brand: #ffffff;
+  /* Text and icons drawn on the danger, positive and warning fills. White on
+     the first two in every theme, dark on the yellow; a named colour, so a
+     theme that changes a fill changes what sits on it with it. */
+  --on-danger: #ffffff;
+  --on-positive: #ffffff;
+  --on-warning: #111214;
   /* The accent at full strength is 1.8:1 against the palest panel it is drawn
      on, which is fine for a fill that carries its own text but not for a 2px
      ring around something — WCAG 1.4.11 asks a focus indicator for 3:1 — so the

@@ -8,8 +8,11 @@
  * this is where they are written down, alongside this account's own safety
  * number and how long this device has been keeping watch.
  */
-import { KeyRound, ShieldAlert } from "lucide-react";
+import { Copy, KeyRound, QrCode, ShieldAlert } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/common/Button";
+import { fingerprintOfB64 } from "@/crypto/fingerprint";
+import { copyAndSay } from "@/lib/copyText";
 import { SafetyNumber } from "@/components/profile/KeyVerify";
 import { b64 } from "@/crypto/bytes";
 import { hasPins, pinsSince } from "@/lib/keyPins";
@@ -49,15 +52,28 @@ export function EncryptionSection() {
   // The key in hand, not the one the server would answer with: this is the one
   // thing on the page that can be shown without trusting anybody.
   const myKey = identity ? b64.enc(identity.publicKey) : (me?.public_key ?? null);
+  const [showCode, setShowCode] = useState(false);
 
   return (
     <>
       <h3 className={s.h5} style={{ marginTop: 28 }}><KeyRound size={16} /> {t("encryption.sectionTitle")}</h3>
       <p className={s.hint}>{t("encryption.sectionHint")}</p>
 
+      {/* The number used to sit here with no name, straight under a sentence
+          about other people's keys, and read as if it might be one of theirs. */}
       {myKey ? (
-        <div style={{ marginTop: 12 }}>
-          <SafetyNumber publicKey={myKey} qr={false} />
+        <div className={s.safety} data-testid="own-safety-number">
+          <div className={s.safetyHead}>
+            <div>
+              <div className={s.deviceName}>{t("encryption.yourSafetyNumber")}</div>
+              <div className={s.deviceSub}>{t("encryption.yourSafetyNumberHint")}</div>
+            </div>
+            <div className={s.safetyBtns}>
+              <Button size="sm" variant="secondary" onClick={() => copyAndSay(fingerprintOfB64(myKey) ?? "")}><Copy size={14} /> {t("modals.groupInvite.copy")}</Button>
+              <Button size="sm" variant="secondary" onClick={() => setShowCode((v) => !v)} aria-expanded={showCode}><QrCode size={14} /> {showCode ? t("encryption.hideCode") : t("encryption.showCode")}</Button>
+            </div>
+          </div>
+          <SafetyNumber publicKey={myKey} qr={showCode} />
         </div>
       ) : null}
 

@@ -73,6 +73,8 @@ interface UIState {
   editDrafts: Record<string, { messageId: string; text: string | null }>;
   jumpTo: { channelId: string; messageId: string } | null;
   toasts: Toast[];
+  /** While a toast is pointed at or focused, none of them go away. */
+  toastsHeld: boolean;
   focused: boolean;
   setConnection: (s: GatewayStatus, note?: string | null) => void;
   setLeftOpen: (v: boolean) => void;
@@ -94,6 +96,7 @@ interface UIState {
   setJumpTo: (j: UIState["jumpTo"]) => void;
   toast: (text: string, kind?: Toast["kind"]) => void;
   dismissToast: (id: number) => void;
+  holdToasts: (held: boolean) => void;
   setFocused: (v: boolean) => void;
 }
 
@@ -103,7 +106,7 @@ const ONE_AT_A_TIME = new Set(["profile", "serverProfile", "memberAction", "veri
 
 let modalSeq = 0;
 
-export const useUI = create<UIState>()((set) => ({
+export const useUI = create<UIState>()((set, get) => ({
   connection: "idle",
   connectionNote: null,
   leftOpen: false,
@@ -119,6 +122,7 @@ export const useUI = create<UIState>()((set) => ({
   editDrafts: {},
   jumpTo: null,
   toasts: [],
+  toastsHeld: false,
   focused: true,
   // a note says why the connection went; it stays through the reconnect it explains and goes once one succeeds
   setConnection: (connection, note) => set((s) => ({ connection, connectionNote: connection === "open" || connection === "idle" ? null : note === undefined ? s.connectionNote : note })),
@@ -186,8 +190,18 @@ export const useUI = create<UIState>()((set) => ({
     toastSeq += 1;
     const id = toastSeq;
     set((s) => ({ toasts: [...s.toasts, { id, text, kind }] }));
-    setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 5000);
+    // An error is the one worth reading twice, so it stays longer; and none
+    // goes while someone is reading it with the pointer on it or focus in it.
+    const expire = (): void => {
+      if (get().toastsHeld) {
+        setTimeout(expire, 1000);
+        return;
+      }
+      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+    };
+    setTimeout(expire, kind === "error" ? 8000 : 5000);
   },
-  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+  dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id), toastsHeld: s.toasts.length > 1 && s.toastsHeld })),
+  holdToasts: (toastsHeld) => set({ toastsHeld }),
   setFocused: (focused) => set({ focused }),
 }));

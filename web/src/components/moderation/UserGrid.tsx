@@ -14,6 +14,8 @@ import { FLAG_ADMIN, FLAG_DISABLED, relativeTo } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
+import { formatStamp } from "@/lib/time";
+import { copyAndSay } from "@/lib/copyText";
 import { t } from "@/i18n";
 import { ModerateModal } from "./ModerateModal";
 import m from "./Moderation.module.css";
@@ -135,7 +137,7 @@ export function UserGrid() {
       label: u.display_name,
       items: [
         { id: "profile", label: t("moderation.menu.profile"), onSelect: () => openModal("profile", { userId: u.id }) },
-        { id: "copy", label: t("moderation.menu.copyId"), onSelect: () => void navigator.clipboard?.writeText(u.id).then(() => toast(t("moderation.copied"), "success")), separatorAfter: true },
+        { id: "copy", label: t("moderation.menu.copyId"), onSelect: () => copyAndSay(u.id, t("moderation.copied")), separatorAfter: true },
         ...(u.blocked === "self" || owner
           ? []
           : [
@@ -326,7 +328,7 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
         <div className={m.cardMeta}>
           <span>
             <CalendarDays size={13} aria-hidden="true" />
-            {t("moderation.joined", { when: new Date(u.created_at).toLocaleDateString() })}
+            {t("moderation.joined", { when: formatStamp(new Date(u.created_at), "d") })}
           </span>
           {u.last_seen_at ? (
             <span>
@@ -353,6 +355,7 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
             <Ellipsis size={18} />
           </button>
         </div>
+        {blocked ? <p className={m.blockedNote} aria-hidden="true">{blocked}</p> : null}
       </div>
     </article>
   );

@@ -71,7 +71,10 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
   const screens = request.sources.filter((x) => x.kind === "screen");
   const windows = request.sources.filter((x) => x.kind === "window");
   const [tab, setTab] = useState<"screen" | "window">(screens.length ? "screen" : "window");
-  const [picked, setPicked] = useState<string | null>(screens.length === 1 ? screens[0]!.id : null);
+  // One pick per tab. A single pick shared by both tabs was still the screen
+  // after switching to Windows, where nothing was highlighted — and Share,
+  // still enabled, sent the whole screen for a dialog showing a list of windows.
+  const [picks, setPicks] = useState<{ screen: string | null; window: string | null }>(() => ({ screen: screens.length === 1 ? screens[0]!.id : null, window: null }));
   const gridId = useId();
   const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -80,11 +83,38 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
     const strip = e.currentTarget.parentElement;
     const buttons = strip ? [...strip.querySelectorAll<HTMLElement>('[role="tab"]')] : [];
     const at = buttons.indexOf(e.currentTarget);
-    buttons[Math.min(buttons.length - 1, Math.max(0, at + step))]?.click();
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const next = buttons[Math.min(buttons.length - 1, Math.max(0, at + (rtl ? -step : step)))];
+    next?.click();
+    next?.focus();
   };
   // an older app offers sound whether or not the share asked for it
   const audio = request.audio && shareAudioRequested();
   const shown = tab === "screen" ? screens : windows;
+  // only ever something on the tab in front of the person choosing
+  const picked = shown.some((x) => x.id === picks[tab]) ? picks[tab] : null;
+  const pick = (id: string) => setPicks((cur) => ({ ...cur, [tab]: id }));
+
+  // The sources are a radio group, which is moved through with the arrows:
+  // with no arrow keys and every source but a picked one out of the tab
+  // order, a keyboard could share a screen and never a window.
+  const onSourceKey = (e: React.KeyboardEvent<HTMLButtonElement>, at: number) => {
+    // Enter on a source shares it: a double click was the only one-gesture path to sharing.
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onChoose(shown[at]!.id, audio);
+      return;
+    }
+    const rtl = getComputedStyle(e.currentTarget).direction === "rtl";
+    const forward = e.key === "ArrowDown" || e.key === (rtl ? "ArrowLeft" : "ArrowRight");
+    const back = e.key === "ArrowUp" || e.key === (rtl ? "ArrowRight" : "ArrowLeft");
+    const to = forward ? (at + 1) % shown.length : back ? (at - 1 + shown.length) % shown.length : e.key === "Home" ? 0 : e.key === "End" ? shown.length - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    pick(shown[to]!.id);
+    const group = e.currentTarget.parentElement;
+    group?.querySelectorAll<HTMLElement>('[role="radio"]')[to]?.focus();
+  };
 
   return (
     <Modal
@@ -95,7 +125,7 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
       footer={
         <>
           <Button variant="ghost" onClick={() => onChoose(null, false)}>{t("chat.editMessage.cancel")}</Button>
-          <Button disabled={!picked} onClick={() => onChoose(picked, audio)} data-testid="display-share"><MonitorUp size={16} /> {t("desktop.displayPicker.share")}</Button>
+          <Button disabled={!picked} onClick={() => picked && onChoose(picked, audio)} data-testid="display-share"><MonitorUp size={16} /> {t("desktop.displayPicker.share")}</Button>
         </>
       }
     >
@@ -110,7 +140,7 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
       ) : (
         <div id={gridId} role="tabpanel" aria-label={tab === "screen" ? t("desktop.displayPicker.screensCount", { count: screens.length }) : t("desktop.displayPicker.windowsCount", { count: windows.length })}>
         <div className={s.grid} role="radiogroup" aria-label={t("desktop.displayPicker.share")}>
-          {shown.map((src) => (
+          {shown.map((src, i) => (
             <button
               key={src.id}
               type="button"
@@ -118,17 +148,11 @@ function SourceGrid({ request, onChoose }: { request: DisplaySourceRequest; onCh
               data-on={picked === src.id}
               role="radio"
               aria-checked={picked === src.id}
-              tabIndex={picked === src.id || (!picked && shown[0]?.id === src.id) ? 0 : -1}
-              onClick={() => setPicked(src.id)}
+              // one stop for the group: the pick, or the first source while nothing on this tab is picked
+              tabIndex={picked === src.id || (!picked && i === 0) ? 0 : -1}
+              onClick={() => pick(src.id)}
               onDoubleClick={() => onChoose(src.id, audio)}
-              onKeyDown={(e) => {
-                // Enter on a source shares it: a double click was the only
-                // one-gesture path to sharing.
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  onChoose(src.id, audio);
-                }
-              }}
+              onKeyDown={(e) => onSourceKey(e, i)}
               data-testid="display-source"
             >
               {src.thumbnail ? <img className={s.thumb} src={src.thumbnail} alt="" draggable={false} /> : <span className={s.thumb} />}

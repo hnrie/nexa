@@ -9,7 +9,8 @@ import { Field, TextInput } from "@/components/common/TextInput";
 import { formatBytes } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
-import { t } from "@/i18n";
+import { t, translator } from "@/i18n";
+import { formatNumber } from "@/i18n/core";
 import s from "./Settings.module.css";
 
 /**
@@ -60,17 +61,19 @@ export function DeleteAccountDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
+  // counts in the app's language, not the browser's
+  const n = (v: number) => formatNumber(v, translator().locale);
   const rows: { label: string; value: string }[] = [];
   if (counts && counts !== "failed") {
     const leaving = Math.max(0, counts.servers - counts.owned_servers) + Math.max(0, counts.groups - counts.owned_groups);
-    if (counts.messages) rows.push({ label: t("settings.account.purge.messages"), value: counts.messages.toLocaleString() });
-    if (counts.attachments) rows.push({ label: t("settings.account.purge.files"), value: `${counts.attachments.toLocaleString()} · ${formatBytes(counts.attachment_bytes)}` });
-    if (counts.owned_servers) rows.push({ label: t("settings.account.purge.ownedServers"), value: counts.owned_servers.toLocaleString() });
-    if (counts.owned_groups) rows.push({ label: t("settings.account.purge.ownedGroups"), value: counts.owned_groups.toLocaleString() });
-    if (counts.direct_messages) rows.push({ label: t("settings.account.purge.dms"), value: counts.direct_messages.toLocaleString() });
-    if (counts.reactions) rows.push({ label: t("settings.account.purge.reactions"), value: counts.reactions.toLocaleString() });
-    if (counts.packs) rows.push({ label: t("settings.account.purge.packs"), value: counts.packs.toLocaleString() });
-    if (leaving) rows.push({ label: t("settings.account.purge.leaves"), value: leaving.toLocaleString() });
+    if (counts.messages) rows.push({ label: t("settings.account.purge.messages"), value: n(counts.messages) });
+    if (counts.attachments) rows.push({ label: t("settings.account.purge.files"), value: `${n(counts.attachments)} · ${formatBytes(counts.attachment_bytes)}` });
+    if (counts.owned_servers) rows.push({ label: t("settings.account.purge.ownedServers"), value: n(counts.owned_servers) });
+    if (counts.owned_groups) rows.push({ label: t("settings.account.purge.ownedGroups"), value: n(counts.owned_groups) });
+    if (counts.direct_messages) rows.push({ label: t("settings.account.purge.dms"), value: n(counts.direct_messages) });
+    if (counts.reactions) rows.push({ label: t("settings.account.purge.reactions"), value: n(counts.reactions) });
+    if (counts.packs) rows.push({ label: t("settings.account.purge.packs"), value: n(counts.packs) });
+    if (leaving) rows.push({ label: t("settings.account.purge.leaves"), value: n(leaving) });
   }
   // whatever else there is or is not, the account itself goes
   if (counts !== null) rows.push({ label: t("settings.account.purge.profile"), value: "" });
@@ -113,7 +116,7 @@ export function DeleteAccountDialog({ onClose }: { onClose: () => void }) {
           {t("settings.account.purge.note")}
         </p>
         {error ? (
-          <p className={s.hint} style={{ color: "var(--danger)", margin: 0 }} role="alert">
+          <p className={s.hint} style={{ color: "var(--text-danger)", margin: 0 }} role="alert">
             {error}
           </p>
         ) : null}
