@@ -39,6 +39,9 @@ let loading: Promise<void> | null = null;
 /** The list could not be had, so pictures are tried blind rather than never shown. */
 let unlisted = false;
 const waiting = new Set<() => void>();
+/** After a failed fetch of the list, not before this; the wait doubles up to a few minutes. */
+let retryAt = 0;
+let retryWait = 0;
 
 /**
  * Fetches the list of artwork this build ships. Twemoji trails Unicode, so
@@ -46,6 +49,9 @@ const waiting = new Set<() => void>();
  */
 export function ensureTwemojiIndex(): void {
   if (available || loading) return;
+  // Offline, every emoji drawn asked for the list again. The pictures are
+  // tried blind meanwhile, so waiting a while between tries costs nothing.
+  if (Date.now() < retryAt) return;
   loading = fetch(`${TWEMOJI_BASE}/available.json`)
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error("no index"))))
     .then((names: unknown) => {
@@ -55,12 +61,15 @@ export function ensureTwemojiIndex(): void {
       // for the life of the tab — taking the picker down with it.
       if (!Array.isArray(names)) throw new Error("bad index");
       available = new Set(names.filter((n): n is string => typeof n === "string"));
+      retryWait = 0;
       for (const fn of waiting) fn();
     })
     .catch(() => {
       // no list: fall back to trying, which still works
       loading = null;
       unlisted = true;
+      retryWait = Math.min(5 * 60_000, retryWait ? retryWait * 2 : 5_000);
+      retryAt = Date.now() + retryWait;
       for (const fn of waiting) fn();
     });
 }
