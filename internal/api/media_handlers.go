@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/store"
 )
 
 func (s *Server) mediaRoutes(mux *http.ServeMux) {
@@ -39,7 +41,7 @@ func (s *Server) mediaRoutes(mux *http.ServeMux) {
 func (s *Server) releaseBlob(ctx context.Context, id ids.ID) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	if err := s.Store.AddBlobRef(ctx, id, -1); err != nil {
+	if err := s.Store.AddBlobRef(ctx, id, -1); err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.Log.Warn("release blob", "blob", id.String(), "err", err)
 	}
 }

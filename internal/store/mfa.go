@@ -85,6 +85,11 @@ var ErrMFAAlreadyOn = errors.New("mfa already enabled")
 // anyone gets, and a repeat would quietly replace the list just written down.
 func (s *Store) FinishTOTPSetup(ctx context.Context, id ids.ID, sealed []byte, step int64, hashes []string) error {
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		// Postgres runs these side by side; one at a time, so two cannot both
+		// read the same "before" and act on it
+		if err := tx.Serialise(ctx, "mfa", int64(id)); err != nil {
+			return err
+		}
 		var enabled int
 		err := tx.QueryRowContext(ctx, `SELECT enabled FROM user_mfa WHERE user_id = ?`, int64(id)).Scan(&enabled)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {

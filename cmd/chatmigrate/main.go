@@ -263,7 +263,14 @@ func digest(ctx context.Context, d *db.DB, table, order, cols string) ([]byte, e
 // copyTable reads one table out of SQLite and writes it into Postgres in
 // batches, column for column.
 func copyTable(ctx context.Context, src *db.DB, tx *db.Tx, table string, batch int) (int, error) {
-	rows, err := src.R.QueryContext(ctx, `SELECT * FROM `+table)
+	// Channels point at their category, and Postgres checks that as each
+	// batch goes in, so categories go first: a channel moved into a category
+	// made after it would otherwise arrive in an earlier batch than its parent.
+	order := ""
+	if table == "channels" {
+		order = ` ORDER BY parent_id IS NOT NULL, id`
+	}
+	rows, err := src.R.QueryContext(ctx, `SELECT * FROM `+table+order)
 	if err != nil {
 		return 0, err
 	}

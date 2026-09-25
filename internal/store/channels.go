@@ -352,6 +352,11 @@ func (s *Store) Participants(ctx context.Context, chID ids.ID) ([]ids.ID, error)
 func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) ([]ids.ID, error) {
 	var subs []ids.ID
 	err := s.Tx(ctx, func(tx *db.Tx) error {
+		// the same lock CreateSubchat takes, so a subchat made at the same
+		// moment sees the group's members from before or after, not between
+		if err := tx.Serialise(ctx, "subchats", int64(chID)); err != nil {
+			return err
+		}
 		now := nowMs()
 		res, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(chID), int64(uid), int64(addedBy), now)
 		if err != nil {
@@ -378,6 +383,9 @@ func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) (
 // it, returning the subchats uid was taken out of.
 func (s *Store) RemoveParticipant(ctx context.Context, chID, uid ids.ID) (subs, remaining []ids.ID, err error) {
 	err = s.Tx(ctx, func(tx *db.Tx) error {
+		if err := tx.Serialise(ctx, "subchats", int64(chID)); err != nil {
+			return err
+		}
 		res, err := tx.ExecContext(ctx, `DELETE FROM dm_participants WHERE channel_id = ? AND user_id = ?`, int64(chID), int64(uid))
 		if err != nil {
 			return err

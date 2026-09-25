@@ -29,6 +29,11 @@ func (s *Store) createEpoch(ctx context.Context, e *KeyEpoch, pending bool) erro
 		e.CreatedAt = nowMs()
 	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		// Postgres runs these side by side; one at a time, so two cannot both
+		// read the same "before" and act on it
+		if err := tx.Serialise(ctx, "epoch", int64(e.ConvID)); err != nil {
+			return err
+		}
 		if pending {
 			var n int
 			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM key_flags WHERE conv_id = ? AND needs_rotation = 1`, int64(e.ConvID)).Scan(&n); err != nil {

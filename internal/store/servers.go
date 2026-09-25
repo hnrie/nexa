@@ -517,6 +517,11 @@ func scanRole(r rowScanner) (*Role, error) {
 func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, permsBits perms.Perm, color int) (*Role, error) {
 	ro := &Role{ID: ids.New(), ServerID: serverID, Name: name, Color: color, Permissions: permsBits, CreatedAt: nowMs()}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
+		// Postgres runs these side by side; one at a time, so two cannot both
+		// read the same "before" and act on it
+		if err := tx.Serialise(ctx, "roles", int64(serverID)); err != nil {
+			return err
+		}
 		// new roles start at the bottom of the hierarchy (just above @everyone),
 		// so the creator always outranks them
 		if _, err := tx.ExecContext(ctx, `UPDATE roles SET position = position + 1 WHERE server_id = ? AND position >= 1`, int64(serverID)); err != nil {

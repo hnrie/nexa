@@ -25,6 +25,39 @@ type Store struct {
 
 	locksMu sync.Mutex
 	locks   map[ids.ID]*uploadLock
+
+	// contentLocks serialise everything that decides whether a stored file
+	// is still needed: taking a new reference to existing bytes, and the
+	// collector deleting the last row and then the file. Interleaved, an
+	// upload could reference a row the collector had just deleted, or keep a
+	// file the collector removed a moment later.
+	contentMu    sync.Mutex
+	contentLocks map[string]*uploadLock
+}
+
+// lockContent holds the lock for one file's bytes; call the result to let go.
+func (m *Store) lockContent(sha string) func() {
+	m.contentMu.Lock()
+	if m.contentLocks == nil {
+		m.contentLocks = map[string]*uploadLock{}
+	}
+	l := m.contentLocks[sha]
+	if l == nil {
+		l = &uploadLock{}
+		m.contentLocks[sha] = l
+	}
+	l.users++
+	m.contentMu.Unlock()
+	l.mu.Lock()
+	return func() {
+		l.mu.Unlock()
+		m.contentMu.Lock()
+		l.users--
+		if l.users == 0 {
+			delete(m.contentLocks, sha)
+		}
+		m.contentMu.Unlock()
+	}
 }
 
 type uploadLock struct {
@@ -164,12 +197,16 @@ func (m *Store) PutPublic(ctx context.Context, kind string, r io.Reader, lim Lim
 		}
 		width, height = &w, &h
 	}
+	unlock := m.lockContent(sha)
+	defer unlock()
 	if existing, err := m.st.BlobBySHA(ctx, sha, kind); err == nil {
-		if err := m.st.AddBlobRef(ctx, existing.ID, 1); err != nil {
+		if err := m.st.AddBlobRef(ctx, existing.ID, 1); err == nil {
+			existing.RefCount++
+			return existing, nil
+		} else if !errors.Is(err, store.ErrNotFound) {
 			return nil, err
 		}
-		existing.RefCount++
-		return existing, nil
+		// the row went before it could be referenced: stored afresh below
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return nil, err
 	}
@@ -210,6 +247,9 @@ func (m *Store) PutEncrypted(ctx context.Context, r io.Reader, max int64, owner 
 	if size == 0 {
 		return nil, ErrUnsupported
 	}
+	// the same ciphertext sent twice (a retried upload) shares one file
+	unlock := m.lockContent(sha)
+	defer unlock()
 	if err := m.commit(tmp, sha); err != nil {
 		return nil, err
 	}
@@ -383,6 +423,8 @@ func shaOf(b *store.Blob) string {
 // Remove deletes a blob's metadata and, when no other row shares the same
 // bytes, the file.
 func (m *Store) Remove(ctx context.Context, b *store.Blob) error {
+	unlock := m.lockContent(shaOf(b))
+	defer unlock()
 	deleted, err := m.st.DeleteBlob(ctx, b.ID)
 	if err != nil {
 		return err

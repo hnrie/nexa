@@ -552,6 +552,16 @@ type ModImages struct {
 func (s *Store) ModRemoveImages(ctx context.Context, c *ModCase, which ModImages, log *ModLogEntry) ([]ids.ID, error) {
 	var servers []ids.ID
 	err := s.Tx(ctx, func(tx *db.Tx) error {
+		// Postgres runs these side by side; one at a time, so two cannot both
+		// read the same "before" and act on it
+		if err := tx.Serialise(ctx, "image:users.avatar_id", int64(c.UserID)); err != nil {
+			return err
+		}
+		// Postgres runs these side by side; one at a time, so two cannot both
+		// read the same "before" and act on it
+		if err := tx.Serialise(ctx, "image:users.banner_id", int64(c.UserID)); err != nil {
+			return err
+		}
 		servers = nil
 		if which.Avatar {
 			list, err := idsTx(ctx, tx, `SELECT server_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL`, int64(c.UserID))
@@ -944,8 +954,9 @@ func (s *Store) ModLog(ctx context.Context, f ModLogFilter) ([]*ModLogEntry, err
 		args = append(args, int64(f.TargetID))
 	}
 	if q := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(f.Query), "@"))); q != "" {
-		if len(q) > maxSearchQuery {
-			q = q[:maxSearchQuery]
+		// cut on a character, not a byte: half a character is text Postgres refuses
+		if r := []rune(q); len(r) > maxSearchQuery {
+			q = string(r[:maxSearchQuery])
 		}
 		like := "%" + escapeLike(q) + "%"
 		where = append(where, `(`+s.db.Dialect.Lower("target_username")+` LIKE ? ESCAPE '\' OR `+s.db.Dialect.Lower("moderator_username")+` LIKE ? ESCAPE '\' OR `+s.db.Dialect.Lower("reason")+` LIKE ? ESCAPE '\')`)

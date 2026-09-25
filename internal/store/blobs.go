@@ -56,8 +56,15 @@ func (s *Store) BlobByID(ctx context.Context, id ids.ID) (*Blob, error) {
 
 // AddBlobRef changes the reference count by delta (never below zero).
 func (s *Store) AddBlobRef(ctx context.Context, id ids.ID, delta int) error {
-	_, err := s.db.W.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count + ?")+` WHERE id = ?`, delta, int64(id))
-	return err
+	res, err := s.db.W.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(s.db.Dialect, "ref_count + ?")+` WHERE id = ?`, delta, int64(id))
+	if err != nil {
+		return err
+	}
+	// a blob that is gone takes no reference; saying so lets the caller store it again
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // UnreferencedBlobs lists blobs with no references created before olderThan.
@@ -107,6 +114,11 @@ func (s *Store) SwapImage(ctx context.Context, table, col string, rowID ids.ID, 
 		return fmt.Errorf("swap image: %s.%s is not an image column", table, col)
 	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		// Postgres runs these side by side; one at a time, so two cannot both
+		// read the same "before" and act on it
+		if err := tx.Serialise(ctx, "image:"+table+"."+col, int64(rowID)); err != nil {
+			return err
+		}
 		var old sql.NullInt64
 		if err := tx.QueryRowContext(ctx, `SELECT `+col+` FROM `+table+` WHERE id = ?`, int64(rowID)).Scan(&old); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
