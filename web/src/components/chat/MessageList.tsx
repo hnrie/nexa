@@ -16,6 +16,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
+import { GroupAlone } from "./GroupAlone";
 import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -553,16 +554,18 @@ export function MessageList({ channel }: { channel: Channel }) {
         </div>
       );
     }
+    // a group of one (made with nobody picked) says how to fill it
+    const alone = channel.type === "group_dm" && channel.recipient_ids.length <= 1;
     return (
       <div className={s.empty}>
         {channel.type === "group_dm" && channel.icon_id ? <div className={s.emptyAvatar}><Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={80} kind="icon" /></div> : null}
         <h2 className={s.emptyName}>{channel.server_id ? t("chat.messageList.welcomeToChannel", { name }) : name}</h2>
-        <p className={s.emptyText}>
+        {alone ? <GroupAlone channelId={channel.id} /> : <p className={s.emptyText}>
           {channel.server_id
             ? <Tr id="chat.messageList.channelStart" values={{ name: <b>#{name}</b> }} />
             : <Tr id="chat.messageList.groupStart" values={{ name: <b>{name}</b> }} />}
           {channel.server_id && channel.topic ? ` ${channel.topic}` : ""} {t("chat.messageList.endToEnd")}
-        </p>
+        </p>}
       </div>
     );
   }, [channel, users, me?.id, byIdChannels]);
