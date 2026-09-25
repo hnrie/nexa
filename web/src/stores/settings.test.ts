@@ -94,6 +94,17 @@ describe("settings sync", () => {
     expect(useSettings.getState().settings.notifications.muted.sort()).toEqual(["c2", "c3"]);
   });
 
+  it("sends a change still waiting when the store is reset straight after", async () => {
+    const server = fakeServer({ theme: "dark" });
+    await loadFrom(server);
+    useSettings.getState().patch({ theme: "ash" });
+    // what stopping the session does when the app locks
+    const sent = useSettings.getState().flush();
+    useSettings.getState().reset();
+    await sent;
+    expect(server.doc["theme"]).toBe("ash");
+  });
+
   it("tries a save that could not reach the server again later", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const server = fakeServer({ theme: "dark" });

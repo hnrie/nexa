@@ -132,6 +132,10 @@ export function stopSession(): void {
   client?.close();
   client = null;
   useKeys.getState().reset();
+  // Changes still waiting to be saved go now, sealed with the key they were
+  // made under: the reset below forgets them, so a theme picked a moment
+  // before the app locked itself was simply gone when it unlocked.
+  void useSettings.getState().flush();
   useSettings.getState().reset();
   // Without the keys nothing decrypted should stay readable either; unlocking
   // loads the conversations again.
