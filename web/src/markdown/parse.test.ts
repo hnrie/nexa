@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Node } from "./ast";
+import type { AlertKind, Align, Node } from "./ast";
 import { extractUrls, isEmojiOnly, parse, plainText } from "./parse";
 
 // ---------------------------------------------------------------------------
@@ -34,6 +34,18 @@ const here: Node = { type: "mention", kind: "here" };
 const emoji = (name: string, id: string, animated = false): Node => ({ type: "emoji", name, id, animated });
 const uni = (text: string): Node => ({ type: "unicodeEmoji", text });
 const ts = (unix: number, style: "t" | "T" | "d" | "D" | "f" | "F" | "R"): Node => ({ type: "timestamp", unix, style });
+const mark = (...children: Node[]): Node => ({ type: "mark", children });
+const sup = (...children: Node[]): Node => ({ type: "sup", children });
+const sub = (...children: Node[]): Node => ({ type: "sub", children });
+const color = (fg: string | null, bg: string | null, ...children: Node[]): Node => ({ type: "color", fg, bg, children });
+const hr: Node = { type: "hr" };
+const task = (checked: boolean): Node => ({ type: "task", checked });
+const table = (align: Align[], head: Node[][], rows: Node[][][]): Node => ({ type: "table", align, head, rows });
+const alert = (kind: AlertKind, ...children: Node[]): Node => ({ type: "alert", kind, children });
+const details = (summary: Node[], ...children: Node[]): Node => ({ type: "details", summary, children });
+const fnref = (label: string, n: number): Node => ({ type: "footnoteRef", label, n });
+const footnotes = (...notes: [string, number, Node[]][]): Node => ({ type: "footnotes", notes: notes.map(([label, n, children]) => ({ label, n, children })) });
+const h = (level: 1 | 2 | 3 | 4 | 5 | 6, ...children: Node[]): Node => ({ type: "heading", level, children });
 
 interface Fixture {
   name: string;
@@ -100,7 +112,13 @@ const fixtures: Fixture[] = [
   { name: "h1", src: "# Heading", ast: [heading(1, t("Heading"))] },
   { name: "h2", src: "## Heading", ast: [heading(2, t("Heading"))] },
   { name: "h3", src: "### Heading", ast: [heading(3, t("Heading"))] },
-  { name: "four hashes is text", src: "#### four", ast: [para(t("#### four"))] },
+  { name: "h4", src: "#### four", ast: [h(4, t("four"))] },
+  { name: "h5", src: "##### five", ast: [h(5, t("five"))] },
+  { name: "h6", src: "###### six", ast: [h(6, t("six"))] },
+  { name: "seven hashes is text", src: "####### seven", ast: [para(t("####### seven"))] },
+  { name: "closing hashes are dropped", src: "## Title ##", ast: [h(2, t("Title"))] },
+  { name: "a hash ending a word stays", src: "# C#", ast: [h(1, t("C#"))] },
+  { name: "an escaped closing hash stays", src: "# a \\#", ast: [h(1, t("a #"))] },
   { name: "hash without a space is text", src: "#nospace", ast: [para(t("#nospace"))] },
   { name: "heading content is parsed inline", src: "# **bold** head", ast: [heading(1, strong(t("bold")), t(" head"))] },
   { name: "heading then paragraph", src: "# a\nb", ast: [heading(1, t("a")), para(t("b"))] },
@@ -204,6 +222,134 @@ const fixtures: Fixture[] = [
   { name: "unknown timestamp style is literal", src: "<t:123:Z>", ast: [para(t("<t:123:Z>"))] },
   { name: "non numeric timestamp is literal", src: "<t:abc>", ast: [para(t("<t:abc>"))] },
 
+  // --- rules --------------------------------------------------------------
+  { name: "dash rule", src: "---", ast: [hr] },
+  { name: "star rule", src: "***", ast: [hr] },
+  { name: "underscore rule", src: "___", ast: [hr] },
+  { name: "spaced rule", src: "- - -", ast: [hr] },
+  { name: "a rule between paragraphs, never a heading underline", src: "a\n---\nb", ast: [para(t("a")), hr, para(t("b"))] },
+  { name: "two dashes are text", src: "--", ast: [para(t("--"))] },
+  { name: "dashes with words are text", src: "--- a", ast: [para(t("--- a"))] },
+  { name: "an escaped rule is text", src: "\\---", ast: [para(t("---"))] },
+  { name: "bold italic is not a rule", src: "***a***", ast: [para(strong(em(t("a"))))] },
+
+  // --- nested lists --------------------------------------------------------
+  { name: "three levels", src: "- a\n  - b\n    - c", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b"), list(false, 1, [[t("c")]])]])]])] },
+  { name: "four spaces nest too", src: "- a\n    - b", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")]])]])] },
+  { name: "a tab nests", src: "- a\n\t- b", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")]])]])] },
+  { name: "backing out two levels", src: "- a\n  - b\n    - c\n- d", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b"), list(false, 1, [[t("c")]])]])], [t("d")]])] },
+  { name: "a less indented item joins the list it is still inside", src: "- a\n    - b\n  - c", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")], [t("c")]])]])] },
+  { name: "plus bullets", src: "+ a\n+ b", ast: [list(false, 1, [[t("a")], [t("b")]])] },
+  { name: "ordered with a parenthesis", src: "1) a\n2) b", ast: [list(true, 1, [[t("a")], [t("b")]])] },
+  { name: "ordered inside ordered", src: "1. a\n   1. b\n2. c", ast: [list(true, 1, [[t("a"), list(true, 1, [[t("b")]])], [t("c")]])] },
+  { name: "a bullet list then an ordered one in the same item", src: "- a\n  - b\n  1. c", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")]]), list(true, 1, [[t("c")]])]])] },
+
+  // --- task lists ----------------------------------------------------------
+  { name: "task list", src: "- [ ] todo\n- [x] done", ast: [list(false, 1, [[task(false), t("todo")], [task(true), t("done")]])] },
+  { name: "capital X ticks too", src: "- [X] done", ast: [list(false, 1, [[task(true), t("done")]])] },
+  { name: "task in an ordered list", src: "1. [ ] a", ast: [list(true, 1, [[task(false), t("a")]])] },
+  { name: "empty task", src: "- [ ]", ast: [list(false, 1, [[task(false)]])] },
+  { name: "nested task", src: "- [x] a\n  - [ ] b", ast: [list(false, 1, [[task(true), t("a"), list(false, 1, [[task(false), t("b")]])]])] },
+  { name: "a link is not a task", src: "- [x](https://a.b)", ast: [list(false, 1, [[link("https://a.b", [t("x")], true)]])] },
+  { name: "brackets without a space are text", src: "- [x]y", ast: [list(false, 1, [[t("[x]y")]])] },
+
+  // --- tables --------------------------------------------------------------
+  { name: "table", src: "| a | b |\n|---|---|\n| 1 | 2 |", ast: [table([null, null], [[t("a")], [t("b")]], [[[t("1")], [t("2")]]])] },
+  { name: "table alignment", src: "|l|c|r|n|\n|:-|:-:|-:|-|", ast: [table(["left", "center", "right", null], [[t("l")], [t("c")], [t("r")], [t("n")]], [])] },
+  { name: "table without outer pipes", src: "a | b\n--|--\n1 | 2", ast: [table([null, null], [[t("a")], [t("b")]], [[[t("1")], [t("2")]]])] },
+  { name: "table cells are parsed inline", src: "| **b** | `c|d` |\n|---|---|", ast: [table([null, null], [[strong(t("b"))], [code("c|d")]], [])] },
+  { name: "an escaped pipe stays in its cell", src: "| a \\| b |\n|---|", ast: [table([null], [[t("a | b")]], [])] },
+  { name: "a spoiler stays in its cell", src: "| ||x|| | y |\n|---|---|", ast: [table([null, null], [[spoiler(t("x"))], [t("y")]], [])] },
+  { name: "short rows are padded and long ones cut", src: "| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |", ast: [table([null, null], [[t("a")], [t("b")]], [[[t("1")], []], [[t("1")], [t("2")]]])] },
+  { name: "a table ends at a line without a pipe", src: "| a |\n|---|\n| 1 |\ntext", ast: [table([null], [[t("a")]], [[[t("1")]]]), para(t("text"))] },
+  { name: "a table ends at a blank line", src: "| a |\n|---|\n\n| 1 |", ast: [table([null], [[t("a")]], []), para(br, t("| 1 |"))] },
+  { name: "header and delimiter must agree", src: "| a | b |\n|---|", ast: [para(t("| a | b |"), br, t("|---|"))] },
+  { name: "a table can follow text", src: "hi\n| a |\n|---|", ast: [para(t("hi")), table([null], [[t("a")]], [])] },
+  { name: "a delimiter row alone is text", src: "|---|", ast: [para(t("|---|"))] },
+  { name: "a list item is not a table header", src: "- a | b\n--|--", ast: [list(false, 1, [[t("a | b")]]), para(t("--|--"))] },
+
+  // --- callouts ------------------------------------------------------------
+  { name: "note", src: "> [!NOTE]\n> Read this", ast: [alert("note", para(t("Read this")))] },
+  { name: "tip", src: "> [!TIP]\n> x", ast: [alert("tip", para(t("x")))] },
+  { name: "important", src: "> [!IMPORTANT]\n> x", ast: [alert("important", para(t("x")))] },
+  { name: "warning", src: "> [!WARNING]\n> x", ast: [alert("warning", para(t("x")))] },
+  { name: "caution", src: "> [!CAUTION]\n> x", ast: [alert("caution", para(t("x")))] },
+  { name: "callout kinds ignore case", src: "> [!tip]\n> x", ast: [alert("tip", para(t("x")))] },
+  { name: "words on the marker line", src: "> [!WARNING] Back up first", ast: [alert("warning", para(t("Back up first")))] },
+  { name: "a callout holds blocks", src: "> [!NOTE]\n> - a\n> - b\n>\n> **c**", ast: [alert("note", list(false, 1, [[t("a")], [t("b")]]), para(br, strong(t("c"))))] },
+  { name: "the marker only counts on the first line", src: "> a\n> [!NOTE]", ast: [quote(t("a"), br, t("[!NOTE]"))] },
+  { name: "an unknown kind is a quote", src: "> [!DANGER]\n> x", ast: [quote(t("[!DANGER]"), br, t("x"))] },
+  { name: "an empty callout", src: "> [!CAUTION]", ast: [alert("caution")] },
+  { name: "a block quote can be a callout", src: ">>> [!TIP]\nrest\n- a", ast: [alert("tip", para(t("rest")), list(false, 1, [[t("a")]]))] },
+  { name: "a callout ends where the quote does", src: "> [!NOTE]\n> x\ny", ast: [alert("note", para(t("x"))), para(t("y"))] },
+
+  // --- collapsible sections -------------------------------------------------
+  { name: "details", src: "::: details Logs\nline 1\nline 2\n:::", ast: [details([t("Logs")], para(t("line 1"), br, t("line 2")))] },
+  { name: "details without a summary", src: "::: details\nx\n:::", ast: [details([], para(t("x")))] },
+  { name: "an unclosed section runs to the end", src: "::: details S\nx", ast: [details([t("S")], para(t("x")))] },
+  { name: "sections nest", src: "::: details A\n::: details B\nx\n:::\ny\n:::", ast: [details([t("A")], details([t("B")], para(t("x"))), para(t("y")))] },
+  { name: "a ::: inside code does not close it", src: "::: details A\n```\n:::\n```\n:::", ast: [details([t("A")], codeblock(null, ":::"))] },
+  { name: "text after a section", src: "::: details A\nx\n:::\nafter", ast: [details([t("A")], para(t("x"))), para(t("after"))] },
+  { name: "details ignores case", src: ":::DETAILS **A**\nx\n:::", ast: [details([strong(t("A"))], para(t("x")))] },
+  { name: "a section holds blocks", src: "::: details A\n# h\n- i\n:::", ast: [details([t("A")], heading(1, t("h")), list(false, 1, [[t("i")]]))] },
+  { name: "other ::: lines are text", src: "::: nope", ast: [para(t("::: nope"))] },
+  { name: "an empty section", src: "::: details A\n:::", ast: [details([t("A")])] },
+
+  // --- highlight -----------------------------------------------------------
+  { name: "highlight", src: "==hi==", ast: [para(mark(t("hi")))] },
+  { name: "highlight in a sentence", src: "a ==b== c", ast: [para(t("a "), mark(t("b")), t(" c"))] },
+  { name: "comparisons stay text", src: "x == y and a==b==c", ast: [para(t("x == y and a==b==c"))] },
+  { name: "an unclosed highlight is text", src: "==x", ast: [para(t("==x"))] },
+  { name: "three equals signs are text", src: "===x===", ast: [para(t("===x==="))] },
+  { name: "highlight holds formatting", src: "==**b**==", ast: [para(mark(strong(t("b"))))] },
+  { name: "an escaped highlight is text", src: "\\==x==", ast: [para(t("==x=="))] },
+
+  // --- superscript and subscript -------------------------------------------
+  { name: "superscript", src: "x^{2}", ast: [para(t("x"), sup(t("2")))] },
+  { name: "subscript", src: "H_{2}O", ast: [para(t("H"), sub(t("2")), t("O"))] },
+  { name: "superscript holds formatting", src: "^{**b**}", ast: [para(sup(strong(t("b"))))] },
+  { name: "braces nest", src: "e^{x^{2}}", ast: [para(t("e"), sup(t("x"), sup(t("2"))))] },
+  { name: "an unclosed superscript is text", src: "x^{2", ast: [para(t("x^{2"))] },
+  { name: "an empty superscript is text", src: "x^{}", ast: [para(t("x^{}"))] },
+  { name: "a smiley stays a smiley", src: "^_^ ^-^", ast: [para(t("^_^ ^-^"))] },
+  { name: "strike and subscript side by side", src: "~~a~~ _{b}", ast: [para(s(t("a")), t(" "), sub(t("b")))] },
+  { name: "an escaped superscript is text", src: "x\\^{2}", ast: [para(t("x^{2}"))] },
+
+  // --- colours -------------------------------------------------------------
+  { name: "coloured words", src: "[warning]{red}", ast: [para(color("red", null, t("warning")))] },
+  { name: "short hex", src: "[x]{#F80}", ast: [para(color("#ff8800", null, t("x")))] },
+  { name: "long hex", src: "[x]{#FF8800}", ast: [para(color("#ff8800", null, t("x")))] },
+  { name: "highlight colour", src: "[x]{on yellow}", ast: [para(color(null, "yellow", t("x")))] },
+  { name: "text and highlight colour", src: "[x]{red on yellow}", ast: [para(color("red", "yellow", t("x")))] },
+  { name: "grey is gray", src: "[x]{Grey}", ast: [para(color("gray", null, t("x")))] },
+  { name: "an unknown colour is text", src: "[x]{rde}", ast: [para(t("[x]{rde}"))] },
+  { name: "too many words is text", src: "[x]{red on yellow now}", ast: [para(t("[x]{red on yellow now}"))] },
+  { name: "a space before the braces is text", src: "[x] {red}", ast: [para(t("[x] {red}"))] },
+  { name: "coloured words hold formatting", src: "[**b**]{blue}", ast: [para(color("blue", null, strong(t("b"))))] },
+  { name: "a link in colour", src: "[[a](https://x.y)]{red}", ast: [para(color("red", null, link("https://x.y", [t("a")], true)))] },
+  { name: "colour in a link", src: "[[a]{red}](https://x.y)", ast: [para(link("https://x.y", [color("red", null, t("a"))], true))] },
+  { name: "a label with an open bracket still links as before", src: "[a[b](https://x.y)", ast: [para(link("https://x.y", [t("a[b")], true))] },
+  { name: "escaped coloured words are text", src: "\\[x]{red}", ast: [para(t("[x]{red}"))] },
+
+  // --- footnotes -----------------------------------------------------------
+  { name: "footnote", src: "text[^1]\n[^1]: the note", ast: [para(t("text"), fnref("1", 1)), footnotes(["1", 1, [t("the note")]])] },
+  { name: "footnotes are numbered as they are referred to", src: "b[^b] a[^a]\n[^a]: A\n[^b]: B", ast: [para(t("b"), fnref("b", 1), t(" a"), fnref("a", 2)), footnotes(["b", 1, [t("B")]], ["a", 2, [t("A")]])] },
+  { name: "a reference without a note is text", src: "x[^nope]", ast: [para(t("x[^nope]"))] },
+  { name: "a note nothing refers to stays as typed", src: "[^1]: lonely", ast: [para(t("[^1]: lonely"))] },
+  { name: "two references to one note", src: "a[^x] b[^x]\n[^x]: X", ast: [para(t("a"), fnref("x", 1), t(" b"), fnref("x", 1)), footnotes(["x", 1, [t("X")]])] },
+  { name: "labels ignore case", src: "a[^Note]\n[^note]: N", ast: [para(t("a"), fnref("Note", 1)), footnotes(["note", 1, [t("N")]])] },
+  { name: "a note may refer to a note", src: "a[^1]\n[^1]: see[^2]\n[^2]: two", ast: [para(t("a"), fnref("1", 1)), footnotes(["1", 1, [t("see"), fnref("2", 2)]], ["2", 2, [t("two")]])] },
+  { name: "previews have no footnotes", src: "a[^1]", ast: [t("a[^1]")], inline: true },
+  { name: "an escaped reference is text", src: "\\[^1]\n[^1]: n", ast: [para(t("[^1]")), para(t("[^1]: n"))] },
+
+  // --- escapes for the block markers ---------------------------------------
+  { name: "escaped heading", src: "\\# not a heading", ast: [para(t("# not a heading"))] },
+  { name: "escaped quote", src: "\\> not a quote", ast: [para(t("> not a quote"))] },
+  { name: "escaped bullet", src: "\\- not a list", ast: [para(t("- not a list"))] },
+  { name: "escaped number", src: "1\\. not a list", ast: [para(t("1. not a list"))] },
+  { name: "escaped section", src: "\\::: details", ast: [para(t("::: details"))] },
+  { name: "escaped subscript", src: "a\\_{b}", ast: [para(t("a_{b}"))] },
+
   // --- inline mode --------------------------------------------------------
   { name: "inline mode disables headings", src: "# hi", ast: [t("# hi")], inline: true },
   { name: "inline mode disables lists", src: "- item", ast: [t("- item")], inline: true },
@@ -211,6 +357,9 @@ const fixtures: Fixture[] = [
   { name: "inline mode keeps line breaks", src: "a\nb", ast: [t("a"), br, t("b")], inline: true },
   { name: "inline mode keeps inline formatting", src: "**b** <@1>", ast: [strong(t("b")), t(" "), user("1")], inline: true },
   { name: "inline mode disables fences", src: "```\nx\n```", ast: [t("```"), br, t("x"), br, t("```")], inline: true },
+  { name: "inline mode disables tables", src: "| a |\n|---|", ast: [t("| a |"), br, t("|---|")], inline: true },
+  { name: "inline mode disables callouts", src: "> [!NOTE]", ast: [t("> [!NOTE]")], inline: true },
+  { name: "inline mode keeps colours and highlights", src: "[a]{red} ==b==", ast: [color("red", null, t("a")), t(" "), mark(t("b"))], inline: true },
 
   // --- combinations -------------------------------------------------------
   { name: "everything at once", src: "# t\n> q\n- i\n`c`", ast: [heading(1, t("t")), quote(t("q")), list(false, 1, [[t("i")]]), para(code("c"))] },
@@ -291,6 +440,57 @@ describe("fuzz", () => {
     parse("[a](" + "x".repeat(32000));
     extractUrls("https://a" + ")".repeat(64000));
     expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("is fast on the newer markers", () => {
+    const started = Date.now();
+    parse("==a ".repeat(2000));
+    parse("^{".repeat(4000));
+    parse("_{".repeat(4000));
+    parse("[a]".repeat(2600) + "{red}");
+    parse("[x]{".repeat(2000));
+    parse("[[[[" + "a]".repeat(3000));
+    parse("| a ".repeat(2000) + "\n" + "|---".repeat(2000));
+    parse("| a | b |\n|---|---|\n".repeat(400));
+    parse("||x||".repeat(1600) + "\n|---|");
+    parse("> [!NOTE]\n".repeat(800));
+    parse("::: details a\n".repeat(600));
+    parse(":::\n".repeat(2000));
+    parse(Array.from({ length: 800 }, (_, i) => " ".repeat(i % 60) + "- x").join("\n"));
+    parse("> ".repeat(3000) + "[!NOTE]");
+    parse("[^1]".repeat(2000) + "\n[^1]: x");
+    parse(Array.from({ length: 400 }, (_, i) => `[^${i}]: n[^${i + 1}]`).join("\n") + "\n" + Array.from({ length: 400 }, (_, i) => `[^${i}]`).join(" "));
+    parse("- [ ] ".repeat(1000));
+    parse("# " + "#".repeat(7000));
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it("caps how deep callouts, sections and lists nest", () => {
+    const depthOf = (nodes: Node[], kind: string): number => {
+      let best = 0;
+      for (const node of nodes) {
+        let inner: Node[] = [];
+        if (node.type === "alert" || node.type === "details") inner = node.children;
+        if (node.type === "list") inner = node.items.flat();
+        const d = (node.type === kind ? 1 : 0) + depthOf(inner, kind);
+        if (d > best) best = d;
+      }
+      return best;
+    };
+    const callouts = Array.from({ length: 12 }, (_, d) => "> ".repeat(d + 1) + "[!NOTE]").join("\n");
+    expect(depthOf(parse(callouts), "alert")).toBe(4);
+    expect(depthOf(parse("::: details a\n".repeat(20)), "details")).toBe(4);
+    const lists = Array.from({ length: 20 }, (_, d) => "  ".repeat(d) + "- x").join("\n");
+    expect(depthOf(parse(lists), "list")).toBe(6);
+  });
+
+  it("never lets a table grow past its columns", () => {
+    const head = "|" + " a |".repeat(100);
+    const delim = "|" + "---|".repeat(100);
+    const [node] = parse(head + "\n" + delim);
+    expect(node?.type).toBe("para" + "graph");
+    const [ok] = parse("|" + " a |".repeat(24) + "\n|" + "---|".repeat(24) + "\n|" + " 1 |".repeat(60));
+    expect(ok?.type === "table" && ok.rows[0]?.length).toBe(24);
   });
 
   it("still trims unbalanced closing brackets off a url", () => {
@@ -375,6 +575,32 @@ describe("plainText", () => {
   it("returns an empty string for an empty message", () => {
     expect(plainText(parse(""))).toBe("");
   });
+  it("reads headings, rules and checklists as plain lines", () => {
+    expect(plainText(parse("#### Four\n---\nafter"))).toBe("Four\n---\nafter");
+    expect(plainText(parse("- [ ] milk\n- [x] eggs"))).toBe("☐ milk\n☑ eggs");
+  });
+  it("reads a table row by row", () => {
+    expect(plainText(parse("| a | b |\n|---|---|\n| 1 | **2** |"))).toBe("a | b\n1 | 2");
+  });
+  it("names a callout in the reader's language", () => {
+    expect(plainText(parse("> [!WARNING]\n> Back up first"))).toBe("Warning: Back up first");
+    expect(plainText(parse("> [!TIP]"))).toBe("Tip");
+    expect(plainText(parse("before\n> [!NOTE]\n> - a\n> - b"))).toBe("before\nNote: a\nb");
+  });
+  it("keeps a folded section's words, so search finds them", () => {
+    expect(plainText(parse("::: details Logs\nline one\n:::"))).toBe("Logs\nline one");
+    expect(plainText(parse("::: details\nline\n:::"))).toBe("Details\nline");
+  });
+  it("drops the colour, highlight and script markers", () => {
+    expect(plainText(parse("E = mc^{2}, H_{2}O, ==key==, [red words]{red on yellow}"))).toBe("E = mc2, H2O, key, red words");
+  });
+  it("numbers footnotes and lists them at the end", () => {
+    expect(plainText(parse("a[^x] b\n[^x]: the note"))).toBe("a[1] b\n[1] the note");
+  });
+  it("still hides a spoiler inside the new blocks", () => {
+    expect(plainText(parse("> [!NOTE]\n> ||secret||"))).toBe("Note: [spoiler]");
+    expect(plainText(parse("| ||secret|| |\n|---|"))).toBe("[spoiler]");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -410,5 +636,12 @@ describe("extractUrls", () => {
   });
   it("returns an empty array when there is nothing to find", () => {
     expect(extractUrls("no links here")).toEqual([]);
+  });
+  it("finds links in tables, callouts, colours and footnotes", () => {
+    const src = "| https://a.b |\n|---|\n> [!NOTE]\n> https://c.d\n\n[==https://e.f==]{red} x[^1]\n[^1]: https://g.h";
+    expect(extractUrls(src)).toEqual(["https://a.b", "https://c.d", "https://e.f", "https://g.h"]);
+  });
+  it("skips links folded away in a section", () => {
+    expect(extractUrls("::: details\nhttps://a.b\n:::\nhttps://c.d")).toEqual(["https://c.d"]);
   });
 });

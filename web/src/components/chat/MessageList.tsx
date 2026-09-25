@@ -277,7 +277,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       if (!paneFocused || typeof document === "undefined" || document.visibilityState !== "visible") return;
       const st = channel.server_id ? useServers.getState().byId[channel.server_id] : undefined;
       const name = st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
-      const body = m.payload?.t ? plainText(parse(m.payload.t, { inline: true }), renderCtx).slice(0, 300) : "";
+      const body = m.payload?.t ? plainText(parse(m.payload.t), renderCtx).slice(0, 300) : "";
       const text = body
         ? t("chat.messageList.announce", { name, text: body })
         : m.payload?.sticker

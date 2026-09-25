@@ -98,7 +98,7 @@
    English message in an Arabic interface keeps its question mark at the end
    of the sentence and starts at the left, as in every app that shows the two
    side by side, and an Arabic one in English starts at the right. */
-.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-subtext), .pinText { unicode-bidi: plaintext; text-align: start; }
+.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-h4), .content :global(.md-h5), .content :global(.md-h6), .content :global(.md-subtext), .pinText { unicode-bidi: plaintext; text-align: start; }
 .waiting { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }
 .replyLine { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; height: 22px; font-size: 14px; color: var(--text-muted); position: relative; cursor: pointer; }
 /* the spine hooks up from the avatar column into this line; the avatar sits below it */
