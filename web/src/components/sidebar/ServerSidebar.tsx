@@ -63,7 +63,9 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
     if (!headRef.current) return;
     const r = headRef.current.getBoundingClientRect();
     setMenuOpen(true);
-    openContextMenu({ x: r.left + 8, y: r.bottom + 4, items: serverMenuItems(serverId, { nav, openModal }) });
+    // from the header's start edge, which is its right one in a right-to-left language
+    const x = document.documentElement.dir === "rtl" ? r.right - 8 : r.left + 8;
+    openContextMenu({ x, y: r.bottom + 4, items: serverMenuItems(serverId, { nav, openModal }) });
     menuWatch.current?.();
     menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {

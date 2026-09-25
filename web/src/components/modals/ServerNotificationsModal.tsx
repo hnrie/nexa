@@ -27,8 +27,8 @@ export function ServerNotificationsModal({ onClose, serverId }: { onClose: () =>
     <Modal open onClose={onClose} title={t("modals.serverNotifications.notificationSettings")} width={440} footer={<Button onClick={onClose}>{t("modals.serverNotifications.done")}</Button>}>
       <div className={s.form}>
         <p className={s.hint}>{st?.server.name}</p>
+        {/* the switch's row draws its own rule underneath */}
         <Toggle checked={muted} onChange={setMuted} label={t("modals.serverNotifications.muteName", { name: st?.server.name ?? "" })} description={t("modals.serverNotifications.mutingAServerPreventsUnreadIndicators")} />
-        <div className={s.sep} />
         <div className={s.radioList} role="radiogroup" aria-label={t("modals.serverNotifications.notificationSettings")}>
           {levels().map((l) => (
             <label key={l.v} className={s.radio} data-on={level === l.v}>

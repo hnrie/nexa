@@ -94,8 +94,8 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
           <KeyRound size={16} />
           <span>{key ? t("modals.invite.thisLinkCarriesTheServerS") : t("modals.invite.youDonTHoldThisServer")}</span>
         </div>
+        {/* the switch's row draws its own rule underneath */}
         <Toggle checked={withKey && !!key} disabled={!key} onChange={setWithKey} label={t("modals.invite.includeTheEncryptionKeyInThe")} />
-        <div className={s.sep} />
         <div className={s.row2}>
           <Field label={t("modals.groupInvite.expireAfter")}>
             <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(channel, v, uses); }}>

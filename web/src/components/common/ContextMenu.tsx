@@ -75,7 +75,10 @@ export function ContextMenuHost() {
       return;
     }
     const r = ref.current.getBoundingClientRect();
-    const x = Math.min(menu.x, window.innerWidth - r.width - 8);
+    // Towards the reading direction's end: in a right-to-left language a menu
+    // opens to the left of where it was asked for, as the system's own do.
+    const from = document.documentElement.dir === "rtl" ? menu.x - r.width : menu.x;
+    const x = Math.min(from, window.innerWidth - r.width - 8);
     const y = Math.min(menu.above ? menu.y - r.height : menu.y, window.innerHeight - r.height - 8);
     setPos({ x: Math.max(8, x), y: Math.max(8, y) });
   }, [menu]);

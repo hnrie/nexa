@@ -19,6 +19,7 @@ import { activeTab, paneAddress, panesIn, usePanes } from "@/stores/panes";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import { installAway } from "@/lib/away";
+import { installBackLayers } from "./backLayers";
 import s from "./AppShell.module.css";
 import { t } from "@/i18n";
 
@@ -89,6 +90,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     installVoice();
     installAway();
   }, []);
+
+  // back closes the dialog, the settings or the drawer on top (see backLayers)
+  useEffect(() => installBackLayers(), []);
 
   // Going somewhere closes the drawers. Picking a server or Direct Messages in
   // the rail only changes which list the drawer shows, so the drawer stays open

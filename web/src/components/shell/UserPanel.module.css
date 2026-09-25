@@ -28,5 +28,18 @@
 .update { color: var(--positive); }
 .update:hover { color: #fff; background: var(--positive); }
 
-/* mute and deafen sit side by side; on a touch screen a slip hit the other */
-@media (pointer: coarse) { .icon { width: 40px; height: 40px; } }
+/* a status that comes with a line of explanation keeps its dot beside the status's own name */
+.statusOpt { align-items: flex-start; }
+.statusDot { margin-top: 4px; }
+
+/* Mute and deafen sit side by side, and on a touch screen a slip hit the
+   other, so the buttons are a finger wide there. Three of those beside the
+   name left the name a letter or two ("E…") in a phone's drawer and cut
+   "Online" short on a tablet, so on touch screens the buttons get a row of
+   their own under the name. */
+@media (pointer: coarse) {
+  .icon { width: 40px; height: 40px; }
+  .panel { flex-wrap: wrap; height: auto; padding: 4px; gap: 0; }
+  .me { flex: 1 0 100%; }
+  .btns { flex: 1 0 100%; justify-content: space-evenly; }
+}

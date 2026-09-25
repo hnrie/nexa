@@ -11,6 +11,8 @@ const rows = (): [string, string][] => [
   [t("modals.shortcutsHelp.upEmptyComposer"), t("modals.shortcutsHelp.editYourLastMessage")],
   ["Enter / Shift Enter", t("modals.shortcutsHelp.sendNewLine")],
   [`${mod} E`, t("modals.shortcutsHelp.openTheEmojiPicker")],
+  [`${mod} Alt ← / →`, t("modals.shortcutsHelp.switchTabs")],
+  [`${mod} Alt W`, t("modals.shortcutsHelp.closePaneOrTab")],
   [`${mod} Shift M`, t("modals.shortcutsHelp.toggleMute")],
   [`${mod} Shift D`, t("modals.shortcutsHelp.toggleDeafen")],
   ["Shift PageUp / PageDown", t("modals.shortcutsHelp.scrollTheMessages")],
@@ -24,8 +26,8 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
         <tbody>
           {rows().map(([k, v]) => (
             <tr key={k}>
-              <td style={{ padding: "8px 12px 8px 0", whiteSpace: "nowrap" }}><kbd style={{ padding: "2px 6px", borderRadius: 4, background: "var(--bg-input)", border: "1px solid var(--border)", fontSize: 13 }}>{k}</kbd></td>
-              <td style={{ padding: "8px 0", color: "var(--text)" }}>{v}</td>
+              <td style={{ paddingBlock: 8, paddingInlineEnd: 12, whiteSpace: "nowrap" }}><kbd style={{ padding: "2px 6px", borderRadius: 4, background: "var(--bg-input)", border: "1px solid var(--border)", fontSize: 13 }}>{k}</kbd></td>
+              <td style={{ paddingBlock: 8, color: "var(--text)" }}>{v}</td>
             </tr>
           ))}
         </tbody>

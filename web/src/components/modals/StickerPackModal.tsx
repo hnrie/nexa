@@ -52,7 +52,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
         openModal("settings", { page: "stickers", packId: pack.id });
       }}
     >
-      Edit Pack
+      {t("stickerPack.editPack")}
     </Button>
   ) : installed ? (
     <Button variant="secondary" disabled data-testid="sticker-pack-installed">
@@ -60,7 +60,7 @@ export function StickerPackModal({ onClose, info, stickerId }: { onClose: () => 
     </Button>
   ) : (
     <Button loading={busy} onClick={() => void install()} data-testid="install-sticker-pack">
-      Install Sticker Pack
+      {t("stickerPack.installPack")}
     </Button>
   );
 

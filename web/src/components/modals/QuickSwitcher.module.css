@@ -1,14 +1,15 @@
 .box { background: var(--bg-surface); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .input { height: 56px; padding: 0 16px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); font-size: 20px; border: 0; outline: none; }
 .list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; }
-.item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: var(--radius-xs); color: var(--text); font-size: 16px; text-align: start; }
+/* rows keep their height and the list scrolls: squeezed to fit a phone's short list they were 26px, too small to tap */
+.item { flex: none; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: var(--radius-xs); color: var(--text); font-size: 16px; text-align: start; }
 .item[data-selected="true"] { background: var(--bg-selected); }
 .label { font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub { color: var(--text-muted); font-size: 14px; margin-inline-start: auto; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty { padding: 16px; text-align: center; color: var(--text-muted); }
 .foot { font-size: 12px; color: var(--text-muted); display: flex; gap: 12px; }
 .foot b { color: var(--text-subtle); }
-.hash { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-weight: 600; font-size: 18px; }
+.hash { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-weight: 600; font-size: 18px; }
 /* Phones: the keyboard opens at once and does not shrink the layout, so a sheet at the bottom
    leaves the results under it. Sit at the top, and keep the list short enough to stay above it. */
 @media (max-width: 767px) {
@@ -27,7 +28,7 @@
 .inputRow .input { flex: 1; min-width: 0; padding-inline-end: 44px; }
 .clear { position: absolute; inset-inline-end: 12px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: var(--text-muted); font-size: 20px; line-height: 1; }
 .clear:hover { background: var(--bg-active); color: var(--text-strong); }
-.hit { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--radius-xs); color: var(--text); text-align: start; }
+.hit { flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--radius-xs); color: var(--text); text-align: start; }
 .hit[data-selected="true"] { background: var(--bg-selected); }
 .hitBody { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .hitHead { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 14px; }

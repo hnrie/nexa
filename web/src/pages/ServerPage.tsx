@@ -1,6 +1,6 @@
 import { Volume2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { Button } from "@/components/common/Button";
@@ -19,6 +19,10 @@ import { t as tr_ } from "@/i18n";
 export default function ServerPage() {
   const { serverId = "", channelId, messageId } = useParams();
   const nav = useNavigate();
+  // Handed on through the redirects below: opening a server from the phone's
+  // drawer asks it to stay open on the channel list (AppShell's keepDrawer),
+  // and the hop to the first channel dropped that and shut the drawer.
+  const { state: navState } = useLocation();
   const st = useServers((x) => x.byId[serverId]);
   const setFromView = useServers((x) => x.setFromView);
   const channels = useChannels((c) => c.byId);
@@ -124,12 +128,12 @@ export default function ServerPage() {
   }
   if (!st) return <PaneSpinner text={tr_("server.openingServer")} />;
   if (!channelId || (channelId && !channel && firstText)) {
-    if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace />;
+    if (firstText) return <Navigate to={`/channels/${serverId}/${firstText}`} replace state={navState} />;
     if (!channelId) return <NoChannels />;
   }
   if (!channel || channel.server_id !== serverId) return <NoChannels />;
   if (channel.type === "voice") return <VoiceRoom channel={channel} />;
-  if (channel.type === "category") return <Navigate to={`/channels/${serverId}`} replace />;
+  if (channel.type === "category") return <Navigate to={`/channels/${serverId}`} replace state={navState} />;
   return <ChatView channel={channel} />;
 }
 

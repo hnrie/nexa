@@ -20,10 +20,20 @@ function coarsePointer(): boolean {
 
 const GAP = 8;
 
-/** Places the bubble beside the trigger, nudged back on screen if it would not fit, with where its arrow points. */
-function place(anchor: DOMRect, box: DOMRect, side: Side): { left: number; top: number; side: Side; arrow: number } {
+/**
+ * Places the bubble beside the trigger, nudged back on screen if it would not
+ * fit, with where its arrow points. Left and right are the reading direction's:
+ * in a right-to-left language the server rail sits on the right edge, and its
+ * names, asked for on the "right", came out on top of the rail itself.
+ */
+function place(anchor: DOMRect, box: DOMRect, wanted: Side): { left: number; top: number; side: Side; arrow: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
+  let side = wanted;
+  if ((side === "left" || side === "right") && document.documentElement.dir === "rtl") side = side === "left" ? "right" : "left";
+  // and a side with no room for it is swapped for the other one
+  if (side === "right" && anchor.right + GAP + box.width > vw - 4 && anchor.left - GAP - box.width >= 4) side = "left";
+  else if (side === "left" && anchor.left - GAP - box.width < 4 && anchor.right + GAP + box.width <= vw - 4) side = "right";
   let left = anchor.left + anchor.width / 2 - box.width / 2;
   let top = anchor.top - box.height - GAP;
   if (side === "bottom") top = anchor.bottom + GAP;

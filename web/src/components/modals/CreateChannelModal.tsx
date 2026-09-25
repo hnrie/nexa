@@ -94,7 +94,7 @@ export function CreateChannelModal({ onClose, serverId, parentId }: { onClose: (
         <Field label={t("modals.createChannel.channelName")} required>
           <div className={s.hashInput}>
             {type === "text" ? <Hash size={16} /> : <Volume2 size={16} />}
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="new-channel" maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createChannel.namePlaceholder")} maxLength={100} autoFocus onKeyDown={(e) => e.key === "Enter" && void create()} data-testid="channel-name" />
           </div>
         </Field>
         <Toggle checked={priv} onChange={setPriv} label={t("modals.createChannel.privateChannel")} description={t("modals.createChannel.onlySelectedMembersAndRolesWill")} />

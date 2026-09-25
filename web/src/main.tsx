@@ -9,6 +9,7 @@ import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
 import { installNoZoom } from "./lib/noZoom";
 import { installKeyboardInset } from "./lib/keyboardInset";
+import { applyRememberedAppearance } from "./lib/theme";
 import { ensureTwemojiIndex } from "./lib/twemoji";
 import "./styles/base.css";
 
@@ -48,6 +49,10 @@ installNoZoom();
 installKeyboardInset();
 // the first emoji on screen should not have to wait for the list of pictures
 ensureTwemojiIndex();
+
+// The look this device last had, on before anything is drawn: the account's
+// own settings only arrive with the gateway's ready (see ThemeEffect).
+applyRememberedAppearance();
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("missing #root");

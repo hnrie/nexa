@@ -117,7 +117,7 @@ export function UserPanel() {
               if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
               e.preventDefault();
               const r = e.currentTarget.getBoundingClientRect();
-              openMicMenu({ x: r.left, y: r.top });
+              openMicMenu({ x: document.documentElement.dir === "rtl" ? r.right : r.left, y: r.top });
             }}
           >
             {muted ? <MicOff size={20} /> : <Mic size={20} />}
@@ -158,8 +158,8 @@ export function UserPanel() {
           </button>
           <div className={s.sep} role="separator" />
           {statusOptions().map((o) => (
-            <button key={o.value} className={s.opt} onClick={() => choose(o.value)} role="menuitemradio" aria-checked={status === o.value}>
-              <StatusDot status={o.value} size={12} />
+            <button key={o.value} className={[s.opt, s.statusOpt].join(" ")} onClick={() => choose(o.value)} role="menuitemradio" aria-checked={status === o.value}>
+              <StatusDot status={o.value} size={12} className={s.statusDot} />
               <span className={s.optText}>
                 <span>{o.label}</span>
                 {o.sub ? <span className={s.optSub}>{o.sub}</span> : null}

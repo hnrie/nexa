@@ -1,5 +1,9 @@
 import { blend, contrast, parseHex, readableOn, rgbToHsl, shade, toHex, tuneForContrast, withAlpha } from "@/lib/color";
+import { storage } from "@/lib/storage";
 import type { Settings } from "@/stores/settings";
+
+/** What applyTheme draws the page with. */
+export type Appearance = Pick<Settings, "theme" | "accent" | "fontScale" | "reducedMotion" | "underlineLinks">;
 
 /**
  * The surface in each theme that is hardest to read on, which is where anything
@@ -78,7 +82,7 @@ export function accentVars(accent: string, theme: "dark" | "light" | "ash" | "on
 }
 
 /** Applies theme, accent, font scale and motion preferences to the document. */
-export function applyTheme(s: Pick<Settings, "theme" | "accent" | "fontScale" | "reducedMotion" | "underlineLinks">): void {
+export function applyTheme(s: Appearance): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   const resolved = resolveTheme(s.theme);
@@ -92,4 +96,49 @@ export function applyTheme(s: Pick<Settings, "theme" | "accent" | "fontScale" | 
   root.dataset["underlineLinks"] = s.underlineLinks ? "true" : "false";
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", resolved === "light" ? "#f3f3f4" : resolved === "onyx" ? "#000000" : resolved === "ash" ? "#1a1a1e" : "#2c2d32");
+}
+
+const REMEMBERED = "ec:appearance";
+const THEMES: readonly Settings["theme"][] = ["dark", "light", "ash", "onyx", "system"];
+
+/**
+ * The appearance this device last drew the app in.
+ *
+ * The account's own settings are encrypted and arrive with the gateway's
+ * ready, a second or two after the page has already been drawn — in the
+ * default dark theme, at the default size. Someone who uses the light theme
+ * saw a dark flash on every reload, and a larger font made the whole layout
+ * jump once the settings landed. Remembering the last appearance here lets
+ * the first frame already be the right one. Anything unreadable is ignored
+ * rather than trusted: a bad value costs the flash, never a broken page.
+ */
+export function rememberedAppearance(): Appearance | null {
+  const raw = storage.get(REMEMBERED);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Record<string, unknown> | null;
+    if (!v || typeof v !== "object" || !THEMES.includes(v["theme"] as Settings["theme"])) return null;
+    const accent = typeof v["accent"] === "string" && parseHex(v["accent"]) ? v["accent"] : null;
+    const scale = Number(v["fontScale"]);
+    return {
+      theme: v["theme"] as Settings["theme"],
+      accent,
+      fontScale: Number.isFinite(scale) && scale > 0 ? scale : 1,
+      reducedMotion: v["reducedMotion"] === true,
+      underlineLinks: v["underlineLinks"] === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps the appearance for the next page load on this device (see rememberedAppearance). */
+export function rememberAppearance(a: Appearance): void {
+  storage.set(REMEMBERED, JSON.stringify({ theme: a.theme, accent: a.accent, fontScale: a.fontScale, reducedMotion: a.reducedMotion, underlineLinks: a.underlineLinks }));
+}
+
+/** Draws the page in the remembered appearance, if there is one; for before the first render. */
+export function applyRememberedAppearance(): void {
+  const a = rememberedAppearance();
+  if (a) applyTheme(a);
 }

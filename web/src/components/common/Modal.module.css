@@ -1,5 +1,8 @@
 .overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: var(--bg-overlay); animation: fadeIn 120ms ease-out; padding: 16px; }
 .card { max-width: 100%; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: var(--bg-surface); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: pop 160ms ease-out; outline: none; overflow: hidden; }
+/* The dialog itself takes focus only so a screen reader starts inside it; a
+   ring round the whole card says nothing a keyboard user needs to know. */
+.card:focus-visible { outline: none; }
 .bare { background: transparent; box-shadow: none; }
 .header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 0; }
 .title { margin: 0; font-size: 20px; font-weight: 600; color: var(--text-strong); }

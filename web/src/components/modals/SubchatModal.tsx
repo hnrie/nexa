@@ -61,10 +61,24 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
   };
 
   return (
-    <Modal title={editing ? t("chat.subchat.editSubchat") : t("modals.subchat.newSubchat")} open onClose={onClose} width={440}>
+    <Modal
+      title={editing ? t("chat.subchat.editSubchat") : t("modals.subchat.newSubchat")}
+      open
+      onClose={onClose}
+      width={440}
+      // Cancel and the action at the foot, as in every other dialog that makes something
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>{t("chat.editMessage.cancel")}</Button>
+          <Button loading={busy} disabled={!name.trim()} onClick={() => void save()} data-testid="subchat-modal-save">
+            {editing ? t("chat.editMessage.save") : t("modals.subchat.createSubchat")}
+          </Button>
+        </>
+      }
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Field label={t("modals.subchat.name")} required>
-          <TextInput value={name} maxLength={MAX_NAME} autoFocus onChange={(e) => setName(e.target.value)} data-testid="subchat-modal-name" />
+          <TextInput value={name} maxLength={MAX_NAME} autoFocus onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} data-testid="subchat-modal-name" />
         </Field>
         <Toggle
           checked={wantsPassword}
@@ -95,10 +109,7 @@ export default function SubchatModal({ onClose, channel, parentId }: { onClose: 
             ) : null}
           </>
         ) : null}
-        {error ? <div style={{ color: "var(--danger)", fontSize: 14 }}>{error}</div> : null}
-        <Button block loading={busy} disabled={!name.trim()} onClick={() => void save()} data-testid="subchat-modal-save">
-          {editing ? t("chat.editMessage.save") : t("modals.subchat.createSubchat")}
-        </Button>
+        {error ? <div role="alert" style={{ color: "var(--danger)", fontSize: 14 }}>{error}</div> : null}
       </div>
     </Modal>
   );

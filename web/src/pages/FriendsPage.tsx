@@ -11,7 +11,6 @@ import { Tooltip } from "@/components/common/Tooltip";
 import { audioContext } from "@/voice/media";
 import { joinVoice } from "@/voice/session";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
-import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
 import { activityLine } from "@/lib/activity";
@@ -80,8 +79,8 @@ export default function FriendsPage() {
     <div className={s.page}>
       <header className={s.header}>
         <PageHeaderButtons />
-        <div className={s.title}><Users size={22} /> {tr_("sidebar.dMSidebar.friends")}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }} role="tablist" aria-label={tr_("sidebar.dMSidebar.friends")}>
+        <div className={s.title}><Users size={22} /> <span className={s.titleText}>{tr_("sidebar.dMSidebar.friends")}</span></div>
+        <div className={s.tabs} role="tablist" aria-label={tr_("sidebar.dMSidebar.friends")}>
           {tabs.map((x) => (
             <button key={x.id} className={s.tab} role="tab" aria-selected={tab === x.id} tabIndex={tab === x.id ? 0 : -1} onKeyDown={onTabKey} data-selected={tab === x.id} onClick={() => setTab(x.id)}>
               {x.count ? `${x.label} (${x.count})` : x.label}
@@ -139,7 +138,6 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
   const upsertChannel = useChannels((c) => c.upsert);
   const setRel = useRelationships((r) => r.set);
   const removeRel = useRelationships((r) => r.remove);
-  const meId = useAuth((a) => a.me?.id);
   const status = statusOf(p);
   const cs = customStatus(p);
   const act = activitiesOf(p)[0];
@@ -230,7 +228,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
     const fromKeys = e.clientX === 0 && e.clientY === 0;
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
     openContextMenu({
-      x: fromKeys ? r.left : e.clientX,
+      x: fromKeys ? (document.documentElement.dir === "rtl" ? r.right : r.left) : e.clientX,
       y: fromKeys ? r.bottom + 4 : e.clientY,
       items: [
         { id: "profile", label: tr_("profile.profile.profile"), onSelect: () => useUI.getState().openModal("profile", { userId: rel.user.id }) },
@@ -273,7 +271,6 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
           <Tooltip text={tr_("friends.unblock")}><button className={[s.act, s.no].join(" ")} aria-label={tr_("friends.unblock")} onClick={() => void remove(tr_("friends.unblocked"))}><X size={20} /></button></Tooltip>
         )}
       </div>
-      {meId ? null : null}
     </div>
   );
 }

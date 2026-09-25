@@ -90,6 +90,17 @@ describe("Modal", () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  it("starts in the field to type into, not a radio or a hidden file input before it", () => {
+    render(
+      <Modal open onClose={() => {}} title="Create Channel">
+        <input type="radio" aria-label="Text" defaultChecked />
+        <input type="file" hidden aria-label="Icon" />
+        <input aria-label="Channel name" />
+      </Modal>,
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText("Channel name"));
+  });
+
   it("gives Escape to the topmost dialog only", () => {
     const outer = vi.fn();
     const inner = vi.fn();

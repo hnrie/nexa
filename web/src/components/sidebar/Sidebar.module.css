@@ -30,6 +30,11 @@
 .subItem[data-selected="true"] { background: var(--bg-active); color: var(--text-strong); }
 .subItem[data-unread="true"] { color: var(--text-strong); font-weight: 600; }
 .item[data-parent-selected="true"] { background: var(--bg-hover); }
+/* a finger's worth of room for the search box and the "+" beside Direct Messages, without moving either */
+@media (pointer: coarse) {
+  .searchBtn { height: 40px; }
+  .headerBtn { padding: 12px; margin: -12px -10px; }
+}
 /* hover-only, since on iOS a tap that reveals it is taken as a hover and does not open the conversation; long-press offers Close DM */
 @media (hover: hover) { .item:hover .close { display: flex; } }
 /* reachable from the keyboard as well: it shows while the row has focus */

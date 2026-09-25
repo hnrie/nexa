@@ -34,6 +34,18 @@ interface Props {
 
 /** What Tab can reach, for the trap below. */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** Somewhere to type: where a dialog that asks for something starts. Not a radio, a switch or a file input. */
+const TEXT_FIELD = "input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([disabled]), textarea:not([disabled])";
+
+/**
+ * Of these, the ones laid out — or all of them where nothing is, which is a
+ * page without layout (jsdom, a print preview) as often as a hidden section;
+ * focusing one that cannot take it is caught where this is used.
+ */
+function shown<T extends Element>(all: T[]): T[] {
+  const laidOut = all.filter((el) => el.getClientRects().length > 0);
+  return laidOut.length > 0 ? laidOut : all;
+}
 
 export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true }: Props) {
   const ref = useRef<HTMLDivElement>(null);
@@ -60,6 +72,10 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
   // every keystroke, so a field could only ever take one character.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  // What had focus as the dialog was first drawn, for when something inside
+  // has already taken focus by the time the effect below runs: handing focus
+  // back to that, gone with the dialog, left it nowhere.
+  const [opener] = useState<HTMLElement | null>(() => (typeof document === "undefined" ? null : (document.activeElement as HTMLElement | null)));
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -98,17 +114,33 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
       }
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.activeElement as HTMLElement | null;
-    // Start in the first field, so a dialog that asks for something is ready
-    // to type into — except on a touch screen, where focusing a field opens
-    // the keyboard over the dialog before anyone has read it.
+    const card = ref.current;
+    const active = document.activeElement as HTMLElement | null;
+    // Focus somewhere else came back there from a menu this dialog was chosen
+    // in (a menu hands focus back to what it opened from); focus already
+    // inside belongs to whatever opened the dialog.
+    const prev = active && card && !card.contains(active) ? active : opener;
+    // Start in the field to type into, so a dialog that asks for something is
+    // ready for it — unless something inside has already taken focus. Not on
+    // a touch screen, where focusing a field opens the keyboard over the
+    // dialog before anyone has read it. The first field used to be any input
+    // at all: a radio button ahead of the name to type, or the hidden file
+    // input of an icon picker, which cannot take focus and so left it on the
+    // page behind the dialog. (React's autoFocus is no help here: it fires
+    // before this dialog's container is in the document.)
     const touch = typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
-    const first = touch ? null : ref.current?.querySelector<HTMLElement>("input:not([type=hidden]):not([disabled]), textarea:not([disabled])");
-    (first ?? ref.current)?.focus();
+    const chosen = !touch && card && active && active !== card && card.contains(active);
+    if (!chosen && card) {
+      const field = touch ? null : shown([...card.querySelectorAll<HTMLElement>(TEXT_FIELD)])[0];
+      field?.focus();
+      if (!field || document.activeElement !== field) card.focus();
+    }
     return () => {
       document.removeEventListener("keydown", onKey);
-      prev?.focus?.();
+      if (prev && prev.isConnected) prev.focus?.();
     };
+    // the opener is read once, as the dialog is first drawn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   if (!open || !host) return null;
   return createPortal(
