@@ -387,7 +387,7 @@ func TestDeleteMessagesInOneChannel(t *testing.T) {
 		t.Fatalf("authors: %v %v", err, authors)
 	}
 	deleted, err := s.DeleteMessages(ctx, dm.ID, []ids.ID{one.ID, two.ID, elsewhere.ID, 424242})
-	if err != nil || len(deleted) != 2 {
+	if err != nil || len(deleted.IDs) != 2 {
 		t.Fatalf("delete: %v %v", err, deleted)
 	}
 	if bl, _ := s.BlobByID(ctx, blob.ID); bl.RefCount != 0 {
@@ -400,7 +400,7 @@ func TestDeleteMessagesInOneChannel(t *testing.T) {
 	if _, err := s.MessageByID(ctx, elsewhere.ID, a.ID); err != nil {
 		t.Errorf("another channel's message went too: %v", err)
 	}
-	if deleted, err := s.DeleteMessages(ctx, dm.ID, []ids.ID{one.ID}); err != nil || len(deleted) != 0 {
+	if deleted, err := s.DeleteMessages(ctx, dm.ID, []ids.ID{one.ID}); err != nil || len(deleted.IDs) != 0 {
 		t.Errorf("deleting again: %v %v", err, deleted)
 	}
 }
@@ -444,8 +444,8 @@ func TestPurgeReturnsWhatItDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := map[ids.ID]bool{}
-	for _, list := range deleted {
-		for _, id := range list {
+	for _, d := range deleted {
+		for _, id := range d.IDs {
 			got[id] = true
 		}
 	}
@@ -470,5 +470,39 @@ func TestPurgeReturnsWhatItDeleted(t *testing.T) {
 	}
 	if fresh.LastMessageID == nil || *fresh.LastMessageID != keep.ID {
 		t.Errorf("last_message_id = %v, want %v", fresh.LastMessageID, keep.ID)
+	}
+}
+
+// A deletion reports what the messages it took mentioned, for readers whose
+// badges counted messages they never loaded; the rest it only names.
+func TestDeletionsSayWhatTheyMentioned(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b := mkUser(t, s, "delmenta"), mkUser(t, s, "delmentb")
+	dm, _, _ := s.CreateDM(ctx, a.ID, b.ID)
+	plain := mkMsg(t, s, dm.ID, a.ID, "plain")
+	ping := &Message{ChannelID: dm.ID, AuthorID: a.ID, Ciphertext: json.RawMessage(`{"v":1}`), Mentions: []ids.ID{b.ID}}
+	all := &Message{ChannelID: dm.ID, AuthorID: a.ID, Ciphertext: json.RawMessage(`{"v":1}`), MentionEveryone: true}
+	for _, m := range []*Message{ping, all} {
+		if err := s.InsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d, err := s.DeleteMessages(ctx, dm.ID, []ids.ID{plain.ID, ping.ID, all.ID})
+	if err != nil || len(d.IDs) != 3 {
+		t.Fatalf("delete: %v %+v", err, d)
+	}
+	if len(d.Mentions) != 2 {
+		t.Fatalf("mentions reported: %+v", d.Mentions)
+	}
+	byID := map[ids.ID]MentionMeta{}
+	for _, m := range d.Mentions {
+		byID[m.ID] = m
+	}
+	if m := byID[ping.ID]; m.AuthorID != a.ID || len(m.Mentions) != 1 || m.Mentions[0] != b.ID || m.MentionEveryone {
+		t.Errorf("the mention of b: %+v", m)
+	}
+	if m := byID[all.ID]; !m.MentionEveryone {
+		t.Errorf("the @everyone: %+v", m)
 	}
 }

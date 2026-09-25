@@ -1,4 +1,4 @@
-import type { GatewayEvent } from "./events";
+import type { GatewayEvent, MentionMeta } from "./events";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
@@ -141,11 +141,17 @@ async function ensureUser(id: string): Promise<void> {
   }
 }
 
-/** Whether a loaded message was one this account's mention count was bumped for. */
-function mentionedMe(channelId: string, messageId: string, meId: string | undefined): boolean {
+/**
+ * Whether a message was one this account's mention count was bumped for: by
+ * the copy loaded here, or else by what its event says it mentioned — the
+ * badge counted messages this device never loaded too.
+ */
+function mentionedMe(channelId: string, messageId: string, meId: string | undefined, told?: Partial<MentionMeta>): boolean {
   if (!meId) return false;
-  const m = useMessages.getState().channels[channelId]?.byId[messageId];
-  return !!m && m.author_id !== meId && mentionsMe(m, meId);
+  const loaded = useMessages.getState().channels[channelId]?.byId[messageId];
+  if (loaded) return loaded.author_id !== meId && mentionsMe(loaded, meId);
+  if (!told?.mentions || !told.author_id) return false;
+  return told.author_id !== meId && mentionsMe({ channel_id: channelId, mentions: told.mentions, mention_roles: told.mention_roles ?? [], mention_everyone: !!told.mention_everyone }, meId);
 }
 
 export async function applyEvent(e: GatewayEvent): Promise<void> {
@@ -233,6 +239,14 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "message_update": {
       const decrypted = await decryptForStore(e.d);
       if (gone()) return;
+      // An edit can add a mention the badge should count or take one back
+      // that it did; the event says what the message mentioned before.
+      if (meId && e.d.was && e.d.author_id !== meId) {
+        const before = mentionsMe({ ...e.d.was, channel_id: e.d.channel_id }, meId);
+        const after = mentionsMe(e.d, meId);
+        if (before && !after) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
+        else if (!before && after) useReadStates.getState().addMention(e.d.channel_id, e.d.id);
+      }
       useMessages.getState().update(e.d.channel_id, decrypted);
       return;
     }
@@ -240,14 +254,15 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // Read before it goes: only the message itself says whether it was
       // counted as a mention, and a mention taken back as unread but not as a
       // mention leaves a red pill on a channel with nothing left to read.
-      const counted = mentionedMe(e.d.channel_id, e.d.id, meId);
+      const counted = mentionedMe(e.d.channel_id, e.d.id, meId, e.d);
       useMessages.getState().remove(e.d.channel_id, e.d.id);
       useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
       if (counted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
       return;
     }
     case "message_delete_bulk": {
-      const counted = e.d.ids.filter((id) => mentionedMe(e.d.channel_id, id, meId));
+      const told = new Map((e.d.mentions ?? []).map((m) => [m.id, m]));
+      const counted = e.d.ids.filter((id) => mentionedMe(e.d.channel_id, id, meId, told.get(id)));
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
       for (const id of e.d.ids) useReadStates.getState().dropUnread(e.d.channel_id, id);
       for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);

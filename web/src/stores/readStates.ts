@@ -23,6 +23,8 @@ interface ReadStatesState {
   dropUnread: (channelId: string, messageId: string) => void;
   /** The same for a mention: the two are counted together, so they have to be taken back together. */
   dropMention: (channelId: string, messageId: string) => void;
+  /** Counts a mention an edit added to an unread message. */
+  addMention: (channelId: string, messageId: string) => void;
   markRead: (channelId: string, messageId: string) => void;
   ack: (channelId: string, messageId: string) => Promise<void>;
   clear: () => void;
@@ -112,6 +114,12 @@ export const useReadStates = create<ReadStatesState>()((set, get) => ({
       const cur = s.byChannel[channelId];
       if (!cur || cur.mentions === 0 || (cur.lastReadId && compareIds(messageId, cur.lastReadId) <= 0)) return s;
       return { byChannel: { ...s.byChannel, [channelId]: { ...cur, mentions: cur.mentions - 1 } } };
+    }),
+  addMention: (channelId, messageId) =>
+    set((s) => {
+      const cur = s.byChannel[channelId] ?? EMPTY;
+      if (cur.lastReadId && compareIds(messageId, cur.lastReadId) <= 0) return s;
+      return { byChannel: { ...s.byChannel, [channelId]: { ...cur, mentions: cur.mentions + 1 } } };
     }),
   markRead: (channelId, messageId) =>
     set((s) => {

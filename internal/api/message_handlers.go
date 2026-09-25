@@ -94,6 +94,26 @@ type messageBody struct {
 	Flags int64  `json:"flags"`
 }
 
+// messageUpdateEvent is message_update's payload: the message as it is now,
+// and what it mentioned before the edit.
+type messageUpdateEvent struct {
+	*store.Message
+	Was mentionsBefore `json:"was"`
+}
+
+type mentionsBefore struct {
+	Mentions        []ids.ID `json:"mentions"`
+	MentionRoles    []ids.ID `json:"mention_roles"`
+	MentionEveryone bool     `json:"mention_everyone"`
+}
+
+// bulkDeleteEvent is message_delete_bulk's payload: the ids, and what those
+// of them that mentioned anyone mentioned, for readers whose unread badges
+// counted messages they never loaded.
+func bulkDeleteEvent(ch ids.ID, d *store.Deleted) map[string]any {
+	return map[string]any{"channel_id": ch, "ids": d.IDs, "mentions": d.Mentions}
+}
+
 // allowedRoleMentions keeps the role mentions a message may make: roles of the
 // channel's own server other than @everyone, which has a flag of its own, and
 // of those only the ones anyone may mention, unless the author may mention
@@ -412,9 +432,11 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reactions carry a "me" flag for whoever loaded them, so everyone gets a
-	// copy loaded for no one rather than the editor's.
+	// copy loaded for no one rather than the editor's. What it mentioned before
+	// goes along: an edit can add or take away a mention an unread badge
+	// counted, and a reader who never loaded the message cannot tell which.
 	if shared, err := s.Store.MessageByID(r.Context(), mid, 0); err == nil {
-		s.Bcast.EmitChannel(ch.ID, "message_update", shared)
+		s.Bcast.EmitChannel(ch.ID, "message_update", messageUpdateEvent{shared, mentionsBefore{m.Mentions, m.MentionRoles, m.MentionEveryone}})
 	}
 	WriteJSON(w, http.StatusOK, updated)
 }
@@ -445,7 +467,10 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	s.Bcast.EmitChannel(ch.ID, "message_delete", map[string]any{"id": mid, "channel_id": ch.ID})
+	// what it mentioned goes along: a reader who never loaded it had it
+	// counted in an unread badge, and nothing else says to take it back
+	s.Bcast.EmitChannel(ch.ID, "message_delete", map[string]any{"id": mid, "channel_id": ch.ID, "author_id": m.AuthorID,
+		"mentions": m.Mentions, "mention_roles": m.MentionRoles, "mention_everyone": m.MentionEveryone})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -494,10 +519,10 @@ func (s *Server) handleMessageBulkDelete(w http.ResponseWriter, r *http.Request)
 		WriteError(w, err)
 		return
 	}
-	if len(deleted) > 0 {
-		s.Bcast.EmitChannel(ch.ID, "message_delete_bulk", map[string]any{"channel_id": ch.ID, "ids": deleted})
+	if len(deleted.IDs) > 0 {
+		s.Bcast.EmitChannel(ch.ID, "message_delete_bulk", bulkDeleteEvent(ch.ID, deleted))
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"ids": deleted})
+	WriteJSON(w, http.StatusOK, map[string]any{"ids": deleted.IDs})
 }
 
 // canDeleteOthers says whether the caller may remove messages other people

@@ -341,28 +341,62 @@ func (s *Store) MessageAuthors(ctx context.Context, chID ids.ID, list []ids.ID) 
 	return out, rows.Err()
 }
 
+// MentionMeta is what a message mentioned, which is what unread badges
+// counted it by.
+type MentionMeta struct {
+	ID              ids.ID   `json:"id"`
+	AuthorID        ids.ID   `json:"author_id"`
+	Mentions        []ids.ID `json:"mentions"`
+	MentionRoles    []ids.ID `json:"mention_roles"`
+	MentionEveryone bool     `json:"mention_everyone"`
+}
+
+// Deleted is what a deletion took from one channel: the ids, and what those
+// of them that mentioned anyone mentioned. The mentions are for readers who
+// never loaded the messages: their badges counted them, and only the
+// deletion's event can tell them which to take back.
+type Deleted struct {
+	IDs      []ids.ID
+	Mentions []MentionMeta
+}
+
+// mentionCols are the columns mentionOf reads, after id and channel_id.
+const mentionCols = `author_id, mentions, mention_roles, mention_everyone`
+
+// note records one message found for deletion in its channel's Deleted.
+func (d *Deleted) note(id, author int64, mentions, roles string, everyone int64) {
+	d.IDs = append(d.IDs, ids.ID(id))
+	if everyone == 1 || mentions != "[]" || roles != "[]" {
+		d.Mentions = append(d.Mentions, MentionMeta{ID: ids.ID(id), AuthorID: ids.ID(author), Mentions: parseIDsJSON(mentions), MentionRoles: parseIDsJSON(roles), MentionEveryone: everyone == 1})
+	}
+}
+
+func newDeleted() *Deleted { return &Deleted{IDs: []ids.ID{}, Mentions: []MentionMeta{}} }
+
 // DeleteMessages removes several messages of one channel in a single
 // transaction, releasing their attachment blobs and fixing the channel's
 // last_message_id. Ids that are gone or belong to another channel are
-// skipped; the ones actually deleted are returned.
-func (s *Store) DeleteMessages(ctx context.Context, chID ids.ID, list []ids.ID) ([]ids.ID, error) {
-	deleted := make([]ids.ID, 0, len(list))
+// skipped; what was actually deleted is returned.
+func (s *Store) DeleteMessages(ctx context.Context, chID ids.ID, list []ids.ID) (*Deleted, error) {
+	var deleted *Deleted
 	err := s.Tx(ctx, func(tx *db.Tx) error {
-		deleted = deleted[:0]
+		deleted = newDeleted()
 		for _, id := range list {
-			var n int
-			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM messages WHERE id = ? AND channel_id = ?`, int64(id), int64(chID)).Scan(&n); err != nil {
-				return err
-			}
-			if n == 0 {
+			var author, everyone int64
+			var mentions, roles string
+			err := tx.QueryRowContext(ctx, `SELECT `+mentionCols+` FROM messages WHERE id = ? AND channel_id = ?`, int64(id), int64(chID)).Scan(&author, &mentions, &roles, &everyone)
+			if errors.Is(err, sql.ErrNoRows) {
 				continue
+			}
+			if err != nil {
+				return err
 			}
 			if err := deleteMessageTx(ctx, tx, id); err != nil {
 				return err
 			}
-			deleted = append(deleted, id)
+			deleted.note(int64(id), author, mentions, roles, everyone)
 		}
-		if len(deleted) == 0 {
+		if len(deleted.IDs) == 0 {
 			return nil
 		}
 		return fixLastMessageTx(ctx, tx, chID)
@@ -527,11 +561,11 @@ const MaxPurgeMessages = 5000
 // database with the error swallowing the whole result, so no message_delete_bulk
 // was sent for any of them and every connected client went on showing messages
 // that no longer existed. All or none, and what comes back is what went.
-func (s *Store) DeleteMessagesByUserSince(ctx context.Context, serverID, uid ids.ID, since int64) (map[ids.ID][]ids.ID, error) {
-	out := map[ids.ID][]ids.ID{}
+func (s *Store) DeleteMessagesByUserSince(ctx context.Context, serverID, uid ids.ID, since int64) (map[ids.ID]*Deleted, error) {
+	out := map[ids.ID]*Deleted{}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		clear(out)
-		rows, err := tx.QueryContext(ctx, `SELECT m.id, m.channel_id FROM messages m JOIN channels c ON c.id = m.channel_id
+		rows, err := tx.QueryContext(ctx, `SELECT m.id, m.channel_id, m.author_id, m.mentions, m.mention_roles, m.mention_everyone FROM messages m JOIN channels c ON c.id = m.channel_id
 			WHERE c.server_id = ? AND m.author_id = ? AND m.created_at >= ? ORDER BY m.id DESC LIMIT ?`,
 			int64(serverID), int64(uid), since, MaxPurgeMessages)
 		if err != nil {
@@ -542,12 +576,16 @@ func (s *Store) DeleteMessagesByUserSince(ctx context.Context, serverID, uid ids
 		// this one is still holding a result set open.
 		var order []ids.ID
 		for rows.Next() {
-			var id, ch int64
-			if err := rows.Scan(&id, &ch); err != nil {
+			var id, ch, author, everyone int64
+			var mentions, roles string
+			if err := rows.Scan(&id, &ch, &author, &mentions, &roles, &everyone); err != nil {
 				rows.Close()
 				return err
 			}
-			out[ids.ID(ch)] = append(out[ids.ID(ch)], ids.ID(id))
+			if out[ids.ID(ch)] == nil {
+				out[ids.ID(ch)] = newDeleted()
+			}
+			out[ids.ID(ch)].note(id, author, mentions, roles, everyone)
 			order = append(order, ids.ID(id))
 		}
 		rows.Close()

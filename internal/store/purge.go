@@ -129,25 +129,29 @@ func (s *Store) DeletedByStaff(ctx context.Context, uid ids.ID) (bool, error) {
 // channel's newest message. It returns what it deleted, by channel; an empty
 // map means there is nothing left. Batches keep one account's history from
 // holding the database's only writer for as long as the whole of it takes.
-func (s *Store) PurgeUserMessages(ctx context.Context, uid ids.ID, batch int) (map[ids.ID][]ids.ID, error) {
+func (s *Store) PurgeUserMessages(ctx context.Context, uid ids.ID, batch int) (map[ids.ID]*Deleted, error) {
 	if batch <= 0 {
 		batch = 500
 	}
-	out := map[ids.ID][]ids.ID{}
+	out := map[ids.ID]*Deleted{}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		clear(out)
-		rows, err := tx.QueryContext(ctx, `SELECT id, channel_id FROM messages WHERE author_id = ? ORDER BY id LIMIT ?`, int64(uid), batch)
+		rows, err := tx.QueryContext(ctx, `SELECT id, channel_id, `+mentionCols+` FROM messages WHERE author_id = ? ORDER BY id LIMIT ?`, int64(uid), batch)
 		if err != nil {
 			return err
 		}
 		var order []ids.ID
 		for rows.Next() {
-			var id, ch int64
-			if err := rows.Scan(&id, &ch); err != nil {
+			var id, ch, author, everyone int64
+			var mentions, roles string
+			if err := rows.Scan(&id, &ch, &author, &mentions, &roles, &everyone); err != nil {
 				rows.Close()
 				return err
 			}
-			out[ids.ID(ch)] = append(out[ids.ID(ch)], ids.ID(id))
+			if out[ids.ID(ch)] == nil {
+				out[ids.ID(ch)] = newDeleted()
+			}
+			out[ids.ID(ch)].note(id, author, mentions, roles, everyone)
 			order = append(order, ids.ID(id))
 		}
 		rows.Close()

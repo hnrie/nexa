@@ -6,6 +6,7 @@ import { useReadStates } from "@/stores/readStates";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { useAuth } from "@/stores/auth";
 import type { DecryptedMessage } from "@/lib/decrypt";
 import { applyEvent } from "./dispatch";
 
@@ -76,5 +77,34 @@ describe("message_delete_bulk", () => {
     useReadStates.setState({ byChannel: { c1: { lastReadId: "10", mentions: 0, unread: 3 } } });
     await applyEvent({ t: "message_delete_bulk", d: { channel_id: "c1", ids: ["11", "12", "5"] } } as Parameters<typeof applyEvent>[0]);
     expect(useReadStates.getState().byChannel["c1"]?.unread).toBe(1);
+  });
+});
+
+describe("mentions in messages this device never loaded", () => {
+  const ev = (x: unknown) => x as Parameters<typeof applyEvent>[0];
+  const mentions = () => useReadStates.getState().byChannel["c2"]?.mentions;
+  beforeEach(() => {
+    useAuth.setState({ me: { ...person("me"), flags: 0 } } as never);
+    useChannels.getState().upsert([chan("c2")]);
+  });
+
+  it("takes back a deleted mention its event says was one", async () => {
+    useReadStates.setState({ byChannel: { c2: { lastReadId: "10", mentions: 2, unread: 0 } } });
+    await applyEvent(ev({ t: "message_delete", d: { id: "11", channel_id: "c2", author_id: "u2", mentions: ["me"], mention_roles: [], mention_everyone: false } }));
+    expect(mentions()).toBe(1);
+    await applyEvent(ev({ t: "message_delete_bulk", d: { channel_id: "c2", ids: ["12", "13"], mentions: [{ id: "13", author_id: "u2", mentions: [], mention_roles: [], mention_everyone: true }] } }));
+    expect(mentions()).toBe(0);
+  });
+
+  it("moves the count with an edit that adds or takes back a mention", async () => {
+    useReadStates.setState({ byChannel: { c2: { lastReadId: "10", mentions: 0, unread: 0 } } });
+    const msg = { id: "20", channel_id: "c2", author_id: "u2", type: "default", ciphertext: null, mentions: ["me"], mention_roles: [], mention_everyone: false, reactions: [], attachments: [] };
+    await applyEvent(ev({ t: "message_update", d: { ...msg, was: { mentions: [], mention_roles: [], mention_everyone: false } } }));
+    expect(mentions()).toBe(1);
+    await applyEvent(ev({ t: "message_update", d: { ...msg, mentions: [], was: { mentions: ["me"], mention_roles: [], mention_everyone: false } } }));
+    expect(mentions()).toBe(0);
+    // an edit of a message already read changes nothing
+    await applyEvent(ev({ t: "message_update", d: { ...msg, id: "9", was: { mentions: [], mention_roles: [], mention_everyone: false } } }));
+    expect(mentions()).toBe(0);
   });
 });
