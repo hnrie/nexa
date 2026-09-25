@@ -81,6 +81,7 @@ func (s *Store) CreateServer(ctx context.Context, owner ids.ID, name string, def
 	if err != nil {
 		return nil, err
 	}
+	s.serverChanged(srv.ID)
 	srv.SystemChannelID = &general.ID
 	return srv, nil
 }
@@ -154,11 +155,15 @@ func (s *Store) UpdateServer(ctx context.Context, id ids.ID, p ServerPatch) erro
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	if p.OwnerID != nil {
+		s.serverChanged(id)
+	}
 	return nil
 }
 
 // DeleteServer removes a server and its key material.
 func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
+	defer s.serverChanged(id)
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		// one reference per attachment row, however many rows share a blob
 		if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM attachments a WHERE a.blob_id = blobs.id AND a.channel_id IN (SELECT id FROM channels WHERE server_id = ?))")+` WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id IN (SELECT id FROM channels WHERE server_id = ?))`, int64(id), int64(id)); err != nil {
@@ -255,6 +260,9 @@ func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, e
 		m, err = addMember(ctx, tx, serverID, uid)
 		return err
 	})
+	if err == nil {
+		s.serverChanged(serverID)
+	}
 	return m, err
 }
 
@@ -276,6 +284,7 @@ func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code str
 	if err != nil {
 		return nil, err
 	}
+	s.serverChanged(serverID)
 	return m, nil
 }
 
@@ -310,6 +319,7 @@ func addMember(ctx context.Context, tx *db.Tx, serverID, uid ids.ID) (*Member, e
 // channels, while nobody could edit or remove an overwrite for someone who
 // is not a member.
 func (s *Store) RemoveMember(ctx context.Context, serverID, uid ids.ID) error {
+	defer s.serverChanged(serverID)
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		res, err := tx.ExecContext(ctx, `DELETE FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid))
 		if err != nil {
@@ -458,23 +468,29 @@ func (s *Store) UpdateMember(ctx context.Context, serverID, uid ids.ID, p Member
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
+	if p.TimeoutUntil != nil {
+		s.serverChanged(serverID)
+	}
 	return nil
 }
 
 // AddMemberRole assigns a role; idempotent.
 func (s *Store) AddMemberRole(ctx context.Context, serverID, uid, roleID ids.ID) error {
+	defer s.serverChanged(serverID)
 	_, err := s.db.W.ExecContext(ctx, `INSERT INTO member_roles (server_id, user_id, role_id) VALUES (?,?,?) ON CONFLICT DO NOTHING`, int64(serverID), int64(uid), int64(roleID))
 	return err
 }
 
 // RemoveMemberRole unassigns a role; idempotent.
 func (s *Store) RemoveMemberRole(ctx context.Context, serverID, uid, roleID ids.ID) error {
+	defer s.serverChanged(serverID)
 	_, err := s.db.W.ExecContext(ctx, `DELETE FROM member_roles WHERE server_id = ? AND user_id = ? AND role_id = ?`, int64(serverID), int64(uid), int64(roleID))
 	return err
 }
 
 // SetMemberRoles replaces a member's roles.
 func (s *Store) SetMemberRoles(ctx context.Context, serverID, uid ids.ID, roleIDs []ids.ID) error {
+	defer s.serverChanged(serverID)
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM member_roles WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)); err != nil {
 			return err
@@ -511,6 +527,7 @@ func scanRole(r rowScanner) (*Role, error) {
 // CreateRole adds a role at the top of the hierarchy (below nothing but the owner).
 func (s *Store) CreateRole(ctx context.Context, serverID ids.ID, name string, permsBits perms.Perm, color int) (*Role, error) {
 	ro := &Role{ID: ids.New(), ServerID: serverID, Name: name, Color: color, Permissions: permsBits, CreatedAt: nowMs()}
+	defer s.serverChanged(serverID)
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		// Postgres runs these side by side; one at a time, so two cannot both
 		// read the same "before" and act on it
@@ -582,20 +599,22 @@ func (s *Store) UpdateRole(ctx context.Context, id ids.ID, p RolePatch) error {
 		return nil
 	}
 	args = append(args, int64(id))
-	res, err := s.db.W.ExecContext(ctx, `UPDATE roles SET `+strings.Join(sets, ", ")+` WHERE id = ?`, args...)
+	var serverID ids.ID
+	err := s.db.W.QueryRowContext(ctx, `UPDATE roles SET `+strings.Join(sets, ", ")+` WHERE id = ? RETURNING server_id`, args...).Scan(&serverID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
 	if err != nil {
 		return err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
+	s.serverChanged(serverID)
 	return nil
 }
 
 // DeleteRole removes a role, its assignments and its overwrites. @everyone cannot be deleted.
 func (s *Store) DeleteRole(ctx context.Context, id ids.ID) error {
-	return s.Tx(ctx, func(tx *db.Tx) error {
-		var serverID int64
+	var serverID int64
+	err := s.Tx(ctx, func(tx *db.Tx) error {
 		if err := tx.QueryRowContext(ctx, `SELECT server_id FROM roles WHERE id = ?`, int64(id)).Scan(&serverID); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrNotFound
@@ -611,10 +630,15 @@ func (s *Store) DeleteRole(ctx context.Context, id ids.ID) error {
 		_, err := tx.ExecContext(ctx, `DELETE FROM roles WHERE id = ?`, int64(id))
 		return err
 	})
+	if serverID != 0 {
+		s.serverChanged(ids.ID(serverID))
+	}
+	return err
 }
 
 // SetRolePositions rewrites positions (@everyone stays at 0).
 func (s *Store) SetRolePositions(ctx context.Context, serverID ids.ID, positions map[ids.ID]int) error {
+	defer s.serverChanged(serverID)
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		for id, pos := range positions {
 			if id == serverID {
@@ -655,6 +679,7 @@ func (s *Store) CreateServerChannel(ctx context.Context, serverID ids.ID, typ, n
 	if err != nil {
 		return nil, err
 	}
+	s.serverChanged(serverID)
 	return s.ChannelByID(ctx, c.ID)
 }
 
@@ -734,12 +759,14 @@ func (s *Store) SetChannelPositions(ctx context.Context, serverID ids.ID, list [
 func (s *Store) SetOverwrite(ctx context.Context, ow Overwrite) error {
 	_, err := s.db.W.ExecContext(ctx, `INSERT INTO channel_overwrites (channel_id, target_id, target_type, allow, deny) VALUES (?,?,?,?,?) ON CONFLICT(channel_id, target_id) DO UPDATE SET target_type = excluded.target_type, allow = excluded.allow, deny = excluded.deny`,
 		int64(ow.ChannelID), int64(ow.TargetID), ow.TargetType, int64(ow.Allow), int64(ow.Deny))
+	s.changedIn(channelServer(ctx, s.db.R, ow.ChannelID))
 	return err
 }
 
 // DeleteOverwrite removes an overwrite.
 func (s *Store) DeleteOverwrite(ctx context.Context, channelID, targetID ids.ID) error {
 	res, err := s.db.W.ExecContext(ctx, `DELETE FROM channel_overwrites WHERE channel_id = ? AND target_id = ?`, int64(channelID), int64(targetID))
+	s.changedIn(channelServer(ctx, s.db.R, channelID))
 	if err != nil {
 		return err
 	}

@@ -70,6 +70,10 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	if u.RecoveryAuthHash != "" {
 		recovery = u.RecoveryAuthHash
 	}
+	if u.Flags&FlagAdmin != 0 {
+		// a new admin holds every right in every server they join
+		defer s.everythingChanged()
+	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		// a name a moderator took off an account is still that account's
 		if held, err := usernameHeldTx(ctx, tx, u.Username); err != nil || held {
@@ -356,6 +360,8 @@ func (s *Store) UpdateRecovery(ctx context.Context, id ids.ID, recoveryHash stri
 
 // SetUserFlags overwrites the flags bitfield.
 func (s *Store) SetUserFlags(ctx context.Context, id ids.ID, flags int64) error {
+	// admin, disabled and deleted all decide who is an instance admin
+	defer s.everythingChanged()
 	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET flags = ?, updated_at = ? WHERE id = ?`, flags, nowMs(), int64(id))
 	if err != nil {
 		return err
@@ -375,6 +381,7 @@ func (s *Store) SetUserFlags(ctx context.Context, id ids.ID, flags int64) error 
 // change they made. Doing it in one statement means neither can lose the
 // other's bit, and the value that comes back is what is stored.
 func (s *Store) ChangeUserFlags(ctx context.Context, id ids.ID, set, clear int64) (int64, error) {
+	defer s.everythingChanged()
 	var flags int64
 	err := s.Tx(ctx, func(tx *db.Tx) error {
 		// The complement is worked out here rather than with a ~ in the SQL:
@@ -397,6 +404,7 @@ func (s *Store) ChangeUserFlags(ctx context.Context, id ids.ID, set, clear int64
 
 // DeleteAccount anonymises the account (messages are kept) and drops sessions.
 func (s *Store) DeleteAccount(ctx context.Context, id ids.ID) error {
+	defer s.everythingChanged()
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		anon := fmt.Sprintf("deleted-%d", int64(id))
 		// the avatar and banner are cleared below; give back their references

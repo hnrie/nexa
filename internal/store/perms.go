@@ -2,11 +2,15 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/perms"
 )
+
+// Permissions are answered from each server's snapshot (permcache.go), which
+// every write to what they depend on invalidates.
 
 func toPermRoles(roles []*Role) []perms.Role {
 	out := make([]perms.Role, len(roles))
@@ -24,21 +28,16 @@ func toPermOverwrites(list []Overwrite) []perms.Overwrite {
 	return out
 }
 
-func toPermMember(m *Member, now int64) perms.Member {
-	return perms.Member{UserID: m.UserID, RoleIDs: m.RoleIDs, TimedOut: m.TimeoutUntil != nil && *m.TimeoutUntil > now}
-}
-
 // IsInstanceAdmin reports whether an account runs this instance. In any server
 // it is a member of, such an account holds every permission its owner does.
+// A lookup that fails answers no; the permission functions below return the
+// error instead, so a database hiccup is a 500 there rather than a 403.
 func (s *Store) IsInstanceAdmin(ctx context.Context, uid ids.ID) bool {
-	var flags int64
-	if err := s.db.R.QueryRowContext(ctx, `SELECT flags FROM users WHERE id = ?`, int64(uid)).Scan(&flags); err != nil {
-		return false
-	}
-	return flags&FlagAdmin != 0 && flags&(FlagDisabled|FlagDeleted) == 0
+	admins, err := s.admins(ctx)
+	return err == nil && admins[uid]
 }
 
-// instanceAdmins is IsInstanceAdmin for everyone at once.
+// instanceAdmins reads every instance admin.
 func (s *Store) instanceAdmins(ctx context.Context) (map[ids.ID]bool, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted)
 	if err != nil {
@@ -58,47 +57,24 @@ func (s *Store) instanceAdmins(ctx context.Context) (map[ids.ID]bool, error) {
 
 // ServerPerms resolves a user's server-level permissions (0 for non-members).
 func (s *Store) ServerPerms(ctx context.Context, serverID, uid ids.ID) (perms.Perm, error) {
-	srv, err := s.ServerByID(ctx, serverID)
+	snap, err := s.snapshot(ctx, serverID)
 	if err != nil {
 		return 0, err
 	}
-	m, err := s.Member(ctx, serverID, uid)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return 0, nil
-		}
-		return 0, err
-	}
-	roles, err := s.Roles(ctx, serverID)
-	if err != nil {
-		return 0, err
-	}
-	return perms.Base(serverID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid)), nil
+	return snap.serverPerms(uid, nowMs()), nil
 }
 
 // MembersWithPerm lists the members whose server-level permissions include need.
 func (s *Store) MembersWithPerm(ctx context.Context, serverID ids.ID, need perms.Perm) ([]ids.ID, error) {
-	srv, err := s.ServerByID(ctx, serverID)
+	snap, err := s.snapshot(ctx, serverID)
 	if err != nil {
 		return nil, err
 	}
-	roles, err := s.Roles(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	members, err := s.allMembers(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	admins, err := s.instanceAdmins(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pr, now := toPermRoles(roles), nowMs()
+	now := nowMs()
 	out := []ids.ID{}
-	for _, m := range members {
-		if perms.Base(serverID, pr, toPermMember(m, now), srv.OwnerID == m.UserID || admins[m.UserID]).Has(need) {
-			out = append(out, m.UserID)
+	for _, uid := range snap.memberOrder {
+		if snap.serverPerms(uid, now).Has(need) {
+			out = append(out, uid)
 		}
 	}
 	return out, nil
@@ -111,166 +87,151 @@ func (s *Store) ChannelPerms(ctx context.Context, channelID, uid ids.ID) (perms.
 	if err != nil {
 		return 0, nil, err
 	}
+	p, err := s.PermsIn(ctx, ch, uid)
+	return p, ch, err
+}
+
+// PermsIn is ChannelPerms for a channel the caller has already loaded, which
+// is how a request that has just read the channel avoids reading it again.
+func (s *Store) PermsIn(ctx context.Context, ch *Channel, uid ids.ID) (perms.Perm, error) {
 	if ch.ServerID == nil {
 		for _, id := range ch.Recipients {
 			if id == uid {
-				return perms.All, ch, nil
+				return perms.All, nil
 			}
 		}
-		return 0, ch, nil
+		return 0, nil
 	}
-	srv, err := s.ServerByID(ctx, *ch.ServerID)
+	snap, err := s.snapshot(ctx, *ch.ServerID)
 	if err != nil {
-		return 0, ch, err
+		return 0, err
 	}
-	m, err := s.Member(ctx, *ch.ServerID, uid)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return 0, ch, nil
-		}
-		return 0, ch, err
+	if _, ok := snap.channels[ch.ID]; !ok {
+		// deleted since the caller read it
+		return 0, nil
 	}
-	roles, err := s.Roles(ctx, *ch.ServerID)
-	if err != nil {
-		return 0, ch, err
-	}
-	ows, err := s.Overwrites(ctx, channelID)
-	if err != nil {
-		return 0, ch, err
-	}
-	return perms.Compute(*ch.ServerID, toPermRoles(roles), toPermMember(m, nowMs()), srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid), toPermOverwrites(ows)), ch, nil
+	return snap.channelPerms(ch.ID, uid, nowMs()), nil
 }
 
-// ChannelViewers lists the members who can view a server channel.
+// ChannelViewers lists who can see a channel: a server channel's members who
+// may view it, or a conversation's participants.
 func (s *Store) ChannelViewers(ctx context.Context, channelID ids.ID) ([]ids.ID, error) {
-	ch, err := s.ChannelByID(ctx, channelID)
+	var typ string
+	var server sql.NullInt64
+	err := s.db.R.QueryRowContext(ctx, `SELECT type, server_id FROM channels WHERE id = ?`, int64(channelID)).Scan(&typ, &server)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
-	if ch.ServerID == nil {
-		return ch.Recipients, nil
+	if !server.Valid {
+		return s.Participants(ctx, channelID)
 	}
-	return s.channelViewers(ctx, *ch.ServerID, channelID)
+	return s.channelViewers(ctx, ids.ID(server.Int64), channelID)
 }
 
+// channelViewers lists the members of a server who can view one of its
+// channels. The list is shared with other callers: read it, do not change it.
 func (s *Store) channelViewers(ctx context.Context, serverID, channelID ids.ID) ([]ids.ID, error) {
-	srv, err := s.ServerByID(ctx, serverID)
+	snap, err := s.snapshot(ctx, serverID)
 	if err != nil {
 		return nil, err
 	}
-	roles, err := s.Roles(ctx, serverID)
-	if err != nil {
-		return nil, err
+	if _, ok := snap.channels[channelID]; !ok {
+		return []ids.ID{}, nil
 	}
-	ows, err := s.Overwrites(ctx, channelID)
-	if err != nil {
-		return nil, err
-	}
-	members, err := s.allMembers(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	admins, err := s.instanceAdmins(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pr, po := toPermRoles(roles), toPermOverwrites(ows)
-	now := nowMs()
-	out := []ids.ID{}
-	for _, m := range members {
-		if perms.Compute(serverID, pr, toPermMember(m, now), srv.OwnerID == m.UserID || admins[m.UserID], po).Has(perms.ViewChannel) {
-			out = append(out, m.UserID)
-		}
-	}
-	return out, nil
+	return snap.viewersOf(channelID), nil
 }
 
-// allMembers loads every membership with roles (pages of 1000).
-func (s *Store) allMembers(ctx context.Context, serverID ids.ID) ([]*Member, error) {
-	var out []*Member
-	var after ids.ID
-	for {
-		page, err := s.Members(ctx, serverID, after, 1000, "")
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, page...)
-		if len(page) < 1000 {
-			return out, nil
-		}
-		after = page[len(page)-1].UserID
-	}
+// serversOf lists the servers uid is a member of.
+func (s *Store) serversOf(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
+	return s.idList(ctx, `SELECT server_id FROM server_members WHERE user_id = ? ORDER BY joined_at, server_id`, int64(uid))
 }
 
 // ChannelsForUser lists every server channel the user can view.
 func (s *Store) ChannelsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
-	servers, err := s.ServersForUser(ctx, uid)
+	servers, err := s.serversOf(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 	out := []ids.ID{}
 	now := nowMs()
-	admin := s.IsInstanceAdmin(ctx, uid)
-	for _, srv := range servers {
-		m, err := s.Member(ctx, srv.ID, uid)
-		if err != nil {
+	for _, serverID := range servers {
+		snap, err := s.snapshot(ctx, serverID)
+		if errors.Is(err, ErrNotFound) {
 			continue
 		}
-		roles, err := s.Roles(ctx, srv.ID)
 		if err != nil {
 			return nil, err
 		}
-		chans, err := s.ServerChannels(ctx, srv.ID)
-		if err != nil {
-			return nil, err
+		if _, ok := snap.members[uid]; !ok {
+			continue
 		}
-		ows, err := s.OverwritesForServer(ctx, srv.ID)
-		if err != nil {
-			return nil, err
-		}
-		pr, pm := toPermRoles(roles), toPermMember(m, now)
-		for _, ch := range chans {
-			if ch.Type == "category" {
+		for _, ch := range snap.channelOrder {
+			if snap.channels[ch] == "category" {
 				continue
 			}
-			if perms.Compute(srv.ID, pr, pm, srv.OwnerID == uid || admin, toPermOverwrites(ows[ch.ID])).Has(perms.ViewChannel) {
-				out = append(out, ch.ID)
+			if snap.channelPerms(ch, uid, now).Has(perms.ViewChannel) {
+				out = append(out, ch)
 			}
 		}
 	}
 	return out, nil
 }
 
-// ViewableServerChannels is ChannelsForUser restricted to one server.
+// ViewableServerChannels is ChannelsForUser restricted to one server, with
+// what the user may do in each; ErrNotFound for someone who is not a member.
 func (s *Store) ViewableServerChannels(ctx context.Context, serverID, uid ids.ID) (map[ids.ID]perms.Perm, error) {
-	srv, err := s.ServerByID(ctx, serverID)
+	snap, err := s.snapshot(ctx, serverID)
 	if err != nil {
 		return nil, err
 	}
-	m, err := s.Member(ctx, serverID, uid)
-	if err != nil {
-		return nil, err
+	if _, ok := snap.members[uid]; !ok {
+		return nil, ErrNotFound
 	}
-	roles, err := s.Roles(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	chans, err := s.ServerChannels(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	ows, err := s.OverwritesForServer(ctx, serverID)
-	if err != nil {
-		return nil, err
-	}
-	pr, pm := toPermRoles(roles), toPermMember(m, nowMs())
-	privileged := srv.OwnerID == uid || s.IsInstanceAdmin(ctx, uid)
+	now := nowMs()
 	out := map[ids.ID]perms.Perm{}
-	for _, ch := range chans {
-		p := perms.Compute(serverID, pr, pm, privileged, toPermOverwrites(ows[ch.ID]))
-		if p.Has(perms.ViewChannel) {
-			out[ch.ID] = p
+	for _, ch := range snap.channelOrder {
+		if p := snap.channelPerms(ch, uid, now); p.Has(perms.ViewChannel) {
+			out[ch] = p
 		}
 	}
 	return out, nil
+}
+
+// CoMembers lists everyone who shares a server with uid, uid included when
+// they are in any, each once.
+func (s *Store) CoMembers(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
+	servers, err := s.serversOf(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[ids.ID]bool{}
+	out := []ids.ID{}
+	for _, serverID := range servers {
+		snap, err := s.snapshot(ctx, serverID)
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, m := range snap.memberOrder {
+			if !seen[m] {
+				seen[m] = true
+				out = append(out, m)
+			}
+		}
+	}
+	return out, nil
+}
+
+// serverMemberIDs lists a server's members from its snapshot.
+func (s *Store) serverMemberIDs(ctx context.Context, serverID ids.ID) ([]ids.ID, error) {
+	snap, err := s.snapshot(ctx, serverID)
+	if err != nil {
+		return nil, err
+	}
+	return append([]ids.ID(nil), snap.memberOrder...), nil
 }

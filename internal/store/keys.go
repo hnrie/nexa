@@ -205,8 +205,11 @@ func (s *Store) Entitled(ctx context.Context, conv ids.ID) ([]ids.ID, error) {
 	var serverID sql.NullInt64
 	err := s.db.R.QueryRowContext(ctx, `SELECT type, server_id FROM channels WHERE id = ?`, int64(conv)).Scan(&typ, &serverID)
 	if errors.Is(err, sql.ErrNoRows) {
-		if _, err := s.ServerByID(ctx, conv); err == nil {
-			return s.MemberIDs(ctx, conv)
+		// a server's own conversation belongs to its members
+		if members, err := s.serverMemberIDs(ctx, conv); err == nil {
+			return members, nil
+		} else if !errors.Is(err, ErrNotFound) {
+			return nil, err
 		}
 		if s.EntitledHook != nil {
 			return s.EntitledHook(ctx, conv)

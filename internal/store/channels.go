@@ -492,7 +492,12 @@ func (s *Store) UpdateChannel(ctx context.Context, id ids.ID, p ChannelPatch) er
 // leaves its children in place without a parent; deleting a conversation
 // deletes its subchats with it, since nothing could reach them afterwards.
 func (s *Store) DeleteChannel(ctx context.Context, id ids.ID) error {
+	var server ids.ID
+	var serverErr error
+	// the channel and its overwrites leave its server's permissions with it
+	defer func() { s.changedIn(server, serverErr) }()
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		server, serverErr = channelServer(ctx, tx, id)
 		subs, err := idsTx(ctx, tx, `SELECT id FROM channels WHERE parent_id = ? AND type = 'subchat'`, int64(id))
 		if err != nil {
 			return err

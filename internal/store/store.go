@@ -30,12 +30,16 @@ type Store struct {
 	// EntitledHook resolves key entitlement for conversations the DM layer
 	// does not know (servers and private channels); set by the server layer.
 	EntitledHook func(ctx context.Context, conv ids.ID) ([]ids.ID, error)
+
+	// perm holds each server's permission inputs, so answering who may see
+	// or do what costs no queries while nothing has changed (permcache.go)
+	perm *permCache
 }
 
 type sqlNullInt = sql.NullInt64
 
 // New returns a Store over d.
-func New(d *db.DB) *Store { return &Store{db: d} }
+func New(d *db.DB) *Store { return &Store{db: d, perm: newPermCache()} }
 
 // DB exposes the underlying pools for callers that need transactions spanning domains.
 func (s *Store) DB() *db.DB { return s.db }
