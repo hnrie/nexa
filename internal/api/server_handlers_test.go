@@ -654,3 +654,35 @@ func TestInviteLimits(t *testing.T) {
 		t.Error("revoked invite")
 	}
 }
+
+// Another tab of the account that makes or joins a server learns of it from
+// server_create, and needs the people in its member list as well as their ids.
+func TestServerCreateCarriesTheMembers(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	ga := connectGW(t, ts, tokA)
+	gb := connectGW(t, ts, tokB)
+	view := createServer(t, ts, tokA, "S")
+	ev := ga.next("server_create", 3*time.Second)
+	if ev == nil || ev["id"] != view["id"] {
+		t.Fatalf("server_create for the owner: %v", ev)
+	}
+	named := func(ev map[string]any, id string) bool {
+		users, _ := ev["users"].([]any)
+		for _, u := range users {
+			if u.(map[string]any)["id"] == id {
+				return true
+			}
+		}
+		return false
+	}
+	if !named(ev, idA) {
+		t.Errorf("the owner's own server_create names nobody: %v", ev["users"])
+	}
+	join(t, ts, tokB, inviteFor(t, ts, tokA, channelNamed(view, "general")["id"].(string)))
+	ev = gb.next("server_create", 3*time.Second)
+	if ev == nil || !named(ev, idA) || !named(ev, idB) {
+		t.Errorf("the joiner's server_create should carry both members: %v", ev)
+	}
+}

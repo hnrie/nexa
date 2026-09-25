@@ -267,12 +267,12 @@ func (s *Server) handleServerCreate(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	view, _, err := s.serverView(r.Context(), srv, me.ID)
+	view, users, err := s.serverView(r.Context(), srv, me.ID)
 	if err != nil {
 		WriteError(w, err)
 		return
 	}
-	s.Bcast.EmitUsers([]ids.ID{me.ID}, "server_create", view)
+	s.Bcast.EmitUsers([]ids.ID{me.ID}, "server_create", serverCreateEvent{view, users})
 	WriteJSON(w, http.StatusCreated, view)
 }
 
@@ -2092,7 +2092,7 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if status == http.StatusCreated {
-		s.Bcast.EmitUsers([]ids.ID{me.ID}, "server_create", view)
+		s.Bcast.EmitUsers([]ids.ID{me.ID}, "server_create", serverCreateEvent{view, users})
 	}
 	WriteJSON(w, status, map[string]any{"server": view, "users": users})
 }

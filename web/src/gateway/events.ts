@@ -32,7 +32,7 @@ export type GatewayEvent =
   | { t: "channel_create" | "channel_update"; d: Channel }
   | { t: "channel_delete"; d: { id: Snowflake; server_id?: Snowflake | null } }
   | { t: "channel_positions"; d: { server_id: Snowflake; channels: { id: Snowflake; position: number; parent_id: Snowflake | null }[] } }
-  | { t: "server_create"; d: ServerView }
+  | { t: "server_create"; d: ServerView & { users?: PublicUser[] } }
   | { t: "server_update"; d: Server }
   | { t: "server_delete"; d: { id: Snowflake } }
   | { t: "member_add"; d: { server_id: Snowflake; member: Member; user: PublicUser } }

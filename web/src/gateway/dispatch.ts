@@ -278,6 +278,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useChannels.getState().applyPositions(e.d.channels);
       return;
     case "server_create":
+      if (e.d.users) useUsers.getState().upsert(e.d.users);
       ingestServerView(e.d);
       for (const h of dispatchHooks.onUnhandled) h(e);
       return;

@@ -41,6 +41,15 @@ type ServerView struct {
 	MyPermissions perms.Perm       `json:"my_permissions"`
 }
 
+// serverCreateEvent is a server as server_create carries it: with the people
+// in its member list. The tab that made or joined the server has them from its
+// reply; every other tab of the account showed the members nameless until it
+// fetched them one by one.
+type serverCreateEvent struct {
+	*ServerView
+	Users []store.PublicUser `json:"users"`
+}
+
 const readyMemberLimit = 500
 
 // serverView assembles a member's view of a server (only channels they can see).
