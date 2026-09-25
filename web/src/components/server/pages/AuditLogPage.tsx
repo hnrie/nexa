@@ -3,6 +3,7 @@ import { servers as serversApi } from "@/api/servers";
 import type { AuditEntry } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { Select } from "@/components/common/Select";
 import { LoadError } from "@/components/common/LoadError";
 import { Spinner } from "@/components/common/Spinner";
 import { formatSpan } from "@/lib/moderation";
@@ -69,6 +70,11 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
   // page that failed keeps what is already on screen and says the rest is
   // missing.
   const [failed, setFailed] = useState(false);
+  // Who and what to show. The log only ever arrives a page at a time, so this
+  // narrows what has loaded; "Load more" carries on further back, filtered.
+  const [actor, setActor] = useState("");
+  const [action, setAction] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   const load = async (before?: string) => {
     setBusy(true);
@@ -224,24 +230,60 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
       const shown = field(k, v, e, obj);
       if (shown) parts.push(`${shown[0]}: ${shown[1]}`);
     }
-    const text = parts.join(" · ");
-    return text.length > 300 ? `${text.slice(0, 299)}…` : text;
+    return parts.join(" · ");
   };
+  // A long bulk change is cut, with a way to read the rest: the cut used to
+  // drop its tail with no sign there was one.
+  const LONG = 300;
+  const changesView = (e: AuditEntry) => {
+    const text = changesText(e);
+    if (!text) return null;
+    const open = expanded.has(e.id);
+    const long = text.length > LONG;
+    return (
+      <div className={s.auditChanges}>
+        {long && !open ? `${text.slice(0, LONG - 1)}…` : text}
+        {long ? (
+          <button type="button" className={s.auditMore} aria-expanded={open} onClick={() => setExpanded((cur) => { const next = new Set(cur); if (open) next.delete(e.id); else next.add(e.id); return next; })}>
+            {open ? t("server.auditLog.showLess") : t("server.auditLog.showAll")}
+          </button>
+        ) : null}
+      </div>
+    );
+  };
+  const actors = [...new Set((entries ?? []).map((e) => e.actor_id))];
+  const actions = [...new Set((entries ?? []).map((e) => e.action))];
+  const shown = (entries ?? []).filter((e) => (!actor || e.actor_id === actor) && (!action || e.action === action));
+  const filtering = !!actor || !!action;
 
   return (
     <>
       <h2 className={st.title}>{t("server.auditLog.auditLog")}</h2>
       <p className={st.hint}>{t("server.auditLog.everyModerationAndConfigurationChangeIn")}</p>
       <div style={{ height: 16 }} />
+      {entries && entries.length > 0 ? (
+        <div className={s.auditFilters}>
+          <Select value={actor} onChange={(e) => setActor(e.target.value)} aria-label={t("server.auditLog.filterByMember")} data-testid="audit-actor">
+            <option value="">{t("server.auditLog.anyone")}</option>
+            {actors.map((id) => <option key={id} value={id}>{displayName(users[id])}</option>)}
+          </Select>
+          <Select value={action} onChange={(e) => setAction(e.target.value)} aria-label={t("server.auditLog.filterByAction")} data-testid="audit-action">
+            <option value="">{t("server.auditLog.anyAction")}</option>
+            {actions.map((a) => <option key={a} value={a}>{verbs()[a] ?? a}</option>)}
+          </Select>
+        </div>
+      ) : null}
+      {filtering && !done ? <p className={st.hint} style={{ margin: "0 0 12px" }}>{t("server.auditLog.filteredSoFar")}</p> : null}
       {entries === null && !failed ? <Spinner label={t("server.auditLog.loadingTheAuditLog")} /> : null}
       {entries && entries.length === 0 && !failed ? <p className={st.hint}>{t("server.auditLog.nothingHasHappenedYet")}</p> : null}
-      {entries?.map((e) => (
+      {entries && entries.length > 0 && shown.length === 0 ? <p className={st.hint}>{t("server.auditLog.nothingMatches")}</p> : null}
+      {shown.map((e) => (
         <div key={e.id} className={s.auditRow}>
           <Avatar id={e.actor_id} avatarId={users[e.actor_id]?.avatar_id ?? null} name={displayName(users[e.actor_id])} size={32} />
           <div className={s.auditText}>
             <b>{displayName(users[e.actor_id])}</b> {verbs()[e.action] ?? e.action} {targetName(e) ? <b>{targetName(e)}</b> : null}
             <div className={s.auditMeta}>{formatFull(e.created_at)}{e.reason ? ` · ${t("server.auditLog.reason", { reason: e.reason })}` : ""}</div>
-            {changesText(e) ? <div className={s.auditChanges}>{changesText(e)}</div> : null}
+            {changesView(e)}
           </div>
         </div>
       ))}

@@ -1,5 +1,7 @@
 import { Pencil, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { TextInput } from "@/components/common/TextInput";
+import { NoMatches } from "../NoMatches";
 import { expressions as expressionsApi } from "@/api/expressions";
 import type { Emoji } from "@/api/types";
 import { emojiUrl } from "@/api/users";
@@ -34,6 +36,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [over, setOver] = useState(false);
+  const [q, setQ] = useState("");
   const manage = canI(server, P.MANAGE_EMOJIS);
 
   const upload = async (files: FileList | File[]) => {
@@ -94,8 +97,10 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
       },
     });
 
-  const animated = emojis.filter((e) => e.animated);
-  const still = emojis.filter((e) => !e.animated);
+  const query = q.trim().toLowerCase().replace(/^:|:$/g, "");
+  const found = query ? emojis.filter((e) => e.name.toLowerCase().includes(query)) : emojis;
+  const animated = found.filter((e) => e.animated);
+  const still = found.filter((e) => !e.animated);
   const section = (label: string, list: Emoji[]) =>
     list.length === 0 ? null : (
       <>
@@ -152,6 +157,12 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
         </>
       ) : null}
       {emojis.length === 0 ? <p className={st.hint} style={{ marginTop: 16 }}>{t("server.emoji.noCustomEmojiYet")}</p> : null}
+      {emojis.length > 0 ? (
+        <div className={s.searchRow} style={{ marginTop: 16 }}>
+          <TextInput type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("server.emoji.searchEmoji")} aria-label={t("server.emoji.searchEmoji")} />
+        </div>
+      ) : null}
+      {emojis.length > 0 && found.length === 0 ? <NoMatches query={q} onClear={() => setQ("")} /> : null}
       {section(t("server.emoji.emoji"), still)}
       {section(t("server.emoji.animatedEmoji"), animated)}
       {manage ? <div style={{ marginTop: 16 }}><Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} loading={busy}>{t("server.emoji.uploadEmoji")}</Button></div> : null}

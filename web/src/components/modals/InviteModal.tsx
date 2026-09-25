@@ -15,6 +15,7 @@ import { P } from "@/lib/perms";
 import { selectServerChannels, useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
+import { useKeys } from "@/stores/keys";
 import { copyText } from "@/lib/copyText";
 import s from "./ServerModals.module.css";
 
@@ -44,7 +45,32 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
   const [invite, setInvite] = useState<Invite | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const key = ring.latest(serverId);
+  // A server makes its key with its first message, so the owner of a server
+  // made a moment ago was told she "doesn't hold this server's encryption key
+  // yet" and handed a link without it. The key is made here instead, as a
+  // first message would; for a server that already has one, this only finds
+  // out that it is waiting for a grant.
+  const [key, setKey] = useState(() => ring.latest(serverId));
+  const [keyBusy, setKeyBusy] = useState(() => !ring.latest(serverId));
+  useEffect(() => {
+    if (key) return;
+    let alive = true;
+    useKeys
+      .getState()
+      .ensureConvKey(serverId)
+      .then((k) => {
+        if (alive) setKey(k ?? ring.latest(serverId));
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (alive) setKeyBusy(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // once, as the dialog opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId]);
   // only the newest request may fill in the link, so a slow earlier one cannot show old settings
   const seq = useRef(0);
 
@@ -66,6 +92,20 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
     void generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Each change of channel, expiry or uses makes a new invite, and stepping
+  // through a list with the arrow keys is a change per step: a keyboard used
+  // to leave a trail of live invites behind it. The new one is made once the
+  // choice has settled.
+  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const regenerate = (ch: string, a: number, u: number) => {
+    if (settle.current) clearTimeout(settle.current);
+    setInvite(null);
+    setBusy(true);
+    settle.current = setTimeout(() => void generate(ch, a, u), 450);
+  };
+  useEffect(() => () => {
+    if (settle.current) clearTimeout(settle.current);
+  }, []);
 
   const link = invite ? inviteUrl(invite.code, withKey && key ? key : null) : "";
   const copy = () => {
@@ -85,7 +125,7 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
     <Modal open onClose={onClose} title={t("modals.invite.inviteFriendsTo", { name: st?.server.name ?? t("modals.invite.theServer") })} width={480}>
       <div className={s.form}>
         <Field label={t("modals.invite.inviteToChannel")}>
-          <Select value={channel} onChange={(e) => { setChannel(e.target.value); void generate(e.target.value); }}>
+          <Select value={channel} onChange={(e) => { setChannel(e.target.value); regenerate(e.target.value, age, uses); }}>
             {candidates.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
           </Select>
         </Field>
@@ -95,20 +135,20 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
             <Button onClick={copy} variant={copied ? "positive" : "primary"} disabled={!link}>{copied ? <><Check size={16} /> {t("modals.groupInvite.copied")}</> : <><Copy size={16} /> {t("modals.groupInvite.copy")}</>}</Button>
           </div>
         </Field>
-        <div className={s.keyNote} data-warn={!key}>
+        <div className={s.keyNote} data-warn={!key && !keyBusy}>
           <KeyRound size={16} />
-          <span>{key ? t("modals.invite.thisLinkCarriesTheServerS") : t("modals.invite.youDonTHoldThisServer")}</span>
+          <span>{key ? t("modals.invite.thisLinkCarriesTheServerS") : keyBusy ? t("modals.invite.gettingTheKey") : t("modals.invite.youDonTHoldThisServer")}</span>
         </div>
         {/* the switch's row draws its own rule underneath */}
         <Toggle checked={withKey && !!key} disabled={!key} onChange={setWithKey} label={t("modals.invite.includeTheEncryptionKeyInThe")} />
         <div className={s.row2}>
           <Field label={t("modals.groupInvite.expireAfter")}>
-            <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(channel, v, uses); }}>
+            <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); regenerate(channel, v, uses); }}>
               {ages().map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
           <Field label={t("modals.groupInvite.maxNumberOfUses")}>
-            <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); void generate(channel, age, v); }}>
+            <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); regenerate(channel, age, v); }}>
               {USES.map((u) => <option key={u} value={u}>{u === 0 ? t("modals.invite.noLimit") : t("modals.invite.usesCount", { count: u })}</option>)}
             </Select>
           </Field>

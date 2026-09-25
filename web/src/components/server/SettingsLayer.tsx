@@ -70,6 +70,18 @@ export function SettingsLayer({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
+  // A reload or a closed tab takes unsaved edits with it just as surely as
+  // the close button, and nothing used to ask: the browser's own "Leave
+  // site?" now does, while a save bar is showing.
+  useEffect(() => {
+    const onUnload = (e: BeforeUnloadEvent) => {
+      if (useUnsaved.getState().holds === 0) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  }, []);
   // Each page starts at its top. The column scrolls, not the page, so it kept
   // the last page's offset: Licenses scrolled halfway opened My Account halfway.
   useLayoutEffect(() => {

@@ -77,6 +77,8 @@
 .radio { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; margin-bottom: 8px; }
 .radio[data-on="true"] { outline: 2px solid var(--brand); }
 .radio input { accent-color: var(--brand); width: 18px; height: 18px; }
+.radio[data-disabled] { cursor: default; }
+.radio[data-disabled] .radioLabel { color: var(--text-muted); }
 .radioText { display: flex; flex-direction: column; }
 .radioLabel { font-size: 16px; color: var(--text); }
 .radioDesc { font-size: 13px; color: var(--text-muted); }
@@ -191,6 +193,9 @@
 .safetyHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
 .safetyHead > :first-child { flex: 1 1 220px; min-width: 0; }
 .safetyBtns { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* a search that matched nothing, with the way back */
+.noMatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 16px 0; }
 
 /* where the registration choice comes from, and the way back to the config file */
 .configNote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin: 4px 0 24px; }

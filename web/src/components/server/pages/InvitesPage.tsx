@@ -8,6 +8,9 @@ import { dispatchHooks } from "@/gateway/dispatch";
 import type { GatewayEvent } from "@/gateway/events";
 import { describeError } from "@/lib/errors";
 import { formatFull } from "@/lib/time";
+import { copyAndSay } from "@/lib/copyText";
+import { inviteUrl } from "@/lib/inviteLink";
+import { ring } from "@/lib/keyring";
 import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
@@ -90,7 +93,13 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
                   <td data-label={t("server.invites.channel")}>{i.channel_id && channels[i.channel_id] ? <bdi>#{channels[i.channel_id]!.name}</bdi> : "—"}</td>
                   <td data-label={t("server.invites.uses")}>{i.uses}{i.max_uses ? ` / ${i.max_uses}` : ""}</td>
                   <td data-label={t("server.invites.expires")}>{i.expires_at ? formatFull(i.expires_at) : t("server.invites.never")}</td>
-                  <td><Button size="sm" variant="ghost" loading={busy === i.code} onClick={() => void revoke(i.code)}>{t("server.invites.revoke")}</Button></td>
+                  <td className={s.inviteActions}>
+                    {/* The link itself, carrying the server's key where this
+                        device holds it, as the invite dialog makes it: the
+                        table used to offer only a way to revoke. */}
+                    <Button size="sm" variant="secondary" onClick={() => copyAndSay(inviteUrl(i.code, ring.latest(serverId)), t("server.invites.linkCopied"))} data-testid="invite-copy">{t("server.invites.copyLink")}</Button>
+                    <Button size="sm" variant="ghost" loading={busy === i.code} onClick={() => void revoke(i.code)}>{t("server.invites.revoke")}</Button>
+                  </td>
                 </tr>
               ))}
             </tbody>

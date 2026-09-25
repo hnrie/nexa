@@ -27,6 +27,10 @@ export default function VoicePage() {
   const [micError, setMicError] = useState<string | null>(null);
   const [wrongDevice, setWrongDevice] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const captureRef = useRef<HTMLButtonElement>(null);
+  // A touch screen has no key to hold, so calls there fall back to voice
+  // activity (voice/session.ts); the page says so instead of promising a key.
+  const [noKeys] = useState(() => typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches);
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
   const aliveRef = useRef(true);
@@ -120,8 +124,16 @@ export default function VoicePage() {
       set({ pttKey: e.key.length === 1 ? e.key : e.code });
       setCapturing(false);
     };
+    // a press anywhere else puts the box down, so it cannot be left waiting for a key forever
+    const onDown = (e: PointerEvent) => {
+      if (!captureRef.current?.contains(e.target as Node)) setCapturing(false);
+    };
     window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", onDown, true);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [capturing]);
 
@@ -203,15 +215,16 @@ export default function VoicePage() {
           <input type="radio" name="voice-input-mode" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
           <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.voiceActivity")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitWheneverYouTalk")}</span></span>
         </label>
-        <label className={st.radio} data-on={settings.mode === "ptt"}>
-          <input type="radio" name="voice-input-mode" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
-          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
+        <label className={st.radio} data-on={settings.mode === "ptt"} data-disabled={noKeys || undefined}>
+          <input type="radio" name="voice-input-mode" checked={settings.mode === "ptt"} disabled={noKeys && settings.mode !== "ptt"} onChange={() => set({ mode: "ptt" })} />
+          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{noKeys ? tr_("settings.voice.pushToTalkNeedsAKeyboard") : tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
         </label>
       </div>
+      {noKeys && settings.mode === "ptt" ? <p className={st.hint}>{tr_("settings.voice.pushToTalkOnTouch")}</p> : null}
       <div className={st.form} style={{ marginTop: 12 }}>
-        {settings.mode === "ptt" ? (
+        {settings.mode === "ptt" && !noKeys ? (
           <Field label={tr_("settings.voice.pushToTalkKey")} hint={tr_("settings.voice.clickTheBoxThenPressThe")}>
-            <button type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing(true)}>
+            <button ref={captureRef} type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing((c) => !c)} aria-pressed={capturing}>
               <span>{capturing ? tr_("settings.voice.pressAKey") : settings.pttKey}</span>
               <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{capturing ? tr_("settings.voice.escToCancel") : tr_("settings.security.change")}</span>
             </button>

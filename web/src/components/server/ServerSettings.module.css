@@ -71,6 +71,18 @@
   .memberActions button { padding: 11px; }
   .iconBtn { width: 40px; height: 40px; }
 }
+/* Copy and Revoke on an invite's row */
+.inviteActions { white-space: nowrap; text-align: end; }
+.inviteActions > * + * { margin-inline-start: 6px; }
+
+/* who and what the audit log shows */
+.auditFilters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.auditFilters > * { flex: 1 1 200px; min-width: 0; }
+.auditMore { margin-inline-start: 6px; color: var(--link); font-family: var(--font); font-size: 12px; }
+.auditMore:hover { text-decoration: underline; }
+
+/* a hint and the action it is about, on one line when there is room */
+.permHintRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; margin-bottom: 8px; }
 .searchRow { display: flex; gap: 8px; margin-bottom: 12px; }
 .loadMore { margin: 12px 0; display: flex; justify-content: center; }
 

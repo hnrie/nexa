@@ -25,6 +25,7 @@ import { t as tr_ } from "@/i18n";
 import { formatShortDuration } from "@/lib/time";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { isolate } from "./bidi";
+import { slug, typedChannelName } from "@/components/modals/CreateChannelModal";
 const SLOWMODE = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600];
 
 function slowLabel(v: number): string {
@@ -84,7 +85,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
     setBusy(true);
     try {
       const body: Parameters<typeof serversApi.patchChannel>[1] = {};
-      if (name !== channel.name) body.name = name;
+      if (name !== channel.name) body.name = isText ? slug(name) : name;
       if (topic !== channel.topic) body.topic = topic;
       if (slow !== channel.slowmode_seconds) body.slowmode_seconds = slow;
       if (nsfw !== channel.nsfw) body.nsfw = nsfw;
@@ -108,7 +109,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
         <Field label={channel.type === "category" ? tr_("server.channelSettings.categoryName") : tr_("server.channelSettings.channelName")} required>
           <div className={s.iconInput}>
             {channel.type === "text" ? <Hash size={16} /> : channel.type === "voice" ? <Volume2 size={16} /> : null}
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="channel-settings-name" {...(isText ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
+            <TextInput value={name} onChange={(e) => setName(isText ? typedChannelName(e.target.value) : e.target.value)} maxLength={100} data-testid="channel-settings-name" {...(isText ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
           </div>
         </Field>
         {isText ? (
@@ -269,7 +270,8 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
           ) : null}
           {adding === "member" ? (
             <div className={s.picker}>
-              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("server.channelSettings.searchMembers")} autoFocus />
+              <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("server.channelSettings.searchMembers")} aria-label={tr_("server.channelSettings.searchMembers")} autoFocus />
+              {candidateMembers.length === 0 ? <div className={s.pickerEmpty}>{q ? tr_("friends.nobodyHereMatches", { query: query.trim() }) : tr_("server.channelSettings.nobodyLeftToAdd")}</div> : null}
               {candidateMembers.map((m) => (
                 <button key={m.id} className={s.pickerRow} onClick={unlessUnsaved(() => void add(m.id, "member"))}>
                   <Avatar id={m.id} avatarId={users[m.id]?.avatar_id ?? null} name={m.name} size={20} />

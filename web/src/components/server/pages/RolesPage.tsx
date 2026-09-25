@@ -22,6 +22,7 @@ import { rolePositionsAfterDrop } from "./rolePositions";
 import s from "../ServerSettings.module.css";
 
 import { t } from "@/i18n";
+import { NoMatches } from "../NoMatches";
 import { unlessUnsaved } from "@/stores/unsaved";
 const SWATCHES = [0x1abc9c, 0x2ecc71, 0x3498db, 0x9b59b6, 0xe91e63, 0xf1c40f, 0xe67e22, 0xe74c3c, 0x95a5a6, 0x607d8b, 0x11806a, 0x1f8b4c, 0x206694, 0x71368a, 0xad1457, 0xc27c0e, 0xa84300, 0x992d22, 0x979c9f, 0x546e7a];
 
@@ -273,16 +274,25 @@ function PermissionsTab({ role, editable, actorPerms, onSaved }: { role: Role; e
   return (
     <div>
       <div className={s.searchRow}>
-        <TextInput value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("server.roles.searchPermissions")} />
-        {/* Clear takes off what the editor could have given, and nothing else */}
-        <Button variant="ghost" size="sm" onClick={() => setValue(grantable === undefined ? 0n : value & ~grantable)} disabled={!editable}>{t("modals.quickSwitcher.clear")}</Button>
+        <TextInput type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("server.roles.searchPermissions")} aria-label={t("server.roles.searchPermissions")} />
       </div>
-      <p className={st.hint} style={{ marginBottom: 8 }}>{(actorPerms & (1n << 3n)) !== 0n ? t("server.roles.grantHintAll") : t("server.roles.grantHint")}</p>
+      {/* It sat beside the search box as "Clear", the word the quick switcher
+          uses for emptying its box, and took every permission off the role.
+          It says what it does now, away from the search; the save bar's Reset
+          still undoes it. It takes off what the editor could have given, and
+          nothing else. */}
+      <div className={s.permHintRow}>
+        <p className={st.hint} style={{ margin: 0 }}>{(actorPerms & (1n << 3n)) !== 0n ? t("server.roles.grantHintAll") : t("server.roles.grantHint")}</p>
+        <Button variant="ghost" size="sm" onClick={() => setValue(grantable === undefined ? 0n : value & ~grantable)} disabled={!editable || (grantable === undefined ? value === 0n : (value & grantable) === 0n)}>{t("server.roles.turnAllOff")}</Button>
+      </div>
       <RoleGrid value={value} onChange={setValue} editable={editable} filter={filter} grantable={grantable} />
       <SaveBar dirty={dirty} busy={busy} onReset={() => setValue(original)} onSave={() => void save()} />
     </div>
   );
 }
+
+/** How many members Manage Members shows at a time. */
+const MEMBERS_PAGE = 50;
 
 function MembersTab({ role, serverId, editable }: { role: Role; serverId: string; editable: boolean }) {
   const server = useServers((x) => x.byId[serverId]);
@@ -291,13 +301,16 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
   const toast = useUI((u) => u.toast);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [shown, setShown] = useState(MEMBERS_PAGE);
   if (!server) return null;
   const query = q.trim().toLowerCase();
-  const members = Object.values(server.members)
-    .map((m) => ({ m, name: memberName(m.nickname, users[m.user_id]), username: users[m.user_id]?.username ?? "", has: m.role_ids.includes(role.id) }))
-    .filter((x) => !query || x.name.toLowerCase().includes(query) || x.username.includes(query))
-    .sort((a, b) => Number(b.has) - Number(a.has) || a.name.localeCompare(b.name))
-    .slice(0, 100);
+  const all = Object.values(server.members).map((m) => ({ m, name: memberName(m.nickname, users[m.user_id]), username: users[m.user_id]?.username ?? "", has: m.role_ids.includes(role.id) }));
+  const holders = all.filter((x) => x.has).length;
+  // Cut at a hundred with no count and no way on, whether someone appeared
+  // depended on where the alphabet put them. A page at a time, as the
+  // members page does, with how many are left.
+  const matching = all.filter((x) => !query || x.name.toLowerCase().includes(query) || x.username.includes(query)).sort((a, b) => Number(b.has) - Number(a.has) || a.name.localeCompare(b.name));
+  const members = matching.slice(0, shown);
   const toggle = async (userId: string, on: boolean) => {
     setBusy(userId);
     try {
@@ -311,8 +324,10 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
   return (
     <div>
       <div className={s.searchRow}>
-        <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("server.channelSettings.searchMembers")} />
+        <TextInput value={q} onChange={(e) => { setQ(e.target.value); setShown(MEMBERS_PAGE); }} placeholder={t("server.channelSettings.searchMembers")} aria-label={t("server.channelSettings.searchMembers")} />
       </div>
+      <p className={st.hint} style={{ margin: "0 0 8px" }}>{t("server.roles.holdersCount", { count: holders })}</p>
+      {matching.length === 0 && query ? <NoMatches people query={q} onClear={() => setQ("")} /> : null}
       {members.map(({ m, name, username, has }) => (
         <div key={m.user_id} className={s.memberRow}>
           <Avatar id={m.user_id} avatarId={m.avatar_id ?? users[m.user_id]?.avatar_id ?? null} name={name} size={32} />
@@ -323,6 +338,7 @@ function MembersTab({ role, serverId, editable }: { role: Role; serverId: string
           <Button size="sm" variant={has ? "secondary" : "primary"} disabled={!editable || busy === m.user_id} onClick={() => void toggle(m.user_id, !has)}>{has ? t("server.packEditor.remove") : t("server.roles.addMember")}</Button>
         </div>
       ))}
+      {matching.length > shown ? <div className={s.loadMore}><Button variant="secondary" size="sm" onClick={() => setShown((v) => v + MEMBERS_PAGE)}>{t("server.members.showMoreLeft", { count: matching.length - shown })}</Button></div> : null}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { FLAG_ADMIN, FLAG_DISABLED, relativeTo } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
+import { formatStamp } from "@/lib/time";
 import { copyAndSay } from "@/lib/copyText";
 import { t } from "@/i18n";
 import { ModerateModal } from "./ModerateModal";
@@ -327,7 +328,7 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
         <div className={m.cardMeta}>
           <span>
             <CalendarDays size={13} aria-hidden="true" />
-            {t("moderation.joined", { when: new Date(u.created_at).toLocaleDateString() })}
+            {t("moderation.joined", { when: formatStamp(new Date(u.created_at), "d") })}
           </span>
           {u.last_seen_at ? (
             <span>
