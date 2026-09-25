@@ -2220,7 +2220,7 @@
   "settings.profile.topColourOnItsOwnIt": "上の色 — 単独ではバナーの色になります",
   "settings.security.anAuthenticatorAppAdds": "認証アプリを使うと、ログインのたびに 6 桁のコードが必要になり、パスワードだけでは入れなくなります。メッセージはいずれにせよエンドツーエンドで暗号化されています。これはアカウント自体を守るものです。",
   "settings.security.appLock": "アプリロック",
-  "settings.security.appLockHint": "この端末用のパスコードです。有効な間、鍵はパスコードで包んだ形で保存されるので、タブを閉じたりアプリをロックしたりすると、もう一度入力するまでメッセージは本当に読めなくなります。10 回間違えると包んだコピーは消去され、アカウントのパスワードで再び入れます。",
+  "settings.security.appLockHint": "オンにすると、サインインするすべての端末でパスコードを求められます。パスコードは入力した端末から外に出ません。その端末では鍵がパスコードで包んだ形で保存されるので、タブを閉じたりアプリをロックしたりすると、もう一度入力するまでメッセージは本当に読めなくなります。10 回間違えると包んだコピーは消去され、アカウントのパスワードで再び入れます。",
   "settings.security.authenticatorAppIsOff": "認証アプリはオフです",
   "settings.security.authenticatorAppIsOn": "認証アプリはオンです",
   "settings.security.authenticatorSetupCode": "認証アプリのセットアップコード",

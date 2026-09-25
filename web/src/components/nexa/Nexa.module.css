@@ -9,7 +9,7 @@
   flex: none;
   border-radius: 50%;
   background: linear-gradient(145deg, var(--brand), color-mix(in srgb, var(--brand) 62%, #000));
-  color: #fff;
+  color: var(--on-brand);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
@@ -347,7 +347,7 @@
   padding: 0 5px;
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
+  color: var(--on-danger);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;

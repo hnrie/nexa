@@ -2304,7 +2304,7 @@
   "settings.profile.topColourOnItsOwnIt": "Cor de cima — sozinha, ela colore seu banner",
   "settings.security.anAuthenticatorAppAdds": "Um app autenticador acrescenta um código de seis dígitos a cada login, então só a senha não basta. Suas mensagens continuam com criptografia de ponta a ponta de todo jeito; isto protege a conta em si.",
   "settings.security.appLock": "Bloqueio do app",
-  "settings.security.appLockHint": "Um código para este dispositivo. Enquanto estiver ativo, suas chaves ficam guardadas protegidas por ele, então fechar a aba ou bloquear o app deixa mesmo suas mensagens fora de alcance até você digitá-lo de novo. Dez tentativas erradas apagam a cópia protegida, e a senha da sua conta traz você de volta.",
+  "settings.security.appLockHint": "Depois de ativado, todo dispositivo em que você entrar pede um código. O código nunca sai do dispositivo em que é digitado: ali suas chaves ficam guardadas protegidas por ele, então fechar a aba ou bloquear o app deixa mesmo suas mensagens fora de alcance até você digitá-lo de novo. Dez tentativas erradas apagam a cópia protegida, e a senha da sua conta traz você de volta.",
   "settings.security.authenticatorAppIsOff": "O app autenticador está desligado",
   "settings.security.authenticatorAppIsOn": "O app autenticador está ligado",
   "settings.security.authenticatorSetupCode": "Código de configuração do autenticador",

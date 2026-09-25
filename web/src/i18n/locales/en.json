@@ -2655,7 +2655,7 @@
   "settings.admin.panelMoved": "Browse every account, act on them, work through cases, read the log and send announcements.",
   "settings.admin.openPanel": "Open",
   "settings.desktop.programNamed": "Program {id}",
-  "settings.security.appLockHint": "A passcode for this device. While it is on, your keys are stored wrapped by the passcode, so closing the tab or locking the app really does put your messages out of reach until you type it again. Ten wrong tries wipe the wrapped copy, and your account password gets you back in.",
+  "settings.security.appLockHint": "Once it is on, every device you sign in on asks for a passcode. The passcode never leaves the device it is typed on: your keys are stored wrapped by it there, so closing the tab or locking the app really does put your messages out of reach until you type it again. Ten wrong tries wipe the wrapped copy, and your account password gets you back in.",
   "settings.settings.logOutConfirm": "You will need your password to sign back in on this device.",
   "settings.stickers.installedTag": "installed",
   "settings.stickers.privateTag": "private",

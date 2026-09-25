@@ -2303,7 +2303,7 @@
   "settings.profile.topColourOnItsOwnIt": "Couleur du haut — seule, elle colore votre bannière",
   "settings.security.anAuthenticatorAppAdds": "Une application d’authentification ajoute un code à six chiffres à chaque connexion : votre mot de passe seul ne suffit plus. Vos messages restent chiffrés de bout en bout dans tous les cas ; ceci protège le compte lui-même.",
   "settings.security.appLock": "Verrouillage de l’application",
-  "settings.security.appLockHint": "Un code pour cet appareil. Tant qu'il est activé, vos clés sont stockées chiffrées par ce code : fermer l'onglet ou verrouiller l'app met vraiment vos messages hors d'atteinte jusqu'à ce que vous le saisissiez à nouveau. Dix essais ratés effacent la copie chiffrée, et le mot de passe de votre compte vous permet de revenir.",
+  "settings.security.appLockHint": "Une fois activé, chaque appareil sur lequel vous vous connectez demande un code. Le code ne quitte jamais l’appareil où il est saisi : vos clés y sont stockées chiffrées par ce code, donc fermer l’onglet ou verrouiller l’app met vraiment vos messages hors d’atteinte jusqu’à ce que vous le saisissiez à nouveau. Dix essais ratés effacent la copie chiffrée, et le mot de passe de votre compte vous permet de revenir.",
   "settings.security.authenticatorAppIsOff": "L’application d’authentification est désactivée",
   "settings.security.authenticatorAppIsOn": "L’application d’authentification est activée",
   "settings.security.authenticatorSetupCode": "Code de configuration de l’authentificateur",

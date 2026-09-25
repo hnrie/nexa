@@ -48,7 +48,7 @@
 /* a card straight under the sentence that introduces it had 4px between them */
 .hint + .device { margin-top: 12px; }
 /* .saveBar comes later in this file and set its own background over this one, so the bar shook but never went red */
-.saveBar.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: #fff; }
+.saveBar.shake { animation: shake 420ms ease-in-out; background: var(--danger); color: var(--on-danger); }
 .saveBar.shake :global(button) { color: inherit; }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 15%, 55% { transform: translateX(-8px); } 35%, 75% { transform: translateX(8px); } }
 @media (prefers-reduced-motion: reduce) { .saveBar.shake { animation: none; } }

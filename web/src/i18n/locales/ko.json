@@ -2220,7 +2220,7 @@
   "settings.profile.topColourOnItsOwnIt": "위쪽 색 — 이것만 고르면 배너 색이 됩니다",
   "settings.security.anAuthenticatorAppAdds": "인증 앱을 쓰면 로그인할 때마다 여섯 자리 코드가 필요해서 비밀번호만으로는 들어올 수 없습니다. 메시지는 어느 쪽이든 종단 간 암호화됩니다. 이건 계정 자체를 지키는 장치입니다.",
   "settings.security.appLock": "앱 잠금",
-  "settings.security.appLockHint": "이 기기의 암호입니다. 켜져 있는 동안 키는 암호로 감싼 상태로 저장되므로, 탭을 닫거나 앱을 잠그면 다시 입력할 때까지 메시지에 정말로 접근할 수 없습니다. 10번 틀리면 감싼 사본이 지워지고, 계정 비밀번호로 다시 들어올 수 있습니다.",
+  "settings.security.appLockHint": "켜 두면 로그인하는 모든 기기가 암호를 요구합니다. 암호는 입력한 기기 밖으로 나가지 않습니다. 그 기기에서 키가 암호로 감싼 상태로 저장되므로, 탭을 닫거나 앱을 잠그면 다시 입력할 때까지 메시지에 정말로 접근할 수 없습니다. 10번 틀리면 감싼 사본이 지워지고, 계정 비밀번호로 다시 들어올 수 있습니다.",
   "settings.security.authenticatorAppIsOff": "인증 앱이 꺼져 있습니다",
   "settings.security.authenticatorAppIsOn": "인증 앱이 켜져 있습니다",
   "settings.security.authenticatorSetupCode": "인증 앱 설정 코드",

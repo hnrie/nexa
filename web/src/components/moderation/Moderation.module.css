@@ -75,7 +75,7 @@
   padding: 0 5px;
   border-radius: 9px;
   background: var(--danger);
-  color: #fff;
+  color: var(--on-danger);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
@@ -566,7 +566,7 @@
   white-space: nowrap;
 }
 .tag[data-tone="danger"] {
-  color: #fff;
+  color: var(--on-danger);
   background: var(--danger);
 }
 .tag[data-tone="warn"] {

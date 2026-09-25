@@ -2220,7 +2220,7 @@
   "settings.profile.topColourOnItsOwnIt": "顶部颜色 — 单独使用时，它会给你的横幅上色",
   "settings.security.anAuthenticatorAppAdds": "验证器应用会在每次登录时要求一个六位数字，光有密码就进不来了。无论如何你的消息都是端到端加密的；这一项保护的是账号本身。",
   "settings.security.appLock": "应用锁",
-  "settings.security.appLockHint": "这台设备的锁屏码。开启时，你的密钥会用锁屏码加密保存，所以关闭标签页或锁定应用后，在你再次输入之前，消息真的无法读取。连续输错十次会清除加密副本，用账号密码可以重新进入。",
+  "settings.security.appLockHint": "开启后，你登录的每台设备都会要求输入锁屏码。锁屏码永远不会离开输入它的设备：你的密钥在那台设备上用它加密保存，所以关闭标签页或锁定应用后，在你再次输入之前，消息真的无法读取。连续输错十次会清除加密副本，用账号密码可以重新进入。",
   "settings.security.authenticatorAppIsOff": "验证器应用已关闭",
   "settings.security.authenticatorAppIsOn": "验证器应用已开启",
   "settings.security.authenticatorSetupCode": "验证器设置代码",

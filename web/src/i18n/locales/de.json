@@ -2295,7 +2295,7 @@
   "settings.profile.topColourOnItsOwnIt": "Obere Farbe — allein färbt sie deinen Banner",
   "settings.security.anAuthenticatorAppAdds": "Eine Authenticator-App verlangt bei jeder Anmeldung einen sechsstelligen Code, sodass dein Passwort allein nicht genügt. Deine Nachrichten bleiben so oder so Ende-zu-Ende-verschlüsselt; das hier schützt das Konto selbst.",
   "settings.security.appLock": "App-Sperre",
-  "settings.security.appLockHint": "Ein Code für dieses Gerät. Solange er aktiv ist, werden deine Schlüssel damit verschlüsselt gespeichert, sodass das Schließen des Tabs oder Sperren der App deine Nachrichten wirklich unerreichbar macht, bis du ihn wieder eingibst. Zehn falsche Versuche löschen die verschlüsselte Kopie, und dein Kontopasswort bringt dich zurück.",
+  "settings.security.appLockHint": "Ist er einmal aktiv, fragt jedes Gerät, auf dem du dich anmeldest, nach einem Code. Der Code verlässt nie das Gerät, auf dem du ihn eingibst: Dort werden deine Schlüssel damit verschlüsselt gespeichert, sodass das Schließen des Tabs oder Sperren der App deine Nachrichten wirklich unerreichbar macht, bis du ihn wieder eingibst. Zehn falsche Versuche löschen die verschlüsselte Kopie, und dein Kontopasswort bringt dich zurück.",
   "settings.security.authenticatorAppIsOff": "Die Authenticator-App ist aus",
   "settings.security.authenticatorAppIsOn": "Die Authenticator-App ist an",
   "settings.security.authenticatorSetupCode": "Einrichtungscode für die Authenticator-App",
