@@ -266,6 +266,10 @@ let dirtyEdits: ListEdits | null = null;
 let sendingEdits: ListEdits | null = null;
 let inflight: Promise<boolean> | null = null;
 let again = false;
+/** The page is going away: saves ride a keepalive request, which outlives it. */
+let leaving = false;
+/** What a keepalive request may carry, a little under the browsers' 64 KB. */
+const KEEPALIVE_MAX = 60_000;
 /** Bumped on reset, so a save from the account before it cannot land on the next one. */
 let generation = 0;
 
@@ -299,7 +303,7 @@ export const useSettings = create<SettingsState>()((set, get) => {
     dirtyEdits = null;
     try {
       const blob = await encryptSettings(key, settings);
-      const res = await usersApi.putSettings(blob, version);
+      const res = await usersApi.putSettings(blob, version, leaving && blob.length < KEEPALIVE_MAX ? { keepalive: true } : undefined);
       if (gen !== generation) return false;
       sending = null;
       sendingEdits = null;
@@ -425,3 +429,27 @@ export const useSettings = create<SettingsState>()((set, get) => {
     },
   };
 });
+
+/**
+ * A page going away — a reload, a closed tab, a phone putting it to sleep —
+ * saves what is still waiting. The save normally waits for a pause in the
+ * changes, and a theme picked a moment before a reload was simply lost.
+ */
+function saveBeforeLeaving(): void {
+  if (!dirty && !saveTimer) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  leaving = true;
+  void useSettings.getState().flush();
+}
+
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  window.addEventListener("pagehide", saveBeforeLeaving);
+  window.addEventListener("pageshow", () => {
+    leaving = false;
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") saveBeforeLeaving();
+    else leaving = false;
+  });
+}

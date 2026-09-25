@@ -54,8 +54,8 @@ export const users = {
     const res = await api.request<SettingsBlob | undefined>("GET", "/users/@me/settings");
     return res && typeof res.blob === "string" ? res : null;
   },
-  putSettings(blob: string, version: number): Promise<{ version: number }> {
-    return api.request("PUT", "/users/@me/settings", { blob, version });
+  putSettings(blob: string, version: number, opts?: { keepalive?: boolean }): Promise<{ version: number }> {
+    return api.request("PUT", "/users/@me/settings", { blob, version }, opts);
   },
   myKeys(): Promise<{ public_key: string; enc_private_key: string; kdf_salt: string; kdf_params: KdfParamsJson }> {
     return api.request("GET", "/users/@me/keys");

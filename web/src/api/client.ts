@@ -47,6 +47,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Appended as a query string; `undefined` values are dropped. */
   query?: Record<string, string | number | undefined>;
+  /** Let the request outlive the page (a save sent as it unloads). Browsers take at most 64 KB this way. */
+  keepalive?: boolean;
 }
 
 export interface UploadOptions {
@@ -203,6 +205,7 @@ export const api = {
 
     const init: RequestInit = { method, headers };
     if (payload !== undefined) init.body = payload;
+    if (opts?.keepalive) init.keepalive = true;
     const limit = deadline(opts?.signal, REQUEST_TIMEOUT_MS);
     init.signal = limit.signal;
 
