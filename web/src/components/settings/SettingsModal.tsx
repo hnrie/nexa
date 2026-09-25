@@ -39,7 +39,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   // Licenses sits at the bottom of the app settings: nobody comes looking for it, and
   // the desktop entry only exists when there is a desktop app to have settings for.
   // About is last of all: Terms, Privacy, encryption note, and owner contact.
-  const appItems = [...(inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []), { id: "licenses", label: t("settings.licenses.licenses") }, { id: "about", label: t("legal.aboutTitle") }];
+  const appItems = [...(inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []), { id: "licenses", label: t("settings.licenses.licenses") }, { id: "about", label: t("settings.about.title") }];
   const base = navGroups().map((g, i) => (i === 1 ? { ...g, items: [...g.items, ...appItems] } : g));
   const groups = isAdmin ? [...base, { head: t("settings.settings.instance"), items: [{ id: "admin", label: t("settings.admin.instanceAdmin") }] }] : base;
   const body =

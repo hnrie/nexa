@@ -9,7 +9,7 @@ import { LegalDocument } from "@/components/legal/LegalDocument";
 import { CONTACT_EMAIL, LEGAL_EFFECTIVE, LEGAL_VERSION, OWNER_USERNAME, termsAccepted } from "@/lib/legal";
 import { useLegalDocs } from "@/lib/legalDocs";
 import { useAuth } from "@/stores/auth";
-import { t } from "@/i18n";
+import { t, useLocale } from "@/i18n";
 import s from "./Settings.module.css";
 import l from "../legal/Legal.module.css";
 
@@ -26,6 +26,7 @@ export default function AboutPage() {
   const [server, setServer] = useState<string | null>(null);
   const docs = useLegalDocs();
   const agreed = !!me && termsAccepted(me.id);
+  const locale = useLocale();
 
   useEffect(() => {
     let alive = true;
@@ -42,7 +43,7 @@ export default function AboutPage() {
     return (
       <>
         <Button size="sm" variant="ghost" onClick={() => setReading(null)} style={{ marginBottom: 12 }}>
-          <ArrowLeft size={16} aria-hidden="true" /> {t("legal.aboutBack")}
+          <ArrowLeft size={16} aria-hidden="true" /> {t("settings.about.back")}
         </Button>
         {docs ? (
           <LegalDocument doc={docs[reading]} />
@@ -63,27 +64,27 @@ export default function AboutPage() {
       <span className={l.rowText}>
         <span className={l.rowTitle}>{title}</span>
         <span className={l.rowSub}>
-          {t("legal.aboutEffective", { date: docs?.[id].effective ?? LEGAL_EFFECTIVE })}
+          {t("settings.about.effective", { date: docs?.[id].effective ?? LEGAL_EFFECTIVE })}
           {agreed ? (
             <>
               {" · "}
               <span className={l.agreed}>
                 <Check size={13} aria-hidden="true" />
-                {t("legal.aboutAgreed")}
+                {t("settings.about.agreed")}
               </span>
             </>
           ) : null}
         </span>
       </span>
       <Button size="sm" variant="secondary" onClick={() => setReading(id)} data-testid={`about-read-${id}`}>
-        {t("legal.aboutRead")}
+        {t("settings.about.read")}
       </Button>
     </div>
   );
 
   return (
     <>
-      <h2 className={s.title}>{t("legal.aboutTitle")}</h2>
+      <h2 className={s.title}>{t("settings.about.title")}</h2>
       <div className={l.aboutHero}>
         <NexaTile size={56} />
         <div className={l.aboutHeroText}>
@@ -93,12 +94,14 @@ export default function AboutPage() {
       </div>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("legal.aboutGlance")}</h3>
+        <h3 className={l.aboutLabel}>{t("settings.about.glance")}</h3>
         <LegalHighlights />
       </section>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("legal.aboutDocs")}</h3>
+        <h3 className={l.aboutLabel}>{t("settings.about.documents")}</h3>
+        {/* the page around them follows the language; a translated Terms would be a different Terms */}
+        {!locale.startsWith("en") ? <p className={s.hint}>{t("settings.about.englishOnly")}</p> : null}
         <div className={l.rows}>
           {doc("terms", t("legal.termsTitle"))}
           {doc("privacy", t("legal.privacyTitle"))}
@@ -106,14 +109,14 @@ export default function AboutPage() {
       </section>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("legal.aboutContact")}</h3>
+        <h3 className={l.aboutLabel}>{t("settings.about.contact")}</h3>
         <div className={l.rows}>
           <div className={l.row}>
             <span className={l.rowIcon} aria-hidden="true">
               <Mail size={18} />
             </span>
             <span className={l.rowText}>
-              <span className={l.rowTitle}>{t("legal.aboutEmail")}</span>
+              <span className={l.rowTitle}>{t("settings.about.email")}</span>
               <span className={l.rowSub}>
                 <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
               </span>
@@ -127,7 +130,7 @@ export default function AboutPage() {
               <AtSign size={18} />
             </span>
             <span className={l.rowText}>
-              <span className={l.rowTitle}>{t("legal.aboutInApp")}</span>
+              <span className={l.rowTitle}>{t("settings.about.inApp")}</span>
               <span className={l.rowSub}>@{OWNER_USERNAME}</span>
             </span>
           </div>
@@ -136,15 +139,15 @@ export default function AboutPage() {
               <MessagesSquare size={18} />
             </span>
             <span className={l.rowText}>
-              <span className={l.rowTitle}>{t("legal.aboutAppeals")}</span>
-              <span className={l.rowSub}>{t("legal.aboutAppealsSub")}</span>
+              <span className={l.rowTitle}>{t("settings.about.appeals")}</span>
+              <span className={l.rowSub}>{t("settings.about.appealsSub")}</span>
             </span>
           </div>
         </div>
       </section>
 
       <section className={l.aboutGroup}>
-        <h3 className={l.aboutLabel}>{t("legal.aboutVersion")}</h3>
+        <h3 className={l.aboutLabel}>{t("settings.about.version")}</h3>
         <div className={l.rows}>
           <div className={l.row}>
             <span className={l.rowIcon} aria-hidden="true">
@@ -153,7 +156,7 @@ export default function AboutPage() {
             <span className={l.rowText}>
               <span className={l.rowTitle}>Nexa</span>
               <span className={l.rowSub}>
-                {server ? t("legal.aboutServer", { version: server }) : "…"} · {t("legal.aboutLegalVersion", { version: LEGAL_VERSION })}
+                {server ? t("settings.about.server", { version: server }) : "…"} · {t("settings.about.terms", { version: LEGAL_VERSION })}
               </span>
             </span>
           </div>
