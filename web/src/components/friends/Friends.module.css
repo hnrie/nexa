@@ -60,7 +60,7 @@
 }
 .addMsg { margin-top: 8px; font-size: 14px; }
 .ok { color: var(--positive); }
-.err { color: var(--danger); }
+.err { color: var(--text-danger); }
 .menuBtn { display: inline-flex; }
 @media (max-width: 767px) { .body { padding-block: 12px 16px; padding-inline: 16px 12px; } }
 /* big enough for a finger, in the header and on each row */

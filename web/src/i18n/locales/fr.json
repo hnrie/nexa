@@ -1259,6 +1259,10 @@
     "other": "{count} messages non lus de Nexa"
   },
   "nexa.viewProfile": "Voir le profil",
+  "notFound.body": "Le lien est peut-être mal saisi, ou ce vers quoi il pointait a été déplacé.",
+  "notFound.home": "Aller à l’accueil",
+  "notFound.openNexa": "Ouvrir Nexa",
+  "notFound.title": "Cette page n’existe pas",
   "notify.friendRequest": "Demande d’ami",
   "notify.newMessage": "Nouveau message",
   "notify.sentASticker": "A envoyé un sticker",

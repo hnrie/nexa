@@ -8,7 +8,7 @@
 /* the dot of a set of choices, filled on the one in use */
 .radio { flex: none; width: 14px; height: 14px; margin-inline-start: 12px; border-radius: 50%; border: 2px solid currentColor; opacity: 0.7; }
 .radio[data-on="true"] { opacity: 1; background: radial-gradient(circle, currentColor 0 3px, transparent 3.5px); }
-.danger { color: var(--danger); }
+.danger { color: var(--text-danger); }
 .danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
 .sep { height: 1px; margin: 4px; background: var(--border); }
 .slider { padding: 6px 8px 8px; }

@@ -1256,6 +1256,10 @@
     "other": "{count} ungelesene Nachrichten von Nexa"
   },
   "nexa.viewProfile": "Profil ansehen",
+  "notFound.body": "Vielleicht ist der Link falsch geschrieben, oder sein Ziel ist umgezogen.",
+  "notFound.home": "Zur Startseite",
+  "notFound.openNexa": "Nexa öffnen",
+  "notFound.title": "Diese Seite gibt es nicht",
   "notify.friendRequest": "Freundschaftsanfrage",
   "notify.newMessage": "Neue Nachricht",
   "notify.sentASticker": "Hat einen Sticker geschickt",

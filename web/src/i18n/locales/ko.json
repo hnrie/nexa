@@ -1216,6 +1216,10 @@
     "other": "Nexa에서 온 읽지 않은 메시지 {count}개"
   },
   "nexa.viewProfile": "프로필 보기",
+  "notFound.body": "링크를 잘못 입력했거나 링크된 곳이 옮겨졌을 수 있습니다.",
+  "notFound.home": "홈페이지로 이동",
+  "notFound.openNexa": "Nexa 열기",
+  "notFound.title": "존재하지 않는 페이지입니다",
   "notify.friendRequest": "친구 요청",
   "notify.newMessage": "새 메시지",
   "notify.sentASticker": "스티커를 보냈습니다",

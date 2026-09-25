@@ -1259,6 +1259,10 @@
     "other": "{count} mensajes sin leer de Nexa"
   },
   "nexa.viewProfile": "Ver perfil",
+  "notFound.body": "Puede que el enlace esté mal escrito o que lo que enlazaba se haya movido.",
+  "notFound.home": "Ir a la página de inicio",
+  "notFound.openNexa": "Abrir Nexa",
+  "notFound.title": "Esta página no existe",
   "notify.friendRequest": "Solicitud de amistad",
   "notify.newMessage": "Mensaje nuevo",
   "notify.sentASticker": "Envió un sticker",

@@ -38,8 +38,8 @@ export function TermsGate() {
   useEffect(() => {
     reader.current?.scrollTo({ top: 0 });
   }, [tab]);
-  // The dialog focuses its first field, the checkbox at the bottom, which
-  // scrolls the dialog to it; it should open at the top, where the reading starts.
+  // The dialog opens at the top of the reading, where it starts, whatever it
+  // focuses first.
   const shown = status === "ready" && !!me && !termsAccepted(me.id);
   // fetched only for someone who is being asked
   const docs = useLegalDocs(shown);
@@ -82,14 +82,23 @@ export function TermsGate() {
       title={previous ? t("legal.gateTitleUpdated") : t("legal.gateTitle")}
       width={680}
       footer={
-        <div className={s.gateFoot}>
-          <Button variant="ghost" onClick={() => void logout()}>
-            {t("settings.settings.logOut")}
-          </Button>
-          <span className={s.grow} />
-          <Button variant="primary" disabled={!checked} onClick={agree} data-testid="terms-agree">
-            {t("legal.agreeAndContinue")}
-          </Button>
+        // The checkbox rides with the button it unlocks. Below the reading it
+        // sat under the fold on a phone, with "Agree" greyed out and nothing on
+        // screen saying why.
+        <div className={s.gateFootWrap}>
+          <label className={s.check} dir="auto">
+            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} data-testid="terms-check" />
+            <span>{t("legal.gateCheck")}</span>
+          </label>
+          <div className={s.gateFoot}>
+            <Button variant="ghost" onClick={() => void logout()}>
+              {t("settings.settings.logOut")}
+            </Button>
+            <span className={s.grow} />
+            <Button variant="primary" disabled={!checked} onClick={agree} data-testid="terms-agree">
+              {t("legal.agreeAndContinue")}
+            </Button>
+          </div>
         </div>
       }
     >
@@ -132,10 +141,6 @@ export function TermsGate() {
             )}
           </div>
         )}
-        <label className={s.check}>
-          <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} data-testid="terms-check" />
-          <span>{t("legal.gateCheck")}</span>
-        </label>
       </div>
     </Modal>
   );

@@ -1216,6 +1216,10 @@
     "other": "Nexa からの未読メッセージ {count} 件"
   },
   "nexa.viewProfile": "プロフィールを表示",
+  "notFound.body": "リンクが間違っているか、リンク先が移動した可能性があります。",
+  "notFound.home": "ホームページへ",
+  "notFound.openNexa": "Nexa を開く",
+  "notFound.title": "このページは存在しません",
   "notify.friendRequest": "フレンド申請",
   "notify.newMessage": "新しいメッセージ",
   "notify.sentASticker": "スタンプを送信しました",

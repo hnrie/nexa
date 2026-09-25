@@ -1366,6 +1366,10 @@
     "other": "{count} رسالة غير مقروءة من Nexa"
   },
   "nexa.viewProfile": "عرض الملف الشخصي",
+  "notFound.body": "ربما كُتب الرابط بشكل خاطئ، أو نُقل ما كان يشير إليه.",
+  "notFound.home": "الذهاب إلى الصفحة الرئيسية",
+  "notFound.openNexa": "افتح Nexa",
+  "notFound.title": "هذه الصفحة غير موجودة",
   "notify.friendRequest": "طلب صداقة",
   "notify.newMessage": "رسالة جديدة",
   "notify.sentASticker": "أرسل ملصقًا",

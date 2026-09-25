@@ -19,6 +19,7 @@ const GuestCallPage = lazyPage(() => import("@/pages/GuestCallPage"));
 const LegalPage = lazyPage(() => import("@/pages/LegalPage"));
 const NexaPage = lazyPage(() => import("@/pages/NexaPage"));
 const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
+const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
 // The panel and its tabs come in one file; the tabs are routes of their own
 // so "@admin/cases/:caseId" outranks ":serverId/:channelId/:messageId".
 const adminPanel = () => import("@/pages/AdminPanelPage");
@@ -70,13 +71,14 @@ export function AppRoutes() {
                   <Route path=":serverId" element={<ServerPage />} />
                   <Route path=":serverId/:channelId" element={<ServerPage />} />
                   <Route path=":serverId/:channelId/:messageId" element={<ServerPage />} />
+                  {/* inside the app an unknown address is usually a conversation that went, and Friends is the place for it */}
                   <Route path="*" element={<Navigate to="/channels/@me" replace />} />
                 </Routes>
               </AppShell>
             </RequireAuth>
           }
         />
-        <Route path="*" element={<Navigate to="/channels/@me" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Suspense>
   );

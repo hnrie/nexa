@@ -1256,6 +1256,10 @@
     "other": "Nexa से {count} बिना पढ़े संदेश"
   },
   "nexa.viewProfile": "प्रोफ़ाइल देखें",
+  "notFound.body": "हो सकता है लिंक गलत लिखा हो, या जिस चीज़ की ओर वह ले जाता था, वह हट गई हो।",
+  "notFound.home": "होम पेज पर जाएँ",
+  "notFound.openNexa": "Nexa खोलें",
+  "notFound.title": "यह पेज मौजूद नहीं है",
   "notify.friendRequest": "दोस्ती का अनुरोध",
   "notify.newMessage": "नया संदेश",
   "notify.sentASticker": "एक स्टिकर भेजा",

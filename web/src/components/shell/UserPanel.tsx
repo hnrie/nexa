@@ -142,7 +142,7 @@ export function UserPanel() {
         </Tooltip>
       </div>
       {open ? (
-        <div className={s.pop} ref={pop} role="menu" aria-label={me.display_name} onKeyDown={onPopKey}>
+        <div className={s.pop} ref={pop} role="menu" aria-label={me.display_name} onKeyDown={onPopKey} data-modal-layer>
           {/* Not a menu item: it is who the menu is about. */}
           <div className={s.popHead} role="presentation">
             <Avatar id={me.id} avatarId={me.avatar_id} name={me.display_name} size={40} status={status} />

@@ -12,7 +12,7 @@
 .navChevron { flex: none; color: var(--text-muted); }
 .navSep { height: 1px; margin: 8px 10px; background: var(--border); }
 /* red whether or not it is the page on screen: Delete Server lost its warning colour once opened */
-.danger, .navItem.danger, .navItem.danger:hover, .navItem.danger[data-selected="true"] { color: var(--danger); }
+.danger, .navItem.danger, .navItem.danger:hover, .navItem.danger[data-selected="true"] { color: var(--text-danger); }
 /* A chevron or arrow that points along the reading direction turns round with it. */
 [dir="rtl"] .flip { transform: scaleX(-1); }
 @media (pointer: coarse) {

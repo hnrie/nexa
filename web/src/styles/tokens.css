@@ -39,6 +39,9 @@
   --warning: #fdb833;
   --danger: #da3e44;
   --danger-hover: #b5343a;
+  /* --danger as text: the fill colour reads at under 3:1 on these panels,
+     which is not enough for an error message someone has to act on */
+  --text-danger: #fc8387;
   --status-online: #3d9e60;
   --status-idle: #f0b232;
   --status-dnd: #da3e44;
@@ -128,6 +131,7 @@
   --warning: #bb7300;
   --danger: #d6363f;
   --danger-hover: #b52d35;
+  --text-danger: #c33139;
   /* The presence colours are the one part of the dark palette the light theme
      forgot. They are not only dots: the header under a DM's name prints the
      status in them, and #f0b232 on this page is 1.7:1. Darkened until the
@@ -196,6 +200,9 @@
   --warning: #fdb833;
   --danger: #da3e44;
   --danger-hover: #b5343a;
+  /* --danger as text: the fill colour reads at under 3:1 on these panels,
+     which is not enough for an error message someone has to act on */
+  --text-danger: #fc8387;
   --status-online: #3d9e60;
   --status-idle: #f0b232;
   --status-dnd: #da3e44;
@@ -224,6 +231,7 @@
   --spoiler-revealed: #1a1a1e;
   --code-bg: #131416;
   --embed-bg: #27272c;
+  --text-danger: #fb5b60;
   color-scheme: dark;
 }
 
@@ -246,5 +254,6 @@
   --spoiler-revealed: #131416;
   --code-bg: #0d0d0f;
   --embed-bg: #131416;
+  --text-danger: #fb5b60;
   color-scheme: dark;
 }

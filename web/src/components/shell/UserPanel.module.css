@@ -21,7 +21,7 @@
 .opt:hover .optSub { color: inherit; }
 .optText { display: flex; flex-direction: column; }
 .optSub { font-size: 12px; color: var(--text-muted); font-weight: 400; }
-.danger { color: var(--danger); }
+.danger { color: var(--text-danger); }
 .danger:hover { background: var(--danger); color: #fff; }
 
 /* the desktop app has an update downloaded: a green button to restart into it */

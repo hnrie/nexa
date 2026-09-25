@@ -1318,6 +1318,10 @@
     "other": "{count} непрочитанных сообщения от Nexa"
   },
   "nexa.viewProfile": "Открыть профиль",
+  "notFound.body": "Возможно, в ссылке опечатка или то, на что она вела, переехало.",
+  "notFound.home": "На главную",
+  "notFound.openNexa": "Открыть Nexa",
+  "notFound.title": "Такой страницы нет",
   "notify.friendRequest": "Запрос в друзья",
   "notify.newMessage": "Новое сообщение",
   "notify.sentASticker": "Отправил(а) стикер",

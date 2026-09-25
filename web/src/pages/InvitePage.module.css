@@ -22,7 +22,7 @@
 .note { margin: 12px 0 0; font-size: 13px; color: var(--text-muted); }
 /* The danger red itself is under 3:1 as text on this card in the dark themes;
    drawn toward the text colour it keeps its meaning and reads at 4.5:1. */
-.acceptError { margin: 4px 0 0; font-size: 14px; color: color-mix(in srgb, var(--danger) 60%, var(--text-strong)); }
+.acceptError { margin: 4px 0 0; font-size: 14px; color: var(--text-danger); }
 /* A pack of three stickers sits in the middle like everything else on the
    card, rather than in the first columns of a grid laid out for thirty. */
 .card .stickers { width: 100%; grid-template-columns: repeat(auto-fit, minmax(112px, 136px)); justify-content: center; }

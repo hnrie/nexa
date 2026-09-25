@@ -1216,6 +1216,10 @@
     "other": "{count} 条来自 Nexa 的未读消息"
   },
   "nexa.viewProfile": "查看资料",
+  "notFound.body": "链接可能输错了，或者它指向的内容已经移走。",
+  "notFound.home": "前往首页",
+  "notFound.openNexa": "打开 Nexa",
+  "notFound.title": "此页面不存在",
   "notify.friendRequest": "好友请求",
   "notify.newMessage": "新消息",
   "notify.sentASticker": "发送了一张贴纸",

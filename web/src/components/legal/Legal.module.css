@@ -314,6 +314,12 @@
 .links a {
   color: var(--link);
 }
+.gateFootWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
 .gateFoot {
   display: flex;
   align-items: center;
