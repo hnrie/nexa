@@ -293,3 +293,60 @@ func TestReadJSONRejectsTrailingAndBig(t *testing.T) {
 	}
 	_ = http.StatusOK
 }
+
+// On an invite-only instance an invite lets in as many accounts as it has
+// uses. A one-use code seen by many used to let all of them sign up, since
+// signing up only checked that it was still live; now the sign-up spends the
+// use, and the new account's first join through it rides on that use.
+func TestAnInviteLetsInAsManyAccountsAsItHasUses(t *testing.T) {
+	srv, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tokA, "S")
+	general := channelNamed(view, "general")["id"].(string)
+	res, body := do(t, ts, "POST", "/api/v1/channels/"+general+"/invites", tokA, map[string]any{"max_uses": 1, "max_age": 0})
+	if res.StatusCode != 201 && res.StatusCode != 200 {
+		t.Fatalf("invite: %d %v", res.StatusCode, body)
+	}
+	code := body["code"].(string)
+	srv.Cfg.Registration = "invite"
+	srv.Cfg.RegistrationKey = ""
+	signUp := func(name string) (int, map[string]any) {
+		b := registerBody(name)
+		b["invite_code"] = code
+		res, body := do(t, ts, "POST", "/api/v1/auth/register", "", b)
+		return res.StatusCode, body
+	}
+	st, body := signUp("carol")
+	if st != 201 {
+		t.Fatalf("carol signs up with the invite: %d %v", st, body)
+	}
+	tokC := body["token"].(string)
+	if st, body := signUp("dave"); st != 403 || errCode(body) != "invite_required" {
+		t.Errorf("a second sign-up on a one-use invite: %d %v", st, body)
+	}
+	// the invite is spent for everyone else, and still open to carol
+	if res, _ := do(t, ts, "GET", "/api/v1/invites/"+code, "", nil); res.StatusCode != 404 {
+		t.Errorf("anonymous preview of a spent invite: %d", res.StatusCode)
+	}
+	if res, body := do(t, ts, "GET", "/api/v1/invites/"+code, tokC, nil); res.StatusCode != 200 {
+		t.Errorf("carol's preview: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "POST", "/api/v1/invites/"+code, tokC, map[string]any{}); res.StatusCode != 201 {
+		t.Fatalf("carol joins on the use her sign-up spent: %d %v", res.StatusCode, body)
+	}
+	// that was her one ride: leaving and coming back needs a use of its own
+	sid := view["id"].(string)
+	if res, body := do(t, ts, "POST", "/api/v1/servers/"+sid+"/leave", tokC, nil); res.StatusCode != 204 && res.StatusCode != 200 {
+		t.Fatalf("leave: %d %v", res.StatusCode, body)
+	}
+	if res, _ := do(t, ts, "POST", "/api/v1/invites/"+code, tokC, map[string]any{}); res.StatusCode != 404 {
+		t.Errorf("rejoining on a spent invite: %d", res.StatusCode)
+	}
+	// the registration key still works on its own, spending no invite
+	srv.Cfg.RegistrationKey = "sesame"
+	b := registerBody("erin")
+	b["registration_key"] = "sesame"
+	if res, body := do(t, ts, "POST", "/api/v1/auth/register", "", b); res.StatusCode != 201 {
+		t.Errorf("sign-up with the key: %d %v", res.StatusCode, body)
+	}
+}

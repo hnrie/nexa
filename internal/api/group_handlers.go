@@ -252,7 +252,8 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 	}
 	// spend the use first: two people tapping a one-use link together must
 	// not both get in
-	if err := s.Store.UseInvite(ctx, in.Code); errors.Is(err, store.ErrNotFound) {
+	signup, err := s.Store.UseInviteFor(ctx, me.ID, in.Code)
+	if errors.Is(err, store.ErrNotFound) {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
 	} else if err != nil {
@@ -261,7 +262,7 @@ func (s *Server) groupInviteJoin(w http.ResponseWriter, r *http.Request, in *sto
 	}
 	subs, err := s.Store.AddParticipant(ctx, ch.ID, me.ID, me.ID)
 	if err != nil {
-		_ = s.Store.UnuseInvite(ctx, in.Code)
+		_ = s.Store.GiveBackInviteUse(ctx, me.ID, in.Code, signup)
 		if errors.Is(err, store.ErrAlreadyExists) {
 			WriteJSON(w, http.StatusOK, map[string]any{"channel": ch})
 			return

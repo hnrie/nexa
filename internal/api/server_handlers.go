@@ -1980,8 +1980,29 @@ func (s *Server) handleInviteCreate(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusCreated, in)
 }
 
+// liveInvite loads an invite that can still be used. An account that signed up
+// with it and has not joined through it yet may still use it however spent or
+// expired it is: the sign-up spent the use its join rides on.
+func (s *Server) liveInvite(r *http.Request, code string) (*store.Invite, error) {
+	in, err := s.Store.InviteByCode(r.Context(), code)
+	if err == nil || !errors.Is(err, store.ErrNotFound) {
+		return in, err
+	}
+	u := auth.UserFrom(r.Context())
+	if u == nil {
+		// the preview is public, and says more to the account it was spent on
+		if token := auth.BearerToken(r); token != "" {
+			u, _, _ = s.Auth.Check(r.Context(), token)
+		}
+	}
+	if u == nil || s.Store.SignupInvite(r.Context(), u.ID) != code {
+		return nil, err
+	}
+	return s.Store.InviteByCodeAny(r.Context(), code)
+}
+
 func (s *Server) handleInvitePreview(w http.ResponseWriter, r *http.Request) {
-	in, err := s.Store.InviteByCode(r.Context(), r.PathValue("code"))
+	in, err := s.liveInvite(r, r.PathValue("code"))
 	if err != nil {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return
@@ -2013,7 +2034,7 @@ func (s *Server) handleInviteJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	me := auth.UserFrom(r.Context())
-	in, err := s.Store.InviteByCode(r.Context(), r.PathValue("code"))
+	in, err := s.liveInvite(r, r.PathValue("code"))
 	if err != nil {
 		WriteError(w, E(http.StatusNotFound, "invite_invalid", "This invite is invalid or has expired."))
 		return

@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -118,16 +119,24 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	mode, regKey := s.registrationPolicy(ctx)
+	// On an invite-only instance, an invite lets in as many accounts as it has
+	// uses: signing up spends one, and the account's first join through the
+	// invite then rides on it. Checking only that the invite was live let
+	// anyone who saw a one-use code sign up until someone joined with it.
+	signupInvite := ""
 	switch mode {
 	case "closed":
 		WriteError(w, E(http.StatusForbidden, "registration_closed", "This server is not accepting new accounts."))
 		return
 	case "invite":
 		keyOK := regKey != "" && hmac.Equal([]byte(req.RegistrationKey), []byte(regKey))
-		inviteOK := req.InviteCode != "" && s.InviteCheck != nil && s.InviteCheck(ctx, req.InviteCode)
+		inviteOK := !keyOK && req.InviteCode != "" && s.InviteCheck != nil && s.InviteCheck(ctx, req.InviteCode)
 		if !keyOK && !inviteOK {
 			WriteError(w, E(http.StatusForbidden, "invite_required", "You need an invite to register here."))
 			return
+		}
+		if inviteOK {
+			signupInvite = req.InviteCode
 		}
 	}
 	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
@@ -195,9 +204,28 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if first || named {
 		u.Flags |= store.FlagAdmin
 	}
+	if signupInvite != "" {
+		if err := s.Store.UseInvite(ctx, signupInvite); errors.Is(err, store.ErrNotFound) {
+			// spent by someone else a moment ago
+			WriteError(w, E(http.StatusForbidden, "invite_required", "You need an invite to register here."))
+			return
+		} else if err != nil {
+			WriteError(w, err)
+			return
+		}
+	}
 	if err := s.Store.CreateUser(ctx, u); err != nil {
+		if signupInvite != "" {
+			_ = s.Store.UnuseInvite(context.WithoutCancel(ctx), signupInvite)
+		}
 		WriteError(w, err)
 		return
+	}
+	if signupInvite != "" {
+		if err := s.Store.SetSignupInvite(ctx, u.ID, signupInvite); err != nil {
+			// the account exists; its join will just spend a use of its own
+			s.Log.Warn("record signup invite", "user", u.ID.String(), "err", err)
+		}
 	}
 	// Two first sign-ups at once both counted nobody before them; the older
 	// of the two keeps the instance, and the other becomes an ordinary account.

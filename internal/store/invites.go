@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
@@ -60,6 +61,67 @@ func (s *Store) InviteByCode(ctx context.Context, code string) (*Invite, error) 
 		return nil, ErrNotFound
 	}
 	return in, nil
+}
+
+// InviteByCodeAny loads an invite whether or not it is still live.
+func (s *Store) InviteByCodeAny(ctx context.Context, code string) (*Invite, error) {
+	return scanInvite(s.db.R.QueryRowContext(ctx, `SELECT `+inviteCols+` FROM invites WHERE code = ?`, code))
+}
+
+// SetSignupInvite records the invite an account signed up with, whose use
+// its first join through that invite rides on.
+func (s *Store) SetSignupInvite(ctx context.Context, uid ids.ID, code string) error {
+	_, err := s.db.W.ExecContext(ctx, `UPDATE users SET signup_invite = ? WHERE id = ?`, code, int64(uid))
+	return err
+}
+
+// SignupInvite is the invite an account signed up with and has not yet
+// joined through, or "".
+func (s *Store) SignupInvite(ctx context.Context, uid ids.ID) string {
+	var code sql.NullString
+	if err := s.db.R.QueryRowContext(ctx, `SELECT signup_invite FROM users WHERE id = ?`, int64(uid)).Scan(&code); err != nil {
+		return ""
+	}
+	return code.String
+}
+
+// spendInvite takes one use of an invite for uid's join, unless uid signed up
+// with it and this is its first join through it: that use was spent at sign-up.
+func spendInvite(ctx context.Context, tx *db.Tx, uid ids.ID, code string) (signup bool, err error) {
+	res, err := tx.ExecContext(ctx, `UPDATE users SET signup_invite = NULL WHERE id = ? AND signup_invite = ?`, int64(uid), code)
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n == 1 {
+		return true, nil
+	}
+	res, err = tx.ExecContext(ctx, `UPDATE invites SET uses = uses + 1 WHERE code = ? AND (max_uses = 0 OR uses < max_uses) AND (expires_at IS NULL OR expires_at > ?)`, code, nowMs())
+	if err != nil {
+		return false, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return false, ErrNotFound
+	}
+	return false, nil
+}
+
+// UseInviteFor records uid's use of an invite for a join, the way spendInvite
+// does. signup says the use was the one its sign-up spent, which
+// GiveBackInviteUse needs to undo it.
+func (s *Store) UseInviteFor(ctx context.Context, uid ids.ID, code string) (signup bool, err error) {
+	err = s.Tx(ctx, func(tx *db.Tx) error {
+		signup, err = spendInvite(ctx, tx, uid, code)
+		return err
+	})
+	return signup, err
+}
+
+// GiveBackInviteUse undoes UseInviteFor for a join that did not happen.
+func (s *Store) GiveBackInviteUse(ctx context.Context, uid ids.ID, code string, signup bool) error {
+	if signup {
+		return s.SetSignupInvite(ctx, uid, code)
+	}
+	return s.UnuseInvite(ctx, code)
 }
 
 // UseInvite records a use, refusing when the invite is exhausted.

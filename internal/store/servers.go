@@ -261,7 +261,8 @@ func (s *Store) AddMember(ctx context.Context, serverID, uid ids.ID) (*Member, e
 // JoinByInvite is AddMember spending one use of an invite in the same
 // transaction, so people joining at once cannot overrun its limit. It is
 // ErrNotFound when the invite is used up or expired; a join that fails
-// spends nothing.
+// spends nothing. An account's first join through the invite it signed up
+// with spends nothing either: its sign-up spent that use.
 func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code string) (*Member, error) {
 	var m *Member
 	err := s.Tx(ctx, func(tx *db.Tx) error {
@@ -269,14 +270,8 @@ func (s *Store) JoinByInvite(ctx context.Context, serverID, uid ids.ID, code str
 		if m, err = addMember(ctx, tx, serverID, uid); err != nil {
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `UPDATE invites SET uses = uses + 1 WHERE code = ? AND (max_uses = 0 OR uses < max_uses) AND (expires_at IS NULL OR expires_at > ?)`, code, nowMs())
-		if err != nil {
-			return err
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			return ErrNotFound
-		}
-		return nil
+		_, err = spendInvite(ctx, tx, uid, code)
+		return err
 	})
 	if err != nil {
 		return nil, err
