@@ -92,7 +92,10 @@ def main() -> int:
             a.screenshot(path=str(OUT / "app.png"))
             print("wrote app.png")
 
-            # the expression picker, open on the emoji it ships with
+            # the expression picker, open on the emoji it ships with. The frame
+            # around it shows the chat behind, whose lines the crop would cut
+            # mid-word at its edge, so the messages step out of the picture.
+            a.add_style_tag(content="[data-id] { visibility: hidden !important; }")
             a.click("button[aria-label='Select emoji']")
             a.wait_for_selector("[data-testid=emoji-picker], [role=dialog]", timeout=15000)
             a.mouse.move(430, 150)
@@ -106,6 +109,7 @@ def main() -> int:
                 "height": min(SHOT[1] - max(0, picker["y"] - pad), picker["height"] + pad * 2),
             })
             a.keyboard.press("Escape")
+            a.evaluate("() => document.querySelectorAll('style').forEach((el) => el.textContent.includes('[data-id] { visibility') && el.remove())")
             print("wrote express.png")
 
             # Both of them in the server's voice channel. No cameras: the fake

@@ -74,3 +74,10 @@
     .addTab { top: calc((var(--header-h) - 40px) / 2); }
   }
 }
+/* The narrowest phones in the longer languages: German's four tabs overran a
+   360px screen by a tab's worth of side padding. They keep their height, which
+   is what a finger needs, and give up some of their sides. */
+@container (max-width: 420px) {
+  .tabs { gap: 2px; }
+  .tab { padding: 0 8px; }
+}
