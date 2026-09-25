@@ -1578,16 +1578,16 @@
     "other": "{count} gemeinsame Freunde"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "one": "Gemeinsame Freunde — {count}",
-    "other": "Gemeinsame Freunde — {count}"
+    "one": "Gemeinsame Freunde ({count})",
+    "other": "Gemeinsame Freunde ({count})"
   },
   "profile.profileCard.mutualServerCount": {
     "one": "{count} gemeinsamer Server",
     "other": "{count} gemeinsame Server"
   },
   "profile.profileCard.mutualServersCount": {
-    "one": "Gemeinsame Server — {count}",
-    "other": "Gemeinsame Server — {count}"
+    "one": "Gemeinsame Server ({count})",
+    "other": "Gemeinsame Server ({count})"
   },
   "profile.profileCard.note": "Notiz",
   "profile.profileCard.onlyYouSeeIt": "Nur du siehst sie.",

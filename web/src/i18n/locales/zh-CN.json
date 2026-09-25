@@ -1526,13 +1526,13 @@
     "other": "{count} 位共同好友"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "other": "共同好友 — {count}"
+    "other": "共同好友（{count}）"
   },
   "profile.profileCard.mutualServerCount": {
     "other": "{count} 个共同服务器"
   },
   "profile.profileCard.mutualServersCount": {
-    "other": "共同服务器 — {count}"
+    "other": "共同服务器（{count}）"
   },
   "profile.profileCard.note": "备注",
   "profile.profileCard.onlyYouSeeIt": "只有你能看到。",

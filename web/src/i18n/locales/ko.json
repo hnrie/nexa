@@ -1526,13 +1526,13 @@
     "other": "함께 아는 친구 {count}명"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "other": "함께 아는 친구 — {count}"
+    "other": "함께 아는 친구 ({count})"
   },
   "profile.profileCard.mutualServerCount": {
     "other": "함께 있는 서버 {count}개"
   },
   "profile.profileCard.mutualServersCount": {
-    "other": "함께 있는 서버 — {count}"
+    "other": "함께 있는 서버 ({count})"
   },
   "profile.profileCard.note": "메모",
   "profile.profileCard.onlyYouSeeIt": "나만 볼 수 있습니다.",

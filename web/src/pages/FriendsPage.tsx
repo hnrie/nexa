@@ -130,7 +130,7 @@ export default function FriendsPage() {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr_("chat.chat.search")} aria-label={tr_("friends.searchFriends")} />
               <Search size={20} />
             </div>
-            <h3 className={s.section}>{activeTab?.label} — <span role="status">{list.length}</span></h3>
+            <h3 className={s.section}>{activeTab?.label} (<span role="status">{list.length}</span>)</h3>
             {list.length === 0 ? (
               alone && !query.trim() && (tab === "online" || tab === "all") ? <FirstRun onAdd={() => setTab("add")} /> : <Empty tab={tab} query={query} onClear={() => setQuery("")} />
             ) : (

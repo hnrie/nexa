@@ -1526,13 +1526,13 @@
     "other": "共通のフレンド {count} 人"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "other": "共通のフレンド — {count}"
+    "other": "共通のフレンド（{count}）"
   },
   "profile.profileCard.mutualServerCount": {
     "other": "共通のサーバー {count} 個"
   },
   "profile.profileCard.mutualServersCount": {
-    "other": "共通のサーバー — {count}"
+    "other": "共通のサーバー（{count}）"
   },
   "profile.profileCard.note": "メモ",
   "profile.profileCard.onlyYouSeeIt": "あなたにしか見えません。",

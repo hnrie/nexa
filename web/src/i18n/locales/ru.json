@@ -1664,7 +1664,7 @@
     "other": "{count} общих друга"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "other": "Общие друзья — {count}"
+    "other": "Общие друзья ({count})"
   },
   "profile.profileCard.mutualServerCount": {
     "one": "{count} общий сервер",
@@ -1673,7 +1673,7 @@
     "other": "{count} общих сервера"
   },
   "profile.profileCard.mutualServersCount": {
-    "other": "Общие серверы — {count}"
+    "other": "Общие серверы ({count})"
   },
   "profile.profileCard.note": "Заметка",
   "profile.profileCard.onlyYouSeeIt": "Её видите только вы.",

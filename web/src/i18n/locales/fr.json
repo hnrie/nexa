@@ -1589,16 +1589,16 @@
     "other": "{count} amis en commun"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "one": "Amis en commun — {count}",
-    "other": "Amis en commun — {count}"
+    "one": "Amis en commun ({count})",
+    "other": "Amis en commun ({count})"
   },
   "profile.profileCard.mutualServerCount": {
     "one": "{count} serveur en commun",
     "other": "{count} serveurs en commun"
   },
   "profile.profileCard.mutualServersCount": {
-    "one": "Serveurs en commun — {count}",
-    "other": "Serveurs en commun — {count}"
+    "one": "Serveurs en commun ({count})",
+    "other": "Serveurs en commun ({count})"
   },
   "profile.profileCard.note": "Note",
   "profile.profileCard.onlyYouSeeIt": "Vous seul la voyez.",

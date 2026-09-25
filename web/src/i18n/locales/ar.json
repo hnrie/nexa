@@ -1741,7 +1741,7 @@
     "other": "{count} صديق مشترك"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "other": "الأصدقاء المشتركون — {count}"
+    "other": "الأصدقاء المشتركون ({count})"
   },
   "profile.profileCard.mutualServerCount": {
     "zero": "لا خوادم مشتركة",
@@ -1752,7 +1752,7 @@
     "other": "{count} خادم مشترك"
   },
   "profile.profileCard.mutualServersCount": {
-    "other": "الخوادم المشتركة — {count}"
+    "other": "الخوادم المشتركة ({count})"
   },
   "profile.profileCard.note": "ملاحظة",
   "profile.profileCard.onlyYouSeeIt": "أنت وحدك تراها.",

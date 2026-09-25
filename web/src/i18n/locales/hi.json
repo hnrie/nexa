@@ -1578,16 +1578,16 @@
     "other": "{count} साझा मित्र"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "one": "साझा दोस्त — {count}",
-    "other": "साझा दोस्त — {count}"
+    "one": "साझा दोस्त ({count})",
+    "other": "साझा दोस्त ({count})"
   },
   "profile.profileCard.mutualServerCount": {
     "one": "{count} साझा सर्वर",
     "other": "{count} साझा सर्वर"
   },
   "profile.profileCard.mutualServersCount": {
-    "one": "साझा सर्वर — {count}",
-    "other": "साझा सर्वर — {count}"
+    "one": "साझा सर्वर ({count})",
+    "other": "साझा सर्वर ({count})"
   },
   "profile.profileCard.note": "नोट",
   "profile.profileCard.onlyYouSeeIt": "इसे सिर्फ़ आप देखते हैं।",

@@ -1175,8 +1175,8 @@
   "profile.profile.profile": "Profile",
   "profile.profileCard.acceptFriendRequest": "Accept friend request",
   "profile.profileCard.addFriend": "Add friend",
-  "profile.profileCard.addFriendNickname": "Add Friend Nickname",
-  "profile.profileCard.addNote": "Add Note",
+  "profile.profileCard.addFriendNickname": "Add friend nickname",
+  "profile.profileCard.addNote": "Add note",
   "profile.profileCard.addNote2": "Add note",
   "profile.profileCard.admin": "Admin",
   "profile.profileCard.owner": "Owner",
@@ -1185,35 +1185,35 @@
   "profile.profileCard.couldNotAccept": "Could not accept.",
   "profile.profileCard.couldNotOpenAConversation": "Could not open a conversation.",
   "profile.profileCard.couldNotSaveTheNickname": "Could not save the nickname.",
-  "profile.profileCard.editFriendNickname": "Edit Friend Nickname",
-  "profile.profileCard.editNote": "Edit Note",
+  "profile.profileCard.editFriendNickname": "Edit friend nickname",
+  "profile.profileCard.editNote": "Edit note",
   "profile.profileCard.editNote2": "Edit note",
-  "profile.profileCard.editProfile": "Edit Profile",
-  "profile.profileCard.friendNickname": "Friend Nickname",
-  "profile.profileCard.friendsSince": "Friends Since",
-  "profile.profileCard.memberSince": "Member Since",
+  "profile.profileCard.editProfile": "Edit profile",
+  "profile.profileCard.friendNickname": "Friend nickname",
+  "profile.profileCard.friendsSince": "Friends since",
+  "profile.profileCard.memberSince": "Member since",
   "profile.profileCard.message": "Message",
   "profile.profileCard.mutualFriendCount": {
-    "one": "{count} Mutual Friend",
-    "other": "{count} Mutual Friends"
+    "one": "{count} mutual friend",
+    "other": "{count} mutual friends"
   },
   "profile.profileCard.mutualFriendsCount": {
-    "one": "Mutual Friends — {count}",
-    "other": "Mutual Friends — {count}"
+    "one": "Mutual friends ({count})",
+    "other": "Mutual friends ({count})"
   },
   "profile.profileCard.mutualServerCount": {
-    "one": "{count} Mutual Server",
-    "other": "{count} Mutual Servers"
+    "one": "{count} mutual server",
+    "other": "{count} mutual servers"
   },
   "profile.profileCard.mutualServersCount": {
-    "one": "Mutual Servers — {count}",
-    "other": "Mutual Servers — {count}"
+    "one": "Mutual servers ({count})",
+    "other": "Mutual servers ({count})"
   },
   "profile.profileCard.note": "Note",
   "profile.profileCard.onlyYouSeeIt": "Only you see it.",
   "profile.profileCard.removeFriend": "Remove friend",
-  "profile.profileCard.viewFullBio": "View Full Bio",
-  "profile.profileCard.viewFullProfile": "View Full Profile",
+  "profile.profileCard.viewFullBio": "View full bio",
+  "profile.profileCard.viewFullProfile": "View full profile",
   "profile.profileCard.viewFullProfileOf": "View {name}'s full profile",
   "rail.rail.addAServer": "Add a Server",
   "rail.rail.and": "{first} and {second}",
