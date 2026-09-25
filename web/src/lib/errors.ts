@@ -23,6 +23,7 @@ import { WeakKdfError } from "@/crypto/kdf";
 import { t } from "@/i18n";
 import { bannedSentence, mutedSentence } from "@/lib/moderation";
 import { activeBan, activeMute, useNexa } from "@/stores/nexa";
+import { ReadableError } from "./readableError";
 
 /**
  * The codes the client makes up when the request never reached a server that
@@ -68,6 +69,8 @@ export function describeError(err: unknown, fallback?: string): string {
   // is already written for a reader — it must not be swallowed by a fallback
   // that blames the password.
   if (err instanceof WeakKdfError) return err.message;
+  // written for the reader already: a passcode rule, a save that did not land
+  if (err instanceof ReadableError) return err.message;
   if (err instanceof ApiError) {
     const mine = codes()[err.code];
     if (mine) return mine;

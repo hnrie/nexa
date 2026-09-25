@@ -11,6 +11,7 @@ import { users as usersApi } from "@/api/users";
 import type { Channel, Message } from "@/api/types";
 import { decryptForStore } from "@/lib/decrypt";
 import { REQUEST_GAP_MS, backoffFor } from "@/lib/fullSearch";
+import { ReadableError } from "@/lib/readableError";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
@@ -49,7 +50,7 @@ const ZIP_MAX_BYTES = 0xffffffff;
 
 /** Builds a store-only zip from (name → bytes) entries. */
 export function buildZip(entries: { name: string; data: Uint8Array; mtime?: Date }[]): Uint8Array {
-  if (entries.length > ZIP_MAX_ENTRIES) throw new Error(t("export.tooLarge"));
+  if (entries.length > ZIP_MAX_ENTRIES) throw new ReadableError(t("export.tooLarge"));
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
@@ -96,10 +97,10 @@ export function buildZip(entries: { name: string; data: Uint8Array; mtime?: Date
     central.set(name, 46);
     centrals.push(central);
     offset += local.length;
-    if (offset > ZIP_MAX_BYTES) throw new Error(t("export.tooLarge"));
+    if (offset > ZIP_MAX_BYTES) throw new ReadableError(t("export.tooLarge"));
   }
   const centralSize = centrals.reduce((n, c) => n + c.length, 0);
-  if (offset + centralSize > ZIP_MAX_BYTES) throw new Error(t("export.tooLarge"));
+  if (offset + centralSize > ZIP_MAX_BYTES) throw new ReadableError(t("export.tooLarge"));
   const end = new Uint8Array(22);
   const ev = new DataView(end.buffer);
   ev.setUint32(0, 0x06054b50, true);

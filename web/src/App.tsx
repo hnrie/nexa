@@ -7,7 +7,7 @@ import { lazyPage, markChunksHealthy } from "@/lib/lazyChunk";
 import { ThemeEffect } from "@/components/shell/ThemeEffect";
 import { I18nProvider } from "@/i18n";
 import { useNexa } from "@/stores/nexa";
-import { useSettings } from "@/stores/settings";
+import { useAppLocale } from "@/lib/appLocale";
 import { AppRoutes } from "./routes";
 
 // Shown once in an account's life, if ever; the front page and the sign-in
@@ -30,7 +30,7 @@ export default function App() {
   useEffect(markChunksHealthy, []);
   // The account carries the choice, so signing in anywhere is in the same
   // language; with none set the browser's own preference decides.
-  const locale = useSettings((s) => s.settings.locale);
+  const locale = useAppLocale();
   return (
     <ErrorBoundary>
       <I18nProvider locale={locale}>

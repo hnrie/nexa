@@ -3,9 +3,9 @@
 @import "./markdown.css";
 
 *, *::before, *::after { box-sizing: border-box; }
-/* Panning only: a pinch or a double tap never zooms the app (see lib/noZoom.ts). */
+/* A double tap does not zoom (it would hold up every tap), but a pinch does: whoever needs the text bigger can have it. */
 /* No pull-to-refresh: in Chrome on Android a pull past the top of a list would reload the app. */
-html { font-size: calc(16px * var(--font-scale, 1)); -webkit-text-size-adjust: 100%; height: 100%; touch-action: pan-x pan-y; overscroll-behavior-y: none; }
+html { font-size: calc(16px * var(--font-scale, 1)); -webkit-text-size-adjust: 100%; height: 100%; touch-action: manipulation; overscroll-behavior-y: none; }
 body {
   margin: 0; height: 100%; overflow: hidden; overscroll-behavior-y: none;
   background: var(--bg-base); color: var(--text);

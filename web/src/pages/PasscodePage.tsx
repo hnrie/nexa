@@ -76,7 +76,17 @@ export default function PasscodePage() {
         {inCall ? (
           <div className={s.call} role="status" data-testid="locked-call">
             <span>{t("passcode.stillInACall")}</span>
-            <Button type="button" size="sm" variant="danger" onClick={() => void import("@/voice/session").then((m) => m.leaveVoice(true))} data-testid="locked-call-leave">
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                // the button goes with the call, so focus goes back to where the passcode is typed
+                input.current?.focus();
+                void import("@/voice/session").then((m) => m.leaveVoice(true));
+              }}
+              data-testid="locked-call-leave"
+            >
               {t("passcode.leaveCall")}
             </Button>
           </div>

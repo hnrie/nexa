@@ -15,6 +15,7 @@ import { b64, randomBytes, utf8 } from "@/crypto/bytes";
 import { deriveEncKey, deriveMaster, type KdfParams } from "@/crypto/kdf";
 import type { AppLockPolicy } from "@/stores/settings";
 import { unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
+import { ReadableError } from "./readableError";
 import { storage } from "./storage";
 
 import { t } from "@/i18n";
@@ -172,7 +173,7 @@ export type LockOptions = Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" |
 /** Turns the lock on: wraps the identity with the passcode and stores it. */
 export async function enableLock(userId: string, identity: Identity, passcode: string, opts?: LockOptions): Promise<LockConfig> {
   const problem = passcodeProblem(passcode);
-  if (problem) throw new Error(problem);
+  if (problem) throw new ReadableError(problem);
   const salt = randomBytes(16);
   const params = opts?.kdf ?? LOCK_KDF;
   const key = await passcodeKey(passcode, salt, params);
@@ -242,7 +243,7 @@ export async function adoptPolicy(userId: string, identity: Identity, passcode: 
  */
 export async function unlockIdentity(userId: string, passcode: string): Promise<Identity> {
   const cfg = loadLock(userId);
-  if (!cfg) throw new Error(t("appLock.thisDeviceHasNoPasscode"));
+  if (!cfg) throw new ReadableError(t("appLock.thisDeviceHasNoPasscode"));
   const key = await passcodeKey(passcode, b64.dec(cfg.salt), cfg.params);
   try {
     const privateKey = await unwrapPrivateKey(b64.dec(cfg.wrapped), key);

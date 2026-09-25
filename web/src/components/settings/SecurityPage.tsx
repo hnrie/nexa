@@ -13,6 +13,7 @@ import { b64 } from "@/crypto/bytes";
 import { deriveAuthKey, deriveMaster } from "@/crypto/kdf";
 import { acceptServerKdf } from "@/lib/serverKdf";
 import { users as usersApi } from "@/api/users";
+import { ReadableError } from "@/lib/readableError";
 import { autoLockChoices, blurDelayChoices, DEFAULT_LOCK, loadLock, passcodeProblem, patchLock, type LockConfig } from "@/lib/appLock";
 import { EncryptionSection } from "./EncryptionSection";
 import { describeError } from "@/lib/errors";
@@ -138,9 +139,10 @@ export default function SecurityPage() {
 
   const savePasscode = () =>
     run(async () => {
+      // said as written: a plain Error reads as "Something went wrong"
       const problem = passcodeProblem(pin);
-      if (problem) throw new Error(problem);
-      if (pin !== pin2) throw new Error(t("settings.security.thoseTwoPasscodesAreDifferent"));
+      if (problem) throw new ReadableError(problem);
+      if (pin !== pin2) throw new ReadableError(t("settings.security.thoseTwoPasscodesAreDifferent"));
       await setPasscode(pin, lock ?? DEFAULT_LOCK);
       setLock(loadLock(me.id));
       close();
