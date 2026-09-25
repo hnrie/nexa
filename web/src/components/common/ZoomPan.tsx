@@ -15,6 +15,8 @@ const DOUBLE_TAP_MS = 350;
 export interface ZoomPanHandle {
   reset: () => void;
   zoomBy: (factor: number) => void;
+  /** Moves a zoomed picture by a fraction of the box (the arrow keys); false when not zoomed in. */
+  panBy: (fx: number, fy: number) => boolean;
 }
 
 function middle(list: { x: number; y: number }[]) {
@@ -84,7 +86,17 @@ export function ZoomPan({
     [apply],
   );
 
-  useImperativeHandle(handle, () => ({ reset, zoomBy: (f: number) => zoomAt({ x: 0, y: 0 }, f) }), [reset, zoomAt]);
+  const panBy = useCallback(
+    (fx: number, fy: number) => {
+      if (view.current.scale <= 1) return false;
+      const b = box();
+      view.current = clampView({ ...view.current, x: view.current.x + fx * b.width, y: view.current.y + fy * b.height }, b);
+      apply();
+      return true;
+    },
+    [apply],
+  );
+  useImperativeHandle(handle, () => ({ reset, zoomBy: (f: number) => zoomAt({ x: 0, y: 0 }, f), panBy }), [reset, zoomAt, panBy]);
 
   // The wheel is taken here: React listens passively, and zooming must not
   // scroll whatever sits behind.
@@ -164,6 +176,14 @@ export function ZoomPan({
         }
         if (view.current.scale > 1) {
           e.stopPropagation();
+          return;
+        }
+        // Beside the picture a double click means nothing, so a click there
+        // closes at once rather than waiting to see whether a second follows.
+        if (e.target === e.currentTarget && onIdleClick) {
+          e.stopPropagation();
+          cancelIdle();
+          onIdleClick();
           return;
         }
         const now = performance.now();

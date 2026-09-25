@@ -5,6 +5,7 @@ import { menuAnchor } from "@/components/common/ContextMenu";
 import { enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay } from "@/lib/fullscreen";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { fitVideo } from "./fitMedia";
+import { mediaPrefs, saveMediaPrefs } from "./mediaPrefs";
 import s from "./VideoPlayer.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -88,9 +89,22 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
-  const [volume, setVolume] = useState(1);
-  const [muted, setMuted] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  // as the last clip was left, on this device
+  const [prefs] = useState(mediaPrefs);
+  const [volume, setVolume] = useState(prefs.volume);
+  const [muted, setMutedState] = useState(prefs.muted);
+  const [speed, setSpeedState] = useState(prefs.speed);
+  const setMuted = useCallback((next: boolean | ((v: boolean) => boolean)) => {
+    setMutedState((v) => {
+      const m = typeof next === "function" ? next(v) : next;
+      saveMediaPrefs({ muted: m });
+      return m;
+    });
+  }, []);
+  const setSpeed = useCallback((v: number) => {
+    setSpeedState(v);
+    saveMediaPrefs({ speed: v });
+  }, []);
   const [full, setFull] = useState(false);
   const [failed, setFailed] = useState(false);
   const [revealed, setRevealed] = useState(!spoiler);
@@ -183,14 +197,22 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
     setTime(el.currentTime);
   };
 
-  const onKey = (e: React.KeyboardEvent) => {
+  /**
+   * The player's own keys, on the player and its seek track only. On a
+   * button Space is that button's — it used to play the clip instead of
+   * muting it — and the arrows on the volume slider move the volume.
+   */
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     const el = video.current;
-    if (!el) return;
+    const target = e.target as HTMLElement;
+    if (!el || (target !== e.currentTarget && target.getAttribute("role") !== "slider")) return;
     switch (e.key) {
       case " ":
       case "k":
         e.preventDefault();
-        toggle();
+        // a spoiler is uncovered first; its sound does not start behind the blur
+        if (!revealed) setRevealed(true);
+        else toggle();
         break;
       case "ArrowRight":
         e.preventDefault();
@@ -293,7 +315,7 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
     >
       <video ref={video} className={s.video} src={src} poster={poster} playsInline preload="metadata" onClick={onSurface} onDoubleClick={toggleFull} />
       {!revealed ? (
-        <div className={s.spoiler} onClick={() => setRevealed(true)}><span>{tr_("composer.composer.spoiler")}</span></div>
+        <button type="button" className={s.spoiler} aria-label={tr_("render.spoilerHidden")} onClick={() => setRevealed(true)}><span>{tr_("composer.composer.spoiler")}</span></button>
       ) : null}
       {failed ? (
         <div className={s.failed}>
@@ -329,12 +351,12 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
           <span className={s.knob} style={{ left: `${pct}%` }} />
         </div>
         <div className={s.controls}>
-          <button className={s.ctl} aria-label={playing ? "Pause" : "Play"} onClick={toggle}>{playing ? <Pause size={18} /> : <Play size={18} />}</button>
+          <button className={s.ctl} aria-label={playing ? tr_("chat.media.pause") : tr_("chat.videoPlayer.play")} onClick={toggle}>{playing ? <Pause size={18} /> : <Play size={18} />}</button>
           <span className={s.time}>{clock(time)}<span className={s.total}> / {clock(duration)}</span></span>
           <span className={s.spacer} />
           <div className={s.volumeWrap}>
-            <button className={s.ctl} aria-label={muted ? "Unmute" : "Mute"} onClick={() => setMuted((v) => !v)}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
-            <input className={s.volume} type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} aria-label={tr_("chat.audioPlayer.volume")} onChange={(e) => { setVolume(Number(e.target.value)); setMuted(false); }} />
+            <button className={s.ctl} aria-label={muted ? tr_("chat.media.unmute") : tr_("chat.media.mute")} aria-pressed={muted} onClick={() => setMuted((v) => !v)}>{muted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
+            <input className={s.volume} type="range" min={0} max={1} step={0.01} value={muted ? 0 : volume} aria-label={tr_("chat.audioPlayer.volume")} onChange={(e) => { const v = Number(e.target.value); setVolume(v); setMuted(false); saveMediaPrefs({ volume: v }); }} />
           </div>
           <button className={[s.speed, s.wideOnly].join(" ")} aria-label={tr_("chat.audioPlayer.playbackSpeed")} onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]!)}>{speed}×</button>
           {pipOk ? (

@@ -169,10 +169,15 @@ button.sysName:hover { text-decoration: underline; }
    so a stray character next to them is not enormous too */
 .jumbo { line-height: 1.15; }
 .att { margin-top: 4px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+/* a clip's place in the list, the same whether the player or its placeholder is showing */
+.mediaSlot { width: 100%; max-width: 100%; }
+.imgWrap img[role="button"] { cursor: pointer; }
+.imgWrap img:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .imgWrap { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-input); cursor: pointer; max-width: 100%; }
 .imgWrap img, .imgWrap video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .imgWrap[data-spoiler="true"] img, .imgWrap[data-spoiler="true"] video { filter: blur(44px); }
-.spoilerTag { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.spoilerTag { position: absolute; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.spoilerTag:focus-visible { outline-offset: -3px; }
 .spoilerTag span { padding: 6px 12px; border-radius: 20px; background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 14px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 /* the favourite star over an uploaded picture: hidden until hover, always
    shown on touch screens and once starred, like link embeds */
@@ -185,7 +190,7 @@ button.sysName:hover { text-decoration: underline; }
 .file { display: flex; align-items: center; gap: 12px; width: 432px; max-width: 100%; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); }
 .fileIcon { color: var(--icon); flex: none; }
 .fileText { min-width: 0; flex: 1; display: flex; flex-direction: column; }
-.fileName { color: var(--link); font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.fileName { color: var(--link); font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; text-align: start; max-width: 100%; }
 .fileName:hover { text-decoration: underline; }
 .fileSize { font-size: 12px; color: var(--text-muted); }
 .dl { color: var(--icon); display: flex; }
@@ -228,23 +233,6 @@ button.sysName:hover { text-decoration: underline; }
 /* A touch screen has no hover, so the button is simply always there. */
 @media (hover: none) { .pinRemove { opacity: 1; } }
 .pinEmpty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
-.lightbox { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.85); display: flex; align-items: center; justify-content: center; }
-.lbStage { display: flex; align-items: center; justify-content: center; width: 92vw; height: 86vh; overflow: hidden; touch-action: none; }
-.lbStage img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--shadow-high); -webkit-user-select: none; user-select: none; }
-.lbStage[data-zoomed="true"] { cursor: grab; }
-.lbStage[data-zoomed="true"]:active { cursor: grabbing; }
-.lbBar button:disabled { opacity: 0.55; cursor: default; text-decoration: none; }
-.lbBar button { display: inline-flex; align-items: center; gap: 4px; min-width: 44px; justify-content: center; }
-/* across the whole width, centred: pinned to the middle with a transform, the
-   bar was only allowed half the screen, and on a phone "Open original" broke
-   over two lines */
-.lbBar { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); inset-inline: 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; pointer-events: none; }
-/* the bar's empty ends are still backdrop, which closes the picture when clicked */
-.lbBar > * { pointer-events: auto; }
-.lbClose { position: absolute; top: 12px; inset-inline-end: 12px; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 0, 0, 0.5); color: #fff; }
-.lbClose:hover { background: rgba(255, 255, 255, 0.15); }
-.lbBar a, .lbBar button { color: #fff; font-size: 14px; font-weight: 600; opacity: 0.85; white-space: nowrap; }
-.lbBar a:hover, .lbBar button:hover { opacity: 1; text-decoration: underline; }
 /* picking messages to delete: every row moves over for a round check in the gutter */
 .composerSlot { flex: none; display: flex; flex-direction: column; }
 .composerSlot[hidden] { display: none; }

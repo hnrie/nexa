@@ -1,0 +1,50 @@
+/* The picture viewer is a dark room in every theme, so its chrome is white on
+   black glass rather than theme colours that would vanish on a light theme. */
+.lightbox { position: fixed; inset: 0; z-index: var(--z-lightbox); background: rgba(0, 0, 0, 0.88); display: flex; flex-direction: column; outline: none; animation: fadeIn 120ms ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .lightbox { animation: none; } }
+[data-reduced-motion="true"] .lightbox { animation: none; }
+
+/* the bar along the top: what this is, then what can be done with it */
+.top { flex: none; display: flex; align-items: center; gap: 12px; padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left)); background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.25)); color: #fff; }
+.info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; }
+.sub { display: flex; gap: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.72); min-width: 0; }
+.sub > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub:empty { display: none; }
+.tools { flex: none; display: flex; align-items: center; gap: 4px; }
+.zoomTools { display: contents; }
+.tool { display: flex; align-items: center; justify-content: center; min-width: 40px; height: 40px; padding: 0 8px; border-radius: var(--radius-sm); color: #fff; background: rgba(255, 255, 255, 0.08); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tool:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); text-decoration: none; color: #fff; }
+.tool:disabled { opacity: 0.5; cursor: default; }
+.tool:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.pct { min-width: 56px; }
+.close { margin-inline-start: 4px; background: rgba(255, 255, 255, 0.14); }
+
+/* the picture, as large as fits under the bar */
+.stageWrap { flex: 1; min-height: 0; display: flex; padding: 0 16px max(16px, env(safe-area-inset-bottom)); }
+.stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; }
+.stage img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: var(--shadow-high); -webkit-user-select: none; user-select: none; }
+.stage[data-zoomed="true"] { cursor: grab; }
+.stage[data-zoomed="true"]:active { cursor: grabbing; }
+.pending { color: rgba(255, 255, 255, 0.8); font-size: 14px; }
+
+/* the neighbours in the same message */
+.side { position: absolute; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; }
+.side:hover { background: rgba(255, 255, 255, 0.2); }
+.side:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.prev { inset-inline-start: max(12px, env(safe-area-inset-left)); }
+.next { inset-inline-end: max(12px, env(safe-area-inset-right)); }
+/* the arrows point the way the pictures go, which is the other way round in Arabic */
+[dir="rtl"] .side svg { transform: scaleX(-1); }
+
+/* A phone pinches and double-taps to zoom; the bar keeps the room for the name. */
+@media (pointer: coarse) {
+  .zoomTools { display: none; }
+  .tool { min-width: 44px; height: 44px; }
+  .side { width: 44px; height: 44px; }
+}
+@media (max-width: 767px) {
+  .stageWrap { padding-inline: 0; }
+  .side { background: rgba(0, 0, 0, 0.4); }
+}

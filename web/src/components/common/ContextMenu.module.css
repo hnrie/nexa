@@ -1,4 +1,4 @@
-.menu { position: fixed; z-index: 300; min-width: 188px; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 6px 8px; background: var(--bg-floating); border-radius: var(--radius-xs); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); }
+.menu { position: fixed; z-index: var(--z-menu); min-width: 188px; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 6px 8px; background: var(--bg-floating); border-radius: var(--radius-xs); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); }
 .backdrop { display: none; }
 .item { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 32px; padding: 6px 8px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; color: var(--text-subtle); text-align: start; }
 /* the accent's own readable text colour: white on a yellow or green accent was 1.8–3:1 */
@@ -21,7 +21,7 @@
 .range { width: 100%; accent-color: var(--brand); touch-action: none; }
 
 @media (pointer: coarse) {
-  .backdrop { display: block; position: fixed; inset: 0; z-index: 299; }
+  .backdrop { display: block; position: fixed; inset: 0; z-index: calc(var(--z-menu) - 1); }
   .menu { min-width: 220px; }
   .item { min-height: 44px; font-size: 16px; }
 }

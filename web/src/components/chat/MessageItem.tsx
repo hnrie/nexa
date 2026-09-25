@@ -288,7 +288,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             </>
           )}
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
-          {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
+          {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
           {embeds ? <Embeds list={embeds} /> : null}
           {pending === "failed" ? (
             <div className={s.failedRow}>
