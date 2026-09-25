@@ -140,6 +140,8 @@ class Session:
         if p.locator("[role=dialog][aria-label='User Settings']").count() == 0:
             p.click("button[aria-label='User Settings']")
         p.click("nav button:has-text('Log Out')")
+        # it asks first, in a dialog of its own above the settings
+        p.locator("[role=dialog] button:has-text('Log Out')").last.click()
         p.wait_for_url("**/login**", timeout=30000)
 
     def open_settings(self, nav):
