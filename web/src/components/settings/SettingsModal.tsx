@@ -13,6 +13,7 @@ import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
 import { confirmLogout } from "@/lib/confirmLogout";
+import { usePortalRoot } from "@/hooks/usePortalRoot";
 const AccountPage = lazyPage(() => import("./AccountPage"));
 const ProfilePage = lazyPage(() => import("./ProfilePage"));
 const PrivacyPage = lazyPage(() => import("./PrivacyPage"));
@@ -47,6 +48,8 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   const base = navGroups().map((g) => (g.id === "app" ? { ...g, items: [...g.items, ...appItems] } : g));
   const nav = isAdmin ? [...base, { id: "instance", head: t("settings.settings.instance"), items: [{ id: "admin", label: t("settings.admin.instanceAdmin") }] }] : base;
   const ref = useRef<HTMLDivElement>(null);
+  // into the full-screen element when a call is full screen, where the body is not seen
+  const portalRoot = usePortalRoot();
   useFocusTrap(ref, true, () => ref.current?.querySelector<HTMLElement>('[aria-current="page"]'));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,6 +93,6 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
         </div>
       </div>
     </div>,
-    document.body,
+    portalRoot,
   );
 }

@@ -119,8 +119,10 @@ export function Lightbox({ src, name, type, onClose }: { src: string; name: stri
       if (e.key === "+" || e.key === "=") return zoom.current?.zoomBy(1.4);
       if (e.key === "-") return zoom.current?.zoomBy(1 / 1.4);
       if (e.key !== "Escape") return;
-      // the lightbox takes this Escape; it does not also stop picking messages under it
+      // the lightbox takes this Escape; it does not also stop picking messages
+      // under it, nor close the panels beside the chat (they look for this)
       e.stopPropagation();
+      e.preventDefault();
       // zoomed in, Escape steps back to the whole picture before it closes
       if (zoomedIn.current) zoom.current?.reset();
       else onClose();

@@ -124,8 +124,8 @@ export function ChatView({ channel }: { channel: Channel }) {
   searchOpenRef.current = searchOpen;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (document.querySelector("[data-modal-layer]")) return;
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector("[data-modal-layer], [role='dialog']")) return;
       // read here rather than inside a setState updater: React runs updaters on
       // the next render, long after the keydown has finished dispatching, so
       // stopping it there stopped nothing

@@ -10,10 +10,10 @@ import { Select } from "@/components/common/Select";
 import { Field, TextArea, TextInput } from "@/components/common/TextInput";
 import { Toggle } from "@/components/common/Toggle";
 import { memberName } from "@/lib/names";
-import { P, has, isPrivateChannel, parsePerm, permString } from "@/lib/perms";
+import { P, has, isPrivateChannel, parsePerm, permString, canManageRole, canActOn } from "@/lib/perms";
 import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
-import { canI, rolesByPosition, useServers } from "@/stores/servers";
+import { canI, rolesByPosition, useServers, channelPerms, memberHighest } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
@@ -147,6 +147,10 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const editable = canI(server, P.MANAGE_ROLES, channel.id) || canI(server, P.MANAGE_CHANNELS, channel.id);
+  // what the editor holds here, which is all they may set or clear; an
+  // administrator holds everything
+  const mine = server ? channelPerms(server, channel.id, server.me.user_id) : 0n;
+  const grantable = (mine & P.ADMINISTRATOR) !== 0n ? undefined : mine;
   // a selection whose overwrite is gone (removed elsewhere, or never added) falls back to @everyone, like the list does
   const current: Overwrite | undefined = overwrites.find((o) => o.target_id === selected) ?? overwrites.find((o) => o.target_id === serverId);
   const [allow, setAllow] = useState<bigint>(current ? parsePerm(current.allow) : 0n);
@@ -218,10 +222,17 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
     if (await save(a, 0n, targetId, type)) setSelected(targetId);
   };
 
-  const candidateRoles = rolesByPosition(server).filter((r) => r.id !== serverId && !overwrites.some((o) => o.target_id === r.id));
+  // Offered only what the server would let this editor set: roles below
+  // their highest, and members they outrank. The rest failed on the first
+  // save with "role hierarchy".
+  const meId = server.me.user_id;
+  const { highest: myTop, isOwner: actorIsOwner } = memberHighest(server, meId);
+  const candidateRoles = rolesByPosition(server).filter((r) => r.id !== serverId && !overwrites.some((o) => o.target_id === r.id) && canManageRole(myTop, actorIsOwner, r.position));
   const q = query.trim().toLowerCase();
   const candidateMembers = Object.values(server.members)
     .filter((m) => !overwrites.some((o) => o.target_id === m.user_id))
+    .filter((m) => m.user_id !== meId || actorIsOwner)
+    .filter((m) => canActOn(myTop, memberHighest(server, m.user_id).highest, actorIsOwner, server.server.owner_id === m.user_id))
     .map((m) => ({ id: m.user_id, name: memberName(m.nickname, users[m.user_id]), username: users[m.user_id]?.username ?? "" }))
     .filter((m) => !q || m.name.toLowerCase().includes(q) || m.username.includes(q))
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -293,7 +304,7 @@ function PermissionsPage({ channel, serverId }: { channel: Channel; serverId: st
               {wantPrivate ? <span className={s.lockNote}><Lock size={14} /> {tr_("server.channelSettings.addRolesOrMembersOnThe")}</span> : null}
             </div>
           ) : null}
-          <OverwriteGrid allow={allow} deny={deny} editable={editable} channelType={channel.type as "text" | "voice" | "category"} onChange={(a, d) => { setAllow(a); setDeny(d); }} />
+          <OverwriteGrid allow={allow} deny={deny} editable={editable} grantable={grantable} channelType={channel.type as "text" | "voice" | "category"} onChange={(a, d) => { setAllow(a); setDeny(d); }} />
           <SaveBar dirty={dirty} busy={busy} onReset={() => { setAllow(current ? parsePerm(current.allow) : 0n); setDeny(current ? parsePerm(current.deny) : 0n); }} onSave={() => void save()} />
         </div>
       </div>

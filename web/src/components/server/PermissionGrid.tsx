@@ -16,8 +16,12 @@ export function permsForChannel(type: "text" | "voice" | "category" | undefined)
   return out;
 }
 
-/** On/off toggles for a role's server-wide permissions. */
-export function RoleGrid({ value, onChange, editable, filter }: { value: bigint; onChange: (v: bigint) => void; editable: boolean; filter?: string }) {
+/**
+ * On/off toggles for a role's server-wide permissions. `grantable`, when
+ * given, is what the editor holds themself: nobody may hand out what they do
+ * not have (the server refuses the save), so the rest are shown but fixed.
+ */
+export function RoleGrid({ value, onChange, editable, filter, grantable }: { value: bigint; onChange: (v: bigint) => void; editable: boolean; filter?: string; grantable?: bigint }) {
   const q = (filter ?? "").trim().toLowerCase();
   return (
     <div className={s.grid}>
@@ -31,7 +35,7 @@ export function RoleGrid({ value, onChange, editable, filter }: { value: bigint;
               const bit = P[it.name];
               return (
                 <div key={it.name} className={s.row} data-perm={it.name}>
-                  <Toggle checked={has(value, bit)} disabled={!editable} onChange={(on) => onChange(on ? value | bit : value & ~bit)} label={it.label} description={it.description} />
+                  <Toggle checked={has(value, bit)} disabled={!editable || (grantable !== undefined && !has(grantable, bit))} onChange={(on) => onChange(on ? value | bit : value & ~bit)} label={it.label} description={it.description} />
                 </div>
               );
             })}
@@ -57,12 +61,15 @@ export function OverwriteGrid({
   onChange,
   editable,
   channelType,
+  grantable,
 }: {
   allow: bigint;
   deny: bigint;
   onChange: (allow: bigint, deny: bigint) => void;
   editable: boolean;
   channelType: "text" | "voice" | "category" | undefined;
+  /** What the editor holds in this channel; the rest are shown but fixed. */
+  grantable?: bigint;
 }) {
   const names = new Set(permsForChannel(channelType));
   const set = (bit: bigint, v: Tri) => {
@@ -77,7 +84,7 @@ export function OverwriteGrid({
   const ORDER: Tri[] = ["deny", "neutral", "allow"];
   const triKeys = (e: React.KeyboardEvent<HTMLDivElement>, bit: bigint, cur: Tri) => {
     const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
-    if (!step || !editable) return;
+    if (!step || !editable || (grantable !== undefined && !has(grantable, bit))) return;
     e.preventDefault();
     const next = ORDER[(ORDER.indexOf(cur) + step + ORDER.length) % ORDER.length]!;
     set(bit, next);
@@ -95,6 +102,7 @@ export function OverwriteGrid({
             {items.map((it) => {
               const bit = P[it.name];
               const cur = triOf(allow, deny, bit);
+              const rowEditable = editable && (grantable === undefined || has(grantable, bit));
               return (
                 <div key={it.name} className={s.row} data-perm={it.name}>
                   <div className={s.text}>
@@ -106,9 +114,9 @@ export function OverwriteGrid({
                       roving tabIndex every one of forty rows cost three Tab
                       presses on the way to Save. */}
                   <div className={s.tri} role="radiogroup" aria-label={it.label} onKeyDown={(e) => triKeys(e, bit, cur)}>
-                    <button type="button" className={s.triBtn} data-kind="deny" data-on={cur === "deny"} disabled={!editable} role="radio" aria-checked={cur === "deny"} tabIndex={cur === "deny" ? 0 : -1} aria-label={t("server.permissionGrid.deny")} onClick={() => set(bit, "deny")}><X size={16} /></button>
-                    <button type="button" className={s.triBtn} data-kind="neutral" data-on={cur === "neutral"} disabled={!editable} role="radio" aria-checked={cur === "neutral"} tabIndex={cur === "neutral" ? 0 : -1} aria-label={t("server.permissionGrid.inherit")} onClick={() => set(bit, "neutral")}><Minus size={16} /></button>
-                    <button type="button" className={s.triBtn} data-kind="allow" data-on={cur === "allow"} disabled={!editable} role="radio" aria-checked={cur === "allow"} tabIndex={cur === "allow" ? 0 : -1} aria-label={t("server.permissionGrid.allow")} onClick={() => set(bit, "allow")}><Check size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="deny" data-on={cur === "deny"} disabled={!rowEditable} role="radio" aria-checked={cur === "deny"} tabIndex={cur === "deny" ? 0 : -1} aria-label={t("server.permissionGrid.deny")} onClick={() => set(bit, "deny")}><X size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="neutral" data-on={cur === "neutral"} disabled={!rowEditable} role="radio" aria-checked={cur === "neutral"} tabIndex={cur === "neutral" ? 0 : -1} aria-label={t("server.permissionGrid.inherit")} onClick={() => set(bit, "neutral")}><Minus size={16} /></button>
+                    <button type="button" className={s.triBtn} data-kind="allow" data-on={cur === "allow"} disabled={!rowEditable} role="radio" aria-checked={cur === "allow"} tabIndex={cur === "allow" ? 0 : -1} aria-label={t("server.permissionGrid.allow")} onClick={() => set(bit, "allow")}><Check size={16} /></button>
                   </div>
                 </div>
               );

@@ -232,7 +232,13 @@ export const api = {
       throw err;
     }
     if (!raw) return undefined as T;
-    return JSON.parse(raw) as T;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      // a 200 that is not ours — a captive portal's sign-in page, a proxy's
+      // error page — is said as that, not as a bare SyntaxError
+      throw new ApiError(res.status, "bad_response", "The server's answer made no sense.");
+    }
   },
 
   /**

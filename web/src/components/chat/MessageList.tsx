@@ -20,6 +20,7 @@ import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
+import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
 type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
@@ -134,6 +135,10 @@ export function MessageList({ channel }: { channel: Channel }) {
   const [newBelow, setNewBelow] = useState(false);
   // Scrolling only moves refs, so whether the jump button shows has to be state of its own.
   const [showJump, setShowJump] = useState(false);
+  const [reachedBottom, setReachedBottom] = useState(0);
+  // one render context for every row, rather than every row subscribing to
+  // every user, channel and server itself
+  const renderCtx = useRenderCtx();
   // Newer pages load below the reader; the loader at the top is for older ones.
   const [newerBusy, setNewerBusy] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -280,13 +285,42 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (a && el) restoreAnchor(el, a);
   }, [selecting]);
 
+  /**
+   * Arrow keys walk the messages from the keyboard: from the list itself ↑
+   * starts at the newest, ↑ and ↓ move a message at a time, Home and End go to
+   * either end. A focused message shows its toolbar, and the menu key opens
+   * its menu. Keys typed in an edit box stay the edit box's.
+   */
+  const onListKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown" && e.key !== "Home" && e.key !== "End") return;
+    const target = e.target as HTMLElement;
+    if (target.closest("textarea, input, select, [contenteditable='true']")) return;
+    const list = scrollRef.current;
+    if (!list) return;
+    const rows = [...list.querySelectorAll<HTMLElement>("[data-row]")];
+    if (rows.length === 0) return;
+    const at = target.closest<HTMLElement>("[data-row]");
+    let i = at ? rows.indexOf(at) : -1;
+    if (e.key === "Home") i = 0;
+    else if (e.key === "End") i = rows.length - 1;
+    else if (i < 0) i = rows.length - 1;
+    else i = e.key === "ArrowUp" ? Math.max(0, i - 1) : Math.min(rows.length - 1, i + 1);
+    e.preventDefault();
+    rows[i]!.focus({ preventScroll: true });
+    rows[i]!.scrollIntoView({ block: "nearest" });
+  };
+
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
     // The end of a list that stops short of the present is not the bottom:
     // nothing should stick to it or be marked read from it.
+    const wasAtBottom = atBottom.current;
     atBottom.current = dist < 80 && !hasNewer;
+    // arriving at the bottom is reading what is there: the ack below runs
+    // again for it, instead of waiting for the next message or a refocus
+    if (atBottom.current && !wasAtBottom) setReachedBottom((n) => n + 1);
     setShowJump(!atBottom.current);
     if (atBottom.current) {
       setNewBelow(false);
@@ -343,7 +377,17 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (readState?.lastReadId && compareIds(readState.lastReadId, newest) >= 0 && readState.mentions === 0) return;
     lastAcked.current = newest;
     void ack(channel.id, newest);
-  }, [loaded, hasNewer, newest, focused, readState, ack, channel.id]);
+  }, [loaded, hasNewer, newest, focused, readState, ack, channel.id, reachedBottom]);
+
+  // A list too short to scroll never sends the scroll that asks for older
+  // messages — after most of a page was deleted, or on a tall screen — so it
+  // asks once it has settled.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !loaded || !hasOlder || loading) return;
+    // (a list with no size yet has not been laid out, and says nothing)
+    if (el.clientHeight > 0 && el.scrollHeight > 0 && el.scrollHeight <= el.clientHeight + 400) onScroll();
+  }, [ids.length, loaded, hasOlder, loading, onScroll]);
 
   useEffect(() => {
     if (!jumpTo || jumpTo.channelId !== channel.id) return;
@@ -477,7 +521,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   return (
     <div className={[s.listWrap, compact ? s.compact : ""].join(" ")} data-selecting={selecting || undefined}>
       {newBelow ? <div className={s.newPill} onClick={jumpToPresent}><span>{t("chat.messageList.newMessages")}</span><span>{t("chat.messageList.jumpToPresent")}</span></div> : null}
-      <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="">
+      <div className={s.scroll} ref={scrollRef} onScroll={onScroll} data-scroller="" tabIndex={0} aria-label={t("modals.quickSwitcher.messages")} onKeyDown={onListKey}>
         <div className={s.inner}>
           {!hasOlder ? (
             intro
@@ -491,12 +535,14 @@ export function MessageList({ channel }: { channel: Channel }) {
           ) : (
             <div style={{ height: 24 }} />
           )}
-          {rows.map((row, i) => {
-            if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
-            if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
-            if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} upload={row.p.upload} />;
-            return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
-          })}
+          <RenderCtxProvider value={renderCtx}>
+            {rows.map((row, i) => {
+              if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
+              if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
+              if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} upload={row.p.upload} />;
+              return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
+            })}
+          </RenderCtxProvider>
           {hasNewer && loaded ? <div className={s.loader}><Spinner size={24} /></div> : null}
         </div>
       </div>

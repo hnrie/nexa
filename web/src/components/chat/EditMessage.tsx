@@ -62,6 +62,7 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   return (
     <div className={s.edit}>
       <textarea
+        aria-label={t("composer.editYourMessage")}
         ref={ref}
         className={s.editTa}
         value={text}

@@ -2035,6 +2035,7 @@
     "many": "Показать ещё (осталось {count})",
     "other": "Показать ещё (осталось {count})"
   },
+  "server.members.showingFirstMembers": "Показаны первые 20 000 участников. Остальных можно найти через поиск.",
   "server.members.stillLoadingTheRestOfThe": "Загружаем остальных участников…",
   "server.members.timedOut": "В тайм-ауте",
   "server.members.timeout": "Тайм-аут",

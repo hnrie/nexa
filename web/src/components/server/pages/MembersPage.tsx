@@ -37,6 +37,9 @@ export default function MembersPage({ serverId }: { serverId: string }) {
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const complete = server?.membersComplete ?? true;
+  // A server past the twenty thousand members this page reads through is
+  // shown in part, and says so; a search asks the server for the rest.
+  const [capped, setCapped] = useState(false);
 
   useEffect(() => {
     if (complete) return;
@@ -49,9 +52,10 @@ export default function MembersPage({ serverId }: { serverId: string }) {
         if (!alive) return;
         upsertUsers(res.users);
         upsertMembers(serverId, res.members, res.members.length < 1000);
-        if (res.members.length < 1000) break;
+        if (res.members.length < 1000) return;
         after = res.members[res.members.length - 1]?.user_id;
       }
+      if (alive) setCapped(true);
     })().catch(() => {
       if (alive) setFailed(true);
     });
@@ -59,6 +63,27 @@ export default function MembersPage({ serverId }: { serverId: string }) {
       alive = false;
     };
   }, [complete, serverId, upsertMembers, upsertUsers, attempt]);
+
+  // with the list incomplete, a search also asks the server, which searches them all
+  useEffect(() => {
+    const query = q.trim();
+    if (complete || query.length < 2) return;
+    let alive = true;
+    const h = setTimeout(() => {
+      void serversApi
+        .members(serverId, { q: query, limit: 100 })
+        .then((res) => {
+          if (!alive) return;
+          upsertUsers(res.users);
+          upsertMembers(serverId, res.members, false);
+        })
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(h);
+    };
+  }, [q, complete, serverId, upsertMembers, upsertUsers]);
 
   const rows = useMemo(() => {
     if (!server) return [];
@@ -81,7 +106,7 @@ export default function MembersPage({ serverId }: { serverId: string }) {
         <TextInput value={q} onChange={(e) => { setQ(e.target.value); setShown(PAGE); }} placeholder={t("server.channelSettings.searchMembers")} aria-label={t("server.channelSettings.searchMembers")} />
       </div>
       {failed ? <LoadError message={t("server.members.notEveryMemberCouldBeLoaded")} onRetry={() => setAttempt((n) => n + 1)} /> : null}
-      {!complete && !failed ? <p className={st.hint} role="status">{t("server.members.stillLoadingTheRestOfThe")}</p> : null}
+      {!complete && !failed ? <p className={st.hint} role="status">{capped ? t("server.members.showingFirstMembers") : t("server.members.stillLoadingTheRestOfThe")}</p> : null}
       {rows.slice(0, shown).map(({ m, name, username }) => {
         const above = m.user_id !== meId && outranks(serverId, m.user_id);
         const timedOut = !!m.timeout_until && m.timeout_until > Date.now();

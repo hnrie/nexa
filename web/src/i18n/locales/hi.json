@@ -1937,6 +1937,7 @@
     "one": "और दिखाएँ ({count} बचा)",
     "other": "और दिखाएँ ({count} बचे)"
   },
+  "server.members.showingFirstMembers": "पहले 20,000 सदस्य दिखाए जा रहे हैं। किसी और को ढूँढ़ने के लिए खोजें।",
   "server.members.stillLoadingTheRestOfThe": "बाकी सदस्य अभी लोड हो रहे हैं…",
   "server.members.timedOut": "टाइम आउट",
   "server.members.timeout": "टाइम आउट",

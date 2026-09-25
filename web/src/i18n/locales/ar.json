@@ -2113,6 +2113,7 @@
   "server.members.showMoreLeft": {
     "other": "عرض المزيد (بقي {count})"
   },
+  "server.members.showingFirstMembers": "يُعرض أول 20,000 عضو. ابحث للعثور على أي شخص آخر.",
   "server.members.stillLoadingTheRestOfThe": "لا يزال تحميل بقية الأعضاء جاريًا…",
   "server.members.timedOut": "موقوف مؤقتًا",
   "server.members.timeout": "إيقاف مؤقت",

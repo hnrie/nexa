@@ -1873,6 +1873,7 @@
   "server.members.showMoreLeft": {
     "other": "显示更多（还剩 {count} 个）"
   },
+  "server.members.showingFirstMembers": "正在显示前 20,000 位成员。其他人请通过搜索查找。",
   "server.members.stillLoadingTheRestOfThe": "仍在加载其余成员…",
   "server.members.timedOut": "已禁言",
   "server.members.timeout": "禁言",

@@ -10,6 +10,8 @@ import type { Channel, PublicUser } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { t } from "@/i18n";
 import s from "./Search.module.css";
+import { channelDisplayName } from "@/lib/names";
+import { useAuth } from "@/stores/auth";
 
 /** The filter being typed at the end of a query, if any. */
 export interface PartialToken {
@@ -64,10 +66,17 @@ export function SearchSuggestions({
       .slice(0, 8);
   }, [tok, users, wanted, nicknames]);
 
+  // A DM has no name of its own; it is offered as the people in it and put in
+  // the query by id (which in: also takes), as is anything with a space in
+  // its name — "in:Weekend plans" would search for "plans" in "Weekend".
   const chans = useMemo(() => {
     if (!tok || tok.key !== "in") return [];
-    return channels.filter((c) => !wanted || c.name.toLowerCase().includes(wanted)).slice(0, 8);
-  }, [tok, channels, wanted]);
+    const meId = useAuth.getState().me?.id;
+    return channels
+      .map((c) => ({ c, label: channelDisplayName(c, users, meId), dm: c.type === "dm" || c.type === "group_dm" || c.type === "subchat" }))
+      .filter((x) => !wanted || x.label.toLowerCase().includes(wanted))
+      .slice(0, 8);
+  }, [tok, channels, users, wanted]);
 
   if (!tok) return null;
 
@@ -107,10 +116,10 @@ export function SearchSuggestions({
     if (chans.length === 0) return null;
     return (
       <div className={s.suggest} data-testid="search-suggest">
-        {chans.map((c) => (
-          <button key={c.id} className={s.suggestRow} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(completeToken(query, tok, c.name))}>
-            <span className={s.suggestHash}>#</span>
-            <span className={s.suggestName}>{c.name}</span>
+        {chans.map(({ c, label, dm }) => (
+          <button key={c.id} className={s.suggestRow} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(completeToken(query, tok, dm || /\s/.test(c.name) ? c.id : c.name))}>
+            <span className={s.suggestHash}>{dm ? "@" : "#"}</span>
+            <span className={s.suggestName}>{label}</span>
           </button>
         ))}
       </div>

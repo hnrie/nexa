@@ -152,6 +152,24 @@ function put(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages {
  * cannot take messages past its end, because the ones in between are missing;
  * they come with the newer pages instead.
  */
+/**
+ * How many live messages a conversation nobody has opened keeps. Every
+ * message anywhere arrives over the gateway; kept in full, a device left
+ * connected for days held every message of every busy channel, decrypted,
+ * and walked all of them again on each key grant. The newest few are enough
+ * for what reads them before the conversation is opened (a mention taken
+ * back, a notification); opening it loads its first page as usual.
+ */
+const UNOPENED_KEEP = 50;
+
+function keepNewest(c: ChannelMessages, n: number): ChannelMessages {
+  if (c.ids.length <= n) return c;
+  const drop = c.ids.slice(0, c.ids.length - n);
+  const byId = { ...c.byId };
+  for (const id of drop) delete byId[id];
+  return { ...c, ids: c.ids.slice(-n), byId };
+}
+
 function arrived(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages {
   const newest = c.ids[c.ids.length - 1];
   if (!c.hasNewer || !newest) return put(c, msgs);
@@ -192,7 +210,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
   insert: (channelId, msgs) => {
     if (msgs.length === 0) return;
     resolveAuthors(msgs);
-    set((s) => withChannel(s, channelId, (c) => arrived(c, msgs)));
+    set((s) => withChannel(s, channelId, (c) => (c.loaded ? arrived(c, msgs) : keepNewest(arrived(c, msgs), UNOPENED_KEEP))));
   },
   settle: (channelId, msgs, drop) => {
     resolveAuthors(msgs);

@@ -257,6 +257,8 @@ function PermissionsTab({ role, editable, actorPerms, onSaved }: { role: Role; e
   const [busy, setBusy] = useState(false);
   const original = parsePerm(role.permissions);
   const dirty = value !== original;
+  // an administrator holds everything, and so may give anything
+  const grantable = (actorPerms & (1n << 3n)) !== 0n ? undefined : actorPerms;
   const save = async () => {
     setBusy(true);
     try {
@@ -272,10 +274,11 @@ function PermissionsTab({ role, editable, actorPerms, onSaved }: { role: Role; e
     <div>
       <div className={s.searchRow}>
         <TextInput value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t("server.roles.searchPermissions")} />
-        <Button variant="ghost" size="sm" onClick={() => setValue(0n)} disabled={!editable}>{t("modals.quickSwitcher.clear")}</Button>
+        {/* Clear takes off what the editor could have given, and nothing else */}
+        <Button variant="ghost" size="sm" onClick={() => setValue(grantable === undefined ? 0n : value & ~grantable)} disabled={!editable}>{t("modals.quickSwitcher.clear")}</Button>
       </div>
       <p className={st.hint} style={{ marginBottom: 8 }}>{(actorPerms & (1n << 3n)) !== 0n ? t("server.roles.grantHintAll") : t("server.roles.grantHint")}</p>
-      <RoleGrid value={value} onChange={setValue} editable={editable} filter={filter} />
+      <RoleGrid value={value} onChange={setValue} editable={editable} filter={filter} grantable={grantable} />
       <SaveBar dirty={dirty} busy={busy} onReset={() => setValue(original)} onSave={() => void save()} />
     </div>
   );

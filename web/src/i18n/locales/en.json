@@ -2813,6 +2813,7 @@
   "server.encryption.someoneLeftRotate": "Someone left or was removed and the keys they held have not been rotated yet. Rotating happens automatically when a key holder is online; you can also do it now.",
   "server.memberAction.banNamed": "Ban {name}",
   "server.memberAction.kickNamed": "Kick {name}",
+  "server.members.showingFirstMembers": "Showing the first 20,000 members. Search to find anyone else.",
   "server.packEditor.addYourFirstEmoji": "Add your first emoji above.",
   "server.packEditor.addYourFirstSticker": "Add your first sticker above.",
   "server.packEditor.editEmoji": "Edit Emoji",

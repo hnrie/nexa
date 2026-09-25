@@ -1937,6 +1937,7 @@
     "one": "Mehr anzeigen (noch {count})",
     "other": "Mehr anzeigen (noch {count})"
   },
+  "server.members.showingFirstMembers": "Die ersten 20.000 Mitglieder werden angezeigt. Suche, um alle anderen zu finden.",
   "server.members.stillLoadingTheRestOfThe": "Die übrigen Mitglieder werden noch geladen…",
   "server.members.timedOut": "Im Timeout",
   "server.members.timeout": "Timeout",

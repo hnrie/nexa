@@ -398,11 +398,17 @@ export const useAuth = create<AuthState>()((set, get) => ({
     api.setToken(null);
     pendingMfa = null;
     pendingPolicy = null;
-    if (me) {
-      clearLock(me.id);
-      await keystore.clear(me.id);
+    try {
+      if (me) {
+        clearLock(me.id);
+        await keystore.clear(me.id);
+      }
+    } finally {
+      // Signed out whatever the key store says: a dead database handle (iOS
+      // after a long time in the background) made clear() throw, and the app
+      // sat "ready" with no token and no connection, going nowhere.
+      set({ status: "anonymous", me: null, token: null, identity: null, settingsKey: null, error: null });
     }
-    set({ status: "anonymous", me: null, token: null, identity: null, settingsKey: null, error: null });
   },
 
   setMe: (me) => set({ me }),

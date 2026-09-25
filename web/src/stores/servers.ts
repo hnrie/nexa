@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Member, Role, Server, ServerView } from "@/api/types";
-import { ALL, compute, has, highestPosition, P, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
+import { ALL, base, compute, has, highestPosition, P, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
 
 /** The flag bit marking an account that runs the instance. */
 const USER_FLAG_ADMIN = 1;
@@ -176,8 +176,12 @@ export function isInstanceAdmin(userId: string): boolean {
 /** Server-level permissions of a user from local state. */
 export function serverPerms(st: ServerState, userId: string): bigint {
   if (st.server.owner_id === userId || isInstanceAdmin(userId)) return ALL;
+  // Base, as the server works out my_permissions: compute() with no channel
+  // treats a missing View Channel as "can see nothing" and returned 0, so
+  // staff whose view came from channel overwrites lost every server-wide
+  // action after any role update.
   const m = st.members[userId];
-  return compute(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(m, userId), false, undefined);
+  return base(st.server.id, toPermRoles(Object.values(st.roles)), toPermMember(m, userId), false);
 }
 
 /** A user's permissions in a channel of the server, from local state. */

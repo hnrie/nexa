@@ -19,11 +19,14 @@ import { clearMediaCache } from "@/lib/mediaCache";
 import { keystore } from "@/crypto/keystore";
 import { leaveVoice } from "@/voice/session";
 import { workerClearTimeout, workerSetTimeout } from "@/lib/workerTimers";
+import { usePanes } from "@/stores/panes";
 
 let client: GatewayClient | null = null;
 let queue: Promise<void> = Promise.resolve();
 /** Set for the whole of startSession, including its awaits, so two overlapping calls build one client. */
 let starting = false;
+/** Moves on when a session ends, so one still starting knows to stop. */
+let sessionGeneration = 0;
 
 export function gatewayUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
@@ -39,6 +42,7 @@ export async function startSession(): Promise<void> {
   // never referenced again but keeps applying every event a second time.
   if (starting) return;
   starting = true;
+  const gen = ++sessionGeneration;
   try {
     useSettings.getState().setKey(settingsKey);
     void loadUploadLimits();
@@ -50,6 +54,12 @@ export async function startSession(): Promise<void> {
       // must not leave the app without a connection.
       console.warn("keystore: could not load cached keys", err);
       useKeys.setState({ userId: me.id, identity, waiting: {} });
+    }
+    // Locked or signed out while the keys were loading: this session is not
+    // wanted any more, and connecting now would bring it back to life.
+    if (gen !== sessionGeneration) {
+      useKeys.getState().reset();
+      return;
     }
     if (client) return;
     client = new GatewayClient({
@@ -112,6 +122,7 @@ function wakeGatewayIfShown(): void {
 }
 
 export function stopSession(): void {
+  sessionGeneration++;
   window.removeEventListener("online", wakeGateway);
   window.removeEventListener("pageshow", wakeGateway);
   document.removeEventListener("visibilitychange", wakeGatewayIfShown);
@@ -153,6 +164,8 @@ export async function endSession(): Promise<void> {
   forgetSends();
   useMessages.setState({ channels: {} });
   forgetUnsentAcks();
+  // tabs and split panes name another account's channels
+  usePanes.getState().reset();
 }
 
 logoutHooks.push(endSession);

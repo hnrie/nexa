@@ -2,7 +2,7 @@ import { Check, Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
-import { useRenderCtx } from "@/lib/markdownCtx";
+import { useRowRenderCtx } from "@/lib/markdownCtx";
 import { formatFull, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingUpload } from "@/stores/messages";
@@ -52,14 +52,30 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const target = useMessages((m) => (msg.reply_to_id ? m.channels[msg.channel_id]?.byId[msg.reply_to_id] : undefined));
   const setJumpTo = useUI((u) => u.setJumpTo);
   const openModal = useUI((u) => u.openModal);
-  const ctx = useRenderCtx();
+  const ctx = useRowRenderCtx();
   if (!msg.reply_to_id) return null;
-  if (!target) return <div className={s.replyLine}><span className={s.replyText}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</span></div>;
+  const replyTo = msg.reply_to_id;
+  // Jumping works whether or not the original is loaded: the list fetches the
+  // page around it, and says so if it really is gone. Only the newest page is
+  // loaded when a conversation opens, so most replies point past it.
+  const jump = () => setJumpTo({ channelId: msg.channel_id, messageId: replyTo });
+  const keys = (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    jump();
+  };
+  if (!target) {
+    return (
+      <div className={s.replyLine} role="button" tabIndex={0} onClick={jump} onKeyDown={keys}>
+        <span className={s.replyText}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</span>
+      </div>
+    );
+  }
   const author = users[target.author_id];
   const mediaOnly = !!target.payload?.t && isOnlyMediaLinks(target.payload.t, (target.payload.embeds ?? []) as UnfurlResult[]);
   const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true }), ctx) : target.payload?.att?.length || mediaOnly ? t("chat.messageItem.clickToSeeAttachment") : target.decryptError ? t("chat.messageItem.encryptedMessage") : "";
   return (
-    <div className={s.replyLine} onClick={() => setJumpTo({ channelId: msg.channel_id, messageId: target.id })}>
+    <div className={s.replyLine} role="button" tabIndex={0} onClick={jump} onKeyDown={keys}>
       <Avatar id={target.author_id} avatarId={author?.avatar_id ?? null} name={displayName(author)} size={16} />
       <span className={s.replyName} onClick={(e) => { e.stopPropagation(); openModal("profile", { userId: target.author_id }); }}>{displayName(author)}</span>
       <span className={s.replyText}>{text}</span>
@@ -87,7 +103,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const setReplyTo = useUI((u) => u.setReplyTo);
   const setEditing = useUI((u) => u.setEditing);
   const dev = useSettings((st) => st.settings.developerMode);
-  const ctx = useRenderCtx();
+  const ctx = useRowRenderCtx();
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
   const member = serverState?.members[msg.author_id];
@@ -96,7 +112,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWatch = useRef<(() => void) | null>(null);
   const friendNickname = useRelationships((r) => r.byUser[msg.author_id]?.nickname);
-  const shift = useShiftHeld();
   const selecting = useSelection((x) => x.channelId === msg.channel_id);
   const picked = useSelection((x) => x.channelId === msg.channel_id && !!x.picked[msg.id]);
   const pickable = selecting && !pending && canPick(msg);
@@ -190,8 +205,18 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           if (pickable) pick(e);
           return;
         }
+        // the menu key or Shift+F10 on a focused row has no pointer: open by the row
+        if (e.clientX === 0 && e.clientY === 0) {
+          const r = e.currentTarget.getBoundingClientRect();
+          openMenu(r.left + 72, r.top + 8);
+          return;
+        }
         openMenu(e.clientX, e.clientY, imageTarget(e.target));
       }}
+      // reachable with the arrow keys from the list (MessageList), and its
+      // toolbar shows while it has focus
+      tabIndex={-1}
+      data-row=""
     >
       {pickable ? (
         <button type="button" className={s.pick} role="checkbox" aria-checked={picked} aria-label={picked ? t("chat.messageItem.unselectMessage") : t("chat.messageItem.selectMessage")} data-testid="pick-message">
@@ -239,31 +264,43 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         </div>
       )}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
-      {!pending && !editing && !selecting ? (
-        <div className={s.toolbar} role="toolbar" data-shift={shift}>
-          <ToolButton label={t("chat.messageItem.addReaction")} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
-          {canEdit(msg) ? (
-            <ToolButton label={t("chat.messageItem.editMessage")} onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
-          ) : null}
-          <ToolButton label={t("chat.messageItem.reply")} onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
-          {shift ? (
-            <>
-              {canPin(msg) ? <ToolButton label={pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage")} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
-              <ToolButton label={t("chat.messageItem.markUnread")} onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
-              <ToolButton label={t("chat.messageItem.copyMessageLink")} onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
-              {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
-              {canDelete(msg) ? (
-                <ToolButton label={t("chat.messageItem.deleteMessageShiftSkipsThePrompt")} danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
-              ) : null}
-            </>
-          ) : null}
-          <ToolButton label={shift ? t("chat.messageItem.everythingElse") : t("chat.messageItem.moreHoldShiftForAllActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
-        </div>
-      ) : null}
+      {!pending && !editing && !selecting ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
     </div>
   );
 });
+
+/**
+ * The toolbar over a row, in a component of its own: holding Shift changes
+ * what it offers, and with the Shift state in the row itself every loaded
+ * message re-rendered — markdown, embeds and all — on each Shift press.
+ */
+function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedMessage; pinned: boolean; dev: boolean; setPicker: (r: DOMRect | null) => void; openMenu: (x: number, y: number) => void }) {
+  const shift = useShiftHeld();
+  const setEditing = useUI((u) => u.setEditing);
+  const setReplyTo = useUI((u) => u.setReplyTo);
+  return (
+    <div className={s.toolbar} role="toolbar" data-shift={shift}>
+      <ToolButton label={t("chat.messageItem.addReaction")} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
+      {canEdit(msg) ? (
+        <ToolButton label={t("chat.messageItem.editMessage")} onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
+      ) : null}
+      <ToolButton label={t("chat.messageItem.reply")} onClick={() => setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true })}><Reply size={18} /></ToolButton>
+      {shift ? (
+        <>
+          {canPin(msg) ? <ToolButton label={pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage")} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
+          <ToolButton label={t("chat.messageItem.markUnread")} onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
+          <ToolButton label={t("chat.messageItem.copyMessageLink")} onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
+          {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
+          {canDelete(msg) ? (
+            <ToolButton label={t("chat.messageItem.deleteMessageShiftSkipsThePrompt")} danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
+          ) : null}
+        </>
+      ) : null}
+      <ToolButton label={shift ? t("chat.messageItem.everythingElse") : t("chat.messageItem.moreHoldShiftForAllActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
+    </div>
+  );
+}
 
 /** A sticker in a message: 160 px, keeps its aspect; a click shows its name and, for a public pack, the pack. */
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {

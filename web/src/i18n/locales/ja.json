@@ -1873,6 +1873,7 @@
   "server.members.showMoreLeft": {
     "other": "さらに表示（残り {count}）"
   },
+  "server.members.showingFirstMembers": "最初の 20,000 人のメンバーを表示しています。ほかの人は検索で見つけてください。",
   "server.members.stillLoadingTheRestOfThe": "残りのメンバーを読み込んでいます…",
   "server.members.timedOut": "タイムアウト中",
   "server.members.timeout": "タイムアウト",

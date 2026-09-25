@@ -99,6 +99,13 @@
 .tDanger { color: var(--danger); }
 .tDanger:hover { color: #fff; background: var(--danger); }
 .msg[data-menu="true"] .toolbar { display: flex; }
+/* From the keyboard: a row focused with the arrow keys, or holding focus on
+   one of its buttons, shows its toolbar and says it is focused. Keyed to
+   :focus-visible, so a tap on a phone (which focuses the row too) does not
+   leave the toolbar over the message. */
+.msg:focus-visible .toolbar, .msg:has(:focus-visible) .toolbar { display: flex; }
+.msg:focus-visible .addReact, .msg:has(:focus-visible) .addReact { display: inline-flex; }
+.msg:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 /* Touch browsers keep :hover on the last tapped row, which would leave the
    toolbar over the content and catch the next tap; only real pointers reveal it. */
 @media (hover: hover) {

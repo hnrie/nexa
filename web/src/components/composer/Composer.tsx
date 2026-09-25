@@ -26,7 +26,7 @@ import { expressions as expressionsApi } from "@/api/expressions";
 import { extractUrls } from "@/markdown";
 import { emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
 import { channelDisplayName } from "@/lib/names";
-import { Autocomplete, type AcItem } from "./Autocomplete";
+import { Autocomplete, type AcItem, AC_LIST_ID, acOptionId } from "./Autocomplete";
 import { commands, applyCommand } from "./commands";
 import { createLinkPreviews } from "./linkPreviews";
 import { sendMessage, sendWithFiles, type SendOptions } from "./send";
@@ -446,7 +446,7 @@ export function Composer({ channel }: { channel: Channel }) {
   if (!canSend) {
     return (
       <div className={s.wrap}>
-          <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled />
+          {paneFocused ? <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled /> : null}
         <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">{tr_("composer.composer.youDoNotHavePermissionTo")}</div>
       </div>
     );
@@ -454,7 +454,10 @@ export function Composer({ channel }: { channel: Channel }) {
 
   return (
     <div className={s.wrap}>
-      <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
+      {/* One pane takes a dropped file, the one in focus: every pane's box
+          listened to the whole window, so the first one mounted took every
+          drop while all of them drew their scrim. */}
+      {paneFocused ? <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} /> : null}
       {ac ? <Autocomplete items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
       {picker ? (
         <ExpressionPicker
@@ -526,6 +529,11 @@ export function Composer({ channel }: { channel: Channel }) {
         {canAttach ? <button className={s.attach} aria-label={tr_("composer.composer.uploadAFile")} onClick={() => fileRef.current?.click()}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
         <textarea
           data-composer=""
+          // a screen reader hears the suggestions and which one Enter takes
+          aria-autocomplete="list"
+          aria-expanded={!!ac}
+          aria-controls={ac ? AC_LIST_ID : undefined}
+          aria-activedescendant={ac ? acOptionId(ac.index) : undefined}
           ref={taRef}
           className={s.ta}
           value={text}

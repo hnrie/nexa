@@ -57,22 +57,45 @@ export function Reactions({ msg, pickerAnchor, onOpenPicker, onPickerClose }: Pr
   const [who, setWho] = useState<Record<string, string>>({});
   const closePicker = onPickerClose;
   if (msg.reactions.length === 0 && !pickerAnchor) return null;
-  const hover = async (emoji: string) => {
-    if (who[emoji]) return;
+  // who reacted, asked for once per emoji and count: a count that moved means
+  // the list did too, where it used to be kept from the first look for good
+  const lookup = async (emoji: string, count: number): Promise<string | null> => {
+    const key = `${emoji}:${count}`;
+    if (who[key]) return who[key]!;
     try {
       const ids = await messagesApi.reactors(msg.channel_id, msg.id, emoji, 20);
       const names = ids.map((id) => displayName(users[id])).join(", ");
-      setWho((w) => ({ ...w, [emoji]: names }));
+      setWho((w) => ({ ...w, [key]: names }));
+      return names;
     } catch {
-      /* tooltip stays generic */
+      /* the label stays generic */
+      return null;
     }
+  };
+  // A long press (or right click) says who reacted: there is no hover on a
+  // touch screen, and a tooltip never shows there.
+  const tell = async (e: React.MouseEvent, emoji: string, count: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const names = await lookup(emoji, count);
+    if (names) useUI.getState().toast(t("chat.reactions.reactedWith", { who: names, emoji }), "info");
   };
   return (
     <div className={s.reactions}>
       {msg.reactions.map((r) => {
         const custom = isCustom(r.emoji);
         return (
-          <button key={r.emoji} className={s.pill} data-me={r.me} title={who[r.emoji] ? t("chat.reactions.reactedWith", { who: who[r.emoji]!, emoji: r.emoji }) : t("chat.reactions.reactWith", { emoji: r.emoji })} onMouseEnter={() => void hover(r.emoji)} onClick={() => void toggleReaction(msg, r.emoji)}>
+          <button
+            key={r.emoji}
+            className={s.pill}
+            data-me={r.me}
+            aria-pressed={r.me}
+            title={who[`${r.emoji}:${r.count}`] ? t("chat.reactions.reactedWith", { who: who[`${r.emoji}:${r.count}`]!, emoji: r.emoji }) : t("chat.reactions.reactWith", { emoji: r.emoji })}
+            onMouseEnter={() => void lookup(r.emoji, r.count)}
+            onFocus={() => void lookup(r.emoji, r.count)}
+            onContextMenu={(e) => void tell(e, r.emoji, r.count)}
+            onClick={() => void toggleReaction(msg, r.emoji)}
+          >
             {custom ? <img src={emojiUrl(custom.id, custom.animated, 24)} alt={r.emoji} /> : <Twemoji text={r.emoji} className={s.pillImg} fallbackClassName={s.pillEmoji} title="" />}
             <span>{r.count}</span>
           </button>

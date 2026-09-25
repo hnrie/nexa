@@ -25,6 +25,7 @@ import type { Message, PublicUser, Relationship, ServerView } from "@/api/types"
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
+import { usePanes } from "@/stores/panes";
 
 /** Something from Nexa worth a sound or a notification. */
 export type NexaAlert = { kind: "notice" | "reply"; case: MemberCase } | { kind: "announcement"; announcement: Announcement } | { kind: "appeal"; caseId: string; userId: string };
@@ -273,6 +274,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "channel_delete":
       useChannels.getState().remove(e.d.id);
       useMessages.getState().clearChannel(e.d.id);
+      // split panes still showing it close (the focused one follows the address)
+      usePanes.getState().forgetChannel(e.d.id);
       return;
     case "channel_positions":
       useChannels.getState().applyPositions(e.d.channels);
@@ -290,6 +293,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         if (ch.server_id === e.d.id) {
           chans.remove(ch.id);
           useMessages.getState().clearChannel(ch.id);
+          usePanes.getState().forgetChannel(ch.id);
         }
       }
       useServers.getState().remove(e.d.id);

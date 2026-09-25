@@ -8,6 +8,7 @@ import s from "@/components/settings/Settings.module.css";
 import { unlessUnsaved, useHoldUnsaved, useUnsaved } from "@/stores/unsaved";
 
 import { t } from "@/i18n";
+import { usePortalRoot } from "@/hooks/usePortalRoot";
 export interface NavGroup {
   head: string;
   items: { id: string; label: string; danger?: boolean }[];
@@ -16,6 +17,8 @@ export interface NavGroup {
 /** The full-screen settings frame (nav on the left, content on the right) used by user, server and channel settings. */
 export function SettingsLayer({ label, groups, page, setPage, onClose, children, footer }: { label: string; groups: NavGroup[]; page: string; setPage: (id: string) => void; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // into the full-screen element when a call is full screen, where the body is not seen
+  const portalRoot = usePortalRoot();
   // into the layer when it opens, at the page it opened on
   useFocusTrap(ref, true, () => ref.current?.querySelector<HTMLElement>('[aria-current="page"]'));
   useEffect(() => {
@@ -54,7 +57,7 @@ export function SettingsLayer({ label, groups, page, setPage, onClose, children,
         </div>
       </div>
     </div>,
-    document.body,
+    portalRoot,
   );
 }
 

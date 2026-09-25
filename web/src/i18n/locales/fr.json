@@ -1942,6 +1942,7 @@
     "one": "Voir plus ({count} restant)",
     "other": "Voir plus ({count} restants)"
   },
+  "server.members.showingFirstMembers": "Affichage des 20 000 premiers membres. Faites une recherche pour trouver quelqu'un d'autre.",
   "server.members.stillLoadingTheRestOfThe": "Chargement du reste des membres…",
   "server.members.timedOut": "Exclu temporairement",
   "server.members.timeout": "Exclusion temporaire",

@@ -1873,6 +1873,7 @@
   "server.members.showMoreLeft": {
     "other": "더 보기({count}명 남음)"
   },
+  "server.members.showingFirstMembers": "처음 20,000명의 멤버를 표시하고 있습니다. 다른 사람은 검색으로 찾으세요.",
   "server.members.stillLoadingTheRestOfThe": "나머지 멤버를 불러오는 중…",
   "server.members.timedOut": "타임아웃됨",
   "server.members.timeout": "타임아웃",

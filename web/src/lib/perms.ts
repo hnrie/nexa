@@ -152,6 +152,8 @@ export function base(everyoneId: string, roles: PermRole[], m: PermMember, isOwn
   let p = 0n;
   for (const r of roles) if (mine.has(r.id)) p |= r.permissions;
   if (has(p, P.ADMINISTRATOR)) return ALL;
+  // as the server's Base does: a timeout takes everything but looking
+  if (m.timedOut) p &= TIMED_OUT_KEEP;
   return p;
 }
 

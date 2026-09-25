@@ -44,7 +44,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
   }, [channel.recipient_ids, presence, users, rels, me]);
 
   return (
-    <aside className={s.list} data-testid="group-member-list" data-open={drawer ? open : undefined} aria-hidden={drawer && !open}>
+    <aside className={s.list} data-testid="group-member-list" data-open={drawer ? open : undefined} aria-hidden={drawer && !open} {...(drawer && !open ? ({ inert: "" } as Record<string, string>) : {})}>
       <div className={s.head}>{t("chat.groupMemberList.membersCount", { count: rows.length })}</div>
       {rows.map((row) => {
         const p = presence[row.id];

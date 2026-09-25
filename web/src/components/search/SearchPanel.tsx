@@ -21,6 +21,8 @@ import { SearchSuggestions } from "./SearchSuggestions";
 import s from "./Search.module.css";
 
 import { t, Tr } from "@/i18n";
+import { useRenderCtx } from "@/lib/markdownCtx";
+import { parse, plainText } from "@/markdown";
 
 /** Conversations that hold messages; categories and voice channels hold none. */
 const SEARCHABLE = new Set(["text", "dm", "group_dm", "subchat"]);
@@ -40,6 +42,10 @@ function newestFirst(a: DecryptedMessage, b: DecryptedMessage): number {
  * long as it takes, so the panel says where it has got to and stops when asked.
  */
 export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }: { channel: Channel; query: string; onClose: () => void; onQuery: (v: string) => void; onJump?: (() => void) | undefined; inline?: boolean }) {
+  // Results read as the message does, not as its source: mentions by name,
+  // custom emoji as :name:, and a spoiler still hidden.
+  const renderCtx = useRenderCtx();
+  const readable = (source: string): string => plainText(parse(source, { inline: true }), renderCtx);
   const nav = useNavigate();
   const users = useUsers((u) => u.byId);
   const meId = useAuth((a) => a.me?.id);
@@ -149,7 +155,7 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
                 <span className={s.resultTime} title={formatFull(m.created_at)}>{formatTimestamp(m.created_at)}</span>
               </div>
               <div className={s.resultText}>
-                {m.payload?.t ? highlight(m.payload.t, q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("search.search.filesCount", { count: m.payload.att.length }) : ""}
+                {m.payload?.t ? highlight(readable(m.payload.t), q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("search.search.filesCount", { count: m.payload.att.length }) : ""}
               </div>
             </button>
           );

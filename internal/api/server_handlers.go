@@ -977,8 +977,20 @@ func (s *Server) handleOverwritePut(w http.ResponseWriter, r *http.Request) {
 	if !s.canOverwrite(w, r, srv, me.ID, req.Type, target) {
 		return
 	}
-	// one can only grant or deny permissions one holds (owners/admins hold all)
-	if actorPerms != perms.All && ((req.Allow|req.Deny)&^actorPerms) != 0 {
+	// One can only change what one holds (owners and admins hold everything).
+	// What changes is measured against the overwrite already there, as a
+	// role's permissions are: an overwrite that denies something the editor
+	// lacks can still have its other permissions edited, where before it
+	// could not be touched at all.
+	var old store.Overwrite
+	for _, o := range ch.Overwrites {
+		if o.TargetID == target {
+			old = o
+			break
+		}
+	}
+	changed := (req.Allow ^ old.Allow) | (req.Deny ^ old.Deny)
+	if actorPerms != perms.All && changed&^actorPerms != 0 {
 		WriteError(w, E(http.StatusForbidden, "missing_permission", "You cannot manage permissions you do not have."))
 		return
 	}

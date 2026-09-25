@@ -64,6 +64,8 @@ interface PanesState {
   setMembersOpen: (paneId: string, open: boolean) => void;
   /** Drops panes whose conversation has gone, and tabs left with none. */
   forgetChannel: (channelId: string) => void;
+  /** Sign-out: the next account on this browser starts from one empty tab. */
+  reset: () => void;
 }
 
 let counter = 0;
@@ -275,6 +277,11 @@ export const usePanes = create<PanesState>((set, get) => ({
 
   setMembersOpen(paneId, open) {
     set((s) => ({ membersOpen: { ...s.membersOpen, [paneId]: open } }));
+  },
+
+  reset() {
+    set({ ...fresh(), membersOpen: {} });
+    storage.remove(KEY);
   },
 
   forgetChannel(channelId) {

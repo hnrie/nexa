@@ -10,6 +10,12 @@ import { t } from "@/i18n";
 
 export type AcItem = { kind: "user"; user: PublicUser } | { kind: "emoji"; entry: EmojiEntry } | { kind: "customEmoji"; emoji: Emoji } | { kind: "command"; name: string; desc: string };
 
+/** The suggestion list's ids, so the message box can say which one is chosen. */
+export const AC_LIST_ID = "composer-suggestions";
+export function acOptionId(i: number): string {
+  return `${AC_LIST_ID}-${i}`;
+}
+
 export function Autocomplete({ items, index, onHover, onPick, tone }: { items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number }) {
   const listRef = useRef<HTMLDivElement>(null);
   // The list scrolls when it is taller than the room above the keyboard, so the
@@ -27,10 +33,10 @@ export function Autocomplete({ items, index, onHover, onPick, tone }: { items: A
   if (items.length === 0) return null;
   const head = items[0]?.kind === "user" ? t("server.serverSettings.members") : items[0]?.kind === "emoji" || items[0]?.kind === "customEmoji" ? t("server.emoji.emoji") : t("composer.autocomplete.commands");
   return (
-    <div ref={listRef} className={s.ac} role="listbox" onMouseDown={(e) => e.preventDefault()}>
+    <div ref={listRef} id={AC_LIST_ID} className={s.ac} role="listbox" onMouseDown={(e) => e.preventDefault()}>
       <div className={s.acHead}>{head}</div>
       {items.map((it, i) => (
-        <button key={it.kind === "user" ? it.user.id : it.kind === "emoji" ? it.entry.hexcode : it.kind === "customEmoji" ? it.emoji.id : it.name} className={s.acRow} data-selected={i === index} role="option" aria-selected={i === index} onMouseEnter={() => onHover(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i)}>
+        <button key={it.kind === "user" ? it.user.id : it.kind === "emoji" ? it.entry.hexcode : it.kind === "customEmoji" ? it.emoji.id : it.name} className={s.acRow} id={acOptionId(i)} data-selected={i === index} role="option" aria-selected={i === index} onMouseEnter={() => onHover(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i)}>
           {it.kind === "user" ? (
             <>
               <Avatar id={it.user.id} avatarId={it.user.avatar_id} name={it.user.display_name} size={24} />

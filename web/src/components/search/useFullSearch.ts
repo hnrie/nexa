@@ -50,7 +50,11 @@ function newestFirst(a: DecryptedMessage, b: DecryptedMessage): number {
  */
 function seedFromStore(channelId: string): { msgs: DecryptedMessage[]; reachedStart: boolean } | null {
   const c = useMessages.getState().channels[channelId];
-  if (!c || c.ids.length === 0) return null;
+  // Only a window that reaches the present: one the reader jumped back into
+  // history with would have the search catch up a few pages from there and
+  // walk backwards, never reading the newest part of the channel — while
+  // saying nothing was left out.
+  if (!c || c.ids.length === 0 || c.hasNewer) return null;
   const msgs: DecryptedMessage[] = [];
   for (const id of c.ids) {
     const m = c.byId[id];
