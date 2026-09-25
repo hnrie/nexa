@@ -204,6 +204,10 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
         return [t("modals.groupInvite.maxNumberOfUses"), num ? String(num) : t("modals.invite.noLimit")];
       case "delete_message_days":
         return [t("server.memberAction.deleteMessageHistory"), num ? formatSpan(num * 86_400_000) : none()];
+      case "icon":
+        return [t("server.serverOverview.serverIcon"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
+      case "banner":
+        return [t("server.serverOverview.serverBanner"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
       case "target_type":
         return null;
       default:

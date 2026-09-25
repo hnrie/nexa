@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { ApiError } from "@/api/client";
 import { servers as serversApi, type ChannelPositionPatch } from "@/api/servers";
+import { bannerUrl } from "@/api/users";
 import { UserPanel } from "@/components/shell/UserPanel";
 import { VoiceParticipants } from "@/components/voice/VoiceParticipants";
 import { VoiceStatus } from "@/components/voice/VoiceStatus";
@@ -24,6 +25,10 @@ import { t } from "@/i18n";
 type Drag = { id: string; kind: "channel" | "category" };
 type Drop = { id: string; where: "before" | "after" | "into" };
 
+/** The banner's height, and the header's over it: kept in step with ServerSidebar.module.css. */
+const BANNER_H = 138;
+const HEADER_H = 49;
+
 export function ServerSidebar({ serverId }: { serverId: string }) {
   const nav = useNavigate();
   const loc = useLocation();
@@ -42,6 +47,18 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   const [drop, setDrop] = useState<Drop | null>(null);
   const voiceByChannel = useVoice((v) => v.byChannel);
   const headRef = useRef<HTMLButtonElement>(null);
+  // A banner scrolls away with the channels under the name, which sits over
+  // it until the list has scrolled past it and then takes the plain header's
+  // background, so the name is readable on the picture and on the list alike.
+  const banner = bannerUrl(st?.server.banner_id ?? null, 480);
+  const [pastBanner, setPastBanner] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const measureBanner = useCallback(() => {
+    const el = listRef.current;
+    setPastBanner(!!el && el.scrollTop > BANNER_H - HEADER_H);
+  }, []);
+  // another server's list, or a banner added or taken away, starts from where the list is now
+  useEffect(measureBanner, [serverId, banner, measureBanner]);
   // whether the menu was open when the header was pressed: pressing closes it, and the click that follows must not open it again
   const wasOpen = useRef(false);
   const menuWatch = useRef<(() => void) | null>(null);
@@ -231,13 +248,13 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
   };
 
   return (
-    <div className={s.sidebar} onDrop={(e) => e.preventDefault()}>
-      <button ref={headRef} className={s.head} data-open={menuOpen} onPointerDown={() => { wasOpen.current = menuOpen; }} onClick={openHeaderMenu} aria-haspopup="menu" aria-expanded={menuOpen}>
+    <div className={s.sidebar} data-banner={!!banner} onDrop={(e) => e.preventDefault()}>
+      <button ref={headRef} className={s.head} data-open={menuOpen} data-over-banner={banner ? !pastBanner : undefined} onPointerDown={() => { wasOpen.current = menuOpen; }} onClick={openHeaderMenu} aria-haspopup="menu" aria-expanded={menuOpen}>
         <span className={s.headName}>{st.server.name}</span>
         {menuOpen ? <X size={18} /> : <ChevronDown size={18} />}
       </button>
-      <div className={s.scroll}>
-        <div className={s.top} />
+      <div className={s.scroll} ref={listRef} onScroll={banner ? measureBanner : undefined}>
+        {banner ? <div className={s.banner} style={{ backgroundImage: `url(${banner})` }} aria-hidden="true" /> : <div className={s.top} />}
         {tree.loose.map(renderChannel)}
         {tree.categories.map(({ category, children }) => {
           const isCollapsed = collapsed.includes(category.id);

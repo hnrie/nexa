@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
 import { describeError } from "@/lib/errors";
-import { iconUrl } from "@/api/users";
+import { bannerUrl, iconUrl } from "@/api/users";
 import { Button } from "@/components/common/Button";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
 import { Select } from "@/components/common/Select";
@@ -22,12 +22,13 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
   const channels = useChannels((c) => c.byId);
   const toast = useUI((u) => u.toast);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bannerRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(server?.name ?? "");
   const [description, setDescription] = useState(server?.description ?? "");
   const [system, setSystem] = useState(server?.system_channel_id ?? "");
   const [notif, setNotif] = useState(server?.default_notifications ?? 0);
   const [busy, setBusy] = useState(false);
-  const [crop, setCrop] = useState<File | null>(null);
+  const [crop, setCrop] = useState<{ file: File; kind: "icon" | "banner" } | null>(null);
   if (!server) return null;
   const texts = selectServerChannels(channels, serverId).filter((c) => c.type === "text");
   const dirty = name !== server.name || description !== server.description || (system || "") !== (server.system_channel_id ?? "") || notif !== server.default_notifications;
@@ -59,12 +60,23 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       setBusy(false);
     }
   };
-  const upload = async (file: File) => {
+  const upload = async (kind: "icon" | "banner", file: File) => {
     setBusy(true);
     try {
-      updateServer(await serversApi.uploadIcon(serverId, file));
+      updateServer(await (kind === "icon" ? serversApi.uploadIcon(serverId, file) : serversApi.uploadBanner(serverId, file)));
     } catch (err) {
-      toast(describeError(err, t("server.serverOverview.couldNotUploadTheIcon")), "error");
+      toast(describeError(err, kind === "icon" ? t("server.serverOverview.couldNotUploadTheIcon") : t("server.serverOverview.couldNotUploadTheBanner")), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const removeBanner = async () => {
+    setBusy(true);
+    try {
+      await serversApi.deleteBanner(serverId);
+      updateServer({ ...server, banner_id: null });
+    } catch (err) {
+      toast(describeError(err, t("server.serverOverview.couldNotRemoveTheBanner")), "error");
     } finally {
       setBusy(false);
     }
@@ -84,6 +96,7 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
     }
   };
   const icon = iconUrl(server.icon_id, 128);
+  const banner = bannerUrl(server.banner_id, 600);
   return (
     <>
       <h2 className={st.title}>{t("server.serverOverview.serverOverview")}</h2>
@@ -96,9 +109,16 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
               <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={busy}>{t("server.serverOverview.uploadImage")}</Button>
               {server.icon_id ? <Button variant="ghost" size="sm" onClick={() => void removeIcon()} disabled={busy}>{t("composer.composer.remove")}</Button> : null}
             </div>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop(f); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "icon" }); e.target.value = ""; }} />
           </div>
         </div>
+        <Field as="div" label={t("server.serverOverview.serverBanner")} hint={t("server.serverOverview.serverBannerHint")}>
+          <div className={s.serverBanner} style={banner ? { backgroundImage: `url(${banner})` } : undefined} data-testid="server-banner">
+            <Button variant="secondary" size="sm" onClick={() => bannerRef.current?.click()} disabled={busy}>{server.banner_id ? t("settings.profile.changeBanner") : t("server.serverOverview.uploadImage")}</Button>
+            {server.banner_id ? <Button variant="secondary" size="sm" onClick={() => void removeBanner()} disabled={busy}>{t("composer.composer.remove")}</Button> : null}
+          </div>
+          <input ref={bannerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) setCrop({ file: f, kind: "banner" }); e.target.value = ""; }} data-testid="server-banner-file" />
+        </Field>
         <Field label={t("modals.createServer.serverName")} required>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} maxLength={100} data-testid="server-settings-name" />
         </Field>
@@ -120,14 +140,16 @@ export default function ServerOverviewPage({ serverId }: { serverId: string }) {
       </div>
       {crop ? (
         <ImageCropModal
-          file={crop}
-          aspect={1}
-          round
-          title={t("server.serverOverview.cropTheServerIcon")}
+          file={crop.file}
+          aspect={crop.kind === "icon" ? 1 : 16 / 9}
+          round={crop.kind === "icon"}
+          maxSize={crop.kind === "icon" ? 1024 : 1280}
+          title={crop.kind === "icon" ? t("server.serverOverview.cropTheServerIcon") : t("server.serverOverview.cropTheServerBanner")}
           onClose={() => setCrop(null)}
           onDone={({ blob }) => {
+            const kind = crop.kind;
             setCrop(null);
-            void upload(new File([blob], "icon.png", { type: blob.type }));
+            void upload(kind, new File([blob], `${kind}.png`, { type: blob.type }));
           }}
         />
       ) : null}

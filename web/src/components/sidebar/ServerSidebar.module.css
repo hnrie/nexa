@@ -4,6 +4,14 @@
 .headName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; }
 .top { height: 12px; }
+/* A server banner sits at the top of the list, under the name, and scrolls
+   away with it; the header floats over it until the list has passed it. */
+.sidebar[data-banner="true"] { position: relative; }
+.sidebar[data-banner="true"] .head { position: absolute; top: 0; inset-inline: 0; z-index: 2; background: var(--bg-base); }
+.sidebar[data-banner="true"] .head:hover, .sidebar[data-banner="true"] .head[data-open="true"] { background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--bg-base); }
+.sidebar[data-banner="true"] .head[data-over-banner="true"] { background: linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0)); border-bottom-color: transparent; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7); }
+.sidebar[data-banner="true"] .head[data-over-banner="true"]:hover, .sidebar[data-banner="true"] .head[data-over-banner="true"][data-open="true"] { background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.15)); }
+.banner { height: 138px; margin-inline: -8px; margin-bottom: 12px; background-size: cover; background-position: center; }
 .category { margin-top: 16px; }
 .catHead { position: relative; display: flex; align-items: center; justify-content: space-between; height: 24px; padding-inline-end: 4px; color: var(--text-channel); }
 .catHead:hover { color: var(--text); }

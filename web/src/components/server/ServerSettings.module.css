@@ -114,3 +114,5 @@
   .permRemove { padding: 10px; }
   .roleRow { height: 44px; }
 }
+/* the banner as the channel list shows it, wider than tall, with its buttons on it */
+.serverBanner { aspect-ratio: 16 / 9; max-width: 360px; border-radius: var(--radius-sm); background: var(--bg-surface); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 8px; }

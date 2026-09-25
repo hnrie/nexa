@@ -4,7 +4,7 @@ import { ApiError } from "@/api/client";
 import { describeError } from "@/lib/errors";
 import { servers as serversApi } from "@/api/servers";
 import type { InvitePreview } from "@/api/types";
-import { iconUrl } from "@/api/users";
+import { bannerUrl, iconUrl } from "@/api/users";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
@@ -138,6 +138,7 @@ export default function InvitePage() {
   const next = encodeURIComponent(loc.pathname);
   const target = preview?.server ?? preview?.group;
   const icon = target ? iconUrl(target.icon_id, 96) : null;
+  const banner = bannerUrl(preview?.server?.banner_id ?? null, 480);
   const isGroup = !!preview?.group;
   const member = isGroup ? inGroup : alreadyIn;
   return (
@@ -156,6 +157,7 @@ export default function InvitePage() {
         ) : null}
         {preview && target ? (
           <>
+            {banner ? <div className={s.banner} style={{ backgroundImage: `url(${banner})` }} aria-hidden="true" /> : null}
             <p className={s.kicker}>{preview.inviter ? t("invite.invitedYouToJoin", { name: preview.inviter.display_name || preview.inviter.username }) : t("invite.youveBeenInvited")}</p>
             <div className={s.iconBox}>{icon ? <img src={icon} alt="" /> : initials(target.name)}</div>
             <h1 className={s.title}>{target.name}</h1>
