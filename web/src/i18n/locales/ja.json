@@ -129,7 +129,7 @@
     "other": "メンバー — {count}"
   },
   "chat.groupMemberList.membersOnly": {
-    "other": "{count} 人のメンバー"
+    "other": "メンバー {count} 人"
   },
   "chat.groupMemberMenu.copied": "コピーしました！",
   "chat.groupMemberMenu.copyUserId": "ユーザーIDをコピー",
@@ -161,6 +161,7 @@
   "chat.media.unmute": "ミュート解除",
   "chat.memberList.offline": "オフライン",
   "chat.memberList.online": "オンライン",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "サーバーのオーナー",
   "chat.messageItem.addReaction": "リアクションを追加",
   "chat.messageItem.clickToSeeAttachment": "クリックして添付を表示",
@@ -236,9 +237,16 @@
   "chat.pins.unpin": "ピン留めを解除",
   "chat.pins.unpinThisMessage": "このメッセージのピン留めを解除",
   "chat.reactions.addReaction": "リアクションを追加",
+  "chat.reactions.andMore": {
+    "other": "ほか {count} 人"
+  },
   "chat.reactions.couldNotReact": "リアクションできませんでした。",
+  "chat.reactions.pillLabel": {
+    "other": "{emoji}：{count} 件のリアクション"
+  },
   "chat.reactions.reactWith": "{emoji} でリアクション",
   "chat.reactions.reactedWith": "{who} が {emoji} でリアクションしました",
+  "chat.reactions.whoReacted": "{emoji} でリアクションした人",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "other": "この {count} 件のメッセージを削除しますか？元に戻せません。"
   },

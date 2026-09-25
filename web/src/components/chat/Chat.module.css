@@ -145,6 +145,9 @@
 .pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 6px; border-radius: 8px; background: var(--bg-surface); border: 1px solid transparent; font-size: 14px; color: var(--text-subtle); }
 .pill:hover { border-color: var(--border-strong); }
 .pill[data-me="true"] { background: var(--mention-bg); border-color: var(--brand); color: var(--text-strong); }
+/* where no new reaction may be added, someone else's can only be looked at */
+.pill[data-locked="true"] { cursor: default; }
+.pill[data-locked="true"]:hover { border-color: transparent; }
 .pill img { width: 16px; height: 16px; object-fit: contain; }
 .pillEmoji { font-size: 16px; line-height: 1; }
 .addReact { width: 28px; height: 24px; display: none; align-items: center; justify-content: center; border-radius: 8px; background: var(--bg-surface); color: var(--text-muted); }
@@ -221,11 +224,16 @@ button.sysName:hover { text-decoration: underline; }
 .popClose { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-xs); color: var(--icon); }
 .popClose:hover { background: var(--bg-hover); color: var(--text); }
 .pinsList { overflow-y: auto; overscroll-behavior: contain; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
-.pinItem { position: relative; padding: 8px 12px; border-radius: var(--radius-xs); background: var(--bg-surface); cursor: pointer; }
+.pinsPop:focus { outline: none; }
+.pinsTitle { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pinItem { position: relative; border-radius: var(--radius-xs); background: var(--bg-surface); }
 .pinItem:hover { background: var(--bg-active); }
-.pinHead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; }
-.pinAuthor { font-weight: 600; color: var(--text-strong); }
-.pinText { font-size: 14px; color: var(--text); max-height: 66px; overflow: hidden; }
+/* the whole pin is the way to the message; Unpin sits in its corner */
+.pinJump { display: flex; flex-direction: column; width: 100%; padding-block: 8px; padding-inline: 12px 36px; border-radius: inherit; text-align: start; color: inherit; }
+.pinJump:focus-visible { outline-offset: -2px; }
+.pinHead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; min-width: 0; }
+.pinAuthor { font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pinText { display: block; font-size: 14px; color: var(--text); max-height: 66px; overflow: hidden; }
 .pinRemove { position: absolute; top: 4px; inset-inline-end: 4px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); opacity: 0; transition: opacity var(--transition), background var(--transition), color var(--transition); }
 .pinItem:hover .pinRemove, .pinRemove:focus-visible { opacity: 1; }
 .pinRemove:hover { background: var(--danger); color: #fff; }
@@ -365,7 +373,14 @@ button.sysName:hover { text-decoration: underline; }
    button, and a failed message's Retry / Delete were 22–32px there. */
 @media (pointer: coarse) {
   .hBtn { width: 40px; height: 40px; }
-  .pill { height: 32px; padding: 0 8px; }
-  .addReact { width: 36px; height: 32px; }
+  /* a reaction is a toggle everyone sees, so a miss adds a name where it was
+     not meant: taller pills, set further apart, each with a few pixels more
+     around it that still count as a hit */
+  .reactions { gap: 6px; }
+  .pill { position: relative; height: 32px; padding: 0 10px; }
+  .pill::after, .addReact::after { content: ""; position: absolute; inset: -3px; }
+  .addReact { position: relative; width: 40px; height: 32px; }
   .retry { height: 32px; padding: 0 12px; }
+  .popClose { width: 40px; height: 40px; }
+  .pinRemove { width: 36px; height: 36px; }
 }

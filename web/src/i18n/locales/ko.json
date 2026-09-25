@@ -161,6 +161,7 @@
   "chat.media.unmute": "음소거 해제",
   "chat.memberList.offline": "오프라인",
   "chat.memberList.online": "온라인",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "서버 소유자",
   "chat.messageItem.addReaction": "반응 추가",
   "chat.messageItem.clickToSeeAttachment": "클릭해서 첨부 보기",
@@ -236,9 +237,16 @@
   "chat.pins.unpin": "고정 해제",
   "chat.pins.unpinThisMessage": "이 메시지 고정 해제",
   "chat.reactions.addReaction": "반응 추가",
+  "chat.reactions.andMore": {
+    "other": "외 {count}명"
+  },
   "chat.reactions.couldNotReact": "반응하지 못했습니다.",
+  "chat.reactions.pillLabel": {
+    "other": "{emoji}: 반응 {count}개"
+  },
   "chat.reactions.reactWith": "{emoji}(으)로 반응",
   "chat.reactions.reactedWith": "{who}이(가) {emoji}(으)로 반응했습니다",
+  "chat.reactions.whoReacted": "{emoji}(으)로 반응한 사람",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "other": "이 메시지 {count}개를 삭제할까요? 되돌릴 수 없습니다."
   },

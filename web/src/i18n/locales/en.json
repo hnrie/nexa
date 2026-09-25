@@ -133,8 +133,8 @@
     "other": "Members — {count}"
   },
   "chat.groupMemberList.membersOnly": {
-    "one": "{count} Member",
-    "other": "{count} Members"
+    "one": "{count} member",
+    "other": "{count} members"
   },
   "chat.groupMemberMenu.copied": "Copied!",
   "chat.groupMemberMenu.copyUserId": "Copy User ID",
@@ -166,6 +166,7 @@
   "chat.media.unmute": "Unmute",
   "chat.memberList.offline": "Offline",
   "chat.memberList.online": "Online",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "Server Owner",
   "chat.messageItem.addReaction": "Add Reaction",
   "chat.messageItem.clickToSeeAttachment": "Click to see attachment",
@@ -242,9 +243,18 @@
   "chat.pins.unpin": "Unpin",
   "chat.pins.unpinThisMessage": "Unpin this message",
   "chat.reactions.addReaction": "Add reaction",
+  "chat.reactions.andMore": {
+    "one": "and {count} more",
+    "other": "and {count} more"
+  },
   "chat.reactions.couldNotReact": "Could not react.",
+  "chat.reactions.pillLabel": {
+    "one": "{emoji}: {count} reaction",
+    "other": "{emoji}: {count} reactions"
+  },
   "chat.reactions.reactWith": "React with {emoji}",
   "chat.reactions.reactedWith": "{who} reacted with {emoji}",
+  "chat.reactions.whoReacted": "Who reacted with {emoji}",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "one": "Are you sure you want to delete this message?",
     "other": "Are you sure you want to delete these {count} messages? This cannot be undone."

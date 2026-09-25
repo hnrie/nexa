@@ -139,7 +139,12 @@
     "other": "الأعضاء — {count}"
   },
   "chat.groupMemberList.membersOnly": {
-    "other": "{count} عضوًا"
+    "zero": "لا أعضاء",
+    "one": "عضو واحد",
+    "two": "عضوان",
+    "few": "{count} أعضاء",
+    "many": "{count} عضوًا",
+    "other": "{count} عضو"
   },
   "chat.groupMemberMenu.copied": "تم النسخ!",
   "chat.groupMemberMenu.copyUserId": "نسخ معرّف المستخدم",
@@ -171,6 +176,7 @@
   "chat.media.unmute": "إلغاء كتم الصوت",
   "chat.memberList.offline": "غير متصل",
   "chat.memberList.online": "متصل",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "مالك الخادم",
   "chat.messageItem.addReaction": "إضافة تفاعل",
   "chat.messageItem.clickToSeeAttachment": "انقر لرؤية المرفق",
@@ -251,9 +257,26 @@
   "chat.pins.unpin": "إلغاء التثبيت",
   "chat.pins.unpinThisMessage": "إلغاء تثبيت هذه الرسالة",
   "chat.reactions.addReaction": "إضافة تفاعل",
+  "chat.reactions.andMore": {
+    "zero": "لا أحد غيرهم",
+    "one": "وشخص آخر",
+    "two": "وشخصان آخران",
+    "few": "و{count} آخرون",
+    "many": "و{count} آخرين",
+    "other": "و{count} آخرين"
+  },
   "chat.reactions.couldNotReact": "تعذّر التفاعل.",
+  "chat.reactions.pillLabel": {
+    "zero": "{emoji}: لا تفاعلات",
+    "one": "{emoji}: تفاعل واحد",
+    "two": "{emoji}: تفاعلان",
+    "few": "{emoji}: {count} تفاعلات",
+    "many": "{emoji}: {count} تفاعلًا",
+    "other": "{emoji}: {count} تفاعل"
+  },
   "chat.reactions.reactWith": "تفاعل بـ {emoji}",
   "chat.reactions.reactedWith": "تفاعل {who} بـ {emoji}",
+  "chat.reactions.whoReacted": "من تفاعل بـ {emoji}",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "zero": "هل تريد حذف هذه الرسائل؟ لا يمكن التراجع.",
     "one": "هل تريد حذف هذه الرسالة؟",

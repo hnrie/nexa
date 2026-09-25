@@ -136,6 +136,7 @@
   },
   "chat.groupMemberList.membersOnly": {
     "one": "{count} membro",
+    "many": "{count} membros",
     "other": "{count} membros"
   },
   "chat.groupMemberMenu.copied": "Copiado!",
@@ -168,6 +169,7 @@
   "chat.media.unmute": "Ativar som",
   "chat.memberList.offline": "Offline",
   "chat.memberList.online": "Online",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "Dono do servidor",
   "chat.messageItem.addReaction": "Adicionar reação",
   "chat.messageItem.clickToSeeAttachment": "Clique para ver o anexo",
@@ -245,9 +247,20 @@
   "chat.pins.unpin": "Desafixar",
   "chat.pins.unpinThisMessage": "Desafixar esta mensagem",
   "chat.reactions.addReaction": "Adicionar reação",
+  "chat.reactions.andMore": {
+    "one": "e mais {count}",
+    "many": "e mais {count}",
+    "other": "e mais {count}"
+  },
   "chat.reactions.couldNotReact": "Não foi possível reagir.",
+  "chat.reactions.pillLabel": {
+    "one": "{emoji}: {count} reação",
+    "many": "{emoji}: {count} reações",
+    "other": "{emoji}: {count} reações"
+  },
   "chat.reactions.reactWith": "Reagir com {emoji}",
   "chat.reactions.reactedWith": "{who} reagiu com {emoji}",
+  "chat.reactions.whoReacted": "Quem reagiu com {emoji}",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "one": "Tem certeza de que quer excluir esta mensagem?",
     "other": "Tem certeza de que quer excluir estas {count} mensagens? Isso não dá para desfazer."

@@ -9,6 +9,7 @@ import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { Twemoji } from "@/components/common/Twemoji";
 import { toneNames, emojiGroups, emojiLoaded, loadEmoji, searchEmoji, spriteStyle, withTone, type EmojiEntry } from "./emojiIndex";
+import { SearchBox } from "@/components/common/SearchBox";
 import s from "./Picker.module.css";
 
 import { t } from "@/i18n";
@@ -461,7 +462,7 @@ export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => vo
   return (
     <>
       <div className={s.searchRow}>
-        <input ref={inputRef} className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("pickers.emojiPicker.findThePerfectEmoji")} aria-label={t("pickers.emojiPicker.searchEmoji")} />
+        <SearchBox ref={inputRef} className={s.searchBox} value={q} onChange={setQ} placeholder={t("pickers.emojiPicker.findThePerfectEmoji")} aria-label={t("pickers.emojiPicker.searchEmoji")} />
         <ToneSelector tone={tone} onChange={(i) => patch({ skinTone: i })} />
       </div>
       <div className={s.body}>

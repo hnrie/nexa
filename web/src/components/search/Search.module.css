@@ -3,8 +3,7 @@
 .headText { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .close { display: flex; padding: 4px; border-radius: var(--radius-xs); color: var(--text-muted); }
 .close:hover { color: var(--text); background: var(--bg-hover); }
-.inlineSearch { display: flex; align-items: center; gap: 6px; margin: 8px 12px; padding: 0 8px; height: 32px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); }
-.inlineSearch input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
+.inlineSearch { flex: none; margin: 8px 12px; }
 .help { padding: 16px; font-size: 14px; color: var(--text-muted); line-height: 1.4; }
 .help p { margin: 0 0 12px; }
 .help dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
@@ -32,11 +31,10 @@
    footer, rather than as a toast that interrupts the reading. */
 .notes { flex: none; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px 0; font-size: 12px; line-height: 1.35; color: var(--text-muted); }
 /* In a tight header it gives way first, down to its magnifier, and grows back while it is used. */
-.searchBox { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); width: 180px; min-width: 32px; flex: 0 1 auto; overflow: hidden; transition: width 150ms ease; }
-.searchBox > svg { flex: none; }
-.searchBox:focus-within { width: 260px; color: var(--text); }
-.searchBox input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
-.searchBox input::placeholder { color: var(--text-placeholder); }
+.searchBox { width: 180px; min-width: 32px; flex: 0 1 auto; overflow: hidden; transition: width 150ms ease; }
+.searchBox:focus-within { width: 260px; }
+@media (prefers-reduced-motion: reduce) { .searchBox { transition: none; } }
+[data-reduced-motion="true"] .searchBox { transition: none; }
 /* Tablets and narrow windows have no room for a 420px column beside the chat,
    which would squeeze the messages and composer to nothing: search opens over it. */
 @media (max-width: 1099px) { .panel { position: absolute; top: 0; inset-inline-end: 0; bottom: 0; z-index: 5; width: min(420px, 100%); max-width: none; box-shadow: var(--shadow-high); } }
@@ -52,12 +50,11 @@
 /* What to type next, under whichever box the query is being typed in. */
 .suggest { position: relative; margin: 0 12px 8px; max-height: 232px; overflow-y: auto; border-radius: var(--radius-xs); background: var(--bg-floating); box-shadow: var(--shadow-medium); }
 .suggestRow { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; text-align: start; color: var(--text); font-size: 14px; }
-.suggestRow:hover { background: var(--bg-hover); }
+.suggestRow:hover, .suggestRow[data-active] { background: var(--bg-hover); }
+@media (pointer: coarse) { .suggestRow { min-height: 44px; } }
 .suggestName { color: var(--text-strong); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggestSub { color: var(--text-muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .suggestHash { width: 20px; text-align: center; color: var(--text-muted); font-weight: 700; }
 .suggestDate { display: flex; align-items: center; gap: 8px; padding: 8px 10px; color: var(--text); font-size: 14px; }
 .suggestDate input { flex: 1; min-width: 0; padding: 4px 6px; border-radius: var(--radius-xs); border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font: inherit; }
-/* the little x that empties a search box */
-.clear { display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex: none; border-radius: 50%; color: var(--text-muted); }
-.clear:hover { background: var(--bg-active); color: var(--text-strong); }
+

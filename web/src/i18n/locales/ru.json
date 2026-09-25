@@ -138,7 +138,7 @@
     "one": "{count} участник",
     "few": "{count} участника",
     "many": "{count} участников",
-    "other": "{count} участников"
+    "other": "{count} участника"
   },
   "chat.groupMemberMenu.copied": "Скопировано!",
   "chat.groupMemberMenu.copyUserId": "Копировать ID пользователя",
@@ -170,6 +170,7 @@
   "chat.media.unmute": "Включить звук",
   "chat.memberList.offline": "Не в сети",
   "chat.memberList.online": "В сети",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "Владелец сервера",
   "chat.messageItem.addReaction": "Добавить реакцию",
   "chat.messageItem.clickToSeeAttachment": "Нажмите, чтобы посмотреть вложение",
@@ -248,9 +249,22 @@
   "chat.pins.unpin": "Открепить",
   "chat.pins.unpinThisMessage": "Открепить это сообщение",
   "chat.reactions.addReaction": "Добавить реакцию",
+  "chat.reactions.andMore": {
+    "one": "и ещё {count}",
+    "few": "и ещё {count}",
+    "many": "и ещё {count}",
+    "other": "и ещё {count}"
+  },
   "chat.reactions.couldNotReact": "Не удалось поставить реакцию.",
+  "chat.reactions.pillLabel": {
+    "one": "{emoji}: {count} реакция",
+    "few": "{emoji}: {count} реакции",
+    "many": "{emoji}: {count} реакций",
+    "other": "{emoji}: {count} реакции"
+  },
   "chat.reactions.reactWith": "Отреагировать {emoji}",
   "chat.reactions.reactedWith": "{who} отреагировал(а) {emoji}",
+  "chat.reactions.whoReacted": "Кто отреагировал {emoji}",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "one": "Точно удалить это сообщение?",
     "few": "Точно удалить эти {count} сообщения? Отменить будет нельзя.",

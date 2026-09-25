@@ -8,6 +8,7 @@ import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
 import { menuAnchor } from "@/components/common/ContextMenu";
+import { SearchBox } from "@/components/common/SearchBox";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
@@ -62,6 +63,9 @@ export function ChatView({ channel }: { channel: Channel }) {
   const [subchats, setSubchats] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // the header's search box works the panel's filter suggestions with the keyboard
+  const searchKeys = useRef<((e: React.KeyboardEvent<HTMLInputElement>) => boolean) | null>(null);
+  const [suggestActive, setSuggestActive] = useState<string | undefined>(undefined);
   // The profile of the person a DM is with, in a column beside it, as Discord shows it, remembered on
   // this device. Where it would cover the chat (a narrow window) it only opens when asked, each time.
   const [profileWide, setProfileWide] = useState(() => storage.get(PROFILE_PANEL_KEY) !== "0");
@@ -125,19 +129,24 @@ export function ChatView({ channel }: { channel: Channel }) {
     };
   }, [channel.id]);
   const selecting = useSelection((x) => x.channelId === channel.id);
-  const searchOpenRef = useRef(searchOpen);
-  searchOpenRef.current = searchOpen;
+  // read by the key handler below rather than inside a setState updater: React
+  // runs updaters on the next render, long after the keydown has finished
+  // dispatching, so stopping it there stopped nothing
+  const open = useRef({ searchOpen, pins, subchats });
+  open.current = { searchOpen, pins, subchats };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      if (document.querySelector("[data-modal-layer], [role='dialog']")) return;
-      // read here rather than inside a setState updater: React runs updaters on
-      // the next render, long after the keydown has finished dispatching, so
-      // stopping it there stopped nothing
-      if (searchOpenRef.current) e.stopPropagation();
-      setSearchOpen(false);
-      setPins(false);
-      setSubchats(false);
+      if (document.querySelector("[data-modal-layer], [role='dialog'][aria-modal='true']")) return;
+      // One Escape closes one thing, the one on top: the pinned messages or
+      // the subchat list over the chat, then search. It used to close all
+      // three at once, and a second Escape found nothing left to close.
+      const now = open.current;
+      if (now.pins) setPins(false);
+      else if (now.subchats) setSubchats(false);
+      else if (now.searchOpen) setSearchOpen(false);
+      else return;
+      e.stopPropagation();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -181,7 +190,7 @@ export function ChatView({ channel }: { channel: Channel }) {
           // a group's icon and name open its settings, as Discord's header does
           <button className={s.hGroup} onClick={() => openModal("editGroup", { channelId: channel.id })} aria-label={tr_("chat.chat.editGroup")} data-testid="edit-group">
             <span className={s.hIcon}>{channel.icon_id ? <Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={24} kind="icon" /> : <Users size={22} />}</span>
-            <span className={s.hName}>{name}</span>
+            <span className={s.hName} dir="auto">{name}</span>
           </button>
         ) : (
           <>
@@ -196,9 +205,9 @@ export function ChatView({ channel }: { channel: Channel }) {
             )}
             {channel.type === "dm" && other ? (
               // the other person's name is the way to their profile, as their avatar is
-              <button className={[s.hName, s.hNameBtn].join(" ")} onClick={() => openModal("profile", { userId: other })} data-testid="dm-header-name">{name}</button>
+              <button className={[s.hName, s.hNameBtn].join(" ")} onClick={() => openModal("profile", { userId: other })} data-testid="dm-header-name" dir="auto">{name}</button>
             ) : (
-              <span className={s.hName}>{name}</span>
+              <span className={s.hName} dir="auto">{name}</span>
             )}
           </>
         )}
@@ -218,9 +227,10 @@ export function ChatView({ channel }: { channel: Channel }) {
             <span className={s.hSub} data-status={otherStatus} data-testid="dm-status">{statusLabel(otherStatus)}</span>
           )
         ) : isServer ? (
-          channel.topic ? <button className={[s.hSub, s.hTopic].join(" ")} title={channel.topic} onClick={() => openModal("channelTopic", { channelId: channel.id })}>{channel.topic}</button> : null
+          channel.topic ? <button className={[s.hSub, s.hTopic].join(" ")} title={channel.topic} dir="auto" onClick={() => openModal("channelTopic", { channelId: channel.id })}>{channel.topic}</button> : null
         ) : (
-          <span className={s.hSub}>{tr_("chat.chatView.membersCount", { count: channel.recipient_ids.length })}</span>
+          // a phone keeps the header for the group's name; the count is in the member list
+          mobile ? null : <span className={s.hSub}>{tr_("chat.chatView.membersCount", { count: channel.recipient_ids.length })}</span>
         )}
         {channel.type === "dm" && other ? (
           // Whether this device has seen this person's encryption key before,
@@ -250,29 +260,30 @@ export function ChatView({ channel }: { channel: Channel }) {
             <button className={s.hBtn} data-on={searchOpen} aria-label={tr_("chat.chat.searchMessages")} onClick={() => setSearchOpen((v) => !v)}><Search size={22} /></button>
           </Tooltip>
         ) : (
-          <label className={sc.searchBox} title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")} data-header-search="">
-            <Search size={16} />
-            <input
-              value={searchQuery}
-              placeholder={tr_("chat.chat.search")}
-              aria-label={tr_("chat.chat.searchMessages")}
-              data-testid="search-input"
-              onFocus={() => setSearchOpen(true)}
-              onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-              onKeyDown={(e) => { if (e.key === "Escape") { if (searchQuery) { setSearchQuery(""); } else { setSearchOpen(false); e.currentTarget.blur(); } } }}
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                className={sc.clear}
-                aria-label={tr_("chat.chat.clearSearch")}
-                data-testid="search-clear"
-                onClick={(e) => { e.preventDefault(); setSearchQuery(""); setSearchOpen(false); }}
-              >
-                <X size={14} />
-              </button>
-            ) : null}
-          </label>
+          <SearchBox
+            className={sc.searchBox}
+            value={searchQuery}
+            onChange={(v) => {
+              setSearchQuery(v);
+              setSearchOpen(true);
+            }}
+            placeholder={tr_("chat.chat.search")}
+            aria-label={tr_("chat.chat.searchMessages")}
+            title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")}
+            data-testid="search-input"
+            data-header-search=""
+            role="combobox"
+            aria-expanded={searchOpen}
+            aria-activedescendant={suggestActive}
+            onFocus={() => setSearchOpen(true)}
+            onClear={() => setSearchOpen(false)}
+            onEscape={() => {
+              setSearchOpen(false);
+              (document.activeElement as HTMLElement | null)?.blur();
+            }}
+            // ↓ ↑ and Enter choose from the filter suggestions in the panel
+            onKeyDown={(e) => void searchKeys.current?.(e)}
+          />
         )}
         {!mobile ? (
           <Tooltip text={tr_("chat.chat.pinnedMessages")} side="bottom">
@@ -327,7 +338,8 @@ export function ChatView({ channel }: { channel: Channel }) {
       <div className={s.body} data-search={searchOpen}>
         {/* The call and the composer belong to the conversation's column, so the member list, search and the
             profile run the full height beside them, and pinned messages open at the top rather than under the call. */}
-        <div className={s.main}>
+        {/* under a search that covers it, the chat is out of reach of Tab and of a screen reader */}
+        <div className={s.main} {...(searchOpen && compactSearch ? ({ inert: "" } as Record<string, string>) : {})}>
           {!isServer ? <CallBanner channelId={convo.id} /> : null}
           {!isServer && inThisCall ? <VoiceView channel={convo} embedded /> : null}
           {locked ? (
@@ -349,7 +361,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}
-        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} inline={compactSearch} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} inline={compactSearch} keysRef={searchKeys} onSuggest={setSuggestActive} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
         {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}

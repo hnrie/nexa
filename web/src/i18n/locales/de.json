@@ -166,6 +166,7 @@
   "chat.media.unmute": "Stummschaltung aufheben",
   "chat.memberList.offline": "Offline",
   "chat.memberList.online": "Online",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "Serverinhaber",
   "chat.messageItem.addReaction": "Reaktion hinzufügen",
   "chat.messageItem.clickToSeeAttachment": "Zum Ansehen des Anhangs klicken",
@@ -242,9 +243,18 @@
   "chat.pins.unpin": "Abpinnen",
   "chat.pins.unpinThisMessage": "Diese Nachricht abpinnen",
   "chat.reactions.addReaction": "Reaktion hinzufügen",
+  "chat.reactions.andMore": {
+    "one": "und {count} weitere Person",
+    "other": "und {count} weitere"
+  },
   "chat.reactions.couldNotReact": "Reagieren nicht möglich.",
+  "chat.reactions.pillLabel": {
+    "one": "{emoji}: {count} Reaktion",
+    "other": "{emoji}: {count} Reaktionen"
+  },
   "chat.reactions.reactWith": "Mit {emoji} reagieren",
   "chat.reactions.reactedWith": "{who} hat mit {emoji} reagiert",
+  "chat.reactions.whoReacted": "Wer mit {emoji} reagiert hat",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "one": "Diese Nachricht wirklich löschen?",
     "other": "Diese {count} Nachrichten wirklich löschen? Das lässt sich nicht rückgängig machen."

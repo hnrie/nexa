@@ -161,6 +161,7 @@
   "chat.media.unmute": "取消静音",
   "chat.memberList.offline": "离线",
   "chat.memberList.online": "在线",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "服务器所有者",
   "chat.messageItem.addReaction": "添加表情回应",
   "chat.messageItem.clickToSeeAttachment": "点击查看附件",
@@ -236,9 +237,16 @@
   "chat.pins.unpin": "取消置顶",
   "chat.pins.unpinThisMessage": "取消置顶这条消息",
   "chat.reactions.addReaction": "添加表情回应",
+  "chat.reactions.andMore": {
+    "other": "还有 {count} 人"
+  },
   "chat.reactions.couldNotReact": "无法添加表情回应。",
+  "chat.reactions.pillLabel": {
+    "other": "{emoji}：{count} 个回应"
+  },
   "chat.reactions.reactWith": "用 {emoji} 回应",
   "chat.reactions.reactedWith": "{who} 用 {emoji} 回应了",
+  "chat.reactions.whoReacted": "用 {emoji} 回应的人",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "other": "确定删除这 {count} 条消息吗？此操作无法撤销。"
   },

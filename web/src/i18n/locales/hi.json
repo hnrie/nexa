@@ -166,6 +166,7 @@
   "chat.media.unmute": "आवाज़ चालू करें",
   "chat.memberList.offline": "ऑफ़लाइन",
   "chat.memberList.online": "ऑनलाइन",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "सर्वर का मालिक",
   "chat.messageItem.addReaction": "प्रतिक्रिया जोड़ें",
   "chat.messageItem.clickToSeeAttachment": "अनुलग्नक देखने के लिए क्लिक करें",
@@ -242,9 +243,18 @@
   "chat.pins.unpin": "पिन हटाएँ",
   "chat.pins.unpinThisMessage": "इस संदेश का पिन हटाएँ",
   "chat.reactions.addReaction": "प्रतिक्रिया जोड़ें",
+  "chat.reactions.andMore": {
+    "one": "और {count} व्यक्ति",
+    "other": "और {count} लोग"
+  },
   "chat.reactions.couldNotReact": "प्रतिक्रिया नहीं दी जा सकी।",
+  "chat.reactions.pillLabel": {
+    "one": "{emoji}: {count} प्रतिक्रिया",
+    "other": "{emoji}: {count} प्रतिक्रियाएँ"
+  },
   "chat.reactions.reactWith": "{emoji} से प्रतिक्रिया दें",
   "chat.reactions.reactedWith": "{who} ने {emoji} से प्रतिक्रिया दी",
+  "chat.reactions.whoReacted": "{emoji} से प्रतिक्रिया देने वाले",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "one": "क्या आप सचमुच यह संदेश मिटाना चाहते हैं?",
     "other": "क्या आप सचमुच ये {count} संदेश मिटाना चाहते हैं? इसे पलटा नहीं जा सकता।"

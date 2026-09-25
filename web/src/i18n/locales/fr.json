@@ -136,6 +136,7 @@
   },
   "chat.groupMemberList.membersOnly": {
     "one": "{count} membre",
+    "many": "{count} membres",
     "other": "{count} membres"
   },
   "chat.groupMemberMenu.copied": "Copié !",
@@ -168,6 +169,7 @@
   "chat.media.unmute": "Rétablir le son",
   "chat.memberList.offline": "Hors ligne",
   "chat.memberList.online": "En ligne",
+  "chat.memberList.roleGroupCount": "{label} — {count}",
   "chat.memberList.serverOwner": "Propriétaire du serveur",
   "chat.messageItem.addReaction": "Ajouter une réaction",
   "chat.messageItem.clickToSeeAttachment": "Cliquez pour voir la pièce jointe",
@@ -245,9 +247,20 @@
   "chat.pins.unpin": "Désépingler",
   "chat.pins.unpinThisMessage": "Désépingler ce message",
   "chat.reactions.addReaction": "Ajouter une réaction",
+  "chat.reactions.andMore": {
+    "one": "et {count} autre",
+    "many": "et {count} autres",
+    "other": "et {count} autres"
+  },
   "chat.reactions.couldNotReact": "Impossible de réagir.",
+  "chat.reactions.pillLabel": {
+    "one": "{emoji} : {count} réaction",
+    "many": "{emoji} : {count} réactions",
+    "other": "{emoji} : {count} réactions"
+  },
   "chat.reactions.reactWith": "Réagir avec {emoji}",
   "chat.reactions.reactedWith": "{who} a réagi avec {emoji}",
+  "chat.reactions.whoReacted": "Qui a réagi avec {emoji}",
   "chat.selectionBar.areYouSureDeleteMessages": {
     "one": "Voulez-vous vraiment supprimer ce message ?",
     "other": "Voulez-vous vraiment supprimer ces {count} messages ? C’est irréversible."

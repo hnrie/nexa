@@ -10,6 +10,7 @@ import { StickerView } from "@/components/stickers/StickerView";
 import { useNearScreen } from "@/hooks/useNearScreen";
 import { useSettings } from "@/stores/settings";
 import { focusSearchOnOpen } from "./EmojiPicker";
+import { SearchBox } from "@/components/common/SearchBox";
 import s from "./Picker.module.css";
 
 import { t } from "@/i18n";
@@ -97,7 +98,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   return (
     <>
       <div className={s.searchRow}>
-        <input className={s.search} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("pickers.stickerPicker.searchStickers")} aria-label={t("pickers.stickerPicker.searchStickers")} autoFocus={focusSearchOnOpen()} />
+        <SearchBox className={s.searchBox} value={q} onChange={setQ} placeholder={t("pickers.stickerPicker.searchStickers")} aria-label={t("pickers.stickerPicker.searchStickers")} autoFocus={focusSearchOnOpen()} />
       </div>
       <div className={s.body}>
         <div className={s.cats}>
