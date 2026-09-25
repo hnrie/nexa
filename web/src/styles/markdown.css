@@ -66,6 +66,10 @@ img.md-emoji-jumbo { width: var(--jumbo-size, 48px); height: var(--jumbo-size, 4
 .md-hr { border: 0; border-top: 1px solid var(--border-strong); margin: 10px 0; }
 .md-mark { background: color-mix(in srgb, var(--warning) 32%, transparent); color: inherit; border-radius: 3px; padding: 0 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .md-color-bg { border-radius: 3px; padding: 0 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+/* A coloured link takes its author's colour, whichever of the two wraps the
+   other, and keeps an underline so it still reads as a link. */
+.md-color .md-link { color: inherit; }
+.md-color .md-link, .md-link .md-color { text-decoration: underline; }
 /* raised and lowered without pushing the lines around them apart */
 .md-sup, .md-sub, .md-fnref { position: relative; font-size: 0.75em; line-height: 0; vertical-align: baseline; }
 .md-sup, .md-fnref { top: -0.5em; }

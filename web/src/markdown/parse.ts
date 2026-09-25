@@ -47,23 +47,27 @@ const RE_ANGLE_URL = /<(https?:\/\/[^\s>]+)>/iy;
 const RE_URL = /https?:\/\/[^\s<]+/iy;
 // bounded, so a line of unclosed brackets is not rescanned to its end from each one
 const RE_MASKED = /\[([^\]\n]{0,512})\]\(\s*(<[^>\s]{1,2048}>|[^()\s]{1,2048})\s*\)/y;
-/** A link's destination right after a bracketed label that may itself hold brackets. */
-const RE_DEST = /\(\s*(<[^>\s]{1,2048}>|[^()\s]{1,2048})\s*\)/y;
+/**
+ * A link's destination right after a bracketed label that may itself hold
+ * brackets; one level of balanced parentheses may be part of the address, as
+ * in a Wikipedia link.
+ */
+const RE_DEST = /\(\s*(<[^>\s]{1,2048}>|(?:[^()\s]|\([^()\s]{0,2048}\)){1,2048})\s*\)/y;
 /** The braces after `[words]`: a colour, checked by parseColorSpec. */
 const RE_COLOR_BRACES = /\{([a-zA-Z0-9# ]{1,40})\}/y;
 const RE_FOOTNOTE_REF = /\[\^([^\]\s]{1,64})\]/y;
 const RE_FENCE_LANG = /[a-zA-Z0-9_+-]*/y;
-const RE_HEADING = /^(#{1,6})[ \t](.*)$/;
+export const RE_HEADING = /^(#{1,6})[ \t](.*)$/;
 /** A heading's optional closing hashes: `## Title ##`. */
 const RE_HEADING_CLOSE = /(?:^|[ \t]+)#+[ \t]*$/;
-const RE_SUBTEXT = /^-# (.*)$/;
-const RE_HR = /^[ \t]{0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/;
-const RE_LIST = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))[ \t]+(.*)$/;
+export const RE_SUBTEXT = /^-# (.*)$/;
+export const RE_HR = /^[ \t]{0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/;
+export const RE_LIST = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))[ \t]+(.*)$/;
 const RE_TASK = /^\[([ xX])\](?:[ \t]+(.*))?$/;
-const RE_ALERT = /^\[!(note|tip|important|warning|caution)\](?:[ \t]+(.*))?$/i;
-const RE_DETAILS_OPEN = /^:::[ \t]*details(?:[ \t]+(.*))?$/i;
+export const RE_ALERT = /^\[!(note|tip|important|warning|caution)\](?:[ \t]+(.*))?$/i;
+export const RE_DETAILS_OPEN = /^:::[ \t]*details(?:[ \t]+(.*))?$/i;
 const RE_DETAILS_CLOSE = /^:::[ \t]*$/;
-const RE_FOOTNOTE_DEF = /^\[\^([^\]\s]{1,64})\]:[ \t]*/;
+export const RE_FOOTNOTE_DEF = /^\[\^([^\]\s]{1,64})\]:[ \t]*/;
 const RE_DELIM_CELL = /^:?-+:?$/;
 const RE_PUNCT = /[!-/:-@[-`{-~]/;
 const RE_WORD = /[\p{L}\p{N}_]/u;
@@ -80,7 +84,7 @@ function bareHost(host: string): string {
  * to — "[bank.example](https://elsewhere.example)". Shown masked, the label
  * is all anyone sees on a phone, where no tooltip gives the address away.
  */
-function misleadingLabel(label: string, url: string): boolean {
+export function misleadingLabel(label: string, url: string): boolean {
   const m = RE_LABEL_HOST.exec(label.trim());
   if (!m) return false;
   let real: string;
@@ -385,21 +389,15 @@ function trimBlankLines(src: string): string {
 }
 
 /** Where a fenced code block starting at `start` ends, as readFence sees it. */
-function fenceEnd(src: string, start: number): number {
-  const afterFence = start + 3;
-  RE_FENCE_LANG.lastIndex = afterFence;
-  const langRaw = RE_FENCE_LANG.exec(src)?.[0] ?? "";
-  const langEnd = afterFence + langRaw.length;
-  const eol = src.indexOf("\n", langEnd);
-  const lineEnd = eol < 0 ? src.length : eol;
-  const contentStart = src.slice(langEnd, lineEnd).trim() === "" ? (eol < 0 ? src.length : eol + 1) : afterFence;
-  const close = src.indexOf("```", contentStart);
-  return close < 0 ? src.length : close + 3;
-}
-
-/** Reads a fenced code block starting at `start`; returns the index after it. */
-function readFence(src: string, start: number, out: Node[]): number {
-  const afterFence = start + 3;
+/**
+ * A fenced code block starting at `start`: its language, where its code
+ * starts and ends, and the index after it. Three backticks close at the next
+ * three, as they always have; a longer fence waits for a run as long as
+ * itself, so code that holds ``` can still be fenced.
+ */
+function scanFence(src: string, start: number): { lang: string | null; from: number; to: number; end: number } {
+  const width = Math.max(3, runOf(src, start, "`"));
+  const afterFence = start + width;
   RE_FENCE_LANG.lastIndex = afterFence;
   const langRaw = RE_FENCE_LANG.exec(src)?.[0] ?? "";
   const langEnd = afterFence + langRaw.length;
@@ -407,21 +405,30 @@ function readFence(src: string, start: number, out: Node[]): number {
   const lineEnd = eol < 0 ? src.length : eol;
 
   let lang: string | null;
-  let contentStart: number;
+  let from: number;
   if (src.slice(langEnd, lineEnd).trim() === "") {
     lang = langRaw === "" ? null : langRaw;
-    contentStart = eol < 0 ? src.length : eol + 1;
+    from = eol < 0 ? src.length : eol + 1;
   } else {
     // Not a language token, e.g. ```code``` on a single line: it is content.
     lang = null;
-    contentStart = afterFence;
+    from = afterFence;
   }
+  const close = src.indexOf("`".repeat(width), from);
+  return close < 0 ? { lang, from, to: src.length, end: src.length } : { lang, from, to: close, end: close + width };
+}
 
-  const close = src.indexOf("```", contentStart);
-  let text = close < 0 ? src.slice(contentStart) : src.slice(contentStart, close);
+function fenceEnd(src: string, start: number): number {
+  return scanFence(src, start).end;
+}
+
+/** Reads a fenced code block starting at `start`; returns the index after it. */
+function readFence(src: string, start: number, out: Node[]): number {
+  const fence = scanFence(src, start);
+  let text = src.slice(fence.from, fence.to);
   if (text.endsWith("\n")) text = text.slice(0, -1);
-  out.push({ type: "codeblock", lang, text });
-  return close < 0 ? src.length : close + 3;
+  out.push({ type: "codeblock", lang: fence.lang, text });
+  return fence.end;
 }
 
 /**
@@ -1136,7 +1143,7 @@ function findPair(line: string, from: number, ch: string): number {
 }
 
 /** Drops trailing sentence punctuation and unbalanced closing brackets. */
-function trimUrl(url: string): string {
+export function trimUrl(url: string): string {
   // the brackets are counted once and kept up to date as the end moves back,
   // so a long run of them costs no more than its length
   let open = 0;

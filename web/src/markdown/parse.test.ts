@@ -149,6 +149,8 @@ const fixtures: Fixture[] = [
   { name: "fence with trailing spaces on the opening line", src: "``` \nx\n```", ast: [codeblock(null, "x")] },
   { name: "single line fence", src: "```x```", ast: [codeblock(null, "x")] },
   { name: "multi line fence content", src: "```\na\n\nb\n```", ast: [codeblock(null, "a\n\nb")] },
+  { name: "a longer fence holds three backticks", src: "````md\n```js\nx\n```\n````", ast: [codeblock("md", "```js\nx\n```")] },
+  { name: "a longer fence on one line", src: "````a```b````", ast: [codeblock(null, "a```b")] },
 
   // --- lists --------------------------------------------------------------
   { name: "dash list", src: "- one\n- two", ast: [list(false, 1, [[t("one")], [t("two")]])] },
@@ -330,6 +332,7 @@ const fixtures: Fixture[] = [
   { name: "colour in a link", src: "[[a]{red}](https://x.y)", ast: [para(link("https://x.y", [color("red", null, t("a"))], true))] },
   { name: "a label with an open bracket still links as before", src: "[a[b](https://x.y)", ast: [para(link("https://x.y", [t("a[b")], true))] },
   { name: "escaped coloured words are text", src: "\\[x]{red}", ast: [para(t("[x]{red}"))] },
+  { name: "balanced parentheses in a link's address", src: "[wiki](https://w.org/A_(b))", ast: [para(link("https://w.org/A_(b)", [t("wiki")], true))] },
 
   // --- footnotes -----------------------------------------------------------
   { name: "footnote", src: "text[^1]\n[^1]: the note", ast: [para(t("text"), fnref("1", 1)), footnotes(["1", 1, [t("the note")]])] },
