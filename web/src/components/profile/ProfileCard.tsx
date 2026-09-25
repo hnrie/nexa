@@ -18,6 +18,8 @@ import { promptFields } from "@/components/modals/PromptModal";
 import { KeyStatusChip } from "./KeyVerify";
 import { profileTheme, profileThemeOf } from "@/lib/avatarColor";
 import { guarded } from "@/lib/captcha";
+import { copyText } from "@/lib/clipboard";
+import { formatShortDate } from "@/lib/time";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { Markdown } from "@/markdown";
 import { useAuth } from "@/stores/auth";
@@ -31,7 +33,8 @@ import { displayName, useUsers } from "@/stores/users";
 import s from "./Profile.module.css";
 
 import { t } from "@/i18n";
-const dateOf = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+// in the app's language, not the browser's (lib/time)
+const dateOf = formatShortDate;
 
 interface Props {
   userId: string;
@@ -220,7 +223,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
           }),
       });
     items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(userId) });
+    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) });
     openContextMenu({ x: r.left, y: r.bottom + 4, items });
   };
   const setNote = (value: string) => {

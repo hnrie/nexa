@@ -109,6 +109,29 @@ describe("ContextMenuHost keyboard", () => {
     expect(document.activeElement).toBe(row);
   });
 
+  it("shows a note as a line to read, never a stop for the arrows", async () => {
+    render(<ContextMenuHost />);
+    act(() => useUI.getState().openContextMenu({ x: 10, y: 10, label: "Sent today", items: [{ id: "a", label: "Reply" }, { id: "n", label: "Sent today", note: true }] }));
+    await settle();
+    const menu = screen.getByRole("menu", { name: "Sent today" });
+    expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual(["Reply"]);
+    expect(menu.textContent).toContain("Sent today");
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(label()).toBe("Reply");
+  });
+
+  it("lines a menu up with the end of the button it belongs to, however wide it turns out", async () => {
+    render(<ContextMenuHost />);
+    const rect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 150, height: 100, top: 0, left: 0, right: 150, bottom: 100, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+    act(() => useUI.getState().openContextMenu({ x: 0, y: 0, anchor: { left: 400, right: 432, top: 20, bottom: 52, align: "end" }, items }));
+    await settle();
+    const menu = screen.getByRole("menu");
+    // its right edge on the button's right edge, just under it
+    expect(menu.style.left).toBe("282px");
+    expect(menu.style.top).toBe("56px");
+    rect.mockRestore();
+  });
+
   it("counts as the top layer, so a dialog beneath it stands down", async () => {
     render(<ContextMenuHost />);
     open();

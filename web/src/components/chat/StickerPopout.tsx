@@ -70,6 +70,22 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
     };
   }, [sticker.id]);
 
+  // Focus goes into the card once it is placed, and back to the sticker when
+  // it closes: the card lives at the end of the page, where Tab never reached it.
+  const focused = useRef(false);
+  const inside = useRef(false);
+  useEffect(() => {
+    if (!at || focused.current) return;
+    focused.current = true;
+    card.current?.focus({ preventScroll: true });
+  }, [at]);
+  useEffect(
+    () => () => {
+      if (inside.current && anchor.isConnected) anchor.focus({ preventScroll: true });
+    },
+    [anchor],
+  );
+
   const reposition = useCallback(() => {
     const box = card.current?.getBoundingClientRect();
     const a = anchor.getBoundingClientRect();
@@ -108,7 +124,7 @@ export function StickerPopout({ sticker, anchor, onClose }: { sticker: MessageSt
   }, [anchor, onClose, reposition]);
 
   return createPortal(
-    <div ref={card} className={s.popout} role="dialog" aria-label={name} data-testid="sticker-popout" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
+    <div ref={card} className={s.popout} role="dialog" aria-label={name} tabIndex={-1} onFocus={() => (inside.current = true)} onBlur={(e) => (inside.current = !!card.current?.contains(e.relatedTarget as Node))} data-testid="sticker-popout" style={at ? { left: at.left, top: at.top } : { left: -9999, top: -9999 }}>
       <div className={s.head}>
         {sticker.blob ? <StickerView format={sticker.format ?? info?.sticker.format} src={stickerUrl(sticker.blob, 64)} alt="" className={s.preview} /> : null}
         <div className={s.text}>

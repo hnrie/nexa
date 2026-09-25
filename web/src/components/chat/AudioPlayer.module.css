@@ -7,8 +7,10 @@
 .name { font-size: 14px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .size { font-size: 12px; color: var(--text-muted); flex: none; }
 .track { display: flex; align-items: center; gap: 2px; height: 28px; overflow: hidden; cursor: pointer; touch-action: none; }
-.track:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 2px; }
-.bar { flex: 1; min-width: 0; border-radius: 1px; background: var(--bg-active); transition: background 80ms linear; }
+.track:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
+.bar { flex: 1; min-width: 0; border-radius: 1px; background: var(--bg-active); transition: background 80ms linear, height 200ms ease; }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+[data-reduced-motion="true"] .bar { transition: none; }
 .bar[data-on="true"] { background: var(--brand); }
 .failed { font-size: 13px; color: var(--text-muted); }
 .side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -23,12 +25,15 @@
 @media (max-width: 767px) {
   /* the time and buttons go on their own row, leaving the waveform the full width */
   .player { max-width: 100%; flex-wrap: wrap; gap: 8px; padding: 8px; }
-  .body { flex-basis: calc(100% - 46px); }
+  .body { flex: 1 1 0; }
   .side { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px; }
   .volume { display: none; }
 }
 
+/* finger-sized, as the video player's are: download and mute sat 26px apart on a phone */
 @media (pointer: coarse) {
-  .ctl { width: 36px; height: 36px; }
-  .speed { height: 36px; padding: 0 10px; }
+  .play { width: 44px; height: 44px; }
+  .ctl { width: 40px; height: 40px; }
+  .speed { height: 40px; padding: 0 10px; }
+  .tools { gap: 4px; }
 }

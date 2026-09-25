@@ -3,6 +3,7 @@ import { Button } from "@/components/common/Button";
 import { humanizeMentions } from "@/components/composer/mentions";
 import { editMessage, editNames } from "@/components/composer/send";
 import { useAutosize } from "@/components/composer/useAutosize";
+import { confirmDelete } from "./messageMenu";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -39,7 +40,12 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   const save = async () => {
     if (busy) return;
     const body = text.trim();
-    if (!body && !msg.payload?.att?.length) return;
+    // An emptied message is one to delete, and deleting asks first; Enter on
+    // an empty box used to do nothing at all.
+    if (!body && !msg.payload?.att?.length && !msg.payload?.sticker) {
+      confirmDelete(msg, () => endEdit(msg.channel_id, msg.id));
+      return;
+    }
     // nothing changed: close the editor without marking the message edited
     if (body === humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, editNames(msg.channel_id)).trim()) {
       endEdit(msg.channel_id, msg.id);

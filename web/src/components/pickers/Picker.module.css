@@ -8,9 +8,7 @@
 .close:hover { background: var(--bg-hover); color: var(--text); }
 .tab:disabled { opacity: 0.4; cursor: not-allowed; }
 .searchRow { display: flex; align-items: center; gap: 8px; padding: 12px 16px 8px; }
-.search { flex: 1; height: 32px; padding: 0 10px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text); border: 0; outline: none; font-size: 14px; }
-/* iOS zooms into a field under 16px when it takes focus, and the app can be zoomed now */
-@media (pointer: coarse) { .search { font-size: 16px; } }
+.searchBox { flex: 1; }
 /* the skin tone button, and the column of hands it opens over the grid (above the pinned section title) */
 .toneWrap { position: relative; flex: none; width: 32px; height: 32px; }
 .tone { width: 32px; height: 32px; border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; }

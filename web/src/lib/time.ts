@@ -12,13 +12,15 @@ import { t, translator } from "@/i18n";
 /** The styles a `<t:…>` timestamp in a message can ask for, beside the app's own. */
 export type StampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R";
 
-type Kind = "time" | "date" | "longDate" | "full" | `stamp:${Exclude<StampStyle, "R">}`;
+type Kind = "time" | "date" | "shortDate" | "longDate" | "full" | "exact" | `stamp:${Exclude<StampStyle, "R">}`;
 
 const OPTIONS: Record<Kind, Intl.DateTimeFormatOptions> = {
   time: { hour: "numeric", minute: "2-digit" },
   date: { month: "2-digit", day: "2-digit", year: "numeric" },
+  shortDate: { month: "short", day: "numeric", year: "numeric" },
   longDate: { month: "long", day: "numeric", year: "numeric" },
   full: { weekday: "long", month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" },
+  exact: { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" },
   "stamp:t": { hour: "numeric", minute: "2-digit" },
   "stamp:T": { hour: "numeric", minute: "2-digit", second: "2-digit" },
   "stamp:d": { year: "numeric", month: "2-digit", day: "2-digit" },
@@ -71,6 +73,16 @@ export function formatDateDivider(ms: number): string {
 
 export function formatFull(ms: number): string {
   return fmt("full").format(new Date(ms));
+}
+
+/** "Sep 24, 2026, 4:37:12 PM": the very moment, short enough for a line on a phone. */
+export function formatExact(ms: number): string {
+  return fmt("exact").format(new Date(ms));
+}
+
+/** "Sep 24, 2026", a date on its own: member since, when a page was published. */
+export function formatShortDate(ms: number): string {
+  return fmt("shortDate").format(new Date(ms));
 }
 
 /** A size rounded the way it is shown, so the language formats the digits. */

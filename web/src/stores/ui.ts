@@ -20,6 +20,8 @@ export interface ContextMenuItem {
   checked?: boolean;
   /** A small title over the items that follow it; not an item itself. */
   heading?: boolean;
+  /** A line of information, such as when a message was sent: read, never chosen. */
+  note?: boolean;
   /** Makes the item a slider that takes effect as it moves, and leaves the menu open. */
   slider?: { value: number; min: number; max: number; step?: number; unit?: string; onChange: (value: number) => void };
 }
@@ -32,6 +34,13 @@ export interface ContextMenuState {
   label?: string;
   /** Opens upwards, its bottom edge at y: for a button along the bottom of the screen. */
   above?: boolean;
+  /**
+   * The button the menu belongs to. The menu opens under it (over it when
+   * there is no room below), lined up with the button's start or end edge in
+   * the reading direction, once its real width is known. x and y are then only
+   * where it starts out.
+   */
+  anchor?: { left: number; right: number; top: number; bottom: number; align: "start" | "end" };
 }
 
 export interface Toast {

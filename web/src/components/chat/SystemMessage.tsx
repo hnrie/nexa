@@ -12,8 +12,9 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const setJumpTo = useUI((u) => u.setJumpTo);
   const actor = displayName(users[msg.author_id]);
   const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
-  const A = <b onClick={() => openModal("profile", { userId: msg.author_id })}>{actor}</b>;
-  const T = <b onClick={() => msg.mentions[0] && openModal("profile", { userId: msg.mentions[0] })}>{target}</b>;
+  // names that open a profile, and the link to a pinned message, are real buttons
+  const A = <button type="button" className={s.sysName} dir="auto" onClick={() => openModal("profile", { userId: msg.author_id })}>{actor}</button>;
+  const T = msg.mentions[0] ? <button type="button" className={s.sysName} dir="auto" onClick={() => openModal("profile", { userId: msg.mentions[0]! })}>{target}</button> : <b className={s.sysName}>{target}</b>;
   let icon = <ArrowRightToLine size={18} />;
   let body: React.ReactNode;
   switch (msg.type) {
@@ -34,9 +35,9 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
           values={{
             actor: A,
             message: (
-              <span className={s.sysLink} onClick={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })}>
+              <button type="button" className={s.sysLink} disabled={!msg.reply_to_id} onClick={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })}>
                 {t("chat.systemMessage.aMessage")}
-              </span>
+              </button>
             ),
           }}
         />

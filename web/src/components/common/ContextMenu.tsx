@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { useUI, type ContextMenuItem, type ContextMenuState } from "@/stores/ui";
 import s from "./ContextMenu.module.css";
 
 function SliderItem({ item }: { item: ContextMenuItem & { slider: NonNullable<ContextMenuItem["slider"]> } }) {
@@ -54,6 +54,12 @@ function groups(items: ContextMenuItem[]): { label: string | null; items: Contex
   return out;
 }
 
+/** Where a menu opened from a button goes: by that button, lined up with its start or end edge. */
+export function menuAnchor(el: Element, align: "start" | "end" = "end"): NonNullable<ContextMenuState["anchor"]> {
+  const r = el.getBoundingClientRect();
+  return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align };
+}
+
 /** Renders the ui store's context menu; opened by any component via useUI.openContextMenu. */
 export function ContextMenuHost() {
   const menu = useUI((st) => st.contextMenu);
@@ -75,9 +81,25 @@ export function ContextMenuHost() {
       return;
     }
     const r = ref.current.getBoundingClientRect();
+    const rtl = document.documentElement.dir === "rtl";
+    const a = menu.anchor;
+    if (a) {
+      // Lined up with the button it came from, measured rather than guessed:
+      // the menu is as wide as its longest label in the language in use.
+      const rightAligned = (a.align === "end") !== rtl;
+      const x = rightAligned ? a.right - r.width : a.left;
+      const below = a.bottom + 4;
+      const over = a.top - r.height - 4;
+      const fitsBelow = below + r.height <= window.innerHeight - 8;
+      const fitsOver = over >= 8;
+      // `above` says which side is wanted; the other one is taken when that one has no room
+      const y = menu.above ? (fitsOver || !fitsBelow ? over : below) : fitsBelow || !fitsOver ? below : over;
+      setPos({ x: Math.max(8, Math.min(x, window.innerWidth - r.width - 8)), y: Math.max(8, Math.min(y, window.innerHeight - r.height - 8)) });
+      return;
+    }
     // Towards the reading direction's end: in a right-to-left language a menu
     // opens to the left of where it was asked for, as the system's own do.
-    const from = document.documentElement.dir === "rtl" ? menu.x - r.width : menu.x;
+    const from = rtl ? menu.x - r.width : menu.x;
     const x = Math.min(from, window.innerWidth - r.width - 8);
     const y = Math.min(menu.above ? menu.y - r.height : menu.y, window.innerHeight - r.height - 8);
     setPos({ x: Math.max(8, x), y: Math.max(8, y) });
@@ -243,6 +265,10 @@ export function ContextMenuHost() {
               <div key={item.id} role="none">
                 {item.slider ? (
                   <SliderItem item={{ ...item, slider: item.slider }} />
+                ) : item.note ? (
+                  // read, not chosen, so no stop for the arrows; whoever opens a menu
+                  // with a note in it says the same thing in the menu's own name
+                  <div className={s.note} aria-hidden="true">{item.label}</div>
                 ) : (
                   <button
                     role={item.checked === undefined ? "menuitem" : "menuitemradio"}

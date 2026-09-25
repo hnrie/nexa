@@ -1,0 +1,177 @@
+import { ChevronLeft, ChevronRight, Download, ExternalLink, X, ZoomIn, ZoomOut } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import type { AttachmentMeta } from "@/crypto/message";
+import { acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
+import { useUI } from "@/stores/ui";
+import { Spinner } from "@/components/common/Spinner";
+import { useFocusTrap } from "@/components/common/useFocusTrap";
+import { ZoomPan, type ZoomPanHandle } from "@/components/common/ZoomPan";
+import { imageMenuItems } from "./messageMenu";
+import s from "./Lightbox.module.css";
+import { t } from "@/i18n";
+
+/** One picture the viewer can show: one already on screen, or an attachment it decrypts itself. */
+export interface LightboxItem {
+  name: string;
+  type?: string | undefined;
+  src?: string | undefined;
+  att?: AttachmentMeta | undefined;
+  /** Who sent it, under its name. */
+  from?: string | undefined;
+}
+
+/** How far one press of an arrow moves a zoomed picture, as a share of the view. */
+const PAN_STEP = 0.1;
+
+/** The address of the picture on show, decrypted if need be and held while it is. */
+function useItemSrc(item: LightboxItem): { src: string | null; failed: boolean } {
+  const att = item.att;
+  const [url, setUrl] = useState<string | null>(() => item.src ?? (att ? (cachedURL(att.blob_id) ?? null) : null));
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+    if (item.src) return setUrl(item.src);
+    if (!att) return setUrl(null);
+    const have = cachedURL(att.blob_id);
+    setUrl(have ?? null);
+    if (have) return;
+    let alive = true;
+    attachmentObjectURL(att)
+      .then((u) => alive && setUrl(u))
+      .catch(() => alive && setFailed(true));
+    return () => {
+      alive = false;
+    };
+  }, [item.src, att]);
+  useEffect(() => {
+    if (!url || !att || item.src) return;
+    if (!acquire(att.blob_id, url)) return;
+    return () => release(att.blob_id, url);
+  }, [url, att, item.src]);
+  return { src: url, failed };
+}
+
+/**
+ * The picture viewer: the picture as large as fits, zoomed with the wheel,
+ * a pinch, a double click or + and −, and moved by dragging or with the
+ * arrows once zoomed. Its controls sit in a bar of their own along the top,
+ * with the picture's name; a message's other pictures are a step away with
+ * the side arrows, ← and →, or a swipe.
+ */
+export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[]; start?: number; onClose: () => void }) {
+  const count = items.length;
+  const [index, setIndex] = useState(() => Math.min(Math.max(0, start), Math.max(0, count - 1)));
+  const item = items[index] ?? items[0]!;
+  const { src, failed } = useItemSrc(item);
+  const openContextMenu = useUI((u) => u.openContextMenu);
+  const [scale, setScale] = useState(1);
+  const zoom = useRef<ZoomPanHandle>(null);
+  const root = useRef<HTMLDivElement>(null);
+  const closeBtn = useRef<HTMLButtonElement>(null);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  // a dialog in every sense: focus goes in, stays in, and comes back to the picture after
+  useFocusTrap(root, true, () => closeBtn.current);
+  const rtl = typeof document !== "undefined" && document.documentElement.dir === "rtl";
+  const step = (d: number) => {
+    const next = index + d;
+    if (next < 0 || next >= count) return;
+    zoom.current?.reset();
+    setIndex(next);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const k = e.key;
+    if (k === "Escape") {
+      // the viewer takes this Escape; the panels beside the chat do not close with it
+      e.preventDefault();
+      e.stopPropagation();
+      if (scale > 1) zoom.current?.reset();
+      else onClose();
+      return;
+    }
+    if (k === "+" || k === "=") return void zoom.current?.zoomBy(1.4);
+    if (k === "-") return void zoom.current?.zoomBy(1 / 1.4);
+    if (k === "0") return void zoom.current?.reset();
+    const arrows: Record<string, [number, number]> = { ArrowLeft: [PAN_STEP, 0], ArrowRight: [-PAN_STEP, 0], ArrowUp: [0, PAN_STEP], ArrowDown: [0, -PAN_STEP] };
+    const move = arrows[k];
+    if (!move) return;
+    e.preventDefault();
+    // zoomed in, the arrows move the picture; otherwise ← and → go through the pictures
+    if (zoom.current?.panBy(move[0], move[1])) return;
+    if (k === "ArrowLeft") step(rtl ? 1 : -1);
+    else if (k === "ArrowRight") step(rtl ? -1 : 1);
+  };
+
+  const svg = item.type?.toLowerCase().startsWith("image/svg");
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+  return createPortal(
+    // a layer, so the back gesture on a phone puts the picture away rather than leaving the page under it
+    <div ref={root} className={s.lightbox} tabIndex={-1} onClick={onClose} onKeyDown={onKeyDown} role="dialog" aria-modal="true" aria-label={item.name} data-zoomed={scale > 1 || undefined} data-modal-layer="" data-testid="lightbox">
+      <div className={s.top} onClick={stop}>
+        <div className={s.info}>
+          <span className={s.name} dir="auto" title={item.name}>{item.name}</span>
+          <span className={s.sub}>
+            {item.from ? <span dir="auto">{item.from}</span> : null}
+            {count > 1 ? <span>{t("chat.lightbox.position", { n: index + 1, count })}</span> : null}
+          </span>
+        </div>
+        <div className={s.tools}>
+          <span className={s.zoomTools}>
+            <button type="button" className={s.tool} aria-label={t("chat.attachments.zoomOut")} title={t("chat.attachments.zoomOut")} onClick={() => zoom.current?.zoomBy(1 / 1.4)}><ZoomOut size={20} /></button>
+            <button type="button" className={[s.tool, s.pct].join(" ")} aria-label={t("chat.lightbox.resetZoom")} title={t("chat.lightbox.resetZoom")} onClick={() => zoom.current?.reset()} disabled={scale === 1} data-testid="lightbox-zoom">{Math.round(scale * 100)}%</button>
+            <button type="button" className={s.tool} aria-label={t("chat.attachments.zoomIn")} title={t("chat.attachments.zoomIn")} onClick={() => zoom.current?.zoomBy(1.4)}><ZoomIn size={20} /></button>
+          </span>
+          {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
+          {src && !svg ? <a className={s.tool} href={src} target="_blank" rel="noopener noreferrer" aria-label={t("chat.attachments.openOriginal")} title={t("chat.attachments.openOriginal")}><ExternalLink size={20} /></a> : null}
+          {src ? <a className={s.tool} href={src} download={item.name} aria-label={t("chat.attachments.download")} title={t("chat.attachments.download")}><Download size={20} /></a> : null}
+          <button ref={closeBtn} type="button" className={[s.tool, s.close].join(" ")} aria-label={t("chat.attachments.close")} title={t("chat.attachments.close")} onClick={onClose}><X size={22} /></button>
+        </div>
+      </div>
+      <div
+        className={s.stageWrap}
+        // a sideways swipe on a touch screen goes to the next picture, while the picture is at its own size
+        onPointerDown={(e) => {
+          swipe.current = e.pointerType === "touch" && scale <= 1 && count > 1 ? { x: e.clientX, y: e.clientY } : null;
+        }}
+        onPointerUp={(e) => {
+          const from = swipe.current;
+          swipe.current = null;
+          if (!from) return;
+          const dx = e.clientX - from.x;
+          const dy = e.clientY - from.y;
+          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+          step((dx < 0) !== rtl ? 1 : -1);
+        }}
+      >
+        <ZoomPan key={index} className={s.stage} handle={zoom} onZoom={setScale} onIdleClick={onClose}>
+          {src ? (
+            <img
+              src={src}
+              alt={item.name}
+              draggable={false}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src, name: item.name }) });
+              }}
+            />
+          ) : (
+            <span className={s.pending} onClick={stop}>{failed ? t("chat.attachments.imageUnloadable") : <Spinner size={28} />}</span>
+          )}
+        </ZoomPan>
+      </div>
+      {count > 1 && index > 0 ? (
+        <button type="button" className={[s.side, s.prev].join(" ")} aria-label={t("chat.lightbox.previous")} title={t("chat.lightbox.previous")} onClick={(e) => { stop(e); step(-1); }}>
+          <ChevronLeft size={28} />
+        </button>
+      ) : null}
+      {count > 1 && index < count - 1 ? (
+        <button type="button" className={[s.side, s.next].join(" ")} aria-label={t("chat.lightbox.next")} title={t("chat.lightbox.next")} onClick={(e) => { stop(e); step(1); }}>
+          <ChevronRight size={28} />
+        </button>
+      ) : null}
+    </div>,
+    document.body,
+  );
+}

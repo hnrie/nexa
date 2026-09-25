@@ -174,7 +174,7 @@ export function sendMessage(channelId: string, rawText: string, opts: SendOption
  * Messages whose files are going up: the files, kept for a retry and for
  * their previews, and the way to stop them.
  */
-const uploading = new Map<string, { files: Staged[]; stop: AbortController | null }>();
+const uploading = new Map<string, { files: Staged[]; stop: AbortController | null; sent: Map<string, Awaited<ReturnType<typeof uploadStaged>>> }>();
 
 /** Lets go of a message's files once nothing shows them any more. */
 function forget(tmp: string): void {
@@ -206,7 +206,7 @@ export function sendWithFiles(channelId: string, rawText: string, files: Staged[
     error: null,
   };
   useMessages.getState().addPending({ tmpId: tmp, nonce, channelId, authorId: me.id, payload: w.payload, createdAt: Date.now(), status: "sending", ...chosen(opts), upload });
-  uploading.set(tmp, { files, stop: null });
+  uploading.set(tmp, { files, stop: null, sent: new Map() });
   return uploadThenSend(channelId, me.id, tmp, nonce, w, opts);
 }
 
@@ -254,8 +254,17 @@ async function uploadThenSend(channelId: string, meId: string, tmp: string, nonc
   try {
     let before = 0;
     for (const f of job.files) {
+      // a file that went up before one after it failed is not sent again on the retry
+      const had = job.sent.get(f.id);
+      if (had) {
+        ups.push(had);
+        before += f.file.size;
+        continue;
+      }
       const done = before;
-      ups.push(await uploadStaged(channelId, f, (p) => show(done + p * f.file.size), sendInWorker, stop.signal));
+      const up = await uploadStaged(channelId, f, (p) => show(done + p * f.file.size), sendInWorker, stop.signal);
+      job.sent.set(f.id, up);
+      ups.push(up);
       before += f.file.size;
     }
   } catch (err) {

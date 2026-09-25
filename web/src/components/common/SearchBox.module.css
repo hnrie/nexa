@@ -1,0 +1,16 @@
+.box { display: flex; align-items: center; gap: 6px; height: 32px; min-width: 0; padding-inline: 8px 4px; border-radius: var(--radius-xs); background: var(--bg-input); color: var(--text-muted); cursor: text; }
+.box:focus-within { color: var(--text); box-shadow: 0 0 0 2px var(--focus-ring); }
+.icon { flex: none; }
+.input { flex: 1; min-width: 0; height: 100%; padding: 0; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
+.input::placeholder { color: var(--text-placeholder); }
+/* the browser's own × would sit beside ours */
+.input::-webkit-search-cancel-button, .input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.input:focus-visible { outline: none; }
+.clear { flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: var(--text-muted); }
+.clear:hover { background: var(--bg-active); color: var(--text-strong); }
+@media (pointer: coarse) {
+  .box { height: 40px; }
+  /* a phone's keyboard zooms into any field under 16px */
+  .input { font-size: 16px; }
+  .clear { width: 36px; height: 36px; margin-inline-end: -4px; }
+}

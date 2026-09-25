@@ -1,4 +1,4 @@
-.stack { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.stack { position: fixed; top: calc(16px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: var(--z-toast); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .toast { pointer-events: auto; padding: 10px 16px; border-radius: var(--radius-sm); background: var(--bg-floating); color: var(--text); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-high); border-inline-start: 4px solid var(--brand); animation: drop 160ms ease-out; max-width: min(90vw, 480px); text-align: start; }
 .error { border-inline-start-color: var(--danger); }
 .success { border-inline-start-color: var(--positive); }

@@ -1,7 +1,7 @@
 .wrap { position: relative; display: inline-flex; }
 /* drawn on the page itself, so nothing it labels can clip or cover it: a dark bubble with an arrow, as Discord's */
 .tip {
-  position: fixed; z-index: 400; max-width: 260px; padding: 7px 12px;
+  position: fixed; z-index: var(--z-tooltip); max-width: 260px; padding: 7px 12px;
   background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: var(--tooltip-shadow);
   font-size: 14px; font-weight: 600; line-height: 18px; text-align: center; white-space: normal; overflow-wrap: break-word;
   border-radius: 6px; pointer-events: none; animation: tipIn 110ms ease-out;

@@ -1,10 +1,12 @@
+import { Copy } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
+import { copyText } from "@/lib/clipboard";
 import { ensureShortcodes, mightHaveShortcode, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import { formatStamp, type StampStyle } from "@/lib/time";
 import type { Node, RenderCtx } from "./ast";
-import { parse } from "./parse";
+import { parse, plainText } from "./parse";
 
 import { t } from "@/i18n";
 // ---------------------------------------------------------------------------
@@ -136,51 +138,58 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
         </Spoiler>
       );
+    // Every block takes the direction of its own words (dir="auto"): an
+    // English line in an Arabic conversation reads, and lines up, as English.
     case "paragraph":
       return (
-        <div className="md-paragraph">
+        <div className="md-paragraph" dir="auto">
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
         </div>
       );
     case "quote":
       return (
-        <blockquote className="md-quote">
+        <blockquote className="md-quote" dir="auto">
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
         </blockquote>
       );
     case "heading": {
       const Tag = (node.level === 1 ? "h1" : node.level === 2 ? "h2" : "h3") as "h1" | "h2" | "h3";
       return (
-        <Tag className={"md-h" + String(node.level)}>
+        <Tag className={"md-h" + String(node.level)} dir="auto">
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
         </Tag>
       );
     }
     case "subtext":
       return (
-        <small className="md-subtext">
+        <small className="md-subtext" dir="auto">
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
         </small>
       );
     case "list": {
       const items = node.items.map((item, i) => (
-        <li key={i} className="md-list-item">
+        <li key={i} className="md-list-item" dir="auto">
           <RenderNodes nodes={item} ctx={ctx} jumbo={jumbo} />
         </li>
       ));
+      // the list as a whole follows its first item, so its markers sit on that side
       return node.ordered ? (
-        <ol className="md-list" start={node.start}>
+        <ol className="md-list" start={node.start} dir="auto">
           {items}
         </ol>
       ) : (
-        <ul className="md-list">{items}</ul>
+        <ul className="md-list" dir="auto">{items}</ul>
       );
     }
     case "code":
       return <code className="md-inline-code">{node.text}</code>;
     case "codeblock":
       return <CodeBlock lang={node.lang} text={node.text} />;
-    case "link":
+    case "link": {
+      // A masked link says where it really goes, after its words, unless they
+      // already name that site: the tooltip that did so shows on no phone.
+      const host = node.masked ? linkHost(node.url) : null;
+      const shows = host && !plainText(node.children).toLowerCase().replace(/\bwww\./g, "").includes(host);
       return (
         <a
           href={node.url}
@@ -190,8 +199,10 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
           title={node.masked ? node.url : undefined}
         >
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+          {shows ? <span className="md-link-host" dir="ltr">{host}</span> : null}
         </a>
       );
+    }
     case "mention":
       switch (node.kind) {
         case "everyone":
@@ -232,21 +243,43 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
 // spoilers
 // ---------------------------------------------------------------------------
 
+/**
+ * A spoiler. Hidden, it is a button named "spoiler" whose words are out of
+ * the accessibility tree as well as out of sight (transparent text used to be
+ * read out in full, as the button's name); shown, it is ordinary text again.
+ */
 function Spoiler(props: { ctx: RenderCtx; children: ReactNode }): JSX.Element {
   const [revealed, setRevealed] = useState(false);
   const open = props.ctx.revealSpoilers === true || revealed;
+  const inner = <span className="md-spoiler-inner">{props.children}</span>;
+  if (open) {
+    return (
+      <span className="md-spoiler" data-revealed="true">
+        {inner}
+      </span>
+    );
+  }
   return (
     <span
       className="md-spoiler"
-      data-revealed={open}
+      data-revealed="false"
       role="button"
       tabIndex={0}
-      onClick={() => setRevealed(true)}
+      aria-label={t("render.spoilerHidden")}
+      aria-expanded={false}
+      onClick={(e) => {
+        // the first click only uncovers: a link or a mention under it waits for a second one
+        e.preventDefault();
+        e.stopPropagation();
+        setRevealed(true);
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") setRevealed(true);
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        setRevealed(true);
       }}
     >
-      {props.children}
+      {inner}
     </span>
   );
 }
@@ -348,13 +381,40 @@ function rgbaColor(color: number, alpha: number): string {
 // timestamps
 // ---------------------------------------------------------------------------
 
+/** How soon a relative time ("in 5 minutes") can read differently: often while it is close, rarely once it is far. */
+export function relativeTick(deltaMs: number): number {
+  const away = Math.abs(deltaMs);
+  return away < 60_000 ? 10_000 : away < 3_600_000 ? 30_000 : away < 86_400_000 ? 60_000 : 3_600_000;
+}
+
+/**
+ * A `<t:…>` time. It is set apart from the words around it (dir="auto"
+ * isolates it), so a date written in Arabic does not decide which way an
+ * English sentence around it reads. The relative style ("in 2 hours") keeps
+ * counting; rendered once, it went on saying "in 2 hours" all day.
+ */
 function Timestamp(props: { unix: number; style: StampStyle }): JSX.Element {
   const date = new Date(props.unix * 1000);
-  if (Number.isNaN(date.getTime())) {
+  const valid = !Number.isNaN(date.getTime());
+  const relative = valid && props.style === "R";
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!relative) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const next = () => {
+      timer = setTimeout(() => {
+        tick((n) => n + 1);
+        next();
+      }, relativeTick(props.unix * 1000 - Date.now()));
+    };
+    next();
+    return () => clearTimeout(timer);
+  }, [relative, props.unix]);
+  if (!valid) {
     return <time className="md-timestamp">{String(props.unix)}</time>;
   }
   return (
-    <time className="md-timestamp" dateTime={date.toISOString()} title={formatStamp(date, "F")}>
+    <time className="md-timestamp" dir="auto" dateTime={date.toISOString()} title={formatStamp(date, "F")}>
       {formatStamp(date, props.style)}
     </time>
   );
@@ -469,10 +529,25 @@ function CodeBlock(props: { lang: string | null; text: string }): JSX.Element {
   }, [lang, text]);
 
   return (
-    <pre className="md-codeblock">
-      <code className={lang === null ? "hljs" : "hljs language-" + lang}>
-        {highlighted ? renderHl(highlighted) : text}
-      </code>
-    </pre>
+    <div className="md-codeblock-wrap">
+      <pre className="md-codeblock">
+        <code className={lang === null ? "hljs" : "hljs language-" + lang}>
+          {highlighted ? renderHl(highlighted) : text}
+        </code>
+      </pre>
+      {/* just the code, without the fences and whatever else the message said */}
+      <button type="button" className="md-code-copy" aria-label={t("render.copyCode")} title={t("render.copyCode")} onClick={() => void copyText(text, t("clipboard.codeCopied"))}>
+        <Copy size={15} aria-hidden="true" />
+      </button>
+    </div>
   );
+}
+
+/** The site a link goes to, as people know it: no scheme, no "www.". */
+function linkHost(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "") || null;
+  } catch {
+    return null;
+  }
 }

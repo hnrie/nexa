@@ -1,16 +1,15 @@
 import { Check, Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRowRenderCtx } from "@/lib/markdownCtx";
-import { formatFull, formatTime, formatTimestamp } from "@/lib/time";
+import { formatExact, formatFull, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingUpload } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
-import { useUI } from "@/stores/ui";
-import { useRelationships } from "@/stores/relationships";
+import { useUI, type ContextMenuState } from "@/stores/ui";
 import { rangeBetween, useSelection } from "@/stores/selection";
-import { useUsers, displayName } from "@/stores/users";
+import { useUsers } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
 import { mentionsMe } from "@/lib/mentionsMe";
@@ -31,9 +30,13 @@ import { Reactions } from "./Reactions";
 import { StickerPopout } from "./StickerPopout";
 import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
+import { menuAnchor } from "@/components/common/ContextMenu";
+import { copyText } from "@/lib/clipboard";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, canPick, canPin, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, canPick, canPin, canReact, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
+import { useRowActive } from "./activeRow";
+import { useShownName } from "./useShownName";
 import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
@@ -48,38 +51,57 @@ interface Props {
   first?: boolean;
 }
 
+/**
+ * The line over a reply: who it answers and what they said. The name opens
+ * their profile and the quote goes to the message, both as real buttons; the
+ * rest of the line goes to the message too, for a pointer.
+ */
 function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
-  const users = useUsers((u) => u.byId);
   const target = useMessages((m) => (msg.reply_to_id ? m.channels[msg.channel_id]?.byId[msg.reply_to_id] : undefined));
+  const avatarId = useUsers((u) => (target ? (u.byId[target.author_id]?.avatar_id ?? null) : null));
+  const name = useShownName(msg.channel_id, target?.author_id);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const openModal = useUI((u) => u.openModal);
   const ctx = useRowRenderCtx();
+  const payload = target?.payload;
+  const failed = !!target?.decryptError;
+  // parsed when the quoted message changes, not on every render of the row
+  const text = useMemo(() => {
+    const mediaOnly = !!payload?.t && isOnlyMediaLinks(payload.t, (payload.embeds ?? []) as UnfurlResult[]);
+    if (payload?.t && !mediaOnly) return plainText(parse(payload.t, { inline: true }), ctx);
+    if (payload?.att?.length || mediaOnly || payload?.sticker) return t("chat.messageItem.clickToSeeAttachment");
+    return failed ? t("chat.messageItem.encryptedMessage") : "";
+  }, [payload, failed, ctx]);
   if (!msg.reply_to_id) return null;
   const replyTo = msg.reply_to_id;
   // Jumping works whether or not the original is loaded: the list fetches the
   // page around it, and says so if it really is gone. Only the newest page is
   // loaded when a conversation opens, so most replies point past it.
   const jump = () => setJumpTo({ channelId: msg.channel_id, messageId: replyTo });
-  const keys = (e: React.KeyboardEvent) => {
-    if (e.key !== "Enter" && e.key !== " ") return;
-    e.preventDefault();
-    jump();
-  };
   if (!target) {
     return (
-      <div className={s.replyLine} role="button" tabIndex={0} onClick={jump} onKeyDown={keys}>
-        <span className={s.replyText}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</span>
+      <div className={s.replyLine}>
+        <button type="button" className={s.replyText} onClick={jump} title={t("chat.messageItem.goToOriginal")}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</button>
       </div>
     );
   }
-  const author = users[target.author_id];
-  const mediaOnly = !!target.payload?.t && isOnlyMediaLinks(target.payload.t, (target.payload.embeds ?? []) as UnfurlResult[]);
-  const text = target.payload?.t && !mediaOnly ? plainText(parse(target.payload.t, { inline: true }), ctx) : target.payload?.att?.length || mediaOnly ? t("chat.messageItem.clickToSeeAttachment") : target.decryptError ? t("chat.messageItem.encryptedMessage") : "";
   return (
-    <div className={s.replyLine} role="button" tabIndex={0} onClick={jump} onKeyDown={keys}>
-      <Avatar id={target.author_id} avatarId={author?.avatar_id ?? null} name={displayName(author)} size={16} />
-      <span className={s.replyName} onClick={(e) => { e.stopPropagation(); openModal("profile", { userId: target.author_id }); }}>{displayName(author)}</span>
-      <span className={s.replyText}>{text}</span>
+    <div className={s.replyLine} onClick={jump}>
+      <span className={s.replyAvatar} aria-hidden="true"><Avatar id={target.author_id} avatarId={avatarId} name={name} size={16} /></span>
+      <button
+        type="button"
+        className={s.replyName}
+        dir="auto"
+        onClick={(e) => {
+          e.stopPropagation();
+          openModal("profile", { userId: target.author_id });
+        }}
+      >
+        {name}
+      </button>
+      <button type="button" className={s.replyText} dir="auto" title={t("chat.messageItem.goToOriginal")} onClick={(e) => { e.stopPropagation(); jump(); }}>
+        {text}
+      </button>
     </div>
   );
 }
@@ -97,22 +119,24 @@ function ToolButton({ label, danger, onClick, children }: { label: string; dange
 
 export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, upload, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
-  const author = useUsers((u) => u.byId[msg.author_id]);
+  const avatarId = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
+  // A nickname you gave a friend applies everywhere their name appears, not
+  // just in the sidebar; a server nickname wins inside that server.
+  const name = useShownName(msg.channel_id, msg.author_id);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
-  const setReplyTo = useUI((u) => u.setReplyTo);
-  const setEditing = useUI((u) => u.setEditing);
   const dev = useSettings((st) => st.settings.developerMode);
   const ctx = useRowRenderCtx();
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
-  const serverState = useServers((st) => (serverId ? st.byId[serverId] : undefined));
-  const member = serverState?.members[msg.author_id];
-  const color = serverState ? memberColor(serverState, msg.author_id) : undefined;
+  // the author's colour only, so a change to anyone else in the server leaves this row alone
+  const color = useServers((st) => (serverId && st.byId[serverId] ? memberColor(st.byId[serverId], msg.author_id) : undefined));
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWatch = useRef<(() => void) | null>(null);
-  const friendNickname = useRelationships((r) => r.byUser[msg.author_id]?.nickname);
+  // only the row being pointed at or focused draws its toolbar (see activeRow)
+  const active = useRowActive(msg.id);
+  const uid = useId();
   const selecting = useSelection((x) => x.channelId === msg.channel_id);
   const picked = useSelection((x) => x.channelId === msg.channel_id && !!x.picked[msg.id]);
   const pickable = selecting && !pending && canPick(msg);
@@ -135,9 +159,10 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     return n <= 3 ? 48 : n <= 8 ? 36 : 28;
   }, [jumbo, nodes]);
 
-  const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null) => {
+  const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null, anchor?: ContextMenuState["anchor"]) => {
     setMenuOpen(true);
-    openContextMenu({ x, y, items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
+    // the menu is named by when the message was sent: its last lines say so to the eye
+    openContextMenu({ x, y, ...(anchor ? { anchor } : {}), label: messageTimes(msg).join(", "), items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
     menuWatch.current?.();
     menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {
@@ -174,17 +199,20 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
 
   if (msg.type.startsWith("system_")) return <SystemMessage msg={msg} />;
 
-  const baseName = displayName(author, msg.author_id === me?.id ? me.display_name : t("names.unknownUser"));
-  // A nickname you gave a friend applies everywhere their name appears, not
-  // just in the sidebar; a server nickname wins inside that server.
-  const name = member?.nickname || friendNickname || baseName;
   const isReply = !!msg.reply_to_id;
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
 
   const showHeader = groupStart || isReply;
+  const profile = () => openModal("profile", { userId: msg.author_id });
+  // A row reads as who, when and what, whether or not it shows the name: a
+  // message grouped under the one before still says who wrote it.
+  const whoId = `${uid}who`;
+  const bodyId = `${uid}body`;
 
   return (
     <div
+      role="article"
+      aria-labelledby={`${whoId} ${bodyId}`}
       className={s.msg}
       data-id={msg.id}
       data-group-start={showHeader}
@@ -230,21 +258,25 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {isReply ? <ReplyPreview msg={msg} /> : null}
       {showHeader ? (
         <>
-          <div className={s.avatar} data-group-start={showHeader} onClick={() => openModal("profile", { userId: msg.author_id })}>
-            <Avatar id={msg.author_id} avatarId={author?.avatar_id ?? null} name={name} size={40} />
-          </div>
-          <div className={s.headerRow}>
-            <span className={s.author} data-author={msg.author_id} style={color ? { color } : undefined} onClick={() => openModal("profile", { userId: msg.author_id })}>{name}</span>
-            <time className={s.time} title={formatFull(msg.created_at)} dateTime={new Date(msg.created_at).toISOString()}>{formatTimestamp(msg.created_at)}</time>
+          {/* the same way to the profile as the name beside it, for a pointer only: one stop for the keyboard is enough */}
+          <button type="button" className={s.avatar} data-group-start={showHeader} onClick={profile} tabIndex={-1} aria-hidden="true">
+            <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />
+          </button>
+          <div className={s.headerRow} id={whoId}>
+            <button type="button" className={s.author} data-author={msg.author_id} style={color ? { color } : undefined} onClick={profile} dir="auto">{name}</button>
+            <HeaderTime at={msg.created_at} />
           </div>
         </>
       ) : (
-        <span className={s.gutterTime} title={formatFull(msg.created_at)}>{formatTime(msg.created_at)}</span>
+        <>
+          <span className={s.gutterTime} title={formatFull(msg.created_at)} aria-hidden="true">{formatTime(msg.created_at)}</span>
+          <span className="visually-hidden" id={whoId}>{t("chat.messageItem.whoWhen", { name, time: formatTimestamp(msg.created_at) })}</span>
+        </>
       )}
       {editing ? (
         <EditMessage msg={msg} />
       ) : (
-        <div className={[s.content, jumbo ? s.jumbo : ""].join(" ")} style={jumboSize ? ({ "--jumbo-size": `${jumboSize}px` } as React.CSSProperties) : undefined}>
+        <div id={bodyId} className={[s.content, jumbo ? s.jumbo : ""].join(" ")} style={jumboSize ? ({ "--jumbo-size": `${jumboSize}px` } as React.CSSProperties) : undefined}>
           {msg.decryptError === "no_key" ? (
             <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
           ) : msg.decryptError === "bad" ? (
@@ -256,7 +288,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             </>
           )}
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
-          {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} /> : null}
+          {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
           {embeds ? <Embeds list={embeds} /> : null}
           {pending === "failed" ? (
             <div className={s.failedRow}>
@@ -268,7 +300,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         </div>
       )}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
-      {!pending && !editing && !selecting ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
+      {!pending && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
     </div>
   );
@@ -279,13 +311,27 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
  * what it offers, and with the Shift state in the row itself every loaded
  * message re-rendered — markdown, embeds and all — on each Shift press.
  */
-function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedMessage; pinned: boolean; dev: boolean; setPicker: (r: DOMRect | null) => void; openMenu: (x: number, y: number) => void }) {
+function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedMessage; pinned: boolean; dev: boolean; setPicker: (r: DOMRect | null) => void; openMenu: (x: number, y: number, image?: null, anchor?: ContextMenuState["anchor"]) => void }) {
   const shift = useShiftHeld();
   const setEditing = useUI((u) => u.setEditing);
   const setReplyTo = useUI((u) => u.setReplyTo);
+  // "hold Shift" means nothing without a keyboard beside a mouse
+  const [keyboardHint] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches);
+  /** ← and → walk the buttons, as a toolbar's arrows do; the reading direction decides which way is next. */
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+    const buttons = [...e.currentTarget.querySelectorAll<HTMLButtonElement>("button")];
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (at < 0 || buttons.length === 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const forward = (e.key === "ArrowRight") !== (document.documentElement.dir === "rtl");
+    const next = e.key === "Home" ? 0 : e.key === "End" ? buttons.length - 1 : (at + (forward ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next]!.focus();
+  };
   return (
-    <div className={s.toolbar} role="toolbar" data-shift={shift}>
-      <ToolButton label={t("chat.messageItem.addReaction")} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton>
+    <div className={s.toolbar} role="toolbar" aria-label={t("chat.messageItem.messageActions")} data-shift={shift} onKeyDown={onKey}>
+      {canReact(msg) ? <ToolButton label={t("chat.messageItem.addReaction")} onClick={(e) => setPicker(e.currentTarget.getBoundingClientRect())}><SmilePlus size={18} /></ToolButton> : null}
       {canEdit(msg) ? (
         <ToolButton label={t("chat.messageItem.editMessage")} onClick={() => setEditing({ channelId: msg.channel_id, messageId: msg.id })}><Pencil size={18} /></ToolButton>
       ) : null}
@@ -295,14 +341,36 @@ function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedM
           {canPin(msg) ? <ToolButton label={pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage")} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
           <ToolButton label={t("chat.messageItem.markUnread")} onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
           <ToolButton label={t("chat.messageItem.copyMessageLink")} onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
-          {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
+          {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void copyText(msg.id, t("clipboard.idCopied"))}><Hash size={18} /></ToolButton> : null}
           {canDelete(msg) ? (
             <ToolButton label={t("chat.messageItem.deleteMessageShiftSkipsThePrompt")} danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
           ) : null}
         </>
       ) : null}
-      <ToolButton label={shift ? t("chat.messageItem.everythingElse") : t("chat.messageItem.moreHoldShiftForAllActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
+      <ToolButton label={shift ? t("chat.messageItem.everythingElse") : keyboardHint ? t("chat.messageItem.moreHoldShiftForAllActions") : t("chat.chat.more")} onClick={(e) => { const a = menuAnchor(e.currentTarget); openMenu(a.left, a.bottom + 4, null, a); }}><MoreHorizontal size={18} /></ToolButton>
     </div>
+  );
+}
+
+/** How long a tapped time stays written out in full. */
+const EXACT_FOR_MS = 4000;
+
+/**
+ * When a message was sent, by its author's name. A phone shows no tooltip,
+ * so a tap writes the time out to the second for a few seconds; the menu says
+ * it too, for the keyboard.
+ */
+function HeaderTime({ at }: { at: number }) {
+  const [exact, setExact] = useState(false);
+  useEffect(() => {
+    if (!exact) return;
+    const timer = setTimeout(() => setExact(false), EXACT_FOR_MS);
+    return () => clearTimeout(timer);
+  }, [exact]);
+  return (
+    <time className={s.time} title={formatFull(at)} dateTime={new Date(at).toISOString()} data-exact={exact || undefined} onClick={() => setExact(true)}>
+      {exact ? formatExact(at) : formatTimestamp(at)}
+    </time>
   );
 }
 
@@ -310,11 +378,13 @@ function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedM
 function StickerView({ sticker }: { sticker: NonNullable<MessagePayload["sticker"]> }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const close = useCallback(() => setAnchor(null), []);
-  const packs = useExpressions((x) => x.packs);
   // New messages carry the format; older ones are looked up in the packs on
   // this device. Anything still unknown renders as a picture, exactly as
-  // before, which is right for every image format.
-  const format = sticker.format ?? useMemo(() => stickerFormatOf(packs, sticker.id), [packs, sticker.id]);
+  // before, which is right for every image format. (Only the lookup is
+  // conditional, never the hook: which hooks run must not depend on the data.)
+  const known = sticker.format;
+  const looked = useExpressions((x) => (known ? undefined : stickerFormatOf(x.packs, sticker.id)));
+  const format = known ?? looked;
   if (!sticker.blob) return <span className={s.edited}>{t("chat.messageItem.sticker")}</span>;
   const w = sticker.w && sticker.h ? Math.round((160 * sticker.w) / sticker.h) : 160;
   const toggle = (el: HTMLElement) => setAnchor((cur) => (cur ? null : el));

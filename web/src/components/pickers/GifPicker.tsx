@@ -13,6 +13,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { GifGrid, type GifTileData } from "./GifGrid";
 import { focusSearchOnOpen } from "./EmojiPicker";
+import { SearchBox } from "@/components/common/SearchBox";
 import s from "./Picker.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -195,7 +196,7 @@ export function GifPicker({ onPick }: { onPick: Pick }) {
     <div className={s.body} style={{ flexDirection: "column" }}>
       <div className={s.searchRow}>
         {enabled ? (
-          <input className={s.search} value={q} onChange={(e) => { setQ(e.target.value); setTab("search"); }} placeholder={tr_("pickers.gifPicker.searchKlipy")} aria-label={tr_("pickers.gifPicker.searchGifs")} autoFocus={focusSearchOnOpen()} />
+          <SearchBox className={s.searchBox} value={q} onChange={(v) => { setQ(v); setTab("search"); }} placeholder={tr_("pickers.gifPicker.searchKlipy")} aria-label={tr_("pickers.gifPicker.searchGifs")} autoFocus={focusSearchOnOpen()} />
         ) : null}
         <div className={s.gifTabs} role="tablist" aria-label={tr_("pickers.expressionPicker.gifs")}>
           <button className={s.gifTab} role="tab" aria-selected={tab === "favorites"} tabIndex={tab === "favorites" ? 0 : -1} onKeyDown={onTabKey} data-on={tab === "favorites"} onClick={() => setTab("favorites")}>{tr_("pickers.gifPicker.favorites")}</button>

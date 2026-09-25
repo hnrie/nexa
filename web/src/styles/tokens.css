@@ -1,5 +1,15 @@
 /* Design tokens. Values measured from the 2025 Discord client (docs/design/reference);
    colours and dimensions only — no asset is reproduced. Dark is the default theme. */
+/* The floating layers, bottom to top. Two of them once shared 200, and a toast
+   raised from the picture viewer (Copy image, a failed save) was drawn under it. */
+:root {
+  --z-popover: 40;
+  --z-modal: 100;
+  --z-lightbox: 200;
+  --z-menu: 300;
+  --z-toast: 350;
+  --z-tooltip: 400;
+}
 :root {
   --bg-base: #2c2d32;
   --bg-raised: #323339;

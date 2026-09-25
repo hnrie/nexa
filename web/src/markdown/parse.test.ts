@@ -189,6 +189,13 @@ const fixtures: Fixture[] = [
   { name: "digits are never emoji", src: "1", ast: [para(t("1"))] },
   { name: "emoji between text", src: "a\u{1F600}b", ast: [para(t("a"), uni("\u{1F600}"), t("b"))] },
   { name: "two emoji are two nodes", src: "\u{1F600}\u{1F601}", ast: [para(uni("\u{1F600}"), uni("\u{1F601}"))] },
+  // symbols that are text unless they ask to be emoji
+  { name: "a trademark sign stays text", src: "Nexa™ and © 2026", ast: [para(t("Nexa™ and © 2026"))] },
+  { name: "an arrow stays text", src: "a ↔ b ▶", ast: [para(t("a ↔ b ▶"))] },
+  { name: "a text symbol with FE0F is an emoji", src: "❤️", ast: [para(uni("❤️"))] },
+  { name: "a text symbol with a skin tone is an emoji", src: "✌\u{1F3FD}", ast: [para(uni("✌\u{1F3FD}"))] },
+  { name: "a flag made of a text symbol and FE0F is one emoji", src: "\u{1F3F3}️‍\u{1F308}", ast: [para(uni("\u{1F3F3}️‍\u{1F308}"))] },
+  { name: "a lone skin tone is not an emoji", src: "\u{1F3FD}", ast: [para(t("\u{1F3FD}"))] },
 
   // --- timestamps ---------------------------------------------------------
   { name: "timestamp defaults to f", src: "<t:1700000000>", ast: [para(ts(1700000000, "f"))] },

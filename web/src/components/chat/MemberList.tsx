@@ -15,11 +15,12 @@ import { isInstanceAdmin, memberColor, permRolesOf, rolesByPosition, useServers 
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { P, compute, has, toPermMember } from "@/lib/perms";
+import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
 
 import { t } from "@/i18n";
-// one collator for every sort: localeCompare with options builds one per call
-const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
+
+
 
 type Row =
   | { kind: "head"; key: string; label: string; count: number }
@@ -113,7 +114,8 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
   // of what a busy member list cost; now a change only regroups the list.
   const sorted = useMemo<Member[]>(() => {
     const named = visible.map((m) => ({ m, name: memberName(m.nickname, users[m.user_id]) }));
-    named.sort((a, b) => nameOrder.compare(a.name, b.name));
+    const order = nameOrder();
+    named.sort((a, b) => order.compare(a.name, b.name));
     return named.map((x) => x.m);
   }, [visible, users]);
 
@@ -175,13 +177,13 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
   };
 
   return (
-    <aside className={s.list} ref={ref} onScroll={(e) => virtual && setScrollTop(e.currentTarget.scrollTop)} data-testid="member-list" data-open={drawer ? !!open : undefined} aria-hidden={drawer && !open}>
+    <aside className={s.list} ref={ref} onScroll={(e) => virtual && setScrollTop(e.currentTarget.scrollTop)} data-testid="member-list" data-open={drawer ? !!open : undefined} aria-hidden={drawer && !open} {...(drawer && !open ? ({ inert: "" } as Record<string, string>) : {})}>
       {padTop ? <div style={{ height: padTop }} /> : null}
       {rows.slice(start, end).map((row) => {
         if (row.kind === "head") {
           return (
             <div key={row.key} className={s.head}>
-              {row.label} — {row.count}
+              {t("chat.memberList.roleGroupCount", { label: row.label, count: row.count })}
             </div>
           );
         }

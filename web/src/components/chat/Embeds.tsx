@@ -6,12 +6,15 @@ import { Button } from "@/components/common/Button";
 import { FavoriteButton } from "./FavoriteButton";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
-import { Lightbox, fitMedia } from "./Attachments";
+import { fitMedia } from "./Attachments";
+import { Lightbox } from "./Lightbox";
+import { AudioPlayer } from "./AudioPlayer";
 import { VideoPlayer } from "./VideoPlayer";
 import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 import { imageNameFromUrl } from "@/lib/imageActions";
 import { useMediaSrc } from "@/lib/mediaLinks";
+import { formatShortDate } from "@/lib/time";
 
 import { t } from "@/i18n";
 /** A readable name for a linked file: the last part of its address. */
@@ -43,7 +46,7 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
   // without a recorded size, the picture's own tells the frame what shape to be
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const dims = fitMedia(e.image_w ?? natural?.w, e.image_h ?? natural?.h);
-  const name = e.type === "gif" ? "GIF" : fileNameOf(e.url, t("server.emoji.image"));
+  const name = e.type === "gif" ? t("chat.embeds.gif") : fileNameOf(e.url, t("server.emoji.image"));
   // what "Download" saves it as; a GIF from the picker arrives through the proxy, whose address says nothing
   const fileName = e.type === "gif" ? "animation.gif" : fileNameOf(e.url, "image");
   if (src === null) return null;
@@ -62,6 +65,15 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
           referrerPolicy="no-referrer"
           data-image-src={src}
           data-image-name={fileName}
+          // the way into the viewer, for a keyboard as for a pointer
+          role="button"
+          tabIndex={0}
+          aria-haspopup="dialog"
+          onKeyDown={(ev) => {
+            if (ev.key !== "Enter" && ev.key !== " ") return;
+            ev.preventDefault();
+            setOpen(true);
+          }}
           onLoad={(ev) => {
             if (!e.image_w || !e.image_h) setNatural({ w: ev.currentTarget.naturalWidth, h: ev.currentTarget.naturalHeight });
           }}
@@ -69,7 +81,7 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
         {e.type === "gif" ? <span className={s.gifBadge}>GIF</span> : null}
         <FavoriteButton url={src} {...(e.image_w ? { w: e.image_w } : {})} {...(e.image_h ? { h: e.image_h } : {})} />
       </div>
-      {open ? <Lightbox src={src} name={fileName} onClose={() => setOpen(false)} /> : null}
+      {open ? <Lightbox items={[{ src, name: fileName }]} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -95,9 +107,9 @@ function playerSrc(e: UnfurlResult): string | null {
 /** "3 Feb 2026", for the line under a card's title. */
 function publishedOn(ms: number | undefined): string | null {
   if (!ms) return null;
-  const d = new Date(ms);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  if (Number.isNaN(new Date(ms).getTime())) return null;
+  // the app's language, not the browser's
+  return formatShortDate(ms);
 }
 
 /** The line above the title: the site's icon, its name, the author, the date. */
@@ -132,13 +144,13 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
   const media = useMediaSrc(e.media);
   const src = playerSrc(e);
   const big = !!e.image && (e.image_w ?? 0) >= 400;
-  const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer">{e.title}</a> : null;
+  const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer" dir="auto">{e.title}</a> : null;
   if (src) {
     return (
       <div className={s.card} style={e.color ? { borderInlineStartColor: e.color } : undefined}>
         <CardHead e={e} />
         {title}
-        {e.description ? <div className={s.desc}>{e.description}</div> : null}
+        {e.description ? <div className={s.desc} dir="auto">{e.description}</div> : null}
         <div className={s.video}>
           {play ? (
             <iframe
@@ -164,7 +176,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
         <div className={s.cardText}>
           <CardHead e={e} />
           {title}
-          {e.description ? <div className={s.desc}>{e.description}</div> : null}
+          {e.description ? <div className={s.desc} dir="auto">{e.description}</div> : null}
         </div>
         {image && !big && !e.media ? <img className={s.thumb} src={image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={image} data-image-name={imageNameFromUrl(image)} /> : null}
       </div>
@@ -172,9 +184,11 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
       {media && e.media_kind === "video" ? (
         <VideoPlayer src={media} name={fileNameOf(e.url, t("perms.video"))} width={e.media_w} height={e.media_h} />
       ) : media && e.media_kind === "audio" ? (
-        <audio className={s.audio} src={media} controls preload="none" />
+        // the app's own player, as for an uploaded voice note, not the browser's grey bar
+        <div className={s.audio}><AudioPlayer src={media} name={fileNameOf(e.url, t("chat.embeds.audio"))} /></div>
       ) : image && big ? (
-        <img className={s.large} src={image} alt="" loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={image} data-image-name={imageNameFromUrl(image)} />
+        // the picture is most of what the preview says, so it is named
+        <img className={s.large} src={image} alt={e.title || e.site_name || t("chat.embeds.linkPreviewImage")} loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={image} data-image-name={imageNameFromUrl(image)} />
       ) : null}
     </div>
   );
@@ -230,7 +244,7 @@ function InviteEmbed({ e }: { e: UnfurlResult }) {
           <span className={s.inviteIcon} data-blank="true">{(e.title ?? "?").slice(0, 1).toUpperCase()}</span>
         )}
         <div className={s.inviteText}>
-          <span className={s.inviteName}>{e.title}</span>
+          <span className={s.inviteName} dir="auto">{e.title}</span>
           <span className={s.inviteSub}>{[online, members].filter(Boolean).join(" · ") || e.description}</span>
         </div>
         <Button size="sm" variant="positive" onClick={open} data-testid="invite-join">{t("chat.embeds.join")}</Button>

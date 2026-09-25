@@ -2,10 +2,12 @@
  * What to type next. As a filter is being typed — `from:`, `in:`, `has:`,
  * `before:` — the people, channels or kinds that would match are offered with
  * their pictures, and a date filter opens a calendar rather than asking for
- * the exact spelling of a date.
+ * the exact spelling of a date. The list works from the search box itself:
+ * ↓ and ↑ move through it and Enter takes the one chosen, as the message box's
+ * suggestions do; it was reachable by pointer only.
  */
 import { CalendarDays } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useImperativeHandle, useMemo, useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import type { Channel, PublicUser } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { t } from "@/i18n";
@@ -43,18 +45,37 @@ export function completeToken(query: string, tok: PartialToken, value: string): 
 
 const HAS = ["link", "image", "file", "sticker", "embed"];
 
+/** The keys the search box hands the list; true when the list used the key. */
+export interface SuggestHandle {
+  key: (e: KeyboardEvent<HTMLInputElement>) => boolean;
+}
+
+/** One row: what it puts in the query, and how it looks. */
+interface Option {
+  id: string;
+  value: string;
+  body: ReactNode;
+}
+
 export function SearchSuggestions({
   query,
   users,
   channels,
   nicknames,
   onPick,
+  handle,
+  listId = "search-suggestions",
+  onActive,
 }: {
   query: string;
   users: Record<string, PublicUser>;
   channels: Channel[];
   nicknames?: Record<string, string>;
   onPick: (next: string) => void;
+  handle?: Ref<SuggestHandle>;
+  listId?: string;
+  /** The row ↑ and ↓ have reached, for the box's aria-activedescendant. */
+  onActive?: (optionId: string | undefined) => void;
 }) {
   const tok = useMemo(() => partialToken(query), [query]);
   const wanted = tok?.value.replace(/^[@#]/, "").toLowerCase() ?? "";
@@ -78,6 +99,66 @@ export function SearchSuggestions({
       .slice(0, 8);
   }, [tok, channels, users, wanted]);
 
+  const options = useMemo<Option[]>(() => {
+    if (!tok) return [];
+    if (tok.key === "has") {
+      return HAS.filter((h) => h.startsWith(wanted)).map((h) => ({ id: `${listId}-${h}`, value: h, body: <span className={s.suggestName}>{h}</span> }));
+    }
+    if (tok.key === "in") {
+      return chans.map(({ c, label, dm }) => ({
+        id: `${listId}-${c.id}`,
+        value: dm || /\s/.test(c.name) ? c.id : c.name,
+        body: (
+          <>
+            <span className={s.suggestHash}>{dm ? "@" : "#"}</span>
+            <span className={s.suggestName} dir="auto">{label}</span>
+          </>
+        ),
+      }));
+    }
+    if (tok.key === "from" || tok.key === "mentions") {
+      return people.map((u) => ({
+        id: `${listId}-${u.id}`,
+        value: u.username,
+        body: (
+          <>
+            <Avatar id={u.id} avatarId={u.avatar_id} name={u.display_name} size={20} />
+            <span className={s.suggestName} dir="auto">{u.display_name}</span>
+            <span className={s.suggestSub}>@{u.username}</span>
+          </>
+        ),
+      }));
+    }
+    return [];
+  }, [tok, wanted, chans, people, listId]);
+
+  const [active, setActive] = useState(-1);
+  // a new query starts the choosing over
+  useEffect(() => setActive(-1), [query]);
+  useEffect(() => onActive?.(active >= 0 ? options[active]?.id : undefined), [active, options, onActive]);
+
+  useImperativeHandle(
+    handle,
+    () => ({
+      key: (e) => {
+        if (!tok || options.length === 0) return false;
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const step = e.key === "ArrowDown" ? 1 : -1;
+          setActive((a) => (a < 0 ? (step > 0 ? 0 : options.length - 1) : (a + step + options.length) % options.length));
+          return true;
+        }
+        if ((e.key === "Enter" || e.key === "Tab") && active >= 0 && options[active]) {
+          e.preventDefault();
+          onPick(completeToken(query, tok, options[active]!.value));
+          return true;
+        }
+        return false;
+      },
+    }),
+    [tok, options, active, onPick, query],
+  );
+
   if (!tok) return null;
 
   if (tok.key === "before" || tok.key === "after") {
@@ -98,42 +179,23 @@ export function SearchSuggestions({
     );
   }
 
-  if (tok.key === "has") {
-    const list = HAS.filter((h) => h.startsWith(wanted));
-    if (list.length === 0) return null;
-    return (
-      <div className={s.suggest} data-testid="search-suggest">
-        {list.map((h) => (
-          <button key={h} className={s.suggestRow} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(completeToken(query, tok, h))}>
-            <span className={s.suggestName}>{h}</span>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  if (tok.key === "in") {
-    if (chans.length === 0) return null;
-    return (
-      <div className={s.suggest} data-testid="search-suggest">
-        {chans.map(({ c, label, dm }) => (
-          <button key={c.id} className={s.suggestRow} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(completeToken(query, tok, dm || /\s/.test(c.name) ? c.id : c.name))}>
-            <span className={s.suggestHash}>{dm ? "@" : "#"}</span>
-            <span className={s.suggestName}>{label}</span>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  if (people.length === 0) return null;
+  if (options.length === 0) return null;
   return (
-    <div className={s.suggest} data-testid="search-suggest">
-      {people.map((u) => (
-        <button key={u.id} className={s.suggestRow} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(completeToken(query, tok, u.username))}>
-          <Avatar id={u.id} avatarId={u.avatar_id} name={u.display_name} size={20} />
-          <span className={s.suggestName}>{u.display_name}</span>
-          <span className={s.suggestSub}>@{u.username}</span>
+    <div className={s.suggest} id={listId} role="listbox" aria-label={t("chat.chat.search")} data-testid="search-suggest">
+      {options.map((o, i) => (
+        <button
+          key={o.id}
+          id={o.id}
+          role="option"
+          aria-selected={i === active}
+          data-active={i === active || undefined}
+          tabIndex={-1}
+          className={s.suggestRow}
+          onMouseDown={(e) => e.preventDefault()}
+          onMouseEnter={() => setActive(i)}
+          onClick={() => onPick(completeToken(query, tok, o.value))}
+        >
+          {o.body}
         </button>
       ))}
     </div>

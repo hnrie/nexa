@@ -1,5 +1,5 @@
 import { Search, X } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -17,7 +17,8 @@ import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { MAX_RESULTS, useFullSearch } from "./useFullSearch";
-import { SearchSuggestions } from "./SearchSuggestions";
+import { SearchSuggestions, type SuggestHandle } from "./SearchSuggestions";
+import { SearchBox } from "@/components/common/SearchBox";
 import s from "./Search.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -41,11 +42,39 @@ function newestFirst(a: DecryptedMessage, b: DecryptedMessage): number {
  * decrypts it here and streams the matches in as they turn up. That takes as
  * long as it takes, so the panel says where it has got to and stops when asked.
  */
-export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }: { channel: Channel; query: string; onClose: () => void; onQuery: (v: string) => void; onJump?: (() => void) | undefined; inline?: boolean }) {
+export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline, keysRef, onSuggest }: {
+  channel: Channel;
+  query: string;
+  onClose: () => void;
+  onQuery: (v: string) => void;
+  onJump?: (() => void) | undefined;
+  /** The box is in the panel (a phone, a tablet), which then covers the chat as a dialog of its own. */
+  inline?: boolean;
+  /** Filled with the suggestion list's key handler, for a search box outside the panel. */
+  keysRef?: MutableRefObject<((e: KeyboardEvent<HTMLInputElement>) => boolean) | null>;
+  /** The suggestion list's id and chosen row, for a search box outside the panel. */
+  onSuggest?: (active: string | undefined) => void;
+}) {
   // Results read as the message does, not as its source: mentions by name,
-  // custom emoji as :name:, and a spoiler still hidden.
+  // custom emoji as :name:, a spoiler still hidden, and no markup — a heading
+  // reads as its words, not as "## A heading".
   const renderCtx = useRenderCtx();
-  const readable = (source: string): string => plainText(parse(source, { inline: true }), renderCtx);
+  const readable = (source: string): string => plainText(parse(source), renderCtx);
+  const suggest = useRef<SuggestHandle>(null);
+  const [activeOption, setActiveOption] = useState<string | undefined>(undefined);
+  const listId = useId();
+  if (keysRef) keysRef.current = (e) => suggest.current?.key(e) ?? false;
+  useEffect(() => onSuggest?.(activeOption), [activeOption, onSuggest]);
+  const panel = useRef<HTMLElement>(null);
+  // Where the panel covers the chat it is a dialog: focus goes in (to its box)
+  // and comes back to what opened it.
+  useEffect(() => {
+    if (!inline) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [inline]);
   const nav = useNavigate();
   const users = useUsers((u) => u.byId);
   const meId = useAuth((a) => a.me?.id);
@@ -114,19 +143,42 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
       : t("search.search.notStarted");
 
   return (
-    <aside className={s.panel} data-testid="search-panel">
+    <aside
+      ref={panel}
+      className={s.panel}
+      data-testid="search-panel"
+      role={inline ? "dialog" : "complementary"}
+      aria-modal={inline || undefined}
+      aria-label={t("chat.chat.searchMessages")}
+      onKeyDown={(e) => {
+        // covering the chat, the panel closes on Escape itself
+        if (!inline || e.key !== "Escape" || e.defaultPrevented) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }}
+    >
       <div className={s.head}>
-        <span className={s.headText}><Search size={16} /> {isEmptyQuery(q) ? t("chat.chat.search") : t("search.search.results", { count: results.length })}</span>
+        {/* the count is said as it changes, politely; the running progress below is not */}
+        <span className={s.headText} role="status"><Search size={16} aria-hidden="true" /> {isEmptyQuery(q) ? t("chat.chat.search") : t("search.search.results", { count: results.length })}</span>
         <button className={s.close} aria-label={t("search.search.closeSearch")} onClick={onClose}><X size={18} /></button>
       </div>
       {inline ? (
-        <div className={s.inlineSearch}>
-          <Search size={16} />
-          <input value={query} placeholder={t("chat.chat.search")} aria-label={t("chat.chat.searchMessages")} autoFocus data-testid="search-input-mobile" onChange={(e) => onQuery(e.target.value)} />
-          {query ? <button className={s.clear} aria-label={t("chat.chat.clearSearch")} onClick={() => onQuery("")} data-testid="search-clear-mobile"><X size={14} /></button> : null}
-        </div>
+        <SearchBox
+          className={s.inlineSearch}
+          value={query}
+          onChange={onQuery}
+          placeholder={t("chat.chat.search")}
+          aria-label={t("chat.chat.searchMessages")}
+          autoFocus
+          data-testid="search-input-mobile"
+          role="combobox"
+          aria-controls={listId}
+          aria-activedescendant={activeOption}
+          onKeyDown={(e) => void suggest.current?.key(e)}
+        />
       ) : null}
-      <SearchSuggestions query={query} users={users} channels={scope} nicknames={nicknames} onPick={onQuery} />
+      <SearchSuggestions query={query} users={users} channels={scope} nicknames={nicknames} onPick={onQuery} handle={suggest} listId={listId} onActive={setActiveOption} />
       {isEmptyQuery(q) ? (
         <div className={s.help}>
           <p>{t("search.search.helpEverything")}</p>
@@ -150,11 +202,11 @@ export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline }
             <button key={m.id} className={s.result} onClick={() => jump(m.channel_id, m.id)} data-result={m.id}>
               <div className={s.resultHead}>
                 <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={name} size={20} />
-                <span className={s.resultName}>{name}</span>
+                <span className={s.resultName} dir="auto">{name}</span>
                 {m.channel_id !== channel.id && where ? <span className={s.resultChan}>{where}</span> : null}
                 <span className={s.resultTime} title={formatFull(m.created_at)}>{formatTimestamp(m.created_at)}</span>
               </div>
-              <div className={s.resultText}>
+              <div className={s.resultText} dir="auto">
                 {m.payload?.t ? highlight(readable(m.payload.t), q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("search.search.filesCount", { count: m.payload.att.length }) : ""}
               </div>
             </button>

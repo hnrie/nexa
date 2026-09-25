@@ -6,13 +6,18 @@ import type { Channel } from "@/api/types";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
+import { useUsers } from "@/stores/users";
 import { MessageList } from "./MessageList";
 
 // The list only ever asks a row where it is and what its id is, so a stand-in
-// keeps these tests about scrolling rather than about markdown and avatars.
-vi.mock("./MessageItem", () => ({
-  MessageItem: ({ msg }: { msg: DecryptedMessage }) => <div data-id={msg.id} data-testid="row" />,
-}));
+// keeps these tests about scrolling rather than about markdown and avatars. It
+// says whether the list counts it as the row being looked at.
+vi.mock("./MessageItem", async () => {
+  const { useRowActive } = await import("./activeRow");
+  return {
+    MessageItem: ({ msg }: { msg: DecryptedMessage }) => <div data-id={msg.id} data-row="" tabIndex={-1} data-testid="row" data-active={useRowActive(msg.id)} />,
+  };
+});
 
 const CHANNEL = "700";
 const ME = "1";
@@ -403,5 +408,46 @@ describe("MessageList behaviours the anchoring must not cost", () => {
     expect(topOf(keeping)).toBe(was);
     // it counts what came in, and says since when
     expect(document.body.textContent).toMatch(/1 new message since \d{1,2}:\d{2}/);
+  });
+});
+
+describe("MessageList for the keyboard and screen readers", () => {
+  const active = () => [...scroller.querySelectorAll<HTMLElement>('[data-active="true"]')].map((r) => r.dataset.id);
+  const row = (id: string) => scroller.querySelector<HTMLElement>(`[data-id="${id}"]`)!;
+
+  it("counts only the row pointed at, or holding focus, as looked at", () => {
+    seed(5);
+    show();
+    expect(active()).toEqual([]);
+    fireEvent.pointerOver(row("1003"));
+    expect(active()).toEqual(["1003"]);
+    fireEvent.pointerOver(row("1004"));
+    expect(active()).toEqual(["1004"]);
+    fireEvent.pointerLeave(scroller);
+    expect(active()).toEqual([]);
+    act(() => row("1002").focus());
+    expect(active()).toEqual(["1002"]);
+    act(() => row("1002").blur());
+    expect(active()).toEqual([]);
+  });
+
+  it("tells a screen reader about a message arriving, and not about a page of history", () => {
+    useUsers.setState({ byId: { [THEM]: { id: THEM, username: "them", display_name: "Them" } as never } });
+    seed(60);
+    show();
+    const status = () => document.querySelector('[role="status"]')!.textContent;
+    expect(status()).toBe("");
+
+    act(() => useMessages.getState().insert(CHANNEL, [msg("1061")]));
+    expect(status()).toBe("Them: m1061");
+
+    // older messages paged in above are not news
+    scrollTo(0);
+    inFlight.land(["951", "952"]);
+    expect(status()).toBe("Them: m1061");
+
+    // nor is your own message
+    act(() => useMessages.getState().insert(CHANNEL, [msg("1062", ME)]));
+    expect(status()).toBe("Them: m1061");
   });
 });

@@ -13,10 +13,11 @@ import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
 import { groupMemberMenuItems } from "./groupMemberMenu";
+import { nameOrder } from "./nameOrder";
 import s from "./MemberList.module.css";
 
 import { t } from "@/i18n";
-const nameOrder = new Intl.Collator(undefined, { sensitivity: "base" });
+
 
 /**
  * A group's members, drawn exactly as a server's member list: online first,
@@ -40,7 +41,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
         const name = nicknames[id] || displayName(users[id], id === me?.id ? me.display_name : t("names.unknownUser"));
         return { id, name, offline: status === "offline" || status === "invisible" };
       })
-      .sort((a, b) => Number(a.offline) - Number(b.offline) || nameOrder.compare(a.name, b.name));
+      .sort((a, b) => Number(a.offline) - Number(b.offline) || nameOrder().compare(a.name, b.name));
   }, [channel.recipient_ids, presence, users, rels, me]);
 
   return (

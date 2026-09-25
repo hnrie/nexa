@@ -1,6 +1,7 @@
 import { ApiError } from "@/api/client";
 import { channels as channelsApi } from "@/api/channels";
 import { closeDM, managesGroup } from "@/components/sidebar/dmMenu";
+import { copyText } from "@/lib/clipboard";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -109,7 +110,7 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   }
   if (useSettings.getState().settings.developerMode) {
     items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(userId).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success")) });
+    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void copyText(userId, t("clipboard.idCopied")) });
   }
   return items;
 }
