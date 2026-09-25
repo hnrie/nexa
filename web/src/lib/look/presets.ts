@@ -39,6 +39,7 @@ const RECIPES: Recipe[] = [
   { id: "amber", nameKey: "look.presets.amber", group: "dark", colours: { background: "#241e16", accent: "#eaa23a", scheme: "dark" } },
   { id: "ocean", nameKey: "look.presets.ocean", group: "dark", colours: { background: "#10202a", accent: "#127f91", scheme: "dark" } },
   { id: "nexa-light", nameKey: "look.presets.nexaLight", group: "light", colours: { background: "#fbf9ff", accent: "#7400f0", scheme: "light" } },
+  { id: "sky", nameKey: "look.presets.sky", group: "light", colours: { background: "#f5f8ff", accent: "#2f5fe0", scheme: "light" } },
   { id: "forest-light", nameKey: "look.presets.forestLight", group: "light", colours: { background: "#f6faf5", accent: "#1d7c47", scheme: "light" } },
   { id: "rose-light", nameKey: "look.presets.roseLight", group: "light", colours: { background: "#fff7f9", accent: "#c0245b", scheme: "light" } },
   { id: "amber-light", nameKey: "look.presets.amberLight", group: "light", colours: { background: "#fffaf0", accent: "#a85a00", scheme: "light" } },

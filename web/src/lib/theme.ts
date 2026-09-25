@@ -176,7 +176,8 @@ export function applyTheme(s: Appearance, draft?: ThemeDraft | null): void {
   root.dataset["look"] = look.id;
   root.style.setProperty("--font-scale", String(Math.min(1.5, Math.max(0.75, s.fontScale || 1))));
   for (const v of ACCENT_VARS) root.style.removeProperty(v);
-  const accent = s.accent ? accentVarsOn(s.accent, hardestSurface(look), look.scheme) : null;
+  // A theme being built is shown with its own accent, which is what is being chosen.
+  const accent = s.accent && !draft ? accentVarsOn(s.accent, hardestSurface(look), look.scheme) : null;
   const rules = [look.tokens ? declarations(look.tokens) : "", accent ? Object.entries(accent).map(([k, v]) => `${k}:${v}`).join(";") : ""].filter(Boolean).join(";");
   const style = themeStyle();
   const text = rules ? `:root{${rules}}` : "";

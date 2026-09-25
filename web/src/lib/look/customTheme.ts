@@ -108,6 +108,14 @@ export function resolveCustom(theme: CustomTheme): ResolvedTheme {
   return { tokens, scheme: luminance(toHex(parseColour(tokens["bg-raised"])?.rgb ?? [0, 0, 0])) > 0.18 ? "light" : "dark" };
 }
 
+/** The palette of any theme the gallery can show: classic, preset or custom. */
+export function themeTokens(id: string, customs: readonly CustomTheme[]): TokenMap | null {
+  const preset = presetTokens(id);
+  if (preset) return preset;
+  const custom = isCustomId(id) ? customs.find((c) => c.id === id) : undefined;
+  return custom ? resolveCustom(custom).tokens : null;
+}
+
 /** Whether links should be underlined in this custom theme: when it starts from a preset that asks for it. */
 export function customUnderlines(theme: CustomTheme): boolean {
   return theme.source.kind === "preset" && !!presetById(theme.source.id)?.underlineLinks;
