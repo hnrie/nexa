@@ -372,6 +372,12 @@
   "composer.composer.youDoNotHavePermissionTo": "このチャンネルでメッセージを送信する権限がありません。",
   "composer.dropOverlay.dragToUpload": "ドラッグしてアップロード",
   "composer.editYourMessage": "メッセージを編集",
+  "composer.limit.left": {
+    "other": "残り {count} 文字"
+  },
+  "composer.limit.over": {
+    "other": "上限を {count} 文字超えています"
+  },
   "composer.replyingTo": "{name} に返信中",
   "composer.send.slowModeTryAgain": "低速モード中です。{seconds} 秒後にもう一度お試しください。",
   "composer.send.waitingForTheEncryptionKeyFor": "この会話の暗号鍵を待っています。鍵を持っている人がオンラインになる必要があります。",

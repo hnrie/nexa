@@ -386,6 +386,14 @@
   "composer.composer.youDoNotHavePermissionTo": "You do not have permission to send messages in this channel.",
   "composer.dropOverlay.dragToUpload": "Drag to Upload",
   "composer.editYourMessage": "Edit your message",
+  "composer.limit.left": {
+    "one": "{count} character left",
+    "other": "{count} characters left"
+  },
+  "composer.limit.over": {
+    "one": "{count} character over the limit",
+    "other": "{count} characters over the limit"
+  },
   "composer.replyingTo": "Replying to {name}",
   "composer.send.slowModeTryAgain": "Slow mode is on. Try again in {seconds}s.",
   "composer.send.waitingForTheEncryptionKeyFor": "Waiting for the encryption key for this conversation. Someone who has it needs to be online.",

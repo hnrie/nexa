@@ -432,6 +432,22 @@
   "composer.composer.youDoNotHavePermissionTo": "ليس لديك إذن لإرسال رسائل في هذه القناة.",
   "composer.dropOverlay.dragToUpload": "اسحب للرفع",
   "composer.editYourMessage": "عدّل رسالتك",
+  "composer.limit.left": {
+    "zero": "بقي {count} حرف",
+    "one": "بقي حرف واحد",
+    "two": "بقي حرفان",
+    "few": "بقيت {count} أحرف",
+    "many": "بقي {count} حرفًا",
+    "other": "بقي {count} حرف"
+  },
+  "composer.limit.over": {
+    "zero": "{count} حرف فوق الحد",
+    "one": "حرف واحد فوق الحد",
+    "two": "حرفان فوق الحد",
+    "few": "{count} أحرف فوق الحد",
+    "many": "{count} حرفًا فوق الحد",
+    "other": "{count} حرف فوق الحد"
+  },
   "composer.replyingTo": "رد على {name}",
   "composer.send.slowModeTryAgain": "الوضع البطيء مفعّل. حاول مجددًا بعد {seconds} ثانية.",
   "composer.send.waitingForTheEncryptionKeyFor": "في انتظار مفتاح تشفير هذه المحادثة. يجب أن يكون أحد من يملكه متصلًا.",

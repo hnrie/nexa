@@ -408,6 +408,18 @@
   "composer.composer.youDoNotHavePermissionTo": "У вас нет прав отправлять сообщения в этом канале.",
   "composer.dropOverlay.dragToUpload": "Перетащите, чтобы загрузить",
   "composer.editYourMessage": "Измените сообщение",
+  "composer.limit.left": {
+    "one": "Остался {count} символ",
+    "few": "Осталось {count} символа",
+    "many": "Осталось {count} символов",
+    "other": "Осталось {count} символа"
+  },
+  "composer.limit.over": {
+    "one": "На {count} символ больше лимита",
+    "few": "На {count} символа больше лимита",
+    "many": "На {count} символов больше лимита",
+    "other": "На {count} символа больше лимита"
+  },
   "composer.replyingTo": "Ответ {name}",
   "composer.send.slowModeTryAgain": "Включён медленный режим. Попробуйте через {seconds} с.",
   "composer.send.waitingForTheEncryptionKeyFor": "Ожидание ключа шифрования этой беседы. Кто-то, у кого он есть, должен быть в сети.",

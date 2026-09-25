@@ -42,7 +42,9 @@ import s from "./Composer.module.css";
 
 import { t as tr_, Tr } from "@/i18n";
 import { formatShortDuration } from "@/lib/time";
-const MAX_LEN = 4000;
+import { MAX_MESSAGE_LENGTH, pasteOverflows, tooLong, tooLongMessage } from "./limit";
+import { MessageCounter } from "./MessageCounter";
+import { applyWrap, formatShortcut } from "./wrapShortcut";
 /** How many files one message carries. */
 const MAX_FILES = 10;
 // a stable empty tray, so a conversation with nothing in it does not re-render on every change to another
@@ -474,7 +476,7 @@ export function Composer({ channel }: { channel: Channel }) {
   const send = () => {
     if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
     let body = text.trim();
-    if (body.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
+    if (tooLong(body)) return toast(tooLongMessage(), "error");
     const cmd = runCommand(body);
     if (cmd.kind === "command") body = cmd.text;
     else if (cmd.kind === "empty") return toast(tr_("composer.composer.commandNeedsText", { name: cmd.name }), "error");
@@ -508,6 +510,13 @@ export function Composer({ channel }: { channel: Channel }) {
     // Korean…) belong to it: Enter confirms the word, arrows pick one. Safari
     // sends that Enter after composition ends, marked only by keyCode 229.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    // Ctrl/Cmd+B, I, U: the selection in bold, italics or underline, as markdown
+    const marker = formatShortcut(e);
+    if (marker) {
+      e.preventDefault();
+      applyWrap(e.currentTarget, marker);
+      return;
+    }
     if (ac) {
       if (e.key === "ArrowDown") { e.preventDefault(); setAc({ ...ac, index: (ac.index + 1) % ac.items.length }); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setAc({ ...ac, index: (ac.index - 1 + ac.items.length) % ac.items.length }); return; }
@@ -548,7 +557,6 @@ export function Composer({ channel }: { channel: Channel }) {
   const selecting = useSelection((x) => x.channelId) !== null;
   const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
   const replyName = useShownName(channel.id, replyTarget?.author_id);
-  const counterOn = text.length > MAX_LEN - 200;
 
   if (!canSend) {
     return (
@@ -609,7 +617,7 @@ export function Composer({ channel }: { channel: Channel }) {
         <div className={s.notice} role="status" data-testid="composer-notice">
           <span className={s.noticeText}>
             {notice.kind === "long"
-              ? tr_("composer.composer.pasteTooLong", { count: MAX_LEN })
+              ? tr_("composer.composer.pasteTooLong", { count: MAX_MESSAGE_LENGTH })
               : notice.dropped.length === 1
                 ? tr_("composer.composer.fileLeftOut", { max: MAX_FILES, name: notice.dropped[0]! })
                 : tr_("composer.composer.filesLeftOut", { max: MAX_FILES, name: notice.dropped[0]!, count: notice.dropped.length - 1 })}
@@ -694,7 +702,7 @@ export function Composer({ channel }: { channel: Channel }) {
             const el = e.currentTarget;
             const start = el.selectionStart ?? el.value.length;
             const end = el.selectionEnd ?? start;
-            if (el.value.length - (end - start) + pasted.length > MAX_LEN) {
+            if (pasteOverflows(el.value, start, end, pasted)) {
               e.preventDefault();
               setNotice({ kind: "long", text: pasted, start, end });
             }
@@ -709,7 +717,7 @@ export function Composer({ channel }: { channel: Channel }) {
           <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
         </div>
       </div>
-      {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
+      <MessageCounter text={text} className={s.counter} />
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
         <span className={s.slowmode} data-active={remaining > 0} title={tr_("composer.composer.slowModeIsEnabled")}>
           <Timer size={14} /> {remaining > 0 ? formatShortDuration(remaining) : tr_("composer.composer.slowModeIsEnabled")}

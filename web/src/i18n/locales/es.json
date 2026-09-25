@@ -395,6 +395,16 @@
   "composer.composer.youDoNotHavePermissionTo": "No tienes permiso para enviar mensajes en este canal.",
   "composer.dropOverlay.dragToUpload": "Arrastra para subir",
   "composer.editYourMessage": "Edita tu mensaje",
+  "composer.limit.left": {
+    "one": "Queda {count} carácter",
+    "many": "Quedan {count} caracteres",
+    "other": "Quedan {count} caracteres"
+  },
+  "composer.limit.over": {
+    "one": "{count} carácter por encima del límite",
+    "many": "{count} caracteres por encima del límite",
+    "other": "{count} caracteres por encima del límite"
+  },
   "composer.replyingTo": "Respondiendo a {name}",
   "composer.send.slowModeTryAgain": "El modo lento está activo. Inténtalo de nuevo en {seconds} s.",
   "composer.send.waitingForTheEncryptionKeyFor": "Esperando la clave de cifrado de esta conversación. Alguien que la tenga tiene que estar en línea.",

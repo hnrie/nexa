@@ -386,6 +386,14 @@
   "composer.composer.youDoNotHavePermissionTo": "Du darfst in diesem Kanal keine Nachrichten senden.",
   "composer.dropOverlay.dragToUpload": "Zum Hochladen ziehen",
   "composer.editYourMessage": "Bearbeite deine Nachricht",
+  "composer.limit.left": {
+    "one": "Noch {count} Zeichen",
+    "other": "Noch {count} Zeichen"
+  },
+  "composer.limit.over": {
+    "one": "{count} Zeichen zu viel",
+    "other": "{count} Zeichen zu viel"
+  },
   "composer.replyingTo": "Antwort an {name}",
   "composer.send.slowModeTryAgain": "Der langsame Modus ist an. Versuch es in {seconds} s noch einmal.",
   "composer.send.waitingForTheEncryptionKeyFor": "Warten auf den Schlüssel dieser Unterhaltung. Jemand, der ihn hat, muss online sein.",

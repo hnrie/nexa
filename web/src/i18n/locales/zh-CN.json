@@ -372,6 +372,12 @@
   "composer.composer.youDoNotHavePermissionTo": "你没有在这个频道发送消息的权限。",
   "composer.dropOverlay.dragToUpload": "拖进来上传",
   "composer.editYourMessage": "编辑你的消息",
+  "composer.limit.left": {
+    "other": "还剩 {count} 个字符"
+  },
+  "composer.limit.over": {
+    "other": "超出上限 {count} 个字符"
+  },
   "composer.replyingTo": "正在回复 {name}",
   "composer.send.slowModeTryAgain": "慢速模式已开启。请在 {seconds} 秒后重试。",
   "composer.send.waitingForTheEncryptionKeyFor": "正在等待这个对话的加密密钥。需要有持有密钥的人在线。",

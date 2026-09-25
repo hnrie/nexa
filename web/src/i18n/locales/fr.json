@@ -395,6 +395,16 @@
   "composer.composer.youDoNotHavePermissionTo": "Vous n’avez pas la permission d’envoyer des messages dans ce salon.",
   "composer.dropOverlay.dragToUpload": "Glissez pour envoyer",
   "composer.editYourMessage": "Modifiez votre message",
+  "composer.limit.left": {
+    "one": "{count} caractère restant",
+    "many": "{count} caractères restants",
+    "other": "{count} caractères restants"
+  },
+  "composer.limit.over": {
+    "one": "{count} caractère de trop",
+    "many": "{count} caractères de trop",
+    "other": "{count} caractères de trop"
+  },
   "composer.replyingTo": "Réponse à {name}",
   "composer.send.slowModeTryAgain": "Le mode lent est actif. Réessayez dans {seconds} s.",
   "composer.send.waitingForTheEncryptionKeyFor": "En attente de la clé de chiffrement de cette conversation. Quelqu’un qui l’a doit être en ligne.",

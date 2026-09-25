@@ -17,6 +17,16 @@ import (
 )
 
 const (
+	// maxEnvelopeBytes is one message's ceiling, for sending and editing alike.
+	//
+	// The server cannot count a message's characters: all it holds is
+	// ciphertext, and the JSON sealed inside carries the text (whose mentions
+	// and custom emoji are already expanded to <@id> tokens, several times
+	// longer than the names typed), the keys and names of up to ten files, and
+	// up to five link previews. The client holds what people type to 4000
+	// characters (web/src/components/composer/limit.ts); this is what the
+	// largest message it can legitimately send fits under, so a hand-built
+	// message, or an edit that went round the client's limit, gets no further.
 	maxEnvelopeBytes = 64 << 10
 	maxMentions      = 50
 	maxAttachments   = 10
@@ -38,6 +48,8 @@ func (s *Server) messageRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}/@me", s.authed(s.handleReactionRemove))
 	mux.Handle("GET /api/v1/channels/{id}/messages/{mid}/reactions/{emoji}", s.authed(s.handleReactors))
 }
+
+var errMessageTooLong = E(http.StatusRequestEntityTooLarge, "message_too_long", "The message is too long. Shorten it and try again.")
 
 // envelope mirrors the client's encrypted message format.
 type envelope struct {
@@ -182,6 +194,11 @@ func (s *Server) dmBlocked(w http.ResponseWriter, r *http.Request, ch *store.Cha
 // passed as alt: a channel that later got its own key still has older
 // messages under the server's.
 func (s *Server) checkEnvelope(w http.ResponseWriter, r *http.Request, ch *store.Channel, body *messageBody, alt *ids.ID) (*envelope, bool) {
+	// told apart from a malformed envelope, so the sender can say what to do
+	if len(body.Ciphertext) > maxEnvelopeBytes {
+		WriteError(w, errMessageTooLong)
+		return nil, false
+	}
 	env, ok := validEnvelope(body.Ciphertext)
 	if !ok {
 		WriteError(w, E(http.StatusBadRequest, "bad_envelope", "The encrypted message envelope is malformed."))

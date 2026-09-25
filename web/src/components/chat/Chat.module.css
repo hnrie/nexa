@@ -166,8 +166,22 @@ button.sysName:hover { text-decoration: underline; }
 .editHint { font-size: 12px; color: var(--text-muted); }
 .editHint button { color: var(--link); font: inherit; padding: 0; }
 .editHint button:hover { text-decoration: underline; }
-.editActions { display: flex; justify-content: flex-end; gap: 8px; }
+.editActions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
 .editBtn { min-height: 40px; }
+/* the characters left, the same as under the message box: at the end of the hint, or before the buttons */
+.editFoot { display: flex; align-items: baseline; gap: 12px; }
+.editFoot .editHint { min-width: 0; }
+.editCounter { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.editActions .editCounter { margin-inline-start: 0; margin-inline-end: auto; }
+.editCounter[data-over="true"] { color: var(--text-danger); font-weight: 600; }
+/* a paste held back because it would make the message too long */
+.editNotice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding-block: 6px; padding-inline: 12px 6px; border-radius: var(--radius-sm); background: var(--bg-surface); border-inline-start: 3px solid var(--warning); font-size: 14px; color: var(--text); }
+.editNoticeText { flex: 1 1 12em; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+.editNoticeBtn { min-height: 32px; padding: 0 12px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.editNoticeBtn:hover { background: var(--bg-hover); }
+.editNoticeClose { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; border-radius: var(--radius-xs); color: var(--text-muted); }
+.editNoticeClose:hover { color: var(--text); }
+@media (pointer: coarse) { .editNoticeBtn, .editNoticeClose { min-height: 40px; } .editNoticeClose { min-width: 40px; } }
 /* the emoji themselves scale from --jumbo-size; the block keeps the normal text size
    so a stray character next to them is not enormous too */
 .jumbo { line-height: 1.15; }

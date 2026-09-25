@@ -386,6 +386,14 @@
   "composer.composer.youDoNotHavePermissionTo": "आपको इस चैनल में संदेश भेजने की अनुमति नहीं है।",
   "composer.dropOverlay.dragToUpload": "अपलोड करने के लिए खींचें",
   "composer.editYourMessage": "अपना संदेश संपादित करें",
+  "composer.limit.left": {
+    "one": "{count} अक्षर बाकी",
+    "other": "{count} अक्षर बाकी"
+  },
+  "composer.limit.over": {
+    "one": "सीमा से {count} अक्षर ज़्यादा",
+    "other": "सीमा से {count} अक्षर ज़्यादा"
+  },
   "composer.replyingTo": "{name} को जवाब",
   "composer.send.slowModeTryAgain": "धीमा मोड चालू है। {seconds} सेकंड बाद फिर कोशिश करें।",
   "composer.send.waitingForTheEncryptionKeyFor": "इस बातचीत की एन्क्रिप्शन कुंजी का इंतज़ार है। जिसके पास वह है उसका ऑनलाइन होना ज़रूरी है।",
