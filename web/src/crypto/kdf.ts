@@ -8,7 +8,6 @@
 
 import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
-import { argon2id } from "hash-wasm";
 import { randomBytes, utf8 } from "./bytes";
 
 export interface KdfParams {
@@ -102,6 +101,9 @@ function expand(ikm: Uint8Array, info: Uint8Array): Uint8Array {
  */
 export async function deriveMaster(password: string, salt: Uint8Array, p: KdfParams): Promise<Uint8Array> {
   if (!kdfParamsAcceptable(p)) throw new WeakKdfError(`argon2id parameters outside the accepted range: m=${p.m} t=${p.t} p=${p.p} v=${p.v}`);
+  // Loaded when a password is first stretched: every visitor to the front page
+  // or an invite used to download it with the app.
+  const { argon2id } = await import("hash-wasm");
   return argon2id({
     password: password.normalize("NFKC"),
     salt,

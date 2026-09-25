@@ -2,8 +2,8 @@ import { Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { lazyPage } from "@/lib/lazyChunk";
 import { FullScreenSpinner } from "@/components/common/Spinner";
-import { AppShell } from "@/components/shell/AppShell";
 import { RedirectIfAuthed, RequireAuth } from "@/components/shell/RequireAuth";
+import { hasSavedSession } from "@/stores/auth";
 
 const HomePage = lazyPage(() => import("@/pages/HomePage"));
 const LoginPage = lazyPage(() => import("@/pages/LoginPage"));
@@ -20,6 +20,16 @@ const LegalPage = lazyPage(() => import("@/pages/LegalPage"));
 const NexaPage = lazyPage(() => import("@/pages/NexaPage"));
 const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
+// The app itself: its sidebars, conversations, calls and every store behind
+// them. The public pages (the front page, signing in, an invite) never load it.
+const loadAppShell = () => import("@/components/shell/AppShell");
+const AppShell = lazyPage(() => loadAppShell().then((m) => ({ default: m.AppShell })));
+// Someone with a session opening the app is on their way into it: fetch it
+// alongside the check of that session rather than only after it.
+if (typeof location !== "undefined" && location.pathname.startsWith("/channels") && hasSavedSession()) {
+  void loadAppShell().catch(() => undefined);
+  void import("@/gateway/session").catch(() => undefined);
+}
 // The panel and its tabs come in one file; the tabs are routes of their own
 // so "@admin/cases/:caseId" outranks ":serverId/:channelId/:messageId".
 const adminPanel = () => import("@/pages/AdminPanelPage");
