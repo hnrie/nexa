@@ -4,8 +4,10 @@ import { users as usersApi } from "@/api/users";
 import { ApiError } from "@/api/client";
 import { decryptSettings, encryptSettings } from "@/lib/settingsCrypto";
 import { fromStreamQuality } from "@/voice/shareQuality";
+import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
 
-export type Theme = "dark" | "light" | "ash" | "onyx" | "system";
+/** A classic theme, "system", or the id of a gallery preset or a custom theme (lib/look). */
+export type Theme = "dark" | "light" | "ash" | "onyx" | "system" | (string & {});
 export type NotificationLevel = "all" | "mentions" | "none";
 /** What a notification may show: the sender and the text, the sender only, or neither. */
 export type NotificationPreview = "full" | "name" | "none";
@@ -94,6 +96,14 @@ export interface Settings {
   // --- people: blocking ---
 
   // --- look: themes, custom CSS, plugins ---
+  /** Themes made in the theme builder; `theme` names one by its id. Checked on use (lib/look/customTheme.ts). */
+  customThemes: CustomTheme[];
+  /** The two themes "Sync with system" moves between. */
+  systemThemes: { dark: string; light: string };
+  /** The person's own CSS, and stylesheets loaded from links (their text stays on each device). */
+  customCss: CustomCss;
+  /** Plugins, each pinned to the exact code that was approved (lib/look/plugins). */
+  plugins: PluginEntry[];
 
   // --- shell: what's new ---
 
@@ -151,6 +161,10 @@ export const DEFAULT_SETTINGS: Settings = {
   // --- people: blocking ---
 
   // --- look: themes, custom CSS, plugins ---
+  customThemes: [],
+  systemThemes: { dark: "dark", light: "light" },
+  customCss: { snippet: "", snippetOn: true, links: [] },
+  plugins: [],
 
   // --- shell: what's new ---
 
@@ -171,6 +185,10 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     // --- people: blocking ---
 
     // --- look: themes, custom CSS, plugins ---
+    customThemes: Array.isArray(inc.customThemes) ? inc.customThemes : base.customThemes,
+    systemThemes: { ...base.systemThemes, ...(inc.systemThemes ?? {}) },
+    customCss: { ...base.customCss, ...(inc.customCss ?? {}) },
+    plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
     // --- shell: what's new ---
 
