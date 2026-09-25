@@ -2,7 +2,8 @@ import { uploads, type UploadSession } from "@/api/uploads";
 import { b64 } from "@/crypto/bytes";
 import { decryptFile } from "@/crypto/file";
 import { CHUNK, FRAME_LEN, HEADER_LEN, encryptChunks, encryptedSize } from "@/crypto/fileChunks";
-import { fitsUploadLimit, setUploadLimits, uploadStaged, type PieceJob, type PieceSender, type Staged } from "./attachments";
+import { ApiError } from "@/api/client";
+import { RESUMABLE_ABOVE, fitsUploadLimit, setUploadLimits, uploadStaged, type PieceJob, type PieceSender, type Staged } from "./attachments";
 
 const MiB = 1024 * 1024;
 
@@ -94,6 +95,51 @@ describe("uploadStaged", () => {
     expect(server.single!.length).toBe(encryptedSize(data.length));
     expect(await same(server.single!, meta.key, data)).toBe(true);
     expect(meta.size).toBe(data.length);
+  });
+
+  it("tries a single request once more when the connection lets it down", async () => {
+    vi.useFakeTimers();
+    try {
+      const data = pattern(CHUNK + 10);
+      const { server, send } = fakeServer();
+      let failed = 0;
+      const flaky: PieceSender = async (job, onProgress, signal) => {
+        if (failed === 0) {
+          failed += 1;
+          server.jobs.push(job);
+          throw new ApiError(0, "network", "offline");
+        }
+        return send(job, onProgress, signal);
+      };
+      const done = uploadStaged("c1", staged(data), () => undefined, flaky);
+      await vi.advanceTimersByTimeAsync(2000);
+      const { meta } = await done;
+      expect(server.jobs).toHaveLength(2);
+      expect(await same(server.single!, meta.key, data)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not send a single request again when the server turned it down", async () => {
+    const { server } = fakeServer();
+    const refusing: PieceSender = async (job) => {
+      server.jobs.push(job);
+      throw new ApiError(413, "too_large", "too large");
+    };
+    await expect(uploadStaged("c1", staged(pattern(100)), () => undefined, refusing)).rejects.toThrow("too large");
+    expect(server.jobs).toHaveLength(1);
+  });
+
+  it("sends a file above a few megabytes through a resumable session even when one request could carry it", { timeout: 20_000 }, async () => {
+    setUploadLimits({ max: 100 * MiB, single: 90 * MiB, chunk: 32 * MiB });
+    const data = pattern(RESUMABLE_ABOVE + 1);
+    const { server, send } = fakeServer();
+    const { meta } = await uploadStaged("c1", staged(data), () => undefined, send);
+    expect(uploads.create).toHaveBeenCalledWith(encryptedSize(data.length));
+    expect(server.single).toBeNull();
+    expect(server.jobs.every((j) => j.method === "PATCH")).toBe(true);
+    expect(await same(server.stored(), meta.key, data)).toBe(true);
   });
 
   describe("above the single-request limit", { timeout: 20_000 }, () => {

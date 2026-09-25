@@ -197,12 +197,29 @@ export const sendInWorker: PieceSender = async (job, onProgress, signal) => {
 };
 
 /**
+ * Above this a file goes up through a resumable session even when one request
+ * could carry it. A single request that dies at 95% — a phone moving from
+ * Wi-Fi to cellular, a minute's stall — starts again from nothing, and most
+ * photos and videos people send are exactly that size; the session costs one
+ * request more and resumes from what the server already holds.
+ */
+export const RESUMABLE_ABOVE = 8 * 1024 * 1024;
+
+/** A failure a second try might get past: the connection or the server, not the request itself. */
+function worthAnotherTry(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  if (err.code === "aborted") return false;
+  return err.status === 0 || err.status >= 500;
+}
+
+/**
  * Encrypts and uploads a staged file, returning the metadata that rides inside the message.
  *
- * A file that fits in one request goes up as one request. Anything larger
- * goes up a stretch of chunks at a time, each stretch encrypted only as it is
- * sent. Either way the work happens in a worker that is ended afterwards, so
- * memory holds one request's worth at most, however big the file is.
+ * A small file goes up as one request, tried a second time if the connection
+ * or the server lets it down. Anything larger goes up a stretch of chunks at a
+ * time, each stretch encrypted only as it is sent, resuming where it stopped.
+ * Either way the work happens in a worker that is ended afterwards, so memory
+ * holds one request's worth at most, however big the file is.
  */
 export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
   if (!fitsUploadLimit(st.file.size)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(limits.max) }));
@@ -213,9 +230,20 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   // a new version of the app waits for the upload rather than reloading over it
   const release = holdReload();
   try {
-    if (total <= limits.single) {
+    if (total <= Math.min(limits.single, RESUMABLE_ABOVE)) {
       const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: st.file, key, baseIv, first: 0, count: chunkCount(st.file.size), skip: 0 };
-      res = (await send(job, (loaded) => onProgress(loaded / total), signal)) as { blob_id: string; size: number };
+      const once = async () => (await send(job, (loaded) => onProgress(loaded / total), signal)) as { blob_id: string; size: number };
+      try {
+        res = await once();
+      } catch (err) {
+        // Once more, after a moment. A copy that did land the first time only
+        // leaves a file nothing refers to, which the server sweeps away.
+        if (signal?.aborted || !worthAnotherTry(err)) throw err;
+        await connectionBack(1500, signal);
+        if (signal?.aborted) throw cancelled();
+        onProgress(0);
+        res = await once();
+      }
     } else {
       res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send, signal);
     }
