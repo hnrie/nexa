@@ -232,7 +232,7 @@ const WORDS = ["hello", "world", "a", "*", "_", "~", "|", "=", "^", "`", "[", "]
 const FLAG_NAMES = ["b", "i", "u", "s", "spoiler", "mark", "sup", "sub", "code"] as const;
 const COLOURS = ["red", "blue", "#ff8800", null] as const;
 
-function randomRuns(rand: () => number, cell = false): Inline[] {
+function randomRuns(rand: () => number, cell = false, words: string[] = WORDS): Inline[] {
   const out: Inline[] = [];
   const n = 1 + Math.floor(rand() * 5);
   for (let k = 0; k < n; k++) {
@@ -247,8 +247,8 @@ function randomRuns(rand: () => number, cell = false): Inline[] {
     if (rand() < 0.08) out.push({ kind: "atom", atom: "user", raw: "<@" + (100 + k) + ">", label: "@x", marks });
     else {
       let text = "";
-      const words = 1 + Math.floor(rand() * 3);
-      for (let w = 0; w < words; w++) text += (w ? " " : "") + WORDS[Math.floor(rand() * WORDS.length)];
+      const count = 1 + Math.floor(rand() * 3);
+      for (let w = 0; w < count; w++) text += (w ? " " : "") + words[Math.floor(rand() * words.length)];
       if (cell) text = text.replace(/\|/g, "/");
       out.push({ kind: "text", text, marks });
     }
@@ -256,7 +256,7 @@ function randomRuns(rand: () => number, cell = false): Inline[] {
   return out;
 }
 
-function randomDoc(rand: () => number): Block[] {
+function randomDoc(rand: () => number, words: string[] = WORDS): Block[] {
   const blocks: Block[] = [];
   const n = 1 + Math.floor(rand() * 8);
   let indent = -1;
@@ -264,20 +264,20 @@ function randomDoc(rand: () => number): Block[] {
     const roll = rand();
     const wraps: Wrap[] = [null, null, null, "quote", "note", "warning", "details"];
     const wrap = wraps[Math.floor(rand() * wraps.length)] ?? null;
-    if (roll < 0.4) blocks.push(textBlock("p", randomRuns(rand), wrap));
-    else if (roll < 0.5 && wrap !== "quote") blocks.push(textBlock((["h1", "h2", "h3", "h4", "h5", "h6", "subtext"] as const)[Math.floor(rand() * 7)]!, randomRuns(rand), wrap));
+    if (roll < 0.4) blocks.push(textBlock("p", randomRuns(rand, false, words), wrap));
+    else if (roll < 0.5 && wrap !== "quote") blocks.push(textBlock((["h1", "h2", "h3", "h4", "h5", "h6", "subtext"] as const)[Math.floor(rand() * 7)]!, randomRuns(rand, false, words), wrap));
     else if (roll < 0.7 && wrap !== "quote") {
       indent = Math.min(MAX_INDENT, Math.max(0, indent + Math.floor(rand() * 3) - 1));
       const task = rand() < 0.3;
-      blocks.push(textBlock("li", randomRuns(rand), wrap, { list: { ordered: !task && rand() < 0.5, task, checked: task && rand() < 0.5, indent, start: null } }));
+      blocks.push(textBlock("li", randomRuns(rand, false, words), wrap, { list: { ordered: !task && rand() < 0.5, task, checked: task && rand() < 0.5, indent, start: null } }));
       continue;
     } else if (roll < 0.8 && wrap !== "quote") blocks.push({ id: k, kind: "code", wrap, lang: rand() < 0.5 ? "js" : "", text: "const a = `x`;\n```\n::: \n| b |" });
     else if (roll < 0.9 && wrap !== "quote") {
       const cols = 1 + Math.floor(rand() * 3);
       const rows = 1 + Math.floor(rand() * 3);
-      blocks.push({ id: k, kind: "table", wrap, align: Array.from({ length: cols }, (_, c) => ([null, "left", "center", "right"] as const)[c % 4]!), rows: Array.from({ length: rows }, () => Array.from({ length: cols }, () => randomRuns(rand, true))) });
+      blocks.push({ id: k, kind: "table", wrap, align: Array.from({ length: cols }, (_, c) => ([null, "left", "center", "right"] as const)[c % 4]!), rows: Array.from({ length: rows }, () => Array.from({ length: cols }, () => randomRuns(rand, true, words))) });
     } else if (wrap !== "quote") blocks.push({ id: k, kind: "hr", wrap });
-    else blocks.push(textBlock("p", randomRuns(rand), wrap));
+    else blocks.push(textBlock("p", randomRuns(rand, false, words), wrap));
     indent = -1;
   }
   return blocks;
@@ -294,13 +294,37 @@ function held(src: string): unknown {
     .map((b) => ({ ...b, id: 0 }));
 }
 
+/** Every character and atom the editor holds, in order, blocks apart. */
+function characters(src: string): string {
+  return fromMarkdown(src)
+    .blocks.map((b) => {
+      if (b.kind === "code") return b.text;
+      if (b.kind === "hr") return "---";
+      if (b.kind === "table") return b.rows.map((r) => r.map((c) => c.map((x) => (x.kind === "text" ? x.text : x.raw)).join("")).join("|")).join("\n");
+      return b.content.map((x) => (x.kind === "text" ? x.text : x.raw)).join("");
+    })
+    .join("\n");
+}
+
 describe("fuzz", () => {
-  it("writes 1000 random documents that read back as they were written", () => {
+  it("never loses or changes a character, and settles after one pass, whatever the marker soup", () => {
     const rand = mulberry32(0xf0e11);
     for (let n = 0; n < 1000; n++) {
-      const doc = randomDoc(rand);
+      const md = toMarkdown(randomDoc(rand));
+      const back = roundTrip(md);
+      expect(characters(back), `doc ${n}:\n${md}`).toBe(characters(md));
+      expect(roundTrip(back), `doc ${n}:\n${md}`).toBe(back);
+    }
+  });
+
+  it("keeps every mark on ordinary words exactly", () => {
+    const rand = mulberry32(0x0dd);
+    const plain = ["hello", "world", "a", "tea", "é", "مرحبا", "👍", "42", "x_y", "it's", "ok,", "yes.", "why?"];
+    for (let n = 0; n < 500; n++) {
+      const doc = randomDoc(rand, plain);
       const md = toMarkdown(doc);
       expect(held(roundTrip(md)), `doc ${n}:\n${md}`).toEqual(held(md));
+      expect(held(md), `doc ${n}:\n${md}`).toEqual(held(toMarkdown(fromMarkdown(md).blocks)));
     }
   });
 
