@@ -14,6 +14,7 @@ import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { joinVoice } from "@/voice/session";
 import { openMenuItems } from "./openMenu";
+import { dmArrangeItems, forgetConversation } from "./dmArrange";
 
 import { t } from "@/i18n";
 function nameOf(ch: Channel): string {
@@ -40,12 +41,13 @@ function leave(channelId: string, nav?: (p: string) => void): void {
   if (nav && isViewingDM(window.location.pathname, channelId, useChannels.getState().byId)) nav("/channels/@me");
 }
 
-/** Closes a conversation for you; a new message brings it back. */
+/** Closes a conversation for you; a new message brings it back, to the main list. */
 export async function closeDM(channelId: string, nav?: (p: string) => void): Promise<void> {
   try {
     await channelsApi.close(channelId);
     leave(channelId, nav);
     forget(channelId);
+    forgetConversation(channelId);
   } catch (err) {
     useUI.getState().toast(err instanceof ApiError ? err.message : t("sidebar.dmMenu.couldNotCloseThatConversation"), "error");
   }
@@ -57,6 +59,7 @@ export async function purgeDM(channelId: string, nav?: (p: string) => void): Pro
     await channelsApi.purge(channelId);
     leave(channelId, nav);
     forget(channelId);
+    forgetConversation(channelId);
   } catch (err) {
     useUI.getState().toast(err instanceof ApiError ? err.message : t("sidebar.dmMenu.couldNotDeleteThatConversation"), "error");
   }
@@ -72,6 +75,8 @@ export function managesGroup(ch: Channel | undefined): boolean {
 export interface DMMenuCtx {
   nav: (path: string) => void;
   openModal: (kind: string, props?: Record<string, unknown>) => void;
+  /** Move up and Move down, for a pinned conversation: the list offers them where it can move them. */
+  moves?: ContextMenuItem[];
 }
 
 /** Context menu for a DM or group row in the sidebar. */
@@ -94,6 +99,8 @@ export function dmMenuItems(channelId: string, ctx: DMMenuCtx): ContextMenuItem[
       onSelect: () => ch.last_message_id && void reads.ack(channelId, ch.last_message_id),
       separatorAfter: true,
     },
+    // pin it, group it, move it: arranging the list comes straight after reading
+    ...dmArrangeItems(channelId, ctx.moves),
   ];
   if (group) {
     items.push({ id: "edit", label: t("modals.editGroup.editGroup"), onSelect: () => ctx.openModal("editGroup", { channelId }) });
