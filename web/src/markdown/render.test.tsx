@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ensureTwemojiIndex, onTwemojiIndexReady, twemojiIndexSettled } from "@/lib/twemoji";
 import type { RenderCtx } from "./ast";
-import { Markdown, parseHighlightHtml, RenderNodes } from "./render";
+import { Markdown, parseHighlightHtml, relativeTick, RenderNodes } from "./render";
 import { parse } from "./parse";
 
 function makeCtx(over: Partial<RenderCtx> = {}): RenderCtx {
@@ -31,6 +31,20 @@ describe("spoilers", () => {
     const { container } = render(<Markdown source="||secret||" ctx={makeCtx({ revealSpoilers: true })} />);
     expect(container.querySelector(".md-spoiler")?.getAttribute("data-revealed")).toBe("true");
   });
+
+  it("is a button named for what it is, not for what it hides, until it is shown", () => {
+    const { container } = render(<Markdown source="||the ending||" ctx={makeCtx()} />);
+    const button = screen.getByRole("button");
+    expect(button.getAttribute("aria-label")).toBe("Spoiler, select to show");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    // the words are an element of their own, which the stylesheet hides
+    expect(container.querySelector(".md-spoiler-inner")?.textContent).toBe("the ending");
+    fireEvent.keyDown(button, { key: "Enter" });
+    const shown = container.querySelector(".md-spoiler")!;
+    expect(shown.getAttribute("role")).toBeNull();
+    expect(shown.getAttribute("tabindex")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
 });
 
 describe("links", () => {
@@ -44,11 +58,17 @@ describe("links", () => {
     expect(a.textContent).toBe("https://example.com/x");
   });
 
-  it("gives masked links a title with the destination", () => {
-    const { container } = render(<Markdown source="[click me](https://example.com/y)" ctx={makeCtx()} />);
+  it("says where a masked link goes, after its words and in a title", () => {
+    const { container } = render(<Markdown source="[click me](https://www.example.com/y)" ctx={makeCtx()} />);
     const a = container.querySelector("a.md-link") as HTMLAnchorElement;
-    expect(a.textContent).toBe("click me");
-    expect(a.getAttribute("title")).toBe("https://example.com/y");
+    expect(a.getAttribute("title")).toBe("https://www.example.com/y");
+    expect(a.querySelector(".md-link-host")?.textContent).toBe("example.com");
+    expect(a.textContent).toBe("click meexample.com");
+  });
+
+  it("does not repeat the site when the words already name it", () => {
+    const { container } = render(<Markdown source="[the example.com docs](https://example.com/docs)" ctx={makeCtx()} />);
+    expect(container.querySelector(".md-link-host")).toBeNull();
   });
 
   it("never renders a javascript: masked link as an anchor", () => {
@@ -202,6 +222,32 @@ describe("code", () => {
     const code = container.querySelector("pre.md-codeblock code") as HTMLElement;
     expect(code.className).toBe("hljs");
     expect(code.textContent).toBe("plain");
+  });
+
+  it("copies just the code, without the fences", async () => {
+    const write = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
+    render(<Markdown source={"before\n```js\nconst a = 1;\n```\nafter"} ctx={makeCtx()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy code" }));
+    await waitFor(() => expect(write).toHaveBeenCalledWith("const a = 1;"));
+  });
+});
+
+describe("relative times", () => {
+  it("count often while close and rarely once far", () => {
+    expect(relativeTick(30_000)).toBe(10_000);
+    expect(relativeTick(-20 * 60_000)).toBe(30_000);
+    expect(relativeTick(5 * 3_600_000)).toBe(60_000);
+    expect(relativeTick(3 * 86_400_000)).toBe(3_600_000);
+  });
+});
+
+describe("direction", () => {
+  it("lets every block take the direction of its own words, and sets a time apart", () => {
+    const { container } = render(<Markdown source={"# title\nwords <t:1700000000:R>\n> quote\n- item"} ctx={makeCtx()} />);
+    for (const sel of [".md-h1", ".md-paragraph", ".md-quote", ".md-list", ".md-list-item", ".md-timestamp"]) {
+      expect(container.querySelector(sel)?.getAttribute("dir"), sel).toBe("auto");
+    }
   });
 });
 
