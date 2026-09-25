@@ -283,14 +283,51 @@ func (s *Store) heldLatest(ctx context.Context, uid ids.ID) ([]heldKey, error) {
 // Needs computes, for every conversation uid holds the latest key of and is
 // still part of, which entitled users lack a grant and whether the key is
 // waiting to be rotated.
+//
+// Every client asks on connect and after every keys_needed, and an account
+// can hold hundreds of conversations' keys, so the conversations, their
+// participants and the holders of their latest keys are each read in one
+// query for all of them rather than two or three queries apiece.
 func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
 	held, err := s.heldLatest(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
+	convs := make([]ids.ID, len(held))
+	for i, e := range held {
+		convs[i] = e.ConvID
+	}
+	kinds, err := s.convKinds(ctx, convs)
+	if err != nil {
+		return nil, err
+	}
+	var talks []ids.ID
+	for _, c := range convs {
+		if k, ok := kinds[c]; ok && IsDMLike(k.typ) {
+			talks = append(talks, c)
+		}
+	}
+	participants, err := s.participantsOf(ctx, talks)
+	if err != nil {
+		return nil, err
+	}
+	holders, err := s.latestHolders(ctx, convs)
+	if err != nil {
+		return nil, err
+	}
 	out := []KeyNeed{}
 	for _, e := range held {
-		entitled, err := s.Entitled(ctx, e.ConvID)
+		var entitled []ids.ID
+		k, isChannel := kinds[e.ConvID]
+		switch {
+		case isChannel && IsDMLike(k.typ):
+			entitled = participants[e.ConvID]
+		case isChannel && !k.server.IsZero():
+			entitled, err = s.channelViewers(ctx, k.server, e.ConvID)
+		default:
+			// a server's own conversation, or one the hook knows about
+			entitled, err = s.Entitled(ctx, e.ConvID)
+		}
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
 				continue
@@ -308,15 +345,99 @@ func (s *Store) Needs(ctx context.Context, uid ids.ID) ([]KeyNeed, error) {
 			// a key kept from a conversation the user has left is not theirs to share
 			continue
 		}
-		lacking, err := s.UsersLackingGrant(ctx, e.ConvID, e.Epoch, entitled)
-		if err != nil {
-			return nil, err
-		}
+		lacking := Lacking(entitled, holders[e.ConvID])
 		if len(lacking) > 0 || e.rotate {
 			out = append(out, KeyNeed{ConvID: e.ConvID, Epoch: e.Epoch, UserIDs: lacking, Rotate: e.rotate})
 		}
 	}
 	return out, nil
+}
+
+// convKind is what a conversation id names when it is a channel.
+type convKind struct {
+	typ    string
+	server ids.ID
+}
+
+// chunked runs fn over list in pieces small enough for one IN (…).
+func chunked(list []ids.ID, fn func(part []ids.ID) error) error {
+	for start := 0; start < len(list); start += 500 {
+		if err := fn(list[start:min(start+500, len(list))]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// convKinds looks up the channels among convs; a conversation that is not a
+// channel (a server's own) is simply absent.
+func (s *Store) convKinds(ctx context.Context, convs []ids.ID) (map[ids.ID]convKind, error) {
+	out := map[ids.ID]convKind{}
+	err := chunked(convs, func(part []ids.ID) error {
+		rows, err := s.db.R.QueryContext(ctx, `SELECT id, type, server_id FROM channels WHERE id IN (`+placeholders(len(part))+`)`, idArgs(part)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id ids.ID
+			var k convKind
+			var server sql.NullInt64
+			if err := rows.Scan(&id, &k.typ, &server); err != nil {
+				return err
+			}
+			if server.Valid {
+				k.server = ids.ID(server.Int64)
+			}
+			out[id] = k
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+// participantsOf lists the participants of each conversation, in join order.
+func (s *Store) participantsOf(ctx context.Context, convs []ids.ID) (map[ids.ID][]ids.ID, error) {
+	out := map[ids.ID][]ids.ID{}
+	err := chunked(convs, func(part []ids.ID) error {
+		rows, err := s.db.R.QueryContext(ctx, `SELECT channel_id, user_id FROM dm_participants WHERE channel_id IN (`+placeholders(len(part))+`) ORDER BY added_at, user_id`, idArgs(part)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var ch, u ids.ID
+			if err := rows.Scan(&ch, &u); err != nil {
+				return err
+			}
+			out[ch] = append(out[ch], u)
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+// latestHolders lists, for each conversation, who holds a grant for its
+// latest epoch.
+func (s *Store) latestHolders(ctx context.Context, convs []ids.ID) (map[ids.ID][]ids.ID, error) {
+	out := map[ids.ID][]ids.ID{}
+	err := chunked(convs, func(part []ids.ID) error {
+		rows, err := s.db.R.QueryContext(ctx, `SELECT g.conv_id, g.user_id FROM key_grants g
+			WHERE g.conv_id IN (`+placeholders(len(part))+`) AND g.epoch = (SELECT max(e.epoch) FROM key_epochs e WHERE e.conv_id = g.conv_id)`, idArgs(part)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var conv, u ids.ID
+			if err := rows.Scan(&conv, &u); err != nil {
+				return err
+			}
+			out[conv] = append(out[conv], u)
+		}
+		return rows.Err()
+	})
+	return out, err
 }
 
 // SetKeyFlags updates the per-conversation flags (nil leaves a flag alone).

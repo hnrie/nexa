@@ -3,9 +3,11 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/perms"
 )
 
 func TestKeyEpochsGrantsNeeds(t *testing.T) {
@@ -100,4 +102,64 @@ func TestKeyEpochsGrantsNeeds(t *testing.T) {
 	if e, err := s.Entitled(ctx, ids.ID(4242)); err != nil || len(e) != 1 {
 		t.Error("hook")
 	}
+}
+
+// One Needs call over every kind of conversation: a DM, a server's own
+// conversation and a private channel with keys of its own, each answered with
+// its own people.
+func TestNeedsAcrossKindsOfConversation(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b, c := mkUser(t, s, "a"), mkUser(t, s, "b"), mkUser(t, s, "c")
+	dm, _, _ := s.CreateDM(ctx, a.ID, b.ID)
+	srv, err := s.CreateServer(ctx, a.ID, "S", DefaultNames{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []*User{b, c} {
+		if _, err := s.AddMember(ctx, srv.ID, u.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	private, err := s.CreateServerChannel(ctx, srv.ID, "text", "p", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetOverwrite(ctx, Overwrite{ChannelID: private.ID, TargetID: srv.ID, TargetType: "role", Deny: perms.ViewChannel}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetOverwrite(ctx, Overwrite{ChannelID: private.ID, TargetID: c.ID, TargetType: "member", Allow: perms.ViewChannel}); err != nil {
+		t.Fatal(err)
+	}
+	for _, conv := range []ids.ID{dm.ID, srv.ID, private.ID} {
+		if err := s.CreateEpoch(ctx, &KeyEpoch{ConvID: conv, Epoch: 0, CreatedBy: a.ID}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.PutGrants(ctx, []KeyGrant{{ConvID: conv, Epoch: 0, UserID: a.ID, WrappedKey: []byte{1}, WrappedBy: a.ID}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	needs, err := s.Needs(ctx, a.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[ids.ID][]ids.ID{}
+	for _, n := range needs {
+		got[n.ConvID] = n.UserIDs
+	}
+	want := map[ids.ID][]ids.ID{dm.ID: {b.ID}, srv.ID: {b.ID, c.ID}, private.ID: {c.ID}}
+	for conv, users := range want {
+		if !slices.Equal(sortedIDs(got[conv]), sortedIDs(users)) {
+			t.Errorf("conversation %v: lacking %v, want %v", conv, got[conv], users)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("needs for %d conversations, want %d: %v", len(got), len(want), got)
+	}
+}
+
+func sortedIDs(list []ids.ID) []ids.ID {
+	out := slices.Clone(list)
+	slices.Sort(out)
+	return out
 }
