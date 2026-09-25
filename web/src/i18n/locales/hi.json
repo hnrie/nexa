@@ -391,6 +391,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "इस बातचीत की एन्क्रिप्शन कुंजी का इंतज़ार है। जिसके पास वह है उसका ऑनलाइन होना ज़रूरी है।",
   "composer.send.youAreSendingMessagesTooQuickly": "आप बहुत तेज़ी से संदेश भेज रहे हैं।",
   "composer.send.yourMessageCouldNotBeSent": "आपका संदेश भेजा नहीं जा सका।",
+  "contextMenu.back": "वापस",
   "dM.openingConversation": "बातचीत खुल रही है…",
   "dM.thatConversationCouldNotBeOpened": "वह बातचीत नहीं खुल सकी।",
   "dM.thatConversationIsGone": "वह बातचीत अब नहीं है।",

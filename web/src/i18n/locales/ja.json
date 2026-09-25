@@ -377,6 +377,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "この会話の暗号鍵を待っています。鍵を持っている人がオンラインになる必要があります。",
   "composer.send.youAreSendingMessagesTooQuickly": "メッセージの送信が速すぎます。",
   "composer.send.yourMessageCouldNotBeSent": "メッセージを送信できませんでした。",
+  "contextMenu.back": "戻る",
   "dM.openingConversation": "会話を開いています…",
   "dM.thatConversationCouldNotBeOpened": "その会話を開けませんでした。",
   "dM.thatConversationIsGone": "その会話はもうありません。",

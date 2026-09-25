@@ -437,6 +437,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "في انتظار مفتاح تشفير هذه المحادثة. يجب أن يكون أحد من يملكه متصلًا.",
   "composer.send.youAreSendingMessagesTooQuickly": "أنت ترسل الرسائل بسرعة كبيرة.",
   "composer.send.yourMessageCouldNotBeSent": "تعذّر إرسال رسالتك.",
+  "contextMenu.back": "رجوع",
   "dM.openingConversation": "جارٍ فتح المحادثة…",
   "dM.thatConversationCouldNotBeOpened": "تعذّر فتح هذه المحادثة.",
   "dM.thatConversationIsGone": "لم تعد هذه المحادثة موجودة.",

@@ -400,6 +400,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "Esperando a chave de criptografia desta conversa. Alguém que a tenha precisa estar on-line.",
   "composer.send.youAreSendingMessagesTooQuickly": "Você está enviando mensagens rápido demais.",
   "composer.send.yourMessageCouldNotBeSent": "Sua mensagem não pôde ser enviada.",
+  "contextMenu.back": "Voltar",
   "dM.openingConversation": "Abrindo a conversa…",
   "dM.thatConversationCouldNotBeOpened": "Não foi possível abrir essa conversa.",
   "dM.thatConversationIsGone": "Essa conversa não existe mais.",

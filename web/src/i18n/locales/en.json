@@ -391,6 +391,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "Waiting for the encryption key for this conversation. Someone who has it needs to be online.",
   "composer.send.youAreSendingMessagesTooQuickly": "You are sending messages too quickly.",
   "composer.send.yourMessageCouldNotBeSent": "Your message could not be sent.",
+  "contextMenu.back": "Back",
   "dM.openingConversation": "Opening conversation…",
   "dM.thatConversationCouldNotBeOpened": "That conversation could not be opened.",
   "dM.thatConversationIsGone": "That conversation is gone.",

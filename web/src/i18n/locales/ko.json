@@ -377,6 +377,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "이 대화의 암호화 키를 기다리는 중입니다. 키를 가진 사람이 접속해 있어야 합니다.",
   "composer.send.youAreSendingMessagesTooQuickly": "메시지를 너무 빨리 보내고 있습니다.",
   "composer.send.yourMessageCouldNotBeSent": "메시지를 보내지 못했습니다.",
+  "contextMenu.back": "뒤로",
   "dM.openingConversation": "대화를 여는 중…",
   "dM.thatConversationCouldNotBeOpened": "그 대화를 열 수 없습니다.",
   "dM.thatConversationIsGone": "그 대화는 더 이상 없습니다.",

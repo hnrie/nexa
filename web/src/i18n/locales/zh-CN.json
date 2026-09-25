@@ -377,6 +377,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "正在等待这个对话的加密密钥。需要有持有密钥的人在线。",
   "composer.send.youAreSendingMessagesTooQuickly": "你发消息太快了。",
   "composer.send.yourMessageCouldNotBeSent": "你的消息没能发送出去。",
+  "contextMenu.back": "返回",
   "dM.openingConversation": "正在打开对话……",
   "dM.thatConversationCouldNotBeOpened": "无法打开那个对话。",
   "dM.thatConversationIsGone": "那个对话已经不存在了。",

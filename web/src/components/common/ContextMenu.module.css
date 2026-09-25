@@ -19,6 +19,14 @@
 .sliderHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); margin-bottom: 6px; }
 .sliderValue { font-variant-numeric: tabular-nums; color: var(--text); text-transform: none; }
 .range { width: 100%; accent-color: var(--brand); touch-action: none; }
+/* an item that opens a submenu: the arrow points the way it opens, which in a right-to-left language is the other way */
+.chevron { flex: none; margin-inline-start: 12px; opacity: 0.8; }
+[dir="rtl"] .chevron { transform: scaleX(-1); }
+/* its submenu is open beside it: it stays lit while the pointer is over there */
+.item[aria-expanded="true"] { background: var(--bg-active); color: var(--text-strong); }
+/* the way back from a submenu drilled into, arrow first */
+.back { justify-content: flex-start; gap: 6px; color: var(--text-muted); }
+.back .chevron { margin-inline-start: -2px; }
 
 @media (pointer: coarse) {
   .backdrop { display: block; position: fixed; inset: 0; z-index: calc(var(--z-menu) - 1); }

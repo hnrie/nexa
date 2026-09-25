@@ -140,3 +140,171 @@ describe("ContextMenuHost keyboard", () => {
     expect(layers[layers.length - 1]).toBe(screen.getByRole("menu"));
   });
 });
+
+describe("ContextMenuHost submenus", () => {
+  const picked = vi.fn();
+  const nested: ContextMenuItem[] = [
+    { id: "read", label: "Mark as read" },
+    {
+      id: "folder",
+      label: "Add to folder",
+      submenu: [
+        { id: "games", label: "Games", onSelect: () => picked("games") },
+        { id: "study", label: "Study", onSelect: () => picked("study"), separatorAfter: true },
+        { id: "new", label: "New folder", onSelect: () => picked("new") },
+      ],
+    },
+    { id: "leave", label: "Leave server", danger: true },
+  ];
+
+  function openNested() {
+    act(() => useUI.getState().openContextMenu({ x: 10, y: 10, label: "Nexa Design Lab", items: nested }));
+  }
+
+  /** Real time passing, for the delays that stand between a resting pointer and a submenu. */
+  async function wait(ms: number) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, ms));
+    });
+  }
+
+  afterEach(() => {
+    picked.mockReset();
+    document.documentElement.dir = "ltr";
+    vi.unstubAllGlobals();
+  });
+
+  it("opens beside the menu with the arrow towards it and Enter, and goes back with the other arrow", async () => {
+    render(<ContextMenuHost />);
+    openNested();
+    await settle();
+    const menu = screen.getByRole("menu", { name: "Nexa Design Lab" });
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(label()).toBe("Add to folder");
+    const parent = document.activeElement as HTMLElement;
+    expect(parent.getAttribute("aria-haspopup")).toBe("menu");
+    expect(parent.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.keyDown(menu, { key: "ArrowRight" });
+    await settle();
+    const sub = screen.getByRole("menu", { name: "Add to folder" });
+    expect(parent.getAttribute("aria-expanded")).toBe("true");
+    expect(parent.getAttribute("aria-controls")).toBe(sub.id);
+    expect(label()).toBe("Games");
+    fireEvent.keyDown(sub, { key: "ArrowDown" });
+    expect(label()).toBe("Study");
+    fireEvent.keyDown(sub, { key: "ArrowLeft" });
+    await settle();
+    expect(screen.queryByRole("menu", { name: "Add to folder" })).toBeNull();
+    expect(label()).toBe("Add to folder");
+
+    fireEvent.keyDown(menu, { key: "Enter" });
+    await settle();
+    expect(label()).toBe("Games");
+  });
+
+  it("takes Escape one level at a time", async () => {
+    render(<ContextMenuHost />);
+    openNested();
+    await settle();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add to folder" }));
+    await settle();
+    expect(screen.getByRole("menu", { name: "Add to folder" })).toBeTruthy();
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+    await settle();
+    expect(screen.queryByRole("menu", { name: "Add to folder" })).toBeNull();
+    expect(useUI.getState().contextMenu).not.toBeNull();
+    expect(label()).toBe("Add to folder");
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+    expect(useUI.getState().contextMenu).toBeNull();
+  });
+
+  it("mirrors the arrows in a right-to-left language", async () => {
+    document.documentElement.dir = "rtl";
+    render(<ContextMenuHost />);
+    openNested();
+    await settle();
+    const menu = screen.getByRole("menu", { name: "Nexa Design Lab" });
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(label()).toBe("Add to folder");
+    fireEvent.keyDown(menu, { key: "ArrowLeft" });
+    await settle();
+    const sub = screen.getByRole("menu", { name: "Add to folder" });
+    expect(label()).toBe("Games");
+    // the arrow towards the submenu does nothing more inside it
+    fireEvent.keyDown(sub, { key: "ArrowLeft" });
+    expect(label()).toBe("Games");
+    fireEvent.keyDown(sub, { key: "ArrowRight" });
+    await settle();
+    expect(screen.queryByRole("menu", { name: "Add to folder" })).toBeNull();
+    expect(label()).toBe("Add to folder");
+  });
+
+  it("opens when the pointer rests on its item, and waits a moment before going when it moves on", async () => {
+    render(<ContextMenuHost />);
+    openNested();
+    await settle();
+    fireEvent.pointerEnter(screen.getByRole("menuitem", { name: "Add to folder" }));
+    // not at once: a pointer passing over on its way down opens nothing
+    expect(screen.queryByRole("menu", { name: "Add to folder" })).toBeNull();
+    await wait(200);
+    const sub = screen.getByRole("menu", { name: "Add to folder" });
+    // resting the pointer opens it without taking focus out of the menu
+    expect(sub.contains(document.activeElement)).toBe(false);
+
+    fireEvent.pointerEnter(screen.getByRole("menuitem", { name: "Leave server" }));
+    await wait(60);
+    expect(screen.getByRole("menu", { name: "Add to folder" })).toBeTruthy();
+    // reaching the submenu in time keeps it open
+    fireEvent.pointerEnter(sub);
+    await wait(400);
+    expect(screen.getByRole("menu", { name: "Add to folder" })).toBeTruthy();
+
+    fireEvent.pointerEnter(screen.getByRole("menuitem", { name: "Leave server" }));
+    await wait(400);
+    expect(screen.queryByRole("menu", { name: "Add to folder" })).toBeNull();
+  });
+
+  it("runs what is chosen in a submenu and closes the whole menu", async () => {
+    render(<ContextMenuHost />);
+    openNested();
+    await settle();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add to folder" }));
+    await settle();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Study" }));
+    expect(picked).toHaveBeenCalledWith("study");
+    expect(useUI.getState().contextMenu).toBeNull();
+  });
+
+  it("drills in on a touch screen, with the way back at the top", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("hover: none"), media: q, addEventListener() {}, removeEventListener() {} }));
+    render(<ContextMenuHost />);
+    openNested();
+    await settle();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add to folder" }));
+    await settle();
+    // the same menu, now showing the submenu, named after it and headed by it
+    const menu = screen.getByRole("menu", { name: "Add to folder" });
+    expect(screen.getAllByRole("menu").length).toBe(1);
+    expect(screen.getByRole("group", { name: "Add to folder" })).toBeTruthy();
+    expect(screen.getAllByRole("menuitem").map((el) => el.textContent)).toEqual(["Back", "Games", "Study", "New folder"]);
+    // focus on the first choice, the way back one step up
+    expect(label()).toBe("Games");
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(label()).toBe("Back");
+
+    fireEvent.click(screen.getByRole("menuitem", { name: "Back" }));
+    await settle();
+    expect(screen.getByRole("menu", { name: "Nexa Design Lab" })).toBeTruthy();
+    expect(label()).toBe("Add to folder");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add to folder" }));
+    await settle();
+    fireEvent.click(screen.getByRole("menuitem", { name: "New folder" }));
+    expect(picked).toHaveBeenCalledWith("new");
+    expect(useUI.getState().contextMenu).toBeNull();
+  });
+});

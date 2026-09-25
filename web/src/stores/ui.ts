@@ -24,6 +24,12 @@ export interface ContextMenuItem {
   note?: boolean;
   /** Makes the item a slider that takes effect as it moves, and leaves the menu open. */
   slider?: { value: number; min: number; max: number; step?: number; unit?: string; onChange: (value: number) => void };
+  /**
+   * Makes the item open a menu of its own, one level deep: beside this one
+   * with a mouse or a keyboard, and in its place (with a way back) on a touch
+   * screen. The item itself is then never chosen, so it has no onSelect.
+   */
+  submenu?: ContextMenuItem[];
 }
 
 export interface ContextMenuState {

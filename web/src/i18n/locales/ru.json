@@ -413,6 +413,7 @@
   "composer.send.waitingForTheEncryptionKeyFor": "Ожидание ключа шифрования этой беседы. Кто-то, у кого он есть, должен быть в сети.",
   "composer.send.youAreSendingMessagesTooQuickly": "Вы отправляете сообщения слишком часто.",
   "composer.send.yourMessageCouldNotBeSent": "Ваше сообщение не удалось отправить.",
+  "contextMenu.back": "Назад",
   "dM.openingConversation": "Открываем беседу…",
   "dM.thatConversationCouldNotBeOpened": "Не удалось открыть этот разговор.",
   "dM.thatConversationIsGone": "Этого разговора больше нет.",
