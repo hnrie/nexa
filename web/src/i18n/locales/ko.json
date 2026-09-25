@@ -2294,6 +2294,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "이 브라우저는 통화 소리를 시스템 출력으로 재생합니다.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "위: 마이크. 아래: 통화가 보내는 소리.",
   "settings.voice.transmitOnlyWhileYouHoldA": "키를 누르고 있는 동안에만 전송합니다.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "통화 화면의 버튼을 누르고 있는 동안에만 전송합니다.",
   "settings.voice.transmitWheneverYouTalk": "말할 때마다 전송합니다.",
   "settings.voice.voiceActivity": "음성 감지",
   "settings.voice.voiceProcessing": "음성 처리",

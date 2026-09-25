@@ -2492,6 +2492,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "Этот браузер выводит звук звонков на системное устройство.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "Сверху: ваш микрофон. Снизу: то, что уходит в звонок.",
   "settings.voice.transmitOnlyWhileYouHoldA": "Передавать, только пока вы держите клавишу.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "Передавать звук, только пока вы удерживаете кнопку в звонке.",
   "settings.voice.transmitWheneverYouTalk": "Передавать, как только вы заговорите.",
   "settings.voice.voiceActivity": "Голосовая активность",
   "settings.voice.voiceProcessing": "Обработка голоса",

@@ -230,15 +230,20 @@ export class MeshTransport implements VoiceTransport {
 
   /**
    * This device's link to the call as a whole: up while any peer is (or with
-   * nobody to reach), coming back while the peers it had are all down, and
-   * otherwise still coming up.
+   * nobody to reach), and otherwise still coming up. Peer to peer, one link
+   * that dropped says nothing about whose network it was — their tile says it
+   * is reconnecting — so this device only calls itself reconnecting when every
+   * link it had went down together, or the browser says it is offline.
    */
   private reportConnection(): void {
     if (this.closed) return;
     const peers = [...this.peers.values()];
+    const hadUp = peers.filter((p) => this.upBefore.has(p.userId)).length;
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
     let state: "connecting" | "connected" | "reconnecting" = "connecting";
     if (peers.length === 0 || peers.some((p) => p.pc.connectionState === "connected")) state = "connected";
-    else if (peers.some((p) => this.upBefore.has(p.userId))) state = "reconnecting";
+    else if (hadUp >= 2 || (hadUp >= 1 && offline)) state = "reconnecting";
+    else if (hadUp === 1) state = "connected";
     if (state === this.lastConnection) return;
     this.lastConnection = state;
     this.events.onConnection?.(state);

@@ -2574,6 +2574,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "يشغّل هذا المتصفح المكالمات عبر مخرج الصوت في نظامك.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "الأعلى: ميكروفونك. الأسفل: ما ترسله المكالمة.",
   "settings.voice.transmitOnlyWhileYouHoldA": "لا يُرسَل الصوت إلا أثناء ضغطك على مفتاح.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "الإرسال فقط أثناء الضغط مطولًا على الزر في المكالمة.",
   "settings.voice.transmitWheneverYouTalk": "يُرسَل الصوت كلما تحدثت.",
   "settings.voice.voiceActivity": "نشاط الصوت",
   "settings.voice.voiceProcessing": "معالجة الصوت",

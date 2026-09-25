@@ -2378,6 +2378,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "Este navegador toca as chamadas pela saída de som do sistema.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "Em cima: seu microfone. Embaixo: o que a chamada envia.",
   "settings.voice.transmitOnlyWhileYouHoldA": "Só transmitir enquanto você segurar uma tecla.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "Transmitir só enquanto você segura o botão na chamada.",
   "settings.voice.transmitWheneverYouTalk": "Transmitir sempre que você falar.",
   "settings.voice.voiceActivity": "Atividade de voz",
   "settings.voice.voiceProcessing": "Processamento de voz",

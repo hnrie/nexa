@@ -2294,6 +2294,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "このブラウザーでは通話の音声はシステムの出力から再生されます。",
   "settings.voice.topYourMicrophoneBottomWhatThe": "上：マイク。下：通話が送る音。",
   "settings.voice.transmitOnlyWhileYouHoldA": "キーを押している間だけ送信します。",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "通話中のボタンを押している間だけ送信します。",
   "settings.voice.transmitWheneverYouTalk": "話すたびに送信します。",
   "settings.voice.voiceActivity": "音声検出",
   "settings.voice.voiceProcessing": "音声処理",

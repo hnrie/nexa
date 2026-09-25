@@ -2294,6 +2294,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "此浏览器通过系统的声音输出播放通话。",
   "settings.voice.topYourMicrophoneBottomWhatThe": "上：你的麦克风。下：通话发送的内容。",
   "settings.voice.transmitOnlyWhileYouHoldA": "只在你按住某个键时才发送。",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "仅在按住通话中的按钮时发送。",
   "settings.voice.transmitWheneverYouTalk": "只要你说话就发送。",
   "settings.voice.voiceActivity": "语音活动",
   "settings.voice.voiceProcessing": "语音处理",

@@ -2369,6 +2369,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "Dieser Browser spielt Anrufe über die Tonausgabe deines Systems ab.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "Oben: dein Mikrofon. Unten: was der Anruf sendet.",
   "settings.voice.transmitOnlyWhileYouHoldA": "Nur senden, solange du eine Taste hältst.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "Nur senden, solange du die Taste im Anruf gedrückt hältst.",
   "settings.voice.transmitWheneverYouTalk": "Senden, sobald du sprichst.",
   "settings.voice.voiceActivity": "Sprachaktivität",
   "settings.voice.voiceProcessing": "Sprachverarbeitung",

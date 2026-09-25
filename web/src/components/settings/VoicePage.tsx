@@ -212,7 +212,7 @@ export default function VoicePage() {
         </label>
         <label className={st.radio} data-on={settings.mode === "ptt"}>
           <input type="radio" name="voice-input-mode" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
-          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
+          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{holdButton ? tr_("settings.voice.transmitOnlyWhileYouHoldTheButton") : tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
         </label>
       </div>
       <div className={st.form} style={{ marginTop: 12 }}>

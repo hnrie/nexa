@@ -1949,6 +1949,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "This browser plays calls through your system’s sound output.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "Top: your microphone. Bottom: what the call sends.",
   "settings.voice.transmitOnlyWhileYouHoldA": "Transmit only while you hold a key.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "Transmit only while you hold the button in the call.",
   "settings.voice.transmitWheneverYouTalk": "Transmit whenever you talk.",
   "settings.voice.voiceActivity": "Voice Activity",
   "settings.voice.voiceProcessing": "Voice processing",

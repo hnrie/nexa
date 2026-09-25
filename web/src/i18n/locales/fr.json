@@ -2377,6 +2377,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "Ce navigateur diffuse les appels sur la sortie audio de votre système.",
   "settings.voice.topYourMicrophoneBottomWhatThe": "En haut : votre microphone. En bas : ce que l’appel envoie.",
   "settings.voice.transmitOnlyWhileYouHoldA": "N’émettre que pendant que vous maintenez une touche.",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "Transmettre seulement pendant que vous maintenez le bouton de l’appel.",
   "settings.voice.transmitWheneverYouTalk": "Émettre dès que vous parlez.",
   "settings.voice.voiceActivity": "Activité vocale",
   "settings.voice.voiceProcessing": "Traitement de la voix",

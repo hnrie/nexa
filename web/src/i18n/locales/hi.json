@@ -2369,6 +2369,7 @@
   "settings.voice.thisBrowserPlaysCallsOnThe": "यह ब्राउज़र कॉल की आवाज़ आपके सिस्टम के साउंड आउटपुट से चलाता है।",
   "settings.voice.topYourMicrophoneBottomWhatThe": "ऊपर: आपका माइक्रोफ़ोन। नीचे: कॉल जो भेजती है।",
   "settings.voice.transmitOnlyWhileYouHoldA": "सिर्फ़ तब भेजें जब आप कोई कुंजी दबाए रखें।",
+  "settings.voice.transmitOnlyWhileYouHoldTheButton": "सिर्फ़ तब भेजें जब आप कॉल में बटन दबाए रखें।",
   "settings.voice.transmitWheneverYouTalk": "जब भी आप बोलें, तब भेजें।",
   "settings.voice.voiceActivity": "आवाज़ की गतिविधि",
   "settings.voice.voiceProcessing": "आवाज़ प्रसंस्करण",
