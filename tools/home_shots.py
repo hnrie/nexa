@@ -126,7 +126,7 @@ def main() -> int:
             # wait for the two of them to actually be connected to each other,
             # so the picture is a call rather than a call starting
             a.wait_for_function(
-                "() => !document.body.innerText.includes('connecting')",
+                "() => !/connecting/i.test(document.body.innerText)",
                 timeout=30000,
             )
             a.mouse.move(400, 500)
