@@ -151,6 +151,14 @@ func (s *Store) SpendBackupCode(ctx context.Context, id ids.ID, hash string) (bo
 	return n > 0, err
 }
 
+// CountTwoFactorAccounts counts the accounts with a second factor on, each of
+// whose secrets is sealed with the server's own secret.
+func (s *Store) CountTwoFactorAccounts(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM user_mfa WHERE enabled = 1`).Scan(&n)
+	return n, err
+}
+
 // BackupCodesLeft counts the codes still unused.
 func (s *Store) BackupCodesLeft(ctx context.Context, id ids.ID) (int, error) {
 	var n int
