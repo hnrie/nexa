@@ -34,6 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const setLeftOpen = useUI((u) => u.setLeftOpen);
   const setRightOpen = useUI((u) => u.setRightOpen);
   const connection = useUI((u) => u.connection);
+  const connectionNote = useUI((u) => u.connectionNote);
   const loc = useLocation();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -215,7 +216,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
       <div className={s.main}>
         {connection !== "open" && connection !== "idle" ? (
-          <div className={s.connection} data-state={connection} role="status">{connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting")}</div>
+          <div className={s.connection} data-state={connection} role="status">{connectionNote ?? (connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting"))}</div>
         ) : null}
         <UpdateBanner />
         <RpcBanner />

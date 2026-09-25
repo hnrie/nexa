@@ -138,3 +138,21 @@ describe("how moderation reads", () => {
     expect(mutedSentence({ expires_at: Date.now() + 2 * SPAN.HOUR })).toMatch(/^You can't do that while you're muted\. The mute ends in 2 hours\.$/);
   });
 });
+
+describe("signing out while Nexa is loading", () => {
+  it("does not write a feed or a thread that arrives after the reset into the next account's store", async () => {
+    let answer: (v: unknown) => void = () => undefined;
+    api.request = <T>(): Promise<T> => new Promise<T>((r) => (answer = r as (v: unknown) => void));
+    useNexa.getState().reset();
+    const feed = useNexa.getState().loadFeed();
+    useNexa.getState().reset();
+    answer({ items: [{ kind: "case", case: kase("7"), at: 7 }], has_more: false, people: {} });
+    await feed;
+    expect(useNexa.getState().feed).toBeNull();
+    const thread = useNexa.getState().loadThread("7");
+    useNexa.getState().reset();
+    answer({ case: kase("7"), messages: [line("1")], people: {} });
+    await thread;
+    expect(useNexa.getState().threads).toEqual({});
+  });
+});

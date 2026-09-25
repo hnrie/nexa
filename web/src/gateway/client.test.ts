@@ -146,6 +146,7 @@ describe("GatewayClient", () => {
     client.connect();
     const ws1 = FakeWS.instances[0]!;
     ws1.open();
+    ws1.message({ t: "ready", s: 1, d: {} });
     vi.advanceTimersByTime(1010);
     ws1.message({ t: "heartbeat_ack", d: {} });
     vi.advanceTimersByTime(8000);
@@ -161,6 +162,80 @@ describe("GatewayClient", () => {
     // the old socket's late close is ignored
     ws1.serverClose(1006);
     expect(client.status).toBe("connecting");
+  });
+
+  it("gives ready far longer than a heartbeat to arrive, since the answer queues behind it", () => {
+    const { client } = make();
+    client.connect();
+    const ws = FakeWS.instances[0]!;
+    ws.open();
+    // a large account's ready on a slow line: nothing arrives for half a minute
+    vi.advanceTimersByTime(30_000);
+    expect(client.status).toBe("open");
+    expect(FakeWS.instances).toHaveLength(1);
+    ws.message({ t: "ready", s: 1, d: {} });
+    ws.message({ t: "heartbeat_ack", d: {} });
+    // from ready on, silence is judged at the usual pace
+    vi.advanceTimersByTime(20_000);
+    expect(client.status).not.toBe("open");
+  });
+
+  it("still gives up on a socket that never brings ready at all", () => {
+    const { client } = make();
+    client.connect();
+    FakeWS.instances[0]!.open();
+    vi.advanceTimersByTime(92_000);
+    expect(client.status).not.toBe("open");
+  });
+
+  it("waits minutes, not seconds, after being turned away as one connection too many", () => {
+    const { client, events } = make();
+    client.connect();
+    FakeWS.instances[0]!.serverClose(4009, "too many connections for this account");
+    expect(client.status).toBe("closed");
+    vi.advanceTimersByTime(29_000);
+    expect(FakeWS.instances).toHaveLength(1);
+    vi.advanceTimersByTime(1_500);
+    expect(FakeWS.instances).toHaveLength(2);
+    // a second refusal waits twice as long
+    FakeWS.instances[1]!.serverClose(4009, "too many connections for this account");
+    vi.advanceTimersByTime(59_000);
+    expect(FakeWS.instances).toHaveLength(2);
+    vi.advanceTimersByTime(1_500);
+    expect(FakeWS.instances).toHaveLength(3);
+    // and a ready forgets the refusals
+    FakeWS.instances[2]!.open();
+    FakeWS.instances[2]!.message({ t: "ready", s: 1, d: {} });
+    FakeWS.instances[2]!.serverClose(4009, "too many connections for this account");
+    vi.advanceTimersByTime(30_500);
+    expect(FakeWS.instances).toHaveLength(4);
+    expect(events.map((e) => e.t)).toEqual(["ready"]);
+  });
+
+  it("gives the limiter a few seconds after closing for sending too much", () => {
+    const { client } = make();
+    client.connect();
+    FakeWS.instances[0]!.serverClose(4008, "rate limited");
+    vi.advanceTimersByTime(4_000);
+    expect(FakeWS.instances).toHaveLength(1);
+    vi.advanceTimersByTime(1_100);
+    expect(FakeWS.instances).toHaveLength(2);
+    expect(client.status).toBe("connecting");
+  });
+
+  it("restart() drops the socket and connects again at once, ignoring the old one's close", () => {
+    const { client, statuses } = make();
+    client.connect();
+    const ws1 = FakeWS.instances[0]!;
+    ws1.open();
+    ws1.message({ t: "ready", s: 1, d: {} });
+    client.restart();
+    expect(ws1.readyState).toBe(3);
+    expect(FakeWS.instances).toHaveLength(2);
+    expect(client.status).toBe("connecting");
+    FakeWS.instances[1]!.open();
+    expect(ops(FakeWS.instances[1]!)).toEqual(["identify"]);
+    expect(statuses.at(-1)).toBe("open");
   });
 
   it("keeps a socket whose heartbeat is answered within the same millisecond", () => {

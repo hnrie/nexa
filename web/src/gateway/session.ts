@@ -1,6 +1,7 @@
-import { GatewayClient } from "./client";
+import { CLOSE_TOO_MANY, GatewayClient, type GatewayStatus } from "./client";
 import type { GatewayEvent } from "./events";
-import { applyEvent, dispatchGeneration, endDispatchSession, resetAll } from "./dispatch";
+import { applyEvent, applyLockedEvent, dispatchGeneration, endDispatchSession, forgetRotations, resetAll } from "./dispatch";
+import { ApiError } from "@/api/client";
 import { logoutHooks, useAuth } from "@/stores/auth";
 import { useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
@@ -10,16 +11,19 @@ import { useVoice } from "@/stores/voice";
 import { useNexa } from "@/stores/nexa";
 import { useModeration } from "@/stores/moderation";
 import { useUploads } from "@/stores/uploads";
+import { useSelection } from "@/stores/selection";
+import { useSlowmode } from "@/stores/slowmode";
 import { forgetSends } from "@/components/composer/send";
 import { forgetUnsentAcks } from "@/stores/readStates";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
 import { clearLock, hasLock } from "@/lib/appLock";
+import { reportCrash } from "@/lib/crashReport";
 import { clearMediaCache } from "@/lib/mediaCache";
 import { keystore } from "@/crypto/keystore";
-import { leaveVoice } from "@/voice/session";
 import { workerClearTimeout, workerSetTimeout } from "@/lib/workerTimers";
 import { usePanes } from "@/stores/panes";
+import { t } from "@/i18n";
 
 let client: GatewayClient | null = null;
 let queue: Promise<void> = Promise.resolve();
@@ -27,10 +31,59 @@ let queue: Promise<void> = Promise.resolve();
 let starting = false;
 /** Moves on when a session ends, so one still starting knows to stop. */
 let sessionGeneration = 0;
+/**
+ * Set while the app is locked with a call going on. People lock while they
+ * listen, so the socket stays up and the call with it; but nothing that needs
+ * the keys is applied, only the call's own events. Unlocking connects again,
+ * and the ready that brings back everything the lock put away.
+ */
+let lockedInCall = false;
 
 export function gatewayUrl(): string {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   return `${proto}://${location.host}/gateway`;
+}
+
+/**
+ * What the connection banner says when the server gave a reason worth passing
+ * on; undefined leaves the note as it is, null takes it away.
+ */
+export function connectionNote(s: GatewayStatus, info?: { code?: number; reason?: string }): string | null | undefined {
+  if (s !== "closed") return undefined;
+  if (info?.code !== CLOSE_TOO_MANY) return null;
+  // the server's reason names which limit it was (internal/gateway/hub.go)
+  const reason = info.reason ?? "";
+  if (reason.includes("address")) return t("gateway.tooManyFromThisNetwork");
+  if (reason.includes("limit")) return t("gateway.serverIsFull");
+  return t("gateway.tooManyForThisAccount");
+}
+
+/**
+ * A handler that throws still lets the queue go on, since one bad event must
+ * not stop every later one; but it is said somewhere. A message whose handler
+ * failed is a message that never appears, and without this nothing in the
+ * console or the crash reports would explain it.
+ */
+function handlerFailed(e: GatewayEvent, err: unknown): void {
+  console.warn("gateway: the handler for an event failed", e.t, err);
+  // a request that failed on the way is the network's doing, not a bug here
+  if (err instanceof ApiError && (err.status === 0 || err.status >= 500)) return;
+  reportCrash({ kind: "promise", message: `gateway ${e.t}: ${err instanceof Error ? `${err.name}: ${err.message}` : String(err)}`, stack: err instanceof Error ? (err.stack ?? "") : "" });
+}
+
+/** Applies events strictly in order: a slow decrypt never lets a later frame overtake it. */
+export function enqueueEvent(e: GatewayEvent): Promise<void> {
+  const gen = dispatchGeneration();
+  // decided as the event arrives: one that came while the app was locked is
+  // handled as the lock allowed, even if the queue reaches it after unlocking
+  const locked = lockedInCall;
+  queue = queue
+    .then(() => {
+      if (gen !== dispatchGeneration()) return undefined;
+      return locked ? applyLockedEvent(e) : applyEvent(e);
+    })
+    .catch((err: unknown) => handlerFailed(e, err));
+  return queue;
 }
 
 /** Connects the gateway for the logged-in user; safe to call repeatedly. */
@@ -61,16 +114,20 @@ export async function startSession(): Promise<void> {
       useKeys.getState().reset();
       return;
     }
-    if (client) return;
+    if (client) {
+      // Unlocked with the call's socket still up: everything else comes back
+      // with a fresh ready.
+      if (lockedInCall) {
+        lockedInCall = false;
+        client.restart();
+      }
+      return;
+    }
     client = new GatewayClient({
       url: gatewayUrl,
       token: () => useAuth.getState().token,
-      onEvent: (e) => {
-        // events are applied strictly in order; a slow decrypt never reorders later frames
-        const gen = dispatchGeneration();
-        queue = queue.then(() => (gen === dispatchGeneration() ? applyEvent(e) : undefined)).catch(() => undefined);
-      },
-      onStatus: (s) => useUI.getState().setConnection(s),
+      onEvent: (e) => void enqueueEvent(e),
+      onStatus: (s, info) => useUI.getState().setConnection(s, connectionNote(s, info)),
       // heartbeats keep their pace in a hidden window, where the page's own timers slow to once a minute
       setTimeoutImpl: workerSetTimeout,
       clearTimeoutImpl: workerClearTimeout,
@@ -94,7 +151,7 @@ export function startGuestSession(token: string, onEvent: (e: GatewayEvent) => v
     url: gatewayUrl,
     token: () => token,
     onEvent,
-    onStatus: (s) => useUI.getState().setConnection(s),
+    onStatus: (s, info) => useUI.getState().setConnection(s, connectionNote(s, info)),
     setTimeoutImpl: workerSetTimeout,
     clearTimeoutImpl: workerClearTimeout,
   });
@@ -121,16 +178,14 @@ function wakeGatewayIfShown(): void {
   if (document.visibilityState === "visible") client?.wake();
 }
 
-export function stopSession(): void {
-  sessionGeneration++;
-  window.removeEventListener("online", wakeGateway);
-  window.removeEventListener("pageshow", wakeGateway);
-  document.removeEventListener("visibilitychange", wakeGatewayIfShown);
+/**
+ * Forgets everything this session could read: the keys, the settings (sent
+ * first, if any are still waiting) and every decrypted message and file.
+ */
+function forgetReadable(): void {
   // Events already partway through applying stop here rather than finishing
   // into stores that have just been cleared.
   endDispatchSession();
-  client?.close();
-  client = null;
   useKeys.getState().reset();
   // Changes still waiting to be saved go now, sealed with the key they were
   // made under: the reset below forgets them, so a theme picked a moment
@@ -143,6 +198,38 @@ export function stopSession(): void {
   clearMediaCache();
 }
 
+export function stopSession(): void {
+  sessionGeneration++;
+  lockedInCall = false;
+  window.removeEventListener("online", wakeGateway);
+  window.removeEventListener("pageshow", wakeGateway);
+  document.removeEventListener("visibilitychange", wakeGatewayIfShown);
+  client?.close();
+  client = null;
+  forgetReadable();
+}
+
+/** Whether a call is under way on this device, joined or still joining. */
+function inCall(): boolean {
+  const v = useVoice.getState();
+  return v.mine !== null || v.joining !== null;
+}
+
+/**
+ * The app has locked. Everything readable goes, as it always has; a call
+ * going on keeps its socket, so locking does not hang up on anyone.
+ */
+export function lockSession(): void {
+  if (!client || !inCall()) {
+    stopSession();
+    return;
+  }
+  // a startSession still loading keys stops where it is
+  sessionGeneration++;
+  lockedInCall = true;
+  forgetReadable();
+}
+
 /**
  * Ends the session on sign-out: hangs up any call, so the microphone and the
  * peer connections do not outlive the account, and forgets everything the
@@ -150,12 +237,14 @@ export function stopSession(): void {
  */
 export async function endSession(): Promise<void> {
   try {
-    await leaveVoice(true);
+    const voice = await import("@/voice/session");
+    await voice.leaveVoice(true);
   } catch {
     /* nothing to hang up */
   }
   stopSession();
   resetAll();
+  forgetRotations();
   useVoice.getState().clear();
   useUI.setState({ activeChannelId: null, replyTo: null, editing: null, editDrafts: {}, jumpTo: null, contextMenu: null, quickSwitcher: false, modals: [], modal: null });
   // a deletion notice stays, to be read on the sign-in page
@@ -168,11 +257,22 @@ export async function endSession(): Promise<void> {
   forgetSends();
   useMessages.setState({ channels: {} });
   forgetUnsentAcks();
+  // what was being picked for deleting, and the slow mode waits, were this account's
+  useSelection.getState().clear();
+  useSlowmode.getState().reset();
   // tabs and split panes name another account's channels
   usePanes.getState().reset();
 }
 
 logoutHooks.push(endSession);
+
+// The lock's promise is that it forgets what is held in memory. That used to
+// happen in a route guard's effect, so a page outside it — an invite — kept
+// the keys and the socket behind the passcode screen; it happens here now,
+// wherever the app is when it locks.
+useAuth.subscribe((a, prev) => {
+  if (a.status === "pinlocked" && prev.status !== "pinlocked") lockSession();
+});
 
 export function gateway(): GatewayClient | null {
   return client;

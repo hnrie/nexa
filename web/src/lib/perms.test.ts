@@ -24,6 +24,15 @@ describe("perms", () => {
     expect(base(S, roles, { userId: "u", roleIds: ["11"], timedOut: false }, false)).toBe(ALL);
     expect(base(S, roles, { userId: "u", roleIds: [], timedOut: false }, true)).toBe(ALL);
   });
+  it("takes everything but looking from a member in timeout at the server level too, as the server's Base does", () => {
+    // a moderator in timeout cannot kick, ban or manage anything until it ends
+    const moderator = { userId: "u", roleIds: ["10"], timedOut: true };
+    expect(base(S, roles, moderator, false)).toBe(P.VIEW_CHANNEL | P.READ_MESSAGE_HISTORY);
+    expect(has(base(S, roles, moderator, false), P.MANAGE_MESSAGES)).toBe(false);
+    // an administrator and the owner are never held back
+    expect(base(S, roles, { ...moderator, roleIds: ["11"] }, false)).toBe(ALL);
+    expect(base(S, roles, moderator, true)).toBe(ALL);
+  });
   it("applies overwrites in Discord order", () => {
     const m = { userId: "u", roleIds: ["10"], timedOut: false };
     expect(compute(S, roles, m, false, [ow(S, "role", 0n, P.VIEW_CHANNEL)])).toBe(0n);

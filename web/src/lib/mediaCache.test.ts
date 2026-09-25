@@ -28,6 +28,19 @@ describe("mediaCache", () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
+  it("stops a download on its way when the cache is cleared, and never caches it after", async () => {
+    let finish: (b: Blob) => void = () => undefined;
+    vi.mocked(decryptFile).mockImplementation(() => new Promise<Blob>((r) => (finish = r)));
+    const p = attachmentObjectURL(att("late", 1024));
+    await Promise.resolve();
+    // signed out (or locked) while the file was still coming
+    clearMediaCache();
+    finish(new Blob([new Uint8Array(1024)]));
+    await expect(p).rejects.toThrow();
+    expect(cachedURL("late")).toBeUndefined();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
   it("never revokes a URL something on screen still holds", async () => {
     const first = await attachmentObjectURL(att("a", 70 * MB));
     expect(acquire("a", first)).toBe(true);

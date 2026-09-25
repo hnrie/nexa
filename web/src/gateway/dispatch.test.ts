@@ -1,4 +1,4 @@
-import { api } from "@/api/client";
+import { ApiError, api } from "@/api/client";
 import type { Channel, PublicUser, ReadyPayload } from "@/api/types";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
@@ -134,5 +134,61 @@ describe("mentions in messages this device never loaded", () => {
     // an edit of a message already read changes nothing
     await applyEvent(ev({ t: "message_update", d: { ...msg, id: "9", was: { mentions: [], mention_roles: [], mention_everyone: false } } }));
     expect(mentions()).toBe(0);
+  });
+});
+
+describe("the order events arrive in", () => {
+  const ev = (x: unknown) => x as Parameters<typeof applyEvent>[0];
+  const msg = (id: string, channel: string, author = "u2") => ({ id, channel_id: channel, author_id: author, type: "default", ciphertext: null, mentions: [], mention_roles: [], mention_everyone: false, reactions: [], attachments: [], flags: 0, created_at: 0, edited_at: null, key_conv_id: null, key_epoch: 0, reply_to_id: null });
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  let asked: string[] = [];
+
+  beforeEach(() => {
+    asked = [];
+    useAuth.setState({ me: { ...person("me"), flags: 0 } } as never);
+    useMessages.setState({ channels: {} });
+    api.request = <T>(method: string, path: string): Promise<T> => {
+      asked.push(`${method} ${path}`);
+      if (path.startsWith("/channels/gone")) return Promise.reject(new ApiError(404, "not_found", "gone"));
+      if (path.startsWith("/users/")) return Promise.resolve(person(path.split("/")[2]!) as T);
+      return Promise.resolve([] as T);
+    };
+  });
+
+  it("asks once for the profile of someone new, however their first message reaches the stores", async () => {
+    useChannels.getState().upsert([chan("c5")]);
+    await applyEvent(ev({ t: "message_create", d: msg("50", "c5", "newcomer") }));
+    await applyEvent(ev({ t: "message_create", d: msg("51", "c5", "newcomer") }));
+    await flush();
+    expect(asked.filter((a) => a === "GET /users/newcomer")).toHaveLength(1);
+    expect(useUsers.getState().byId["newcomer"]).toBeDefined();
+  });
+
+  it("leaves nothing behind for a message that raced its channel's deletion", async () => {
+    await applyEvent(ev({ t: "channel_delete", d: { ...chan("gone"), id: "gone" } }));
+    await applyEvent(ev({ t: "message_create", d: msg("60", "gone") }));
+    await flush();
+    expect(useMessages.getState().channels["gone"]).toBeUndefined();
+    // the other way round ends the same
+    useChannels.getState().upsert([chan("gone")]);
+    await applyEvent(ev({ t: "message_create", d: msg("61", "gone") }));
+    await applyEvent(ev({ t: "channel_delete", d: { ...chan("gone"), id: "gone" } }));
+    expect(useMessages.getState().channels["gone"]).toBeUndefined();
+  });
+
+  it("takes reactions, edits and deletes of messages this device never loaded in its stride", async () => {
+    useChannels.getState().upsert([chan("c6")]);
+    await applyEvent(ev({ t: "reaction_add", d: { channel_id: "c6", message_id: "70", user_id: "u2", emoji: "👍" } }));
+    await applyEvent(ev({ t: "message_update", d: { ...msg("70", "c6"), was: { mentions: [], mention_roles: [], mention_everyone: false } } }));
+    await applyEvent(ev({ t: "message_delete", d: { id: "70", channel_id: "c6" } }));
+    expect(useMessages.getState().channels["c6"]?.ids ?? []).toEqual([]);
+  });
+
+  it("keeps a reaction that came in before an edit of the same message", async () => {
+    useChannels.getState().upsert([chan("c7")]);
+    useMessages.setState({ channels: { c7: { ids: ["80"], byId: { "80": { ...msg("80", "c7"), reactions: [] } as unknown as DecryptedMessage }, hasOlder: false, hasNewer: false, loading: false, loaded: true, failed: 0, pending: [] } } });
+    await applyEvent(ev({ t: "reaction_add", d: { channel_id: "c7", message_id: "80", user_id: "u3", emoji: "🎉" } }));
+    await applyEvent(ev({ t: "message_update", d: { ...msg("80", "c7"), edited_at: 5, was: { mentions: [], mention_roles: [], mention_everyone: false } } }));
+    expect(useMessages.getState().channels["c7"]?.byId["80"]?.reactions).toEqual([{ emoji: "🎉", count: 1, me: false }]);
   });
 });

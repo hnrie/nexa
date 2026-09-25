@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { storage } from "@/lib/storage";
+import { useAuth } from "./auth";
 
 /**
  * Tabs, and the tiles inside them.
@@ -81,12 +82,24 @@ interface PanesState {
   forgetChannel: (channelId: string) => void;
   /** Sign-out: the next account on this browser starts from one empty tab. */
   reset: () => void;
+  /** Brings back an account's own layout (sign-in). */
+  restore: (userId: string) => void;
 }
 
 let counter = 0;
 const newId = (): string => `${Date.now().toString(36)}${(counter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-const KEY = "ec:panes";
+/**
+ * Each account's layout is its own: kept under its id, and brought back when
+ * it signs in, so the next person on a shared browser never starts in the
+ * last one's tabs.
+ */
+const keyFor = (userId: string): string => `ec:panes:${userId}`;
+/** Where one layout for everybody used to be kept; taken over by the first account to sign in. */
+const LEGACY_KEY = "ec:panes";
+
+/** The account whose layout this is; null while nobody is signed in, when nothing is saved. */
+let owner: string | null = null;
 
 // --- the tile tree -------------------------------------------------------
 
@@ -163,8 +176,14 @@ interface Saved {
   panes: Record<string, Pane>;
 }
 
-function load(): Saved | null {
-  const raw = storage.get(KEY);
+function load(userId: string): Saved | null {
+  let raw = storage.get(keyFor(userId));
+  if (!raw) {
+    // Before layouts were kept per account there was one, removed at every
+    // sign-out, so one still here belongs to the account still signed in.
+    raw = storage.get(LEGACY_KEY);
+    if (raw) storage.remove(LEGACY_KEY);
+  }
   if (!raw) return null;
   try {
     const saved = JSON.parse(raw) as Saved;
@@ -190,8 +209,14 @@ function fresh(): Saved {
   return { tabs: [tab], active: tab.id, panes: { [pane.id]: pane } };
 }
 
+/** The layout to start from: the signed-in account's own, when there is one. */
+function initial(): Saved {
+  owner = useAuth.getState().me?.id ?? null;
+  return (owner ? load(owner) : null) ?? fresh();
+}
+
 export const usePanes = create<PanesState>((set, get) => ({
-  ...(load() ?? fresh()),
+  ...initial(),
   membersOpen: {},
 
   openTab(serverId, channelId, opts) {
@@ -295,8 +320,13 @@ export const usePanes = create<PanesState>((set, get) => ({
   },
 
   reset() {
+    owner = null;
     set({ ...fresh(), membersOpen: {} });
-    storage.remove(KEY);
+  },
+
+  restore(userId) {
+    owner = userId;
+    set({ ...(load(userId) ?? fresh()), membersOpen: {} });
   },
 
   forgetChannel(channelId) {
@@ -331,9 +361,17 @@ usePanes.subscribe(() => {
   // change.
   writing = setTimeout(() => {
     writing = null;
+    if (!owner) return;
     const s = usePanes.getState();
-    storage.set(KEY, JSON.stringify({ tabs: s.tabs, active: s.active, panes: s.panes }));
+    storage.set(keyFor(owner), JSON.stringify({ tabs: s.tabs, active: s.active, panes: s.panes }));
   }, 400);
+});
+
+// Signing in brings that account's layout back before anything is drawn in it:
+// the store changes in the same step as the account does.
+useAuth.subscribe((a, prev) => {
+  const id = a.me?.id ?? null;
+  if (id && id !== (prev.me?.id ?? null) && id !== owner) usePanes.getState().restore(id);
 });
 
 /** Where the address bar should be for a pane. */

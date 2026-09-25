@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { VoiceState } from "@/api/types";
 import { storage } from "@/lib/storage";
+import { useAuth } from "./auth";
 
 export type PeerState = RTCPeerConnectionState | "new";
 
@@ -87,13 +88,35 @@ interface VoiceStore {
   clear: () => void;
 }
 
-function loadVolumes(key = "voiceVolumes"): Record<string, number> {
+type VolumeKind = "voiceVolumes" | "voiceStreamVolumes";
+
+/**
+ * Whose volume choices are loaded. They are about the people an account talks
+ * to, so each account keeps its own, and the next person on a shared browser
+ * does not start with the last one's.
+ */
+let volumesOwner: string | null = useAuth.getState().me?.id ?? null;
+
+function loadVolumes(kind: VolumeKind, userId: string | null): Record<string, number> {
+  if (!userId) return {};
   try {
-    const raw = storage.get(key);
+    let raw = storage.get(`${kind}:${userId}`);
+    if (!raw) {
+      // kept for everyone under one key before; the account signed in now takes it over
+      raw = storage.get(kind);
+      if (raw) {
+        storage.set(`${kind}:${userId}`, raw);
+        storage.remove(kind);
+      }
+    }
     return raw ? (JSON.parse(raw) as Record<string, number>) : {};
   } catch {
     return {};
   }
+}
+
+function saveVolumes(kind: VolumeKind, volumes: Record<string, number>): void {
+  if (volumesOwner) storage.set(`${kind}:${volumesOwner}`, JSON.stringify(volumes));
 }
 
 export const useVoice = create<VoiceStore>()((set) => ({
@@ -107,8 +130,8 @@ export const useVoice = create<VoiceStore>()((set) => ({
   speaking: {},
   level: 0,
   quality: null,
-  volumes: loadVolumes(),
-  streamVolumes: loadVolumes("voiceStreamVolumes"),
+  volumes: loadVolumes("voiceVolumes", volumesOwner),
+  streamVolumes: loadVolumes("voiceStreamVolumes", volumesOwner),
   streamMutes: {},
   localMutes: {},
   ringing: {},
@@ -173,14 +196,14 @@ export const useVoice = create<VoiceStore>()((set) => ({
   setVolume: (userId, pct) =>
     set((s) => {
       const volumes = { ...s.volumes, [userId]: Math.max(0, Math.min(200, Math.round(pct))) };
-      storage.set("voiceVolumes", JSON.stringify(volumes));
+      saveVolumes("voiceVolumes", volumes);
       return { volumes };
     }),
   setLocalMute: (userId, on) => set((s) => ({ localMutes: { ...s.localMutes, [userId]: on } })),
   setStreamVolume: (userId, pct) =>
     set((s) => {
       const streamVolumes = { ...s.streamVolumes, [userId]: Math.max(0, Math.min(200, Math.round(pct))) };
-      storage.set("voiceStreamVolumes", JSON.stringify(streamVolumes));
+      saveVolumes("voiceStreamVolumes", streamVolumes);
       return { streamVolumes };
     }),
   setStreamMute: (userId, on) => set((s) => ({ streamMutes: { ...s.streamMutes, [userId]: on } })),
@@ -211,6 +234,14 @@ export const useVoice = create<VoiceStore>()((set) => ({
   resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false, calling: null }),
   clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false, calling: null }),
 }));
+
+// Signing in (or out) swaps in that account's own volume choices.
+useAuth.subscribe((a) => {
+  const id = a.me?.id ?? null;
+  if (id === volumesOwner) return;
+  volumesOwner = id;
+  useVoice.setState({ volumes: loadVolumes("voiceVolumes", id), streamVolumes: loadVolumes("voiceStreamVolumes", id) });
+});
 
 /** A channel's participants in join order. */
 export function participantsOf(byChannel: Record<string, Record<string, VoiceState>>, channelId: string): VoiceState[] {
