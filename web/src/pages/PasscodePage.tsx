@@ -3,6 +3,7 @@ import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { hasLock, loadLock, MAX_FAILURES, triesLeft, WrongPasscode } from "@/lib/appLock";
 import { useAuth } from "@/stores/auth";
+import { useVoice } from "@/stores/voice";
 import { describeError } from "@/lib/errors";
 import { AuthLayout, usePageTitle } from "./AuthLayout";
 import s from "./Auth.module.css";
@@ -25,6 +26,9 @@ export default function PasscodePage() {
   // the pad is only offered once this device knows the passcode is all digits.
   const [numeric] = useState(() => !!me && loadLock(me.id)?.numeric === true);
   const input = useRef<HTMLInputElement>(null);
+  // A call carries on behind the lock (people lock while they listen), so the
+  // one thing that can still be done here without unlocking is to leave it.
+  const inCall = useVoice((v) => v.mine !== null || v.joining !== null);
 
   useEffect(() => input.current?.focus(), []);
   usePageTitle(adopting ? t("passcode.thisAccountHasAPasscode") : t("passcode.locked"));
@@ -69,6 +73,24 @@ export default function PasscodePage() {
       width={420}
     >
       <form className={s.form} onSubmit={(e) => void onSubmit(e)}>
+        {inCall ? (
+          <div className={s.call} role="status" data-testid="locked-call">
+            <span>{t("passcode.stillInACall")}</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                // the button goes with the call, so focus goes back to where the passcode is typed
+                input.current?.focus();
+                void import("@/voice/session").then((m) => m.leaveVoice(true));
+              }}
+              data-testid="locked-call-leave"
+            >
+              {t("passcode.leaveCall")}
+            </Button>
+          </div>
+        ) : null}
         {error ? <div className={s.error} role="alert">{error}</div> : null}
         <Field label={t("settings.security.passcode")} required error={wrong}>
           <TextInput

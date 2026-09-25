@@ -1,11 +1,10 @@
 import { Suspense, useEffect, type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { FullScreenSpinner } from "@/components/common/Spinner";
-import { startSession, stopSession } from "@/gateway/session";
 import LockPage from "@/pages/LockPage";
 import OfflinePage from "@/pages/OfflinePage";
 import PasscodePage from "@/pages/PasscodePage";
-import { lazyPage } from "@/lib/lazyChunk";
+import { lazyPage, loadChunk } from "@/lib/lazyChunk";
 import { useAuth } from "@/stores/auth";
 import { useBan } from "@/stores/nexa";
 
@@ -13,6 +12,13 @@ import { t } from "@/i18n";
 
 // only a banned account ever needs it
 const BannedPage = lazyPage(() => import("@/pages/BannedPage"));
+
+let sessionModule: Promise<typeof import("@/gateway/session")> | null = null;
+/** The gateway and everything behind it, loaded for a signed-in page rather than with the public ones. */
+function session(): Promise<typeof import("@/gateway/session")> {
+  sessionModule ??= loadChunk(() => import("@/gateway/session"));
+  return sessionModule;
+}
 
 /** Gates the app behind a logged-in, unlocked session and keeps the gateway connected. */
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -28,10 +34,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   useEffect(() => {
     // A banned account has no live connection: the server turns it away, and
     // the ban screen asks for what it needs. When the ban ends, it connects.
-    if (status === "ready" && !banned) void startSession();
-    // Locking drops the keys, so the socket goes too: nothing should keep
-    // arriving that this device can no longer read.
-    if (status === "anonymous" || status === "pinlocked" || banned) stopSession();
+    if (status === "ready" && !banned) void session().then((m) => m.startSession());
+    // Locking is the session's own business (gateway/session.ts), wherever the
+    // app is when it happens, and a call can outlast it. A session that never
+    // started has nothing to stop.
+    if ((status === "anonymous" || banned) && sessionModule) void sessionModule.then((m) => m.stopSession());
   }, [status, banned]);
 
   if (status === "idle" || status === "loading") return <FullScreenSpinner text={t("shell.requireAuth.connecting")} />;

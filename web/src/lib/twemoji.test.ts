@@ -69,4 +69,31 @@ describe("the list of pictures", () => {
     expect(tw.twemojiCandidates("🫩")).toHaveLength(1);
     vi.unstubAllGlobals();
   });
+
+  it("waits a while after a failed fetch instead of asking again at every emoji drawn", async () => {
+    vi.resetModules();
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    const fetchMock = vi.fn(async () => new Response("", { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const tw = await import("./twemoji");
+      let settled = new Promise<void>((r) => tw.onTwemojiIndexReady(r));
+      tw.ensureTwemojiIndex();
+      await settled;
+      // a screenful of emoji asking again straight away
+      for (let i = 0; i < 20; i++) tw.ensureTwemojiIndex();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      // a few seconds on it tries again, and succeeds
+      now.mockReturnValue(1_000_000 + 6_000);
+      fetchMock.mockImplementation(async () => new Response(JSON.stringify(["1f600"])));
+      settled = new Promise<void>((r) => tw.onTwemojiIndexReady(r));
+      tw.ensureTwemojiIndex();
+      await settled;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(tw.twemojiIndexReady()).toBe(true);
+    } finally {
+      now.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
 });

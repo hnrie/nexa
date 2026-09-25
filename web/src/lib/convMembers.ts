@@ -42,9 +42,12 @@ export type ConvMembership =
 export function membershipOf(conv: string): ConvMembership {
   const ch = useChannels.getState().byId[conv];
   if (ch) {
-    if (ch.type === "dm" || ch.type === "group_dm") {
+    if (ch.type === "dm" || ch.type === "group_dm" || ch.type === "subchat") {
       // Recipients ride on the channel object itself and are always complete:
-      // a group DM with a member missing from the list could not be drawn.
+      // a group DM with a member missing from the list could not be drawn. A
+      // subchat is a conversation of its own with its own keys, and its people
+      // (the chat's, kept in step with it) ride on it the same way; leaving it
+      // out let a forged request seal a side conversation's key for anyone.
       return { known: true, complete: true, members: new Set(ch.recipient_ids) };
     }
     if (ch.server_id) return serverMembership(ch.server_id);

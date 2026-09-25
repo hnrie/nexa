@@ -36,12 +36,34 @@ const ACK_TIMEOUT_MS = 8_000;
  * neither `connect()` nor `wake()` would touch again.
  */
 const CONNECT_TIMEOUT_MS = 15_000;
+/**
+ * How long a heartbeat may go unanswered before ready has arrived. Ready is
+ * one frame, and the answer to a heartbeat queues behind it: a large account
+ * on a slow line can take longer than ACK_TIMEOUT_MS to download it, and
+ * dropping the socket then only starts the same download again, for ever.
+ */
+const READY_ACK_TIMEOUT_MS = 90_000;
+
+/** Close codes the server gives a reason with (internal/gateway/conn.go). */
+export const CLOSE_RATE_LIMITED = 4008;
+export const CLOSE_TOO_MANY = 4009;
+/**
+ * A socket turned away for being one too many (for the account, the address or
+ * the whole instance) gets the same answer if it asks again at once. It waits
+ * this long instead, doubling each time up to the cap.
+ */
+const CROWDED_BACKOFF_MS = 30_000;
+const MAX_CROWDED_BACKOFF_MS = 5 * 60_000;
+/** A socket closed for sending too much waits for the limiter to fill up again. */
+const RATE_LIMITED_BACKOFF_MS = 5_000;
 
 export class GatewayClient {
   private readonly opts: GatewayOptions;
   private ws: WebSocket | null = null;
   private _status: GatewayStatus = "idle";
   private attempt = 0;
+  /** Refusals in a row for being one connection too many, reset by a ready. */
+  private crowded = 0;
   private closedByUser = false;
   private heartbeat: ReturnType<typeof setTimeout> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -131,6 +153,13 @@ export class GatewayClient {
       if (parsed.t === "ready") {
         this.ready = true;
         this.attempt = 0;
+        this.crowded = 0;
+        // The long wait allowed for ready is over; the next heartbeat is held
+        // to the usual one.
+        if (this.ackTimer !== null) {
+          this.timers().clear(this.ackTimer);
+          this.ackTimer = null;
+        }
       }
       this.opts.onEvent(parsed as GatewayEvent);
     };
@@ -189,7 +218,13 @@ export class GatewayClient {
     this.clearConnectTimer();
     this.setStatus("closed", { code, reason });
     const rnd = this.opts.random ?? Math.random;
-    const delay = Math.min(MAX_BACKOFF_MS, 1000 * Math.pow(1.7, this.attempt)) + rnd() * 500;
+    let delay = Math.min(MAX_BACKOFF_MS, 1000 * Math.pow(1.7, this.attempt)) + rnd() * 500;
+    if (code === CLOSE_TOO_MANY) {
+      delay = Math.min(MAX_CROWDED_BACKOFF_MS, CROWDED_BACKOFF_MS * 2 ** this.crowded) + rnd() * 5000;
+      this.crowded += 1;
+    } else if (code === CLOSE_RATE_LIMITED) {
+      delay = Math.max(delay, RATE_LIMITED_BACKOFF_MS);
+    }
     this.attempt += 1;
     const { set, clear } = this.timers();
     if (this.reconnectTimer !== null) clear(this.reconnectTimer);
@@ -234,6 +269,7 @@ export class GatewayClient {
     ws.send(JSON.stringify({ op: "heartbeat" }));
     if (this.ackTimer !== null) return;
     const seen = this.framesSeen;
+    const limit = this.ready ? ACK_TIMEOUT_MS : READY_ACK_TIMEOUT_MS;
     this.ackTimer = this.timers().set(() => {
       this.ackTimer = null;
       if (this.ws !== ws || this.framesSeen > seen) return;
@@ -248,7 +284,36 @@ export class GatewayClient {
         /* already closing */
       }
       this.scheduleReconnect(1006, "heartbeat timeout");
-    }, ACK_TIMEOUT_MS);
+    }, limit);
+  }
+
+  /**
+   * Drops the socket and connects again at once, for a fresh ready: unlocking
+   * the app needs everything it put away, and ready is what brings it. A call
+   * rides this the way it rides any change of network.
+   */
+  restart(): void {
+    const ws = this.ws;
+    const { clear } = this.timers();
+    if (this.reconnectTimer !== null) {
+      clear(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.clearConnectTimer();
+    this.stopHeartbeat();
+    this.ws = null;
+    this.ready = false;
+    this.attempt = 0;
+    this.closedByUser = false;
+    if (ws) {
+      try {
+        ws.close(4000, "restart");
+      } catch {
+        /* already closing */
+      }
+    }
+    this._status = "idle";
+    this.connect();
   }
 
   close(): void {

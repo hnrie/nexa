@@ -4,7 +4,7 @@ import type { RequestOptions } from "@/api/client";
 import type { KeyGrant, Message } from "@/api/types";
 import { b64 } from "@/crypto/bytes";
 import { channelKey, newRootKey } from "@/crypto/conv";
-import { generateIdentity, unwrapGrant } from "@/crypto/keys";
+import { generateIdentity, unwrapGrant, wrapGrant } from "@/crypto/keys";
 import { keystore } from "@/crypto/keystore";
 import { encryptMessage } from "@/crypto/message";
 import { decryptForStore } from "@/lib/decrypt";
@@ -130,6 +130,38 @@ describe("key manager", () => {
     expect(changed).toEqual(["conv1"]);
     expect(b64.enc(ring.get("conv1", 0)!)).toBe(b64.enc(rootA));
     expect(b64.enc(channelKey(ring.get("conv1", 0)!, "chan9"))).toBe(b64.enc(channelKey(rootA, "chan9")));
+  });
+
+  it("opens a pile of grants together and writes them to disk in one go", async () => {
+    await useKeys.getState().init("A", alice);
+    // ten conversations' first epochs, each granted to bob
+    const grants: KeyGrant[] = [];
+    for (let i = 0; i < 10; i++) {
+      const root = newRootKey();
+      grants.push({ conv_id: `pile${i}`, epoch: 0, user_id: "B", wrapped_key: b64.enc(await wrapGrant(bob.publicKey, root)), wrapped_by: "A", created_at: 1 });
+    }
+    useKeys.getState().reset();
+    await useKeys.getState().init("B", bob);
+    const one = vi.spyOn(keystore, "saveRoot");
+    const many = vi.spyOn(keystore, "saveRoots");
+    const changed = await useKeys.getState().ingestGrants(grants);
+    expect(changed.sort()).toEqual(grants.map((g) => g.conv_id).sort());
+    expect(one).not.toHaveBeenCalled();
+    expect(many).toHaveBeenCalledTimes(1);
+    expect((await keystore.loadRoots("B")).filter((r) => r.conv.startsWith("pile"))).toHaveLength(10);
+    one.mockRestore();
+    many.mockRestore();
+  });
+
+  it("does not put keys back into a session that locked while they were being opened", async () => {
+    await useKeys.getState().init("B", bob);
+    const grant: KeyGrant = { conv_id: "late", epoch: 0, user_id: "B", wrapped_key: b64.enc(await wrapGrant(bob.publicKey, newRootKey())), wrapped_by: "A", created_at: 1 };
+    const ingesting = useKeys.getState().ingestGrants([grant]);
+    // the lock lands while the grant is being opened
+    useKeys.getState().reset();
+    expect(await ingesting).toEqual([]);
+    expect(ring.get("late", 0)).toBeUndefined();
+    expect((await keystore.loadRoots("B")).some((r) => r.conv === "late")).toBe(false);
   });
 
   it("carries out a rotation that was left pending while nobody was online", async () => {

@@ -8,7 +8,6 @@ import { bannerUrl, iconUrl } from "@/api/users";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { startSession } from "@/gateway/session";
 import LockPage from "@/pages/LockPage";
 import PasscodePage from "@/pages/PasscodePage";
 import { hasLock } from "@/lib/appLock";
@@ -75,7 +74,8 @@ export default function InvitePage() {
     if (status === "idle") void bootstrap();
   }, [status, bootstrap]);
   useEffect(() => {
-    if (status === "ready") void startSession();
+    // the gateway (and the stores behind it) only for someone signed in
+    if (status === "ready") void import("@/gateway/session").then((m) => m.startSession());
   }, [status]);
 
   useEffect(() => {

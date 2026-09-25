@@ -12,6 +12,20 @@ let table: Map<string, string> | null = null;
 let loading: Promise<void> | null = null;
 let version = 0;
 const listeners = new Set<() => void>();
+/** After a failed load, not before this; the wait doubles up to a few minutes. */
+let retryAt = 0;
+let retryWait = 0;
+const FIRST_RETRY_MS = 5_000;
+const MAX_RETRY_MS = 5 * 60_000;
+
+/**
+ * Whether a text could hold a `:name:` at all, by the parser's own pattern.
+ * Asking only whether it has a colon fetched the table for every link, every
+ * "12:30" and every "re:", which is most of the first page of any channel.
+ */
+export function mightHaveShortcode(text: string): boolean {
+  return /:[a-z0-9_+-]{1,60}:/.test(text);
+}
 
 function charsOf(hexcode: string): string {
   let out = "";
@@ -35,6 +49,9 @@ function add(map: Map<string, string>, hexcode: string, raw: string | string[]):
 /** Starts loading the table if it is not here yet. Safe to call on every render. */
 export function ensureShortcodes(): void {
   if (table || loading) return;
+  // offline, every message on screen asking again at every render was a
+  // request each; a failure waits a while before the next try
+  if (Date.now() < retryAt) return;
   loading = Promise.all([
     import("emojibase-data/en/shortcodes/iamcal.json"),
     import("emojibase-data/en/shortcodes/emojibase.json"),
@@ -46,11 +63,14 @@ export function ensureShortcodes(): void {
       for (const [hexcode, raw] of Object.entries(base.default as Record<string, string | string[]>)) add(map, hexcode, raw);
       table = map;
       version += 1;
+      retryWait = 0;
       for (const fn of listeners) fn();
     })
     .catch(() => {
       // leave the text alone; a failed fetch must not break rendering
       loading = null;
+      retryWait = Math.min(MAX_RETRY_MS, retryWait ? retryWait * 2 : FIRST_RETRY_MS);
+      retryAt = Date.now() + retryWait;
     });
 }
 

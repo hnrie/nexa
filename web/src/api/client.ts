@@ -20,6 +20,13 @@ const API_PREFIX = "/api/v1";
  */
 const REQUEST_TIMEOUT_MS = 30_000;
 
+/**
+ * How long an upload may go without sending a byte or hearing back: the same
+ * minute the upload worker allows (see lib/upload.worker.ts). Uploads have no
+ * overall deadline, since a large file on a slow line takes as long as it takes.
+ */
+export const UPLOAD_STALL_MS = 60_000;
+
 /** An error the server reported, or a transport failure dressed up as one. */
 export class ApiError extends Error {
   status: number;
@@ -239,8 +246,9 @@ export const api = {
       return JSON.parse(raw) as T;
     } catch {
       // a 200 that is not ours — a captive portal's sign-in page, a proxy's
-      // error page — is said as that, not as a bare SyntaxError
-      throw new ApiError(res.status, "bad_response", "The server's answer made no sense.");
+      // error page — is said as that, in the reader's language, not as a bare
+      // SyntaxError that thirteen call sites would show as it stands
+      throw new ApiError(res.status, "bad_response", t("attachments.theServerSAnswerCouldNot"));
     }
   },
 
@@ -259,6 +267,11 @@ export const api = {
     const url = this.url(path);
     const auth = token;
     const headers = opts?.headers ?? {};
+    const signal = opts?.signal;
+    // An XMLHttpRequest aborted before send() fires no event at all, so a
+    // signal that was already down when this was called left the promise
+    // pending for good — and with it the upload's hold on reloading the app.
+    if (signal?.aborted) return Promise.reject(new ApiError(0, "aborted", t("errors.thatWasCancelledBeforeItFinished")));
 
     return new Promise<T>((resolve, reject) => {
       const xhr = new XHR();
@@ -266,12 +279,26 @@ export const api = {
       // A signal shared across uploads would otherwise keep one listener, and
       // through it one finished XMLHttpRequest, per upload it ever saw.
       let offAbort: (() => void) | null = null;
+      let stall: ReturnType<typeof setTimeout> | undefined;
+      let stalled = false;
       const finish = (fn: () => void): void => {
         if (settled) return;
         settled = true;
+        clearTimeout(stall);
         offAbort?.();
         offAbort = null;
         fn();
+      };
+      // A connection that dies quietly (a phone between networks) never errors
+      // on its own; the upload worker gives up after a minute of silence, and
+      // an upload sent from the page — an avatar, an emoji, a file where no
+      // worker can start — did not give up at all.
+      const watch = (): void => {
+        clearTimeout(stall);
+        stall = setTimeout(() => {
+          stalled = true;
+          xhr.abort();
+        }, UPLOAD_STALL_MS);
       };
 
       xhr.open(opts?.method ?? "POST", url);
@@ -282,9 +309,12 @@ export const api = {
       if (auth) xhr.setRequestHeader("Authorization", `Bearer ${auth}`);
 
       const onProgress = opts?.onProgress;
-      if (onProgress) {
-        xhr.upload.onprogress = (ev: ProgressEvent): void => onProgress(ev.loaded, ev.total);
-      }
+      xhr.upload.onprogress = (ev: ProgressEvent): void => {
+        watch();
+        onProgress?.(ev.loaded, ev.total);
+      };
+      // all sent: the answer gets the same time to arrive
+      xhr.upload.onload = watch;
 
       xhr.onload = (): void =>
         finish(() => {
@@ -314,19 +344,17 @@ export const api = {
         finish(() => reject(new ApiError(0, "network", t("offline.couldNotReachTheServer"))));
 
       xhr.onabort = (): void =>
-        finish(() => reject(new ApiError(0, "aborted", t("errors.thatWasCancelledBeforeItFinished"))));
+        finish(() =>
+          reject(stalled ? new ApiError(0, "timeout", t("offline.couldNotReachTheServer")) : new ApiError(0, "aborted", t("errors.thatWasCancelledBeforeItFinished"))),
+        );
 
-      const signal = opts?.signal;
       if (signal) {
-        if (signal.aborted) {
-          xhr.abort();
-          return;
-        }
         const onAbort = (): void => xhr.abort();
         signal.addEventListener("abort", onAbort, { once: true });
         offAbort = () => signal.removeEventListener("abort", onAbort);
       }
 
+      watch();
       xhr.send(body as XMLHttpRequestBodyInit);
     });
   },

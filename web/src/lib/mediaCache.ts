@@ -33,6 +33,8 @@ interface Job {
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Job>();
 let total = 0;
+/** Moves on when the cache is cleared, so a download still on its way is not cached into the next session. */
+let generation = 0;
 
 function evict(keep: string): void {
   if (total <= BUDGET) return;
@@ -85,10 +87,14 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
   if (pending) return join(pending, signal);
   const ctrl = new AbortController();
   const job: Job = { promise: undefined as unknown as Promise<string>, ctrl, waiting: 0, done: false };
+  const gen = generation;
   job.promise = (async () => {
     try {
       const cipher = await channelsApi.downloadAttachment(att.blob_id, ctrl.signal, encryptedSize(att.size));
       const plain = await decryptFile(cipher, b64.dec(att.key));
+      // Signed out or locked while it was on its way: the file belonged to that
+      // session, and caching it now would hand it to whoever comes next.
+      if (gen !== generation) throw new DOMException("Aborted", "AbortError");
       const typed = new Blob([plain], { type: playableType(att.type) });
       const url = URL.createObjectURL(typed);
       cache.set(att.blob_id, { url, size: typed.size, last: Date.now(), refs: 0 });
@@ -97,7 +103,7 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
       return url;
     } finally {
       job.done = true;
-      inflight.delete(att.blob_id);
+      if (inflight.get(att.blob_id) === job) inflight.delete(att.blob_id);
     }
   })();
   inflight.set(att.blob_id, job);
@@ -176,6 +182,10 @@ export function release(blobId: string, url: string): void {
 }
 
 export function clearMediaCache(): void {
+  generation += 1;
+  // downloads under way stop too, rather than finishing into the cache after it was cleared
+  for (const job of inflight.values()) job.ctrl.abort();
+  inflight.clear();
   for (const e of cache.values()) URL.revokeObjectURL(e.url);
   cache.clear();
   total = 0;

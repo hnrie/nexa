@@ -6,31 +6,39 @@
 import type { Activity } from "@/api/types";
 
 import { t } from "@/i18n";
-/** The verb each activity type reads with, per call so it follows the language. */
-const verbs = (): Record<number, string> => ({ 0: t("activity.playing"), 2: t("activity.listeningTo"), 3: t("activity.watching"), 5: t("activity.competingIn") });
-
-export function activityVerb(a: Pick<Activity, "type">): string {
-  return verbs()[a.type] ?? t("activity.playing");
-}
 
 /**
- * "Listening to" and "Rick Astley" apart, so a list can weight the name on its
- * own. The name is whichever field the program asked to be shown.
+ * "Listening to Rick Astley", with the name where the language puts it: a
+ * sentence built as verb-then-name read "再生中 Rick Astley" in Japanese,
+ * which says it the other way round. Built per call, so it follows the language.
  */
-export function activityParts(a: Activity): { verb: string; name: string } {
+function lineFor(type: number, name: string): string {
+  switch (type) {
+    case 2:
+      return t("activity.listeningToName", { name });
+    case 3:
+      return t("activity.watchingName", { name });
+    case 5:
+      return t("activity.competingInName", { name });
+    default:
+      return t("activity.playingName", { name });
+  }
+}
+
+/** The name an activity shows: whichever field the program asked to be shown. */
+export function activityParts(a: Activity): { name: string } {
   const text = a.status_display_type === 1 ? a.state : a.status_display_type === 2 ? a.details : undefined;
-  return { verb: activityVerb(a), name: text || a.name };
+  return { name: text || a.name };
 }
 
 /** "Listening to Rick Astley": the summary shown under a name in lists. */
 export function activityLine(a: Activity): string {
-  const { verb, name } = activityParts(a);
-  return `${verb} ${name}`;
+  return lineFor(a.type, activityParts(a).name);
 }
 
 /** The card's heading: "Listening to Music Player", or "Playing a game". */
 export function activityHeading(a: Activity): string {
-  return a.type === 0 ? t("activity.statusLine.playingAGame") : `${activityVerb(a)} ${a.name}`;
+  return a.type === 0 ? t("activity.statusLine.playingAGame") : lineFor(a.type, a.name);
 }
 
 export type ActivityClock =

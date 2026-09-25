@@ -15,13 +15,22 @@ import { b64, randomBytes, utf8 } from "@/crypto/bytes";
 import { deriveEncKey, deriveMaster, type KdfParams } from "@/crypto/kdf";
 import type { AppLockPolicy } from "@/stores/settings";
 import { unwrapPrivateKey, wrapPrivateKey, type Identity } from "@/crypto/keys";
+import { ReadableError } from "./readableError";
 import { storage } from "./storage";
 
 import { t } from "@/i18n";
-/** Heavier than the login KDF: a four-digit passcode needs the help. */
+/** Heavier than the login KDF: a passcode of digits needs the help. */
 export const LOCK_KDF: KdfParams = { m: 65536, t: 6, p: 1, v: 1 };
 export const MAX_FAILURES = 10;
 export const MIN_PASSCODE = 4;
+/**
+ * A passcode of digits alone needs more of them. The try counter lives next
+ * to the wrapped key, so a copy of this browser's storage can be guessed at
+ * offline with no counter at all: four digits fall in minutes on a laptop,
+ * six take days. Six is also what phones settled on. Passcodes made before
+ * this keep working; only new ones are held to it.
+ */
+export const MIN_NUMERIC_PASSCODE = 6;
 
 /** Idle time before the app locks itself, in milliseconds. 0 means never. */
 export function autoLockChoices(): { label: string; ms: number }[] {
@@ -149,6 +158,7 @@ export function isNumeric(passcode: string): boolean {
 
 /** Returns why a passcode is unacceptable, or null when it is fine. */
 export function passcodeProblem(passcode: string): string | null {
+  if (isNumeric(passcode) && passcode.length < MIN_NUMERIC_PASSCODE) return t("appLock.useAtLeastDigits", { count: MIN_NUMERIC_PASSCODE });
   if (passcode.length < MIN_PASSCODE) return t("appLock.useAtLeastCharacters", { count: MIN_PASSCODE });
   if (passcode.length > 128) return t("appLock.thatIsTooLong");
   if (/^(.)\1*$/.test(passcode)) return t("appLock.pickSomethingLessGuessableThanOne");
@@ -163,7 +173,7 @@ export type LockOptions = Partial<Pick<LockConfig, "autoLockMs" | "lockOnBlur" |
 /** Turns the lock on: wraps the identity with the passcode and stores it. */
 export async function enableLock(userId: string, identity: Identity, passcode: string, opts?: LockOptions): Promise<LockConfig> {
   const problem = passcodeProblem(passcode);
-  if (problem) throw new Error(problem);
+  if (problem) throw new ReadableError(problem);
   const salt = randomBytes(16);
   const params = opts?.kdf ?? LOCK_KDF;
   const key = await passcodeKey(passcode, salt, params);
@@ -233,7 +243,7 @@ export async function adoptPolicy(userId: string, identity: Identity, passcode: 
  */
 export async function unlockIdentity(userId: string, passcode: string): Promise<Identity> {
   const cfg = loadLock(userId);
-  if (!cfg) throw new Error(t("appLock.thisDeviceHasNoPasscode"));
+  if (!cfg) throw new ReadableError(t("appLock.thisDeviceHasNoPasscode"));
   const key = await passcodeKey(passcode, b64.dec(cfg.salt), cfg.params);
   try {
     const privateKey = await unwrapPrivateKey(b64.dec(cfg.wrapped), key);

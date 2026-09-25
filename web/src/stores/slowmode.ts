@@ -7,6 +7,8 @@ interface SlowmodeState {
   until: Record<string, number>;
   markSent: (channelId: string) => void;
   setUntil: (channelId: string, until: number) => void;
+  /** Sign-out: the next account's waits are its own. */
+  reset: () => void;
 }
 
 export const useSlowmode = create<SlowmodeState>()((set) => ({
@@ -14,6 +16,7 @@ export const useSlowmode = create<SlowmodeState>()((set) => ({
   until: {},
   markSent: (channelId) => set((s) => ({ lastSent: { ...s.lastSent, [channelId]: Date.now() } })),
   setUntil: (channelId, until) => set((s) => ({ until: { ...s.until, [channelId]: until } })),
+  reset: () => set({ lastSent: {}, until: {} }),
 }));
 
 /** Seconds left before the user may send again in a slowmode channel. */

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
-import { ensureShortcodes, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
+import { ensureShortcodes, mightHaveShortcode, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import { formatStamp, type StampStyle } from "@/lib/time";
 import type { Node, RenderCtx } from "./ast";
 import { parse } from "./parse";
@@ -28,7 +28,7 @@ export function Markdown(props: { source: string; ctx: RenderCtx; inline?: boole
 /** Loads the shortcode table when some text might need it, and re-renders once it lands. */
 function useShortcodes(source: string): number {
   const [version, setVersion] = useState(() => shortcodeVersion());
-  const wants = source.includes(":");
+  const wants = mightHaveShortcode(source);
   useEffect(() => {
     if (!wants || shortcodesReady()) return;
     ensureShortcodes();

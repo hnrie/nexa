@@ -142,7 +142,7 @@ describe("auth store", () => {
     });
 
     it("keeps no readable keys on the device once it is saved", async () => {
-      await useAuth.getState().setPasscode("2468", fast);
+      await useAuth.getState().setPasscode("246813", fast);
       expect(settingsSaves).toBeGreaterThan(0);
       expect(hasLock("1")).toBe(true);
       expect(useSettings.getState().settings.appLock).not.toBeNull();
@@ -152,14 +152,14 @@ describe("auth store", () => {
 
     it("puts everything back and says so when the account never gets the policy", async () => {
       failSettings = true;
-      await expect(useAuth.getState().setPasscode("2468", fast)).rejects.toThrow(/Could not save/);
+      await expect(useAuth.getState().setPasscode("246813", fast)).rejects.toThrow(/Could not save/);
       expect(hasLock("1")).toBe(false);
       expect(useSettings.getState().settings.appLock).toBeNull();
       expect(await keystore.loadIdentity("1")).not.toBeNull();
     });
 
     it("keeps the passcode when removing it cannot be saved", async () => {
-      await useAuth.getState().setPasscode("2468", fast);
+      await useAuth.getState().setPasscode("246813", fast);
       failSettings = true;
       await expect(useAuth.getState().removePasscode()).rejects.toThrow(/Could not save/);
       expect(hasLock("1")).toBe(true);

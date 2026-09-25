@@ -8,17 +8,16 @@ import { useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { useExpressions } from "@/stores/expressions";
-import { handleVoiceEvent, onReadyVoice } from "@/voice/session";
 import { useSettings } from "@/stores/settings";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
 import { applyLockPolicy } from "./session";
-import { useUsers } from "@/stores/users";
+import { fetchMissingUsers, useUsers } from "@/stores/users";
 import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
 import { appOnScreen } from "@/lib/notify";
 import { readingPresent } from "@/lib/readPosition";
-import { users as usersApi } from "@/api/users";
 import { channels as channelsApi } from "@/api/channels";
+import { ApiError } from "@/api/client";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { ring } from "@/lib/keyring";
 import type { Message, PublicUser, Relationship, ServerView } from "@/api/types";
@@ -27,6 +26,23 @@ import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
 import { channelsOnScreen, usePanes } from "@/stores/panes";
 import { mentionsMe } from "@/lib/mentionsMe";
+import { loadChunk } from "@/lib/lazyChunk";
+
+type VoiceModule = typeof import("@/voice/session");
+let voiceModule: Promise<VoiceModule> | null = null;
+
+/**
+ * The call engine, fetched the first time an event needs it rather than with
+ * the gateway: it is most of a hundred kilobytes, and the gateway comes with
+ * pages (an invite, for one) that never show a call.
+ */
+function voice(): Promise<VoiceModule> {
+  voiceModule ??= loadChunk(() => import("@/voice/session")).catch((err: unknown) => {
+    voiceModule = null;
+    throw err;
+  });
+  return voiceModule;
+}
 
 /** Something from Nexa worth a sound or a notification. */
 export type NexaAlert = { kind: "notice" | "reply"; case: MemberCase } | { kind: "announcement"; announcement: Announcement } | { kind: "appeal"; caseId: string; userId: string };
@@ -114,33 +130,31 @@ const channelFetches = new Set<string>();
 /** Key rotations under way, by conversation. */
 const rotations = new Map<string, Promise<void>>();
 
+/** Sign-out: the rotations queued for the account that has gone are not the next one's to wait behind. */
+export function forgetRotations(): void {
+  rotations.clear();
+}
+
 /** A message can arrive for a conversation this client closed or never saw. */
 async function ensureChannel(id: string): Promise<void> {
   if (useChannels.getState().byId[id] || channelFetches.has(id)) return;
   channelFetches.add(id);
+  const gen = sessionGen;
   try {
-    useChannels.getState().upsert(await channelsApi.get(id));
-  } catch {
-    /* no access: the message will simply not show a conversation */
+    const ch = await channelsApi.get(id);
+    if (gen === sessionGen) useChannels.getState().upsert(ch);
+  } catch (err) {
+    // Gone, or not this account's to see: a message that raced the channel's
+    // deletion would otherwise leave a list behind for a channel nothing shows.
+    if (gen === sessionGen && err instanceof ApiError && (err.status === 403 || err.status === 404)) useMessages.getState().clearChannel(id);
   } finally {
     channelFetches.delete(id);
   }
 }
 
-const userFetches = new Set<string>();
-
-async function ensureUser(id: string): Promise<void> {
-  // the same guard ensureChannel above has: a burst of ten messages from
-  // somebody nobody has loaded was ten identical requests
-  if (useUsers.getState().byId[id] || userFetches.has(id)) return;
-  userFetches.add(id);
-  try {
-    useUsers.getState().upsert(await usersApi.get(id));
-  } catch {
-    /* unknown users render as placeholders */
-  } finally {
-    userFetches.delete(id);
-  }
+/** Fetches someone this device has not loaded; unknown users render as placeholders meanwhile. */
+function ensureUser(id: string): void {
+  fetchMissingUsers([id]);
 }
 
 /**
@@ -195,7 +209,14 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
           if (!gone()) useExpressions.getState().setRecents(list);
         })
         .catch(() => undefined);
-      onReadyVoice(d.voice_states ?? [], d.session_id);
+      // Not waited for: the engine's first load must not hold up the settings,
+      // the keys and the conversations below. Call events after this one wait
+      // on the same load, so they still come after it.
+      void voice()
+        .then((v) => {
+          if (!gone()) v.onReadyVoice(d.voice_states ?? [], d.session_id);
+        })
+        .catch((err: unknown) => console.warn("voice: could not load the call engine", err));
       const settings = useSettings.getState();
       await settings.load(d.settings?.blob ?? null, d.settings?.version ?? 0);
       if (gone()) return;
@@ -219,7 +240,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useChannels.getState().setLastMessage(m.channel_id, m.id);
       useTyping.getState().remove(m.channel_id, m.author_id);
       if (decrypted.decryptError === "no_key" && m.key_conv_id) useKeys.getState().markWaiting(m.key_conv_id);
-      void ensureUser(m.author_id);
+      ensureUser(m.author_id);
       void ensureChannel(m.channel_id);
       const mine = meId === m.author_id;
       const ui = useUI.getState();
@@ -285,7 +306,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "channel_create":
     case "channel_update":
       useChannels.getState().upsert(e.d);
-      for (const id of e.d.recipient_ids) void ensureUser(id);
+      fetchMissingUsers(e.d.recipient_ids);
       return;
     case "channel_delete":
       useChannels.getState().remove(e.d.id);
@@ -457,9 +478,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "voice_error":
     case "voice_resumed":
     case "call_ring":
-    case "call_end":
-      handleVoiceEvent(e);
+    case "call_end": {
+      const v = await voice();
+      if (!gone()) v.handleVoiceEvent(e);
       return;
+    }
     case "ban_add":
     case "ban_remove":
     case "invite_create":
@@ -470,5 +493,37 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const never: never = e;
       void never;
     }
+  }
+}
+
+/**
+ * An event that arrived while the app was locked with a call going on. The
+ * keys are gone, so nothing that needs them is applied — the ready after
+ * unlocking brings all of that back — but the call goes on: its own events are
+ * handled as usual, and a reconnect meanwhile still resumes it. A call ringing
+ * in is left: nobody can answer it behind the passcode.
+ */
+export async function applyLockedEvent(e: GatewayEvent): Promise<void> {
+  const gen = sessionGen;
+  switch (e.t) {
+    case "ready": {
+      const v = await voice();
+      if (gen === sessionGen) v.onReadyVoice(e.d.voice_states ?? [], e.d.session_id);
+      return;
+    }
+    case "voice_state":
+    case "voice_signal":
+    case "voice_error":
+    case "voice_resumed":
+    case "call_end": {
+      const v = await voice();
+      if (gen === sessionGen) v.handleVoiceEvent(e);
+      return;
+    }
+    case "session_expired":
+    case "account_banned":
+      return applyEvent(e);
+    default:
+      return;
   }
 }

@@ -1,4 +1,4 @@
-import { ApiError, api } from "./client";
+import { ApiError, UPLOAD_STALL_MS, api } from "./client";
 
 interface Recorded {
   url: string;
@@ -273,6 +273,15 @@ describe("api.request", () => {
     await expect(api.request("POST", "/auth/logout")).resolves.toBeUndefined();
   });
 
+  it("says a 200 that is not JSON (a captive portal's page) in words, as an ApiError", async () => {
+    useFetch(() => new Response("<!DOCTYPE html><title>Sign in to the Wi-Fi</title>", { status: 200, headers: { "content-type": "text/html" } }));
+    const err = (await api.request("POST", "/auth/login", {}).catch((e: unknown) => e)) as ApiError;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("bad_response");
+    expect(err.status).toBe(200);
+    expect(err.message).toBe("The server's answer could not be read.");
+  });
+
   it("parses the error envelope into an ApiError", async () => {
     useFetch(() => json({ error: { code: "dm_closed", message: "No DMs." } }, 403));
     const err = await api.request("POST", "/users/@me/channels", {}).catch((e: unknown) => e);
@@ -454,6 +463,42 @@ describe("api.upload", () => {
     expect(xhr.aborted).toBe(true);
     const err = (await p.catch((e: unknown) => e)) as ApiError;
     expect(err.code).toBe("aborted");
+  });
+
+  it("settles at once when handed a signal that is already down", async () => {
+    useXHR();
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const err = (await api.upload("/channels/7/attachments", new Uint8Array([1]), { signal: ctrl.signal }).catch((e: unknown) => e)) as ApiError;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe("aborted");
+    // nothing was opened, let alone sent
+    expect(FakeXHR.last).toBeNull();
+  });
+
+  it("gives up on an upload that goes a minute without a byte, and not on one that keeps moving", async () => {
+    vi.useFakeTimers();
+    try {
+      useXHR();
+      const p = api.upload("/channels/7/attachments", new Uint8Array([1, 2, 3]));
+      const xhr = lastXHR();
+      const caught = p.catch((e: unknown) => e);
+      // progress keeps it alive well past a minute in total
+      for (let i = 0; i < 5; i++) {
+        vi.advanceTimersByTime(UPLOAD_STALL_MS - 1000);
+        xhr.progress(i + 1, 3);
+      }
+      expect(xhr.aborted).toBe(false);
+      vi.advanceTimersByTime(UPLOAD_STALL_MS);
+      expect(xhr.aborted).toBe(true);
+      const err = (await caught) as ApiError;
+      expect(err).toBeInstanceOf(ApiError);
+      // a stall reads as a lost connection, which the resumable path picks up from
+      expect(err.code).toBe("timeout");
+      expect(err.status).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rejects when no XMLHttpRequest is available", async () => {

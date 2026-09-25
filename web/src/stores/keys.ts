@@ -53,6 +53,9 @@ async function persistRoot(userId: string, conv: string, epoch: number, root: Ui
   await keystore.saveRoot(userId, conv, epoch, root);
 }
 
+/** Grants opened at a time: enough to overlap their decryptions, few enough to keep the tab drawing. */
+const UNWRAP_BATCH = 32;
+
 /**
  * Narrows a server-supplied recipient list to the accounts this device is
  * willing to hand a conversation key to.
@@ -170,24 +173,34 @@ export const useKeys = create<KeysState>()((set, get) => ({
     const { identity, userId } = get();
     if (!identity || !userId) return [];
     const changed: string[] = [];
-    for (const g of grants) {
-      if (ring.get(g.conv_id, g.epoch)) continue;
-      let root: Uint8Array;
-      try {
-        root = await unwrapGrant(identity.privateKey, identity.publicKey, b64.dec(g.wrapped_key));
-      } catch {
-        /* a grant we cannot open is ignored; another holder may send a good one */
-        continue;
+    const opened: { conv: string; epoch: number; root: Uint8Array }[] = [];
+    const fresh = grants.filter((g) => !ring.get(g.conv_id, g.epoch));
+    // A first sign-in on a device brings every grant the account holds, and
+    // each used to be opened and written to disk on its own, one after the
+    // other, while ready and every event behind it waited.
+    for (let i = 0; i < fresh.length; i += UNWRAP_BATCH) {
+      const batch = fresh.slice(i, i + UNWRAP_BATCH);
+      // a grant this device cannot open is left; another holder may send a good one
+      const roots = await Promise.all(batch.map((g) => unwrapGrant(identity.privateKey, identity.publicKey, b64.dec(g.wrapped_key)).catch(() => null)));
+      // Locked or signed out meanwhile: these keys belong to a session that has
+      // ended, and putting them back would undo the forgetting it just did.
+      if (get().identity !== identity) return [];
+      for (const [j, root] of roots.entries()) {
+        const g = batch[j]!;
+        if (!root || ring.get(g.conv_id, g.epoch)) continue;
+        // In memory the key works at once, whether or not the disk takes it: a
+        // dead database handle (iOS after a long time in the background) must
+        // not leave messages saying "waiting for key" with the key right here.
+        ring.set(g.conv_id, g.epoch, root);
+        changed.push(g.conv_id);
+        opened.push({ conv: g.conv_id, epoch: g.epoch, root });
       }
-      // In memory the key works at once, whether or not the disk takes it: a
-      // dead database handle (iOS after a long time in the background) must
-      // not leave messages saying "waiting for key" with the key right here.
-      ring.set(g.conv_id, g.epoch, root);
-      changed.push(g.conv_id);
+    }
+    if (opened.length > 0 && !hasLock(userId)) {
       try {
-        await persistRoot(userId, g.conv_id, g.epoch, root);
+        await keystore.saveRoots(userId, opened);
       } catch {
-        /* kept for this session; the next grant or sign-in stores it again */
+        /* kept for this session; the next grant or sign-in stores them again */
       }
     }
     if (changed.length > 0) {

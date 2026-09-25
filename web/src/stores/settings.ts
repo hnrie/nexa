@@ -7,6 +7,8 @@ import { fromStreamQuality } from "@/voice/shareQuality";
 
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system";
 export type NotificationLevel = "all" | "mentions" | "none";
+/** What a notification may show: the sender and the text, the sender only, or neither. */
+export type NotificationPreview = "full" | "name" | "none";
 export type ShareResolution = "720p" | "1080p" | "1440p" | "source";
 export type ShareFps = 15 | 30 | 60;
 
@@ -78,7 +80,7 @@ export interface Settings {
    * desktop: notifications in a browser, which has to be allowed first.
    * app: notifications in the desktop app, on unless turned off.
    */
-  notifications: { desktop: boolean; app: boolean; sounds: boolean; perChannel: Record<string, NotificationLevel>; muted: string[] };
+  notifications: { desktop: boolean; app: boolean; sounds: boolean; perChannel: Record<string, NotificationLevel>; muted: string[]; preview: NotificationPreview };
   drafts: Record<string, string>;
   voice: VoiceSettings;
   serverPositions: string[];
@@ -106,7 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   recentEmoji: [],
   favoriteGifs: [],
   skinTone: 0,
-  notifications: { desktop: false, app: true, sounds: true, perChannel: {}, muted: [] },
+  notifications: { desktop: false, app: true, sounds: true, perChannel: {}, muted: [], preview: "full" },
   drafts: {},
   voice: {
     inputDeviceId: null,

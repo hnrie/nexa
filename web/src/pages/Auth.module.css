@@ -35,6 +35,9 @@
    after each dash), so no group is ever split across two lines to be copied
    out by hand wrong. */
 .recovery { font-family: var(--font-mono); font-size: 15px; line-height: 1.7; letter-spacing: 0.04em; padding: 16px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; color: var(--text-strong); border: 1px solid var(--border); }
+/* the call a lock left running, and the way to leave it */
+.call { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--status-online) 12%, transparent); border: 1px solid color-mix(in srgb, var(--status-online) 45%, transparent); font-size: 14px; color: var(--text); }
+.call > span { flex: 1 1 200px; }
 .warn { padding: 12px; border-radius: var(--radius-xs); background: rgba(253, 184, 51, 0.12); border: 1px solid rgba(253, 184, 51, 0.5); font-size: 14px; color: var(--text); }
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
 .check input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }

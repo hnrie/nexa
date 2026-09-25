@@ -7,7 +7,6 @@ import { installCrashReporting } from "./lib/crashReport";
 import { downloadsSettled } from "./lib/download";
 import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
-import { installNoZoom } from "./lib/noZoom";
 import { installKeyboardInset } from "./lib/keyboardInset";
 import { applyRememberedAppearance } from "./lib/theme";
 import { ensureTwemojiIndex } from "./lib/twemoji";
@@ -45,7 +44,6 @@ installCrashReporting();
 installLongPress();
 // whether the actions bots abuse need a captcha here, known before anyone signs in
 void loadCaptchaConfig();
-installNoZoom();
 installKeyboardInset();
 // the first emoji on screen should not have to wait for the list of pictures
 ensureTwemojiIndex();

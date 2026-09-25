@@ -42,6 +42,8 @@ export interface Toast {
 
 interface UIState {
   connection: GatewayStatus;
+  /** Why the connection is down, when the server said something worth passing on; null otherwise. */
+  connectionNote: string | null;
   leftOpen: boolean;
   rightOpen: boolean;
   membersOpen: boolean;
@@ -63,7 +65,7 @@ interface UIState {
   jumpTo: { channelId: string; messageId: string } | null;
   toasts: Toast[];
   focused: boolean;
-  setConnection: (s: GatewayStatus) => void;
+  setConnection: (s: GatewayStatus, note?: string | null) => void;
   setLeftOpen: (v: boolean) => void;
   setRightOpen: (v: boolean) => void;
   toggleMembers: () => void;
@@ -94,6 +96,7 @@ let modalSeq = 0;
 
 export const useUI = create<UIState>()((set) => ({
   connection: "idle",
+  connectionNote: null,
   leftOpen: false,
   rightOpen: false,
   membersOpen: true,
@@ -108,7 +111,8 @@ export const useUI = create<UIState>()((set) => ({
   jumpTo: null,
   toasts: [],
   focused: true,
-  setConnection: (connection) => set({ connection }),
+  // a note says why the connection went; it stays through the reconnect it explains and goes once one succeeds
+  setConnection: (connection, note) => set((s) => ({ connection, connectionNote: connection === "open" || connection === "idle" ? null : note === undefined ? s.connectionNote : note })),
   setLeftOpen: (leftOpen) => set(leftOpen ? { leftOpen: true, rightOpen: false } : { leftOpen: false }),
   setRightOpen: (rightOpen) => set(rightOpen ? { rightOpen: true, leftOpen: false } : { rightOpen: false }),
   toggleMembers: () => set((s) => ({ membersOpen: !s.membersOpen })),

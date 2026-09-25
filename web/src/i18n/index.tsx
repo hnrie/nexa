@@ -70,6 +70,18 @@ export function t(key: string, values?: Values & { count?: number }): string {
   return current.t(key, values);
 }
 
+/**
+ * Names or words joined the way the language joins a list: "Ann, Bob, Carl",
+ * "Ann、Bob、Carl", "Ann, Bob und Carl". A comma and a space are English.
+ */
+export function formatList(items: string[]): string {
+  try {
+    return new Intl.ListFormat(current.locale, { type: "conjunction", style: "narrow" }).format(items);
+  } catch {
+    return items.join(", ");
+  }
+}
+
 /** The translator itself, for code that needs the locale or the raw message. */
 export function translator(): Translator {
   return current;

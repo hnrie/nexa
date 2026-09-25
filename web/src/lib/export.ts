@@ -4,11 +4,14 @@
  * The zip is "store" (uncompressed): simple, fast, and the JSON is small.
  */
 import { channels as channelsApi } from "@/api/channels";
+import { ApiError } from "@/api/client";
 import { messages as messagesApi } from "@/api/messages";
 import { relationships as relationshipsApi } from "@/api/relationships";
 import { users as usersApi } from "@/api/users";
-import type { Channel } from "@/api/types";
+import type { Channel, Message } from "@/api/types";
 import { decryptForStore } from "@/lib/decrypt";
+import { REQUEST_GAP_MS, backoffFor } from "@/lib/fullSearch";
+import { ReadableError } from "@/lib/readableError";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
@@ -36,8 +39,18 @@ function dosDateTime(d: Date): { time: number; date: number } {
   return { time, date };
 }
 
+/**
+ * The most a plain zip can describe: 65,535 entries and 4 GiB of offsets.
+ * Past either, the fields wrap and the archive is quietly corrupt; ZIP64
+ * would lift both, but an export that size would not fit in a tab's memory
+ * anyway, so it is refused with a sentence rather than written broken.
+ */
+const ZIP_MAX_ENTRIES = 0xffff;
+const ZIP_MAX_BYTES = 0xffffffff;
+
 /** Builds a store-only zip from (name → bytes) entries. */
 export function buildZip(entries: { name: string; data: Uint8Array; mtime?: Date }[]): Uint8Array {
+  if (entries.length > ZIP_MAX_ENTRIES) throw new ReadableError(t("export.tooLarge"));
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
@@ -84,8 +97,10 @@ export function buildZip(entries: { name: string; data: Uint8Array; mtime?: Date
     central.set(name, 46);
     centrals.push(central);
     offset += local.length;
+    if (offset > ZIP_MAX_BYTES) throw new ReadableError(t("export.tooLarge"));
   }
   const centralSize = centrals.reduce((n, c) => n + c.length, 0);
+  if (offset + centralSize > ZIP_MAX_BYTES) throw new ReadableError(t("export.tooLarge"));
   const end = new Uint8Array(22);
   const ev = new DataView(end.buffer);
   ev.setUint32(0, 0x06054b50, true);
@@ -118,18 +133,54 @@ function safeName(s: string): string {
   return s.replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 60) || "channel";
 }
 
+/** When the walk last asked for a page, and how it waits; tests replace the clock. */
+export interface Pace {
+  last: number;
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+}
+
+export function realPace(): Pace {
+  return { last: 0, now: () => Date.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)) };
+}
+
+/** How many times one page is asked for before the export gives up. */
+const PAGE_TRIES = 6;
+
+/**
+ * One page of history, paced like the search walk. The history route sits
+ * behind the per-account limiter, and an account with a few hundred pages
+ * used to run into it part-way: every page after that was a refusal, and the
+ * export came back with most of its channels missing.
+ */
+async function historyPage(channelId: string, before: string | undefined, pace: Pace): Promise<Message[]> {
+  for (let attempt = 0; ; attempt++) {
+    const wait = REQUEST_GAP_MS - (pace.now() - pace.last);
+    if (wait > 0) await pace.sleep(wait);
+    pace.last = pace.now();
+    try {
+      return await messagesApi.list(channelId, { limit: 100, ...(before ? { before } : {}) });
+    } catch (err) {
+      // slow down, or the connection or the server: worth waiting for; the rest is final
+      const again = err instanceof ApiError && (err.status === 429 || err.status === 0 || err.status >= 500);
+      if (!again || attempt + 1 >= PAGE_TRIES) throw err;
+      await pace.sleep(backoffFor(err, attempt));
+    }
+  }
+}
+
 /**
  * Walks a channel's whole history (newest → oldest) and decrypts what we can.
  * Each page comes back oldest first, so the pages are kept apart and only
  * their order is reversed: reversing the flat list would also turn every
  * page of 100 around.
  */
-export async function allMessages(channelId: string, onProgress: (n: number) => void): Promise<unknown[]> {
+export async function allMessages(channelId: string, onProgress: (n: number) => void, pace: Pace = realPace()): Promise<unknown[]> {
   const pages: unknown[][] = [];
   let count = 0;
   let before: string | undefined;
   for (let page = 0; page < 10000; page++) {
-    const batch = await messagesApi.list(channelId, { limit: 100, ...(before ? { before } : {}) });
+    const batch = await historyPage(channelId, before, pace);
     if (batch.length === 0) break;
     const rows: unknown[] = [];
     for (const m of batch) {
@@ -159,32 +210,51 @@ export async function allMessages(channelId: string, onProgress: (n: number) => 
   return pages.reverse().flat();
 }
 
+const README = `Nexa data export
+
+Everything here was decrypted on your device. Messages you never held a key for are marked decrypted: false.
+Attachments are listed by name; download them from the app while you still have access.
+`;
+
 /** Gathers everything and returns the zip bytes. */
 export async function exportMyData(onProgress: (text: string) => void): Promise<Uint8Array> {
   const entries: { name: string; data: Uint8Array }[] = [];
-  onProgress("Profile…");
+  onProgress(t("export.readingProfile"));
   const me = await usersApi.me();
   entries.push({ name: "profile.json", data: json(me) });
   entries.push({ name: "settings.json", data: json(useSettings.getState().settings) });
-  onProgress("Friends…");
+  onProgress(t("export.readingFriends"));
   entries.push({ name: "relationships.json", data: json(await relationshipsApi.list()) });
   const dms: Channel[] = await channelsApi.listDMs();
   const serverChannels = Object.values(useChannels.getState().byId).filter((c) => c.server_id && c.type === "text");
   entries.push({ name: "servers.json", data: json(Object.values(useServers.getState().byId).map((s) => ({ ...s.server, roles: Object.values(s.roles), me: s.me }))) });
   entries.push({ name: "channels.json", data: json([...dms, ...serverChannels]) });
   const all = [...dms, ...serverChannels];
+  const pace = realPace();
+  const skipped: string[] = [];
   for (let i = 0; i < all.length; i++) {
     const ch = all[i]!;
     const label = ch.server_id ? `${useServers.getState().byId[ch.server_id]?.server.name ?? ch.server_id}/${ch.name}` : ch.name || ch.recipient_ids.join("-");
-    onProgress(`${i + 1}/${all.length} ${label}`);
+    const step = { done: i + 1, total: all.length, name: label };
+    onProgress(t("export.readingChannel", step));
     try {
-      const msgs = await allMessages(ch.id, (n) => onProgress(`${i + 1}/${all.length} ${label} (${t("export.messagesCount", { count: n })})`));
+      const msgs = await allMessages(ch.id, (n) => onProgress(t("export.readingChannelCount", { ...step, messages: t("export.messagesCount", { count: n }) })), pace);
       entries.push({ name: `messages/${ch.server_id ? safeName(useServers.getState().byId[ch.server_id]?.server.name ?? ch.server_id) + "/" : "dm/"}${safeName(ch.name || ch.id)}-${ch.id}.json`, data: json({ channel: ch, messages: msgs }) });
     } catch (err) {
-      entries.push({ name: `messages/errors/${ch.id}.txt`, data: new TextEncoder().encode(String(err)) });
+      // A conversation this account can no longer read (left, or gone) is
+      // said so in the README and the rest goes on. Anything else would leave
+      // a hole nobody sees until it is too late: the export fails, and says so.
+      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        skipped.push(`${label} (${ch.id})`);
+        continue;
+      }
+      throw err;
     }
   }
-  entries.push({ name: "README.txt", data: new TextEncoder().encode("Nexa data export\n\nEverything here was decrypted on your device. Messages you never held a key for are marked decrypted: false.\nAttachments are listed by name; download them from the app while you still have access.\n") });
+  // The notes stay in English, as the data does; the first line is in the reader's language.
+  const notes = [t("export.readmeFirstLine"), "", README];
+  if (skipped.length) notes.push("These conversations could not be read any more, so they are not here:", ...skipped.map((s) => `- ${s}`), "");
+  entries.push({ name: "README.txt", data: new TextEncoder().encode(notes.join("\n")) });
   return buildZip(entries);
 }
 
@@ -198,5 +268,6 @@ export function downloadBytes(name: string, bytes: Uint8Array, type = "applicati
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  // iOS may still be asking where to save it ten seconds on
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

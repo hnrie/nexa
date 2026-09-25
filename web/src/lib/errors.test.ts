@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError, errorFrom, genericMessage } from "@/api/client";
 import { describeError } from "./errors";
+import { ReadableError } from "./readableError";
 
 describe("describeError", () => {
   it("never shows the status line for a response with no envelope", () => {
@@ -36,5 +37,17 @@ describe("describeError", () => {
   it("says something different for 429, 4xx and 5xx", () => {
     const three = new Set([genericMessage(429), genericMessage(404), genericMessage(503)]);
     expect(three.size).toBe(3);
+  });
+
+  it("shows a sentence written for the reader as it is, and keeps a platform's own message to the console", () => {
+    // a passcode rule used to come out as "Something went wrong"
+    expect(describeError(new ReadableError("Use at least 6 digits, or mix in letters."), "Something went wrong.")).toBe("Use at least 6 digits, or mix in letters.");
+    expect(describeError(new Error("InvalidStateError: the database connection is closing"), "Something went wrong.")).toBe("Something went wrong.");
+  });
+
+  it("refuses a short passcode in words", async () => {
+    const { enableLock } = await import("./appLock");
+    const err = await enableLock("u-readable", { publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) }, "1379").catch((e: unknown) => e);
+    expect(describeError(err)).toMatch(/at least 6 digits/i);
   });
 });

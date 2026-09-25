@@ -1,4 +1,5 @@
 import { ApiError } from "@/api/client";
+import { describeError } from "@/lib/errors";
 import { users as usersApi } from "@/api/users";
 import type { MeUser } from "@/api/types";
 import { Toggle } from "@/components/common/Toggle";
@@ -28,7 +29,7 @@ export default function PrivacyPage() {
       const bytes = await exportMyData(setExportStatus);
       downloadBytes(`evilion-chat-export-${new Date().toISOString().slice(0, 10)}.zip`, bytes);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("settings.privacy.couldNotExportYourData"), "error");
+      toast(describeError(err, t("settings.privacy.couldNotExportYourData")), "error");
     } finally {
       setExporting(false);
       setExportStatus("");

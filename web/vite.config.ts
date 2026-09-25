@@ -130,7 +130,9 @@ export default defineConfig({
         entryFileNames: (chunk) => (chunk.name === "sw" || chunk.name === "download-sw" ? "[name].js" : "assets/[name]-[hash].js"),
         manualChunks: (id) => {
           if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/react-router")) return "react";
-          if (id.includes("@noble") || id.includes("hash-wasm")) return "crypto";
+          if (id.includes("@noble")) return "crypto";
+          // argon2 is only needed to sign in, sign up, unlock or change a password
+          if (id.includes("hash-wasm")) return "argon2";
           return undefined;
         },
       },

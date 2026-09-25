@@ -12,6 +12,7 @@ import { adoptPolicy, clearLock, enableLock, hasLock, loadLock, policyFor, saveL
 import { acceptServerKdf } from "@/lib/serverKdf";
 import { useSettings, type AppLockPolicy } from "@/stores/settings";
 import { useNexa } from "@/stores/nexa";
+import { ReadableError } from "@/lib/readableError";
 import { storage } from "@/lib/storage";
 
 import { t } from "@/i18n";
@@ -215,7 +216,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   completeMfa: async ({ code, backupCode }) => {
     const pending = pendingMfa;
-    if (!pending) throw new Error(t("auth.startAgainFromYourPassword"));
+    if (!pending) throw new ReadableError(t("auth.startAgainFromYourPassword"));
     const body = backupCode ? { backup_code: backupCode } : { code: (code ?? "").replace(/\s/g, "") };
     const res = await authApi.loginMfa(pending.ticket, body);
     const privateKey = await unwrapPrivateKey(b64.dec(res.enc_private_key), pending.encKey);
@@ -244,7 +245,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
       // This device has not seen the account's passcode yet: check it against
       // the policy, then wrap this device's copy of the key with it.
       const policy = pendingPolicy ?? useSettings.getState().settings.appLock;
-      if (!policy || !current) throw new Error(t("appLock.thisDeviceHasNoPasscode"));
+      if (!policy || !current) throw new ReadableError(t("appLock.thisDeviceHasNoPasscode"));
       await adoptPolicy(me.id, current, passcode, policy);
       pendingPolicy = null;
       await keystore.forgetIdentity(me.id);
@@ -274,7 +275,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
 
   setPasscode: async (passcode, opts) => {
     const { me, identity } = get();
-    if (!me || !identity) throw new Error(t("auth.unlockYourKeysFirst"));
+    if (!me || !identity) throw new ReadableError(t("auth.unlockYourKeysFirst"));
     const previousLock = loadLock(me.id);
     const previousPolicy = useSettings.getState().settings.appLock;
     const cfg = await enableLock(me.id, identity, passcode, opts);
@@ -298,7 +299,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     }
     useSettings.getState().patch({ appLock: previousPolicy });
     get().bumpLock();
-    throw new Error(saveFailed());
+    throw new ReadableError(saveFailed());
   },
 
   removePasscode: async () => {
@@ -318,7 +319,7 @@ export const useAuth = create<AuthState>()((set, get) => ({
     }
     useSettings.getState().patch({ appLock: previousPolicy });
     get().bumpLock();
-    throw new Error(saveFailed());
+    throw new ReadableError(saveFailed());
   },
 
   bumpLock: () => set((s) => ({ lockVersion: s.lockVersion + 1 })),

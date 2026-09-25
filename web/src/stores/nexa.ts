@@ -83,6 +83,8 @@ function appendLines(existing: CaseMessage[], lines: CaseMessage[]): CaseMessage
 }
 
 let feedRequest: Promise<void> | null = null;
+/** Moves on at sign-out, so an answer still on its way is not written into the next account's store. */
+let generation = 0;
 
 export const useNexa = create<NexaStore>()((set, get) => ({
   state: null,
@@ -106,9 +108,11 @@ export const useNexa = create<NexaStore>()((set, get) => ({
   loadFeed: async () => {
     if (feedRequest) return feedRequest;
     set({ feedLoading: true });
+    const gen = generation;
     feedRequest = (async () => {
       try {
         const r = await nexaApi.feed();
+        if (gen !== generation) return;
         set((s) => ({ feed: sortFeed(r.items), feedMore: r.has_more, people: { ...s.people, ...r.people } }));
       } finally {
         set({ feedLoading: false });
@@ -122,8 +126,10 @@ export const useNexa = create<NexaStore>()((set, get) => ({
     const { feed, feedMore, feedLoading } = get();
     if (!feed || !feedMore || feedLoading || feed.length === 0) return;
     set({ feedLoading: true });
+    const gen = generation;
     try {
       const r = await nexaApi.feed(feed[0]!.at);
+      if (gen !== generation) return;
       set((s) => ({ feed: mergeFeed(s.feed ?? [], r.items), feedMore: r.has_more, people: { ...s.people, ...r.people } }));
     } finally {
       set({ feedLoading: false });
@@ -131,8 +137,11 @@ export const useNexa = create<NexaStore>()((set, get) => ({
   },
 
   loadThread: async (caseId) => {
+    const gen = generation;
     const r = await nexaApi.thread(caseId);
     const thread: Thread = { case: r.case, messages: r.messages };
+    // an answer for an account that has since signed out is not the next one's to show
+    if (gen !== generation) return thread;
     set((s) => ({ threads: { ...s.threads, [caseId]: thread }, people: { ...s.people, ...r.people }, feed: caseIntoFeed(s.feed, r.case) }));
     return thread;
   },
@@ -205,7 +214,11 @@ export const useNexa = create<NexaStore>()((set, get) => ({
 
   dismissDeleted: () => set({ deleted: null }),
 
-  reset: () => set({ state: null, people: {}, feed: null, feedMore: false, feedLoading: false, threads: {} }),
+  reset: () => {
+    generation += 1;
+    feedRequest = null;
+    set({ state: null, people: {}, feed: null, feedMore: false, feedLoading: false, threads: {} });
+  },
 }));
 
 /** The mute in force on this account, if its time has not run out. */

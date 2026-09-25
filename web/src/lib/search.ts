@@ -26,8 +26,14 @@ const EMPTY: SearchQuery = { terms: [], phrases: [], exclude: [], from: [], in: 
 function parseDate(v: string, endOfDay: boolean): number | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
   if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
-  return Number.isNaN(d.getTime()) ? null : d.getTime();
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const d = new Date(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+  if (Number.isNaN(d.getTime())) return null;
+  // Date rolls an impossible day over into the next month: 2026-02-30 would
+  // quietly search from the 2nd of March. A date that does not come back as
+  // itself is not a date.
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return d.getTime();
 }
 
 export function parseQuery(raw: string): SearchQuery {

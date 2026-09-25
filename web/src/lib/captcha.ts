@@ -100,9 +100,12 @@ export async function captchaToken(action: string): Promise<string | null> {
     const overlay = document.createElement("div");
     overlay.className = "captcha-overlay";
     overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-label", t("captcha.label"));
     const sheet = document.createElement("div");
     sheet.className = "captcha-sheet";
+    // focusable itself, so moving focus here announces the sheet
+    sheet.tabIndex = -1;
     const title = document.createElement("div");
     title.className = "captcha-title";
     title.textContent = t("captcha.oneQuickCheck");
@@ -117,18 +120,41 @@ export async function captchaToken(action: string): Promise<string | null> {
 
     let id = "";
     let settled = false;
+    // where focus was before the sheet asked for it, to hand it back
+    let before: HTMLElement | null = null;
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== "Escape" || !overlay.classList.contains("captcha-shown")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancelIt();
+    };
     const finish = (then: () => void): void => {
       if (settled) return;
       settled = true;
+      document.removeEventListener("keydown", onKey, true);
       try {
         if (id) turnstile.remove(id);
       } catch {
         /* already gone */
       }
+      const hadFocus = overlay.contains(document.activeElement);
       overlay.remove();
+      if (hadFocus && before?.isConnected) before.focus();
       then();
     };
-    cancel.onclick = () => finish(() => reject(captchaError("captcha_cancelled", t("captcha.theCaptchaWasCancelled"))));
+    const cancelIt = (): void => finish(() => reject(captchaError("captcha_cancelled", t("captcha.theCaptchaWasCancelled"))));
+    cancel.onclick = cancelIt;
+    // Escape leaves it, as it leaves every other sheet in the app; caught
+    // before the page's own handlers, which would close something underneath
+    document.addEventListener("keydown", onKey, true);
+    // The sheet comes up over the form while focus stays on the button that
+    // asked for it: a keyboard user tabbed on into the form, and a screen
+    // reader said nothing. Focus moves into it when it shows, and back after.
+    const show = (): void => {
+      overlay.classList.add("captcha-shown");
+      before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      sheet.focus();
+    };
     try {
       id = turnstile.render(slot, {
         sitekey: key,
@@ -138,7 +164,7 @@ export async function captchaToken(action: string): Promise<string | null> {
         callback: (token: string) => finish(() => resolve(token)),
         "error-callback": () => finish(() => reject(captchaError("captcha_failed", t("captcha.theCaptchaCheckFailedPleaseTry")))),
         "timeout-callback": () => finish(() => reject(captchaError("captcha_failed", t("captcha.theCaptchaTimedOutPleaseTry")))),
-        "before-interactive-callback": () => overlay.classList.add("captcha-shown"),
+        "before-interactive-callback": show,
         "after-interactive-callback": () => overlay.classList.remove("captcha-shown"),
       });
     } catch {
