@@ -18,6 +18,7 @@ import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { badgeText, conversationCount } from "@/lib/unread";
 import { useSettings } from "@/stores/settings";
 import { closeDM, dmMenuItems } from "./dmMenu";
+import { menuPoint } from "./ServerSidebar";
 import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
 import { useNexa } from "@/stores/nexa";
 import { useModeration } from "@/stores/moderation";
@@ -127,7 +128,7 @@ export function DMSidebar() {
               data-channel={ch.id}
               onContextMenu={(e) => {
                 e.preventDefault();
-                openContextMenu({ x: e.clientX, y: e.clientY, items: dmMenuItems(ch.id, { nav, openModal }) });
+                openContextMenu({ ...menuPoint(e), items: dmMenuItems(ch.id, { nav, openModal }) });
               }}
             >
               <button type="button" className={s.itemMain} onClick={() => go(`/channels/@me/${ch.id}`)}>
@@ -136,8 +137,10 @@ export function DMSidebar() {
                   <span className={s.name}>{name}</span>
                   {sub}
                 </span>
+                {/* the count is said with the conversation's name, the button being what a screen reader lands on */}
+                {count > 0 ? <span className="visually-hidden">{`, ${count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count })}`}</span> : null}
               </button>
-              {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-label={count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count })}>{badgeText(count)}</span> : null}
+              {count > 0 ? <span className={s.mention} data-testid="dm-unread" aria-hidden="true">{badgeText(count)}</span> : null}
               <button
                 type="button"
                 className={s.close}

@@ -2,4 +2,6 @@
 .toast { pointer-events: auto; padding: 10px 16px; border-radius: var(--radius-sm); background: var(--bg-floating); color: var(--text); font-size: 14px; font-weight: 500; box-shadow: var(--shadow-high); border-inline-start: 4px solid var(--brand); animation: drop 160ms ease-out; max-width: min(90vw, 480px); text-align: start; }
 .error { border-inline-start-color: var(--danger); }
 .success { border-inline-start-color: var(--positive); }
+/* on a phone, under the page's header rather than over its buttons */
+@media (max-width: 767px) { .stack { top: calc(var(--header-h) + 8px + env(safe-area-inset-top, 0px)); width: calc(100% - 24px); align-items: center; } }
 @keyframes drop { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }

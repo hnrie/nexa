@@ -355,6 +355,7 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
             <Ellipsis size={18} />
           </button>
         </div>
+        {blocked ? <p className={m.blockedNote} aria-hidden="true">{blocked}</p> : null}
       </div>
     </article>
   );

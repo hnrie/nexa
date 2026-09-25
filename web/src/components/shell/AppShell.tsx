@@ -41,6 +41,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [params, setParams] = useSearchParams();
   const openModal = useUI((u) => u.openModal);
   const touch = useRef<{ x: number; y: number; edge: boolean } | null>(null);
+  // The browser knows the moment the network goes; the socket only finds out
+  // when a heartbeat goes unanswered, and for up to half a minute the app
+  // looked perfectly healthy while nothing could arrive.
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
   /** Which settings page the query has already opened, so one run does it once. */
   const openedSettings = useRef<string | null>(null);
   const serverId = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
@@ -226,7 +240,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </>
       )}
       <div className={s.main}>
-        {connection !== "open" && connection !== "idle" ? (
+        {offline ? (
+          <div className={s.connection} data-state="closed" role="status" data-testid="offline-banner">{t("shell.appShell.offline")}</div>
+        ) : connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection} role="status">{connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting")}</div>
         ) : null}
         <UpdateBanner />

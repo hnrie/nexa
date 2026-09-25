@@ -29,6 +29,13 @@ type Drop = { id: string; where: "before" | "after" | "into" };
 const BANNER_H = 138;
 const HEADER_H = 49;
 
+/** Where a context menu opens: at the pointer, or by the row when the keyboard opened it (which reports 0,0). */
+export function menuPoint(e: MouseEvent): { x: number; y: number } {
+  if (e.clientX !== 0 || e.clientY !== 0) return { x: e.clientX, y: e.clientY };
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  return { x: document.documentElement.dir === "rtl" ? r.right - 8 : r.left + 8, y: r.bottom };
+}
+
 export function ServerSidebar({ serverId }: { serverId: string }) {
   const nav = useNavigate();
   const loc = useLocation();
@@ -104,11 +111,11 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
 
   const onChannelContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
-    openContextMenu({ x: e.clientX, y: e.clientY, items: channelMenuItems(id, { nav, openModal }) });
+    openContextMenu({ ...menuPoint(e), items: channelMenuItems(id, { nav, openModal }) });
   };
   const onCategoryContext = (e: MouseEvent, id: string) => {
     e.preventDefault();
-    openContextMenu({ x: e.clientX, y: e.clientY, items: categoryMenuItems(id, { nav, openModal, collapsed: collapsed.includes(id), toggle: () => toggleCategory(id) }) });
+    openContextMenu({ ...menuPoint(e), items: categoryMenuItems(id, { nav, openModal, collapsed: collapsed.includes(id), toggle: () => toggleCategory(id) }) });
   };
 
   // --- drag and drop reordering (Manage Channels only) -------------------
@@ -226,6 +233,9 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
         >
           <span className={s.icon}>{ch.type === "voice" ? <Volume2 size={20} /> : priv ? <span className={s.lockHash}><Hash size={20} /><Lock size={10} className={s.lock} /></span> : <Hash size={20} />}</span>
           <span className={s.name}>{ch.name}</span>
+          {/* The dot and the count sit outside the button, so the button said
+              nothing about either; they are said as part of its name now. */}
+          {mentions > 0 ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.mentionsCount", { count: mentions })}`}</span> : unread && !selected ? <span className="visually-hidden">{`, ${t("sidebar.serverSidebar.unread")}`}</span> : null}
           {ch.type === "voice" && ch.user_limit > 0 ? <span className={s.limit}>{Object.keys(voiceByChannel[ch.id] ?? {}).length}/{ch.user_limit}</span> : null}
         </button>
         <span className={s.actions}>
@@ -240,7 +250,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
             </Tooltip>
           ) : null}
         </span>
-        {mentions > 0 ? <span className={s.mention}>{mentions > 99 ? "99+" : mentions}</span> : null}
+        {mentions > 0 ? <span className={s.mention} aria-hidden="true">{mentions > 99 ? "99+" : mentions}</span> : null}
       </div>
       {ch.type === "voice" ? <VoiceParticipants channelId={ch.id} serverId={serverId} /> : null}
       </div>

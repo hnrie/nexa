@@ -1177,6 +1177,9 @@ td.logReason {
   min-height: 92px;
   resize: vertical;
 }
+.reasonMeta [data-short] {
+  color: var(--text-warning);
+}
 .reasonMeta {
   display: flex;
   justify-content: space-between;
@@ -1387,5 +1390,18 @@ td.logReason {
     padding: 10px;
     margin-block: -6px;
     margin-inline-end: -6px;
+  }
+}
+
+/* why Moderate is off, said under the card's buttons where there is no pointer to hover with */
+.blockedNote {
+  display: none;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+@media (hover: none) {
+  .blockedNote {
+    display: block;
   }
 }
