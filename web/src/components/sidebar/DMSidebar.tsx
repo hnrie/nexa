@@ -85,7 +85,7 @@ export function DMSidebar() {
     useUI.getState().setLeftOpen(false);
   };
 
-  const dms = selectDMs(channels);
+  const dms = useMemo(() => selectDMs(channels), [channels]);
   const view = useMemo(() => {
     const ids = [...dms.map((c) => c.id), ...(nexaShown ? [NEXA_ID] : [])];
     const byId = new Map(dms.map((c) => [c.id, c]));
@@ -153,9 +153,15 @@ export function DMSidebar() {
     const r = e.currentTarget.getBoundingClientRect();
     return e.clientY < r.top + r.height / 2 ? "before" : "after";
   };
+  /** Nothing would change where it is now: dropping here does nothing, whatever it was over before. */
+  const nowhere = (e: DragEvent) => {
+    e.stopPropagation();
+    if (over) setOver(null);
+  };
   /** Among the pinned ones: before or after this one. */
   const overPinned = (e: DragEvent, id: string) => {
-    if (drag === id) return;
+    if (!drag) return;
+    if (drag === id) return nowhere(e);
     const where = half(e);
     const at = layout.pins.indexOf(id);
     if (at < 0) return;
@@ -163,15 +169,18 @@ export function DMSidebar() {
   };
   /** On a group: a conversation goes in; a group goes beside it among the pinned ones, or back to the list. */
   const overGroup = (e: DragEvent, g: DMGroup, pinned: boolean) => {
-    if (!drag || drag === g.id) return;
+    if (!drag) return;
+    if (drag === g.id) return nowhere(e);
     if (!isGroupId(drag)) {
-      if (groupOf(layout, drag)?.id === g.id) return;
+      if (groupOf(layout, drag)?.id === g.id) return nowhere(e);
       hover(e, { at: g.id, where: "into", drop: { kind: "group", groupId: g.id } });
     } else if (pinned) overPinned(e, g.id);
-    else hover(e, { at: "main", where: "main", drop: { kind: "main" } });
+    else if (layout.pins.includes(drag)) hover(e, { at: "main", where: "main", drop: { kind: "main" } });
+    else nowhere(e);
   };
   const overMain = (e: DragEvent) => {
-    if (!drag || (!layout.pins.includes(drag) && !groupOf(layout, drag))) return;
+    if (!drag) return;
+    if (!layout.pins.includes(drag) && !groupOf(layout, drag)) return nowhere(e);
     hover(e, { at: "main", where: "main", drop: { kind: "main" } });
   };
   const overTop = (e: DragEvent) => {
@@ -433,7 +442,7 @@ export function DMSidebar() {
             {t("organize.dm.dropToPin")}
           </div>
         ) : null}
-        <div className={s.header} data-drop={dropAt("main") === "main" || undefined} onDragOver={overMain} onDrop={onDrop}>
+        <div className={s.header} data-drop={dropAt("main") === "main" || undefined} onDragOver={overMain} onDrop={onDrop} data-testid="dm-header">
           <span>{t("sidebar.dMSidebar.directMessages")}</span>
           <button className={s.headerBtn} aria-label={t("sidebar.dMSidebar.createDm")} title={t("sidebar.dMSidebar.createDm")} onClick={() => openModal("createDM")}>
             <Plus size={16} />

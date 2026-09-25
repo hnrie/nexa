@@ -169,15 +169,19 @@ export function Rail() {
     e.dataTransfer.setData("text/plain", id);
   };
   const onDragOver = (e: DragEvent, id: string, target: Target, folderId?: string) => {
-    if (!drag || drag.id === id) return;
-    e.preventDefault();
+    if (!drag) return;
     e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
     const r = e.currentTarget.getBoundingClientRect();
     const where = dropZone(drag, target, (e.clientY - r.top) / Math.max(1, r.height));
     // a folder goes beside another folder, never among its servers
     const next: RailDrop = drag.folder && target === "inFolder" && folderId ? { id: folderId, where } : { id, where };
-    if (next.id === drag.id) return;
+    if (next.id === drag.id) {
+      // back over itself, where dropping does nothing: forget where it was over before
+      if (over) setOver(null);
+      return;
+    }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
     if (over?.id !== next.id || over.where !== next.where) setOver(next);
   };
   /** Over the space around the pinned ones' line or the add button: the end of the list above it. */

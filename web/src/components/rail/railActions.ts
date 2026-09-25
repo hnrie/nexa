@@ -98,8 +98,8 @@ export function serverArrangeItems(serverId: string, ctx: Ctx): ContextMenuItem[
         ...folders.map((f, i): ContextMenuItem => ({
           id: `folder-${f.id}`,
           label: folderName(f),
-          // the folder it is in is the one ticked; choosing it again does nothing
-          checked: f.id === folder?.id,
+          // the folder it is in shows ticked; choosing it again does nothing
+          ...(f.id === folder?.id ? { checked: true } : {}),
           separatorAfter: i === folders.length - 1,
           onSelect: () => changeRail((l) => addToFolder(l, serverId, f.id)),
         })),
