@@ -11,6 +11,7 @@ import { useMessages } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { canPin } from "./messageMenu";
+import { messageFate, useBlockRules } from "@/lib/blocked";
 import { useLayerPresence } from "./useLayerPresence";
 import s from "./Chat.module.css";
 
@@ -54,6 +55,10 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
   const ref = useRef<HTMLDivElement>(null);
   const signal = usePinSignal(channelId);
   const titleId = useId();
+  // pins from people this account blocked fold to a line, or go, as they do in the conversation
+  const rules = useBlockRules();
+  const fates = new Map((pins ?? []).map((m) => [m.id, messageFate(m, rules, (id) => pins?.find((x) => x.id === id)?.author_id ?? useMessages.getState().channels[channelId]?.byId[id]?.author_id)]));
+  const shownPins = pins?.filter((m) => fates.get(m.id) !== "hide") ?? null;
   useLayerPresence();
   // The parent passes a new onClose on every render; fetching must not follow it.
   const closeRef = useRef(onClose);
@@ -123,15 +128,15 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
             {t("chat.pins.couldNotLoadPinnedMessages")}{" "}
             <button className={s.loadRetry} onClick={() => setAttempt((n) => n + 1)} data-testid="pins-retry">{t("chat.messageList.tryAgain")}</button>
           </div>
-        ) : pins === null ? <div className={s.pinEmpty}>{t("chat.pins.loading")}</div> : pins.length === 0 ? <div className={s.pinEmpty}>{t("chat.pins.thisChannelDoesnTHaveAny")}</div> : null}
-        {pins?.map((m) => (
+        ) : shownPins === null ? <div className={s.pinEmpty}>{t("chat.pins.loading")}</div> : shownPins.length === 0 ? <div className={s.pinEmpty}>{t("chat.pins.thisChannelDoesnTHaveAny")}</div> : null}
+        {shownPins?.map((m) => (
           <div key={m.id} className={s.pinItem}>
             <button type="button" className={s.pinJump} onClick={() => { setJumpTo({ channelId, messageId: m.id }); onClose(); }}>
               <span className={s.pinHead}>
                 <span className={s.pinAuthor} dir="auto">{displayName(users[m.author_id])}</span>
                 <span className={s.time}>{formatTimestamp(m.created_at)}</span>
               </span>
-              <span className={s.pinText} dir="auto">{m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.att?.length ? t("chat.pins.attachment") : t("chat.pins.encrypted")}</span>
+              <span className={s.pinText} dir="auto">{fates.get(m.id) === "collapse" ? t("people.blocked.replyPreview") : m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.att?.length ? t("chat.pins.attachment") : t("chat.pins.encrypted")}</span>
             </button>
             {canPin(m) ? (
               <button

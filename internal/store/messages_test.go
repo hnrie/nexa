@@ -301,6 +301,51 @@ func TestReadStatesAndMentions(t *testing.T) {
 	}
 }
 
+// Someone the reader blocked neither pings nor adds to an unread count, in a
+// group or anywhere else; unblocking them counts their messages again.
+func TestBlockedAuthorsDoNotCount(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b, c := mkUser(t, s, "a"), mkUser(t, s, "b"), mkUser(t, s, "c")
+	group, err := s.CreateGroupDM(ctx, a.ID, []ids.ID{b.ID, c.ID}, "g")
+	if err != nil {
+		t.Fatal(err)
+	}
+	say := func(author ids.ID, mention bool) {
+		m := &Message{ChannelID: group.ID, AuthorID: author, Ciphertext: json.RawMessage(`{"v":1}`)}
+		if mention {
+			m.Mentions = []ids.ID{a.ID}
+		}
+		if err := s.InsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	say(b.ID, true)
+	say(c.ID, true)
+	say(c.ID, false)
+	if err := s.Block(ctx, a.ID, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	states, err := s.ReadStatesFor(ctx, a.ID, []ids.ID{group.ID})
+	if err != nil || states[0].MentionCount != 1 || states[0].UnreadCount != 1 {
+		t.Fatalf("with c blocked: %v %+v", err, states)
+	}
+	if n, _ := s.CountMentionsAfter(ctx, group.ID, a.ID, 0); n != 1 {
+		t.Errorf("CountMentionsAfter with c blocked = %d", n)
+	}
+	// a block is one-way: c, blocked by a, still counts what a says
+	say(a.ID, false)
+	if states, _ := s.ReadStatesFor(ctx, c.ID, []ids.ID{group.ID}); states[0].UnreadCount != 2 {
+		t.Errorf("the blocked side's own count: %+v", states[0])
+	}
+	if err := s.DeleteRelationship(ctx, a.ID, c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if states, _ := s.ReadStatesFor(ctx, a.ID, []ids.ID{group.ID}); states[0].MentionCount != 2 || states[0].UnreadCount != 3 {
+		t.Errorf("after unblocking: %+v", states[0])
+	}
+}
+
 func TestMentionsBeforeJoiningDoNotCount(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

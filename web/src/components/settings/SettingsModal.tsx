@@ -12,6 +12,7 @@ import { confirmLogout } from "@/lib/confirmLogout";
 const AccountPage = lazyPage(() => import("./AccountPage"));
 const ProfilePage = lazyPage(() => import("./ProfilePage"));
 const PrivacyPage = lazyPage(() => import("./PrivacyPage"));
+const BlockedPage = lazyPage(() => import("./BlockedPage"));
 const SecurityPage = lazyPage(() => import("./SecurityPage"));
 const DevicesPage = lazyPage(() => import("./DevicesPage"));
 const AppearancePage = lazyPage(() => import("./AppearancePage"));
@@ -26,7 +27,7 @@ const AboutPage = lazyPage(() => import("./AboutPage"));
 /** The navigation, built per render so it follows the language. */
 function navGroups(): NavGroup[] {
   return [
-    { head: t("settings.settings.userSettings"), items: [{ id: "account", label: t("settings.account.myAccount") }, { id: "profiles", label: t("settings.profile.profiles") }, { id: "privacy", label: t("settings.privacy.privacySafety") }, { id: "security", label: t("settings.security.security") }, { id: "devices", label: t("settings.devices.devices") }] },
+    { head: t("settings.settings.userSettings"), items: [{ id: "account", label: t("settings.account.myAccount") }, { id: "profiles", label: t("settings.profile.profiles") }, { id: "privacy", label: t("settings.privacy.privacySafety") }, { id: "blocked", label: t("people.blockedPage.title") }, { id: "security", label: t("settings.security.security") }, { id: "devices", label: t("settings.devices.devices") }] },
     { head: t("settings.settings.appSettings"), items: [{ id: "appearance", label: t("settings.appearance.appearance") }, { id: "voice", label: t("settings.voice.voiceVideo") }, { id: "notifications", label: t("settings.notifications.notifications") }, { id: "stickers", label: t("settings.stickers.expressionPacks") }] },
   ];
 }
@@ -64,7 +65,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     // Opened at My Account is opened as a whole, from the user panel: a phone starts on the list.
     <SettingsLayer label={t("settings.settings.userSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose} footer={footer} startOnList={initial === "account"}>
       {/* A blank content column on a slow link is indistinguishable from a crash. */}
-      <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{body}</Suspense>
+      <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{page === "blocked" ? <BlockedPage /> : body}</Suspense>
     </SettingsLayer>
   );
 }

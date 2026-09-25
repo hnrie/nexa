@@ -12,6 +12,7 @@ import { rangeBetween, useSelection } from "@/stores/selection";
 import { useUsers } from "@/stores/users";
 import { memberColor, useServers } from "@/stores/servers";
 import { useChannels } from "@/stores/channels";
+import { useRelationships } from "@/stores/relationships";
 import { mentionsMe } from "@/lib/mentionsMe";
 import { useShiftHeld } from "@/hooks/useShiftHeld";
 import { stickerUrl } from "@/api/users";
@@ -63,6 +64,8 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const setJumpTo = useUI((u) => u.setJumpTo);
   const openModal = useUI((u) => u.openModal);
   const ctx = useRowRenderCtx();
+  // what someone blocked wrote is not quoted back, even over a reply to it
+  const targetBlocked = useRelationships((r) => (target ? r.byUser[target.author_id]?.type === "blocked" : false));
   const payload = target?.payload;
   const failed = !!target?.decryptError;
   // parsed when the quoted message changes, not on every render of the row
@@ -82,6 +85,13 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
     return (
       <div className={s.replyLine}>
         <button type="button" className={s.replyText} onClick={jump} title={t("chat.messageItem.goToOriginal")}>{t("chat.messageItem.originalMessageWasDeletedOrIs")}</button>
+      </div>
+    );
+  }
+  if (targetBlocked) {
+    return (
+      <div className={s.replyLine}>
+        <button type="button" className={s.replyText} onClick={jump} title={t("chat.messageItem.goToOriginal")} data-testid="reply-blocked">{t("people.blocked.replyPreview")}</button>
       </div>
     );
   }
@@ -144,7 +154,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   // A role of mine in the server counts too. The row listens to my roles
   // there, so its tint follows a role given or taken away.
   useServers((st) => (serverId ? st.byId[serverId]?.me?.role_ids : undefined));
-  const mentioned = !!me && msg.author_id !== me.id && mentionsMe(msg, me.id);
+  // someone blocked does not ping, even in a run of theirs opened to read
+  const authorBlocked = useRelationships((r) => r.byUser[msg.author_id]?.type === "blocked");
+  const mentioned = !!me && msg.author_id !== me.id && !authorBlocked && mentionsMe(msg, me.id);
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
   const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
   // a GIF or picture link shows only the picture, the way an uploaded one does

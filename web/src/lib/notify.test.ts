@@ -4,6 +4,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { DEFAULT_SETTINGS, useSettings, type NotificationPreview } from "@/stores/settings";
 import { useUsers } from "@/stores/users";
+import { useRelationships } from "@/stores/relationships";
 import { installNotifications, messageAlert, showNotification } from "./notify";
 
 function withWorker(reg: unknown) {
@@ -76,6 +77,15 @@ describe("what a notification shows", () => {
     const [title, opts] = (await arrive("name"))!;
     expect(title).toBe("Ann");
     expect(opts.body).toBe("New message");
+  });
+
+  it("stays silent for someone this account blocked", async () => {
+    useRelationships.getState().set({ user: { id: "u2", username: "ann", display_name: "Ann", avatar_id: null } as never, type: "blocked", nickname: "", created_at: 0 });
+    try {
+      expect(await arrive("full")).toBeUndefined();
+    } finally {
+      useRelationships.getState().clear();
+    }
   });
 
   it("shows neither the sender nor the text, nor their picture, when nothing may be shown", async () => {

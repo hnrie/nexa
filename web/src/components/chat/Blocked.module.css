@@ -1,0 +1,26 @@
+/*
+ * A run of messages from blocked people, folded into one quiet row. It lines up
+ * with the messages around it: its icon in the avatar column, its words where
+ * a message's text starts.
+ */
+.run { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 17px; min-height: 26px; padding-block: 3px; padding-inline: 72px 16px; font-size: 14px; line-height: 20px; color: var(--text-muted); }
+.run:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+@media (hover: hover) { .run:hover { background: var(--bg-message-hover); } }
+.icon { position: absolute; inset-inline-start: 28px; top: 50%; margin-top: -8px; display: flex; color: var(--text-muted); opacity: 0.8; }
+.text { min-width: 0; overflow-wrap: anywhere; }
+.toggle { padding: 0 2px; border-radius: 4px; font-size: 14px; font-weight: 600; line-height: 20px; color: var(--link); }
+.toggle:hover { text-decoration: underline; }
+.toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* compact rows start their words further over, past the time */
+.run[data-compact] { padding-inline-start: 80px; margin-top: 4px; }
+.run[data-compact] .icon { inset-inline-start: 56px; }
+@media (max-width: 767px) {
+  .run { padding-inline: 64px 16px; }
+  .icon { inset-inline-start: 24px; }
+  .run[data-compact] { padding-inline-start: 40px; }
+  .run[data-compact] .icon { inset-inline-start: 16px; }
+}
+@media (pointer: coarse) {
+  /* a finger's worth of target, without making the row itself tall */
+  .toggle { padding: 10px 8px; margin-block: -10px; margin-inline: -6px; }
+}

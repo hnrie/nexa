@@ -68,21 +68,24 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 	// a long-ignored channel costs no more than a short one: this runs inside
 	// ready, on every connect, for every channel, and uncapped the mention count
 	// parsed the mentions of every message since the person joined.
-	// A mention of a role counts for whoever holds the role now.
+	// A mention of a role counts for whoever holds the role now. Nothing from
+	// someone the user has blocked counts at all: blocking is not hearing from
+	// them, and a badge for a message nobody will read is noise (the client
+	// keeps them quiet as they arrive too, see web/src/lib/blocked.ts).
 	mentioned := s.db.Dialect.JSONArrayHas("m.mentions")
 	roleMentioned := `m.mention_roles <> '[]' AND EXISTS (SELECT 1 FROM member_roles mr WHERE mr.server_id = f.server_id AND mr.user_id = ? AND ` + s.db.Dialect.JSONArrayHasExpr("m.mention_roles", "mr.role_id") + `)`
 	floor := s.db.Dialect.Greatest(
 		"coalesce(r.last_read_message_id, 0)",
 		"coalesce(((coalesce(sm.joined_at, p.added_at) - ?) << 22) - 1, 0)",
 	)
-	args := []any{int64(uid), uid.String(), int64(uid), MaxUnreadCount, int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
+	args := []any{int64(uid), int64(uid), uid.String(), int64(uid), MaxUnreadCount, int64(uid), int64(uid), MaxUnreadCount, ids.Epoch, int64(uid), int64(uid), int64(uid)}
 	args = append(args, idArgs(channels)...)
 	mrows, err := s.db.R.QueryContext(ctx, `SELECT f.id,
 			(SELECT count(*) FROM (SELECT 1 FROM messages m
-				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor
+				WHERE m.channel_id = f.id AND m.author_id != ? AND `+notBlockedAuthor+` AND m.id > f.floor
 				AND (m.mention_everyone = 1 OR `+mentioned+` OR (`+roleMentioned+`)) LIMIT ?) AS mentions_capped),
 			CASE WHEN f.type IN ('dm', 'group_dm', 'subchat') THEN (SELECT count(*) FROM (SELECT 1 FROM messages m
-				WHERE m.channel_id = f.id AND m.author_id != ? AND m.id > f.floor LIMIT ?) AS capped) ELSE 0 END
+				WHERE m.channel_id = f.id AND m.author_id != ? AND `+notBlockedAuthor+` AND m.id > f.floor LIMIT ?) AS capped) ELSE 0 END
 		FROM (SELECT c.id, c.type, c.server_id, `+floor+` AS floor
 			FROM channels c
 			LEFT JOIN read_states r ON r.channel_id = c.id AND r.user_id = ?
@@ -108,12 +111,16 @@ func (s *Store) ReadStatesFor(ctx context.Context, uid ids.ID, channels []ids.ID
 }
 
 // CountMentionsAfter counts unread mentions of uid in a channel after afterID,
-// its roles' included.
+// its roles' included, leaving out anyone uid has blocked.
 func (s *Store) CountMentionsAfter(ctx context.Context, chID, uid, afterID ids.ID) (int, error) {
 	var n int
 	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM messages m JOIN channels c ON c.id = m.channel_id
-		WHERE m.channel_id = ? AND m.author_id != ? AND m.id > ? AND (m.mention_everyone = 1 OR `+s.db.Dialect.JSONArrayHas("m.mentions")+`
+		WHERE m.channel_id = ? AND m.author_id != ? AND `+notBlockedAuthor+` AND m.id > ? AND (m.mention_everyone = 1 OR `+s.db.Dialect.JSONArrayHas("m.mentions")+`
 			OR (m.mention_roles <> '[]' AND EXISTS (SELECT 1 FROM member_roles mr WHERE mr.server_id = c.server_id AND mr.user_id = ? AND `+s.db.Dialect.JSONArrayHasExpr("m.mention_roles", "mr.role_id")+`)))`,
-		int64(chID), int64(uid), int64(afterID), uid.String(), int64(uid)).Scan(&n)
+		int64(chID), int64(uid), int64(uid), int64(afterID), uid.String(), int64(uid)).Scan(&n)
 	return n, err
 }
+
+// notBlockedAuthor keeps out messages by someone the reader (its one
+// parameter) has blocked; it is a primary-key lookup per message.
+const notBlockedAuthor = `NOT EXISTS (SELECT 1 FROM relationships b WHERE b.user_id = ? AND b.target_id = m.author_id AND b.type = 'blocked')`

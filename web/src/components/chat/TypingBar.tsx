@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAuth } from "@/stores/auth";
 import { typingUsers, useTyping } from "@/stores/typing";
 import { useUsers, displayName } from "@/stores/users";
+import { useBlockRules } from "@/lib/blocked";
 import s from "./Chat.module.css";
 
 import { t as tr_, Tr } from "@/i18n";
@@ -10,11 +11,13 @@ export function TypingBar({ channelId }: { channelId: string }) {
   const byChannel = useTyping((t) => t.byChannel);
   const sweep = useTyping((t) => t.sweep);
   const users = useUsers((u) => u.byId);
+  const rules = useBlockRules();
   useEffect(() => {
     const t = setInterval(() => sweep(), 2000);
     return () => clearInterval(t);
   }, [sweep]);
-  const who = typingUsers(byChannel, channelId, meId).map((id) => displayName(users[id]));
+  // someone blocked is never shown typing (their events are dropped as they come; this covers the moment of blocking)
+  const who = typingUsers(byChannel, channelId, meId).filter((id) => !rules.blocked.has(id)).map((id) => displayName(users[id]));
   if (who.length === 0) return <div className={s.typing} aria-hidden="true" />;
   let text: React.ReactNode;
   if (who.length === 1) text = <Tr id="chat.typingBar.oneTyping" values={{ a: <b dir="auto">{who[0]}</b> }} />;
