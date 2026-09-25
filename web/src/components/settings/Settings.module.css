@@ -92,6 +92,12 @@
 .device > :first-child { flex: 1 1 180px; min-width: 0; }
 .device > :not(:first-child) { margin-inline-start: auto; }
 .recovery { font-family: var(--font-mono); padding: 12px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; word-break: break-all; color: var(--text-strong); }
+/* Copy and Download under a set of backup codes, sharing the row on a phone too */
+.codeActions { display: flex; gap: 8px; }
+.codeActions > * { flex: 1; }
+/* "I have saved these": the tick that has to come before Done */
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
+.check input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
 .dangerBox { padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(218, 62, 68, 0.5); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 /* beside the nav on a tablet there is no room for the form and a 300px preview */
 @media (max-width: 1023px) {

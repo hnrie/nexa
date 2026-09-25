@@ -31,6 +31,8 @@
 .strength[data-score="2"] i[data-on="true"] { background: var(--warning); }
 .strengthLabel { font-size: 12px; color: var(--text-muted); min-width: 60px; text-align: end; }
 .hint { font-size: 12px; color: var(--text-muted); }
+/* a sentence about what a step does, in the flow of the form rather than as a warning */
+.note { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-muted); }
 /* A recovery key breaks between its groups only (the markup offers a break
    after each dash), so no group is ever split across two lines to be copied
    out by hand wrong. */

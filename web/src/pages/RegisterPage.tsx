@@ -6,7 +6,7 @@ import { safeNext } from "@/lib/nextPath";
 import { Button } from "@/components/common/Button";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
-import { AuthLayout, CopyKeyButton, RecoveryKey, passwordStrength, usePageTitle, usernameProblem } from "./AuthLayout";
+import { AuthLayout, RecoveryKeyPanel, passwordStrength, usePageTitle, usernameProblem } from "./AuthLayout";
 import s from "./Auth.module.css";
 
 import { t } from "@/i18n";
@@ -32,7 +32,6 @@ export default function RegisterPage() {
   const [recovery, setRecovery] = useState<string | null>(null);
   // arriving from an invite, the key is already filled in: show it rather than hide it
   const [inviteOpen] = useState(() => !!params.get("invite"));
-  const [saved, setSaved] = useState(false);
   const usernameInput = useRef<HTMLInputElement>(null);
   const displayInput = useRef<HTMLInputElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
@@ -97,28 +96,9 @@ export default function RegisterPage() {
   }
 
   if (recovery) {
-    const download = () => {
-      const blob = new Blob([`${t("register.recoveryKeyFileHeading", { username: uname })}\n\n${recovery}\n\n${t("register.keepThisSomewhereSafe")}\n`], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `evilion-chat-recovery-${uname}.txt`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    };
     return (
       <AuthLayout title={t("register.saveYourRecoveryKey")} subtitle={t("register.yourMessagesAreEndToEnd")}>
-        <RecoveryKey value={recovery} testId="recovery-key" />
-        <div className={s.row}>
-          <CopyKeyButton text={recovery} />
-          <Button variant="secondary" block onClick={download}>{t("register.downloadTxt")}</Button>
-        </div>
-        <div className={s.warn}>{t("register.weCannotShowThisKeyAgain")}</div>
-        <label className={s.check}>
-          <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} />
-          <span>{t("register.iHaveSavedMyRecoveryKey")}</span>
-        </label>
-        <Button size="lg" block disabled={!saved} onClick={() => nav(safeNext(next), { replace: true })}>{t("register.continueToNexa")}</Button>
+        <RecoveryKeyPanel value={recovery} username={uname} confirm={t("register.iHaveSavedMyRecoveryKey")} doneLabel={t("register.continueToNexa")} onDone={() => nav(safeNext(next), { replace: true })} />
       </AuthLayout>
     );
   }

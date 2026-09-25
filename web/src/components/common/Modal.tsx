@@ -30,7 +30,17 @@ interface Props {
   ariaLabel?: string;
   /** Whether the title bar has an ✕; off for a dialog that has to be answered. */
   closeButton?: boolean;
+  /**
+   * What Enter in one of the dialog's text boxes does — its main action, as a
+   * form's Enter does. A phone keyboard's Go key is Enter too; without this it
+   * did nothing, and the keyboard had to be put away to reach the button.
+   * Called whatever the button's state, so it checks what the button checks.
+   */
+  onSubmit?: () => void;
 }
+
+/** Single-line boxes, where Enter has nothing else to do. */
+const SUBMITS_ON_ENTER = new Set(["text", "password", "email", "search", "url", "tel", "number"]);
 
 /** What Tab can reach, for the trap below. */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -47,7 +57,7 @@ function shown<T extends Element>(all: T[]): T[] {
   return laidOut.length > 0 ? laidOut : all;
 }
 
-export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true }: Props) {
+export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true, onSubmit }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const portalRoot = usePortalRoot();
@@ -143,6 +153,17 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   if (!open || !host) return null;
+  const onKeyDown = onSubmit
+    ? (e: React.KeyboardEvent<HTMLDivElement>) => {
+        // Not while an input method is composing (Enter picks the word), not
+        // from a field that has already dealt with it, not Shift+Enter.
+        if (e.key !== "Enter" || e.shiftKey || e.defaultPrevented || e.nativeEvent.isComposing || e.keyCode === 229) return;
+        const el = e.target as HTMLElement;
+        if (!(el instanceof HTMLInputElement) || !SUBMITS_ON_ENTER.has(el.type) || el.getAttribute("aria-expanded") === "true") return;
+        e.preventDefault();
+        onSubmit();
+      }
+    : undefined;
   return createPortal(
     <div className={s.overlay} data-modal-overlay="" onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
       <div
@@ -154,6 +175,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
         {...(!bare && title !== undefined ? { "aria-labelledby": titleId } : { "aria-label": ariaLabel ?? (typeof title === "string" ? title : undefined) })}
         tabIndex={-1}
         data-modal-layer=""
+        onKeyDown={onKeyDown}
       >
         {!bare && title !== undefined ? (
           <div className={s.header}>
