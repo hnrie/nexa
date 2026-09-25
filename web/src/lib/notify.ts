@@ -58,6 +58,13 @@ export async function showNotification(title: string, opts: NotificationOptions,
   }
   try {
     const n = new Notification(title, opts);
+    if (opts.tag) {
+      const tag = opts.tag;
+      shownByTag.set(tag, n);
+      n.onclose = () => {
+        if (shownByTag.get(tag) === n) shownByTag.delete(tag);
+      };
+    }
     n.onclick = () => {
       // window.focus() cannot bring the app's window back from the tray or a minimised taskbar button
       if (bridge?.focusWindow) bridge.focusWindow();
@@ -70,6 +77,21 @@ export async function showNotification(title: string, opts: NotificationOptions,
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Notifications made through the constructor, by tag, so an incoming call's can be taken down once it is answered. */
+const shownByTag = new Map<string, Notification>();
+
+/** Closes whatever notification carries this tag, however it was shown. */
+export async function closeNotifications(tag: string): Promise<void> {
+  shownByTag.get(tag)?.close();
+  shownByTag.delete(tag);
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration("/");
+    for (const n of (await reg?.getNotifications({ tag })) ?? []) n.close();
+  } catch {
+    /* nothing shown that way */
   }
 }
 

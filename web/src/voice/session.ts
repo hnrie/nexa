@@ -1,118 +1,117 @@
 /**
- * The voice session: joins and leaves channels, owns local media, drives the
- * mesh transport from gateway events, and applies mute/deafen/PTT/VAD.
+ * Calls, as the rest of the app sees them: joining and leaving, incoming calls
+ * ringing, the calling tone and what came of a call, and the voice states
+ * everyone's devices report. The call itself — media, the transports, frame
+ * encryption, playback — is engine.ts, loaded the first time this page joins
+ * a call, so a page that never calls never downloads it.
  */
 import { users as usersApi } from "@/api/users";
 import { voice as voiceApi } from "@/api/voice";
 import { GUEST_FLAG, type PublicUser, type VoiceState } from "@/api/types";
+import { dispatchHooks } from "@/gateway/dispatch";
 import type { GatewayEvent } from "@/gateway/events";
 import { gateway } from "@/gateway/session";
-import { holdReload } from "@/lib/busy";
-import { desktopBridge } from "@/lib/desktopBridge";
 import { doNotDisturb } from "@/lib/dnd";
+import { mutedSentence } from "@/lib/moderation";
 import { playSound, startCalling, startRinging, stopCalling, stopRinging } from "@/lib/sounds";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
-import { describeError } from "@/lib/errors";
-import { useUI } from "@/stores/ui";
 import { activeMute, useNexa } from "@/stores/nexa";
 import { usePresence } from "@/stores/presence";
-import { mutedSentence } from "@/lib/moderation";
-import { useVoice, participantsOf } from "@/stores/voice";
-import { useVoiceLocal } from "@/stores/voiceLocal";
-import { SpeakingGate } from "./speaking";
-import { shareBitrate } from "./shareQuality";
-import { LevelMeter, audioContext, getCamera, getMic, getScreen, holdAudio, lastInputChoice, resumeAudio, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
-import { convForChannel } from "@/components/composer/send";
-import { useKeys } from "@/stores/keys";
+import { useSettings, type ShareFps, type ShareResolution } from "@/stores/settings";
+import { useUI } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
-import { ring } from "@/lib/keyring";
-import { FrameCrypto } from "./e2ee";
-import { hasGuestKeys, openRelayedKeys, sealKeysForGuest } from "./guestKeys";
-import { MeshTransport, type SignalPayload } from "./mesh";
-import { SfuTransport } from "./sfu";
-import type { TransportEvents, VoiceTransport } from "./transport";
+import { participantsOf, useVoice } from "@/stores/voice";
+import { useVoiceLocal } from "@/stores/voiceLocal";
+import { closeRingNotice, missedNotice, ringNotice } from "./callNotice";
+import { allDeclined, callDeclined, callEnded, callLine, callStarted, callTimedOut, callsAfterReady, installCallRecord } from "./callRecord";
+import { audioContext, resumeAudio } from "./media";
 
 import { t as tr_ } from "@/i18n";
-interface Session {
-  channelId: string;
-  transport: VoiceTransport;
-  /** The raw capture; what peers get is the gain-staged copy. */
-  mic: MediaStream | null;
-  micRaw: MediaStream | null;
-  inputGain: GainNode | null;
-  inputSource: MediaStreamAudioSourceNode | null;
-  meter: LevelMeter | null;
-  meterTimer: ReturnType<typeof setInterval> | null;
-  camera: MediaStream | null;
-  screen: MediaStream | null;
-  /** A camera or screen request is waiting on the browser; a second tap must not open another. */
-  cameraPending: boolean;
-  screenPending: boolean;
-  noiseFloor: number;
-  pttHeld: boolean;
-  /** Whether voice activity currently hears speech, and until when it keeps listening after. */
-  vadOpen: boolean;
-  vadHoldUntil: number;
-  /** Keeps this device's own speaking ring steady between words. */
-  speaking: SpeakingGate;
-  /** The server has been told about this call, so leaving has to tell it too. */
-  announced: boolean;
+
+type Engine = typeof import("./engine");
+
+/** The call engine once loaded; null until this page first joins a call. */
+let engine: Engine | null = null;
+let engineLoading: Promise<Engine> | null = null;
+
+function loadEngine(): Promise<Engine> {
+  if (engine) return Promise.resolve(engine);
+  engineLoading ??= import("./engine").then(
+    (m) => (engine = m),
+    (err: unknown) => {
+      // offline at the first call: the next try loads it again
+      engineLoading = null;
+      throw err;
+    },
+  );
+  return engineLoading;
 }
 
-let session: Session | null = null;
-/** Keeps a new version of the app from reloading the page while in a call. */
-let releaseCall: (() => void) | null = null;
-/** Keeps the call's audio running (a home-screen app lets it go otherwise). */
-let releaseAudio: (() => void) | null = null;
 let iceCache: { servers: RTCIceServer[]; sfu: boolean; guests: boolean; at: number } | null = null;
 /** Bumped by every join and leave, so a join still waiting on the network can tell it was overtaken. */
 let joinSeq = 0;
 /** This connection's gateway session, to tell this device's call from the same account's other devices. */
 let mySessionId: string | null = null;
 let installed = false;
-let ringTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const ringTimers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Stops the outgoing tone once the people called have been rung for as long as they are. */
 let callingTimer: ReturnType<typeof setTimeout> | null = null;
-/** Measures the call's connection for everything that shows it (see useVoice's quality). */
-let qualityTimer: ReturnType<typeof setInterval> | null = null;
-const QUALITY_EVERY_MS = 3000;
+/** How long a call rings, here and on the other side. */
+const RING_MS = 60_000;
+/** Whether anyone else has been in this device's call since it joined. */
+let company = false;
+/** Hangs up a conversation's call everyone else left, unless someone comes back. */
+let aloneTimer: ReturnType<typeof setTimeout> | null = null;
+const ALONE_MS = 60_000;
 
-function startQuality(s: Session): void {
-  stopQuality();
-  const measure = () => {
-    if (session !== s) return;
-    void s.transport
-      .stats()
-      .then((q) => {
-        // no round trip yet means nothing is connected to measure: unknown, not a perfect 0 ms
-        if (session === s) useVoice.getState().setQuality(q.rtt > 0 ? q : null);
-      })
-      .catch(() => {});
-  };
-  measure();
-  qualityTimer = setInterval(measure, QUALITY_EVERY_MS);
+/** Relay credentials expire, so the list is fetched again after this long. */
+const ICE_CACHE_MS = 30 * 60 * 1000;
+/** Refusals of a voice_signal: they race people leaving and reconnects, and say nothing about our own place in the call. */
+const SIGNAL_ERRORS = new Set(["not_in_voice", "peer_gone", "too_large"]);
+/** The server connects calls the other way than this page thought (turned on or off since it asked). */
+const MODE_ERRORS = new Set(["sfu_required", "sfu_off"]);
+/** When this page last joined again after such a refusal; a second one soon after is shown instead. */
+let modeRetryAt = 0;
+
+export function me(): string | undefined {
+  return useAuth.getState().me?.id;
 }
 
-function stopQuality(): void {
-  if (qualityTimer) clearInterval(qualityTimer);
-  qualityTimer = null;
+/** Whether this page is a guest's, in a call through a guest link, rather than an account's. */
+export function asGuest(): boolean {
+  return ((useAuth.getState().me?.flags ?? 0) & GUEST_FLAG) !== 0;
+}
+
+/** The accounts in a call other than this one; a guest waiting in it is nobody picking up. */
+function othersIn(channelId: string): number {
+  const myId = me();
+  return participantsOf(useVoice.getState().byChannel, channelId).filter((p) => p.user_id !== myId && !p.guest && ((p.user?.flags ?? 0) & GUEST_FLAG) === 0).length;
+}
+
+function isConversation(channelId: string): boolean {
+  const type = useChannels.getState().byId[channelId]?.type;
+  return type === "dm" || type === "group_dm";
 }
 
 /**
  * Calling a DM or group nobody else is in yet: the outgoing tone plays, and
  * the call says who it is calling, until someone picks up. A minute with no
- * answer ends the ringing and says so; the call itself stays open for them.
+ * answer gives the call up, as a phone does, and says so.
  */
 function startCallingTone(channelId: string): void {
   startCalling();
   useVoice.getState().setCalling(channelId);
   if (callingTimer) clearTimeout(callingTimer);
   callingTimer = setTimeout(() => {
+    callingTimer = null;
     stopCallingTone();
-    if (session?.channelId === channelId) useUI.getState().toast(callOutcome(channelId, "noAnswer"), "info");
-  }, 60000);
+    callTimedOut(channelId);
+    if (inVoice() === channelId && othersIn(channelId) === 0) {
+      useUI.getState().toast(callOutcome(channelId, "noAnswer"), "info");
+      void leaveVoice();
+    }
+  }, RING_MS);
 }
 
 function stopCallingTone(): void {
@@ -131,24 +130,33 @@ function callOutcome(channelId: string, what: "noAnswer" | "declined"): string {
   return name ? tr_("voice.call.noAnswer", { name }) : tr_("voice.call.noAnswerGroup");
 }
 
-/** Relay credentials expire, so the list is fetched again after this long. */
-const ICE_CACHE_MS = 30 * 60 * 1000;
-/** How long voice activity keeps the mic open after speech drops, so word endings and short pauses get through. */
-const VAD_HOLD_MS = 400;
-/** Refusals of a voice_signal: they race people leaving and reconnects, and say nothing about our own place in the call. */
-const SIGNAL_ERRORS = new Set(["not_in_voice", "peer_gone", "too_large"]);
-/** The server connects calls the other way than this page thought (turned on or off since it asked). */
-const MODE_ERRORS = new Set(["sfu_required", "sfu_off"]);
-/** When this page last joined again after such a refusal; a second one soon after is shown instead. */
-let modeRetryAt = 0;
-
-function me(): string | undefined {
-  return useAuth.getState().me?.id;
+/**
+ * A conversation's call that people talked in and everyone else then left
+ * waits a minute for them to come back (a dropped phone, a crashed app), then
+ * hangs up by itself instead of sitting open and silent. A server's voice
+ * channel is a place to wait in and never does.
+ */
+function checkAlone(channelId: string): void {
+  if (!isConversation(channelId)) return;
+  if (othersIn(channelId) > 0) {
+    company = true;
+    stopAloneTimer();
+    return;
+  }
+  if (!company || aloneTimer) return;
+  useVoice.getState().setLeftAlone(channelId);
+  aloneTimer = setTimeout(() => {
+    aloneTimer = null;
+    if (inVoice() !== channelId || othersIn(channelId) > 0) return;
+    useUI.getState().toast(tr_("voice.call.callEnded"), "info");
+    void leaveVoice();
+  }, ALONE_MS);
 }
 
-/** Whether this page is a guest's, in a call through a guest link, rather than an account's. */
-function asGuest(): boolean {
-  return ((useAuth.getState().me?.flags ?? 0) & GUEST_FLAG) !== 0;
+function stopAloneTimer(): void {
+  if (aloneTimer) clearTimeout(aloneTimer);
+  aloneTimer = null;
+  if (useVoice.getState().leftAlone) useVoice.getState().setLeftAlone(null);
 }
 
 const BLANK_USER: Omit<PublicUser, "id"> = { username: "", display_name: "", avatar_id: null, banner_id: null, about_me: "", pronouns: "", accent_color: null, accent_color_2: null, status_text: "", status_emoji: "", status_expires_at: null, public_key: "", flags: 0, created_at: 0 };
@@ -181,60 +189,12 @@ function rememberCallUser(vs: VoiceState): void {
   users.upsert({ ...BLANK_USER, ...known, id: u.id, display_name: u.display_name, avatar_id: u.avatar_id, flags: u.flags });
 }
 
-/** The keys handed to each guest in the call, by what they were made from, so each change goes out once. */
-const relayedTo = new Map<string, string>();
-/**
- * How often the call checks for guests who need newer keys than their link
- * brought. A key change shows up here within this long, and until the guest
- * has the new key they cannot open what this device seals with it; the check
- * itself is only a comparison of epoch lists.
- */
-const GUEST_RELAY_MS = 1000;
-let relayTimer: ReturnType<typeof setInterval> | null = null;
-
-/**
- * Hands the guests in this call the call keys newer than the ones their links
- * carried, sealed so only a holder of the link can open them. Everyone in the
- * call does it; a guest keeps the first copy and ignores the rest.
- */
-function relayGuestKeys(s: Session): void {
-  if (session !== s || asGuest() || !(s.transport instanceof SfuTransport)) return;
-  const myId = me();
-  const conv = convForChannel(s.channelId);
-  const epochs = ring.epochs(conv);
-  for (const p of participantsOf(useVoice.getState().byChannel, s.channelId)) {
-    if (!p.guest || p.user_id === myId) continue;
-    // a guest who joins again (a reload) has lost what it was given
-    const made = `${p.joined_at}:${p.guest.epoch}:${epochs.join(",")}`;
-    if (relayedTo.get(p.user_id) === made) continue;
-    relayedTo.set(p.user_id, made);
-    const to = p.user_id;
-    void sealKeysForGuest(s.channelId, to, p.guest.epoch, epochs, (epoch) => ring.get(conv, epoch))
-      .then((payload) => {
-        if (payload && session === s) gateway()?.send("voice_signal", { to, payload: { guest_keys: payload } });
-      })
-      .catch(() => relayedTo.delete(to));
-  }
-}
-
-function startRelay(s: Session): void {
-  stopRelay();
-  if (asGuest()) return;
-  relayTimer = setInterval(() => relayGuestKeys(s), GUEST_RELAY_MS);
-}
-
-function stopRelay(): void {
-  if (relayTimer) clearInterval(relayTimer);
-  relayTimer = null;
-  relayedTo.clear();
-}
-
 /**
  * `resume` marks a rejoin after a reconnect, so the server does not treat it
  * as a new call; with `sfuSession` it asks for the very call this device
  * still holds, which the server keeps a while for it.
  */
-function sendState(channelId: string | null, resume = false, sfuSession?: string): void {
+export function sendState(channelId: string | null, resume = false, sfuSession?: string): void {
   const local = useVoiceLocal.getState();
   const st = useVoice.getState();
   gateway()?.send("voice_state", {
@@ -244,14 +204,18 @@ function sendState(channelId: string | null, resume = false, sfuSession?: string
     video: !!st.localVideo,
     streaming: !!st.localScreen,
     // how this device connects, so the server can turn away a page set up for the other kind
-    ...(channelId ? { sfu: session?.transport instanceof SfuTransport } : {}),
+    ...(channelId ? { sfu: !!engine?.throughSfu() } : {}),
     ...(resume ? { resume: true } : {}),
     ...(resume && sfuSession ? { sfu_session: sfuSession } : {}),
   });
 }
 
-/** The ICE servers, and whether calls go through Cloudflare's SFU on this server. */
-async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boolean } | null> {
+/**
+ * The ICE servers, and whether calls go through Cloudflare's SFU on this
+ * server. Fetched again once the relay credentials in hand are half an hour
+ * old; a call asks again now and then for its reconnects (engine.ts).
+ */
+export async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boolean } | null> {
   if (iceCache && Date.now() - iceCache.at < ICE_CACHE_MS) return iceCache;
   try {
     const res = await voiceApi.ice();
@@ -264,71 +228,14 @@ async function iceConfig(): Promise<{ servers: RTCIceServer[]; sfu: boolean } | 
   }
 }
 
-/**
- * A touch screen with no hover has no key to hold. Push to talk follows the
- * account from the desktop, so there it falls back to voice activity instead
- * of leaving the phone silent for good.
- */
-function noKeyToHold(): boolean {
+/** A touch screen with no hover has no key to hold: push to talk there is a button in the call. */
+export function noKeyToHold(): boolean {
   return typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
-/** True when the local mic may be on at all: not muted, and the push-to-talk key held where there is one. */
-function shouldTransmit(): boolean {
-  const local = useVoiceLocal.getState();
-  const mine = useVoice.getState().mine;
-  if (local.muted || local.deafened || mine?.server_mute) return false;
-  const v = useSettings.getState().settings.voice;
-  if (v.mode === "ptt" && !noKeyToHold()) return !!session?.pttHeld;
-  return true;
-}
-
-/** True when voice activity lets the mic through: it heard speech, or push to talk is doing the job. */
-function gateOpen(): boolean {
-  const s = session;
-  if (!s) return true;
-  if (s.pttHeld) return true;
-  if (useSettings.getState().settings.voice.mode === "ptt" && !noKeyToHold()) return true;
-  // The gate is worked by a timer, which a hidden page has throttled or
-  // frozen; it stays open there rather than cut the speaker off mid-sentence.
-  if (typeof document !== "undefined" && document.visibilityState === "hidden") return true;
-  return s.vadOpen;
-}
-
-function applyTransmit(): void {
-  if (!session?.mic) return;
-  const on = shouldTransmit();
-  for (const t of session.mic.getAudioTracks()) t.enabled = on;
-  // The gate pauses the senders rather than the track, so the meter keeps hearing the mic and can open it again.
-  session.transport.setAudioGate(gateOpen());
-}
-
-/** Scales the microphone before it reaches the peers, for the input slider. */
-function applyInputGain(): void {
-  const s = session;
-  if (!s?.micRaw) return;
-  const volume = useSettings.getState().settings.voice.inputVolume;
-  if (s.inputGain) {
-    // moving back to 100% takes the extra stage out of the way again
-    if (volume === 100) rebuildInput(s);
-    else s.inputGain.gain.value = volume / 100;
-    return;
-  }
-  if (volume !== 100) rebuildInput(s);
-}
-
-/** Rebuilds the path from the microphone to the peers after a volume change. */
-function rebuildInput(s: Session): void {
-  if (!s.micRaw) return;
-  // the meter listens to the sent stream, which is about to be replaced
-  stopMeter(s);
-  disconnectInput(s);
-  if (s.mic && s.mic !== s.micRaw) s.mic.getTracks().forEach((t) => t.stop());
-  s.mic = withInputGain(s, s.micRaw);
-  const track = s.mic.getAudioTracks()[0] ?? null;
-  s.transport.setLocalAudio(track);
-  startMeter(s);
-  applyTransmit();
+/** Whether the call shows a button to hold for push to talk, on a device with no key for it. */
+export function pushToTalkButton(): boolean {
+  return useSettings.getState().settings.voice.mode === "ptt" && noKeyToHold();
 }
 
 /** Join a voice channel (or DM call). Leaves the current one first. */
@@ -346,382 +253,60 @@ export async function joinVoice(channelId: string): Promise<void> {
   // and nothing else in a call without a microphone would get it running.
   audioContext();
   const store = useVoice.getState();
-  if (session?.channelId === channelId) return;
+  if (inVoice() === channelId) return;
   // Moving says so first: if the new channel refuses us, the server must not
   // keep us sitting in the old one.
-  if (session) await leaveVoice(true);
+  if (inVoice()) await leaveVoice(true);
   const seq = ++joinSeq;
   store.setError(null);
   store.setJoining(channelId);
-  clearRing(channelId);
-  const ice = await iceConfig();
-  if (seq !== joinSeq) return; // disconnected, or joined elsewhere, while fetching
+  clearRing(channelId, false);
   const refuse = (message: string) => {
     store.setJoining(null);
     store.setError(message);
     useUI.getState().toast(message, "error");
   };
-  if (!ice) return refuse(tr_("session.couldNotReachTheServerTo"));
-  if (ice.sfu) {
-    if (!FrameCrypto.supported()) return refuse(tr_("session.thisBrowserCannotMakeEncryptedCalls"));
-    // the call's frames are sealed with the conversation's key, which has to be on this device first;
-    // a guest brought the call's key in its link instead
-    if (!hasGuestKeys(channelId)) {
-      const key = await useKeys.getState().ensureConvKey(convForChannel(channelId)).catch(() => null);
-      if (seq !== joinSeq) return;
-      if (!key) return refuse(asGuest() ? tr_("session.thisLinkIsMissingTheCall") : tr_("guestLink.thisConversationSKeysHaveNot"));
-    }
-  }
-  // the session the transport's events belong to; set just below, before anything can fire
-  let s: Session;
-  const events: TransportEvents = {
-    onSignal: (to, payload) => {
-      const gw = gateway();
-      // Losing the socket mid-call would otherwise strand the peer silently.
-      if (!gw) {
-        console.warn("voice: no gateway to signal through");
-        return;
-      }
-      gw.send("voice_signal", { to, payload });
-    },
-    onPeerState: (uid, state) => useVoice.getState().setPeer(uid, state),
-    onRemoteStream: (uid, kind, stream) => useVoice.getState().setRemote(uid, kind, stream),
-    onSpeaking: (uid, on) => useVoice.getState().setSpeaking(uid, on),
-    onError: (code, message) => {
-      useUI.getState().toast(message, "error");
-      // near the free allowance video pauses: what was being sent is turned off, so the buttons say so,
-      // and shares being watched stop waiting for a picture that is not coming
-      if (code === "video_paused" && session === s) {
-        if (s.camera) void toggleCamera();
-        if (s.screen) void toggleScreen();
-        for (const uid of Object.keys(useVoice.getState().watching)) useVoice.getState().setWatching(uid, false);
-      }
-    },
-  };
-  const transport: VoiceTransport = ice.sfu ? new SfuTransport(myId, channelId, ice.servers, events) : new MeshTransport(myId, ice.servers, events);
-  s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false };
-  session = s;
-  releaseCall ??= holdReload();
-  releaseAudio ??= holdAudio();
-  let mic: MediaStream | null = null;
-  try {
-    mic = await getMic(useSettings.getState().settings.voice);
-    useVoice.getState().setMicBlocked(false);
-  } catch (err) {
-    // The toast is gone in five seconds and the call then looked entirely
-    // normal, so the fact is held in the store for as long as it is true.
-    if (session === s) {
-      useUI.getState().toast(describeError(err, tr_("session.microphoneAccessWasDeniedYouCan")), "error");
-      useVoice.getState().setMicBlocked(true);
-    }
-  }
-  if (session !== s || seq !== joinSeq) {
-    // left while asking for the mic: leaving already closed the transport, but
-    // this capture came too late for it to stop
-    mic?.getTracks().forEach((t) => t.stop());
-    return;
-  }
-  if (mic) {
-    s.micRaw = mic;
-    s.mic = withInputGain(s, mic);
-    watchMic(s);
-    if (lastInputChoice() === "missing") {
-      // Better to say so than to carry a microphone nobody is talking into.
-      useUI.getState().toast(tr_("session.theMicrophoneYouPickedIsNot"), "error");
-    }
-    const track = s.mic.getAudioTracks()[0] ?? null;
-    transport.setLocalAudio(track);
-    startMeter(s);
-  }
-  const voiceStore = useVoice.getState();
-  for (const uid of Object.keys(voiceStore.localMutes)) transport.setLocalMute(uid, true);
-  for (const [uid, pct] of Object.entries(voiceStore.volumes)) transport.setVolume(uid, pct);
-  for (const [uid, pct] of Object.entries(voiceStore.streamVolumes)) transport.setStreamVolume(uid, pct);
-  for (const [uid, on] of Object.entries(voiceStore.streamMutes)) if (on) transport.setStreamMuted(uid, true);
-  for (const uid of Object.keys(voiceStore.watching)) transport.setWatching(uid, true);
-  transport.setOutputMuted(useVoiceLocal.getState().deafened);
-  transport.setMasterVolume(useSettings.getState().settings.voice.outputVolume);
-  // Always set, "default" included: the audio output lives as long as the
-  // page, so a speaker chosen in an earlier call stayed chosen after
-  // switching back to Default outside one.
-  const out = useSettings.getState().settings.voice.outputDeviceId;
-  void transport.setOutputDevice(out ?? null);
-  applyTransmit();
-  s.announced = true;
-  sendState(channelId);
-  startQuality(s);
-  startRelay(s);
-  playSound("join");
-  const convo = useChannels.getState().byId[channelId];
-  const others = participantsOf(useVoice.getState().byChannel, channelId).filter((p) => p.user_id !== me());
-  if (convo && (convo.type === "dm" || convo.type === "group_dm") && others.length === 0) startCallingTone(channelId);
+  const [loaded, ice] = await Promise.all([loadEngine().catch(() => null), iceConfig()]);
+  if (seq !== joinSeq) return; // disconnected, or joined elsewhere, while fetching
+  if (!loaded || !ice) return refuse(tr_("session.couldNotReachTheServerTo"));
+  company = false;
+  stopAloneTimer();
+  const announced = await loaded.join(channelId, ice, () => seq === joinSeq, refuse);
+  if (!announced || seq !== joinSeq) return;
+  if (isConversation(channelId) && othersIn(channelId) === 0) {
+    startCallingTone(channelId);
+    callStarted(channelId);
+  } else checkAlone(channelId);
 }
 
 /** Leave voice; tells the server unless the connection is already gone. */
 export async function leaveVoice(notify = true): Promise<void> {
   joinSeq++;
-  const s = session;
-  session = null;
-  releaseCall?.();
-  releaseCall = null;
-  releaseAudio?.();
-  releaseAudio = null;
-  stopQuality();
-  stopRelay();
-  if (s) {
-    stopMeter(s);
-    disconnectInput(s);
-    s.transport.close();
-    s.mic?.getTracks().forEach((t) => t.stop());
-    s.micRaw?.getTracks().forEach((t) => t.stop());
-    s.camera?.getTracks().forEach((t) => t.stop());
-    s.screen?.getTracks().forEach((t) => t.stop());
-    if (notify && s.announced) sendState(null);
-    stopCallingTone();
-    playSound("leave");
-  }
+  const was = engine?.current() ?? null;
+  engine?.leave(notify);
+  if (was) stopCallingTone();
+  stopAloneTimer();
   useVoice.getState().resetSession();
 }
 
-/**
- * Routes the capture through a gain node so the input slider does something.
- * At 100% the microphone's own track is sent instead: a graph that produces
- * silence on some devices is not worth inserting for no change in level.
- */
-function withInputGain(s: Session, raw: MediaStream): MediaStream {
-  const { stream, gain, source } = sentStream(audioContext(), raw, useSettings.getState().settings.voice.inputVolume);
-  s.inputGain = gain;
-  s.inputSource = source;
-  return stream;
-}
-
-/**
- * Watches the microphone itself rather than the copy the peers get.
- *
- * Pulling a headset out ends the device's track. The level meter then reads
- * silence, voice activity closes the gate, and nobody hears you again for the
- * rest of the call while the button still says "Mute". The gain-staged copy is
- * a destination node's track and never ends, so it cannot say so.
- */
-function watchMic(s: Session): void {
-  for (const t of s.micRaw?.getAudioTracks() ?? []) {
-    t.onended = () => {
-      if (session === s) void refreshMic();
-    };
-  }
-}
-
-/** Lets go of the slider's audio graph, which would otherwise stay wired to the live microphone. */
-function disconnectInput(s: Session): void {
-  try {
-    s.inputSource?.disconnect();
-    s.inputGain?.disconnect();
-  } catch {
-    /* already gone */
-  }
-  s.inputSource = null;
-  s.inputGain = null;
-}
-
-function startMeter(s: Session): void {
-  if (!s.mic) return;
-  const ctx = audioContext();
-  s.meter = new LevelMeter(ctx, s.mic);
-  const myId = me() ?? "";
-  s.meterTimer = setInterval(() => {
-    if (!s.meter) return;
-    const level = s.meter.level();
-    useVoice.getState().setLevel(level);
-    const v = useSettings.getState().settings.voice;
-    let threshold: number;
-    if (v.autoSensitivity) {
-      s.noiseFloor = level < s.noiseFloor ? level : s.noiseFloor * 0.995 + level * 0.005;
-      threshold = Math.max(0.02, s.noiseFloor * 2.5);
-    } else threshold = sensitivityToThreshold(v.sensitivity);
-    const now = Date.now();
-    if (level > threshold) s.vadHoldUntil = now + VAD_HOLD_MS;
-    // A stopped audio engine reads silence, which must not shut the mic.
-    const open = ctx.state !== "running" || now < s.vadHoldUntil;
-    if (open !== s.vadOpen && session === s) {
-      s.vadOpen = open;
-      applyTransmit();
-    }
-    // the ring holds through the gaps between words, but a muted mic is out at once
-    const loud = s.speaking.update(level > threshold, now);
-    const speaking = shouldTransmit() && gateOpen() && loud;
-    useVoice.getState().setSpeaking(myId, speaking);
-  }, 80);
-}
-
-function stopMeter(s: Session): void {
-  if (s.meterTimer) clearInterval(s.meterTimer);
-  s.meter?.close();
-  s.meter = null;
-  s.meterTimer = null;
-  s.vadOpen = false;
-  s.vadHoldUntil = 0;
-  s.speaking.reset();
-}
-
 /** Swap the microphone after a device or processing setting change. */
-export async function refreshMic(): Promise<void> {
-  const s = session;
-  if (!s) return;
-  try {
-    const next = await getMic(useSettings.getState().settings.voice);
-    if (session !== s) {
-      next.getTracks().forEach((t) => t.stop());
-      return;
-    }
-    stopMeter(s);
-    disconnectInput(s);
-    s.mic?.getTracks().forEach((t) => t.stop());
-    s.micRaw?.getTracks().forEach((t) => {
-      t.onended = null;
-      t.stop();
-    });
-    s.micRaw = next;
-    s.mic = withInputGain(s, next);
-    watchMic(s);
-    s.transport.setLocalAudio(s.mic.getAudioTracks()[0] ?? null);
-    startMeter(s);
-    applyTransmit();
-    // a microphone that works again is no longer "blocked": the button and
-    // the note said so while every word was going out
-    useVoice.getState().setMicBlocked(false);
-  } catch {
-    useUI.getState().toast(tr_("session.couldNotSwitchTheMicrophone"), "error");
-    // and one that is gone is: the button read "Mute" while nothing was sent
-    if (session === s && !s.micRaw?.getAudioTracks().some((t) => t.readyState === "live")) useVoice.getState().setMicBlocked(true);
-  }
+export function refreshMic(): Promise<void> {
+  return engine?.refreshMic() ?? Promise.resolve();
 }
 
-/** Which way the camera points; a phone can turn it round mid-call. */
-let cameraFacing: CameraFacing = "user";
-
-export function currentCameraFacing(): CameraFacing {
-  return cameraFacing;
+/** Asks for a microphone that was refused or busy again, from the call's "Try again". */
+export function retryMic(): Promise<void> {
+  return engine?.retryMic() ?? Promise.resolve();
 }
 
-/** The camera chosen in settings. */
-function chosenCamera(): { id: string | null; label: string | null } {
-  const v = useSettings.getState().settings.voice;
-  return { id: v.cameraDeviceId ?? null, label: v.cameraDeviceLabel ?? null };
+/** Turns the camera round on a phone. */
+export function flipCamera(): Promise<void> {
+  return engine?.flipCamera() ?? Promise.resolve();
 }
 
-/**
- * Opens the camera chosen in settings in place of the one that is on, so the
- * other side sees the picture change without renegotiating.
- */
-async function switchCamera(): Promise<void> {
-  const s = session;
-  if (!s?.camera || s.cameraPending) return;
-  const old = s.camera;
-  s.cameraPending = true;
-  // The replacement is opened before the working camera is let go. Stopping
-  // first froze this tile and everyone else's on the last frame for as long as
-  // the browser took, and left the camera off altogether when the new one was
-  // busy. flipCamera keeps the stop-first order, for the phones its own
-  // comment describes.
-  const stream = await getCamera(cameraFacing, chosenCamera()).catch(() => null);
-  s.cameraPending = false;
-  if (session !== s) {
-    stream?.getTracks().forEach((t) => t.stop());
-    return;
-  }
-  if (!stream) {
-    useUI.getState().toast(tr_("session.couldNotSwitchTheCamera"), "error");
-    return;
-  }
-  for (const t of old.getTracks()) {
-    t.onended = null;
-    t.stop();
-  }
-  s.camera = stream;
-  const track = stream.getVideoTracks()[0] ?? null;
-  if (track) track.onended = () => void toggleCamera();
-  s.transport.setLocalVideo(track);
-  useVoice.getState().setLocalVideo(stream);
-}
-
-/**
- * Turns the camera round. The new stream replaces the old one in place, so
- * the other side sees the picture change without renegotiating.
- */
-export async function flipCamera(): Promise<void> {
-  const s = session;
-  if (!s?.camera || s.cameraPending) return;
-  const next: CameraFacing = cameraFacing === "user" ? "environment" : "user";
-  // Many phones cannot open a second camera while the first is live, so the
-  // old one is let go before asking for the other. Its ended handler would
-  // otherwise turn the camera off halfway through.
-  const old = s.camera;
-  for (const t of old.getTracks()) {
-    t.onended = null;
-    t.stop();
-  }
-  s.cameraPending = true;
-  let stream: MediaStream | null = null;
-  let facing = next;
-  try {
-    stream = await getCamera(next);
-  } catch {
-    facing = cameraFacing;
-    stream = await getCamera(cameraFacing).catch(() => null);
-    if (stream && session === s) useUI.getState().toast(tr_("session.thisDeviceHasNoOtherCamera"), "error");
-  }
-  s.cameraPending = false;
-  if (session !== s) {
-    stream?.getTracks().forEach((t) => t.stop());
-    return;
-  }
-  if (!stream) {
-    s.camera = null;
-    s.transport.setLocalVideo(null);
-    useVoice.getState().setLocalVideo(null);
-    sendState(s.channelId);
-    useUI.getState().toast(tr_("session.couldNotSwitchTheCamera"), "error");
-    return;
-  }
-  cameraFacing = facing;
-  s.camera = stream;
-  const track = stream.getVideoTracks()[0] ?? null;
-  if (track) track.onended = () => void toggleCamera();
-  s.transport.setLocalVideo(track);
-  useVoice.getState().setLocalVideo(stream);
-}
-
-export async function toggleCamera(): Promise<void> {
-  const s = session;
-  if (!s || s.cameraPending) return;
-  if (s.camera) {
-    s.camera.getTracks().forEach((t) => t.stop());
-    s.camera = null;
-    s.transport.setLocalVideo(null);
-    useVoice.getState().setLocalVideo(null);
-  } else {
-    s.cameraPending = true;
-    let stream: MediaStream;
-    try {
-      stream = await getCamera(cameraFacing, chosenCamera());
-    } catch {
-      s.cameraPending = false;
-      if (session === s) useUI.getState().toast(tr_("session.cameraAccessWasDenied"), "error");
-      return;
-    }
-    s.cameraPending = false;
-    if (session !== s) {
-      // hung up while the camera was opening
-      stream.getTracks().forEach((t) => t.stop());
-      return;
-    }
-    s.camera = stream;
-    const track = stream.getVideoTracks()[0] ?? null;
-    if (track) track.onended = () => void toggleCamera();
-    s.transport.setLocalVideo(track);
-    useVoice.getState().setLocalVideo(stream);
-  }
-  sendState(s.channelId);
+/** Called straight from a click: iOS only opens the camera in a gesture. */
+export function toggleCamera(): Promise<void> {
+  return engine?.toggleCamera() ?? Promise.resolve();
 }
 
 /**
@@ -729,83 +314,49 @@ export async function toggleCamera(): Promise<void> {
  * not given), unless one is already running. Call it straight from a click:
  * the browser only opens its screen picker during a user gesture.
  */
-export async function startScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
-  if (session?.screen) return;
-  await toggleScreen(quality);
+export function startScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
+  if (!engine || engine.sharing()) return Promise.resolve();
+  return engine.toggleScreen(quality);
 }
 
 /** Stops a share, or starts one the way startScreen does. */
-export async function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
-  const s = session;
-  if (!s || s.screenPending) return;
-  if (s.screen) {
-    s.screen.getTracks().forEach((t) => t.stop());
-    s.screen = null;
-    s.transport.setLocalScreen(null);
-    useVoice.getState().setLocalScreen(null);
-  } else {
-    const v = useSettings.getState().settings.voice;
-    const res = quality?.resolution ?? v.shareResolution;
-    const fps = quality?.fps ?? v.shareFps;
-    const audio = quality?.audio ?? v.shareAudio ?? true;
-    s.screenPending = true;
-    let stream: MediaStream | null = null;
-    try {
-      stream = await getScreen(res, fps, audio);
-    } catch (err) {
-      // Cancelling the picker rejects with NotAllowedError. A share whose sound could not start
-      // rejects as a whole: the desktop app then falls back to safer sound and shares the same
-      // source again, without asking, and the share goes ahead.
-      const soundFailed = audio && err instanceof DOMException && (err.name === "NotReadableError" || err.name === "AbortError");
-      const again = soundFailed ? await desktopBridge()?.shareAudioFailed?.().catch(() => false) : false;
-      if (again && session === s) stream = await getScreen(res, fps, audio).catch(() => null);
-      if (!stream && session === s) {
-        // A share that will not start is usually the computer refusing to let
-        // the app record at all; blaming the sound sends people the wrong way.
-        const access = await desktopBridge()?.screenAccess?.().catch(() => null);
-        if (access && !access.usable) useUI.getState().openModal("screenPermission", { stale: access.stale });
-        else if (soundFailed) useUI.getState().toast(tr_("session.yourScreenShareCouldNotStart"), "error");
-      }
-    }
-    s.screenPending = false;
-    if (!stream) return;
-    if (session !== s) {
-      // hung up while the picker was open
-      stream.getTracks().forEach((t) => t.stop());
-      return;
-    }
-    s.screen = stream;
-    const video = stream.getVideoTracks()[0];
-    if (video) video.onended = () => void toggleScreen();
-    s.transport.setLocalScreen(stream, shareBitrate(res, fps));
-    useVoice.getState().setLocalScreen(stream);
-  }
-  sendState(s.channelId);
+export function toggleScreen(quality?: { resolution: ShareResolution; fps: ShareFps; audio?: boolean }): Promise<void> {
+  return engine?.toggleScreen(quality) ?? Promise.resolve();
+}
+
+/** Push to talk's button in the call, pressed or let go. */
+export function holdToTalk(on: boolean): void {
+  engine?.setPttHeld(on);
+}
+
+/** The "tap to turn the sound on" of a call whose audio the system stopped. */
+export function resumeCallAudio(): void {
+  resumeAudio();
 }
 
 export function setUserVolume(userId: string, pct: number): void {
   useVoice.getState().setVolume(userId, pct);
-  session?.transport.setVolume(userId, pct);
+  engine?.setVolume(userId, pct);
 }
 
 /** The volume of someone's screen share sound, leaving their voice as it is. */
 export function setStreamVolume(userId: string, pct: number): void {
   useVoice.getState().setStreamVolume(userId, pct);
-  session?.transport.setStreamVolume(userId, pct);
+  engine?.setStreamVolume(userId, pct);
 }
 
 export function setStreamLocalMute(userId: string, on: boolean): void {
   useVoice.getState().setStreamMute(userId, on);
-  session?.transport.setStreamMuted(userId, on);
+  engine?.setStreamMuted(userId, on);
 }
 
 export function setUserLocalMute(userId: string, on: boolean): void {
   useVoice.getState().setLocalMute(userId, on);
-  session?.transport.setLocalMute(userId, on);
+  engine?.setLocalMute(userId, on);
 }
 
 export function inVoice(): string | null {
-  return session?.channelId ?? null;
+  return engine?.current()?.channelId ?? null;
 }
 
 /** Whether this server takes guests in calls; null before the call's settings arrived. */
@@ -815,23 +366,15 @@ export function guestLinksOn(): boolean | null {
 
 /** Whether this call goes through the SFU rather than peer to peer. */
 export function callThroughSfu(): boolean {
-  return session?.transport instanceof SfuTransport;
+  return !!engine?.throughSfu();
 }
 
 /** Live link quality for the indicator. */
 export function voiceStats(): Promise<{ rtt: number; loss: number }> | null {
-  return session ? session.transport.stats() : null;
+  return engine?.stats() ?? null;
 }
 
 // --- gateway events --------------------------------------------------------
-
-function syncPeers(): void {
-  const s = session;
-  const myId = me();
-  if (!s || !myId) return;
-  const wanted = new Set(participantsOf(useVoice.getState().byChannel, s.channelId).map((p) => p.user_id).filter((id) => id !== myId));
-  for (const id of s.transport.peerIds()) if (!wanted.has(id)) s.transport.removePeer(id), useVoice.getState().removePeer(id);
-}
 
 /**
  * Calls ignored on this device: they neither ring nor show here until they
@@ -839,12 +382,20 @@ function syncPeers(): void {
  */
 const ignoredCalls = new Set<string>();
 
-/** Stops ringing for a channel, and the timeout that would have stopped it. */
-function clearRing(channelId: string): void {
+/**
+ * Stops ringing for a channel, and the timeout that would have stopped it.
+ * `missed` says the call ended without anyone here answering it, which is
+ * worth telling someone who was away; otherwise the notification just goes.
+ */
+function clearRing(channelId: string, missed: boolean): void {
+  const was = useVoice.getState().ringing[channelId];
   useVoice.getState().setRinging(channelId, null);
   const t = ringTimers.get(channelId);
   if (t) clearTimeout(t);
   ringTimers.delete(channelId);
+  if (!was) return;
+  if (missed) missedNotice(channelId, was.from);
+  else closeRingNotice(channelId);
 }
 
 export function handleVoiceEvent(e: GatewayEvent): void {
@@ -856,111 +407,63 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       const before = vs.channel_id ? null : channelOfUser(vs.user_id);
       rememberCallUser(vs);
       store.applyState(vs);
+      const cur = inVoice();
       if (vs.user_id === myId) {
         // The server keeps one call per account and tells all its devices.
         // A state from another device's session is that device's call.
         const elsewhere = !!mySessionId && !!vs.session_id && vs.session_id !== mySessionId;
         if (vs.channel_id) {
           if (elsewhere) {
-            clearRing(vs.channel_id);
-            if (session) {
+            clearRing(vs.channel_id, false);
+            if (cur) {
               void leaveVoice(false);
               useUI.getState().toast(tr_("session.yourCallMovedToAnotherDevice"));
             } else if (store.mine) store.setMine(null);
             return;
           }
           // a join this device has since given up on; its leave is on the way
-          if (!session) return;
-          // A state for another channel before this call was ever confirmed is
-          // an echo of the call just left (its join, a mute, a published
-          // track), arriving after the switch — not a moderator's move. Taken
-          // for one, it pulled the call back to the old channel, and the old
-          // channel's leave that followed ended it.
-          if (session.channelId !== vs.channel_id && store.mine?.channel_id !== session.channelId) return;
-          store.setMine(vs);
-          store.setJoining(null);
-          if (session.channelId !== vs.channel_id) {
-            // moved by a moderator: rebuild peers for the new room
-            for (const id of session.transport.peerIds()) session.transport.removePeer(id), store.removePeer(id);
-            session.channelId = vs.channel_id;
-            session.transport.moveTo(vs.channel_id);
-            // An encrypted call needs the new room's key here. Until it lands
-            // the transport has none, and every frame it sends is dropped, so
-            // it is told the moment the fetch resolves rather than on its own
-            // four-second check.
-            const moved = session;
-            void useKeys
-              .getState()
-              .ensureConvKey(convForChannel(vs.channel_id))
-              .then(() => {
-                if (session === moved) moved.transport.keysArrived?.();
-              })
-              .catch(() => {});
-          }
-          const everyone = participantsOf(useVoice.getState().byChannel, vs.channel_id);
-          for (const p of everyone) {
-            if (p.user_id !== myId) session.transport.addPeer(p.user_id);
-          }
-          session.transport.setRoster(everyone);
-          session.transport.joined(vs);
-          applyTransmit();
-          relayGuestKeys(session);
-        } else if (!elsewhere && session && (vs.old_channel_id === session.channelId || !vs.old_channel_id)) {
+          if (!cur || !engine?.onMine(vs)) return;
+          checkAlone(vs.channel_id);
+          return;
+        }
+        if (!cur || (vs.old_channel_id && vs.old_channel_id !== cur)) return;
+        // another device of this account picked the call up: the server says so first
+        if (vs.reason === "moved") {
+          void leaveVoice(false);
+          useUI.getState().toast(tr_("session.yourCallMovedToAnotherDevice"));
+        } else if (!elsewhere) {
           // disconnected server-side (kick, channel deleted, moderator)
           void leaveVoice(false);
         }
         return;
       }
-      if (!session) return;
-      if (vs.channel_id === session.channelId) {
-        if (!session.transport.peerIds().includes(vs.user_id)) {
-          session.transport.addPeer(vs.user_id);
-          // someone picked up
-          stopCallingTone();
-          playSound("join");
-        }
-      } else if (before === session.channelId || vs.old_channel_id === session.channelId) {
-        session.transport.removePeer(vs.user_id);
-        store.removePeer(vs.user_id);
-        playSound("leave");
-      }
-      syncPeers();
-      // cameras, shares and what people publish change without anyone joining or leaving
-      session.transport.setRoster(participantsOf(useVoice.getState().byChannel, session.channelId));
-      relayGuestKeys(session);
+      if (!cur) return;
+      const what = engine?.onOther(vs, before) ?? null;
+      if (what === "joined") {
+        // someone picked up
+        stopCallingTone();
+        playSound("join");
+      } else if (what === "left") playSound("leave");
+      checkAlone(cur);
       return;
     }
-    case "voice_signal": {
-      const payload = e.d.payload as { guest_keys?: unknown } | null;
-      if (payload && typeof payload === "object" && "guest_keys" in payload) {
-        // newer call keys for a guest, from someone in the call; another guest has none to give
-        const from = session && e.d.channel_id === session.channelId ? useVoice.getState().byChannel[e.d.channel_id]?.[e.d.from] : undefined;
-        if (from && !from.guest && asGuest() && myId) void openRelayedKeys(e.d.channel_id, myId, payload.guest_keys);
-        return;
-      }
-      if (session && e.d.channel_id === session.channelId) session.transport.handleSignal(e.d.from, e.d.payload as SignalPayload);
+    case "voice_signal":
+      engine?.onSignal(e);
       return;
-    }
-    case "voice_resumed": {
-      const s = session;
-      // kept: the call went on all along; otherwise the server let it go, and it starts over as after any reconnect
-      if (!s || e.d.kept || s.channelId !== e.d.channel_id) return;
-      for (const id of s.transport.peerIds()) s.transport.removePeer(id), store.removePeer(id);
-      store.setMine(null);
-      s.transport.reconnected();
+    case "voice_resumed":
+      engine?.onResumed(e);
       return;
-    }
-    case "voice_error":
+    case "voice_error": {
       if (SIGNAL_ERRORS.has(e.d.code)) {
         console.warn("voice: signal refused:", e.d.code);
         return;
       }
-      if (MODE_ERRORS.has(e.d.code) && session && Date.now() - modeRetryAt > 30_000) {
+      const cur = inVoice();
+      if (MODE_ERRORS.has(e.d.code) && cur && Date.now() - modeRetryAt > 30_000) {
         // ask the server again how calls connect, and join that way
         modeRetryAt = Date.now();
         iceCache = null;
-        const channelId = session.channelId;
-        void leaveVoice(false).then(() => joinVoice(channelId));
+        void leaveVoice(false).then(() => joinVoice(cur));
         return;
       }
       store.setJoining(null);
@@ -974,28 +477,43 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       // server does think we are in. Telling it costs one redundant frame; not
       // telling it leaves a tile nobody can get rid of and a channel that
       // refuses to let us back in.
-      if (session && !useVoice.getState().mine) void leaveVoice(true);
-      return;
-    case "call_ring": {
-      // a caller who reconnects rings again; an ignored call stays quiet
-      if (e.d.from === myId || session?.channelId === e.d.channel_id || ignoredCalls.has(e.d.channel_id)) return;
-      // the ringing store starts the repeating ring (see installVoice)
-      store.setRinging(e.d.channel_id, e.d.from);
-      const old = ringTimers.get(e.d.channel_id);
-      if (old) clearTimeout(old);
-      ringTimers.set(e.d.channel_id, setTimeout(() => clearRing(e.d.channel_id), 60000));
+      if (cur && !useVoice.getState().mine) void leaveVoice(true);
       return;
     }
-    case "call_end":
-      if (e.d.reason === "ended" || e.d.user_id === myId) clearRing(e.d.channel_id);
-      if (e.d.reason === "ended") ignoredCalls.delete(e.d.channel_id);
-      // the one person called said no
-      if (session?.channelId === e.d.channel_id && e.d.user_id !== myId && useChannels.getState().byId[e.d.channel_id]?.type === "dm") {
-        const wasCalling = useVoice.getState().calling === e.d.channel_id;
+    case "call_ring": {
+      // a caller who reconnects rings again; an ignored call stays quiet
+      if (e.d.from === myId || inVoice() === e.d.channel_id || ignoredCalls.has(e.d.channel_id)) return;
+      // the ringing store starts the repeating ring (see installVoice)
+      store.setRinging(e.d.channel_id, e.d.from);
+      ringNotice(e.d.channel_id, e.d.from);
+      const old = ringTimers.get(e.d.channel_id);
+      if (old) clearTimeout(old);
+      ringTimers.set(e.d.channel_id, setTimeout(() => clearRing(e.d.channel_id, true), RING_MS));
+      return;
+    }
+    case "call_end": {
+      const { channel_id: ch, reason, user_id: who } = e.d;
+      if (reason === "ended") {
+        // the call is over: a ring still going here was never answered
+        clearRing(ch, true);
+        ignoredCalls.delete(ch);
+        callEnded(ch);
+        return;
+      }
+      // answered or declined on another of this account's devices
+      if (who === myId) clearRing(ch, false);
+      if (reason !== "declined" || !who || who === myId) return;
+      callDeclined(ch, who);
+      if (inVoice() !== ch || store.calling !== ch) return;
+      const type = useChannels.getState().byId[ch]?.type;
+      // the one person called said no, or everyone in a group did: the call is given up, and says why
+      if (type === "dm" || (type === "group_dm" && allDeclined(ch))) {
         stopCallingTone();
-        if (wasCalling && e.d.reason === "declined") useUI.getState().toast(callOutcome(e.d.channel_id, "declined"), "info");
+        useUI.getState().toast(type === "dm" ? callOutcome(ch, "declined") : tr_("voice.call.everyoneDeclined"), "info");
+        void leaveVoice();
       }
       return;
+    }
     default:
       return;
   }
@@ -1012,38 +530,22 @@ export function onReadyVoice(list: VoiceState[], sessionId?: string): void {
   // a reconnect may follow a restart that changed how calls connect
   iceCache = null;
   useVoice.getState().setAll(list);
-  // after a reconnect the server has forgotten us: rejoin the room we were in
-  // (a join still asking for the mic announces itself when it gets there)
-  const s = session;
-  if (!s?.announced) return;
-  // Media through the SFU never went through the gateway: the call carries on while it reconnects,
-  // and the server kept it for this device. Ask for it back as it is; voice_resumed says whether it was.
-  const held = s.transport.currentSession?.() ?? null;
-  if (held) {
-    syncPeers();
-    const everyone = participantsOf(useVoice.getState().byChannel, s.channelId);
-    for (const p of everyone) if (p.user_id !== me()) s.transport.addPeer(p.user_id);
-    s.transport.setRoster(everyone);
-    sendState(s.channelId, true, held);
-    // the network is back, so a connection that dropped with it tries again now
-    s.transport.nudge?.();
-    return;
-  }
-  for (const id of s.transport.peerIds()) s.transport.removePeer(id), useVoice.getState().removePeer(id);
-  useVoice.getState().setMine(null);
-  s.transport.reconnected();
-  sendState(s.channelId, true);
+  // a call that ended while the gateway was away would ring on for its full minute
+  for (const ch of Object.keys(useVoice.getState().ringing)) if (!list.some((vs) => vs.channel_id === ch)) clearRing(ch, true);
+  callsAfterReady((ch) => inVoice() === ch);
+  // after a reconnect the server has forgotten us: the call rejoins the room it was in
+  engine?.onReady();
 }
 
-/** Declines an incoming DM call. */
 /** Silences an incoming call here without answering or declining it. */
 export function ignoreCall(channelId: string): void {
   ignoredCalls.add(channelId);
-  clearRing(channelId);
+  clearRing(channelId, false);
 }
 
+/** Declines an incoming DM call. */
 export async function declineCall(channelId: string): Promise<void> {
-  clearRing(channelId);
+  clearRing(channelId, false);
   try {
     await voiceApi.decline(channelId);
   } catch {
@@ -1055,25 +557,29 @@ export async function declineCall(channelId: string): Promise<void> {
 export function installVoice(): void {
   if (installed || typeof window === "undefined") return;
   installed = true;
+  installCallRecord();
+  // the line a call this device started gets, to write how it went onto
+  dispatchHooks.onMessage.push((m) => callLine(m));
   useVoiceLocal.subscribe((st, prev) => {
     if (st.muted !== prev.muted) playSound(st.muted ? "mute" : "unmute");
-    session?.transport.setOutputMuted(st.deafened);
-    applyTransmit();
+    engine?.setOutputMuted(st.deafened);
+    engine?.applyTransmit();
     // Only a call the server has been told about: during the microphone
     // prompt the join is not sent yet, and a mute there sent it early — ringing
     // the other side of a call this device could not yet leave.
-    if (session?.announced) sendState(session.channelId);
+    const cur = engine?.current();
+    if (cur?.announced) sendState(cur.channelId);
   });
   useSettings.subscribe((st, prev) => {
     const a = st.settings.voice;
     const b = prev.settings.voice;
-    if (!session) return;
-    if (a.inputDeviceId !== b.inputDeviceId || a.noiseSuppression !== b.noiseSuppression || a.echoCancellation !== b.echoCancellation || a.autoGain !== b.autoGain) void refreshMic();
-    if (a.outputDeviceId !== b.outputDeviceId) void session.transport.setOutputDevice(a.outputDeviceId);
-    if (a.cameraDeviceId !== b.cameraDeviceId || a.cameraDeviceLabel !== b.cameraDeviceLabel) void switchCamera();
-    if (a.outputVolume !== b.outputVolume) session.transport.setMasterVolume(a.outputVolume);
-    if (a.inputVolume !== b.inputVolume) applyInputGain();
-    if (a.mode !== b.mode) applyTransmit();
+    if (!engine?.current()) return;
+    if (a.inputDeviceId !== b.inputDeviceId || a.noiseSuppression !== b.noiseSuppression || a.echoCancellation !== b.echoCancellation || a.autoGain !== b.autoGain) void engine.refreshMic();
+    if (a.outputDeviceId !== b.outputDeviceId) engine.setOutputDevice(a.outputDeviceId);
+    if (a.cameraDeviceId !== b.cameraDeviceId || a.cameraDeviceLabel !== b.cameraDeviceLabel) void engine.switchCamera();
+    if (a.outputVolume !== b.outputVolume) engine.setMasterVolume(a.outputVolume);
+    if (a.inputVolume !== b.inputVolume) engine.applyInputGain();
+    if (a.mode !== b.mode) engine.applyTransmit();
   });
   useVoice.subscribe((st, prev) => {
     // One ring for however many calls are coming in, until the last is
@@ -1088,8 +594,8 @@ export function installVoice(): void {
       for (const id of ignoredCalls) if (participantsOf(st.byChannel, id).length === 0) ignoredCalls.delete(id);
     }
     // A share's sound plays only while it is watched.
-    if (session && st.watching !== prev.watching) {
-      for (const id of new Set([...Object.keys(st.watching), ...Object.keys(prev.watching)])) session.transport.setWatching(id, !!st.watching[id]);
+    if (engine?.current() && st.watching !== prev.watching) {
+      for (const id of new Set([...Object.keys(st.watching), ...Object.keys(prev.watching)])) engine.setWatching(id, !!st.watching[id]);
     }
   });
   // turning on Do Not Disturb quiets a call that is already ringing
@@ -1101,55 +607,45 @@ export function installVoice(): void {
     return v.mode === "ptt" && (e.key === v.pttKey || e.code === v.pttKey);
   };
   window.addEventListener("keydown", (e) => {
-    if (!session || !isPtt(e) || e.repeat) return;
-    session.pttHeld = true;
-    applyTransmit();
+    if (!engine?.current() || !isPtt(e) || e.repeat) return;
+    engine.setPttHeld(true);
   });
   window.addEventListener("keyup", (e) => {
-    if (!session || !isPtt(e)) return;
-    session.pttHeld = false;
-    applyTransmit();
+    if (!engine?.current() || !isPtt(e)) return;
+    engine.setPttHeld(false);
   });
-  window.addEventListener("blur", () => {
-    if (session?.pttHeld) {
-      session.pttHeld = false;
-      applyTransmit();
-    }
-  });
-  document.addEventListener("visibilitychange", () => {
-    if (session) applyTransmit();
-  });
+  window.addEventListener("blur", () => engine?.setPttHeld(false));
+  document.addEventListener("visibilitychange", () => engine?.applyTransmit());
   // iOS keeps a suspended AudioContext silent until a gesture resumes it.
   const wake = () => {
-    if (session) resumeAudio();
+    if (engine?.current()) resumeAudio();
   };
   for (const type of ["touchend", "click", "keydown"]) window.addEventListener(type, wake, { capture: true, passive: true });
   window.addEventListener("beforeunload", () => {
-    if (session?.announced) sendState(null);
+    const cur = engine?.current();
+    if (cur?.announced) sendState(null);
   });
   // iOS Safari never fires beforeunload, and Chrome on Android skips it for
   // a tab swiped away; pagehide is what both do send. Without it the call
   // lingered for everyone else until the server's grace ran out.
   window.addEventListener("pagehide", (e) => {
-    if (!e.persisted && session?.announced) sendState(null);
+    const cur = engine?.current();
+    if (!e.persisted && cur?.announced) sendState(null);
   });
   // a call whose connection dropped with the network tries again the moment the network is back
-  window.addEventListener("online", () => session?.transport.nudge?.());
+  window.addEventListener("online", () => engine?.nudge());
   // The device in use going away is not a settings change, and the only other
   // devicechange listener in the app is on a settings page no call mounts.
-  navigator.mediaDevices?.addEventListener?.("devicechange", () => {
-    const s = session;
-    if (s?.micRaw?.getAudioTracks().some((t) => t.readyState === "ended")) void refreshMic();
-  });
+  navigator.mediaDevices?.addEventListener?.("devicechange", () => engine?.devicesChanged());
   // a channel that disappears takes its call with it
   useChannels.subscribe((st, prev) => {
-    const s = session;
-    if (!s || !prev.byId[s.channelId] || st.byId[s.channelId]) return;
+    const ch = inVoice();
+    if (!ch || !prev.byId[ch] || st.byId[ch]) return;
     // A reconnect empties the list and fills it again in the same turn, so
     // only a channel still missing afterwards has really gone. The server
     // does not end our call when a DM is closed, so it is told.
     queueMicrotask(() => {
-      if (session === s && !useChannels.getState().byId[s.channelId]) void leaveVoice(true);
+      if (inVoice() === ch && !useChannels.getState().byId[ch]) void leaveVoice(true);
     });
   });
 }

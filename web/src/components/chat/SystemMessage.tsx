@@ -1,4 +1,5 @@
-import { ArrowLeftFromLine, ArrowRightToLine, Phone, Pin } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, Pin } from "lucide-react";
+import { CallLine } from "@/components/voice/CallLine";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
@@ -46,9 +47,8 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
       body = <Tr id="chat.systemMessage.joined" values={{ actor: A }} />;
       break;
     case "system_call":
-      icon = <Phone size={18} />;
-      body = <Tr id="chat.systemMessage.startedACall" values={{ actor: A }} />;
-      break;
+      // told from where the reader stands, from the summary its caller sealed onto it
+      return <CallLine msg={msg} />;
     default:
       body = <Tr id="chat.systemMessage.didSomething" values={{ actor: A }} />;
   }

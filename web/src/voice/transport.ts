@@ -26,6 +26,12 @@ export interface TransportEvents {
   onPeerState: (userId: string, state: RTCPeerConnectionState) => void;
   onRemoteStream: (userId: string, kind: MediaKind, stream: MediaStream | null) => void;
   onSpeaking: (userId: string, speaking: boolean) => void;
+  /**
+   * This device's own link to the call: coming up the first time, up, or
+   * down and on its way back. The per-person states above cannot say that:
+   * through the SFU they all follow the one connection.
+   */
+  onConnection?: (state: "connecting" | "connected" | "reconnecting") => void;
   /** Something the person should hear about, like video pausing near the free allowance. */
   onError?: (code: string, message: string) => void;
 }
@@ -53,6 +59,8 @@ export interface VoiceTransport {
   nudge?(): void;
   /** The SFU session of this device's call, which a reconnect can resume; null peer to peer. */
   currentSession?(): string | null;
+  /** Fresh relay credentials, for every connection and ICE restart from now on. */
+  setIceServers?(servers: RTCIceServer[]): void;
   setWatching(userId: string, on: boolean): void;
   setVolume(userId: string, pct: number): void;
   setLocalMute(userId: string, on: boolean): void;

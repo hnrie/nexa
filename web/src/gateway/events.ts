@@ -60,7 +60,7 @@ export type GatewayEvent =
   /** After a reconnect: whether the server kept this device's call for it, or it starts over. */
   | { t: "voice_resumed"; d: { channel_id: Snowflake; kept: boolean } }
   | { t: "call_ring"; d: { channel_id: Snowflake; from: Snowflake } }
-  | { t: "call_end"; d: { channel_id: Snowflake; user_id?: Snowflake; reason: "declined" | "ended" } }
+  | { t: "call_end"; d: { channel_id: Snowflake; user_id?: Snowflake; reason: "declined" | "ended" | "answered" } }
   | { t: "key_grant"; d: KeyGrant }
   | { t: "keys_needed"; d: KeyNeed }
   | { t: "key_rotation_needed"; d: { conv_id: Snowflake } }

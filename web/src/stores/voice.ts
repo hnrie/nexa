@@ -60,6 +60,19 @@ interface VoiceStore {
   micBlocked: boolean;
   /** The conversation this device is calling and nobody has picked up in yet, while it rings. */
   calling: string | null;
+  /**
+   * This device's own connection to the call: coming up for the first time,
+   * up, or down and coming back by itself. Null outside a call. The people's
+   * tiles only say how each of them is reached, which read "Connecting…" for
+   * everyone while "Voice connected" and a green dot said all was well.
+   */
+  connection: "connecting" | "connected" | "reconnecting" | null;
+  /** The call's sound is stopped until a tap (an iPhone after a phone call, a browser's autoplay rule). */
+  audioBlocked: boolean;
+  /** A conversation's call that everyone else left: it hangs up by itself unless someone comes back. */
+  leftAlone: string | null;
+  /** Push to talk's on-screen button is being held. */
+  pttHeld: boolean;
   applyState: (vs: VoiceState) => void;
   setAll: (list: VoiceState[]) => void;
   setMine: (vs: VoiceState | null) => void;
@@ -83,6 +96,10 @@ interface VoiceStore {
   setError: (e: string | null) => void;
   setMicBlocked: (v: boolean) => void;
   setCalling: (channelId: string | null) => void;
+  setConnection: (c: VoiceStore["connection"]) => void;
+  setAudioBlocked: (v: boolean) => void;
+  setLeftAlone: (channelId: string | null) => void;
+  setPttHeld: (v: boolean) => void;
   resetSession: () => void;
   clear: () => void;
 }
@@ -117,6 +134,10 @@ export const useVoice = create<VoiceStore>()((set) => ({
   error: null,
   micBlocked: false,
   calling: null,
+  connection: null,
+  audioBlocked: false,
+  leftAlone: null,
+  pttHeld: false,
   applyState: (vs) =>
     set((s) => {
       const byChannel = { ...s.byChannel };
@@ -206,10 +227,14 @@ export const useVoice = create<VoiceStore>()((set) => ({
   setError: (error) => set({ error }),
   setMicBlocked: (micBlocked) => set({ micBlocked }),
   setCalling: (calling) => set({ calling }),
+  setConnection: (connection) => set((s) => (s.connection === connection ? s : { connection })),
+  setAudioBlocked: (audioBlocked) => set((s) => (s.audioBlocked === audioBlocked ? s : { audioBlocked })),
+  setLeftAlone: (leftAlone) => set({ leftAlone }),
+  setPttHeld: (pttHeld) => set((s) => (s.pttHeld === pttHeld ? s : { pttHeld })),
   // error goes with the rest: a refusal from a call that is over has nothing
   // to say about the next one, and it was shown again in its lobby
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false, calling: null }),
-  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false, calling: null }),
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false, calling: null, connection: null, audioBlocked: false, leftAlone: null, pttHeld: false }),
+  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false, calling: null, connection: null, audioBlocked: false, leftAlone: null, pttHeld: false }),
 }));
 
 /** A channel's participants in join order. */

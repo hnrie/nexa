@@ -1,17 +1,12 @@
 import { useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
 import { defaultDeviceLabel, listDevices, realDevices as real } from "@/voice/media";
+import { canChooseOutput } from "@/voice/output";
 
 import { t } from "@/i18n";
 type OpenModal = (kind: string, props?: Record<string, unknown>) => void;
 
-/** Whether this browser can send call audio to a chosen speaker. */
-function canPickOutput(): boolean {
-  return typeof AudioContext !== "undefined" && "setSinkId" in AudioContext.prototype;
-}
-
-/** A device's name; a browser hides them until a device of the kind has been allowed once. */
-/** A device's own name, or "Microphone 2" when the browser will not say it. */
+/** A device's own name, or "Microphone 2" when the browser will not say it (it hides them until a device of the kind was allowed once). */
 function nameOf(d: MediaDeviceInfo, i: number, kind: "microphone" | "speakers" | "camera"): string {
   if (d.label) return d.label;
   const key = kind === "microphone" ? "voice.devices.microphoneN" : kind === "speakers" ? "voice.devices.speakersN" : "voice.devices.cameraN";
@@ -34,7 +29,7 @@ export async function micMenuItems(openModal: OpenModal, opts: { settings?: bool
     items.push({ id: `input-${d.deviceId}`, label: nameOf(d, i, "microphone"), checked: v.inputDeviceId === d.deviceId, onSelect: () => set({ inputDeviceId: d.deviceId, inputDeviceLabel: d.label || null }) });
   });
   const outputs = real(devices.outputs);
-  if (canPickOutput() && outputs.length > 0) {
+  if (canChooseOutput() && outputs.length > 0) {
     items[items.length - 1]!.separatorAfter = true;
     items.push({ id: "output-heading", label: t("voice.deviceMenus.outputDevice"), heading: true });
     items.push({ id: "output-default", label: defaultDeviceLabel(devices.outputs), checked: !v.outputDeviceId, onSelect: () => set({ outputDeviceId: null, outputDeviceLabel: null }) });

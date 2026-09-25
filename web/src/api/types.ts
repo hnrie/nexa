@@ -266,6 +266,8 @@ export interface VoiceState {
   user?: CallUser;
   /** Set for someone in through a guest link, with the key epoch their link carried. */
   guest?: { epoch: number };
+  /** On a leave: "moved" when another device of the same account picked the call up. */
+  reason?: "moved";
 }
 
 /** The flag on a user who is a guest in a call rather than an account. */

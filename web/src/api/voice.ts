@@ -1,3 +1,4 @@
+import type { Envelope } from "@/crypto/message";
 import { api } from "./client";
 import type { IceServer, Snowflake, VoiceState } from "./types";
 
@@ -45,6 +46,10 @@ export const voice = {
   },
   decline(channelId: Snowflake): Promise<void> {
     return api.request<void>("POST", `/channels/${channelId}/call/decline`);
+  },
+  /** The caller's sealed summary of a call that is over, onto the line that says it started (once). */
+  callSummary(channelId: Snowflake, messageId: Snowflake, body: { ciphertext: Envelope; key_conv_id: Snowflake; key_epoch: number }): Promise<void> {
+    return api.request<void>("PUT", `/channels/${channelId}/messages/${messageId}/call`, body);
   },
   moderate(serverId: Snowflake, userId: Snowflake, body: { mute?: boolean; deaf?: boolean; channel_id?: Snowflake | null }): Promise<VoiceState | void> {
     return api.request("PATCH", `/servers/${serverId}/members/${userId}/voice`, body);

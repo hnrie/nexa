@@ -1,4 +1,4 @@
-import { Check, Copy, ShieldCheck } from "lucide-react";
+import { Check, Copy, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { guests as guestsApi } from "@/api/guests";
@@ -14,6 +14,7 @@ import { canI, useServers } from "@/stores/servers";
 import { formatFull } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import s from "@/components/modals/ServerModals.module.css";
+import v from "./Voice.module.css";
 
 import { t } from "@/i18n";
 function ages(): { v: number; label: string }[] {
@@ -43,6 +44,7 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [age, setAge] = useState(86400);
+  const [confirming, setConfirming] = useState(false);
   // only the newest request may fill in the link
   const seq = useRef(0);
 
@@ -79,6 +81,7 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
     try {
       const { revoked } = await guestsApi.revokeAll(channelId);
       toast(revoked ? t("voice.guestLink.thoseGuestLinksNoLongerWork") : t("voice.guestLink.thereWereNoGuestLinksTo"), "success");
+      setConfirming(false);
       setState(null);
       await load({ fresh: true, maxAge: age });
     } catch (err) {
@@ -88,8 +91,23 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
   };
 
   const expires = state ? new Date(state.link.expires_at) : null;
+  // Copying the link is what the dialog is for; revoking breaks every link
+  // already handed out, so it is a quiet button at the foot that asks first,
+  // not the biggest, brightest control in the dialog.
+  const revokeLabel = managesAll ? t("voice.guestLink.revokeAll") : t("voice.guestLink.revokeMine");
+  const footer = confirming ? (
+    <>
+      <Button variant="ghost" onClick={() => setConfirming(false)} disabled={busy}>{t("chat.editMessage.cancel")}</Button>
+      <Button variant="danger" onClick={() => void revoke()} disabled={busy} data-testid="guest-link-revoke-confirm">{revokeLabel}</Button>
+    </>
+  ) : (
+    <>
+      <Button variant="ghost" className={v.revokeStart} onClick={() => setConfirming(true)} disabled={busy} data-testid="guest-link-revoke">{revokeLabel}</Button>
+      <Button variant="secondary" onClick={onClose}>{t("modals.serverNotifications.done")}</Button>
+    </>
+  );
   return (
-    <Modal open onClose={onClose} title={t("voice.guestLink.inviteGuestsToThisCall")} width={480}>
+    <Modal open onClose={onClose} title={t("voice.guestLink.inviteGuestsToThisCall")} width={480} footer={footer}>
       <div className={s.form}>
         <p className={s.hint}>{t("voice.guestLink.anyoneWithThisLinkCanJoin")}</p>
         <Field label={t("voice.guestLink.guestLink")} hint={expires ? t("voice.guestLink.newGuestsCanUseItUntil", { when: formatFull(expires.getTime()) }) : undefined}>
@@ -114,7 +132,12 @@ export function GuestLinkModal({ onClose, channelId }: { onClose: () => void; ch
             <Button variant="secondary" onClick={() => void load({ fresh: true, maxAge: age })} disabled={busy} data-testid="guest-link-new">{t("voice.guestLink.newLink")}</Button>
           </div>
         </div>
-        <Button variant="danger" onClick={() => void revoke()} disabled={busy} data-testid="guest-link-revoke">{managesAll ? t("voice.guestLink.revokeAllGuestLinks") : t("voice.guestLink.revokeMyGuestLinks")}</Button>
+        {confirming ? (
+          <div className={s.keyNote} data-warn="true" role="alert" data-testid="guest-link-revoke-warning">
+            <TriangleAlert size={16} />
+            <span>{managesAll ? t("voice.guestLink.revokeAllWarning") : t("voice.guestLink.revokeMineWarning")}</span>
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

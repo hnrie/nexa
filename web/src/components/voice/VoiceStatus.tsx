@@ -1,4 +1,4 @@
-import { MonitorUp, Signal, Video } from "lucide-react";
+import { MonitorUp, PhoneOutgoing, Signal, Video } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip } from "@/components/common/Tooltip";
 import { channelDisplayName } from "@/lib/names";
@@ -6,7 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
-import { useUsers } from "@/stores/users";
+import { displayName, useUsers } from "@/stores/users";
 import { useVoice } from "@/stores/voice";
 import { canShareScreen } from "@/voice/media";
 import { leaveVoice, toggleCamera, toggleScreen } from "@/voice/session";
@@ -29,12 +29,29 @@ export function VoiceStatus() {
   const meId = useAuth((a) => a.me?.id);
   // measured by the call itself, so switching sidebars (which remounts this) keeps the colour it had
   const quality = useVoice((v) => v.quality);
+  const connection = useVoice((v) => v.connection);
+  const calling = useVoice((v) => !!v.calling && v.calling === v.mine?.channel_id);
   const openModal = useUI((u) => u.openModal);
 
   if (!channelId) return null;
   const name = channel ? channelDisplayName(channel, users, meId) : "…";
   const where = server ? `${channel?.name} / ${server.server.name}` : name;
-  const level = !mine ? "unknown" : quality ? (quality.loss > 0.05 || quality.rtt > 400 ? "bad" : quality.rtt > 150 ? "ok" : "good") : "unknown";
+  const reconnecting = !!mine && connection === "reconnecting";
+  const level = !mine || calling ? "unknown" : reconnecting ? "bad" : quality ? (quality.loss > 0.05 || quality.rtt > 400 ? "bad" : quality.rtt > 150 ? "ok" : "good") : "unknown";
+  // Ringing someone, or a connection that dropped, is not "connected": the
+  // panel said so, green, while nobody had picked up or nothing got through.
+  const calledId = channel?.type === "dm" ? channel.recipient_ids.find((id) => id !== meId) : undefined;
+  const head = !mine
+    ? t("voice.voice.connecting")
+    : calling
+      ? calledId
+        ? t("voice.call.callingName", { name: displayName(users[calledId]) })
+        : t("voice.call.callingGroup")
+      : reconnecting
+        ? t("voice.voice.reconnecting")
+        : connection === "connecting"
+          ? t("voice.voice.connecting")
+          : t("voice.voiceStatus.voiceConnected");
   const go = () => {
     if (!channel) return;
     nav(channel.server_id ? `/channels/${channel.server_id}/${channel.id}` : `/channels/@me/${channel.id}`);
@@ -43,8 +60,8 @@ export function VoiceStatus() {
     <div className={s.status} data-testid="voice-status">
       <div className={s.statusRow}>
         <div className={s.statusText}>
-          <span className={s.statusHead} data-level={level} data-connecting={!mine}>
-            <Signal size={14} /> {mine ? t("voice.voiceStatus.voiceConnected") : t("voice.voice.connecting")}
+          <span className={s.statusHead} data-level={level} data-connecting={!mine || calling || connection === "connecting"} data-testid="voice-status-head">
+            {calling ? <PhoneOutgoing size={14} /> : <Signal size={14} />} {head}
           </span>
           <span className={s.statusSub} onClick={go} title={where}>{where}</span>
         </div>

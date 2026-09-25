@@ -36,16 +36,29 @@ export function voiceKeysVersion(channelId: string): string | null {
   const guest = guestVoiceKeys(channelId);
   if (guest) return guest.version;
   const conv = convForChannel(channelId);
-  const epochs = ring.epochs(conv);
+  const epochs = callEpochs(conv);
   if (epochs.length === 0) return null;
   return `${conv}:${epochs.join(",")}`;
+}
+
+/**
+ * How many of a conversation's newest epochs a call can open. A call only
+ * ever seals with the newest, and a device a few rotations behind catches up
+ * within seconds; a server's conversation has an epoch for every membership
+ * change it ever had, and deriving and importing hundreds of keys held every
+ * frame of the call behind the import.
+ */
+const CALL_EPOCHS = 8;
+
+function callEpochs(conv: string): number[] {
+  return ring.epochs(conv).slice(-CALL_EPOCHS);
 }
 
 export function voiceKeysFor(channelId: string): VoiceKeys | null {
   const guest = guestVoiceKeys(channelId);
   if (guest) return guest;
   const conv = convForChannel(channelId);
-  const epochs = ring.epochs(conv);
+  const epochs = callEpochs(conv);
   const newest = epochs[epochs.length - 1];
   if (newest === undefined) return null;
   const keys = epochs.map((epoch) => ({ index: epoch & 0xff, raw: voiceFrameKey(ring.get(conv, epoch)!, channelId) }));
