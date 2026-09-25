@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -126,6 +127,71 @@ func TestRateLimitIsShared(t *testing.T) {
 			t.Error("the window should have moved on")
 		}
 	})
+}
+
+// The two backends count the same way, so moving to Redis changes where the
+// counts live and nothing else: half a window after a burst, both still say
+// no (a token bucket would already have given one back), and a limit of
+// nothing allows nothing rather than falling over.
+func TestRateLimitsAgreeBetweenBackends(t *testing.T) {
+	each(t, func(t *testing.T, c Cache, tick func(time.Duration)) {
+		ctx := context.Background()
+		for i := 0; i < 4; i++ {
+			if ok, _, _ := c.Allow(ctx, "k", 4, time.Minute); !ok {
+				t.Fatalf("attempt %d should be allowed", i)
+			}
+		}
+		tick(30 * time.Second)
+		ok, wait, err := c.Allow(ctx, "k", 4, time.Minute)
+		if err != nil || ok {
+			t.Errorf("half a window later the burst still counts: %v %v", ok, err)
+		}
+		if wait <= 0 || wait > 31*time.Second {
+			t.Errorf("the wait should be what is left of the window, got %v", wait)
+		}
+		if ok, _, err := c.Allow(ctx, "none", 0, time.Minute); err != nil || ok {
+			t.Errorf("a limit of zero: %v %v", ok, err)
+		}
+	})
+}
+
+// Windows that ran out are swept away, so every address and name ever seen
+// does not stay in memory; and a subscription that ended is gone, not blanked.
+func TestMemoryForgetsWhatIsOver(t *testing.T) {
+	m := NewMemory()
+	now := time.Now()
+	m.now = func() time.Time { return now }
+	ctx := context.Background()
+	for i := 0; i < sweepEvery; i++ {
+		_, _, _ = m.Allow(ctx, "k"+strconv.Itoa(i), 1, time.Second)
+	}
+	now = now.Add(2 * time.Second)
+	for i := 0; i < sweepEvery; i++ {
+		_, _, _ = m.Allow(ctx, "fresh", 1000, time.Minute)
+	}
+	m.mu.Lock()
+	left := len(m.windows)
+	m.mu.Unlock()
+	if left != 1 {
+		t.Errorf("%d windows kept after they ran out, want only the live one", left)
+	}
+
+	subCtx, cancel := context.WithCancel(ctx)
+	if err := m.Subscribe(subCtx, "ch", func([]byte) {}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		m.mu.Lock()
+		n := len(m.subs)
+		m.mu.Unlock()
+		if n == 0 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Error("an ended subscription is still held")
 }
 
 func TestEventsReachEverySubscriber(t *testing.T) {

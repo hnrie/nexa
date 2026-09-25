@@ -32,7 +32,8 @@ type Cache interface {
 	// trip rather than one per user.
 	OnlineAmong(ctx context.Context, userIDs []string) (map[string]bool, error)
 
-	// Allow is a token bucket shared by every process: n per window for key.
+	// Allow counts n requests per window for key, shared by every process: a
+	// fixed window that opens with the first request, the same on every backend.
 	Allow(ctx context.Context, key string, n int, window time.Duration) (bool, time.Duration, error)
 	// ResetRate forgets a key's count, so a successful login clears the
 	// failures before it wherever the counting happens.
