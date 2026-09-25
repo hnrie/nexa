@@ -418,22 +418,15 @@ func (s *Store) Members(ctx context.Context, serverID ids.ID, after ids.ID, limi
 	return out, rrows.Err()
 }
 
-// MemberIDs lists every member's user id.
+// MemberIDs lists every member's user id (none for a server that is gone).
+// Every server event is sent to this list, so it comes from the server's
+// permission snapshot rather than a query each time.
 func (s *Store) MemberIDs(ctx context.Context, serverID ids.ID) ([]ids.ID, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id FROM server_members WHERE server_id = ?`, int64(serverID))
-	if err != nil {
-		return nil, err
+	out, err := s.serverMemberIDs(ctx, serverID)
+	if errors.Is(err, ErrNotFound) {
+		return []ids.ID{}, nil
 	}
-	defer rows.Close()
-	out := []ids.ID{}
-	for rows.Next() {
-		var u int64
-		if err := rows.Scan(&u); err != nil {
-			return nil, err
-		}
-		out = append(out, ids.ID(u))
-	}
-	return out, rows.Err()
+	return out, err
 }
 
 // MemberCount counts members.

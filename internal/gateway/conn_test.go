@@ -114,7 +114,8 @@ func TestTypingRemembersOnlyAccessibleChannels(t *testing.T) {
 	if ca.identify(tokA) == nil {
 		t.Fatal("ready")
 	}
-	for i := 0; i < 40; i++ {
+	// within the typing budget, so every one is judged on access
+	for i := 0; i < 4; i++ {
 		ca.send("typing", map[string]string{"channel_id": ids.New().String()})
 	}
 	ca.send("typing", map[string]string{"channel_id": dm.ID.String()})
@@ -130,6 +131,106 @@ func TestTypingRemembersOnlyAccessibleChannels(t *testing.T) {
 	c.typMu.Unlock()
 	if n != 1 || !has {
 		t.Errorf("typing map holds %d entries (dm remembered: %v), want only the dm", n, has)
+	}
+}
+
+// Rotating through channels to dodge the per-channel cooldown gets an account
+// five indicators in ten seconds, and no more.
+func TestTypingBudgetSpansChannels(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	a, tokA := e.user(t, "a")
+	b, tokB := e.user(t, "b")
+	var dms []ids.ID
+	for i := 0; i < 7; i++ {
+		// seven people, seven conversations with a and b both in them
+		other, _ := e.user(t, "o"+string(rune('a'+i)))
+		g, err := e.st.CreateGroupDM(ctx, a.ID, []ids.ID{b.ID, other.ID}, "g")
+		if err != nil {
+			t.Fatal(err)
+		}
+		dms = append(dms, g.ID)
+	}
+	cb := e.dial(t)
+	if cb.identify(tokB) == nil {
+		t.Fatal("ready b")
+	}
+	ca := e.dial(t)
+	if ca.identify(tokA) == nil {
+		t.Fatal("ready a")
+	}
+	for _, id := range dms {
+		ca.send("typing", map[string]string{"channel_id": id.String()})
+	}
+	ca.roundTrip()
+	got := 0
+	for cb.next("typing", 300*time.Millisecond) != nil {
+		got++
+	}
+	if got != 5 {
+		t.Errorf("b saw %d typing indicators from seven channels at once, want the budget's 5", got)
+	}
+}
+
+// Presence reaches friends and co-members, not someone who merely shares a
+// conversation, and never anyone blocked either way — though a block leaves
+// them sharing that conversation.
+func TestPresenceAudienceLeavesOutBlocksAndConversations(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	a, tokA := e.user(t, "a")
+	friend, tokF := e.user(t, "friend")
+	stranger, tokS := e.user(t, "stranger")
+	if err := e.st.SetRelationshipPair(ctx, a.ID, friend.ID, "friend", "friend"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.st.CreateDM(ctx, a.ID, stranger.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.st.CreateDM(ctx, a.ID, friend.ID); err != nil {
+		t.Fatal(err)
+	}
+	cf, cs := e.dial(t), e.dial(t)
+	if cf.identify(tokF) == nil || cs.identify(tokS) == nil {
+		t.Fatal("ready")
+	}
+	ca := e.dial(t)
+	readyA := ca.identify(tokA)
+	if readyA == nil {
+		t.Fatal("ready a")
+	}
+	if cf.presence(a.ID, "online", 3*time.Second) == nil {
+		t.Error("a friend sees a come online")
+	}
+	if cs.presence(a.ID, "online", 500*time.Millisecond) != nil {
+		t.Error("someone a only shares a DM with must not see a's presence")
+	}
+	// and a's ready lists the friend's presence, not the stranger's
+	pres := map[string]bool{}
+	for _, p := range readyA["d"].(map[string]any)["presences"].([]any) {
+		pres[p.(map[string]any)["user_id"].(string)] = true
+	}
+	if !pres[friend.ID.String()] || pres[stranger.ID.String()] {
+		t.Errorf("a's ready presences: %v", pres)
+	}
+
+	// the friend blocks a: a's status stops reaching them, though their DM stays
+	if err := e.st.Block(ctx, friend.ID, a.ID); err != nil {
+		t.Fatal(err)
+	}
+	ca.send("presence", map[string]any{"status": "dnd", "status_text": "somewhere"})
+	if got := cf.presence(a.ID, "dnd", 700*time.Millisecond); got != nil {
+		t.Errorf("a blocked person still watches a's status: %v", got)
+	}
+	// a's profile changes stop too
+	u, _ := e.st.UserByID(ctx, a.ID)
+	e.hub.UserUpdated(u)
+	if got := cf.next("user_update", 500*time.Millisecond); got != nil {
+		t.Errorf("user_update reached someone who blocked a: %v", got)
+	}
+	// while someone a only shares a DM with does get the profile change
+	if cs.next("user_update", 2*time.Second) == nil {
+		t.Error("a DM partner should still see a's name and picture change")
 	}
 }
 

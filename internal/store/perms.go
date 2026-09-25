@@ -233,5 +233,5 @@ func (s *Store) serverMemberIDs(ctx context.Context, serverID ids.ID) ([]ids.ID,
 	if err != nil {
 		return nil, err
 	}
-	return append([]ids.ID(nil), snap.memberOrder...), nil
+	return append([]ids.ID{}, snap.memberOrder...), nil
 }

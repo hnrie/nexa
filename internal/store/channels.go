@@ -163,6 +163,34 @@ func (s *Store) ChannelByID(ctx context.Context, id ids.ID) (*Channel, error) {
 	return c, nil
 }
 
+// ChannelForAccess loads a channel as access checks need it: its row, and for
+// a conversation its participants. Unlike ChannelByID it does not look up a
+// server channel's overwrites or key conversation — the permission snapshot
+// has the one, and the checks never need the other — so KeyConvID and
+// Overwrites are not to be read from what it returns.
+func (s *Store) ChannelForAccess(ctx context.Context, id ids.ID) (*Channel, error) {
+	c, err := scanChannel(s.db.R.QueryRowContext(ctx, `SELECT `+channelReadCols+` FROM channels WHERE id = ?`, int64(id)))
+	if err != nil {
+		return nil, err
+	}
+	if IsDMLike(c.Type) {
+		if c.Recipients, err = s.Participants(ctx, c.ID); err != nil {
+			return nil, err
+		}
+		c.KeyConvID = c.ID
+		return c, nil
+	}
+	c.Recipients = []ids.ID{}
+	return c, nil
+}
+
+// DMPartners lists everyone uid shares a conversation with — a DM, a group or
+// a subchat — each once.
+func (s *Store) DMPartners(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
+	return s.idList(ctx, `SELECT DISTINCT p2.user_id FROM dm_participants p1 JOIN dm_participants p2 ON p2.channel_id = p1.channel_id
+		WHERE p1.user_id = ? AND p2.user_id != ?`, int64(uid), int64(uid))
+}
+
 // GroupDMsForUser lists every group DM the user is in, hidden ones included.
 func (s *Store) GroupDMsForUser(ctx context.Context, uid ids.ID) ([]ids.ID, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT c.id FROM channels c JOIN dm_participants p ON p.channel_id = c.id WHERE c.type = 'group_dm' AND p.user_id = ?`, int64(uid))

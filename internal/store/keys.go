@@ -185,6 +185,11 @@ func (s *Store) UsersLackingGrant(ctx context.Context, conv ids.ID, epoch int, e
 	if err != nil {
 		return nil, err
 	}
+	return Lacking(entitled, holders), nil
+}
+
+// Lacking is the entitled users who are not among the holders.
+func Lacking(entitled, holders []ids.ID) []ids.ID {
 	has := make(map[ids.ID]bool, len(holders))
 	for _, h := range holders {
 		has[h] = true
@@ -195,7 +200,7 @@ func (s *Store) UsersLackingGrant(ctx context.Context, conv ids.ID, epoch int, e
 			out = append(out, u)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // Entitled lists the users who should hold a conversation's keys: DM and

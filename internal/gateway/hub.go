@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"net/url"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -90,14 +91,20 @@ type Hub struct {
 	// buildReady, tens of queries, so an address that connects and disconnects
 	// in a loop stays inside every cap and still saturates the database.
 	connectRate *ratelimit.Limiter
+	// typingRate is each account's typing budget across every channel and
+	// device. The per-channel cooldown alone let a client rotating through
+	// the channels it can see make the server resolve a channel's audience
+	// several times a second, from one tab; a person typing sends one every
+	// eight seconds to the one channel they are in.
+	typingRate *ratelimit.Limiter
 
-	// Hooks the server layer (Phase 2) sets to extend DM-only behaviour.
-	// ViewerResolver lists users who may see a server channel.
-	ViewerResolver func(ctx context.Context, channelID ids.ID) ([]ids.ID, error)
-	// Access reports whether uid may act in a server channel.
-	Access func(ctx context.Context, uid, channelID ids.ID) (bool, error)
+	// Hooks the server layer (Phase 2) sets to extend DM-only behaviour. Who
+	// may see a server channel comes from the store's permission snapshots.
+	// Access reports whether uid may act in a server channel, handed the
+	// channel the hub has already read.
+	Access func(ctx context.Context, uid ids.ID, ch *store.Channel) (bool, error)
 	// SendAccess reports whether uid may send messages, and so type, in a server channel.
-	SendAccess func(ctx context.Context, uid, channelID ids.ID) (bool, error)
+	SendAccess func(ctx context.Context, uid ids.ID, ch *store.Channel) (bool, error)
 	// Interested lists extra users who should receive uid's presence (server co-members).
 	Interested func(ctx context.Context, uid ids.ID) ([]ids.ID, error)
 	// GuestReady fills in a guest's ready payload with their call.
@@ -135,7 +142,9 @@ func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, publicURL
 		maxConnsPerUser: 32, maxConnsPerIP: 256, maxConns: 4096, maxWaitingPerIP: 32,
 		// Two a second per address, sustained, with room for a burst of tabs
 		// reopening together. No person reaches this; a loop does immediately.
-		connectRate: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute)}
+		connectRate: ratelimit.New(ratelimit.Every(240, time.Minute), 120, 10*time.Minute),
+		// five in ten seconds, across every channel
+		typingRate: ratelimit.New(ratelimit.Every(30, time.Minute), 5, 10*time.Minute)}
 	if u, err := url.Parse(publicURL); err == nil && u.Host != "" {
 		h.originPatterns = append(h.originPatterns, u.Host)
 	}
@@ -284,9 +293,12 @@ const sessionCheckEvery = 12
 
 // Run sweeps dead connections until ctx ends.
 func (h *Hub) Run(ctx context.Context) {
+	// without these every address and account ever seen stays in memory
 	if h.connectRate != nil {
-		// without this every address that ever connected stays in memory
 		h.connectRate.Start(ctx)
+	}
+	if h.typingRate != nil {
+		h.typingRate.Start(ctx)
 	}
 	t := time.NewTicker(5 * time.Second)
 	defer t.Stop()
@@ -535,6 +547,20 @@ func (h *Hub) Online(uid ids.ID) bool {
 	return len(h.conns[uid]) > 0
 }
 
+// OnlineAmong returns those of list with an open connection, taking the hub's
+// lock once rather than once per person.
+func (h *Hub) OnlineAmong(list []ids.ID) []ids.ID {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	out := make([]ids.ID, 0, len(list))
+	for _, uid := range list {
+		if len(h.conns[uid]) > 0 {
+			out = append(out, uid)
+		}
+	}
+	return out
+}
+
 // OnlineUsers lists users with at least one connection.
 func (h *Hub) OnlineUsers() []ids.ID {
 	h.mu.RLock()
@@ -558,7 +584,7 @@ func (h *Hub) EmitUsers(userIDs []ids.ID, t string, d any) {
 	if len(userIDs) == 0 {
 		return
 	}
-	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}
+	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}.fanOut()
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	seen := make(map[ids.ID]bool, len(userIDs))
@@ -588,7 +614,7 @@ func (h *Hub) EmitConn(uid, connID ids.ID, t string, d any) {
 
 // EmitUsersExcept sends to users but skips one connection (the originator).
 func (h *Hub) emitUsersExcept(userIDs []ids.ID, except *conn, t string, d any) {
-	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}
+	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}.fanOut()
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	seen := map[ids.ID]bool{}
@@ -607,7 +633,7 @@ func (h *Hub) emitUsersExcept(userIDs []ids.ID, except *conn, t string, d any) {
 
 // EmitAll sends to every connection.
 func (h *Hub) EmitAll(t string, d any) {
-	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}
+	frame := ServerFrame{T: t, S: h.nextSeq(), D: d}.fanOut()
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	for _, set := range h.conns {
@@ -617,42 +643,37 @@ func (h *Hub) EmitAll(t string, d any) {
 	}
 }
 
-// Viewers lists the users who can see a channel.
+// Viewers lists the users who can see a channel: a conversation's
+// participants, or a server channel's members who may view it. The list may be
+// shared with other callers; read it, do not change it.
 func (h *Hub) Viewers(ctx context.Context, channelID ids.ID) ([]ids.ID, error) {
-	ch, err := h.st.ChannelByID(ctx, channelID)
-	if err != nil {
-		return nil, err
-	}
-	if store.IsDMLike(ch.Type) {
-		return ch.Recipients, nil
-	}
-	if h.ViewerResolver != nil {
-		return h.ViewerResolver(ctx, channelID)
-	}
-	return nil, nil
+	return h.st.ChannelViewers(ctx, channelID)
 }
 
 // CanAccess reports whether uid may read/act in a channel.
 func (h *Hub) CanAccess(ctx context.Context, uid, channelID ids.ID) (bool, error) {
-	ch, err := h.st.ChannelByID(ctx, channelID)
+	ch, err := h.st.ChannelForAccess(ctx, channelID)
 	if err != nil {
 		return false, err
 	}
+	return h.canAccess(ctx, uid, ch)
+}
+
+func (h *Hub) canAccess(ctx context.Context, uid ids.ID, ch *store.Channel) (bool, error) {
 	// A subchat is DM-like everywhere else, and taking the hook branch for one
 	// cost two extra channel reads and — because only this branch checks
 	// DMBlocked — let someone who had been blocked go on acting in a subchat
 	// of the 1:1 conversation they were blocked in.
 	if store.IsDMLike(ch.Type) {
-		ok, err := h.st.IsParticipant(ctx, channelID, uid)
-		if err != nil || !ok {
-			return false, err
+		if !slices.Contains(ch.Recipients, uid) {
+			return false, nil
 		}
 		// a block closes a 1:1 conversation both ways, typing included
 		blocked, err := h.st.DMBlocked(ctx, ch, uid)
 		return !blocked, err
 	}
 	if h.Access != nil {
-		return h.Access(ctx, uid, channelID)
+		return h.Access(ctx, uid, ch)
 	}
 	return false, nil
 }
@@ -669,15 +690,31 @@ func (h *Hub) EmitChannel(channelID ids.ID, t string, d any) {
 	h.EmitUsers(viewers, t, d)
 }
 
-// interestedIn lists users who should see uid's presence and profile changes.
-func (h *Hub) interestedIn(ctx context.Context, uid ids.ID) []ids.ID {
+// presenceAudience lists who sees uid's presence, custom status and
+// activities: uid, their friends and the people they share a server with —
+// minus anyone either of them has blocked. A conversation alone does not
+// subscribe anyone: someone you once exchanged a message with is not owed a
+// live view of when you are at your computer and what you are running, and a
+// block has to end that view too, or blocking a harasser would leave them
+// watching.
+func (h *Hub) presenceAudience(ctx context.Context, uid ids.ID) []ids.ID {
+	return h.audience(ctx, uid, false)
+}
+
+// profileAudience is presenceAudience and everyone uid shares a conversation
+// with (blocks still excepted), who see their name and picture change.
+func (h *Hub) profileAudience(ctx context.Context, uid ids.ID) []ids.ID {
+	return h.audience(ctx, uid, true)
+}
+
+func (h *Hub) audience(ctx context.Context, uid ids.ID, conversations bool) []ids.ID {
 	out := []ids.ID{uid}
 	if friends, err := h.st.Friends(ctx, uid); err == nil {
 		out = append(out, friends...)
 	}
-	if chans, err := h.st.DMChannelsForUser(ctx, uid); err == nil {
-		for _, ch := range chans {
-			out = append(out, ch.Recipients...)
+	if conversations {
+		if partners, err := h.st.DMPartners(ctx, uid); err == nil {
+			out = append(out, partners...)
 		}
 	}
 	if h.Interested != nil {
@@ -685,25 +722,52 @@ func (h *Hub) interestedIn(ctx context.Context, uid ids.ID) []ids.ID {
 			out = append(out, more...)
 		}
 	}
-	return out
+	blocked, err := h.st.BlockedEitherWay(ctx, uid)
+	if err != nil {
+		// not knowing who is blocked, tell only the person themselves
+		return []ids.ID{uid}
+	}
+	if len(blocked) == 0 {
+		return out
+	}
+	kept := out[:0]
+	for _, id := range out {
+		if !blocked[id] {
+			kept = append(kept, id)
+		}
+	}
+	return kept
 }
 
 // UserUpdated broadcasts a profile change (api.Broadcaster).
 func (h *Hub) UserUpdated(u *store.User) {
 	ctx, cancel := background()
 	defer cancel()
-	// Each connection keeps its own copy of the account: the name a voice
-	// join carries to guests, and the presence choice going idle checks.
-	// One changed anywhere — on another device, by a moderator — changes it
-	// here too.
-	h.mu.RLock()
-	for c := range h.conns[u.ID] {
-		c.user.Store(u)
-	}
-	h.mu.RUnlock()
-	h.EmitUsers(h.interestedIn(ctx, u.ID), EvUserUpdate, u.Public())
+	h.refreshUser(u)
+	h.EmitUsers(h.profileAudience(ctx, u.ID), EvUserUpdate, u.Public())
 	// presence carries the custom status too
 	h.broadcastPresence(ctx, u)
+}
+
+// refreshUser gives every connection of the account this copy of it, unless
+// one holds a newer one. Each connection keeps its own: the name a voice join
+// carries to guests, the presence choice going idle checks, and what every
+// presence it sends is built from. One changed anywhere — on another device,
+// by a moderator — changes it here too.
+func (h *Hub) refreshUser(u *store.User) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for c := range h.conns[u.ID] {
+		for {
+			old := c.user.Load()
+			if old != nil && old.UpdatedAt > u.UpdatedAt {
+				break
+			}
+			if c.user.CompareAndSwap(old, u) {
+				break
+			}
+		}
+	}
 }
 
 // KeysMaybeNeeded tells online holders of a conversation's latest key about
@@ -719,21 +783,16 @@ func (h *Hub) KeysMaybeNeeded(convID ids.ID) {
 	if err != nil {
 		return
 	}
-	lacking, err := h.st.UsersLackingGrant(ctx, convID, epoch, entitled)
-	if err != nil || len(lacking) == 0 {
-		return
-	}
+	// the holders are read once, and serve both questions
 	holders, err := h.st.HoldersOf(ctx, convID, epoch)
 	if err != nil {
 		return
 	}
-	var online []ids.ID
-	for _, uid := range holders {
-		if h.Online(uid) {
-			online = append(online, uid)
-		}
+	lacking := store.Lacking(entitled, holders)
+	if len(lacking) == 0 {
+		return
 	}
-	h.EmitUsers(online, EvKeysNeeded, store.KeyNeed{ConvID: convID, Epoch: epoch, UserIDs: lacking})
+	h.EmitUsers(h.OnlineAmong(holders), EvKeysNeeded, store.KeyNeed{ConvID: convID, Epoch: epoch, UserIDs: lacking})
 }
 
 // PresenceOf computes a user's presence as others see it.
@@ -808,7 +867,7 @@ func (h *Hub) broadcastArrival(ctx context.Context, u *store.User) {
 }
 
 func (h *Hub) broadcastPresence(ctx context.Context, u *store.User) {
-	interested := h.interestedIn(ctx, u.ID)
+	interested := h.presenceAudience(ctx, u.ID)
 	others := interested[:0:0]
 	for _, id := range interested {
 		if id != u.ID {

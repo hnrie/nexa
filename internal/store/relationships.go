@@ -136,6 +136,20 @@ func (s *Store) Blocked(ctx context.Context, a, b ids.ID) (aBlockedB, bBlockedA 
 	return aBlockedB, bBlockedA, rows.Err()
 }
 
+// BlockedEitherWay lists everyone uid has blocked or been blocked by.
+func (s *Store) BlockedEitherWay(ctx context.Context, uid ids.ID) (map[ids.ID]bool, error) {
+	list, err := s.idList(ctx, `SELECT target_id FROM relationships WHERE user_id = ? AND type = 'blocked'
+		UNION SELECT user_id FROM relationships WHERE target_id = ? AND type = 'blocked'`, int64(uid), int64(uid))
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[ids.ID]bool, len(list))
+	for _, id := range list {
+		out[id] = true
+	}
+	return out, nil
+}
+
 // DMBlocked reports whether uid and the other person in a 1:1 DM (or a subchat
 // of one) have blocked each other either way. Group conversations are never
 // blocked as a whole.
