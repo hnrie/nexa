@@ -24,6 +24,22 @@ interface ScreenOut {
   el: HTMLAudioElement;
 }
 
+type SinkContext = AudioContext & { setSinkId?: (id: string | { type: "none" }) => Promise<void> };
+type SinkElement = HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
+
+/**
+ * Where call audio goes when the audio context cannot pick a device itself
+ * (Firefox): into a stream that one element plays on the chosen device. Null
+ * while the context's own output is used. Shared, like the context.
+ */
+let routed: { dest: MediaStreamAudioDestinationNode; el: SinkElement } | null = null;
+/** Every Playback, so a change of device reaches all of them. */
+const players = new Set<Playback>();
+
+function outputOf(ctx: AudioContext): AudioNode {
+  return routed?.dest ?? ctx.destination;
+}
+
 export class Playback {
   private voices = new Map<string, VoiceOut>();
   private screens = new Map<string, ScreenOut>();
@@ -43,7 +59,22 @@ export class Playback {
    */
   private held = new Set<string>();
 
-  constructor(private onSpeaking: (userId: string, speaking: boolean) => void) {}
+  constructor(private onSpeaking: (userId: string, speaking: boolean) => void) {
+    players.add(this);
+  }
+
+  /** Sends everything playing to wherever call audio goes now (see setOutputDevice). */
+  reroute(): void {
+    const ctx = audioContext();
+    for (const out of [...this.voices.values(), ...this.screens.values()]) {
+      try {
+        out.gain.disconnect();
+        out.gain.connect(outputOf(ctx));
+      } catch {
+        /* already gone */
+      }
+    }
+  }
 
   /** Starts playing someone's voice, replacing what played for them before; `held` keeps it silent until setHeld lets it go. */
   attachVoice(userId: string, stream: MediaStream, held = false): void {
@@ -63,7 +94,7 @@ export class Playback {
     const source = ctx.createMediaStreamSource(stream);
     const gain = ctx.createGain();
     gain.gain.value = this.effectiveGain(userId);
-    source.connect(gain).connect(ctx.destination);
+    source.connect(gain).connect(outputOf(ctx));
     const meter = new LevelMeter(ctx, stream);
     const gate = new SpeakingGate();
     const out: VoiceOut = { source, gain, el, meter, timer: null, speaking: false };
@@ -113,7 +144,7 @@ export class Playback {
     const source = ctx.createMediaStreamSource(el.srcObject as MediaStream);
     const gain = ctx.createGain();
     gain.gain.value = this.screenGain(userId);
-    source.connect(gain).connect(ctx.destination);
+    source.connect(gain).connect(outputOf(ctx));
     const track = stream.getAudioTracks()[0];
     this.screens.set(userId, { stream, track, source, gain, el });
     track?.addEventListener(
@@ -152,6 +183,7 @@ export class Playback {
 
   close(): void {
     for (const id of new Set([...this.voices.keys(), ...this.screens.keys()])) this.detach(id);
+    players.delete(this);
   }
 
   // --- levels --------------------------------------------------------------
@@ -227,7 +259,32 @@ export class Playback {
   }
 
   async setOutputDevice(deviceId: string | null): Promise<void> {
-    const ctx = audioContext() as AudioContext & { setSinkId?: (id: string | { type: "none" }) => Promise<void> };
-    if (typeof ctx.setSinkId === "function") await ctx.setSinkId(deviceId ?? "").catch(() => {});
+    const ctx = audioContext() as SinkContext;
+    if (typeof ctx.setSinkId === "function") {
+      await ctx.setSinkId(deviceId ?? "").catch(() => {});
+      return;
+    }
+    // Firefox picks a device only for elements: the call plays through one
+    // on the chosen device, and through the context again for the default.
+    if (typeof HTMLMediaElement === "undefined" || !("setSinkId" in HTMLMediaElement.prototype)) return;
+    if (!deviceId) {
+      if (!routed) return;
+      const was = routed;
+      routed = null;
+      for (const p of players) p.reroute();
+      was.el.pause();
+      was.el.srcObject = null;
+      return;
+    }
+    if (!routed) {
+      const el: SinkElement = new Audio();
+      el.autoplay = true;
+      routed = { dest: ctx.createMediaStreamDestination(), el };
+      el.srcObject = routed.dest.stream;
+      for (const p of players) p.reroute();
+    }
+    const el = routed.el;
+    await el.setSinkId?.(deviceId).catch(() => {});
+    void el.play().catch(() => {});
   }
 }

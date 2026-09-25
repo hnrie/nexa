@@ -236,7 +236,8 @@ export default function GuestCallPage() {
   if (phase === "call" && channel) {
     const top = modals[modals.length - 1];
     return (
-      <div className={s.call} data-testid="guest-call">
+      // the call is dark whatever the guest's system is set to, and its bar and dialogs with it
+      <div className={s.call} data-testid="guest-call" data-dark-scope="">
         <header className={s.bar}>
           <PhoneCall size={18} className={s.barIcon} />
           <span className={s.barTitle}>{t("guestCall.voiceCall")}</span>

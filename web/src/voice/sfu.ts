@@ -9,7 +9,7 @@
 import { ApiError } from "@/api/client";
 import { voice as voiceApi, type SfuDescription } from "@/api/voice";
 import type { VoiceState } from "@/api/types";
-import { FrameCrypto, voiceKeysFor, voiceKeysVersion } from "./e2ee";
+import { FrameCrypto, voiceKeysFor, voiceKeysVersion, type VoiceKeys } from "./e2ee";
 import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
 import { Playback } from "./playback";
 import { PlayoutDelay } from "./playoutDelay";
@@ -85,8 +85,18 @@ const MAX_ICE_RESTARTS = 4;
  * back to tracks that are gone, silent both ways, so it is made again instead.
  */
 const TRACKS_GONE_MS = 20_000;
-/** How often the key ring is checked for a rotated key. */
+/** How often the key ring is checked for a rotated key, beside being told when one arrives. */
 const KEY_CHECK_MS = 4_000;
+/**
+ * How long a newly arrived key waits before frames are sealed under it. Every
+ * other device in the call learns it through its own grant, a moment earlier
+ * or later, and drops whatever it cannot open yet: switching at once cut a
+ * second or more out of whoever was talking on every membership change. The
+ * key it replaces is kept, and new frames under either open everywhere.
+ */
+const SEND_SWITCH_MS = 3_000;
+/** A publisher whose track has been refused this many times in a row is waited for at the ordinary pace, not the quick one. */
+const STUCK_PULLS = 8;
 /** How long a request to chatd may take before the step gives up on it. */
 const REQUEST_TIMEOUT_MS = 15_000;
 /** Retries wait this long, doubling with each failure in a row up to the most. */
@@ -229,7 +239,15 @@ export class SfuTransport implements VoiceTransport {
   private syncQueued = false;
 
   private keyVersion = "";
+  /** The keys last read, the index frames are sealed under now, and the switch to a newer one waiting its turn. */
+  private keys: VoiceKeys | null = null;
+  private sendIndex: number | null = null;
+  private sendSwitch: ReturnType<typeof setTimeout> | null = null;
   private keyTimer: ReturnType<typeof setInterval>;
+  /** Whether this connection was ever up, so a drop reads as reconnecting rather than a first connect. */
+  private everUp = false;
+  /** Pulls refused in a row per person and kind, with the tag they were refused for. */
+  private refusedPulls = new Map<string, { tag: string; count: number }>();
   private bypassTimer: ReturnType<typeof setInterval>;
   private receiverSeq = 0;
   /** Keeps each voice's buffer as short as its link allows, so a call is a conversation. */
@@ -260,7 +278,7 @@ export class SfuTransport implements VoiceTransport {
   constructor(
     private readonly meId: string,
     private channelId: string,
-    private readonly ice: RTCIceServer[],
+    private ice: RTCIceServer[],
     private readonly events: TransportEvents,
   ) {
     this.playback = new Playback(events.onSpeaking);
@@ -336,7 +354,10 @@ export class SfuTransport implements VoiceTransport {
       this.failures++;
     }
     const tries = expected ? this.pullRetries : this.failures;
-    const delay = Math.min(expected ? PULL_RETRY_MAX_MS : RETRY_MAX_MS, baseMs * 2 ** Math.max(0, tries - 1));
+    // A publisher refused again and again is not one still connecting: asked
+    // for every 1.6 s it cost every listener a request for the rest of the call.
+    const stuck = expected && [...this.refusedPulls.values()].some((r) => r.count >= STUCK_PULLS);
+    const delay = Math.min(expected && !stuck ? PULL_RETRY_MAX_MS : RETRY_MAX_MS, baseMs * 2 ** Math.max(0, tries - 1));
     const timer = setTimeout(() => {
       this.retry = null;
       if (rebuild) this.rebuild();
@@ -351,6 +372,24 @@ export class SfuTransport implements VoiceTransport {
     const k = voiceKeysFor(this.channelId) ?? { keys: [], send: 0, version: `none:${this.channelId}` };
     if (k.version === this.keyVersion) return;
     this.keyVersion = k.version;
+    this.keys = k;
+    const before = this.sendIndex;
+    // a newer key is opened with at once, and sealed with a moment later (see SEND_SWITCH_MS)
+    if (before !== null && before !== k.send && k.keys.some((x) => x.index === before)) {
+      this.crypto.setKeys({ ...k, send: before });
+      if (!this.sendSwitch) {
+        this.sendSwitch = setTimeout(() => {
+          this.sendSwitch = null;
+          if (this.closed || !this.keys) return;
+          this.sendIndex = this.keys.send;
+          this.crypto.setKeys(this.keys);
+        }, SEND_SWITCH_MS);
+      }
+      return;
+    }
+    if (this.sendSwitch) clearTimeout(this.sendSwitch);
+    this.sendSwitch = null;
+    this.sendIndex = k.keys.length ? k.send : null;
     this.crypto.setKeys(k);
   }
 
@@ -373,10 +412,24 @@ export class SfuTransport implements VoiceTransport {
     this.refreshKeys();
   }
 
+  /** Fresh relay credentials: the connection's next ICE restart uses them, and so does any connection made after. */
+  setIceServers(servers: RTCIceServer[]): void {
+    this.ice = servers;
+    try {
+      this.pc.setConfiguration({ ...this.pc.getConfiguration(), iceServers: servers });
+    } catch {
+      /* the next connection made takes them */
+    }
+  }
+
   /** Moved by a moderator: the old channel's session is gone and the key belongs to the new channel. */
   moveTo(channelId: string): void {
     if (channelId === this.channelId) return;
     this.channelId = channelId;
+    // another room's keys: nothing from the old one is kept to seal with
+    if (this.sendSwitch) clearTimeout(this.sendSwitch);
+    this.sendSwitch = null;
+    this.sendIndex = null;
     this.refreshKeys();
     this.roster.clear();
     this.reset();
@@ -443,15 +496,19 @@ export class SfuTransport implements VoiceTransport {
     this.lossSeen.clear();
     this.lossTold.clear();
     this.pullRetries = 0;
+    this.refusedPulls.clear();
     this.playout.clear();
     this.present();
     for (const id of this.peers) this.events.onPeerState(id, this.pc.connectionState);
+    this.events.onConnection?.(this.everUp ? "reconnecting" : "connecting");
   }
 
   private onConnectionState(pc: RTCPeerConnection): void {
     if (pc !== this.pc || this.closed) return;
     const state = pc.connectionState;
     for (const id of this.peers) this.events.onPeerState(id, state);
+    if (state === "connected") this.everUp = true;
+    this.events.onConnection?.(state === "connected" ? "connected" : this.everUp ? "reconnecting" : "connecting");
     if (state === "connected") {
       if (this.recoverTimer) clearTimeout(this.recoverTimer);
       this.recoverTimer = null;
@@ -859,9 +916,17 @@ export class SfuTransport implements VoiceTransport {
     let paused = false;
     let refused = false;
     for (const t of res.tracks) {
+      const key = slot(t.user_id, t.kind as PubKind);
       if (t.error === "video_paused") paused = true;
-      else if (t.error || !t.mid) refused = true;
+      else if (t.error || !t.mid) {
+        refused = true;
+        // counted per track, and from nothing again when its publisher publishes it anew
+        const tag = asked.get(key) ?? "";
+        const prev = this.refusedPulls.get(key);
+        this.refusedPulls.set(key, { tag, count: prev && prev.tag === tag ? prev.count + 1 : 1 });
+      }
       if (!t.mid || t.error) continue;
+      this.refusedPulls.delete(key);
       const kind = t.kind as PubKind;
       const p: Pulled = { userId: t.user_id, kind, tag: t.tag ?? "", asked: asked.get(slot(t.user_id, kind)) ?? "", mid: t.mid, track: null };
       this.pulled.set(slot(p.userId, kind), p);
@@ -1081,7 +1146,8 @@ export class SfuTransport implements VoiceTransport {
       }
     });
     const pair = (selected ? pairs.get(selected) : undefined) ?? [...pairs.values()].find((p) => p.nominated && p.currentRoundTripTime !== undefined);
-    if (pair?.currentRoundTripTime !== undefined) rtt = pair.currentRoundTripTime * 1000;
+    // a pair that is down still reports the round trip it last had, which read as a good connection
+    if (pair?.currentRoundTripTime !== undefined && this.pc.connectionState === "connected") rtt = pair.currentRoundTripTime * 1000;
     return { rtt, loss: this.recentLoss.measure(streams) };
   }
 
@@ -1092,6 +1158,7 @@ export class SfuTransport implements VoiceTransport {
     clearInterval(this.keyTimer);
     clearInterval(this.bypassTimer);
     clearInterval(this.lossTimer);
+    if (this.sendSwitch) clearTimeout(this.sendSwitch);
     if (this.recoverTimer) clearTimeout(this.recoverTimer);
     if (this.retry) clearTimeout(this.retry.timer);
     this.retry = null;

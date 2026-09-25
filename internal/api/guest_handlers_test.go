@@ -169,6 +169,10 @@ func TestGuestInADMCall(t *testing.T) {
 	if res, _ := do(t, ts, "GET", "/api/v1/voice/ice", tokG, nil); res.StatusCode != 401 {
 		t.Errorf("removed guest still in: %d", res.StatusCode)
 	}
+	// the guest's link carried the call's key; alice, still in the call, is asked to change it
+	if ev := gb.next("key_rotation_needed", 3*time.Second); ev == nil || ev["conv_id"] != dm {
+		t.Errorf("removing a guest from a live call rotates the key: %v", ev)
+	}
 	for {
 		ev := ga.next("voice_state", 3*time.Second)
 		if ev == nil {

@@ -7,7 +7,8 @@ import { describeError } from "@/lib/errors";
 import { useSettings, type VoiceSettings } from "@/stores/settings";
 import { useVoice } from "@/stores/voice";
 import { LevelMeter, audioContext, defaultDeviceLabel, describeInput, getMic, holdAudio, lastInputChoice, listDevices, realDevices, sensitivityToThreshold, sentStream, type Devices } from "@/voice/media";
-import { inVoice } from "@/voice/session";
+import { canChooseOutput } from "@/voice/output";
+import { inVoice, noKeyToHold } from "@/voice/session";
 import st from "./Settings.module.css";
 import v from "@/components/voice/Voice.module.css";
 
@@ -30,7 +31,6 @@ export default function VoicePage() {
   const captureRef = useRef<HTMLButtonElement>(null);
   // A touch screen has no key to hold, so calls there fall back to voice
   // activity (voice/session.ts); the page says so instead of promising a key.
-  const [noKeys] = useState(() => typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches);
   const [starting, setStarting] = useState(false);
   const startingRef = useRef(false);
   const aliveRef = useRef(true);
@@ -139,7 +139,12 @@ export default function VoicePage() {
 
   const level = testing ? testLevel : inVoice() ? liveLevel : 0;
   const threshold = settings.autoSensitivity ? null : sensitivityToThreshold(settings.sensitivity);
-  const label = (d: MediaDeviceInfo, i: number, kind: string) => d.label || `${kind} ${i + 1}`;
+  // a browser keeps device names to itself until a device of the kind was allowed once
+  const label = (d: MediaDeviceInfo, i: number, kind: "microphoneN" | "speakersN" | "cameraN") => d.label || tr_(`voice.devices.${kind}`, { n: i + 1 });
+  // Safari plays calls on the system's output and cannot be told another
+  const outputs = canChooseOutput();
+  // a touch screen has no key to capture: push to talk there is a button in the call
+  const holdButton = noKeyToHold();
   return (
     <>
       <h2 className={st.title}>{tr_("settings.voice.voiceVideo")}</h2>
@@ -156,12 +161,13 @@ export default function VoicePage() {
               }}
             >
               <option value="">{defaultDeviceLabel(devices?.inputs ?? [])}</option>
-              {realDevices(devices?.inputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, tr_("settings.voice.microphone"))}</option>)}
+              {realDevices(devices?.inputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "microphoneN")}</option>)}
             </Select>
           </Field>
-          <Field label={tr_("settings.voice.outputDevice")}>
+          <Field label={tr_("settings.voice.outputDevice")} hint={outputs ? undefined : tr_("settings.voice.thisBrowserPlaysCallsOnThe")}>
             <Select
               value={settings.outputDeviceId ?? ""}
+              disabled={!outputs}
               onChange={(e) => {
                 const id = e.target.value || null;
                 const chosen = devices?.outputs.find((d) => d.deviceId === id);
@@ -169,7 +175,7 @@ export default function VoicePage() {
               }}
             >
               <option value="">{defaultDeviceLabel(devices?.outputs ?? [])}</option>
-              {realDevices(devices?.outputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, tr_("settings.voice.speaker"))}</option>)}
+              {realDevices(devices?.outputs ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "speakersN")}</option>)}
             </Select>
           </Field>
         </div>
@@ -186,7 +192,7 @@ export default function VoicePage() {
             <Button size="sm" variant={testing ? "danger" : "secondary"} onClick={() => (testing ? stopTest() : void startTest())} disabled={starting} data-testid="mic-test">{testing ? tr_("settings.voice.stopTest") : tr_("settings.voice.letSCheck")}</Button>
             <div className={v.meter} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level * 100)} aria-label={tr_("settings.voice.inputLevel")} data-testid="mic-level">
               <div className={v.meterFill} style={{ width: `${Math.round(level * 100)}%` }} />
-              {threshold !== null ? <div className={v.meterMark} style={{ left: `${Math.round(threshold * 100)}%` }} /> : null}
+              {threshold !== null ? <div className={v.meterMark} style={{ insetInlineStart: `${Math.round(threshold * 100)}%` }} /> : null}
             </div>
             {testing ? (
               <>
@@ -215,14 +221,15 @@ export default function VoicePage() {
           <input type="radio" name="voice-input-mode" checked={settings.mode === "vad"} onChange={() => set({ mode: "vad" })} />
           <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.voiceActivity")}</span><span className={st.radioDesc}>{tr_("settings.voice.transmitWheneverYouTalk")}</span></span>
         </label>
-        <label className={st.radio} data-on={settings.mode === "ptt"} data-disabled={noKeys || undefined}>
-          <input type="radio" name="voice-input-mode" checked={settings.mode === "ptt"} disabled={noKeys && settings.mode !== "ptt"} onChange={() => set({ mode: "ptt" })} />
-          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{noKeys ? tr_("settings.voice.pushToTalkNeedsAKeyboard") : tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
+        <label className={st.radio} data-on={settings.mode === "ptt"}>
+          <input type="radio" name="voice-input-mode" checked={settings.mode === "ptt"} onChange={() => set({ mode: "ptt" })} />
+          <span className={st.radioText}><span className={st.radioLabel}>{tr_("settings.voice.pushToTalk")}</span><span className={st.radioDesc}>{holdButton ? tr_("settings.voice.transmitOnlyWhileYouHoldTheButton") : tr_("settings.voice.transmitOnlyWhileYouHoldA")}</span></span>
         </label>
       </div>
-      {noKeys && settings.mode === "ptt" ? <p className={st.hint}>{tr_("settings.voice.pushToTalkOnTouch")}</p> : null}
       <div className={st.form} style={{ marginTop: 12 }}>
-        {settings.mode === "ptt" && !noKeys ? (
+        {settings.mode === "ptt" && holdButton ? (
+          <p className={st.hint} data-testid="ptt-button-note">{tr_("settings.voice.onThisDevicePushToTalk")}</p>
+        ) : settings.mode === "ptt" ? (
           <Field label={tr_("settings.voice.pushToTalkKey")} hint={tr_("settings.voice.clickTheBoxThenPressThe")}>
             <button ref={captureRef} type="button" className={v.keyCapture} data-capturing={capturing} onClick={() => setCapturing((c) => !c)} aria-pressed={capturing}>
               <span>{capturing ? tr_("settings.voice.pressAKey") : settings.pttKey}</span>
@@ -257,7 +264,7 @@ export default function VoicePage() {
             }}
           >
             <option value="">{devices?.cameras.length ? defaultDeviceLabel(devices.cameras) : tr_("settings.voice.noCameraFound")}</option>
-            {realDevices(devices?.cameras ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, tr_("settings.voice.cameraDevice"))}</option>)}
+            {realDevices(devices?.cameras ?? []).map((d, i) => <option key={d.deviceId} value={d.deviceId}>{label(d, i, "cameraN")}</option>)}
           </Select>
         </Field>
       </div>

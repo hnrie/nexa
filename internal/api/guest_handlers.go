@@ -204,7 +204,7 @@ func (s *Server) handleGuestLinksRevoke(w http.ResponseWriter, r *http.Request) 
 		WriteError(w, err)
 		return
 	}
-	revoked := 0
+	revoked, dropped := 0, 0
 	for _, l := range list {
 		if l.CreatorID != me.ID && !managesGuests(ch, p) {
 			continue
@@ -224,7 +224,11 @@ func (s *Server) handleGuestLinksRevoke(w http.ResponseWriter, r *http.Request) 
 		revoked++
 		for _, g := range guests {
 			s.dropGuest(ctx, g.ID, "revoked")
+			dropped++
 		}
+	}
+	if dropped > 0 {
+		s.rotateAfterGuests(ctx, ch)
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"revoked": revoked})
 }
@@ -259,6 +263,9 @@ func (s *Server) handleGuestLinkRevoke(w http.ResponseWriter, r *http.Request) {
 	for _, g := range guests {
 		s.dropGuest(ctx, g.ID, "revoked")
 	}
+	if len(guests) > 0 {
+		s.rotateAfterGuests(ctx, ch)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -286,6 +293,7 @@ func (s *Server) handleGuestRemove(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.endGuest(ctx, g, "removed")
+	s.rotateAfterGuests(ctx, ch)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -513,6 +521,50 @@ func (s *Server) guestReady(ctx context.Context, g *store.Guest, p *gateway.Read
 	}
 	p.Guest = guestView(g, s.Realtime != nil)
 	return nil
+}
+
+// rotateAfterGuests asks the members of a call that is still going on to
+// change the conversation's key, after guests were put out of it or their
+// links revoked. A guest's link carried the call's key, and it went on opening
+// the call for them until somebody happened to join or leave the
+// conversation; members' devices already rotate on this flag, as they do when
+// a member is removed. A guest who simply left, or whose time ran out, does
+// not cost everyone a rotation.
+func (s *Server) rotateAfterGuests(ctx context.Context, ch *store.Channel) {
+	if s.Voice == nil || s.Voice.MemberCount(ch.ID) == 0 {
+		return
+	}
+	conv := ch.ID
+	var targets []ids.ID
+	switch {
+	case s.isDM(ch):
+		targets = ch.Recipients
+	default:
+		if s.ConvForChannel != nil {
+			c, err := s.ConvForChannel(ctx, ch)
+			if err != nil {
+				s.Log.Warn("guest key rotation", "channel", ch.ID.String(), "err", err)
+				return
+			}
+			conv = c
+		}
+		var err error
+		if ch.ServerID != nil && conv == *ch.ServerID {
+			targets, err = s.Store.MemberIDs(ctx, conv)
+		} else {
+			targets, err = s.Store.ChannelViewers(ctx, conv)
+		}
+		if err != nil {
+			s.Log.Warn("guest key rotation", "channel", ch.ID.String(), "err", err)
+			return
+		}
+	}
+	tr := true
+	if err := s.Store.SetKeyFlags(ctx, conv, &tr, nil); err != nil {
+		s.Log.Warn("guest key rotation", "conv", conv.String(), "err", err)
+		return
+	}
+	s.Bcast.EmitUsers(targets, "key_rotation_needed", map[string]any{"conv_id": conv})
 }
 
 // endGuest ends a guest's stay: the row goes, and dropGuest does the rest.

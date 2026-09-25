@@ -80,28 +80,6 @@ func TestLeaveConnAfterRejoin(t *testing.T) {
 	}
 }
 
-func TestRecentlyActive(t *testing.T) {
-	r := New()
-	a := ids.ID(1)
-	if r.RecentlyActive(10) {
-		t.Fatal("a channel nobody used is not active")
-	}
-	r.Join(State{UserID: a, ChannelID: 10, ConnID: 1}, false)
-	if !r.RecentlyActive(10) {
-		t.Fatal("a channel with people in it is active")
-	}
-	r.Leave(a)
-	if !r.RecentlyActive(10) {
-		t.Error("a channel that just emptied is still recent")
-	}
-	r.mu.Lock()
-	r.emptiedAt[10] -= RecentWindow.Milliseconds()
-	r.mu.Unlock()
-	if r.RecentlyActive(10) {
-		t.Error("a channel empty for longer than the window is not recent")
-	}
-}
-
 func TestSFUSessionFollowsTheCall(t *testing.T) {
 	r := New()
 	u, ch, other := ids.ID(1), ids.ID(10), ids.ID(20)

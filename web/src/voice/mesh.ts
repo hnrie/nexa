@@ -72,6 +72,9 @@ export class MeshTransport implements VoiceTransport {
   private screenBitrate = 5_000_000;
   private audioGateOpen = true;
   private closed = false;
+  /** The peers this device has been connected to, so losing them reads as reconnecting rather than a first connect. */
+  private upBefore = new Set<string>();
+  private lastConnection: "connecting" | "connected" | "reconnecting" | null = null;
 
   constructor(
     private meId: string,
@@ -137,6 +140,7 @@ export class MeshTransport implements VoiceTransport {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       if (state === "connected") {
+        this.upBefore.add(userId);
         if (peer.watchdog) clearTimeout(peer.watchdog);
         if (peer.restartTimer) clearTimeout(peer.restartTimer);
         peer.watchdog = null;
@@ -152,10 +156,12 @@ export class MeshTransport implements VoiceTransport {
         if (!peer.restartTimer) this.scheduleRestart(peer, state === "failed" ? 1500 : ICE_RESTART_MS);
       }
       this.events.onPeerState(userId, state);
+      this.reportConnection();
     };
     pc.ontrack = (e) => this.onTrack(peer, e);
     this.syncSenders(peer);
     this.events.onPeerState(userId, pc.connectionState);
+    this.reportConnection();
     peer.watchdog = setTimeout(() => this.rebuild(userId, attempts), CONNECT_DEADLINE_MS);
     this.drainEarly(userId);
   }
@@ -175,7 +181,9 @@ export class MeshTransport implements VoiceTransport {
       return;
     }
     console.warn("voice: rebuilding the connection to", userId);
+    const wasUp = this.upBefore.has(userId);
     this.removePeer(userId);
+    if (wasUp) this.upBefore.add(userId);
     this.addPeer(userId, attempts + 1);
   }
 
@@ -215,7 +223,42 @@ export class MeshTransport implements VoiceTransport {
     if (p.watchdog) clearTimeout(p.watchdog);
     p.pc.close();
     this.early.delete(userId);
+    this.upBefore.delete(userId);
     for (const kind of ["audio", "video", "screen"] as const) this.events.onRemoteStream(userId, kind, null);
+    this.reportConnection();
+  }
+
+  /**
+   * This device's link to the call as a whole: up while any peer is (or with
+   * nobody to reach), and otherwise still coming up. Peer to peer, one link
+   * that dropped says nothing about whose network it was — their tile says it
+   * is reconnecting — so this device only calls itself reconnecting when every
+   * link it had went down together, or the browser says it is offline.
+   */
+  private reportConnection(): void {
+    if (this.closed) return;
+    const peers = [...this.peers.values()];
+    const hadUp = peers.filter((p) => this.upBefore.has(p.userId)).length;
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    let state: "connecting" | "connected" | "reconnecting" = "connecting";
+    if (peers.length === 0 || peers.some((p) => p.pc.connectionState === "connected")) state = "connected";
+    else if (hadUp >= 2 || (hadUp >= 1 && offline)) state = "reconnecting";
+    else if (hadUp === 1) state = "connected";
+    if (state === this.lastConnection) return;
+    this.lastConnection = state;
+    this.events.onConnection?.(state);
+  }
+
+  /** Fresh relay credentials, for every connection and ICE restart from now on. */
+  setIceServers(servers: RTCIceServer[]): void {
+    this.ice = servers;
+    for (const p of this.peers.values()) {
+      try {
+        p.pc.setConfiguration({ ...p.pc.getConfiguration(), iceServers: servers });
+      } catch {
+        /* the next rebuild takes them */
+      }
+    }
   }
 
   peerIds(): string[] {
@@ -225,7 +268,10 @@ export class MeshTransport implements VoiceTransport {
   /** The mesh learns about peers one by one through addPeer. */
   setRoster(_states: VoiceState[]): void {}
 
-  joined(_state: VoiceState): void {}
+  /** In the call: with nobody else there yet, there is nothing to connect to and the call is up. */
+  joined(_state: VoiceState): void {
+    this.reportConnection();
+  }
 
   reconnected(): void {}
 
