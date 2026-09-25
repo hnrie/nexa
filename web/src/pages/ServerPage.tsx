@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
 import { Button } from "@/components/common/Button";
 import { ChatView } from "@/components/chat/ChatView";
+import { useGridDrawsChat } from "@/components/shell/paneScope";
 import { VoiceView } from "@/components/voice/VoiceView";
 import { PaneSpinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
@@ -17,6 +18,7 @@ import s from "./ServerPage.module.css";
 
 import { t as tr_ } from "@/i18n";
 export default function ServerPage() {
+  const gridChat = useGridDrawsChat();
   const { serverId = "", channelId, messageId } = useParams();
   const nav = useNavigate();
   // Handed on through the redirects below: opening a server from the phone's
@@ -134,6 +136,8 @@ export default function ServerPage() {
   if (!channel || channel.server_id !== serverId) return <NoChannels />;
   if (channel.type === "voice") return <VoiceRoom channel={channel} />;
   if (channel.type === "category") return <Navigate to={`/channels/${serverId}`} replace state={navState} />;
+  // in a split the grid draws it, like every other pane
+  if (gridChat) return null;
   return <ChatView channel={channel} />;
 }
 
