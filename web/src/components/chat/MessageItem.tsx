@@ -7,7 +7,7 @@ import { formatFull, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingUpload } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
-import { useUI } from "@/stores/ui";
+import { useUI, type ContextMenuState } from "@/stores/ui";
 import { useRelationships } from "@/stores/relationships";
 import { rangeBetween, useSelection } from "@/stores/selection";
 import { useUsers, displayName } from "@/stores/users";
@@ -31,9 +31,11 @@ import { Reactions } from "./Reactions";
 import { StickerPopout } from "./StickerPopout";
 import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
+import { menuAnchor } from "@/components/common/ContextMenu";
+import { copyText } from "@/lib/clipboard";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, canPick, canPin, copyMessageLink, deleteMessageNow, markUnread, togglePin } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, canPick, canPin, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
 import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
@@ -135,9 +137,10 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
     return n <= 3 ? 48 : n <= 8 ? 36 : 28;
   }, [jumbo, nodes]);
 
-  const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null) => {
+  const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null, anchor?: ContextMenuState["anchor"]) => {
     setMenuOpen(true);
-    openContextMenu({ x, y, items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
+    // the menu is named by when the message was sent: its last lines say so to the eye
+    openContextMenu({ x, y, ...(anchor ? { anchor } : {}), label: messageTimes(msg).join(", "), items: buildMessageMenu(msg, { openReactionPicker: () => setPicker(new DOMRect(x, y, 0, 0)) }, image) });
     menuWatch.current?.();
     menuWatch.current = useUI.subscribe((state) => {
       if (!state.contextMenu) {
@@ -279,7 +282,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
  * what it offers, and with the Shift state in the row itself every loaded
  * message re-rendered — markdown, embeds and all — on each Shift press.
  */
-function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedMessage; pinned: boolean; dev: boolean; setPicker: (r: DOMRect | null) => void; openMenu: (x: number, y: number) => void }) {
+function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedMessage; pinned: boolean; dev: boolean; setPicker: (r: DOMRect | null) => void; openMenu: (x: number, y: number, image?: null, anchor?: ContextMenuState["anchor"]) => void }) {
   const shift = useShiftHeld();
   const setEditing = useUI((u) => u.setEditing);
   const setReplyTo = useUI((u) => u.setReplyTo);
@@ -295,13 +298,13 @@ function RowToolbar({ msg, pinned, dev, setPicker, openMenu }: { msg: DecryptedM
           {canPin(msg) ? <ToolButton label={pinned ? t("chat.messageItem.unpinMessage") : t("chat.messageItem.pinMessage")} onClick={() => void togglePin(msg)}>{pinned ? <PinOff size={18} /> : <Pin size={18} />}</ToolButton> : null}
           <ToolButton label={t("chat.messageItem.markUnread")} onClick={() => markUnread(msg)}><MailOpen size={18} /></ToolButton>
           <ToolButton label={t("chat.messageItem.copyMessageLink")} onClick={() => copyMessageLink(msg)}><Link2 size={18} /></ToolButton>
-          {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void navigator.clipboard?.writeText(msg.id)}><Hash size={18} /></ToolButton> : null}
+          {dev ? <ToolButton label={t("chat.messageItem.copyMessageId")} onClick={() => void copyText(msg.id, t("clipboard.idCopied"))}><Hash size={18} /></ToolButton> : null}
           {canDelete(msg) ? (
             <ToolButton label={t("chat.messageItem.deleteMessageShiftSkipsThePrompt")} danger onClick={() => void deleteMessageNow(msg)}><Trash2 size={18} /></ToolButton>
           ) : null}
         </>
       ) : null}
-      <ToolButton label={shift ? t("chat.messageItem.everythingElse") : t("chat.messageItem.moreHoldShiftForAllActions")} onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu(r.left, r.bottom + 4); }}><MoreHorizontal size={18} /></ToolButton>
+      <ToolButton label={shift ? t("chat.messageItem.everythingElse") : t("chat.messageItem.moreHoldShiftForAllActions")} onClick={(e) => { const a = menuAnchor(e.currentTarget); openMenu(a.left, a.bottom + 4, null, a); }}><MoreHorizontal size={18} /></ToolButton>
     </div>
   );
 }

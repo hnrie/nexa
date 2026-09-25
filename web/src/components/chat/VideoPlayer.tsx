@@ -1,6 +1,7 @@
 import { Download, Maximize2, Minimize2, MoreVertical, Pause, PictureInPicture2, Play, Volume2, VolumeX } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@/components/common/Tooltip";
+import { menuAnchor } from "@/components/common/ContextMenu";
 import { enterElementFullscreen, enterVideoFullscreen, exitElementFullscreen, fullscreenElement, lockLandscape, onFullscreenChange, streamFullscreenWay } from "@/lib/fullscreen";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { fitVideo } from "./fitMedia";
@@ -248,11 +249,12 @@ export function VideoPlayer({ src, name, width, height, poster, spoiler = false 
   /** On a player too narrow for every control, speed, picture in picture and download wait in a menu. */
   const more = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    const r = e.currentTarget.getBoundingClientRect();
+    const anchor = menuAnchor(e.currentTarget);
     const items: ContextMenuItem[] = [{ id: "speed", label: tr_("chat.audioPlayer.playbackSpeed"), slider: { value: speed, min: 0.5, max: 2, step: 0.5, unit: "×", onChange: setSpeed }, separatorAfter: true }];
     if (pipOk) items.push({ id: "pip", label: tr_("chat.videoPlayer.pictureInPicture"), onSelect: pip });
     items.push({ id: "download", label: tr_("chat.attachments.download"), onSelect: download });
-    openContextMenu({ x: r.right - 200, y: r.top - 8, items });
+    // over the bar it sits on, lined up with the button's end, rather than a guessed 200px to the left
+    openContextMenu({ x: anchor.left, y: anchor.top, anchor, above: true, items });
     reveal();
   };
 

@@ -1,7 +1,11 @@
 .menu { position: fixed; z-index: 300; min-width: 188px; max-width: min(320px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow-y: auto; overscroll-behavior: contain; padding: 6px 8px; background: var(--bg-floating); border-radius: var(--radius-xs); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); }
 .backdrop { display: none; }
 .item { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 32px; padding: 6px 8px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; color: var(--text-subtle); text-align: start; }
-.item:hover:not(:disabled) { background: var(--brand); color: #fff; }
+/* the accent's own readable text colour: white on a yellow or green accent was 1.8–3:1 */
+.item:hover:not(:disabled), .item:focus-visible { background: var(--brand); color: var(--on-brand); }
+.item:focus-visible { outline-offset: -2px; }
+/* a line to read, such as when a message was sent */
+.note { padding: 6px 8px 4px; font-size: 12px; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
 .item:disabled { opacity: 0.5; cursor: not-allowed; }
 .itemLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .heading { padding: 8px 8px 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); }
@@ -9,7 +13,7 @@
 .radio { flex: none; width: 14px; height: 14px; margin-inline-start: 12px; border-radius: 50%; border: 2px solid currentColor; opacity: 0.7; }
 .radio[data-on="true"] { opacity: 1; background: radial-gradient(circle, currentColor 0 3px, transparent 3.5px); }
 .danger { color: var(--text-danger); }
-.danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+.danger:hover:not(:disabled), .danger:focus-visible { background: var(--danger); color: #fff; }
 .sep { height: 1px; margin: 4px; background: var(--border); }
 .slider { padding: 6px 8px 8px; }
 .sliderHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-muted); margin-bottom: 6px; }

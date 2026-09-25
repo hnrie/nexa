@@ -2,8 +2,10 @@ import { channels as channelsApi } from "@/api/channels";
 import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { humanizeMentions, type HumanNames } from "@/components/composer/mentions";
+import { copyText } from "@/lib/clipboard";
 import { compareIds } from "@/lib/ids";
 import { copyImage, saveImage, type ImageTarget } from "@/lib/imageActions";
+import { formatExact } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
@@ -40,6 +42,25 @@ export function canPin(msg: DecryptedMessage): boolean {
   return canI(useServers.getState().byId[ch.server_id], P.MANAGE_MESSAGES, ch.id);
 }
 
+/**
+ * Whether a new reaction may be added: anyone in a DM, and Add Reactions in a
+ * server channel, as the server requires. Taking one's own reaction back is
+ * always allowed.
+ */
+export function canReact(msg: DecryptedMessage): boolean {
+  const ch = useChannels.getState().byId[msg.channel_id];
+  if (!ch?.server_id) return true;
+  return canI(useServers.getState().byId[ch.server_id], P.ADD_REACTIONS, ch.id);
+}
+
+/** When a message was sent, and edited, to the second: a phone has no tooltip to tell it. */
+export function messageTimes(msg: DecryptedMessage): string[] {
+  const out: string[] = [];
+  if (Number.isFinite(msg.created_at)) out.push(t("chat.messageMenu.sentAt", { time: formatExact(msg.created_at) }));
+  if (msg.edited_at && Number.isFinite(msg.edited_at)) out.push(t("chat.messageMenu.editedAt", { time: formatExact(msg.edited_at) }));
+  return out;
+}
+
 export function canEdit(msg: DecryptedMessage): boolean {
   const me = useAuth.getState().me;
   return !!me && msg.author_id === me.id && (msg.type === "default" || msg.type === "reply") && !!msg.payload;
@@ -63,14 +84,15 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
   const items: ContextMenuItem[] = image ? imageMenuItems(image) : [];
   if (items.length) items[items.length - 1]!.separatorAfter = true;
-  items.push({ id: "react", label: t("chat.messageItem.addReaction"), onSelect: hooks.openReactionPicker, separatorAfter: true });
+  // where reacting is not allowed the item is not offered, rather than failing after the pick
+  if (canReact(msg)) items.push({ id: "react", label: t("chat.messageItem.addReaction"), onSelect: hooks.openReactionPicker, separatorAfter: true });
   if (canEdit(msg)) items.push({ id: "edit", label: t("chat.messageItem.editMessage"), onSelect: () => ui.setEditing({ channelId: msg.channel_id, messageId: msg.id }) });
   items.push({ id: "reply", label: t("chat.messageItem.reply"), onSelect: () => ui.setReplyTo({ channelId: msg.channel_id, messageId: msg.id, ping: true }), separatorAfter: true });
   items.push({
     id: "copy",
     label: t("chat.messageMenu.copyText"),
     disabled: !msg.payload?.t,
-    onSelect: () => void navigator.clipboard?.writeText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, knownNames())),
+    onSelect: () => void copyText(humanizeMentions(msg.payload?.t ?? "", useUsers.getState().byId, knownNames()), t("clipboard.textCopied")),
   });
   if (canPin(msg)) items.push({
     id: "pin",
@@ -86,24 +108,28 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
     items.push({ id: "embeds", label: suppressed ? t("chat.messageMenu.showEmbeds") : t("chat.messageMenu.removeEmbeds"), onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast(t("chat.messageMenu.couldNotUpdateEmbeds"), "error")) });
   }
   items.push({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
-  if (dev) items.push({ id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void navigator.clipboard?.writeText(msg.id), separatorAfter: canDelete(msg) });
+  if (dev) items.push({ id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void copyText(msg.id, t("clipboard.idCopied")), separatorAfter: canDelete(msg) });
   if (canDelete(msg)) {
     items.push({ id: "select", label: t("chat.messageMenu.selectMessages"), onSelect: () => startSelecting(msg) });
-    items.push({
-      id: "delete",
-      label: t("chat.messageMenu.deleteMessage"),
-      danger: true,
-      onSelect: () =>
-        ui.openModal("confirm", {
-          title: t("chat.messageMenu.deleteMessage"),
-          body: t("chat.messageMenu.areYouSureYouWantTo"),
-          confirmLabel: t("chat.messageItem.delete"),
-          danger: true,
-          onConfirm: () => messagesApi.remove(msg.channel_id, msg.id).catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotDelete"), "error")),
-        }),
-    });
+    items.push({ id: "delete", label: t("chat.messageMenu.deleteMessage"), danger: true, onSelect: () => confirmDelete(msg) });
   }
+  // the exact moment, which a phone has no tooltip for, closes the menu
+  const times = messageTimes(msg);
+  if (times.length) items[items.length - 1]!.separatorAfter = true;
+  for (const [i, line] of times.entries()) items.push({ id: `time${i}`, label: line, note: true });
   return items;
+}
+
+/** Asks before deleting a message, as the menu's Delete does. */
+export function confirmDelete(msg: DecryptedMessage): void {
+  const ui = useUI.getState();
+  ui.openModal("confirm", {
+    title: t("chat.messageMenu.deleteMessage"),
+    body: t("chat.messageMenu.areYouSureYouWantTo"),
+    confirmLabel: t("chat.messageItem.delete"),
+    danger: true,
+    onConfirm: () => messagesApi.remove(msg.channel_id, msg.id).catch((err: unknown) => ui.toast(err instanceof Error ? err.message : t("chat.messageMenu.couldNotDelete"), "error")),
+  });
 }
 
 /** Every role and channel name this device knows, so copied text reads the way the message does. */
@@ -156,7 +182,7 @@ export function markUnread(msg: DecryptedMessage): void {
 export function copyMessageLink(msg: DecryptedMessage): void {
   const chan = useChannels.getState().byId[msg.channel_id];
   const base = chan?.server_id ? `/channels/${chan.server_id}` : "/channels/@me";
-  void navigator.clipboard?.writeText(`${location.origin}${base}/${msg.channel_id}/${msg.id}`).then(() => useUI.getState().toast(t("chat.messageMenu.linkCopied"), "success"));
+  void copyText(`${location.origin}${base}/${msg.channel_id}/${msg.id}`, t("chat.messageMenu.linkCopied"));
 }
 
 /** Deletes without the confirmation dialog (the Shift shortcut). */

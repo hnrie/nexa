@@ -7,6 +7,7 @@ import { KeyStatusChip } from "@/components/profile/KeyVerify";
 import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { Tooltip } from "@/components/common/Tooltip";
+import { menuAnchor } from "@/components/common/ContextMenu";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
@@ -304,7 +305,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             aria-label={tr_("chat.chat.more")}
             data-testid="chat-more"
             onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect();
+              const anchor = menuAnchor(e.currentTarget);
               const items: ContextMenuItem[] = [
                 { id: "pins", label: tr_("chat.chat.pinnedMessages"), onSelect: () => setPins(true) },
                 // server channels have no subchats
@@ -315,7 +316,7 @@ export function ChatView({ channel }: { channel: Channel }) {
               if (isServer || convo.type === "group_dm") items.push({ id: "members", label: membersOpen ? tr_("chat.chat.hideMembers") : tr_("chat.chat.showMembers"), onSelect: toggleMembers });
               // a phone's call bar has no room for it, so inviting guests to the call is here too
               if (!isServer && inThisCall && (convo.type === "dm" || convo.type === "group_dm")) items.push({ id: "guests", label: tr_("chat.chat.inviteGuestsToCall"), onSelect: () => openModal("guestLink", { channelId: convo.id }) });
-              openContextMenu({ x: Math.max(8, r.right - 200), y: r.bottom + 4, items });
+              openContextMenu({ x: anchor.left, y: anchor.bottom + 4, anchor, items, label: tr_("chat.chat.more") });
             }}
           >
             <MoreVertical size={22} />

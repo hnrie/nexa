@@ -12,6 +12,7 @@ import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 import { imageNameFromUrl } from "@/lib/imageActions";
 import { useMediaSrc } from "@/lib/mediaLinks";
+import { formatShortDate } from "@/lib/time";
 
 import { t } from "@/i18n";
 /** A readable name for a linked file: the last part of its address. */
@@ -95,9 +96,9 @@ function playerSrc(e: UnfurlResult): string | null {
 /** "3 Feb 2026", for the line under a card's title. */
 function publishedOn(ms: number | undefined): string | null {
   if (!ms) return null;
-  const d = new Date(ms);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  if (Number.isNaN(new Date(ms).getTime())) return null;
+  // the app's language, not the browser's
+  return formatShortDate(ms);
 }
 
 /** The line above the title: the site's icon, its name, the author, the date. */

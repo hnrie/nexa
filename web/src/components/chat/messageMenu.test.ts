@@ -7,7 +7,7 @@ import { useChannels } from "@/stores/channels";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useSelection } from "@/stores/selection";
 import { useServers } from "@/stores/servers";
-import { buildMessageMenu, canDelete, canPick, canPin, deleteMessagesNow, startSelecting } from "./messageMenu";
+import { buildMessageMenu, canDelete, canPick, canPin, canReact, deleteMessagesNow, messageTimes, startSelecting } from "./messageMenu";
 
 const S = "100";
 const ch = (id: string, extra: Partial<Channel> = {}): Channel => ({
@@ -81,6 +81,28 @@ describe("message permissions", () => {
     expect(canDelete(msg("300", "2"))).toBe(false);
     signIn("1");
     expect(canDelete(msg("300", "2"))).toBe(true);
+  });
+  it("offers Add Reaction only where reacting is allowed", () => {
+    const ids = () => buildMessageMenu(msg("200", "1"), { openReactionPicker: () => {} }).map((i) => i.id);
+    expect(canReact(msg("200", "1"))).toBe(true);
+    expect(ids()).toContain("react");
+    // an announcements channel: @everyone may not add reactions there
+    useChannels.getState().upsert([ch("200", { overwrites: [{ channel_id: "200", target_id: S, target_type: "role", allow: "0", deny: permString(P.ADD_REACTIONS) }] })]);
+    expect(canReact(msg("200", "1"))).toBe(false);
+    expect(ids()).not.toContain("react");
+    // a group DM has no such permission
+    expect(canReact(msg("300", "1"))).toBe(true);
+  });
+  it("ends the menu with when the message was sent, and edited", () => {
+    const sent = Date.UTC(2026, 8, 24, 14, 3, 11);
+    const m = { ...msg("200", "1"), created_at: sent, edited_at: null } as DecryptedMessage;
+    const menu = buildMessageMenu(m, { openReactionPicker: () => {} });
+    const notes = menu.filter((i) => i.note);
+    expect(notes).toHaveLength(1);
+    expect(menu[menu.length - 1]).toBe(notes[0]);
+    expect(notes[0]!.label).toMatch(/^Sent .*2026.*:11/);
+    expect(menu[menu.length - 2]!.separatorAfter).toBe(true);
+    expect(messageTimes({ ...m, edited_at: sent + 60_000 } as DecryptedMessage)).toHaveLength(2);
   });
 });
 
