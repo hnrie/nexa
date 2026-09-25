@@ -50,7 +50,16 @@ import { callThroughSfu, flipCamera, guestLinksOn, holdToTalk, joinVoice, leaveV
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
 import s from "./Voice.module.css";
 
-import { t as tr_ } from "@/i18n";
+import { t as tr_, translator } from "@/i18n";
+
+/** A round trip in the reader's language: "12 ms", "١٢ ملي ث". */
+function formatRtt(ms: number): string {
+  try {
+    return new Intl.NumberFormat(translator().locale, { style: "unit", unit: "millisecond", unitDisplay: "short", maximumFractionDigits: 0 }).format(ms);
+  } catch {
+    return String(Math.round(ms));
+  }
+}
 /** A video element bound to a MediaStream, that keeps playing through whatever pauses it on iOS. */
 export function StreamVideo({ stream, muted = true, mirror = false, className, onAspect }: { stream: MediaStream; muted?: boolean; mirror?: boolean; className?: string; onAspect?: (ratio: number) => void }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -116,6 +125,17 @@ function HoldToTalk() {
       onPointerUp={release}
       onPointerCancel={release}
       onLostPointerCapture={release}
+      // a keyboard (or a switch control) holds it with Space or Enter
+      onKeyDown={(e) => {
+        if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+          e.preventDefault();
+          holdToTalk(true);
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === " " || e.key === "Enter") release();
+      }}
+      onBlur={release}
       onContextMenu={(e) => e.preventDefault()}
       data-testid="hold-to-talk"
     >
@@ -858,7 +878,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           {quality || participants.length > 1 ? (
             <span className={s.quality} data-level={level} title={quality ? tr_("voice.voiceView.qualityLine", { rtt: Math.round(quality.rtt), loss: (quality.loss * 100).toFixed(1) }) : tr_("voice.voiceView.measuring")}>
               <i className={s.qualityDot} />
-              {quality ? `${Math.round(quality.rtt)} ms` : "…"}
+              {quality ? formatRtt(quality.rtt) : "…"}
             </span>
           ) : null}
         </div>
