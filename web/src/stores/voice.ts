@@ -58,6 +58,8 @@ interface VoiceStore {
    * were live.
    */
   micBlocked: boolean;
+  /** The conversation this device is calling and nobody has picked up in yet, while it rings. */
+  calling: string | null;
   applyState: (vs: VoiceState) => void;
   setAll: (list: VoiceState[]) => void;
   setMine: (vs: VoiceState | null) => void;
@@ -80,6 +82,7 @@ interface VoiceStore {
   setWatching: (userId: string, on: boolean) => void;
   setError: (e: string | null) => void;
   setMicBlocked: (v: boolean) => void;
+  setCalling: (channelId: string | null) => void;
   resetSession: () => void;
   clear: () => void;
 }
@@ -113,6 +116,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   watching: {},
   error: null,
   micBlocked: false,
+  calling: null,
   applyState: (vs) =>
     set((s) => {
       const byChannel = { ...s.byChannel };
@@ -201,10 +205,11 @@ export const useVoice = create<VoiceStore>()((set) => ({
     }),
   setError: (error) => set({ error }),
   setMicBlocked: (micBlocked) => set({ micBlocked }),
+  setCalling: (calling) => set({ calling }),
   // error goes with the rest: a refusal from a call that is over has nothing
   // to say about the next one, and it was shown again in its lobby
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false }),
-  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false }),
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false, calling: null }),
+  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false, calling: null }),
 }));
 
 /** A channel's participants in join order. */

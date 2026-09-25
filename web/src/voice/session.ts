@@ -26,7 +26,7 @@ import { shareBitrate } from "./shareQuality";
 import { LevelMeter, audioContext, getCamera, getMic, getScreen, holdAudio, lastInputChoice, resumeAudio, sensitivityToThreshold, sentStream, type CameraFacing } from "./media";
 import { convForChannel } from "@/components/composer/send";
 import { useKeys } from "@/stores/keys";
-import { useUsers } from "@/stores/users";
+import { displayName, useUsers } from "@/stores/users";
 import { ring } from "@/lib/keyring";
 import { FrameCrypto } from "./e2ee";
 import { hasGuestKeys, openRelayedKeys, sealKeysForGuest } from "./guestKeys";
@@ -100,17 +100,35 @@ function stopQuality(): void {
   qualityTimer = null;
 }
 
-/** Calling a DM or group nobody else is in yet: the outgoing tone plays until someone picks up. */
-function startCallingTone(): void {
+/**
+ * Calling a DM or group nobody else is in yet: the outgoing tone plays, and
+ * the call says who it is calling, until someone picks up. A minute with no
+ * answer ends the ringing and says so; the call itself stays open for them.
+ */
+function startCallingTone(channelId: string): void {
   startCalling();
+  useVoice.getState().setCalling(channelId);
   if (callingTimer) clearTimeout(callingTimer);
-  callingTimer = setTimeout(stopCallingTone, 60000);
+  callingTimer = setTimeout(() => {
+    stopCallingTone();
+    if (session?.channelId === channelId) useUI.getState().toast(callOutcome(channelId, "noAnswer"), "info");
+  }, 60000);
 }
 
 function stopCallingTone(): void {
   if (callingTimer) clearTimeout(callingTimer);
   callingTimer = null;
   stopCalling();
+  useVoice.getState().setCalling(null);
+}
+
+/** What became of a call nobody picked up, in words: a DM names the person called. */
+function callOutcome(channelId: string, what: "noAnswer" | "declined"): string {
+  const ch = useChannels.getState().byId[channelId];
+  const other = ch?.type === "dm" ? ch.recipient_ids.find((id) => id !== me()) : undefined;
+  const name = other ? displayName(useUsers.getState().byId[other]) : "";
+  if (what === "declined") return tr_("voice.call.declined", { name });
+  return name ? tr_("voice.call.noAnswer", { name }) : tr_("voice.call.noAnswerGroup");
 }
 
 /** Relay credentials expire, so the list is fetched again after this long. */
@@ -436,7 +454,7 @@ export async function joinVoice(channelId: string): Promise<void> {
   playSound("join");
   const convo = useChannels.getState().byId[channelId];
   const others = participantsOf(useVoice.getState().byChannel, channelId).filter((p) => p.user_id !== me());
-  if (convo && (convo.type === "dm" || convo.type === "group_dm") && others.length === 0) startCallingTone();
+  if (convo && (convo.type === "dm" || convo.type === "group_dm") && others.length === 0) startCallingTone(channelId);
 }
 
 /** Leave voice; tells the server unless the connection is already gone. */
@@ -972,7 +990,11 @@ export function handleVoiceEvent(e: GatewayEvent): void {
       if (e.d.reason === "ended" || e.d.user_id === myId) clearRing(e.d.channel_id);
       if (e.d.reason === "ended") ignoredCalls.delete(e.d.channel_id);
       // the one person called said no
-      if (session?.channelId === e.d.channel_id && e.d.user_id !== myId && useChannels.getState().byId[e.d.channel_id]?.type === "dm") stopCallingTone();
+      if (session?.channelId === e.d.channel_id && e.d.user_id !== myId && useChannels.getState().byId[e.d.channel_id]?.type === "dm") {
+        const wasCalling = useVoice.getState().calling === e.d.channel_id;
+        stopCallingTone();
+        if (wasCalling && e.d.reason === "declined") useUI.getState().toast(callOutcome(e.d.channel_id, "declined"), "info");
+      }
       return;
     default:
       return;

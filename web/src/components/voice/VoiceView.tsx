@@ -41,7 +41,7 @@ import { pinchView, type View } from "@/lib/zoomPan";
 import { useAuth } from "@/stores/auth";
 import { canI, memberColor, useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
-import { useUsers } from "@/stores/users";
+import { displayName, useUsers } from "@/stores/users";
 import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import { callThroughSfu, currentCameraFacing, flipCamera, guestLinksOn, joinVoice, leaveVoice, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen } from "@/voice/session";
@@ -294,6 +294,9 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const streamMutes = useVoice((v) => v.streamMutes);
   const localMutes = useVoice((v) => v.localMutes);
   const micBlocked = useVoice((v) => v.micBlocked);
+  // ringing them: say who, rather than leave the caller alone on a silent stage
+  const calling = useVoice((v) => v.calling === channel.id);
+  const calledId = channel.type === "dm" ? channel.recipient_ids.find((id) => id !== meId) : undefined;
   const [micNoteDismissed, setMicNoteDismissed] = useState(false);
   const muted = useVoiceLocal((v) => v.muted);
   const deafened = useVoiceLocal((v) => v.deafened);
@@ -750,6 +753,11 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           </div>
         ) : null}
         {participants.length > 10 && !callThroughSfu() ? <div className={s.stageNote}>{tr_("voice.voice.largeRoomsStrainPeerToPeer")}</div> : null}
+        {calling ? (
+          <div className={s.stageNote} role="status" data-testid="calling">
+            {calledId ? tr_("voice.call.callingName", { name: displayName(users[calledId]) }) : tr_("voice.call.callingGroup")}
+          </div>
+        ) : null}
         {focusedTile ? (
           <>
             <div className={s.focus} ref={focusRef}>{renderTile(focusedTile, "focus")}</div>
