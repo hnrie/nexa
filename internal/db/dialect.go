@@ -76,7 +76,10 @@ func IsUniqueViolation(err error) bool {
 }
 
 // rebind turns the `?` placeholders every query here is written with into
-// whatever the driver wants. Anything inside a string literal is left alone.
+// whatever the driver wants. Anything inside a string literal, a quoted
+// identifier or a comment is left alone: queries carry comments explaining
+// themselves, and an apostrophe in one ("the account's") used to read as the
+// start of a string and leave every placeholder after it unnumbered.
 func rebind(d Dialect, query string) string {
 	if d != Postgres || !strings.Contains(query, "?") {
 		return query
@@ -84,24 +87,47 @@ func rebind(d Dialect, query string) string {
 	var b strings.Builder
 	b.Grow(len(query) + 8)
 	n := 0
-	inString := false
+	// quote is the character that ends the quoted run being copied: ' for a
+	// string, " for an identifier, a newline for a -- comment, / for a /* */
+	// one; 0 outside any
+	var quote byte
+	// opened is where the /* of the comment being copied begins, so that the
+	// * of its own opening cannot also close it ("/*/")
+	opened := 0
 	for i := 0; i < len(query); i++ {
 		c := query[i]
 		switch {
-		case inString:
+		case quote == '\'' || quote == '"':
 			b.WriteByte(c)
-			if c == '\'' {
-				// '' inside a string is an escaped quote, not the end of it
-				if i+1 < len(query) && query[i+1] == '\'' {
-					b.WriteByte('\'')
+			if c == quote {
+				// a doubled quote inside is an escaped one, not the end
+				if i+1 < len(query) && query[i+1] == quote {
+					b.WriteByte(c)
 					i++
 					continue
 				}
-				inString = false
+				quote = 0
 			}
-		case c == '\'':
-			inString = true
+		case quote == '\n':
 			b.WriteByte(c)
+			if c == '\n' {
+				quote = 0
+			}
+		case quote == '/':
+			b.WriteByte(c)
+			if c == '/' && query[i-1] == '*' && i-1 > opened+1 {
+				quote = 0
+			}
+		case c == '\'' || c == '"':
+			quote = c
+			b.WriteByte(c)
+		case c == '-' && i+1 < len(query) && query[i+1] == '-':
+			quote = '\n'
+			b.WriteByte(c)
+		case c == '/' && i+1 < len(query) && query[i+1] == '*':
+			quote, opened = '/', i
+			b.WriteString("/*")
+			i++
 		case c == '?':
 			n++
 			b.WriteByte('$')

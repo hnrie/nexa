@@ -11,6 +11,15 @@ func TestRebindNumbersPlaceholders(t *testing.T) {
 		// a question mark inside a string is part of the string
 		{"SELECT * FROM t WHERE a = 'why?' AND b = ?", "SELECT * FROM t WHERE a = 'why?' AND b = $1"},
 		{"SELECT 'it''s a ?' , ?", "SELECT 'it''s a ?' , $1"},
+		// comments are not code: an apostrophe in one opens no string, and a
+		// question mark in one is no placeholder
+		{"SELECT ? -- the account's own ?\nFROM t WHERE a = ?", "SELECT $1 -- the account's own ?\nFROM t WHERE a = $2"},
+		{"SELECT ? /* isn't it? */ , ?", "SELECT $1 /* isn't it? */ , $2"},
+		{"SELECT ? /*/ still a comment ? */ , ?", "SELECT $1 /*/ still a comment ? */ , $2"},
+		// nor is a quoted identifier
+		{`SELECT "odd?name" FROM t WHERE a = ?`, `SELECT "odd?name" FROM t WHERE a = $1`},
+		// a minus alone is arithmetic
+		{"SELECT a - ? FROM t WHERE b = ?", "SELECT a - $1 FROM t WHERE b = $2"},
 	}
 	for _, c := range cases {
 		if got := rebind(Postgres, c.in); got != c.want {
