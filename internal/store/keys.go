@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
@@ -122,18 +123,7 @@ func isFKError(err error) bool {
 	}
 	msg := err.Error()
 	// SQLite says so in words; Postgres uses SQLSTATE 23503.
-	return contains(msg, "FOREIGN KEY constraint failed") || contains(msg, "SQLSTATE 23503")
-}
-
-func contains(s, sub string) bool {
-	return len(sub) <= len(s) && (func() bool {
-		for i := 0; i+len(sub) <= len(s); i++ {
-			if s[i:i+len(sub)] == sub {
-				return true
-			}
-		}
-		return false
-	})()
+	return strings.Contains(msg, "FOREIGN KEY constraint failed") || strings.Contains(msg, "SQLSTATE 23503")
 }
 
 func scanGrants(rows *sql.Rows) ([]*KeyGrant, error) {

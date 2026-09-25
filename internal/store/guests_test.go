@@ -79,3 +79,35 @@ func TestGuestLinks(t *testing.T) {
 		t.Fatalf("second revoke: %v", err)
 	}
 }
+
+// Codes use every letter of the alphabet equally often: drawn by a byte
+// modulo 56, the first 32 letters came up a quarter more often than the rest.
+func TestRandomCodeIsEven(t *testing.T) {
+	counts := map[byte]int{}
+	const draws = 20000
+	for i := 0; i < draws/20; i++ {
+		c := randomCode(20)
+		if len(c) != 20 {
+			t.Fatalf("length %d", len(c))
+		}
+		for j := 0; j < len(c); j++ {
+			counts[c[j]]++
+		}
+	}
+	if len(counts) != len(inviteAlphabet) {
+		t.Fatalf("%d distinct letters, want %d", len(counts), len(inviteAlphabet))
+	}
+	first, rest := 0, 0
+	for i := 0; i < len(inviteAlphabet); i++ {
+		if i < 32 {
+			first += counts[inviteAlphabet[i]]
+		} else {
+			rest += counts[inviteAlphabet[i]]
+		}
+	}
+	// evenly drawn, the first 32 letters take 32/56 of the draws; biased, 160/256
+	got, even := float64(first)/float64(first+rest), 32.0/56.0
+	if got > even+0.02 || got < even-0.02 {
+		t.Errorf("the first 32 letters took %.3f of the draws, want about %.3f", got, even)
+	}
+}

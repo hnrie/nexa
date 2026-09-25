@@ -637,14 +637,15 @@ func (s *Store) SetRolePositions(ctx context.Context, serverID ids.ID, positions
 func (s *Store) CreateServerChannel(ctx context.Context, serverID ids.ID, typ, name string, parent *ids.ID) (*Channel, error) {
 	c := &Channel{ServerID: &serverID, Type: typ, Name: name, ParentID: parent}
 	err := s.Tx(ctx, func(tx *db.Tx) error {
-		var max sql.NullInt64
-		if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND type = ? AND coalesce(parent_id, 0) = ?`, int64(serverID), map[bool]string{true: "category", false: "x"}[typ == "category"], idOrZero(parent)).Scan(&max); err != nil {
-			return err
-		}
+		// categories are ordered among categories, channels among the other
+		// channels under the same parent
+		kind := `type = 'category'`
 		if typ != "category" {
-			if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND type != 'category' AND coalesce(parent_id, 0) = ?`, int64(serverID), idOrZero(parent)).Scan(&max); err != nil {
-				return err
-			}
+			kind = `type != 'category'`
+		}
+		var max sql.NullInt64
+		if err := tx.QueryRowContext(ctx, `SELECT max(position) FROM channels WHERE server_id = ? AND `+kind+` AND coalesce(parent_id, 0) = ?`, int64(serverID), idOrZero(parent)).Scan(&max); err != nil {
+			return err
 		}
 		if max.Valid {
 			c.Position = int(max.Int64) + 1

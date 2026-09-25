@@ -17,10 +17,16 @@ var ErrLimit = errors.New("limit reached")
 // MaxReactionEmoji caps distinct emoji per message.
 const MaxReactionEmoji = 20
 
-const messageCols = `id, channel_id, author_id, type, ciphertext, key_conv_id, key_epoch, reply_to_id, mentions, mention_roles, mention_everyone, has_attachments, flags, nonce, edited_at, created_at`
+// messageCols are what a message is read with. has_attachments is written
+// (the legal record sums it) but never read back: the attachments themselves
+// come with the message.
+const messageCols = `id, channel_id, author_id, type, ciphertext, key_conv_id, key_epoch, reply_to_id, mentions, mention_roles, mention_everyone, flags, nonce, edited_at, created_at`
+
+// messageInsertCols are what a new message is written with.
+const messageInsertCols = messageCols + `, has_attachments`
 
 // messageColsM is messageCols qualified with the alias m, for joins.
-const messageColsM = `m.id, m.channel_id, m.author_id, m.type, m.ciphertext, m.key_conv_id, m.key_epoch, m.reply_to_id, m.mentions, m.mention_roles, m.mention_everyone, m.has_attachments, m.flags, m.nonce, m.edited_at, m.created_at`
+const messageColsM = `m.id, m.channel_id, m.author_id, m.type, m.ciphertext, m.key_conv_id, m.key_epoch, m.reply_to_id, m.mentions, m.mention_roles, m.mention_everyone, m.flags, m.nonce, m.edited_at, m.created_at`
 
 // MessageQuery selects a page of messages. Results are always ascending by id.
 type MessageQuery struct {
@@ -61,9 +67,9 @@ func scanMessage(r rowScanner) (*Message, error) {
 	var ct sql.NullString
 	var conv, epoch, reply, edited sql.NullInt64
 	var mentions, roles string
-	var everyone, hasAtt int64
+	var everyone int64
 	var nonce sql.NullString
-	if err := r.Scan(&m.ID, &m.ChannelID, &m.AuthorID, &m.Type, &ct, &conv, &epoch, &reply, &mentions, &roles, &everyone, &hasAtt, &m.Flags, &nonce, &edited, &m.CreatedAt); err != nil {
+	if err := r.Scan(&m.ID, &m.ChannelID, &m.AuthorID, &m.Type, &ct, &conv, &epoch, &reply, &mentions, &roles, &everyone, &m.Flags, &nonce, &edited, &m.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -113,8 +119,8 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 		epoch = int64(*m.KeyEpoch)
 	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
-		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,
-			int64(m.ID), int64(m.ChannelID), int64(m.AuthorID), m.Type, ct, nullID(m.KeyConvID), epoch, nullID(m.ReplyToID), idsJSON(m.Mentions), idsJSON(m.MentionRoles), boolInt(m.MentionEveryone), boolInt(len(m.Attachments) > 0), m.Flags, nonce, nullInt64(m.EditedAt), m.CreatedAt)
+		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageInsertCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,
+			int64(m.ID), int64(m.ChannelID), int64(m.AuthorID), m.Type, ct, nullID(m.KeyConvID), epoch, nullID(m.ReplyToID), idsJSON(m.Mentions), idsJSON(m.MentionRoles), boolInt(m.MentionEveryone), m.Flags, nonce, nullInt64(m.EditedAt), m.CreatedAt, boolInt(len(m.Attachments) > 0))
 		if err != nil {
 			return err
 		}
@@ -275,7 +281,12 @@ func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) er
 
 // UpdateMessage replaces the ciphertext and mention metadata.
 func (s *Store) UpdateMessage(ctx context.Context, id ids.ID, ciphertext json.RawMessage, keyConv ids.ID, keyEpoch int, mentions, roles []ids.ID, everyone bool, editedAt int64) error {
-	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET ciphertext = ?, key_conv_id = ?, key_epoch = ?, mentions = ?, mention_roles = ?, mention_everyone = ?, edited_at = ? WHERE id = ?`, string(ciphertext), int64(keyConv), keyEpoch, idsJSON(mentions), idsJSON(roles), boolInt(everyone), editedAt, int64(id))
+	// written the way InsertMessage writes it: no conversation is NULL, not 0
+	var conv *ids.ID
+	if !keyConv.IsZero() {
+		conv = &keyConv
+	}
+	res, err := s.db.W.ExecContext(ctx, `UPDATE messages SET ciphertext = ?, key_conv_id = ?, key_epoch = ?, mentions = ?, mention_roles = ?, mention_everyone = ?, edited_at = ? WHERE id = ?`, string(ciphertext), nullID(conv), keyEpoch, idsJSON(mentions), idsJSON(roles), boolInt(everyone), editedAt, int64(id))
 	if err != nil {
 		return err
 	}
@@ -480,9 +491,30 @@ func (s *Store) Reactors(ctx context.Context, msgID ids.ID, emoji string, limit 
 	return out, rows.Err()
 }
 
-// PinMessage pins a message in its channel.
+// MaxPins is how many messages one channel can have pinned. Pins lists them
+// all at once, so past this a list would have had to stop partway, silently.
+const MaxPins = 500
+
+// PinMessage pins a message in its channel; ErrTooMany once MaxPins are.
 func (s *Store) PinMessage(ctx context.Context, chID, msgID, by ids.ID) error {
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		// counted and then added to, so the channel is this transaction's alone
+		if err := tx.Serialise(ctx, "pins", int64(chID)); err != nil {
+			return err
+		}
+		var n int
+		if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM pins WHERE channel_id = ?`, int64(chID)).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxPins {
+			var already int
+			if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM pins WHERE channel_id = ? AND message_id = ?`, int64(chID), int64(msgID)).Scan(&already); err != nil {
+				return err
+			}
+			if already == 0 {
+				return ErrTooMany
+			}
+		}
 		res, err := tx.ExecContext(ctx, `INSERT INTO pins (channel_id, message_id, pinned_by, pinned_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(chID), int64(msgID), int64(by), nowMs())
 		if err != nil {
 			return err
@@ -510,9 +542,11 @@ func (s *Store) UnpinMessage(ctx context.Context, chID, msgID ids.ID) error {
 	})
 }
 
-// Pins lists pinned messages, most recently pinned first.
+// Pins lists pinned messages, most recently pinned first — all of them, as
+// PinMessage stops at MaxPins. Two pinned in the same millisecond come back
+// in the same order every time.
 func (s *Store) Pins(ctx context.Context, chID ids.ID, forUser ids.ID) ([]*Message, error) {
-	list, err := s.queryMessages(ctx, `SELECT `+messageColsM+` FROM messages m JOIN pins p ON p.message_id = m.id WHERE p.channel_id = ? ORDER BY p.pinned_at DESC LIMIT 500`, int64(chID))
+	list, err := s.queryMessages(ctx, `SELECT `+messageColsM+` FROM messages m JOIN pins p ON p.message_id = m.id WHERE p.channel_id = ? ORDER BY p.pinned_at DESC, p.message_id DESC LIMIT ?`, int64(chID), MaxPins)
 	if err != nil {
 		return nil, err
 	}

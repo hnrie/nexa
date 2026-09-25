@@ -198,6 +198,66 @@ func TestReactionsAndPins(t *testing.T) {
 	}
 }
 
+// A channel holds at most MaxPins pins, so the list of them is always whole,
+// and pins made in the same millisecond keep one order.
+func TestPinsStopAtTheMostAndKeepTheirOrder(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b := mkUser(t, s, "a"), mkUser(t, s, "b")
+	dm, _, _ := s.CreateDM(ctx, a.ID, b.ID)
+	var last *Message
+	for i := 0; i < MaxPins; i++ {
+		last = mkMsg(t, s, dm.ID, a.ID, "x")
+		// straight in, with one shared time: pinning 500 through the API is slow
+		if _, err := s.db.W.ExecContext(ctx, `INSERT INTO pins (channel_id, message_id, pinned_by, pinned_at) VALUES (?,?,?,?)`, int64(dm.ID), int64(last.ID), int64(a.ID), 1000); err != nil {
+			t.Fatal(err)
+		}
+	}
+	extra := mkMsg(t, s, dm.ID, a.ID, "one too many")
+	if err := s.PinMessage(ctx, dm.ID, extra.ID, a.ID); !errors.Is(err, ErrTooMany) {
+		t.Fatalf("pin past the cap: %v", err)
+	}
+	// pinning one that is already pinned still says so, cap or not
+	if err := s.PinMessage(ctx, dm.ID, last.ID, a.ID); !errors.Is(err, ErrAlreadyExists) {
+		t.Errorf("repin at the cap: %v", err)
+	}
+	pins, err := s.Pins(ctx, dm.ID, a.ID)
+	if err != nil || len(pins) != MaxPins {
+		t.Fatalf("pins: %d %v", len(pins), err)
+	}
+	if pins[0].ID != last.ID {
+		t.Errorf("same-millisecond pins come newest message first: got %v, want %v", pins[0].ID, last.ID)
+	}
+	if err := s.UnpinMessage(ctx, dm.ID, last.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.PinMessage(ctx, dm.ID, extra.ID, a.ID); err != nil {
+		t.Errorf("room again after an unpin: %v", err)
+	}
+}
+
+// An edit writes "no conversation" as NULL, the way a new message does.
+func TestUpdateMessageWritesNoConversationAsNull(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b := mkUser(t, s, "a"), mkUser(t, s, "b")
+	dm, _, _ := s.CreateDM(ctx, a.ID, b.ID)
+	m := mkMsg(t, s, dm.ID, a.ID, "x")
+	if err := s.UpdateMessage(ctx, m.ID, json.RawMessage(`"y"`), 0, 0, nil, nil, false, 5); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.MessageByID(ctx, m.ID, a.ID)
+	if err != nil || got.KeyConvID != nil {
+		t.Fatalf("key_conv_id: %v %v", got.KeyConvID, err)
+	}
+	if err := s.UpdateMessage(ctx, m.ID, json.RawMessage(`"z"`), dm.ID, 1, nil, nil, false, 6); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.MessageByID(ctx, m.ID, a.ID); got.KeyConvID == nil || *got.KeyConvID != dm.ID {
+		t.Errorf("key_conv_id after a real edit: %v", got.KeyConvID)
+	}
+}
+
 func TestReadStatesAndMentions(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
@@ -361,6 +421,30 @@ func TestUnreadCountStopsAtTheMost(t *testing.T) {
 	}
 	if states, _ := s.ReadStatesFor(ctx, a.ID, []ids.ID{dm.ID}); states[0].UnreadCount != 0 {
 		t.Errorf("your own messages are never unread: %+v", states[0])
+	}
+
+	// mentions stop at the same place, so a channel ignored for a year costs
+	// no more on connect than one ignored for an hour
+	for i := 0; i < MaxUnreadCount+5; i++ {
+		m := &Message{ChannelID: dm.ID, AuthorID: a.ID, Ciphertext: json.RawMessage(`"x"`), Mentions: []ids.ID{b.ID}}
+		if err := s.InsertMessage(ctx, m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if states, _ := s.ReadStatesFor(ctx, b.ID, []ids.ID{dm.ID}); states[0].MentionCount != MaxUnreadCount {
+		t.Errorf("mentions should stop at %d: %+v", MaxUnreadCount, states[0])
+	}
+
+	// a subchat is a conversation like its DM, and counts its unread messages
+	sub, err := s.CreateSubchat(ctx, dm, a.ID, "side", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		mkMsg(t, s, sub.ID, a.ID, "x")
+	}
+	if states, _ := s.ReadStatesFor(ctx, b.ID, []ids.ID{sub.ID}); states[0].UnreadCount != 3 {
+		t.Errorf("a subchat's unread messages: %+v", states[0])
 	}
 }
 

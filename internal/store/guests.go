@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"crypto/rand"
 	"database/sql"
 	"errors"
 
@@ -54,14 +53,7 @@ func (g *Guest) Session() *Session {
 // those servers take no guests unless told to.
 const guestCodeLen = 12
 
-func newGuestCode() string {
-	b := make([]byte, guestCodeLen)
-	_, _ = rand.Read(b)
-	for i := range b {
-		b[i] = inviteAlphabet[int(b[i])%len(inviteAlphabet)]
-	}
-	return string(b)
-}
+func newGuestCode() string { return randomCode(guestCodeLen) }
 
 const guestLinkCols = `code, channel_id, creator_id, epoch, created_at, expires_at`
 
