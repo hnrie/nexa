@@ -14,6 +14,7 @@ import { FLAG_ADMIN, FLAG_DISABLED, relativeTo } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { useUI } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 import { t } from "@/i18n";
 import { ModerateModal } from "./ModerateModal";
 import m from "./Moderation.module.css";
@@ -135,7 +136,7 @@ export function UserGrid() {
       label: u.display_name,
       items: [
         { id: "profile", label: t("moderation.menu.profile"), onSelect: () => openModal("profile", { userId: u.id }) },
-        { id: "copy", label: t("moderation.menu.copyId"), onSelect: () => void navigator.clipboard?.writeText(u.id).then(() => toast(t("moderation.copied"), "success")), separatorAfter: true },
+        { id: "copy", label: t("moderation.menu.copyId"), onSelect: () => copyAndSay(u.id, t("moderation.copied")), separatorAfter: true },
         ...(u.blocked === "self" || owner
           ? []
           : [

@@ -14,6 +14,7 @@ import { describeError } from "@/lib/errors";
 import { useAuth } from "@/stores/auth";
 import { useExpressions } from "@/stores/expressions";
 import { useUI } from "@/stores/ui";
+import { copyText } from "@/lib/copyText";
 import { unlessUnsaved } from "@/stores/unsaved";
 import { SaveBar } from "./SettingsLayer";
 import s from "./PackEditor.module.css";
@@ -257,7 +258,11 @@ function PackDetail({ pack, manage, onDeleted }: { pack: StickerPack; manage: bo
     await applyOrder(list);
   };
   const copyLink = () => {
-    void navigator.clipboard?.writeText(packUrl(pack.id)).then(() => {
+    void copyText(packUrl(pack.id)).then((ok) => {
+      if (!ok) {
+        useUI.getState().toast(t("common.copyFailed"), "error");
+        return;
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

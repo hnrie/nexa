@@ -15,6 +15,7 @@ import { P } from "@/lib/perms";
 import { selectServerChannels, useChannels } from "@/stores/channels";
 import { canI, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
+import { copyText } from "@/lib/copyText";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
@@ -69,7 +70,11 @@ export function InviteModal({ onClose, serverId, channelId }: { onClose: () => v
   const link = invite ? inviteUrl(invite.code, withKey && key ? key : null) : "";
   const copy = () => {
     if (!link) return;
-    void navigator.clipboard?.writeText(link).then(() => {
+    void copyText(link).then((ok) => {
+      if (!ok) {
+        useUI.getState().toast(t("common.copyFailed"), "error");
+        return;
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

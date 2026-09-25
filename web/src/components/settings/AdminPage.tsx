@@ -11,6 +11,7 @@ import { formatBytes, formatFull } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useNexa } from "@/stores/nexa";
 import { useUI } from "@/stores/ui";
+import { copyText } from "@/lib/copyText";
 import st from "./Settings.module.css";
 import s from "@/components/server/ServerSettings.module.css";
 
@@ -170,11 +171,10 @@ function LegalResponse() {
 
   const copy = async () => {
     if (!report) return;
-    try {
-      await navigator.clipboard.writeText(report.document);
+    if (await copyText(report.document)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
+    } else {
       toast(tr_("settings.admin.legal.couldNotReachTheClipboardSelect"), "error");
     }
   };

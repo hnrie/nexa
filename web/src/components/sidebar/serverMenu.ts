@@ -7,6 +7,7 @@ import { useReadStates, isUnread } from "@/stores/readStates";
 import { canI, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 import { openMenuItems } from "./openMenu";
 
 import { t } from "@/i18n";
@@ -47,7 +48,7 @@ export async function leaveServer(serverId: string, nav: (p: string) => void): P
 }
 
 function copy(text: string): void {
-  void navigator.clipboard?.writeText(text).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success"));
+  copyAndSay(text);
 }
 
 export function serverMenuItems(serverId: string, ctx: MenuCtx): ContextMenuItem[] {

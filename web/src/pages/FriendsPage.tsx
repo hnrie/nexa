@@ -16,6 +16,7 @@ import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/pres
 import { activityLine } from "@/lib/activity";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
 import s from "@/components/friends/Friends.module.css";
 import { guarded } from "@/lib/captcha";
@@ -238,7 +239,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         ...(rel.type !== "blocked"
           ? [{ id: "block", label: tr_("profile.profileCard.block"), danger: true, onSelect: confirmBlock }]
           : [{ id: "unblock", label: tr_("friends.unblock"), onSelect: () => void remove(tr_("friends.unblocked")) }]),
-        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(rel.user.id).then(() => toast(tr_("friends.userIdCopied"), "success"), () => toast(tr_("friends.theUserIdCouldNotBe"), "error")) },
+        { id: "copy", label: tr_("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(rel.user.id, tr_("friends.userIdCopied")) },
       ],
     });
   };

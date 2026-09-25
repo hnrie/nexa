@@ -1,6 +1,6 @@
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
-import { t } from "@/i18n";
+import type { ContextMenuItem } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 
 /** Whether menus offer the Copy … ID items (Settings → Privacy → Developer Mode). */
 export function developerMode(): boolean {
@@ -12,7 +12,7 @@ export function copyIdItem(key: string, label: string, id: string): ContextMenuI
   return {
     id: key,
     label,
-    onSelect: () => void navigator.clipboard?.writeText(id).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success"), () => undefined),
+    onSelect: () => copyAndSay(id),
   };
 }
 

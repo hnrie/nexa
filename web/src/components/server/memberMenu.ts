@@ -2,7 +2,8 @@ import { P, canActOn } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { canI, memberHighest, useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
-import { useUI, type ContextMenuItem } from "@/stores/ui";
+import type { ContextMenuItem } from "@/stores/ui";
+import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
 
 import { t } from "@/i18n";
@@ -51,7 +52,7 @@ export function memberMenuItems(serverId: string, userId: string, ctx: { openMod
   }
   if (useSettings.getState().settings.developerMode) {
     items[items.length - 1]!.separatorAfter = true;
-    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => void navigator.clipboard?.writeText(userId).then(() => useUI.getState().toast(t("chat.groupMemberMenu.copied"), "success")) });
+    items.push({ id: "copy", label: t("chat.groupMemberMenu.copyUserId"), onSelect: () => copyAndSay(userId) });
   }
   return items;
 }
