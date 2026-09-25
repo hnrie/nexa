@@ -19,7 +19,17 @@ import (
 // 'unsafe-inline' for styles; embeds may load https images/media directly;
 // only the privacy-enhanced YouTube host may be framed, and Cloudflare
 // Turnstile may load its captcha script and frame when captchas are on.
-const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' wss: https: blob:; frame-src 'self' https://www.youtube-nocookie.com https://challenges.cloudflare.com; worker-src 'self' blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+//
+// A person's own look (custom CSS, and themes loaded from links) may pull in
+// https stylesheets and web fonts with @import and @font-face, so style-src
+// and font-src allow https: as img-src already did. Plugins are ES modules
+// the app imports from blob: URLs it makes itself, out of code the person
+// approved and whose hash it checked (web/src/lib/look/plugins), so
+// script-src allows blob:. Only script already running in this page can
+// make a blob: URL, so that lets no new script in from anywhere else, and
+// script-src still refuses https: sources and eval, so a plugin cannot
+// fetch more code past the hash it was pinned to.
+const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob: https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' wss: https: blob:; frame-src 'self' https://www.youtube-nocookie.com https://challenges.cloudflare.com; worker-src 'self' blob:; font-src 'self' data: https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 
 func init() {
 	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")

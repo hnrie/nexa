@@ -8,6 +8,31 @@ const KAOMOJI: Record<string, string> = {
   lenny: "( ͡° ͜ʖ ͡°)",
 };
 
+/**
+ * Commands plugins add (lib/look/plugins). They come after the app's own,
+ * which a plugin cannot replace, and each says which plugin it is from.
+ */
+export interface PluginCommand {
+  name: string;
+  desc: string;
+  /** Runs the command; resolves to the message to send, or null to send none. */
+  run: (args: string, channelId: string) => Promise<string | null>;
+}
+const pluginCommands = new Map<string, PluginCommand>();
+const BUILT_IN = new Set(["shrug", "tableflip", "unflip", "lenny", "me", "spoiler"]);
+
+/** Adds a plugin's command; false when the name is taken. */
+export function registerPluginCommand(c: PluginCommand): boolean {
+  const name = c.name.toLowerCase();
+  if (BUILT_IN.has(name) || pluginCommands.has(name)) return false;
+  pluginCommands.set(name, { ...c, name });
+  return true;
+}
+
+export function unregisterPluginCommand(name: string, run: PluginCommand["run"]): void {
+  if (pluginCommands.get(name.toLowerCase())?.run === run) pluginCommands.delete(name.toLowerCase());
+}
+
 export function commands() {
   return [
   { name: "shrug", desc: t("composer.commands.appendsShrug") },
@@ -16,6 +41,7 @@ export function commands() {
   { name: "lenny", desc: t("composer.commands.appendsToYourMessage3") },
   { name: "me", desc: t("composer.commands.displaysTextWithEmphasis") },
   { name: "spoiler", desc: t("composer.commands.marksYourMessageAsASpoiler") },
+  ...[...pluginCommands.values()].map((c) => ({ name: c.name, desc: c.desc })),
 ];
 }
 
@@ -30,7 +56,7 @@ export function commands() {
  * The last two used to be published as they were typed, so "/ban someone"
  * landed in the channel for everyone to read.
  */
-export type CommandResult = { kind: "text" } | { kind: "command"; text: string } | { kind: "unknown"; name: string } | { kind: "empty"; name: string };
+export type CommandResult = { kind: "text" } | { kind: "command"; text: string } | { kind: "unknown"; name: string } | { kind: "empty"; name: string } | { kind: "plugin"; name: string; run: (channelId: string) => Promise<string | null> };
 
 export function runCommand(text: string): CommandResult {
   const m = /^\/(\w+)(?:\s+([\s\S]*))?$/.exec(text.trim());
@@ -41,6 +67,8 @@ export function runCommand(text: string): CommandResult {
   if (k) return { kind: "command", text: rest ? `${rest} ${k}` : k };
   if (cmd === "me") return rest ? { kind: "command", text: `*${rest}*` } : { kind: "empty", name: cmd };
   if (cmd === "spoiler") return rest ? { kind: "command", text: `||${rest}||` } : { kind: "empty", name: cmd };
+  const fromPlugin = pluginCommands.get(cmd);
+  if (fromPlugin) return { kind: "plugin", name: cmd, run: (channelId) => fromPlugin.run(rest, channelId) };
   return { kind: "unknown", name: m[1]! };
 }
 

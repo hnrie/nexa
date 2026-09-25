@@ -248,14 +248,6 @@
 .facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 13px; }
 .facts dt { color: var(--text-muted); }
 .facts dd { margin: 0; color: var(--text); font-family: var(--font-mono); overflow-wrap: anywhere; }
-.banner { position: fixed; z-index: var(--z-toast); inset-inline: 0; inset-block-start: calc(8px + env(safe-area-inset-top)); display: flex; justify-content: center; pointer-events: none; padding-inline: 12px; }
-.bannerCard { pointer-events: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; max-width: 640px; padding: 8px 8px 8px 14px; border-radius: var(--radius-md); background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-high), 0 0 0 1px var(--border-subtle); font-size: 14px; }
-.bannerCard svg { flex: none; color: var(--text-warning); }
-.bannerText { flex: 1 1 220px; min-width: 0; }
-@media (prefers-reduced-motion: no-preference) {
-  :root:not([data-reduced-motion="true"]) .bannerCard { animation: bannerIn 180ms ease-out; }
-}
-@keyframes bannerIn { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 480px) {
   .itemActions > * { flex: 1 1 auto; }
 }

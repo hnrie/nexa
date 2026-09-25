@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportCrash } from "@/lib/crashReport";
+import { enterSafeMode, lookActive, noteCrash } from "@/lib/look/safeMode";
 import { storage } from "@/lib/storage";
 import s from "./ErrorBoundary.module.css";
 
@@ -41,6 +42,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error("render crash", error, info.componentStack);
+    // counted against plugins, which are turned off after a few of these in a row
+    noteCrash();
     reportCrash({ kind: "render", message: `${error.name}: ${error.message}`, stack: error.stack ?? "", component: info.componentStack ?? "" });
     this.setState({ info: (info.componentStack ?? "").split("\n").slice(0, 8).join("\n") });
     const count = recentReloads();
@@ -87,7 +90,10 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className={s.actions}>
             <button className={s.primary} onClick={this.reload}>{t("shell.errorBoundary.reload")}</button>
             <button className={s.secondary} onClick={() => void this.reset()}>{t("shell.errorBoundary.clearCacheAndReload")}</button>
+            {/* custom CSS or a plugin is the likeliest cause when either is on, and this starts without them */}
+            {lookActive() ? <button className={s.secondary} onClick={enterSafeMode} data-testid="crash-safe-mode">{t("look.safe.startSafe")}</button> : null}
           </div>
+          {lookActive() ? <p className={s.note}>{t("look.safe.crashHint")}</p> : null}
           <p className={s.note}>{t("shell.errorBoundary.ifItKeepsHappeningTellWhoever")}</p>
         </div>
       </div>
