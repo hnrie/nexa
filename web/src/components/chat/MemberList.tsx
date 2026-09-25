@@ -107,6 +107,16 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     });
   }, [st, serverId, overwrites]);
 
+  // The order by name depends on names, not on who is online, so it is sorted
+  // when the members or their names change. Presence changes all the time, and
+  // sorting a large server's whole list again for every one of them was most
+  // of what a busy member list cost; now a change only regroups the list.
+  const sorted = useMemo<Member[]>(() => {
+    const named = visible.map((m) => ({ m, name: memberName(m.nickname, users[m.user_id]) }));
+    named.sort((a, b) => nameOrder.compare(a.name, b.name));
+    return named.map((x) => x.m);
+  }, [visible, users]);
+
   const rows = useMemo<Row[]>(() => {
     if (!st) return [];
     const roles = rolesByPosition(st);
@@ -115,7 +125,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     for (const r of hoisted) groups.set(r.id, { label: r.name, members: [] });
     const online: Member[] = [];
     const offline: Member[] = [];
-    for (const m of visible) {
+    for (const m of sorted) {
       const status = statusOf(presence[m.user_id]);
       if (status === "offline" || status === "invisible") {
         offline.push(m);
@@ -129,11 +139,10 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
       if (top && groups.has(top.id)) groups.get(top.id)!.members.push(m);
       else online.push(m);
     }
-    const byName = (a: Member, b: Member) => nameOrder.compare(memberName(a.nickname, users[a.user_id]), memberName(b.nickname, users[b.user_id]));
     const out: Row[] = [];
+    // each list keeps the name order it was filled in
     const push = (key: string, label: string, list: Member[], off: boolean) => {
       if (list.length === 0) return;
-      list.sort(byName);
       out.push({ kind: "head", key: "h:" + key, label, count: list.length });
       for (const m of list) out.push({ kind: "member", key: m.user_id, member: m, user: users[m.user_id], color: memberColor(st, m.user_id), offline: off });
     };
@@ -141,7 +150,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
     push("online", t("chat.memberList.online"), online, false);
     push("offline", t("chat.memberList.offline"), offline, true);
     return out;
-  }, [st, visible, users, presence, serverId]);
+  }, [st, sorted, users, presence, serverId]);
 
   if (!st) return null;
   const virtual = rows.length > VIRTUAL_FROM;
