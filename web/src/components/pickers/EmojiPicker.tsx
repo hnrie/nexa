@@ -227,15 +227,29 @@ function firstRowBelow(rows: Row[], y: number): number {
   return lo;
 }
 
-export function EmojiPicker({ onPick, serverId }: { onPick: (e: EmojiPick) => void; serverId?: string | null | undefined }) {
+/** No packs, for a picker that offers only one server's own emoji. */
+const NO_PACKS: Record<string, StickerPack> = {};
+
+/**
+ * `onlyServer` keeps the custom emoji to those of `serverId` and leaves out
+ * emoji packs: for something every member of that server sees, like a
+ * channel's icon, where a picture from elsewhere would not be theirs to use.
+ */
+export function EmojiPicker({ onPick, serverId, onlyServer = false }: { onPick: (e: EmojiPick) => void; serverId?: string | null | undefined; onlyServer?: boolean }) {
   const [ready, setReady] = useState(emojiLoaded());
   const [loadFailed, setLoadFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState("");
   const hover = useMemo(createHover, []);
-  const customByServer = useExpressions((x) => x.emojis);
+  const allCustom = useExpressions((x) => x.emojis);
+  const customByServer = useMemo(() => {
+    if (!onlyServer) return allCustom;
+    const own = serverId ? allCustom[serverId] : undefined;
+    return own && serverId ? { [serverId]: own } : {};
+  }, [allCustom, onlyServer, serverId]);
   const servers = useServers((x) => x.byId);
-  const packs = useExpressions((x) => x.packs);
+  const allPacks = useExpressions((x) => x.packs);
+  const packs = onlyServer ? NO_PACKS : allPacks;
   const tone = useSettings((st) => st.settings.skinTone);
   const recent = useSettings((st) => st.settings.recentEmoji);
   const patch = useSettings((st) => st.patch);

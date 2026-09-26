@@ -172,9 +172,9 @@ export default function RegisterPage() {
         {/* English in every language (the legal.* strings are), so it lays itself out as English */}
         <div className={s.foot} dir="auto">
           {t("legal.gatePrivacy")}{" "}
-          <Link className={s.nowrap} to="/terms" target="_blank" rel="noreferrer noopener">{t("legal.termsTitle")}</Link>
+          <Link className={s.nowrap} to="/terms" target="_blank" rel="noreferrer noopener" data-new-tab="">{t("legal.termsTitle")}</Link>
           {" · "}
-          <Link className={s.nowrap} to="/privacy" target="_blank" rel="noreferrer noopener">{t("legal.privacyTitle")}</Link>
+          <Link className={s.nowrap} to="/privacy" target="_blank" rel="noreferrer noopener" data-new-tab="">{t("legal.privacyTitle")}</Link>
         </div>
         <div className={s.foot}>
           <Link to="/login">{t("register.alreadyHaveAnAccount")}</Link>

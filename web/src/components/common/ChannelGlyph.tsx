@@ -48,6 +48,18 @@ export function ChannelGlyph({ channel, size, locked = false, className }: Props
   );
 }
 
+/**
+ * What leads a channel mention in a message: the channel's own icon, small
+ * and in line with the text, or the "#" every other mention has.
+ */
+export function MentionGlyph({ channel }: { channel: { name: string; type?: Channel["type"]; server_id?: string | null; glyph?: string | undefined } }) {
+  const g = parseGlyph(channel.glyph);
+  const found = useExpressions((x) => (g?.kind === "custom" && channel.server_id ? !!x.emojis[channel.server_id]?.some((e) => e.id === g.id) : false));
+  const own = g?.kind === "emoji" || (g?.kind === "icon" && !!CHANNEL_ICONS[g.name]) || found;
+  if (!own) return <>#</>;
+  return <ChannelGlyph channel={{ type: channel.type ?? "text", server_id: channel.server_id ?? null, glyph: channel.glyph }} size={16} className={s.inline} />;
+}
+
 /** The corner mark: half the glyph, and never so small it turns to a smudge. */
 function badgeSize(size: number): number {
   return Math.max(9, Math.round(size / 2));

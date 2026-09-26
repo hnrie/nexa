@@ -9,3 +9,5 @@
 .picture { width: calc(var(--glyph-size) * 0.86); height: calc(var(--glyph-size) * 0.86); object-fit: contain; }
 .text { font-size: calc(var(--glyph-size) * 0.8); line-height: 1; }
 .badge { position: absolute; inset-inline-end: -4px; bottom: -2px; display: flex; border-radius: 2px; background: var(--glyph-cut, var(--bg-base)); }
+/* in a mention, in line with the words: nudged to sit on their baseline, with a hair of space before the name */
+.inline { vertical-align: -3px; margin-inline-end: 2px; }

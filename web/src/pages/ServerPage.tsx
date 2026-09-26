@@ -1,4 +1,4 @@
-import { Volume2 } from "lucide-react";
+import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -156,7 +156,7 @@ function NoChannels() {
 function VoiceRoom({ channel }: { channel: import("@/api/types").Channel }) {
   return (
     <div className={s.empty}>
-      <header className={s.header}><PageHeaderButtons /><Volume2 size={22} className={s.hIcon} /><span className={s.hName}>{channel.name}</span></header>
+      <header className={s.header}><PageHeaderButtons /><ChannelGlyph channel={channel} size={22} className={s.hIcon} /><span className={s.hName}>{channel.name}</span></header>
       <VoiceView channel={channel} />
     </div>
   );

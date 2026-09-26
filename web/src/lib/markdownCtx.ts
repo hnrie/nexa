@@ -51,9 +51,9 @@ function sameBy<T>(field: (x: T) => unknown): (a: Record<string, T>, b: Record<s
   };
 }
 
-// what a mention shows of each: a person's names, a channel's name, a role's name and colour
+// what a mention shows of each: a person's names, a channel's name and icon, a role's name and colour
 const sameUsers = sameBy<PublicUser>((u) => [u.display_name, u.username]);
-const sameChannels = sameBy<Channel>((c) => c.name);
+const sameChannels = sameBy<Channel>((c) => [c.name, c.glyph ?? ""]);
 const sameRoles = sameBy<Roles[string]>((r) => [r.name, r.color]);
 
 function rolesOf(servers: Record<string, ServerState>): Roles {

@@ -18,6 +18,8 @@ interface Props {
   anchor?: DOMRect | null;
   /** The server whose custom emoji lead the list. */
   serverId?: string | null | undefined;
+  /** Offer that server's custom emoji only, and no packs (see EmojiPicker). */
+  onlyServer?: boolean;
 }
 
 /** What Tab can reach inside the popover, for the trap. */
@@ -54,7 +56,7 @@ function openedOver(picker: HTMLElement, el: Element | null): boolean {
 }
 
 /** Tabbed popover above the composer (or anchored anywhere); closes on outside click or Escape. */
-export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId }: Props) {
+export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, stickers, anchor = null, serverId, onlyServer }: Props) {
   // drawn in place over the message box, it tells the back gesture itself (a portalled one is seen anyway)
   useLayerPresence(!anchor);
   const [active, setActive] = useState<PickerTab>(tab === "gif" && !gifs ? "emoji" : tab === "sticker" && !stickers ? "emoji" : tab);
@@ -146,7 +148,7 @@ export function ExpressionPicker({ tab = "emoji", onEmoji, onClose, gifs, sticke
         </div>
         <button className={s.close} aria-label={t("pickers.expressionPicker.closePicker")} onClick={onClose}><X size={18} /></button>
       </div>
-      {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} /> : active === "gif" ? gifs : stickers}
+      {active === "emoji" ? <EmojiPicker onPick={onEmoji} serverId={serverId} onlyServer={onlyServer} /> : active === "gif" ? gifs : stickers}
     </div>
   );
   return anchor ? createPortal(body, document.body) : body;

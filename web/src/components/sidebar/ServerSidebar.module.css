@@ -32,9 +32,10 @@
 .catHead[data-drop="into"] { box-shadow: inset 0 0 0 2px var(--brand); border-radius: var(--radius-xs); }
 .channel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 8px; color: inherit; font-size: 16px; font-weight: 500; text-align: start; }
 .icon { display: flex; flex: none; color: var(--text-muted); }
-.lockHash { position: relative; display: flex; }
-.lock { position: absolute; inset-inline-end: -4px; bottom: -2px; background: var(--bg-base); border-radius: 2px; }
-.row[data-selected="true"] .lock, .row:hover .lock { background: var(--bg-selected); }
+/* the colour behind a glyph's corner badge (a lock, a speaker), so it reads as cut out */
+.row { --glyph-cut: var(--bg-base); }
+.row[data-selected="true"], .row:hover { --glyph-cut: var(--bg-selected); }
+.catGlyph { margin-inline: 2px 4px; }
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: none; gap: 4px; }
 .action { display: flex; padding: 2px; color: var(--text-muted); border-radius: var(--radius-xs); }

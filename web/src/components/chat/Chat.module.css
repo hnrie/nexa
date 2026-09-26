@@ -19,8 +19,8 @@
    makes way for it rather than both it and the channel's name being cut to
    a letter or two. */
 @media (max-width: 1099px) { .header:has([data-header-search]:focus-within) .hTopic { display: none; } }
-.lockHash { position: relative; display: flex; }
-.lock { position: absolute; inset-inline-end: -5px; bottom: -3px; background: var(--bg-raised); border-radius: 2px; }
+/* a channel glyph's corner badge (ChannelGlyph) is cut out of the header behind it */
+.hIcon { --glyph-cut: var(--bg-raised); }
 .authorNick { font-weight: 500; }
 /* The encryption-key badge sits with the name, not with the action buttons:
    it describes the conversation rather than doing anything to it. */

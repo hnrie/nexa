@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Hash, Lock, Plus, Settings, UserPlus, Volume2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Settings, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import { servers as serversApi, type ChannelPositionPatch } from "@/api/servers";
 import { bannerUrl } from "@/api/users";
 import { UserPanel } from "@/components/shell/UserPanel";
+import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { VoiceParticipants } from "@/components/voice/VoiceParticipants";
 import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { joinVoice } from "@/voice/session";
@@ -231,7 +232,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
           }}
           aria-current={selected ? "page" : undefined}
         >
-          <span className={s.icon}>{ch.type === "voice" ? <Volume2 size={20} /> : priv ? <span className={s.lockHash}><Hash size={20} /><Lock size={10} className={s.lock} /></span> : <Hash size={20} />}</span>
+          <span className={s.icon}><ChannelGlyph channel={ch} size={20} locked={priv && ch.type !== "voice"} /></span>
           <span className={s.name}>{ch.name}</span>
           {/* The dot and the count sit outside the button, so the button said
               nothing about either; they are said as part of its name now. */}
@@ -282,6 +283,7 @@ export function ServerSidebar({ serverId }: { serverId: string }) {
               >
                 <button className={s.catToggle} onClick={() => toggleCategory(category.id)} aria-expanded={!isCollapsed}>
                   {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                  <ChannelGlyph channel={category} size={14} className={s.catGlyph} />
                   <span className={s.catName}>{category.name}</span>
                 </button>
                 {canManage ? (

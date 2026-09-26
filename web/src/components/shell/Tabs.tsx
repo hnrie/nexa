@@ -2,6 +2,7 @@ import { Hash, Lock, MessageCircle, Plus, Users, Volume2, X } from "lucide-react
 import { useRef, useState } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
+import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
@@ -189,7 +190,7 @@ function TabIcon({ channel, meId, name }: { channel: Channel; meId: string | und
     return <Avatar id={other} avatarId={users[other]?.avatar_id ?? null} name={name} size={16} />;
   }
   if (channel.type === "group_dm") return <Users size={14} />;
-  if (channel.type === "voice") return <Volume2 size={14} />;
+  if (channel.type === "voice") return <ChannelGlyph channel={channel} size={14} />;
   if (channel.type === "subchat") return channel.locked ? <Lock size={14} /> : <MessageCircle size={14} />;
-  return <Hash size={14} />;
+  return <ChannelGlyph channel={channel} size={14} />;
 }
