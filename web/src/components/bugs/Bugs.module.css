@@ -258,7 +258,7 @@
   padding: 2px 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-link, var(--link));
+  color: var(--link);
 }
 .disclose:hover {
   text-decoration: underline;
@@ -382,6 +382,22 @@
 .headerButton svg {
   flex: none;
 }
+/* a phone's header keeps its room for the page's name: the icon stays, its name is read out */
+@media (max-width: 600px) {
+  .headerButton {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  .headerButton span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 
 /* On the Friends page: at the far end of the header where there is room for
    one row, and beside the title where the tabs take a row of their own (Add
@@ -500,6 +516,10 @@
 @container (max-width: 420px) {
   .reportTop {
     flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .reportTitles {
+    flex: 1 1 calc(100% - 48px);
   }
   .reportTop > .status {
     order: 3;
@@ -550,6 +570,7 @@
 }
 .shot {
   position: relative;
+  width: 100%;
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -657,6 +678,14 @@ button.shot:focus-visible {
   display: flex;
   align-items: flex-start;
   gap: 10px;
+}
+.feedSubject {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .feedTitle {
   flex: 1;

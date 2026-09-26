@@ -149,7 +149,7 @@ export function BugsTab() {
       <div className={m.listCol}>
         <div className={b.tools}>
           <div className={b.toolRow}>
-            <SearchBox className={b.search} value={query} onChange={setQuery} placeholder={t("bugs.staff.search")} aria-label={t("bugs.staff.search")} data-testid="bugs-search" />
+            <SearchBox className={b.search} value={query} onChange={setQuery} placeholder={t("bugs.staff.searchShort")} aria-label={t("bugs.staff.search")} title={t("bugs.staff.search")} data-testid="bugs-search" />
             <Select className={b.sort} value={sort} onChange={(e) => setSort(e.target.value as BugSort)} aria-label={t("bugs.staff.sort")} data-testid="bugs-sort">
               <option value="activity">{t("bugs.staff.sortActivity")}</option>
               <option value="newest">{t("bugs.staff.sortNewest")}</option>
@@ -158,7 +158,7 @@ export function BugsTab() {
           </div>
           <div className={b.chips} role="radiogroup" aria-label={t("bugs.staff.views")}>
             {views.map((v) => (
-              <button key={v.id} type="button" role="radio" aria-checked={view === v.id} className={m.chip} data-selected={view === v.id} data-tone={v.id === "waiting" ? "danger" : undefined} onClick={() => setView(v.id)} data-testid={`bugs-view-${v.id}`}>
+              <button key={v.id} type="button" role="radio" aria-checked={view === v.id} className={m.chip} data-selected={view === v.id} onClick={() => setView(v.id)} data-testid={`bugs-view-${v.id}`}>
                 {v.label}
                 {v.n !== undefined ? <span className={m.chipCount}>{v.n}</span> : null}
               </button>

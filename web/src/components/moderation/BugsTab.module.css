@@ -29,6 +29,15 @@
   flex: none;
   width: auto;
   max-width: 45%;
+  height: 32px;
+  padding: 0 6px;
+  font-size: 13.5px;
+}
+@media (pointer: coarse) {
+  .sort {
+    height: 40px;
+    font-size: 16px;
+  }
 }
 .chips {
   display: flex;

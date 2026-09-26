@@ -166,6 +166,7 @@
   "bugs.staff.pickHint": "Le signalement et son fil s’ouvrent ici.",
   "bugs.staff.reopen": "Rouvrir",
   "bugs.staff.search": "Rechercher par objet, texte, auteur ou #numéro",
+  "bugs.staff.searchShort": "Rechercher des signalements",
   "bugs.staff.setStatus": "Changer le statut",
   "bugs.staff.sort": "Trier les signalements",
   "bugs.staff.sortActivity": "Activité récente",

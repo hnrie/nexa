@@ -161,6 +161,7 @@
   "bugs.staff.pickHint": "报告及其对话会在这里打开。",
   "bugs.staff.reopen": "重新打开",
   "bugs.staff.search": "按主题、内容、报告人或 #编号搜索",
+  "bugs.staff.searchShort": "搜索报告",
   "bugs.staff.setStatus": "更改状态",
   "bugs.staff.sort": "报告排序",
   "bugs.staff.sortActivity": "最近活动",

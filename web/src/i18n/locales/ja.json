@@ -161,6 +161,7 @@
   "bugs.staff.pickHint": "報告とそのスレッドがここに表示されます。",
   "bugs.staff.reopen": "再オープン",
   "bugs.staff.search": "件名、本文、報告者、#番号で検索",
+  "bugs.staff.searchShort": "報告を検索",
   "bugs.staff.setStatus": "ステータスを変更",
   "bugs.staff.sort": "報告の並べ替え",
   "bugs.staff.sortActivity": "最近のアクティビティ",

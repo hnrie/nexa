@@ -166,6 +166,7 @@
   "bugs.staff.pickHint": "Aquí se abren el informe y su hilo.",
   "bugs.staff.reopen": "Reabrir",
   "bugs.staff.search": "Buscar por asunto, texto, autor o #número",
+  "bugs.staff.searchShort": "Buscar informes",
   "bugs.staff.setStatus": "Cambiar estado",
   "bugs.staff.sort": "Ordenar informes",
   "bugs.staff.sortActivity": "Actividad reciente",

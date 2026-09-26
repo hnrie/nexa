@@ -176,6 +176,7 @@
   "bugs.staff.pickHint": "يُفتح البلاغ ومحادثته هنا.",
   "bugs.staff.reopen": "إعادة الفتح",
   "bugs.staff.search": "ابحث بالموضوع أو النص أو صاحب البلاغ أو #الرقم",
+  "bugs.staff.searchShort": "البحث في البلاغات",
   "bugs.staff.setStatus": "تغيير الحالة",
   "bugs.staff.sort": "ترتيب البلاغات",
   "bugs.staff.sortActivity": "آخر نشاط",

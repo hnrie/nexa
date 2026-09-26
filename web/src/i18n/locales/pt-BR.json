@@ -166,6 +166,7 @@
   "bugs.staff.pickHint": "O relato e o tópico dele abrem aqui.",
   "bugs.staff.reopen": "Reabrir",
   "bugs.staff.search": "Buscar por assunto, texto, autor ou #número",
+  "bugs.staff.searchShort": "Buscar relatos",
   "bugs.staff.setStatus": "Alterar status",
   "bugs.staff.sort": "Ordenar relatos",
   "bugs.staff.sortActivity": "Atividade recente",

@@ -53,6 +53,9 @@ export function BugFeedEntry({ item, people, onOpen }: { item: BugItem; people: 
         <div className={s.feedTop}>
           <p className={s.feedTitle}>{t("bugs.feed.replied", { number: bugNumber(b.number) })}</p>
         </div>
+        <p className={s.feedSubject} dir="auto">
+          {b.subject}
+        </p>
         <p className={s.quote} dir="auto">
           {plainText(parse(item.message.body))}
         </p>
@@ -60,7 +63,6 @@ export function BugFeedEntry({ item, people, onOpen }: { item: BugItem; people: 
           <span className={n.credit}>
             {t("nexa.thread.sentBy")} <PersonChip id={item.message.author_id} person={people[item.message.author_id]} size={16} />
           </span>
-          <span dir="auto">{b.subject}</span>
         </div>
         <div className={n.noticeActions}>{open}</div>
       </div>

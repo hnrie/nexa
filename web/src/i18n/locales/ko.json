@@ -161,6 +161,7 @@
   "bugs.staff.pickHint": "신고와 스레드가 여기에 열립니다.",
   "bugs.staff.reopen": "다시 열기",
   "bugs.staff.search": "제목, 내용, 신고자, #번호로 검색",
+  "bugs.staff.searchShort": "신고 검색",
   "bugs.staff.setStatus": "상태 변경",
   "bugs.staff.sort": "신고 정렬",
   "bugs.staff.sortActivity": "최근 활동",

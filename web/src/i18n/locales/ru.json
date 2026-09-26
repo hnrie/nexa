@@ -170,6 +170,7 @@
   "bugs.staff.pickHint": "Здесь откроется сообщение и переписка по нему.",
   "bugs.staff.reopen": "Открыть снова",
   "bugs.staff.search": "Поиск по теме, тексту, автору или #номеру",
+  "bugs.staff.searchShort": "Поиск сообщений",
   "bugs.staff.setStatus": "Изменить статус",
   "bugs.staff.sort": "Сортировка",
   "bugs.staff.sortActivity": "Последняя активность",

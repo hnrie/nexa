@@ -165,6 +165,7 @@
   "bugs.staff.pickHint": "रिपोर्ट और उसका थ्रेड यहाँ खुलेंगे।",
   "bugs.staff.reopen": "फिर से खोलें",
   "bugs.staff.search": "विषय, टेक्स्ट, रिपोर्ट करने वाले या #नंबर से खोजें",
+  "bugs.staff.searchShort": "रिपोर्ट खोजें",
   "bugs.staff.setStatus": "स्थिति बदलें",
   "bugs.staff.sort": "रिपोर्ट क्रम से लगाएँ",
   "bugs.staff.sortActivity": "हाल की गतिविधि",

@@ -165,6 +165,7 @@
   "bugs.staff.pickHint": "The report and its thread open here.",
   "bugs.staff.reopen": "Reopen",
   "bugs.staff.search": "Search subject, text, reporter or #number",
+  "bugs.staff.searchShort": "Search reports",
   "bugs.staff.setStatus": "Set Status",
   "bugs.staff.sort": "Sort Reports",
   "bugs.staff.sortActivity": "Recent Activity",

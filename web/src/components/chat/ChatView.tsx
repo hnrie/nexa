@@ -312,7 +312,7 @@ export function ChatView({ channel }: { channel: Channel }) {
           </Tooltip>
         ) : null}
         {/* every conversation's header has the way to tell the team something broke; a phone has it in More */}
-        {!mobile && !isServer ? <ReportBugButton from={convo.type === "group_dm" ? "group" : "dm"} className={s.hBtn} /> : null}
+        {!mobile && !isServer ? <ReportBugButton from={convo.type === "group_dm" ? "group" : "dm"} className={s.hBtn} minHeaderWidth={600} /> : null}
         {mobile ? (
           <button
             className={s.hBtn}
