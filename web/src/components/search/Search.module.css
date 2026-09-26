@@ -102,7 +102,8 @@
 .day, .month { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; padding: 12px 16px 6px; background: var(--search-bg); color: var(--text-muted); font-size: 12px; font-weight: 600; }
 .day::after, .month::after { content: ""; flex: 1; height: 1px; background: var(--border-subtle); }
 .hit { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 8px 16px; text-align: start; color: var(--text); }
-.hit:hover { background: var(--bg-message-hover); }
+/* rows shade under a pointer that hovers; on a touch screen a tapped row would keep the shade */
+@media (hover: hover) { .hit:hover { background: var(--bg-message-hover); } }
 .hit:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .hitMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .hitHead { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
@@ -136,12 +137,12 @@
 .grid .month { grid-column: 1 / -1; margin-inline: -12px; }
 .tile { display: block; aspect-ratio: 1; padding: 0; border-radius: var(--radius-xs); overflow: hidden; }
 .tileImg { width: 100%; height: 100%; }
-.tile:hover .tileImg img { filter: brightness(1.08); }
+@media (hover: hover) { .tile:hover .tileImg img { filter: brightness(1.08); } }
 .tile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* ----- links and files ----- */
 .rowWrap { display: flex; align-items: center; gap: 4px; padding-inline-end: 8px; }
-.rowWrap:hover { background: var(--bg-message-hover); }
+@media (hover: hover) { .rowWrap:hover { background: var(--bg-message-hover); } }
 .linkRow { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding: 10px 4px 10px 16px; text-align: start; color: var(--text); }
 .linkRow:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .mono, .fileTile { flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-sm); }
@@ -183,9 +184,12 @@
 /* ----- fingers ----- */
 @media (pointer: coarse) {
   .close { width: 44px; height: 44px; margin: -8px -4px -8px auto; }
-  .chip { height: 34px; padding-inline-start: 10px; }
-  .chipX { width: 32px; height: 32px; }
-  .narrow { height: 34px; }
+  /* the ✕ fills the end of the pill, so a thumb finds it */
+  .chip { height: 40px; padding-inline: 12px 0; }
+  .chipX { width: 40px; height: 40px; }
+  .narrow { height: 40px; }
+  .sheetBox { height: 44px; }
+  .sheetBox button { width: 40px; height: 40px; }
   .opt { min-height: 44px; }
   .optRemove { width: 40px; height: 40px; margin-inline-end: -8px; }
   .tab { height: 46px; padding: 0 12px; }

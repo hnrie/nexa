@@ -279,7 +279,8 @@ export function SearchSuggestions({
                   // the box keeps focus, and its caret, while a row is clicked
                   if (item.kind !== "pickDate") e.preventDefault();
                 }}
-                onMouseEnter={() => onHover(i)}
+                // a pointer that moves chooses; rows sliding under a still one do not
+                onMouseMove={() => i !== active && onHover(i)}
                 onClick={() => item.kind !== "pickDate" && onPick(item)}
               >
                 <SuggestionRow item={item} names={names} onDate={onDate} />

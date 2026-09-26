@@ -175,6 +175,14 @@ function Finder({ onClose }: { onClose: () => void }) {
   const listId = useId();
   const places = usePlaces(onClose);
 
+  // Straight into the box, on a phone too: this dialog is for typing, and the
+  // keyboard coming up is what someone who opened it wants. (A dialog's own
+  // focus goes to the card on a touch screen, and autoFocus fires before the
+  // dialog is in the page, so it is asked for once it is.)
+  useEffect(() => {
+    input.current?.focus({ preventScroll: true });
+  }, []);
+
   // An empty box starts over; the choice of tab and order stays while it is open.
   useEffect(() => {
     if (!q.trim()) setSearched(false);
@@ -196,8 +204,8 @@ function Finder({ onClose }: { onClose: () => void }) {
     return searched ? all : all.filter((g) => g.kind !== "filters");
   }, [dismissed, q, caret, names, candidates, recent, searched]);
 
-  const matches = useMemo(() => {
-    if (!q.trim()) return places.filter((pl) => pl.kind === "dm" || pl.kind === "group").slice(0, 6);
+  const scored = useMemo(() => {
+    if (!q.trim()) return places.filter((pl) => pl.kind === "dm" || pl.kind === "group").slice(0, 6).map((pl) => ({ pl, sc: 0 }));
     const hasFilters = run.parsed.tokens.some((tk) => tk.kind === "filter");
     const query = fold(run.parsed.terms.join(" ").replace(/^[@#]/, ""));
     if (!query || hasFilters) return [];
@@ -205,9 +213,13 @@ function Finder({ onClose }: { onClose: () => void }) {
       .map((pl) => ({ pl, sc: Math.max(score(pl.label, query), score(pl.sub.replace(/^@/, ""), query) - 5) }))
       .filter((x) => x.sc >= 0)
       .sort((a, b) => b.sc - a.sc)
-      .slice(0, 6)
-      .map((x) => x.pl);
+      .slice(0, 6);
   }, [places, q, run.parsed]);
+  const matches = useMemo(() => scored.map((x) => x.pl), [scored]);
+  // A name typed (its start, a word's start, inside it) is where Enter goes.
+  // Letters that only happen to come in order in a long name are offered, but
+  // Enter searches the words instead: "hello" is not a trip to #a-channel-with-a-long-name.
+  const nameTyped = (scored[0]?.sc ?? 0) >= 50;
 
   const commit = useCallback(() => {
     if (!q.trim()) return;
@@ -281,7 +293,7 @@ function Finder({ onClose }: { onClose: () => void }) {
   // typed land on nothing, so Enter searches them and brings up the tabs.
   // The same list worked out again (the index filling in) keeps its row.
   const optionSig = options.map((o) => o.id).join("\n");
-  const firstIsPlace = options[0]?.kind === "place";
+  const firstIsPlace = options[0]?.kind === "place" && nameTyped;
   useEffect(() => setActive(q.trim() && !typingFilter && firstIsPlace ? 0 : -1), [optionSig, q, typingFilter, firstIsPlace]);
   const choose = (o: Option | undefined) => {
     if (!o || o.kind === "all") return commit();
@@ -392,7 +404,8 @@ function Finder({ onClose }: { onClose: () => void }) {
                   className={s.option}
                   // the box keeps focus (and the keyboard stays up on a phone)
                   onMouseDown={(e) => kind !== "pickDate" && e.preventDefault()}
-                  onMouseEnter={() => setActive(at)}
+                  // a pointer that moves chooses; rows sliding under a still one do not
+                  onMouseMove={() => active !== at && setActive(at)}
                   onClick={() => kind !== "pickDate" && choose(o)}
                   data-testid={o.kind === "place" ? "switcher-place" : o.kind === "message" ? "switcher-hit" : o.kind === "all" ? "switcher-all" : "switcher-suggestion"}
                 >
@@ -435,7 +448,6 @@ function Finder({ onClose }: { onClose: () => void }) {
             aria-controls={searched ? (floating.length ? `${listId}-float` : undefined) : listId}
             aria-autocomplete="list"
             aria-activedescendant={activeDom}
-            autoFocus={!mobile}
             onKeyDown={keys}
             onEscape={onClose}
           />
