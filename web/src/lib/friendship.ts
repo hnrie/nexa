@@ -16,8 +16,10 @@ import type { Channel, PublicUser, Relationship } from "@/api/types";
 import { guarded } from "@/lib/captcha";
 import { describeError } from "@/lib/errors";
 import { isSystemAccount } from "@/lib/moderation";
+import { sealRequestNote } from "@/lib/requestNote";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
+import { sealingKeyOf } from "@/stores/keys";
 import { useRelationships } from "@/stores/relationships";
 import { useSettings, type Settings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
@@ -100,6 +102,27 @@ export async function sendFriendRequest(user: PublicUser): Promise<"outgoing" | 
     }
   });
   return done ?? null;
+}
+
+/**
+ * Puts a note on the request this account just sent them, sealed on this
+ * device to their identity key (the key a conversation with them would be
+ * sealed to, pin check and all). The request itself has gone either way, so a
+ * note that cannot be sealed or sent only says so; resolves to whether it went.
+ */
+export async function addRequestNote(user: PublicUser, note: string): Promise<boolean> {
+  try {
+    const key = await sealingKeyOf(user.id);
+    // their key is not the one this device pinned: the question is on screen
+    // (judgeKey), and nothing is sealed to the new key until it is answered
+    if (!key) throw new Error("their identity key changed");
+    await relApi.setNote(user.id, await sealRequestNote(key, note));
+    return true;
+  } catch (err) {
+    console.warn("friends: could not add the note to a request", err);
+    toast(t("friends.noteNotAdded"));
+    return false;
+  }
 }
 
 /** Says yes to someone's request. Resolves to the conversation the server opens with it, if any. */

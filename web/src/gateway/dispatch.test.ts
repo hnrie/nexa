@@ -1,14 +1,15 @@
 import { ApiError, api } from "@/api/client";
-import type { Channel, PublicUser, ReadyPayload } from "@/api/types";
+import type { Channel, PublicUser, ReadyPayload, Relationship } from "@/api/types";
 import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
+import { useRelationships } from "@/stores/relationships";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useAuth } from "@/stores/auth";
 import type { DecryptedMessage } from "@/lib/decrypt";
-import { applyEvent } from "./dispatch";
+import { applyEvent, dispatchHooks } from "./dispatch";
 
 const chan = (id: string): Channel => ({ id, type: "text", server_id: "s1", name: id, position: 0, parent_id: null, recipient_ids: [], last_message_id: null }) as unknown as Channel;
 const person = (id: string): PublicUser => ({ id, username: id, display_name: id }) as unknown as PublicUser;
@@ -185,3 +186,32 @@ describe("the order events arrive in", () => {
     expect(useMessages.getState().channels["c7"]?.byId["80"]?.reactions).toEqual([{ emoji: "🎉", count: 1, me: false }]);
   });
 });
+
+describe("a friend request's note", () => {
+  beforeEach(() => {
+    api.request = <T>(): Promise<T> => Promise.resolve([] as T);
+    useRelationships.getState().clear();
+  });
+
+  it("is kept when it arrives after the request, which is not announced a second time", async () => {
+    const heard: string[] = [];
+    const hook = (r: Relationship) => void heard.push(r.user.id);
+    dispatchHooks.onFriendRequest.push(hook);
+    try {
+      const request: Relationship = { user: person("sam"), type: "incoming", nickname: "", created_at: 1 };
+      await applyEvent({ t: "relationship_add", d: request });
+      await applyEvent({ t: "relationship_add", d: { ...request, note: "c2VhbGVkIGJveA==" } });
+      expect(useRelationships.getState().byUser["sam"]?.note).toBe("c2VhbGVkIGJveA==");
+      expect(heard).toEqual(["sam"]);
+      // and the list a reconnect brings keeps it too
+      await applyEvent({ t: "ready", d: { ...ready([], [person("sam")]), relationships: [{ ...request, note: "c2VhbGVkIGJveA==" }] } });
+      expect(useRelationships.getState().byUser["sam"]?.note).toBe("c2VhbGVkIGJveA==");
+      // accepting it leaves a friendship with no note
+      await applyEvent({ t: "relationship_add", d: { ...request, type: "friend" } });
+      expect(useRelationships.getState().byUser["sam"]?.note).toBeUndefined();
+    } finally {
+      dispatchHooks.onFriendRequest.splice(dispatchHooks.onFriendRequest.indexOf(hook), 1);
+    }
+  });
+});
+

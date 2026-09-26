@@ -11,7 +11,7 @@ import (
 
 // Relationships lists everything from uid's point of view.
 func (s *Store) Relationships(ctx context.Context, uid ids.ID) ([]*Relationship, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id, target_id, type, nickname, created_at FROM relationships WHERE user_id = ? ORDER BY created_at`, int64(uid))
+	rows, err := s.db.R.QueryContext(ctx, `SELECT user_id, target_id, type, nickname, request_note, created_at FROM relationships WHERE user_id = ? ORDER BY created_at`, int64(uid))
 	if err != nil {
 		return nil, err
 	}
@@ -19,7 +19,7 @@ func (s *Store) Relationships(ctx context.Context, uid ids.ID) ([]*Relationship,
 	out := []*Relationship{}
 	for rows.Next() {
 		var r Relationship
-		if err := rows.Scan(&r.UserID, &r.TargetID, &r.Type, &r.Nickname, &r.CreatedAt); err != nil {
+		if err := rows.Scan(&r.UserID, &r.TargetID, &r.Type, &r.Nickname, &r.Note, &r.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, &r)
@@ -30,7 +30,7 @@ func (s *Store) Relationships(ctx context.Context, uid ids.ID) ([]*Relationship,
 // Relationship returns the row uid → target, or ErrNotFound.
 func (s *Store) Relationship(ctx context.Context, uid, target ids.ID) (*Relationship, error) {
 	var r Relationship
-	err := s.db.R.QueryRowContext(ctx, `SELECT user_id, target_id, type, nickname, created_at FROM relationships WHERE user_id = ? AND target_id = ?`, int64(uid), int64(target)).Scan(&r.UserID, &r.TargetID, &r.Type, &r.Nickname, &r.CreatedAt)
+	err := s.db.R.QueryRowContext(ctx, `SELECT user_id, target_id, type, nickname, request_note, created_at FROM relationships WHERE user_id = ? AND target_id = ?`, int64(uid), int64(target)).Scan(&r.UserID, &r.TargetID, &r.Type, &r.Nickname, &r.Note, &r.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -40,16 +40,20 @@ func (s *Store) Relationship(ctx context.Context, uid, target ids.ID) (*Relation
 	return &r, nil
 }
 
-// SetRelationship upserts uid → target with the given type.
+// SetRelationship upserts uid → target with the given type. A request's note
+// belongs to the request, so a row that changes type loses it.
 func (s *Store) SetRelationship(ctx context.Context, uid, target ids.ID, typ string) error {
 	_, err := s.db.W.ExecContext(ctx, `INSERT INTO relationships (user_id, target_id, type, nickname, created_at) VALUES (?,?,?,'',?)
-		ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, created_at = excluded.created_at`, int64(uid), int64(target), typ, nowMs())
+		ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, request_note = '', created_at = excluded.created_at`, int64(uid), int64(target), typ, nowMs())
 	return err
 }
 
 // SetRelationshipPair writes both directions atomically. It refuses, with
 // ErrBlocked, when either side has blocked the other: a request checked
 // against the block before a block landed must not write over it.
+//
+// Both rows lose any request note: an accepted request is a friendship, and a
+// request sent again says only what its own note says (SetRequestNote).
 func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typeB string) error {
 	now := nowMs()
 	return s.Tx(ctx, func(tx *db.Tx) error {
@@ -65,7 +69,7 @@ func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typ
 			typ  string
 		}{{a, b, typeA}, {b, a, typeB}} {
 			if _, err := tx.ExecContext(ctx, `INSERT INTO relationships (user_id, target_id, type, nickname, created_at) VALUES (?,?,?,'',?)
-				ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, created_at = excluded.created_at`, int64(p.u), int64(p.t), p.typ, now); err != nil {
+				ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, request_note = '', created_at = excluded.created_at`, int64(p.u), int64(p.t), p.typ, now); err != nil {
 				return err
 			}
 		}
@@ -87,13 +91,31 @@ func (s *Store) SetRelationshipPair(ctx context.Context, a, b ids.ID, typeA, typ
 func (s *Store) Block(ctx context.Context, uid, target ids.ID) error {
 	now := nowMs()
 	return s.Tx(ctx, func(tx *db.Tx) error {
+		// a request they sent is refused along with them, note and all
 		if _, err := tx.ExecContext(ctx, `INSERT INTO relationships (user_id, target_id, type, nickname, created_at) VALUES (?,?,'blocked','',?)
-			ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, created_at = excluded.created_at`, int64(uid), int64(target), now); err != nil {
+			ON CONFLICT(user_id, target_id) DO UPDATE SET type = excluded.type, request_note = '', created_at = excluded.created_at`, int64(uid), int64(target), now); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `DELETE FROM relationships WHERE user_id = ? AND target_id = ? AND type <> 'blocked'`, int64(target), int64(uid))
 		return err
 	})
+}
+
+// SetRequestNote puts a note on the friend request from → to. It lands on
+// to's row, the only place it is shown, and only while that row is still a
+// request from them that from's own row is still waiting on; ok reports
+// whether it was. The note is stored as given: the sender sealed it to to's
+// identity key, and nobody else can read it.
+func (s *Store) SetRequestNote(ctx context.Context, from, to ids.ID, note string) (ok bool, err error) {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE relationships SET request_note = ?
+		WHERE user_id = ? AND target_id = ? AND type = 'incoming'
+		AND EXISTS (SELECT 1 FROM relationships o WHERE o.user_id = ? AND o.target_id = ? AND o.type = 'outgoing')`,
+		note, int64(to), int64(from), int64(from), int64(to))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // DeleteRelationship removes uid → target.

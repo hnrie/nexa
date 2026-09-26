@@ -923,7 +923,7 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 	p.Relationships = make([]store.RelationshipView, 0, len(rels))
 	for _, r := range rels {
 		if usr := users[r.TargetID]; usr != nil {
-			p.Relationships = append(p.Relationships, store.RelationshipView{User: usr.Public(), Type: r.Type, Nickname: r.Nickname, CreatedAt: r.CreatedAt})
+			p.Relationships = append(p.Relationships, r.View(usr.Public()))
 		}
 	}
 	p.Presences = append(p.Presences, h.selfPresence(ctx, u))

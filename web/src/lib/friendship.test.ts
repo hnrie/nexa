@@ -1,8 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
 import type { Channel, PublicUser, Relationship } from "@/api/types";
+import { b64 } from "@/crypto/bytes";
+import { generateIdentity } from "@/crypto/keys";
+import { closePins, openPins, pinKey } from "@/lib/keyPins";
+import { openRequestNote } from "@/lib/requestNote";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
+import { useKeyAlerts } from "@/stores/keyAlerts";
 import { useRelationships } from "@/stores/relationships";
 import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -15,12 +20,13 @@ const api = vi.hoisted(() => ({
   remove: vi.fn(),
   block: vi.fn(),
   unblock: vi.fn(),
+  setNote: vi.fn(),
 }));
 vi.mock("@/api/relationships", () => ({ relationships: api }));
 // no captcha on this instance: the request goes straight out
 vi.mock("@/lib/captcha", () => ({ guarded: (_action: string, send: (c: string | null) => Promise<unknown>) => send(null) }));
 
-import { acceptFriendRequest, blockUser, dropFriendRequest, relationshipMenuItems, sendFriendRequest, unblockUser, useRelationshipBusy } from "./friendship";
+import { acceptFriendRequest, addRequestNote, blockUser, dropFriendRequest, relationshipMenuItems, sendFriendRequest, unblockUser, useRelationshipBusy } from "./friendship";
 
 const eve = { id: "eve", username: "eve", display_name: "Eve", avatar_id: null, flags: 0 } as unknown as PublicUser;
 const nexa = { id: "nexa", username: "nexa", display_name: "Nexa", avatar_id: null, flags: FLAG_SYSTEM } as unknown as PublicUser;
@@ -142,3 +148,46 @@ describe("relationshipMenuItems", () => {
     expect(useUI.getState().modals.map((m) => [m.kind, m.props])).toEqual([["block", { userId: "eve" }]]);
   });
 });
+
+describe("a note on a friend request", () => {
+  const sam = generateIdentity();
+  const samUser = { id: "sam", username: "sam", display_name: "Sam", avatar_id: null, flags: 0, public_key: b64.enc(sam.publicKey) } as unknown as PublicUser;
+  beforeEach(() => {
+    useUsers.setState({ byId: { sam: samUser } });
+    useKeyAlerts.getState().reset();
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    closePins();
+    vi.restoreAllMocks();
+  });
+
+  it("is sealed on this device to their key, so only they can read it", async () => {
+    api.setNote.mockResolvedValue(undefined);
+    expect(await addRequestNote(samUser, "Hi, it's Sam from the climbing gym")).toBe(true);
+    expect(api.setNote).toHaveBeenCalledTimes(1);
+    const [id, sealed] = api.setNote.mock.calls[0] as [string, string];
+    expect(id).toBe("sam");
+    expect(sealed).not.toContain("climbing");
+    expect(await openRequestNote(sam, sealed)).toBe("Hi, it's Sam from the climbing gym");
+    expect(await openRequestNote(generateIdentity(), sealed)).toBeNull();
+    expect(useUI.getState().toasts).toEqual([]);
+  });
+
+  it("says the request went but the note did not, when the note cannot be added", async () => {
+    api.setNote.mockRejectedValue(new ApiError(404, "no_request", "You have no pending request to that user."));
+    expect(await addRequestNote(samUser, "hello")).toBe(false);
+    expect(useUI.getState().toasts.map((x) => x.text)).toEqual(["Your friend request was sent, but the note could not be added."]);
+  });
+
+  it("is not sealed to a key other than the one this device pinned for them", async () => {
+    openPins("me");
+    // the key this device first met them with, before the server offered another
+    pinKey("sam", b64.enc(generateIdentity().publicKey));
+    expect(await addRequestNote(samUser, "hello")).toBe(false);
+    expect(api.setNote).not.toHaveBeenCalled();
+    expect(useKeyAlerts.getState().pending["sam"]?.offered).toBe(samUser.public_key);
+    expect(useUI.getState().toasts.map((x) => x.kind)).toEqual(["error"]);
+  });
+});
+

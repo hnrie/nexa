@@ -154,12 +154,15 @@ type Blob struct {
 	CreatedAt int64   `json:"created_at"`
 }
 
-// Relationship links two users from user_id's point of view.
+// Relationship links two users from user_id's point of view. Note is the note
+// an incoming request came with, sealed to user_id by the sender's device
+// (base64); it is empty on every other row.
 type Relationship struct {
 	UserID    ids.ID `json:"-"`
 	TargetID  ids.ID `json:"user_id"`
 	Type      string `json:"type"` // friend | outgoing | incoming | blocked
 	Nickname  string `json:"nickname"`
+	Note      string `json:"note,omitempty"`
 	CreatedAt int64  `json:"created_at"`
 }
 
@@ -168,7 +171,13 @@ type RelationshipView struct {
 	User      PublicUser `json:"user"`
 	Type      string     `json:"type"`
 	Nickname  string     `json:"nickname"`
+	Note      string     `json:"note,omitempty"`
 	CreatedAt int64      `json:"created_at"`
+}
+
+// View is r as its owner's clients see it, with other (the target) inline.
+func (r *Relationship) View(other PublicUser) RelationshipView {
+	return RelationshipView{User: other, Type: r.Type, Nickname: r.Nickname, Note: r.Note, CreatedAt: r.CreatedAt}
 }
 
 // Channel is any conversation container: DM, group DM, or server channel.

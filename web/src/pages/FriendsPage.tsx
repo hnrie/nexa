@@ -1,14 +1,17 @@
-import { Check, Copy, MessageSquare, MoreVertical, Phone, Plus, Search, UserPlus, Users, X } from "lucide-react";
-import { useMemo, useState, type FormEvent } from "react";
+import { Check, Copy, MessageSquare, MessageSquarePlus, MoreVertical, Phone, Plus, Search, UserPlus, Users, X } from "lucide-react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
-import { acceptFriendRequest, confirmRemoveFriend, dropFriendRequest, openBlockDialog, requestError, unblockUser, useBusyWith } from "@/lib/friendship";
+import { acceptFriendRequest, addRequestNote, confirmRemoveFriend, dropFriendRequest, openBlockDialog, requestError, unblockUser, useBusyWith } from "@/lib/friendship";
+import { REQUEST_NOTE_MAX, cleanRequestNote } from "@/lib/requestNote";
 import type { Relationship } from "@/api/types";
 import { Avatar, statusLabel } from "@/components/common/Avatar";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { Button } from "@/components/common/Button";
+import { Field, TextArea } from "@/components/common/TextInput";
 import { Tooltip } from "@/components/common/Tooltip";
+import { RequestNote } from "@/components/friends/RequestNote";
 import { audioContext } from "@/voice/media";
 import { joinVoice } from "@/voice/session";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
@@ -298,6 +301,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
           {/* On a touch screen the username is never hovered into view, and it
               is what tells two people with the same display name apart. */}
           <span className={s.rowSub}><span className={s.subUser}>{presenceUser.username} · </span>{sub}</span>
+          {rel.type === "incoming" && rel.note ? <RequestNote sealed={rel.note} /> : null}
         </span>
       </button>
       <div className={s.actions}>
@@ -324,9 +328,12 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
 
 function AddFriend() {
   const [value, setValue] = useState("");
+  const [note, setNote] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const setRel = useRelationships((r) => r.set);
+  const formId = useId();
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const username = value.trim().replace(/^@/, "").toLowerCase();
@@ -338,6 +345,16 @@ function AddFriend() {
       setRel({ user: res.user, type: res.type as Relationship["type"], nickname: "", created_at: Date.now() });
       setMsg({ ok: true, text: res.type === "friend" ? tr_("friends.youAreNowFriends", { name: res.user.display_name }) : tr_("friends.friendRequestSent", { name: res.user.display_name }) });
       setValue("");
+      // The note goes onto the request once there is one; if they had already
+      // asked, this made you friends and there is no request left to carry it.
+      const text = cleanRequestNote(note);
+      if (text && res.type === "outgoing") {
+        // their key comes in through the one door every key does, and is judged there
+        useUsers.getState().upsert(res.user);
+        await addRequestNote(res.user, text);
+      }
+      setNote("");
+      setNoteOpen(false);
     } catch (err) {
       setMsg({ ok: false, text: requestError(err) });
     } finally {
@@ -348,11 +365,30 @@ function AddFriend() {
     <div className={s.addBox}>
       <h3 className={s.addTitle}>{tr_("profile.profileCard.addFriend")}</h3>
       <p className={s.addSub}>{tr_("friends.youCanAddFriendsWithTheir")}</p>
-      <form className={s.addForm} onSubmit={(e) => void submit(e)}>
+      <form id={formId} className={s.addForm} onSubmit={(e) => void submit(e)}>
         <UserPlus size={20} style={{ color: "var(--text-muted)" }} />
         <input value={value} onChange={(e) => setValue(e.target.value)} placeholder={tr_("friends.addFriendPlaceholder")} aria-label={tr_("settings.account.username")} autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="send" />
         <Button type="submit" size="sm" loading={busy} disabled={!value.trim()}>{tr_("friends.sendFriendRequest")}</Button>
       </form>
+      {noteOpen ? (
+        <Field
+          className={s.noteField}
+          label={tr_("friends.requestNote")}
+          hint={
+            <span className={s.noteHint}>
+              <span>{tr_("friends.requestNoteHint")}</span>
+              <span className={s.noteCount} aria-hidden="true">{note.length}/{REQUEST_NOTE_MAX}</span>
+            </span>
+          }
+        >
+          {/* in the form, so the one Send button sends the request and its note together */}
+          <TextArea form={formId} value={note} onChange={(e) => setNote(e.target.value)} maxLength={REQUEST_NOTE_MAX} rows={2} dir="auto" placeholder={tr_("friends.requestNotePlaceholder")} autoFocus data-testid="friend-request-note-input" />
+        </Field>
+      ) : (
+        <Button type="button" variant="ghost" size="sm" className={s.addNote} onClick={() => setNoteOpen(true)} data-testid="friend-request-add-note">
+          <MessageSquarePlus size={16} aria-hidden="true" /> {tr_("friends.addANote")}
+        </Button>
+      )}
       {msg ? <div className={[s.addMsg, msg.ok ? s.ok : s.err].join(" ")} role={msg.ok ? "status" : "alert"}>{msg.text}</div> : null}
       <YourUsername />
     </div>

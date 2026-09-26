@@ -46,6 +46,7 @@ func TestMigrationTidiesSubchatMembers(t *testing.T) {
 	ALTER TABLE messages DROP COLUMN webhook_id;
 	ALTER TABLE messages DROP COLUMN plain;
 	ALTER TABLE polls DROP COLUMN ended_at;
+	ALTER TABLE relationships DROP COLUMN request_note;
 	PRAGMA user_version = 6;`)
 	if err != nil {
 		t.Fatal(err)

@@ -51,6 +51,20 @@ async function publicKeyOf(userId: string): Promise<string> {
 }
 
 /**
+ * The identity key to seal something to for a person: the one this device
+ * holds for them (or the server's answer), judged against the pin. Null when
+ * it is not the key pinned for them; judgeKey has put the change in front of
+ * a human, and nothing is sealed to it until they accept it. Every conversation
+ * grant goes through here, and so does anything else sealed to one person
+ * (a friend request's note), so neither can skip the check.
+ */
+export async function sealingKeyOf(userId: string): Promise<Uint8Array | null> {
+  const pub = await publicKeyOf(userId);
+  if (judgeKey(userId, pub) === "changed") return null;
+  return b64.dec(pub);
+}
+
+/**
  * Caches a root on this device, except behind a passcode: a root at rest reads
  * its messages without one, so a locked device takes its roots from the grants
  * that come with every ready instead.
@@ -103,16 +117,16 @@ async function putGrantsFor(conv: string, epoch: number, root: Uint8Array, wante
   const uploads: { conv_id: string; epoch: number; user_id: string; wrapped_key: string }[] = [];
   const wrap = async (uid: string): Promise<boolean> => {
     try {
-      const pub = await publicKeyOf(uid);
+      const pub = await sealingKeyOf(uid);
       // A key that is not the one this device pinned for that person does not
       // get a copy of the conversation until a human has looked at it. The
       // question is raised by judgeKey; this path just declines quietly, and
       // the grant is made on the next reconcile once it is answered.
-      if (judgeKey(uid, pub) === "changed") {
+      if (!pub) {
         useKeyAlerts.getState().report({ kind: "grant_withheld", conv, epoch, userId: uid });
         return true;
       }
-      uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(b64.dec(pub), root)) });
+      uploads.push({ conv_id: conv, epoch, user_id: uid, wrapped_key: b64.enc(await wrapGrant(pub, root)) });
       return true;
     } catch (err) {
       // An account that is genuinely gone is skipped for good; anything else —

@@ -474,6 +474,8 @@ export interface Relationship {
   user: PublicUser;
   type: "friend" | "outgoing" | "incoming" | "blocked";
   nickname: string;
+  /** On an incoming request, the note it came with: a sealed box (base64) only this account can open. */
+  note?: string;
   created_at: number;
 }
 

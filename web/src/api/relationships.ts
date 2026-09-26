@@ -23,4 +23,8 @@ export const relationships = {
   setNickname(userId: Snowflake, nickname: string): Promise<Relationship> {
     return api.request<Relationship>("PATCH", `/users/@me/relationships/${userId}`, { nickname });
   },
+  /** Puts a note on the request this account sent them: a sealed box, base64 (lib/requestNote). */
+  setNote(userId: Snowflake, sealedB64: string): Promise<void> {
+    return api.request<void>("PUT", `/users/@me/relationships/${userId}/note`, { note: sealedB64 });
+  },
 };

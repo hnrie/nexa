@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ func (s *Server) relationshipRoutes(mux *http.ServeMux) {
 	mux.Handle("PUT /api/v1/users/@me/relationships/{id}", s.authed(s.handleFriendAccept))
 	mux.Handle("DELETE /api/v1/users/@me/relationships/{id}", s.authed(s.handleRelationshipDelete))
 	mux.Handle("PATCH /api/v1/users/@me/relationships/{id}", s.authed(s.handleRelationshipNickname))
+	mux.Handle("PUT /api/v1/users/@me/relationships/{id}/note", s.authed(s.handleRequestNote))
 	mux.Handle("PUT /api/v1/users/@me/blocks/{id}", s.authed(s.handleBlock))
 	mux.Handle("DELETE /api/v1/users/@me/blocks/{id}", s.authed(s.handleUnblock))
 	s.Profile.MutualFriends = func(r *http.Request, me, other ids.ID) ([]ids.ID, error) {
@@ -44,7 +46,7 @@ func (s *Server) handleRelationships(w http.ResponseWriter, r *http.Request) {
 	out := make([]relationshipView, 0, len(rels))
 	for _, rel := range rels {
 		if u := users[rel.TargetID]; u != nil {
-			out = append(out, relationshipView{User: u.Public(), Type: rel.Type, Nickname: rel.Nickname, CreatedAt: rel.CreatedAt})
+			out = append(out, rel.View(u.Public()))
 		}
 	}
 	WriteJSON(w, http.StatusOK, out)
@@ -61,22 +63,26 @@ func blockedErr(err error) error {
 
 // emitRelationship tells both sides about their current relationship rows.
 func (s *Server) emitRelationship(r *http.Request, a, b *store.User) {
-	for _, pair := range [][2]*store.User{{a, b}, {b, a}} {
-		rel, err := s.Store.Relationship(r.Context(), pair[0].ID, pair[1].ID)
-		if err != nil {
-			// Only "there is no row" means the relationship went. A read that
-			// merely failed used to send the same relationship_remove, so a
-			// transient error after two people became friends dropped one of
-			// them from the other's list while the database still said friend.
-			if !errors.Is(err, store.ErrNotFound) {
-				s.Log.Warn("relationship read-back", "user", pair[0].ID.String(), "other", pair[1].ID.String(), "err", err)
-				continue
-			}
-			s.Bcast.EmitUsers([]ids.ID{pair[0].ID}, "relationship_remove", map[string]any{"user_id": pair[1].ID})
-			continue
+	s.emitRelationshipTo(r, a, b)
+	s.emitRelationshipTo(r, b, a)
+}
+
+// emitRelationshipTo tells owner about their current row with other.
+func (s *Server) emitRelationshipTo(r *http.Request, owner, other *store.User) {
+	rel, err := s.Store.Relationship(r.Context(), owner.ID, other.ID)
+	if err != nil {
+		// Only "there is no row" means the relationship went. A read that
+		// merely failed used to send the same relationship_remove, so a
+		// transient error after two people became friends dropped one of
+		// them from the other's list while the database still said friend.
+		if !errors.Is(err, store.ErrNotFound) {
+			s.Log.Warn("relationship read-back", "user", owner.ID.String(), "other", other.ID.String(), "err", err)
+			return
 		}
-		s.Bcast.EmitUsers([]ids.ID{pair[0].ID}, "relationship_add", relationshipView{User: pair[1].Public(), Type: rel.Type, Nickname: rel.Nickname, CreatedAt: rel.CreatedAt})
+		s.Bcast.EmitUsers([]ids.ID{owner.ID}, "relationship_remove", map[string]any{"user_id": other.ID})
+		return
 	}
+	s.Bcast.EmitUsers([]ids.ID{owner.ID}, "relationship_add", rel.View(other.Public()))
 }
 
 func (s *Server) handleFriendRequest(w http.ResponseWriter, r *http.Request) {
@@ -281,7 +287,73 @@ func (s *Server) handleRelationshipNickname(w http.ResponseWriter, r *http.Reque
 		WriteError(w, ErrNotFound)
 		return
 	}
-	view := store.RelationshipView{User: u.Public(), Type: rel.Type, Nickname: rel.Nickname, CreatedAt: rel.CreatedAt}
+	view := rel.View(u.Public())
 	s.Bcast.EmitUsers([]ids.ID{me.ID}, "relationship_add", view)
 	WriteJSON(w, http.StatusOK, view)
+}
+
+// A request note is a sealed box (keys.ts seal): the sender's ephemeral
+// x25519 key, an iv and a GCM tag around the text. The app keeps the text to
+// 200 characters, which fits well inside the ceiling in any script.
+const (
+	requestNoteMin = 32 + 12 + 16
+	requestNoteMax = 1024
+)
+
+// handleRequestNote puts a note on a friend request the caller sent and is
+// still waiting on. The sender's device seals it to the recipient's identity
+// key, so the server can only check that it is shaped like a sealed box,
+// keep it on the recipient's row, and pass it on to them.
+func (s *Server) handleRequestNote(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	id, err := ids.Parse(r.PathValue("id"))
+	if err != nil {
+		WriteError(w, ErrNotFound)
+		return
+	}
+	var req struct {
+		Note string `json:"note"`
+	}
+	if err := ReadJSON(w, r, &req, 4<<10); err != nil {
+		WriteError(w, err)
+		return
+	}
+	// Standard base64, padded or not. Go's decoder would skip line breaks, so
+	// those are refused here rather than stored.
+	sealed, err := base64.StdEncoding.DecodeString(req.Note)
+	if err != nil {
+		sealed, err = base64.RawStdEncoding.DecodeString(req.Note)
+	}
+	if err != nil || strings.ContainsAny(req.Note, "\r\n") {
+		WriteError(w, E(http.StatusBadRequest, "invalid_note", "The note must be a sealed box in standard base64."))
+		return
+	}
+	if len(sealed) < requestNoteMin || len(sealed) > requestNoteMax {
+		WriteError(w, E(http.StatusBadRequest, "invalid_note", "A sealed note is between 60 and 1024 bytes."))
+		return
+	}
+	noRequest := E(http.StatusNotFound, "no_request", "You have no pending request to that user.")
+	rel, err := s.Store.Relationship(r.Context(), me.ID, id)
+	if err != nil || rel.Type != "outgoing" {
+		WriteError(w, noRequest)
+		return
+	}
+	target, err := s.Store.UserByID(r.Context(), id)
+	if err != nil || target.Flags&store.FlagDeleted != 0 {
+		WriteError(w, noRequest)
+		return
+	}
+	// kept padded, whichever way it came, so every client reads it the same way
+	ok, err := s.Store.SetRequestNote(r.Context(), me.ID, id, base64.StdEncoding.EncodeToString(sealed))
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if !ok {
+		// answered, taken back or blocked since the check above
+		WriteError(w, noRequest)
+		return
+	}
+	s.emitRelationshipTo(r, target, me)
+	w.WriteHeader(http.StatusNoContent)
 }
