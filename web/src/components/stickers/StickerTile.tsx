@@ -36,8 +36,11 @@ export function moves(src: StillSource): boolean {
   return src.animated || src.format === "tgs" || src.format === "webm";
 }
 
-/** The still for one tile, asked for as urgently as the tile is near the screen, and a way to try again. */
-export function useStickerStill(src: StillSource, place: ScreenPlace): [StillView, () => void] {
+/**
+ * The still for one tile, asked for as urgently as the tile is near the
+ * screen (later still by `lower`), and a way to try again.
+ */
+export function useStickerStill(src: StillSource, place: ScreenPlace, lower = 0): [StillView, () => void] {
   const px = gridStillPx();
   const key = stillKey(src, px);
   const [view, setView] = useState<StillView>(() => peekStill(src, px));
@@ -53,8 +56,8 @@ export function useStickerStill(src: StillSource, place: ScreenPlace): [StillVie
     };
   }, [key, px]);
   useEffect(() => {
-    handle.current?.want(place === "visible" ? 0 : place === "near" ? 1 : null);
-  }, [key, place]);
+    handle.current?.want(place === "visible" ? lower : place === "near" ? lower + 1 : null);
+  }, [key, place, lower]);
   const retry = useCallback(() => handle.current?.retry(), []);
   return [view, retry];
 }

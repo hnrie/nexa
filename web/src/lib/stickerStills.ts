@@ -175,30 +175,39 @@ function update(e: Entry): void {
 async function load(e: Entry, priority: number): Promise<void> {
   const plan = stillPlan(e.src, e.px);
   try {
-    let blob = e.source;
-    if (!blob) {
-      const t = network.add(priority, (signal) => fetchBlob(plan.url, signal));
+    let blob: Blob;
+    if (plan.draw === "webm") {
+      // the player fetches only what the first frame needs, so it is the download
+      const t = network.add(priority, (signal) => webmPoster(plan.url, e.px, signal, STALL_MS));
       e.ticket = t;
       notify(e);
       blob = await t.promise;
-      if (plan.draw) {
-        e.source = blob;
-        bytesKept += blob.size;
+    } else {
+      let got = e.source;
+      if (!got) {
+        const t = network.add(priority, (signal) => fetchBlob(plan.url, signal));
+        e.ticket = t;
+        notify(e);
+        got = await t.promise;
+        if (plan.draw) {
+          e.source = got;
+          bytesKept += got.size;
+        }
       }
-    }
-    if (plan.draw) {
-      const source = blob;
-      const draw = plan.draw;
-      const t = drawing.add(best(e) ?? 2, async (signal) => {
-        // a breath between frames, so a long grid of them never holds the page
-        await new Promise((r) => setTimeout(r, 0));
-        return draw === "tgs" ? tgsPoster(source, e.px, signal) : webmPoster(source, e.px, signal);
-      });
-      e.ticket = t;
-      notify(e);
-      blob = await t.promise;
-      if (e.source) bytesKept -= e.source.size;
-      e.source = null;
+      blob = got;
+      if (plan.draw === "tgs") {
+        const source = got;
+        const t = drawing.add(best(e) ?? 2, async (signal) => {
+          // a breath between frames, so a long grid of them never holds the page
+          await new Promise((r) => setTimeout(r, 0));
+          return tgsPoster(source, e.px, signal);
+        });
+        e.ticket = t;
+        notify(e);
+        blob = await t.promise;
+        if (e.source) bytesKept -= e.source.size;
+        e.source = null;
+      }
     }
     e.ticket = null;
     e.url = URL.createObjectURL(blob);
@@ -218,6 +227,9 @@ async function load(e: Entry, priority: number): Promise<void> {
       else tidy(e);
       return;
     }
+    // a file that would not draw may have come in damaged: the next try downloads it again
+    if (e.source) bytesKept -= e.source.size;
+    e.source = null;
     e.failures++;
     e.permanent = err instanceof UnsupportedError || (err instanceof HttpError && [400, 403, 404, 410].includes(err.status));
     e.retryAt = Date.now() + retryDelay(e.failures - 1);

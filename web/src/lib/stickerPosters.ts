@@ -6,6 +6,7 @@
  * players, one per tile, is what used to leave tiles grey (see
  * stickerStills.ts).
  */
+import type { AnimationConfigWithData } from "lottie-web";
 import { AbortedError } from "./loadQueue";
 
 /** A failure trying again will not fix, such as a format this browser cannot play. */
@@ -69,14 +70,16 @@ export async function tgsPoster(data: Blob, px: number, signal: AbortSignal): Pr
   canvas.height = px;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("no canvas");
-  // No container: the player draws straight onto this canvas, at its size.
-  const anim = lottie.loadAnimation({
+  // No container: the player draws straight onto this canvas, at its size
+  // (the types insist on one, the player does not).
+  const config = {
     renderer: "canvas",
     loop: false,
     autoplay: false,
     animationData: doc,
     rendererSettings: { context, clearCanvas: true, preserveAspectRatio: "xMidYMid meet", dpr: 1 },
-  }) as unknown as LottieItem;
+  } as unknown as AnimationConfigWithData<"canvas">;
+  const anim = lottie.loadAnimation(config) as unknown as LottieItem;
   try {
     await abortable<void>(signal, (done, fail) => {
       if (anim.isLoaded) done();
@@ -98,34 +101,44 @@ export function canPlayWebm(): boolean {
 }
 
 /**
- * The first frame of a video sticker, no more than px across. One player,
- * made for this and let go before returning: taking its source away frees it
- * now, rather than whenever the page next collects garbage.
+ * The first frame of a video sticker, no more than px across. The player
+ * fetches only as much of the file as that frame needs, and is let go before
+ * this returns: taking its source away frees it now, rather than whenever the
+ * page next collects garbage. A download that goes quiet for stallMs is given
+ * up (the caller tries again later).
  */
-export async function webmPoster(data: Blob, px: number, signal: AbortSignal): Promise<Blob> {
+export async function webmPoster(url: string, px: number, signal: AbortSignal, stallMs = 20_000): Promise<Blob> {
   if (!canPlayWebm()) throw new UnsupportedError("webm");
-  const url = URL.createObjectURL(data);
   const v = document.createElement("video");
   v.muted = true;
   v.playsInline = true;
   v.preload = "auto";
   try {
     await abortable<void>(signal, (done, fail) => {
+      let quiet = setTimeout(() => fail(new Error("video stalled")), stallMs);
+      const progress = () => {
+        clearTimeout(quiet);
+        quiet = setTimeout(() => fail(new Error("video stalled")), stallMs);
+      };
       const ready = () => {
         if (v.readyState >= 2) done();
       };
-      const error = () => fail(v.error?.code === 4 ? new Error("video refused") : new Error("video failed"));
+      // code 4 is also what a browser answers when it will not make another player
+      const error = () => fail(new Error(v.error?.code === 4 ? "video refused" : "video failed"));
       v.addEventListener("loadeddata", ready);
       v.addEventListener("canplay", ready);
+      v.addEventListener("progress", progress);
       v.addEventListener("error", error);
       v.src = url;
       v.load();
       return () => {
+        clearTimeout(quiet);
         v.removeEventListener("loadeddata", ready);
         v.removeEventListener("canplay", ready);
+        v.removeEventListener("progress", progress);
         v.removeEventListener("error", error);
       };
-    }, 15_000);
+    }, 120_000);
     const w = v.videoWidth || px;
     const h = v.videoHeight || px;
     const scale = Math.min(1, px / Math.max(w, h));
@@ -139,6 +152,5 @@ export async function webmPoster(data: Blob, px: number, signal: AbortSignal): P
   } finally {
     v.removeAttribute("src");
     v.load();
-    URL.revokeObjectURL(url);
   }
 }

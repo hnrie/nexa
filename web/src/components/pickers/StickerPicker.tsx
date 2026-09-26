@@ -3,11 +3,11 @@ import type { Sticker, StickerPack } from "@/api/types";
 import { moveFocusInGrid } from "@/lib/gridKeys";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
 import { useAuth } from "@/stores/auth";
-import { groupPacks, packImageUrl, searchStickers, useExpressions } from "@/stores/expressions";
+import { groupPacks, searchStickers, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
-import { StickerView } from "@/components/stickers/StickerView";
-import { useNearScreen } from "@/hooks/useNearScreen";
+import { moves, StillFace, stillSourceOf, useStickerStill } from "@/components/stickers/StickerTile";
+import { useScreenPlace } from "@/hooks/useNearScreen";
 import { useSettings } from "@/stores/settings";
 import { focusSearchOnOpen } from "./EmojiPicker";
 import { SearchBox } from "@/components/common/SearchBox";
@@ -61,7 +61,8 @@ function PackIcon({ pack, cover, root }: { pack: StickerPack; cover: Sticker; ro
   const ref = useRef<HTMLSpanElement>(null);
   const place = useScreenPlace(ref, root);
   const src = useMemo(() => stillSourceOf(pack, cover), [pack, cover]);
-  const [view] = useStickerStill(src, place);
+  // after the stickers in view, which are what people came for
+  const [view] = useStickerStill(src, place, 1);
   return (
     <span ref={ref} className={s.catImg}>
       {/* a pack's icon stays still: a column of them all moving at once is noise, and costly */}
@@ -85,6 +86,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   const openContextMenu = useUI((u) => u.openContextMenu);
   const [q, setQ] = useState("");
   const gridRef = useRef<HTMLDivElement>(null);
+  const catsRef = useRef<HTMLDivElement>(null);
   const still = useSettings((x) => x.settings.reducedMotion) || prefersStill();
   const groups = useMemo(() => groupPacks(packs, serverId, meId), [packs, serverId, meId]);
   const all = useMemo(() => groups.flatMap((g) => g.packs), [groups]);
@@ -136,6 +138,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
         <div
           className={s.grid}
           ref={gridRef}
+          data-scroll-root=""
           tabIndex={0}
           role="group"
           aria-label={t("pickers.stickerPicker.searchStickers")}
