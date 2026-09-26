@@ -1646,6 +1646,7 @@
   },
   "search.box.label": "Rechercher des messages",
   "search.box.placeholder": "Rechercher dans {name}",
+  "search.box.placeholderEverywhere": "Rechercher partout",
   "search.byIn": "{name} dans {where}",
   "search.chip.after": "Après {date}",
   "search.chip.badDate": "« {value} » n’est pas une date. Essayez 2026-01-31",

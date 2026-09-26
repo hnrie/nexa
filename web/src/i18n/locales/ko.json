@@ -1578,6 +1578,7 @@
   },
   "search.box.label": "메시지 검색",
   "search.box.placeholder": "{name} 검색",
+  "search.box.placeholderEverywhere": "모든 곳에서 검색",
   "search.byIn": "{where}의 {name}",
   "search.chip.after": "{date} 이후",
   "search.chip.badDate": "“{value}”은(는) 날짜가 아니에요. 2026-01-31처럼 입력해 보세요",

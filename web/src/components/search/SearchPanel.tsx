@@ -242,7 +242,7 @@ export function SearchPanel({
             onQuery(v);
             setOwnCaret(v.length);
           }}
-          placeholder={scope.kind === "all" ? t("search.everywhere") : t("search.box.placeholder", { name: scopeName(scope, byId, names) })}
+          placeholder={scope.kind === "all" ? t("search.box.placeholderEverywhere") : t("search.box.placeholder", { name: scopeName(scope, byId, names) })}
           aria-label={t("search.box.label")}
           autoFocus
           data-testid="search-input-mobile"

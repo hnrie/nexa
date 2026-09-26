@@ -1725,6 +1725,7 @@
   },
   "search.box.label": "Поиск сообщений",
   "search.box.placeholder": "Поиск: {name}",
+  "search.box.placeholderEverywhere": "Искать везде",
   "search.byIn": "{name} в {where}",
   "search.chip.after": "После {date}",
   "search.chip.badDate": "«{value}» не дата. Попробуйте 2026-01-31",

@@ -1578,6 +1578,7 @@
   },
   "search.box.label": "メッセージを検索",
   "search.box.placeholder": "{name} を検索",
+  "search.box.placeholderEverywhere": "すべてを検索",
   "search.byIn": "{where} の {name}",
   "search.chip.after": "{date} より後",
   "search.chip.badDate": "「{value}」は日付ではありません。2026-01-31 のように入力してください",

@@ -1635,6 +1635,7 @@
   },
   "search.box.label": "Nachrichten durchsuchen",
   "search.box.placeholder": "In {name} suchen",
+  "search.box.placeholderEverywhere": "Überall suchen",
   "search.byIn": "{name} in {where}",
   "search.chip.after": "Nach {date}",
   "search.chip.badDate": "„{value}“ ist kein Datum. Versuch es mit 2026-01-31",

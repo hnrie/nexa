@@ -1578,6 +1578,7 @@
   },
   "search.box.label": "搜索消息",
   "search.box.placeholder": "搜索 {name}",
+  "search.box.placeholderEverywhere": "搜索全部",
   "search.byIn": "{where} 中的 {name}",
   "search.chip.after": "{date} 之后",
   "search.chip.badDate": "“{value}”不是日期。试试 2026-01-31",

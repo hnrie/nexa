@@ -1646,6 +1646,7 @@
   },
   "search.box.label": "Pesquisar mensagens",
   "search.box.placeholder": "Pesquisar em {name}",
+  "search.box.placeholderEverywhere": "Pesquisar em tudo",
   "search.byIn": "{name} em {where}",
   "search.chip.after": "Depois de {date}",
   "search.chip.badDate": "“{value}” não é uma data. Tente 2026-01-31",

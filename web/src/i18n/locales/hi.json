@@ -1635,6 +1635,7 @@
   },
   "search.box.label": "संदेश खोजें",
   "search.box.placeholder": "{name} में खोजें",
+  "search.box.placeholderEverywhere": "हर जगह खोजें",
   "search.byIn": "{where} में {name}",
   "search.chip.after": "{date} के बाद",
   "search.chip.badDate": "“{value}” कोई तारीख नहीं है। 2026-01-31 जैसा लिखें",

@@ -1813,6 +1813,7 @@
   },
   "search.box.label": "البحث في الرسائل",
   "search.box.placeholder": "البحث في {name}",
+  "search.box.placeholderEverywhere": "البحث في كل مكان",
   "search.byIn": "{name} في {where}",
   "search.chip.after": "بعد {date}",
   "search.chip.badDate": "«{value}» ليس تاريخًا. جرّب 2026-01-31",
