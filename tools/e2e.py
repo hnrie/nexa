@@ -299,7 +299,7 @@ def server_flow(srv, alice, bob, phone):
     a.wait_for_selector("text=Role saved.", timeout=15000)
     a.click("[data-nav=members]")
     b_row = a.locator(f"[data-member]:has-text('Bob')")
-    b_row.locator("button[aria-label='Edit roles']").click()
+    b_row.locator("button[aria-label='Edit Roles']").click()
     a.locator("label:has-text('Muted') input").check()
     time.sleep(0.5)
     a.keyboard.press("Escape")
