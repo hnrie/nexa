@@ -93,6 +93,14 @@ describe("the formatting editor reads markdown and writes it back", () => {
     expect(roundTrip("snake_case_word")).toBe("snake_case_word");
   });
 
+  it("does not show the blank line markdown needs between a quote and a callout as a line of its own", () => {
+    const { blocks } = fromMarkdown("> a\n\n> [!NOTE]\n> b");
+    expect(blocks.map((b) => b.wrap)).toEqual(["quote", "note"]);
+    expect(toMarkdown(blocks)).toBe("> a\n\n> [!NOTE]\n> b");
+    // two quotes a blank line apart stay two quotes
+    expect(fromMarkdown("> a\n\n> b").blocks.map((b) => b.wrap)).toEqual(["quote", null, "quote"]);
+  });
+
   it("says when it had to simplify something nested", () => {
     expect(fromMarkdown("> [!NOTE]\n> ::: details x\n> y\n> :::").simplified).toBe(true);
     expect(fromMarkdown("> [!NOTE]\n> plain").simplified).toBe(false);

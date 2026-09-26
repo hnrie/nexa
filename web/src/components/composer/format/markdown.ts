@@ -28,7 +28,23 @@ export function fromMarkdown(src: string, names?: AtomNames): Loaded {
   blocksOf(parse(src), null, st);
   // trailing and leading blank lines say nothing, and the parser drops them
   while (st.out.length > 1 && emptyLine(st.out[st.out.length - 1])) st.out.pop();
-  return { blocks: st.out.length ? st.out : [textBlock()], simplified: st.simplified };
+  return { blocks: st.out.length ? withoutSeparators(st.out) : [textBlock()], simplified: st.simplified };
+}
+
+/**
+ * The blank line markdown needs between a quote and a callout, or between two
+ * tables, which toMarkdown writes again by itself: it is not a line anyone wrote.
+ */
+function withoutSeparators(blocks: Block[]): Block[] {
+  return blocks.filter((b, k) => {
+    if (!emptyLine(b)) return true;
+    const before = blocks[k - 1];
+    const after = blocks[k + 1];
+    if (!before || !after) return true;
+    const angled = ANGLED.has(before.wrap) && ANGLED.has(after.wrap) && before.wrap !== after.wrap;
+    const tables = before.kind === "table" && after.kind === "table" && !before.wrap && !after.wrap;
+    return !(angled || tables);
+  });
 }
 
 interface LoadState {
