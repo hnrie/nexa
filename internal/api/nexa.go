@@ -674,6 +674,15 @@ func (s *Server) systemUser(ctx context.Context) (*store.User, error) {
 // isSystem reports whether an account is Nexa's.
 func isSystem(u *store.User) bool { return u != nil && u.Flags&store.FlagSystem != 0 }
 
+// isWebhookAccount reports whether an account is the one webhook messages are
+// filed under. To everyone it is not there: nobody can message, befriend or
+// block it.
+func isWebhookAccount(u *store.User) bool { return u != nil && u.Flags&store.FlagWebhook != 0 }
+
+// notAPerson covers both accounts nobody holds, which staff can neither
+// moderate nor disable.
+func notAPerson(u *store.User) bool { return u != nil && u.Flags&store.NotPeople != 0 }
+
 func (s *Server) createSystemUser(ctx context.Context) (*store.User, error) {
 	random := func(n int) []byte {
 		b := make([]byte, n)

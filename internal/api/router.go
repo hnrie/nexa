@@ -87,6 +87,10 @@ type Server struct {
 	limCrash   *ratelimit.Limiter
 	limBug     *ratelimit.Limiter
 	limBugFile *ratelimit.Limiter
+	limHook    *ratelimit.Limiter
+	limHookCh  *ratelimit.Limiter
+	limHookMgr *ratelimit.Limiter
+	limVote    *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -203,6 +207,16 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// files for bug reports, per account: five to a report, a few reports,
 		// and room to add one again after taking it out
 		limBugFile: ratelimit.New(ratelimit.Every(30, time.Hour), 15, 2*time.Hour),
+		// Each webhook: five requests every two seconds, and each channel
+		// thirty webhook messages a minute, whichever webhooks send them:
+		// Discord's limits, which programs written for its webhooks pace
+		// themselves by.
+		limHook:   ratelimit.New(ratelimit.Every(5, 2*time.Second), 5, 10*time.Minute),
+		limHookCh: ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
+		// making, changing and deleting webhooks, per account
+		limHookMgr: ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
+		// votes on polls, per account: a change of mind is a click
+		limVote: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
 	}
 }
 
@@ -215,6 +229,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
+		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote,
 	}
 }
 

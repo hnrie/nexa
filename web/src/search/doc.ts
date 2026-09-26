@@ -12,6 +12,7 @@
 import type { AttachmentMeta, MessagePayload } from "@/crypto/message";
 import type { DecryptedMessage } from "@/lib/decrypt";
 import type { HasKind } from "@/lib/search";
+import { hookText } from "@/lib/webhookMessage";
 
 /** A link preview as the message carries it, trimmed to what a result shows. */
 export interface LinkPreview {
@@ -47,6 +48,9 @@ export interface SearchDoc {
   att?: AttachmentMeta[];
   emb?: LinkPreview[];
   st?: MessagePayload["sticker"];
+  /** A webhook's message: the name it was sent as, and the words in its embeds, components and poll. */
+  hn?: string;
+  hx?: string;
 }
 
 export const PINNED = 1;
@@ -94,6 +98,14 @@ export function toDoc(m: DecryptedMessage): SearchDoc | null {
   const emb = (p.embeds ?? []).map(preview).filter((e): e is LinkPreview => e !== null);
   if (emb.length) doc.emb = emb;
   if (p.sticker) doc.st = { ...p.sticker };
+  if (m.hook) {
+    doc.hn = m.hook.name;
+    // the content is already t; what is left is the rest of what it says
+    const rest = hookText({ ...m.hook, content: "" });
+    if (rest) doc.hx = rest.slice(0, 8000);
+    const links = m.hook.link_embeds.map(preview).filter((e): e is LinkPreview => e !== null);
+    if (links.length) doc.emb = [...(doc.emb ?? []), ...links];
+  }
   return doc;
 }
 
@@ -104,6 +116,8 @@ export function toDoc(m: DecryptedMessage): SearchDoc | null {
  */
 export function searchableText(d: SearchDoc): string {
   const extra: string[] = [];
+  if (d.hn) extra.push(d.hn);
+  if (d.hx) extra.push(d.hx);
   for (const a of d.att ?? []) extra.push(a.name);
   if (d.st?.name) extra.push(d.st.name);
   for (const e of d.emb ?? []) {

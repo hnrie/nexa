@@ -193,7 +193,8 @@ async function streamThroughWorker(att: AttachmentMeta, onProgress?: DownloadPro
 const FETCH_SHARE = 0.9;
 
 async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
-  const expected = encryptedSize(att.size);
+  // a webhook's file came unencrypted and downloads as it is
+  const expected = att.plain ? att.size : encryptedSize(att.size);
   // the body arrives in many small pieces, so only a new whole percent is passed on
   let shown = -1;
   const fetched = onProgress
@@ -210,7 +211,7 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
     : undefined;
   let plain: Blob;
   try {
-    plain = await decryptFile(cipher, b64.dec(att.key), decrypted);
+    plain = att.plain ? cipher : await decryptFile(cipher, b64.dec(att.key), decrypted);
   } catch (err) {
     if (err instanceof DecryptError) throw new Error(t("download.thisFileCouldNotBeDecrypted"));
     throw err;
@@ -229,7 +230,8 @@ async function saveInPage(att: AttachmentMeta, onProgress?: DownloadProgress): P
 
 /** Decrypts an attachment and saves it where the browser keeps downloads. */
 export async function saveAttachment(att: AttachmentMeta, onProgress?: DownloadProgress): Promise<void> {
-  if (att.size > STREAM_ABOVE) {
+  // the streaming worker decrypts as it goes; a webhook's file has nothing to decrypt
+  if (att.size > STREAM_ABOVE && !att.plain) {
     if (!homeScreenIOS() && (await streamThroughWorker(att, onProgress)) === "done") return;
     // said before anything is fetched: a phone decrypting more than it can
     // hold does not fail, it reloads the app with nothing saved

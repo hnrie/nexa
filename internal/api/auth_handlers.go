@@ -257,7 +257,7 @@ func (s *Server) handleKDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := s.Store.UserBySignInName(r.Context(), username)
-	if err != nil || u.Flags&(store.FlagDeleted|store.FlagSystem) != 0 {
+	if err != nil || u.Flags&(store.FlagDeleted|store.NotPeople) != 0 {
 		WriteJSON(w, http.StatusOK, map[string]any{"salt": s.fakeSalt(username), "params": json.RawMessage(defaultKDF)})
 		return
 	}
@@ -296,7 +296,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// A username a moderator reset still signs its account in, so someone
 	// who was away when it happened is not locked out (UserBySignInName).
 	u, err := s.Store.UserBySignInName(r.Context(), req.Username)
-	if err != nil || u.Flags&(store.FlagDeleted|store.FlagDisabled|store.FlagSystem) != 0 || len(req.AuthKey) != 32 {
+	if err != nil || u.Flags&(store.FlagDeleted|store.FlagDisabled|store.NotPeople) != 0 || len(req.AuthKey) != 32 {
 		fail()
 		return
 	}
@@ -364,7 +364,7 @@ func (s *Server) verifyRecovery(w http.ResponseWriter, r *http.Request, username
 		return nil, false
 	}
 	u, err := s.Store.UserBySignInName(r.Context(), username)
-	valid := err == nil && u.Flags&(store.FlagDeleted|store.FlagDisabled|store.FlagSystem) == 0 && len(key) == 32 && u.RecoveryAuthHash != ""
+	valid := err == nil && u.Flags&(store.FlagDeleted|store.FlagDisabled|store.NotPeople) == 0 && len(key) == 32 && u.RecoveryAuthHash != ""
 	if valid {
 		ok, verr := auth.VerifyAuthKey(key, u.RecoveryAuthHash)
 		valid = verr == nil && ok

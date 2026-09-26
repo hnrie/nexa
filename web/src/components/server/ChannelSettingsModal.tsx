@@ -1,5 +1,5 @@
 import { Lock, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
 import { servers as serversApi } from "@/api/servers";
@@ -21,6 +21,8 @@ import { OverwriteGrid } from "./PermissionGrid";
 import { ChannelIconPicker } from "./ChannelIconPicker";
 import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { SaveBar, SettingsLayer, type NavGroup } from "./SettingsLayer";
+import { Spinner } from "@/components/common/Spinner";
+import { lazyPage } from "@/lib/lazyChunk";
 import s from "./ServerSettings.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -29,6 +31,7 @@ import { unlessUnsaved } from "@/stores/unsaved";
 import { isolate } from "./bidi";
 import { slug, typedChannelName } from "@/components/modals/CreateChannelModal";
 const SLOWMODE = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600];
+const IntegrationsPage = lazyPage(() => import("./pages/IntegrationsPage"));
 
 function slowLabel(v: number): string {
   return v === 0 ? tr_("server.channelSettings.slowmodeOff") : formatShortDuration(v);
@@ -43,13 +46,26 @@ export default function ChannelSettingsModal({ onClose, channelId, page: initial
   }, [channel, onClose]);
   if (!channel || !channel.server_id) return null;
   const isCat = channel.type === "category";
+  // a text channel's webhooks can be managed from its own settings too
+  const hooks = channel.type === "text" && canI(useServers.getState().byId[channel.server_id], P.MANAGE_WEBHOOKS, channel.id);
   const groups: NavGroup[] = [
-    { head: isolate((isCat ? "" : "#") + channel.name), items: [{ id: "overview", label: tr_("server.channelSettings.overview") }, { id: "permissions", label: tr_("server.channelSettings.permissions") }] },
+    {
+      head: isolate((isCat ? "" : "#") + channel.name),
+      items: [
+        { id: "overview", label: tr_("server.channelSettings.overview") },
+        { id: "permissions", label: tr_("server.channelSettings.permissions") },
+        ...(hooks ? [{ id: "integrations", label: tr_("integrations.title") }] : []),
+      ],
+    },
     { head: "", items: [{ id: "delete", label: isCat ? tr_("server.channelSettings.deleteCategory") : tr_("server.channelSettings.deleteChannel"), danger: true }] },
   ];
   return (
     <SettingsLayer label={tr_("server.channelSettings.channelSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose} startOnList={!initial}>
-      {page === "permissions" ? <PermissionsPage channel={channel} serverId={channel.server_id} /> : page === "delete" ? <DeletePage channel={channel} onDone={() => { onClose(); nav(`/channels/${channel.server_id}`); }} /> : <OverviewPage channel={channel} />}
+      {page === "permissions" ? <PermissionsPage channel={channel} serverId={channel.server_id} /> : page === "integrations" && hooks ? (
+        <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={tr_("chat.pins.loading")} /></div>}>
+          <IntegrationsPage serverId={channel.server_id} channelId={channel.id} />
+        </Suspense>
+      ) : page === "delete" ? <DeletePage channel={channel} onDone={() => { onClose(); nav(`/channels/${channel.server_id}`); }} /> : <OverviewPage channel={channel} />}
     </SettingsLayer>
   );
 }

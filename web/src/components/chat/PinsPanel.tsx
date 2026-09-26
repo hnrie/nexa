@@ -12,6 +12,7 @@ import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { canPin } from "./messageMenu";
 import { messageFate, useBlockRules } from "@/lib/blocked";
+import { hookText } from "@/lib/webhookMessage";
 import { useLayerPresence } from "./useLayerPresence";
 import s from "./Chat.module.css";
 
@@ -133,10 +134,10 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
           <div key={m.id} className={s.pinItem}>
             <button type="button" className={s.pinJump} onClick={() => { setJumpTo({ channelId, messageId: m.id }); onClose(); }}>
               <span className={s.pinHead}>
-                <span className={s.pinAuthor} dir="auto">{displayName(users[m.author_id])}</span>
+                <span className={s.pinAuthor} dir="auto">{m.hook?.name ?? displayName(users[m.author_id])}</span>
                 <span className={s.time}>{formatTimestamp(m.created_at)}</span>
               </span>
-              <span className={s.pinText} dir="auto">{fates.get(m.id) === "collapse" ? t("people.blocked.replyPreview") : m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.att?.length ? t("chat.pins.attachment") : t("chat.pins.encrypted")}</span>
+              <span className={s.pinText} dir="auto">{fates.get(m.id) === "collapse" ? t("people.blocked.replyPreview") : m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.hook && hookText(m.hook) ? <Markdown source={hookText(m.hook)} ctx={ctx} inline /> : m.payload?.att?.length ? t("chat.pins.attachment") : t("chat.pins.encrypted")}</span>
             </button>
             {canPin(m) ? (
               <button

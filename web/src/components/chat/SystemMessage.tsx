@@ -1,4 +1,4 @@
-import { ArrowLeftFromLine, ArrowRightToLine, Pin } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Pin } from "lucide-react";
 import { CallLine } from "@/components/voice/CallLine";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
@@ -11,7 +11,8 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const openModal = useUI((u) => u.openModal);
   const setJumpTo = useUI((u) => u.setJumpTo);
-  const actor = displayName(users[msg.author_id]);
+  // a poll's closing line speaks for the webhook that posted the poll
+  const actor = msg.hook?.name ?? displayName(users[msg.author_id]);
   const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
   // names that open a profile, and the link to a pinned message, are real buttons
   const A = <button type="button" className={s.sysName} dir="auto" onClick={() => openModal("profile", { userId: msg.author_id })}>{actor}</button>;
@@ -50,6 +51,10 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
     case "system_call":
       // told from where the reader stands, from the summary its caller sealed onto it
       return <CallLine msg={msg} />;
+    case "system_poll_result":
+      icon = <ChartBar size={18} />;
+      body = <PollResult msg={msg} actor={<b className={s.sysName} dir="auto">{actor}</b>} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />;
+      break;
     default:
       body = <Tr id="chat.systemMessage.didSomething" values={{ actor: A }} />;
   }
@@ -61,5 +66,31 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
         <span className={s.time}>{formatTimestamp(msg.created_at)}</span>
       </span>
     </div>
+  );
+}
+
+/**
+ * How a poll went, from the result its closing carries (Discord's poll result
+ * embed): whose poll, its question, and the answer that won with its share of
+ * the votes, or that it was a tie, or that nobody voted.
+ */
+function PollResult({ msg, actor, onView }: { msg: DecryptedMessage; actor: React.ReactNode; onView: () => void }) {
+  const fields = new Map((msg.hook?.embeds.find((e) => e.type === "poll_result")?.fields ?? []).map((f) => [f.name, f.value]));
+  const question = fields.get("poll_question_text") ?? "";
+  const total = Number(fields.get("total_votes") ?? 0) || 0;
+  const votes = Number(fields.get("victor_answer_votes") ?? 0) || 0;
+  const winner = fields.get("victor_answer_text");
+  const emoji = fields.get("victor_answer_emoji_name");
+  const percent = total ? Math.round((votes / total) * 100) : 0;
+  const outcome = total === 0
+    ? t("chat.systemMessage.pollNoVotes")
+    : winner
+      ? t("chat.systemMessage.pollWinner", { answer: emoji ? `${emoji} ${winner}` : winner, percent })
+      : t("chat.systemMessage.pollTie");
+  return (
+    <>
+      <Tr id="chat.systemMessage.pollClosed" values={{ actor, question: <b className={s.sysName} dir="auto">{question}</b> }} /> {outcome}{" "}
+      <button type="button" className={s.sysLink} disabled={!msg.reply_to_id} onClick={onView}>{t("chat.systemMessage.viewPoll")}</button>
+    </>
   );
 }

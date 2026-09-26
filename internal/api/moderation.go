@@ -54,7 +54,7 @@ func (s *Server) moderationBlock(ctx context.Context, me, target *store.User) st
 	switch {
 	case target.ID == me.ID:
 		return blockSelf
-	case isSystem(target):
+	case notAPerson(target):
 		return blockSystem
 	case target.Flags&store.FlagDeleted != 0:
 		return blockDeleted
@@ -218,7 +218,7 @@ func (s *Server) handleModUser(w http.ResponseWriter, r *http.Request) {
 	if u == nil {
 		return
 	}
-	if isSystem(u) {
+	if notAPerson(u) {
 		WriteError(w, blockError(blockSystem))
 		return
 	}

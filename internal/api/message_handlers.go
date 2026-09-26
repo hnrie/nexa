@@ -408,8 +408,9 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body.Ciphertext) == 0 || string(body.Ciphertext) == "null" {
-		// flags-only edit (e.g. suppress embeds)
-		if m.AuthorID != me.ID {
+		// flags-only edit (e.g. suppress embeds); a webhook's message has no
+		// author here to do it, so whoever may delete it may do it instead
+		if m.AuthorID != me.ID && (m.WebhookID == nil || !s.canDeleteOthers(r, ch, me)) {
 			WriteError(w, ErrForbidden)
 			return
 		}

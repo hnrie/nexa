@@ -553,7 +553,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "ban_remove":
     case "invite_create":
     case "invite_delete":
+    case "webhooks_update":
       for (const h of dispatchHooks.onUnhandled) h(e);
+      return;
+    case "poll_vote_add":
+    case "poll_vote_remove":
+      useMessages.getState().setPollVote(e.d.channel_id, e.d.message_id, e.d.answer_id, e.t === "poll_vote_add", e.d.user_id === meId, e.d.total_voters);
       return;
     default: {
       const never: never = e;

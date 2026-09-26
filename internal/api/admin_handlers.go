@@ -115,7 +115,7 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "self", "You cannot disable or demote yourself."))
 		return
 	}
-	if isSystem(u) {
+	if notAPerson(u) {
 		WriteError(w, blockError(blockSystem))
 		return
 	}
@@ -247,7 +247,7 @@ func (s *Server) handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "self", "Delete your own account from your settings instead."))
 		return
 	}
-	if isSystem(u) {
+	if notAPerson(u) {
 		WriteError(w, blockError(blockSystem))
 		return
 	}

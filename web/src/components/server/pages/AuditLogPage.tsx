@@ -48,6 +48,9 @@ function verbs(): Record<string, string> {
     sticker_pack_delete: t("server.auditLog.verb.sticker_pack_delete"),
     invite_create: t("server.auditLog.verb.invite_create"),
     invite_delete: t("server.auditLog.verb.invite_delete"),
+    webhook_create: t("server.auditLog.verb.webhook_create"),
+    webhook_update: t("server.auditLog.verb.webhook_update"),
+    webhook_delete: t("server.auditLog.verb.webhook_delete"),
   };
 }
 
@@ -111,6 +114,12 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
     if (e.target_type === "emoji") {
       const changes = e.changes as { name?: string } | null;
       return changes?.name ? isolate(`:${changes.name}:`) : "";
+    }
+    if (e.target_type === "webhook") {
+      // a rename records the new name, other changes the name it has; creating and deleting record the one it had
+      const changes = e.changes as { name?: string; current_name?: string } | null;
+      const name = changes?.name || changes?.current_name;
+      return name ? isolate(name) : "";
     }
     if (e.target_type === "sticker_pack") {
       // pack updates record no changes, so the pack's current name is the only one there is
@@ -214,7 +223,10 @@ export default function AuditLogPage({ serverId }: { serverId: string }) {
         return [t("server.serverOverview.serverIcon"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
       case "banner":
         return [t("server.serverOverview.serverBanner"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
+      case "avatar":
+        return [t("integrations.image"), v ? t("server.auditLog.changed") : t("server.auditLog.removed")];
       case "target_type":
+      case "current_name":
         return null;
       default:
         return [k, Array.isArray(v) ? t("server.auditLog.itemsCount", { count: v.length }) : str ?? JSON.stringify(v)];

@@ -74,7 +74,7 @@ type InstanceStats struct {
 // Stats counts the big tables.
 func (s *Store) Stats(ctx context.Context) (*InstanceStats, error) {
 	st := &InstanceStats{}
-	row := s.db.R.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM users WHERE flags & ? = 0), (SELECT count(*) FROM servers), (SELECT count(*) FROM messages), (SELECT count(*) FROM blobs), (SELECT coalesce(sum(size), 0) FROM blobs)`, FlagSystem)
+	row := s.db.R.QueryRowContext(ctx, `SELECT (SELECT count(*) FROM users WHERE flags & ? = 0), (SELECT count(*) FROM servers), (SELECT count(*) FROM messages), (SELECT count(*) FROM blobs), (SELECT coalesce(sum(size), 0) FROM blobs)`, NotPeople)
 	if err := row.Scan(&st.Users, &st.Servers, &st.Messages, &st.Blobs, &st.BlobBytes); err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (s *Store) AdminUsers(ctx context.Context, q string, before ids.ID, limit i
 		limit = 50
 	}
 	where := `WHERE flags & ? = 0`
-	args := []any{FlagDeleted | FlagSystem}
+	args := []any{FlagDeleted | NotPeople}
 	if q = strings.TrimSpace(q); q != "" {
 		if len(q) > maxSearchQuery {
 			q = q[:maxSearchQuery]

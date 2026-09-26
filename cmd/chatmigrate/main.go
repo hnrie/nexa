@@ -210,7 +210,7 @@ var keyColumns = []struct{ table, cols string }{
 	{"users", "id, username, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, auth_hash, recovery_auth_hash, flags"},
 	{"key_epochs", "conv_id, epoch, created_by, created_at"},
 	{"key_grants", "conv_id, epoch, user_id, wrapped_key, wrapped_by"},
-	{"messages", "id, ciphertext, key_conv_id, key_epoch"},
+	{"messages", "id, ciphertext, key_conv_id, key_epoch, webhook_id, plain"},
 	{"user_settings", "user_id, blob, version"},
 	{"blobs", "id, sha256, size, mime, kind"},
 	{"sessions", "id, user_id, token_hash"},
@@ -226,6 +226,9 @@ var keyColumns = []struct{ table, cols string }{
 	{"guest_links", "code, channel_id, epoch"},
 	{"guests", "id, token_hash"},
 	{"username_holds", "username, user_id"},
+	// a webhook's URL is its token: one that came across wrong stops every
+	// program posting through it
+	{"webhooks", "id, token_hash, token_sealed"},
 }
 
 // sameBytes checks that the values that matter are identical on both sides.

@@ -5,6 +5,7 @@ import { lazyPage } from "@/lib/lazyChunk";
 import { P } from "@/lib/perms";
 import { useAuth } from "@/stores/auth";
 import { canI, useServers } from "@/stores/servers";
+import { useChannels } from "@/stores/channels";
 import { SettingsLayer, type NavGroup } from "./SettingsLayer";
 
 import { t } from "@/i18n";
@@ -17,6 +18,7 @@ const AuditLogPage = lazyPage(() => import("./pages/AuditLogPage"));
 const EncryptionPage = lazyPage(() => import("./pages/EncryptionPage"));
 const EmojiPage = lazyPage(() => import("./pages/EmojiPage"));
 const ServerStickersPage = lazyPage(() => import("./pages/ServerStickersPage"));
+const IntegrationsPage = lazyPage(() => import("./pages/IntegrationsPage"));
 const DeleteServerPage = lazyPage(() => import("./pages/DeleteServerPage"));
 
 export default function ServerSettingsModal({ onClose, serverId, page: initial }: { onClose: () => void; serverId: string; page?: string | undefined }) {
@@ -29,6 +31,7 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     { id: "roles", label: t("server.members.roles"), ok: canI(st, P.MANAGE_ROLES), group: 0 },
     { id: "emoji", label: t("modals.customStatus.emoji"), ok: true, group: 0 },
     { id: "stickers", label: t("pickers.expressionPicker.stickers"), ok: true, group: 0 },
+    { id: "integrations", label: t("integrations.title"), ok: canI(st, P.MANAGE_WEBHOOKS) || Object.values(useChannels.getState().byId).some((c) => c.server_id === serverId && c.type === "text" && canI(st, P.MANAGE_WEBHOOKS, c.id)), group: 0 },
     { id: "encryption", label: t("server.encryption.encryption"), ok: true, group: 0 },
     { id: "members", label: t("server.serverSettings.members"), ok: true, group: 1 },
     { id: "invites", label: t("server.invites.invites"), ok: canI(st, P.MANAGE_SERVER), group: 1 },
@@ -56,6 +59,7 @@ export default function ServerSettingsModal({ onClose, serverId, page: initial }
     page === "audit" ? <AuditLogPage serverId={serverId} /> :
     page === "emoji" ? <EmojiPage serverId={serverId} /> :
     page === "stickers" ? <ServerStickersPage serverId={serverId} /> :
+    page === "integrations" ? <IntegrationsPage serverId={serverId} /> :
     page === "delete" ? <DeleteServerPage serverId={serverId} onDone={() => { onClose(); nav("/channels/@me"); }} /> :
     <EncryptionPage serverId={serverId} />;
   return (

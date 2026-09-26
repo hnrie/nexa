@@ -47,6 +47,8 @@ describe("crypto module surface", () => {
       "encryptMessage",
       "decryptMessage",
       "isEnvelope",
+      "webLink",
+      "sanitizeEmbed",
       // file
       "CHUNK",
       "encryptFile",

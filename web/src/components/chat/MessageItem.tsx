@@ -39,6 +39,9 @@ import { discardPending, retryPending } from "@/components/composer/send";
 import { buildMessageMenu, canDelete, canEdit, canPick, canPin, canReact, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
 import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
+import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
+import { HookBody } from "./webhook/HookBody";
+import { hookText } from "@/lib/webhookMessage";
 import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
@@ -61,7 +64,8 @@ interface Props {
 function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const target = useMessages((m) => (msg.reply_to_id ? m.channels[msg.channel_id]?.byId[msg.reply_to_id] : undefined));
   const avatarId = useUsers((u) => (target ? (u.byId[target.author_id]?.avatar_id ?? null) : null));
-  const name = useShownName(msg.channel_id, target?.author_id);
+  const shownName = useShownName(msg.channel_id, target?.hook ? undefined : target?.author_id);
+  const name = target?.hook ? target.hook.name : shownName;
   const setJumpTo = useUI((u) => u.setJumpTo);
   const openModal = useUI((u) => u.openModal);
   const ctx = useRowRenderCtx();
@@ -70,12 +74,18 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const payload = target?.payload;
   const failed = !!target?.decryptError;
   // parsed when the quoted message changes, not on every render of the row
+  const hook = target?.hook;
   const text = useMemo(() => {
     const mediaOnly = !!payload?.t && isOnlyMediaLinks(payload.t, (payload.embeds ?? []) as UnfurlResult[]);
     if (payload?.t && !mediaOnly) return plainText(parse(payload.t), ctx);
+    // a webhook's message says what it has to say in its embeds, as often as not
+    if (hook && !payload?.att?.length) {
+      const words = hookText(hook);
+      if (words) return plainText(parse(words), ctx).slice(0, 200);
+    }
     if (payload?.att?.length || mediaOnly || payload?.sticker) return t("chat.messageItem.clickToSeeAttachment");
     return failed ? t("chat.messageItem.encryptedMessage") : "";
-  }, [payload, failed, ctx]);
+  }, [payload, failed, ctx, hook]);
   if (!msg.reply_to_id) return null;
   const replyTo = msg.reply_to_id;
   // Jumping works whether or not the original is loaded: the list fetches the
@@ -98,14 +108,16 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   }
   return (
     <div className={s.replyLine} onClick={jump}>
-      <span className={s.replyAvatar} aria-hidden="true"><Avatar id={target.author_id} avatarId={avatarId} name={name} size={16} /></span>
+      <span className={s.replyAvatar} aria-hidden="true">{hook && target.webhook_id ? <HookAvatar hook={hook} webhookId={target.webhook_id} size={16} /> : <Avatar id={target.author_id} avatarId={avatarId} name={name} size={16} />}</span>
       <button
         type="button"
         className={s.replyName}
         dir="auto"
         onClick={(e) => {
           e.stopPropagation();
-          openModal("profile", { userId: target.author_id });
+          // a webhook has no profile; its message is where to go
+          if (hook) jump();
+          else openModal("profile", { userId: target.author_id });
         }}
       >
         {name}
@@ -131,9 +143,14 @@ function ToolButton({ label, danger, onClick, children }: { label: string; dange
 export const MessageItem = memo(function MessageItem({ msg, groupStart, pending, upload, highlight, first }: Props) {
   const me = useAuth((a) => a.me);
   const avatarId = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
+  // A webhook's message goes by the name and picture it was sent with.
+  const hook = msg.hook;
   // A nickname you gave a friend applies everywhere their name appears, not
   // just in the sidebar; a server nickname wins inside that server.
-  const name = useShownName(msg.channel_id, msg.author_id);
+  const shownName = useShownName(msg.channel_id, hook ? undefined : msg.author_id);
+  const name = hook ? hook.name : shownName;
+  const [hookCard, setHookCard] = useState<HTMLElement | null>(null);
+  const closeHookCard = useCallback(() => setHookCard(null), []);
   const editing = useUI((u) => u.editing?.channelId === msg.channel_id && u.editing.messageId === msg.id);
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
@@ -141,7 +158,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const ctx = useRowRenderCtx();
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   // the author's colour only, so a change to anyone else in the server leaves this row alone
-  const color = useServers((st) => (serverId && st.byId[serverId] ? memberColor(st.byId[serverId], msg.author_id) : undefined));
+  const color = useServers((st) => (serverId && st.byId[serverId] && !msg.webhook_id ? memberColor(st.byId[serverId], msg.author_id) : undefined));
   const [picker, setPicker] = useState<DOMRect | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuWatch = useRef<(() => void) | null>(null);
@@ -216,7 +233,15 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const pinned = (msg.flags & MSG_FLAG_PINNED) !== 0;
 
   const showHeader = groupStart || isReply;
-  const profile = () => openModal("profile", { userId: msg.author_id });
+  const profile = (e: React.MouseEvent<HTMLElement>) => {
+    // a webhook is not a person with a profile: its card says what it is
+    if (hook) {
+      const el = e.currentTarget;
+      setHookCard((cur) => (cur ? null : el));
+      return;
+    }
+    openModal("profile", { userId: msg.author_id });
+  };
   // A row reads as who, when and what, whether or not it shows the name: a
   // message grouped under the one before still says who wrote it.
   const whoId = `${uid}who`;
@@ -273,12 +298,14 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
         <>
           {/* the same way to the profile as the name beside it, for a pointer only: one stop for the keyboard is enough */}
           <button type="button" className={s.avatar} data-group-start={showHeader} onClick={profile} tabIndex={-1} aria-hidden="true">
-            <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />
+            {hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
           </button>
           <div className={s.headerRow} id={whoId}>
-            <button type="button" className={s.author} data-author={msg.author_id} style={color ? { color } : undefined} onClick={profile} dir="auto">{name}</button>
+            <button type="button" className={s.author} data-author={msg.author_id} data-webhook={msg.webhook_id} style={color ? { color } : undefined} onClick={profile} dir="auto" aria-haspopup={hook ? "dialog" : undefined}>{name}</button>
+            {hook ? <HookTags /> : null}
             <HeaderTime at={msg.created_at} />
           </div>
+          {hookCard && hook && msg.webhook_id ? <HookPopout hook={hook} webhookId={msg.webhook_id} anchor={hookCard} onClose={closeHookCard} /> : null}
         </>
       ) : (
         <>
@@ -303,7 +330,8 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
           {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
           {embeds ? <Embeds list={embeds} /> : null}
-          {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds} />}
+          {hook ? <HookBody msg={msg} from={name} /> : null}
+          {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
           {pending === "failed" ? (
             <div className={s.failedRow}>
               <span>{t("chat.messageItem.messageFailedToSend")}</span>

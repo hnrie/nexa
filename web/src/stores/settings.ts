@@ -70,6 +70,8 @@ export interface Settings {
   spellcheck: boolean;
   linkPreviews: boolean;
   imagePreviews: boolean;
+  /** Read aloud the messages a webhook sends to be read aloud, in the conversation open in front of you (lib/tts.ts). */
+  tts: boolean;
   developerMode: boolean;
   /** Show what the desktop app hears from games and music (Rich Presence) to others. */
   shareActivity: boolean;
@@ -155,6 +157,7 @@ export const DEFAULT_SETTINGS: Settings = {
   spellcheck: true,
   linkPreviews: true,
   imagePreviews: true,
+  tts: true,
   developerMode: false,
   shareActivity: true,
   autoIdle: true,

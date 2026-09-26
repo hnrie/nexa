@@ -107,6 +107,9 @@ const (
 	EvBanRemove          = "ban_remove"
 	EvInviteCreate       = "invite_create"
 	EvInviteDelete       = "invite_delete"
+	EvWebhooksUpdate     = "webhooks_update"
+	EvPollVoteAdd        = "poll_vote_add"
+	EvPollVoteRemove     = "poll_vote_remove"
 	EvSettingsUpdate     = "settings_update"
 	EvSessionExpired     = "session_expired"
 	// EvGuestEnded tells a guest why their time in the call is over, just before the socket closes.

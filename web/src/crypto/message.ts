@@ -39,6 +39,13 @@ export interface AttachmentMeta {
   key: string;
   spoiler?: boolean;
   duration?: number;
+  /**
+   * A webhook's file: stored as it was sent, not encrypted, so it downloads
+   * as it is and `key` is empty.
+   */
+  plain?: boolean;
+  /** Alt text a webhook gave the file. */
+  alt?: string;
 }
 
 export interface MessagePayload {
@@ -120,6 +127,7 @@ function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (isNum(h)) a.h = h;
   if (isNum(duration)) a.duration = duration;
   if (typeof spoiler === "boolean") a.spoiler = spoiler;
+  // a message sealed by a person holds only encrypted files, whatever it says
   return a;
 }
 
@@ -132,7 +140,7 @@ const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count"];
  * path a browser would resolve to another host — the sender wrote to do
  * something other than show a link.
  */
-function webLink(v: string): boolean {
+export function webLink(v: string): boolean {
   if (/[\\\s\u0000-\u001f\u007f]/.test(v)) return false;
   if (v.startsWith("/")) return !v.startsWith("//");
   return /^https?:\/\//i.test(v);
@@ -140,7 +148,7 @@ function webLink(v: string): boolean {
 
 const EMBED_LINKS = new Set(["url", "image"]);
 
-function sanitizeEmbed(e: Obj): Obj {
+export function sanitizeEmbed(e: Obj): Obj {
   const out: Obj = {};
   for (const k of EMBED_STRINGS) {
     const v = e[k];

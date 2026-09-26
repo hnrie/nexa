@@ -79,6 +79,29 @@ describe("messages store", () => {
     expect(useMessages.getState().channels["c1"]?.byId["1"]?.reactions).toEqual([]);
   });
 
+  it("counts poll votes as they come and go, taking the number of voters from the server", () => {
+    const s = useMessages.getState();
+    const tally = { answer_counts: [{ id: 1, count: 0, me_voted: false }, { id: 2, count: 0, me_voted: false }], total_voters: 0, expires_at: null, is_finalized: false };
+    s.insert("c1", [{ ...msg("1"), webhook_id: "7", poll_results: tally }, msg("2")]);
+    const poll = () => useMessages.getState().channels["c1"]?.byId["1"]?.poll_results;
+    // someone else votes
+    s.setPollVote("c1", "1", 2, true, false, 1);
+    expect(poll()?.answer_counts.map((a) => a.count)).toEqual([0, 1]);
+    expect(poll()?.total_voters).toBe(1);
+    // this account votes: the answer to the vote first, then its echo, counted once
+    s.setPollResults("c1", "1", { ...tally, answer_counts: [{ id: 1, count: 1, me_voted: true }, { id: 2, count: 1, me_voted: false }], total_voters: 2 });
+    s.setPollVote("c1", "1", 1, true, true, 2);
+    expect(poll()?.answer_counts).toEqual([{ id: 1, count: 1, me_voted: true }, { id: 2, count: 1, me_voted: false }]);
+    expect(poll()?.total_voters).toBe(2);
+    // the other voter takes theirs back; an older server sends no total
+    s.setPollVote("c1", "1", 2, false, false);
+    expect(poll()?.answer_counts.map((a) => a.count)).toEqual([1, 0]);
+    expect(poll()?.total_voters).toBe(2);
+    // a message with no poll is left alone
+    s.setPollVote("c1", "2", 1, true, false, 1);
+    expect(useMessages.getState().channels["c1"]?.byId["2"]?.poll_results).toBeUndefined();
+  });
+
   it("tracks pending messages and resolves them by nonce", () => {
     const s = useMessages.getState();
     s.addPending({ tmpId: "t1", nonce: "n1", channelId: "c1", authorId: "me", payload: { t: "hi" }, createdAt: 1, status: "sending" });

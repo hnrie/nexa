@@ -20,11 +20,20 @@ const (
 	// delivers moderation notices and announcements. Nobody signs in as it,
 	// and nobody can message, befriend or moderate it.
 	FlagSystem int64 = 16
+	// FlagWebhook marks the account every webhook's messages are filed under.
+	// It stands in for the webhooks in the author column, which names an
+	// account; who a message really came from rides with the message itself.
+	// Nobody signs in as it, and nobody can message, befriend or block it.
+	FlagWebhook int64 = 32
 )
+
+// NotPeople are the flags of accounts no person holds: Nexa's and the
+// webhooks'. Anything that counts or lists people leaves them out.
+const NotPeople = FlagSystem | FlagWebhook
 
 // publicFlags are the bits other people may see: whether an account is staff,
 // and whether it is the system account rather than a person.
-const publicFlags = FlagAdmin | FlagSystem
+const publicFlags = FlagAdmin | FlagSystem | FlagWebhook
 
 // Who may start a direct message with an account (users.dm_privacy): anyone,
 // friends and people who share a server with it, friends, or nobody. A new
@@ -327,10 +336,16 @@ type ChannelPatch struct {
 	Position        *int
 }
 
-// Message flag bits.
+// Message flag bits, at the same values as Discord's.
 const (
 	MsgFlagPinned         int64 = 1
 	MsgFlagSuppressEmbeds int64 = 4
+	// MsgFlagSuppressNotifications is a message that makes no sound and
+	// shows no notification, though it still counts as unread.
+	MsgFlagSuppressNotifications int64 = 1 << 12
+	// MsgFlagComponentsV2 is a webhook message laid out entirely by its
+	// components: it has no content or embeds of its own.
+	MsgFlagComponentsV2 int64 = 1 << 15
 )
 
 // Message is an encrypted message row plus its attachments and reactions.
@@ -352,9 +367,66 @@ type Message struct {
 	Nonce           string            `json:"nonce,omitempty"`
 	EditedAt        *int64            `json:"edited_at"`
 	CreatedAt       int64             `json:"created_at"`
+	// WebhookID names the webhook a message came through, and Webhook holds
+	// what it said, as sent: a webhook's messages are not encrypted (see
+	// api/webhook_message.go for the shape). Both are absent otherwise.
+	WebhookID *ids.ID         `json:"webhook_id,omitempty"`
+	Webhook   json.RawMessage `json:"webhook,omitempty"`
+	// Poll is how a webhook message's poll stands, for whoever loaded it.
+	Poll *PollTally `json:"poll_results,omitempty"`
+	// NewPoll, on a message being inserted, opens its poll with it.
+	NewPoll *NewPoll `json:"-"`
 }
 
-// Attachment is an encrypted file bound to a message.
+// NewPoll is a poll opened with its message: how many answers it has (their
+// ids run from 1 to Answers), whether more than one may be picked, and when
+// it closes.
+type NewPoll struct {
+	Answers     int
+	Multiselect bool
+	ExpiresAt   int64
+}
+
+// PollTally is how a poll stands for one reader: the votes on each answer,
+// which the reader picked, how many people voted, and whether it has closed.
+type PollTally struct {
+	Counts    []PollCount `json:"answer_counts"`
+	Voters    int         `json:"total_voters"`
+	ExpiresAt *int64      `json:"expires_at"`
+	Finalized bool        `json:"is_finalized"`
+}
+
+// PollCount is one answer's votes.
+type PollCount struct {
+	ID      int  `json:"id"`
+	Count   int  `json:"count"`
+	MeVoted bool `json:"me_voted"`
+}
+
+// Webhook is an incoming webhook: a secret URL that posts into one channel.
+// The token is never part of it as stored; the API opens it for managers.
+type Webhook struct {
+	ID          ids.ID  `json:"id"`
+	Type        int     `json:"type"`
+	ServerID    ids.ID  `json:"server_id"`
+	ChannelID   ids.ID  `json:"channel_id"`
+	CreatorID   *ids.ID `json:"creator_id"`
+	Name        string  `json:"name"`
+	AvatarID    *ids.ID `json:"avatar_id"`
+	TokenHash   string  `json:"-"`
+	TokenSealed []byte  `json:"-"`
+	CreatedAt   int64   `json:"created_at"`
+	UpdatedAt   int64   `json:"updated_at"`
+}
+
+// WebhookPatch is an optional set of webhook changes.
+type WebhookPatch struct {
+	Name      *string
+	ChannelID *ids.ID
+}
+
+// Attachment is a file bound to a message: ciphertext, or for a webhook's
+// message the file as it was sent.
 type Attachment struct {
 	ID         ids.ID `json:"id"`
 	MessageID  ids.ID `json:"-"`

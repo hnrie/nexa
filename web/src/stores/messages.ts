@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { fetchMissingUsers } from "./users";
 import { messages as messagesApi } from "@/api/messages";
-import type { Message, ReactionSummary } from "@/api/types";
+import type { Message, PollTally, ReactionSummary } from "@/api/types";
 import type { MessagePayload } from "@/crypto/message";
 import { decryptForStore, type DecryptedMessage, type DecryptError } from "@/lib/decrypt";
 import { compareIds } from "@/lib/ids";
@@ -98,6 +98,11 @@ interface MessagesState {
   removeMany: (channelId: string, ids: string[]) => void;
   setReaction: (channelId: string, messageId: string, emoji: string, userId: string, add: boolean, isMe: boolean) => void;
   setDecryption: (channelId: string, id: string, payload: MessagePayload | undefined, error: DecryptError | undefined) => void;
+  /** A vote on a poll added or taken back, by anyone; `isMe` when it was this account's. */
+  /** Counts one vote coming or going; `voters` is how many people have voted now, where the server says. */
+  setPollVote: (channelId: string, messageId: string, answerId: number, add: boolean, isMe: boolean, voters?: number) => void;
+  /** A poll's standing as the server just counted it for this account. */
+  setPollResults: (channelId: string, messageId: string, results: PollTally) => void;
   setFlags: (channelId: string, id: string, flags: number) => void;
   setLoading: (channelId: string, loading: boolean) => void;
   setHasOlder: (channelId: string, hasOlder: boolean) => void;
@@ -174,11 +179,13 @@ function arrived(c: ChannelMessages, msgs: DecryptedMessage[]): ChannelMessages 
 
 /** The server's copy of a loaded message, reusing the decryption, and the object itself when nothing changed. */
 async function refreshed(prev: DecryptedMessage, m: Message): Promise<DecryptedMessage> {
-  if (prev.edited_at !== m.edited_at || JSON.stringify(prev.ciphertext) !== JSON.stringify(m.ciphertext)) return decryptForStore(m);
-  if (prev.flags === m.flags && JSON.stringify(prev.reactions) === JSON.stringify(m.reactions) && JSON.stringify(prev.attachments) === JSON.stringify(m.attachments)) return prev;
+  // a webhook's message can change without an edit: its link previews come in after it
+  if (prev.edited_at !== m.edited_at || JSON.stringify(prev.ciphertext) !== JSON.stringify(m.ciphertext) || JSON.stringify(prev.webhook) !== JSON.stringify(m.webhook)) return decryptForStore(m);
+  if (prev.flags === m.flags && JSON.stringify(prev.reactions) === JSON.stringify(m.reactions) && JSON.stringify(prev.attachments) === JSON.stringify(m.attachments) && JSON.stringify(prev.poll_results) === JSON.stringify(m.poll_results)) return prev;
   const next: DecryptedMessage = { ...m };
   if (prev.payload !== undefined) next.payload = prev.payload;
   if (prev.decryptError !== undefined) next.decryptError = prev.decryptError;
+  if (prev.hook !== undefined) next.hook = prev.hook;
   return next;
 }
 
@@ -226,7 +233,14 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         if (!prev) return c;
         // The edited copy carries the editor's own "me" flags on its reactions,
         // so the reactions already here stay; their own events keep them current.
-        return { ...c, byId: { ...c.byId, [msg.id]: { ...msg, reactions: prev.reactions } } };
+        // A poll's counts come from the copy, which was counted for nobody, so
+        // which answers are this account's comes from the one already here.
+        const next: DecryptedMessage = { ...msg, reactions: prev.reactions };
+        if (msg.poll_results && prev.poll_results) {
+          const mine = new Set(prev.poll_results.answer_counts.filter((a) => a.me_voted).map((a) => a.id));
+          next.poll_results = { ...msg.poll_results, answer_counts: msg.poll_results.answer_counts.map((a) => ({ ...a, me_voted: mine.has(a.id) })) };
+        }
+        return { ...c, byId: { ...c.byId, [msg.id]: next } };
       }),
     ),
   remove: (channelId, id) => get().removeMany(channelId, [id]),
@@ -279,6 +293,33 @@ export const useMessages = create<MessagesState>()((set, get) => ({
         if (error !== undefined) next.decryptError = error;
         else delete next.decryptError;
         return { ...c, byId: { ...c.byId, [id]: next } };
+      }),
+    ),
+  setPollVote: (channelId, messageId, answerId, add, isMe, voters) =>
+    set((s) =>
+      withChannel(s, channelId, (c) => {
+        const m = c.byId[messageId];
+        const tally = m?.poll_results;
+        if (!m || !tally) return c;
+        const counts = tally.answer_counts.map((a) => ({ ...a }));
+        const a = counts.find((x) => x.id === answerId);
+        if (!a) return c;
+        // the number of voters is as the server counted it, so it can be taken every time
+        const total_voters = voters ?? tally.total_voters;
+        // your own vote arrives twice, once from the answer to it and once
+        // as the echo, so its "me" flag says whether it is already counted
+        if (isMe && a.me_voted === add) return total_voters === tally.total_voters ? c : { ...c, byId: { ...c.byId, [messageId]: { ...m, poll_results: { ...tally, total_voters } } } };
+        a.count = Math.max(0, a.count + (add ? 1 : -1));
+        if (isMe) a.me_voted = add;
+        return { ...c, byId: { ...c.byId, [messageId]: { ...m, poll_results: { ...tally, answer_counts: counts, total_voters } } } };
+      }),
+    ),
+  setPollResults: (channelId, messageId, results) =>
+    set((s) =>
+      withChannel(s, channelId, (c) => {
+        const m = c.byId[messageId];
+        if (!m) return c;
+        return { ...c, byId: { ...c.byId, [messageId]: { ...m, poll_results: results } } };
       }),
     ),
   setFlags: (channelId, id, flags) =>

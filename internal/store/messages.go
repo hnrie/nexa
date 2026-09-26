@@ -20,13 +20,13 @@ const MaxReactionEmoji = 20
 // messageCols are what a message is read with. has_attachments is written
 // (the legal record sums it) but never read back: the attachments themselves
 // come with the message.
-const messageCols = `id, channel_id, author_id, type, ciphertext, key_conv_id, key_epoch, reply_to_id, mentions, mention_roles, mention_everyone, flags, nonce, edited_at, created_at`
+const messageCols = `id, channel_id, author_id, type, ciphertext, key_conv_id, key_epoch, reply_to_id, mentions, mention_roles, mention_everyone, flags, nonce, edited_at, created_at, webhook_id, plain`
 
 // messageInsertCols are what a new message is written with.
 const messageInsertCols = messageCols + `, has_attachments`
 
 // messageColsM is messageCols qualified with the alias m, for joins.
-const messageColsM = `m.id, m.channel_id, m.author_id, m.type, m.ciphertext, m.key_conv_id, m.key_epoch, m.reply_to_id, m.mentions, m.mention_roles, m.mention_everyone, m.flags, m.nonce, m.edited_at, m.created_at`
+const messageColsM = `m.id, m.channel_id, m.author_id, m.type, m.ciphertext, m.key_conv_id, m.key_epoch, m.reply_to_id, m.mentions, m.mention_roles, m.mention_everyone, m.flags, m.nonce, m.edited_at, m.created_at, m.webhook_id, m.plain`
 
 // MessageQuery selects a page of messages. Results are always ascending by id.
 type MessageQuery struct {
@@ -68,8 +68,9 @@ func scanMessage(r rowScanner) (*Message, error) {
 	var conv, epoch, reply, edited sql.NullInt64
 	var mentions, roles string
 	var everyone int64
-	var nonce sql.NullString
-	if err := r.Scan(&m.ID, &m.ChannelID, &m.AuthorID, &m.Type, &ct, &conv, &epoch, &reply, &mentions, &roles, &everyone, &m.Flags, &nonce, &edited, &m.CreatedAt); err != nil {
+	var nonce, plain sql.NullString
+	var webhook sql.NullInt64
+	if err := r.Scan(&m.ID, &m.ChannelID, &m.AuthorID, &m.Type, &ct, &conv, &epoch, &reply, &mentions, &roles, &everyone, &m.Flags, &nonce, &edited, &m.CreatedAt, &webhook, &plain); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -88,6 +89,10 @@ func scanMessage(r rowScanner) (*Message, error) {
 	m.MentionRoles = parseIDsJSON(roles)
 	m.MentionEveryone = everyone == 1
 	m.Nonce = nonce.String
+	m.WebhookID = idPtr(webhook)
+	if plain.Valid && plain.String != "" {
+		m.Webhook = json.RawMessage(plain.String)
+	}
 	m.Attachments = []Attachment{}
 	m.Reactions = []ReactionSummary{}
 	return &m, nil
@@ -118,14 +123,24 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 	if m.KeyEpoch != nil {
 		epoch = int64(*m.KeyEpoch)
 	}
+	var plain any
+	if len(m.Webhook) > 0 {
+		plain = string(m.Webhook)
+	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
-		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageInsertCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,
-			int64(m.ID), int64(m.ChannelID), int64(m.AuthorID), m.Type, ct, nullID(m.KeyConvID), epoch, nullID(m.ReplyToID), idsJSON(m.Mentions), idsJSON(m.MentionRoles), boolInt(m.MentionEveryone), m.Flags, nonce, nullInt64(m.EditedAt), m.CreatedAt, boolInt(len(m.Attachments) > 0))
+		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageInsertCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,
+			int64(m.ID), int64(m.ChannelID), int64(m.AuthorID), m.Type, ct, nullID(m.KeyConvID), epoch, nullID(m.ReplyToID), idsJSON(m.Mentions), idsJSON(m.MentionRoles), boolInt(m.MentionEveryone), m.Flags, nonce, nullInt64(m.EditedAt), m.CreatedAt, nullID(m.WebhookID), plain, boolInt(len(m.Attachments) > 0))
 		if err != nil {
 			return err
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrAlreadyExists
+		}
+		if m.NewPoll != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO polls (message_id, options_count, multiselect, expires_at) VALUES (?,?,?,?)`,
+				int64(m.ID), m.NewPoll.Answers, boolInt(m.NewPoll.Multiselect), m.NewPoll.ExpiresAt); err != nil {
+				return err
+			}
 		}
 		for i := range m.Attachments {
 			a := &m.Attachments[i]
@@ -276,7 +291,10 @@ func (s *Store) hydrate(ctx context.Context, msgs []*Message, forUser ids.ID) er
 			m.Reactions = append(m.Reactions, rs)
 		}
 	}
-	return rrows.Err()
+	if err := rrows.Err(); err != nil {
+		return err
+	}
+	return s.hydratePolls(ctx, msgs, forUser)
 }
 
 // UpdateMessage replaces the ciphertext and mention metadata.

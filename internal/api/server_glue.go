@@ -25,6 +25,8 @@ func needBits(need string) perms.Perm {
 		return perms.ViewChannel | perms.AttachFiles
 	case "mention_everyone":
 		return perms.ViewChannel | perms.MentionEveryone
+	case NeedWebhooks:
+		return perms.ViewChannel | perms.ManageWebhooks
 	default:
 		return perms.ViewChannel
 	}

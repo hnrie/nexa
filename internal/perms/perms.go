@@ -40,6 +40,7 @@ const (
 	ChangeNickname      Perm = 1 << 26
 	ManageNicknames     Perm = 1 << 27
 	ManageRoles         Perm = 1 << 28
+	ManageWebhooks      Perm = 1 << 29
 	ManageEmojis        Perm = 1 << 30
 	ModerateMembers     Perm = 1 << 40
 	UseSoundboard       Perm = 1 << 42
@@ -49,8 +50,8 @@ const (
 // All is every permission this server knows.
 const All = CreateInstantInvite | KickMembers | BanMembers | Administrator | ManageChannels | ManageServer | AddReactions | ViewAuditLog |
 	PrioritySpeaker | Stream | ViewChannel | SendMessages | ManageMessages | EmbedLinks | AttachFiles | ReadMessageHistory | MentionEveryone |
-	Connect | Speak | MuteMembers | DeafenMembers | MoveMembers | UseVAD | ChangeNickname | ManageNicknames | ManageRoles | ManageEmojis |
-	ModerateMembers | UseSoundboard | CreatePolls
+	Connect | Speak | MuteMembers | DeafenMembers | MoveMembers | UseVAD | ChangeNickname | ManageNicknames | ManageRoles | ManageWebhooks |
+	ManageEmojis | ModerateMembers | UseSoundboard | CreatePolls
 
 // DefaultEveryone is what a fresh server's @everyone role gets.
 const DefaultEveryone = CreateInstantInvite | AddReactions | Stream | ViewChannel | SendMessages | EmbedLinks | AttachFiles |
@@ -67,7 +68,7 @@ var Names = map[string]Perm{
 	"MANAGE_MESSAGES": ManageMessages, "EMBED_LINKS": EmbedLinks, "ATTACH_FILES": AttachFiles, "READ_MESSAGE_HISTORY": ReadMessageHistory,
 	"MENTION_EVERYONE": MentionEveryone, "CONNECT": Connect, "SPEAK": Speak, "MUTE_MEMBERS": MuteMembers, "DEAFEN_MEMBERS": DeafenMembers,
 	"MOVE_MEMBERS": MoveMembers, "USE_VAD": UseVAD, "CHANGE_NICKNAME": ChangeNickname, "MANAGE_NICKNAMES": ManageNicknames,
-	"MANAGE_ROLES": ManageRoles, "MANAGE_EMOJIS": ManageEmojis, "MODERATE_MEMBERS": ModerateMembers, "USE_SOUNDBOARD": UseSoundboard,
+	"MANAGE_ROLES": ManageRoles, "MANAGE_WEBHOOKS": ManageWebhooks, "MANAGE_EMOJIS": ManageEmojis, "MODERATE_MEMBERS": ModerateMembers, "USE_SOUNDBOARD": UseSoundboard,
 	"CREATE_POLLS": CreatePolls,
 }
 

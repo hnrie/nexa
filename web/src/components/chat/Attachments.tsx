@@ -152,7 +152,7 @@ function ImageAttachment({ att, onOpen }: { att: AttachmentMeta; onOpen: () => v
         // the picture is the way into the viewer, for a keyboard as for a pointer
         <img
           src={url}
-          alt={att.name}
+          alt={att.alt || att.name}
           width={dims.width}
           height={dims.height}
           data-image-src={url}
@@ -171,7 +171,8 @@ function ImageAttachment({ att, onOpen }: { att: AttachmentMeta; onOpen: () => v
           {error ? (
             <LoadFailed error={error} what="image" onRetry={retry} />
           ) : wanted || auto ? (
-            tr_("chat.attachments.decryptingShort")
+            // a webhook's file is fetched as it is, with nothing to decrypt
+            att.plain ? tr_("chat.pins.loading") : tr_("chat.attachments.decryptingShort")
           ) : (
             <button
               className={s.videoLoad}
@@ -223,7 +224,7 @@ function VideoAttachment({ att }: { att: AttachmentMeta }) {
           {error ? (
             <LoadFailed error={error} what="video" onRetry={retry} />
           ) : wanted || auto ? (
-            <span className={s.videoLoading}><Spinner size={20} /> {tr_("chat.attachments.decryptingNamed", { name: att.name, size: formatBytes(att.size) })}</span>
+            <span className={s.videoLoading}><Spinner size={20} /> {tr_(att.plain ? "chat.attachments.loadingNamed" : "chat.attachments.decryptingNamed", { name: att.name, size: formatBytes(att.size) })}</span>
           ) : (
             <button className={s.videoLoad} onClick={load}>
               <Play size={20} /> {tr_("chat.attachments.loadVideo", { size: formatBytes(att.size) })}
@@ -246,7 +247,7 @@ function AudioAttachment({ att }: { att: AttachmentMeta }) {
       ) : error ? (
         <span className={s.fileSize}><LoadFailed error={error} what="audio" onRetry={retry} /></span>
       ) : wanted || auto ? (
-        <span className={s.fileSize}>{tr_("chat.attachments.decrypting", { name: att.name })}</span>
+        <span className={s.fileSize}>{tr_(att.plain ? "chat.attachments.loadingFile" : "chat.attachments.decrypting", { name: att.name })}</span>
       ) : (
         <button className={s.videoLoad} onClick={load}>
           <Play size={16} /> {tr_("chat.attachments.loadNamed", { name: att.name, size: formatBytes(att.size) })}

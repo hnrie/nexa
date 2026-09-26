@@ -17,6 +17,8 @@ const (
 	NeedReact   = "react"
 	NeedAttach  = "attach"
 	NeedPin     = "pin"
+	// NeedWebhooks is Manage Webhooks in the channel.
+	NeedWebhooks = "webhooks"
 )
 
 // channel loads the channel from the path and checks the caller may act in it.

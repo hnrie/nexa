@@ -128,11 +128,12 @@ export const MessageHit = memo(function MessageHit({ doc, needles, names, showWh
   const renderCtx = useRenderCtx();
   const where = useWhere(names)(doc.c);
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
-  const readable = useMemo(() => (doc.t ? plainText(parse(doc.t), renderCtx) : ""), [doc.t, renderCtx]);
+  // a webhook's message may say everything in its embeds
+  const readable = useMemo(() => (doc.t ? plainText(parse(doc.t), renderCtx) : doc.hx ? plainText(parse(doc.hx), renderCtx) : ""), [doc.t, doc.hx, renderCtx]);
   const runs = useMemo(() => highlight(excerptAround(readable, needles), needles), [readable, needles]);
   const media = mediaOf(doc).filter((m) => m.kind === "file" || imagePreviews);
   const files = filesOf(doc);
-  const name = names.person(doc.a);
+  const name = doc.hn ?? names.person(doc.a);
   const author = names.users[doc.a];
   const inside = (
     <>
@@ -260,7 +261,7 @@ function MediaGrid({ run, names, sort, onJump }: { run: SearchRun; names: Names;
   const items: LightboxItem[] = useMemo(
     () =>
       tiles.map(({ doc, item }) => {
-        const from = t("search.media.from", { name: isolate(names.person(doc.a)), date: formatShortDate(doc.ts) });
+        const from = t("search.media.from", { name: isolate((doc.hn ?? names.person(doc.a))), date: formatShortDate(doc.ts) });
         const jump = () => {
           setOpen(null);
           onJump(doc);
@@ -283,7 +284,7 @@ function MediaGrid({ run, names, sort, onJump }: { run: SearchRun; names: Names;
       }
     }
     const video = tile.item.kind === "file" ? isVideo(tile.item.att.type) : tile.item.embed.type === "video";
-    const label = t(video ? "search.media.videoFrom" : "search.media.imageFrom", { name: isolate(names.person(tile.doc.a)), date: formatShortDate(tile.doc.ts) });
+    const label = t(video ? "search.media.videoFrom" : "search.media.imageFrom", { name: isolate((tile.doc.hn ?? names.person(tile.doc.a))), date: formatShortDate(tile.doc.ts) });
     out.push(
       <button key={tile.key} type="button" className={s.tile} data-tile="" data-testid="search-media-tile" tabIndex={i === focus ? 0 : -1} aria-label={label} title={tileName(tile.item)} onFocus={() => setFocus(i)} onClick={() => setOpen(i)}>
         <MediaThumb item={tile.item} className={s.tileImg} />
@@ -327,7 +328,7 @@ function LinkRows({ run, names, onJump }: { run: SearchRun; names: Names; onJump
                   <time className={s.hitTime} dateTime={new Date(doc.ts).toISOString()} title={formatFull(doc.ts)}>{formatShortDate(doc.ts)}</time>
                 </span>
                 <span className={s.linkTitle} dir="auto">{title ?? link.url.replace(/^https?:\/\//, "")}</span>
-                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: isolate(names.person(doc.a)), where: isolate(w.label) })}</span>
+                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: isolate((doc.hn ?? names.person(doc.a))), where: isolate(w.label) })}</span>
               </span>
             </button>
             <a className={s.rowAction} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={t("search.links.open", { host: isolate(host) })} title={t("search.links.open", { host: isolate(host) })}>
@@ -358,7 +359,7 @@ function FileRows({ run, names, onJump }: { run: SearchRun; names: Names; onJump
                   <span className={s.rowTitle} dir="auto">{att.name}</span>
                   <span className={s.hitTime}>{formatBytes(att.size)}</span>
                 </span>
-                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: isolate(names.person(doc.a)), where: isolate(w.label) })}</span>
+                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: isolate((doc.hn ?? names.person(doc.a))), where: isolate(w.label) })}</span>
                 <span className={s.rowMeta}>{formatShortDate(doc.ts)}</span>
               </span>
             </button>

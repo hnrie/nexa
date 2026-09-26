@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -89,11 +90,16 @@ func (s *Server) inviteCodeOf(raw string) string {
 
 // inviteUnfurl builds the preview card for one of our own invite links.
 func (s *Server) inviteUnfurl(r *http.Request, raw string) *unfurl.Result {
+	return s.inviteUnfurlLink(r.Context(), raw)
+}
+
+// inviteUnfurlLink is inviteUnfurl outside a request: for the links a webhook
+// posts, whose previews the server fetches after the message is in.
+func (s *Server) inviteUnfurlLink(ctx context.Context, raw string) *unfurl.Result {
 	code := s.inviteCodeOf(raw)
 	if code == "" {
 		return nil
 	}
-	ctx := r.Context()
 	in, err := s.Store.InviteByCode(ctx, code)
 	if err != nil {
 		return nil

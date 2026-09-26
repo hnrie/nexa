@@ -6,6 +6,7 @@ import (
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
+	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/store"
 )
 
@@ -80,7 +81,7 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	case len(recipients) == 1:
 		target, err := s.Store.UserByID(ctx, recipients[0])
-		if err != nil || target.Flags&store.FlagDeleted != 0 {
+		if err != nil || target.Flags&store.FlagDeleted != 0 || isWebhookAccount(target) {
 			WriteError(w, ErrNotFound)
 			return
 		}
@@ -498,7 +499,9 @@ func (s *Server) handleAttachmentDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 	b, err := s.Store.BlobByID(r.Context(), id)
-	if err != nil || b.Kind != "attachment" {
+	// a webhook's files are served here too, the same way: as bytes, to
+	// people who can read the channel, for the app to make something of
+	if err != nil || (b.Kind != "attachment" && b.Kind != media.KindWebhookFile) {
 		http.NotFound(w, r)
 		return
 	}

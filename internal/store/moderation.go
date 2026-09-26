@@ -1144,7 +1144,7 @@ func (s *Store) SystemUser(ctx context.Context) (*User, error) {
 // StaffIDs lists every account that can use the moderation panel: the
 // instance admins who can sign in.
 func (s *Store) StaffIDs(ctx context.Context) ([]ids.ID, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted|FlagSystem)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted|NotPeople)
 	if err != nil {
 		return nil, err
 	}
@@ -1165,7 +1165,7 @@ func (s *Store) StaffIDs(ctx context.Context) ([]ids.ID, error) {
 // Nobody can moderate it or take its access away, so it stays the oldest.
 func (s *Store) InstanceOwnerID(ctx context.Context) (ids.ID, error) {
 	var id int64
-	err := s.db.R.QueryRowContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0 ORDER BY id LIMIT 1`, FlagAdmin, FlagDeleted|FlagSystem).Scan(&id)
+	err := s.db.R.QueryRowContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0 ORDER BY id LIMIT 1`, FlagAdmin, FlagDeleted|NotPeople).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
@@ -1175,7 +1175,7 @@ func (s *Store) InstanceOwnerID(ctx context.Context) (ids.ID, error) {
 // AccountIDs lists every account that can sign in, for telling everyone
 // something at once.
 func (s *Store) AccountIDs(ctx context.Context) ([]ids.ID, error) {
-	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? = 0`, FlagDisabled|FlagDeleted|FlagSystem)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? = 0`, FlagDisabled|FlagDeleted|NotPeople)
 	if err != nil {
 		return nil, err
 	}
@@ -1234,7 +1234,7 @@ func (s *Store) ModUsers(ctx context.Context, f ModUserFilter) ([]*ModUser, erro
 		f.Limit = 60
 	}
 	where := []string{`u.flags & ? = 0`}
-	args := []any{f.Now, f.Now, FlagDeleted | FlagSystem}
+	args := []any{f.Now, f.Now, FlagDeleted | NotPeople}
 	switch f.Show {
 	case "muted":
 		where = append(where, `mr.case_id IS NOT NULL`)

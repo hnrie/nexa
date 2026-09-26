@@ -600,7 +600,9 @@ export function Composer({ channel }: { channel: Channel }) {
 
   const selecting = useSelection((x) => x.channelId) !== null;
   const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
-  const replyName = useShownName(channel.id, replyTarget?.author_id);
+  const replyShown = useShownName(channel.id, replyTarget?.hook ? undefined : replyTarget?.author_id);
+  // a webhook's message is answered by the name it was sent with
+  const replyName = replyTarget?.hook ? replyTarget.hook.name : replyShown;
 
   if (!canSend) {
     return (
@@ -698,7 +700,7 @@ export function Composer({ channel }: { channel: Channel }) {
         <div className={s.replyBar}>
           <span className={s.replyWho}><Tr id="composer.replyingTo" values={{ name: <b dir="auto">{replyName}</b> }} /></span>
           <span className={s.replyBtns}>
-            {replyTarget.author_id !== me?.id ? (
+            {replyTarget.author_id !== me?.id && !replyTarget.webhook_id ? (
               <button className={s.pingBtn} data-on={replyTo?.ping} aria-pressed={!!replyTo?.ping} aria-label={tr_("composer.composer.replyPing")} title={tr_("composer.composer.replyPing")} onClick={() => replyTo && setReplyTo({ ...replyTo, ping: !replyTo.ping })}>{replyTo?.ping ? tr_("composer.composer.pingOn") : tr_("composer.composer.pingOff")}</button>
             ) : null}
             <button className={s.closeBtn} aria-label={tr_("composer.composer.cancelReply")} onClick={() => setReplyTo(null)}><X size={16} /></button>

@@ -181,7 +181,7 @@ func (s *Store) SearchUsers(ctx context.Context, q string, limit int) ([]*User, 
 		limit = 10
 	}
 	like := escapeLike(q) + "%"
-	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR `+s.db.Dialect.Lower("display_name")+` LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted|FlagSystem, limit)
+	rows, err := s.db.R.QueryContext(ctx, `SELECT `+userCols+` FROM users WHERE (username LIKE ? ESCAPE '\' OR `+s.db.Dialect.Lower("display_name")+` LIKE ? ESCAPE '\') AND flags & ? = 0 ORDER BY username LIMIT ?`, like, like, FlagDeleted|NotPeople, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -206,27 +206,28 @@ func escapeLike(s string) string {
 	return r.Replace(s)
 }
 
-// CountUsers returns the number of accounts people made. Nexa's is not one:
+// CountUsers returns the number of accounts people made. Nexa's is not one,
+// nor is the one webhooks post as:
 // the first person to register must still find the instance empty, since
 // that is what makes them its admin.
 // CountAdminsEver counts accounts that hold the admin flag, deleted ones
 // included: whether this instance has ever been set up.
 func (s *Store) CountAdminsEver(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagSystem).Scan(&n)
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, NotPeople).Scan(&n)
 	return n, err
 }
 
-// OldestAccountID is the first account anyone made (the system account aside).
+// OldestAccountID is the first account anyone made (the system and webhook accounts aside).
 func (s *Store) OldestAccountID(ctx context.Context) (ids.ID, error) {
 	var id int64
-	err := s.db.R.QueryRowContext(ctx, `SELECT id FROM users WHERE flags & ? = 0 ORDER BY id LIMIT 1`, FlagSystem).Scan(&id)
+	err := s.db.R.QueryRowContext(ctx, `SELECT id FROM users WHERE flags & ? = 0 ORDER BY id LIMIT 1`, NotPeople).Scan(&id)
 	return ids.ID(id), err
 }
 
 func (s *Store) CountUsers(ctx context.Context) (int, error) {
 	var n int
-	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? = 0`, FlagSystem).Scan(&n)
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? = 0`, NotPeople).Scan(&n)
 	return n, err
 }
 

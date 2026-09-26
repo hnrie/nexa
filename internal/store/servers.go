@@ -174,8 +174,9 @@ func (s *Store) DeleteServer(ctx context.Context, id ids.ID) error {
 		if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM servers WHERE id = ?
 			UNION ALL SELECT banner_id FROM servers WHERE id = ?
 			UNION ALL SELECT blob_id FROM emojis WHERE server_id = ?
-			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?`,
-			int64(id), int64(id), int64(id), int64(id)); err != nil {
+			UNION ALL SELECT st.blob_id FROM stickers st JOIN sticker_packs p ON p.id = st.pack_id WHERE p.server_id = ?
+			UNION ALL SELECT avatar_id FROM webhooks WHERE server_id = ?`,
+			int64(id), int64(id), int64(id), int64(id), int64(id)); err != nil {
 			return err
 		}
 		for _, q := range []string{

@@ -557,7 +557,7 @@ func (s *Server) handleServerTransfer(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "not_member", "The new owner must be a member."))
 		return
 	}
-	if heir, err := s.Store.UserByID(r.Context(), req.UserID); err != nil || heir.Flags&(store.FlagDeleted|store.FlagDisabled|store.FlagSystem) != 0 {
+	if heir, err := s.Store.UserByID(r.Context(), req.UserID); err != nil || heir.Flags&(store.FlagDeleted|store.FlagDisabled|store.NotPeople) != 0 {
 		WriteError(w, E(http.StatusBadRequest, "not_member", "The new owner must be a member."))
 		return
 	}

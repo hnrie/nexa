@@ -4,6 +4,7 @@ import { Toggle } from "@/components/common/Toggle";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { showNotification } from "@/lib/notify";
 import { playSound, soundTrouble, type SoundName } from "@/lib/sounds";
+import { stopTTS } from "@/lib/tts";
 import { useSettings, type NotificationPreview } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
@@ -54,6 +55,7 @@ export default function NotificationsPage() {
         <Toggle checked={st.notifications.desktop && perm === "granted"} disabled={perm === "unsupported" || perm === "denied"} onChange={(v) => void enable(v)} label={t("settings.notifications.enableDesktopNotifications")} description={perm === "denied" ? t("settings.notifications.notificationsAreBlocked") : perm === "unsupported" ? t("settings.notifications.thisBrowserDoesNotSupport") : t("settings.notifications.getANotificationWhileThisTabIsOpen")} />
       )}
       <Toggle checked={st.notifications.sounds} onChange={(v) => patch({ notifications: { ...st.notifications, sounds: v } })} label={t("settings.notifications.sounds")} description={t("settings.notifications.playASoundForNewMessages")} />
+      <Toggle checked={st.tts} onChange={(v) => { patch({ tts: v }); if (!v) stopTTS(); }} label={t("settings.notifications.readTtsAloud")} description={t("settings.notifications.readTtsAloudHint")} />
       <h3 className={s.h5}>{t("settings.notifications.previewHeading")}</h3>
       <p className={s.hint}>{t("settings.notifications.previewIntro")}</p>
       {previewChoices().map((o) => (

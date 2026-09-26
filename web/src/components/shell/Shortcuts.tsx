@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { installNotifications, setNotificationNavigator } from "@/lib/notify";
+import { installTTS } from "@/lib/tts";
 import { playSound } from "@/lib/sounds";
 import { installTitleBadge } from "@/lib/title";
 import { useAuth } from "@/stores/auth";
@@ -25,6 +26,7 @@ export function Shortcuts() {
 
   useEffect(() => {
     installNotifications();
+    installTTS();
     setNotificationNavigator(nav);
     const stop = installTitleBadge();
     return () => {

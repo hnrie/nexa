@@ -93,7 +93,7 @@ func (s *Server) handleFriendRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	target, err := s.Store.UserByUsername(ctx, strings.ToLower(strings.TrimSpace(req.Username)))
-	if err != nil || target.Flags&store.FlagDeleted != 0 {
+	if err != nil || target.Flags&store.FlagDeleted != 0 || isWebhookAccount(target) {
 		WriteError(w, E(http.StatusNotFound, "user_not_found", "No user with that username."))
 		return
 	}
@@ -207,7 +207,7 @@ func (s *Server) handleBlock(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	target, err := s.Store.UserByID(r.Context(), id)
-	if err != nil {
+	if err != nil || isWebhookAccount(target) {
 		WriteError(w, ErrNotFound)
 		return
 	}

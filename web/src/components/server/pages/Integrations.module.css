@@ -1,0 +1,27 @@
+.notice { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-surface); color: var(--text-subtle); font-size: 14px; line-height: 18px; }
+.notice svg { flex: none; margin-top: 1px; color: var(--text-muted); }
+.bar { display: flex; gap: 8px; margin: 4px 0 12px; }
+.bar button svg { vertical-align: -3px; }
+.empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; border-radius: var(--radius-sm); border: 1px dashed var(--border); color: var(--text-muted); font-size: 14px; text-align: center; }
+.list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 80px; }
+.card { border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); overflow: hidden; }
+.head { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 0; background: none; color: inherit; text-align: start; cursor: pointer; }
+.head:hover { background: var(--bg-hover); }
+.head > svg { flex: none; color: var(--text-muted); }
+.avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; }
+.headText { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.name { font-size: 16px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.body { display: flex; gap: 20px; padding: 4px 16px 16px; border-top: 1px solid var(--border-subtle); padding-top: 16px; }
+.avatarCol { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; width: 120px; }
+.bigAvatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; }
+.fields { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button svg { vertical-align: -3px; }
+.tip { margin: 0; font-size: 13px; line-height: 17px; color: var(--text-muted); }
+
+@media (max-width: 767px) {
+  .body { flex-direction: column; align-items: stretch; }
+  .avatarCol { width: auto; flex-direction: row; justify-content: flex-start; flex-wrap: wrap; }
+  .actions > * { flex: 1 1 auto; }
+}

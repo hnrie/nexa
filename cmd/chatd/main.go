@@ -137,6 +137,7 @@ func main() {
 	srv.StartLimiters(ctx)
 	srv.StartGuests(ctx)
 	srv.StartModeration(ctx)
+	srv.StartPolls(ctx)
 	// whatever deleted accounts still own goes, now and every hour after
 	srv.StartAccountSweep(ctx)
 	// what runs beside the requests, waited for at shutdown: the meter

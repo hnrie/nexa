@@ -568,7 +568,8 @@ func deleteChannelTx(ctx context.Context, tx *db.Tx, id ids.ID) error {
 	if _, err := tx.ExecContext(ctx, `UPDATE blobs SET ref_count = `+refFloor(tx.Dialect(), "ref_count - (SELECT count(*) FROM attachments a WHERE a.channel_id = ? AND a.blob_id = blobs.id)")+` WHERE id IN (SELECT blob_id FROM attachments WHERE channel_id = ?)`, int64(id), int64(id)); err != nil {
 		return err
 	}
-	if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM channels WHERE id = ?`, int64(id)); err != nil {
+	// its icon, and its webhooks' pictures: the webhooks go with it by cascade
+	if err := releaseBlobRefs(ctx, tx, `SELECT icon_id FROM channels WHERE id = ? UNION ALL SELECT avatar_id FROM webhooks WHERE channel_id = ?`, int64(id), int64(id)); err != nil {
 		return err
 	}
 	for _, q := range []string{`DELETE FROM key_grants WHERE conv_id = ?`, `DELETE FROM key_epochs WHERE conv_id = ?`, `DELETE FROM key_flags WHERE conv_id = ?`} {

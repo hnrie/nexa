@@ -73,6 +73,10 @@ export type GatewayEvent =
   | { t: "ban_remove"; d: { server_id: Snowflake; user_id: Snowflake } }
   | { t: "invite_create"; d: Invite }
   | { t: "invite_delete"; d: { server_id: Snowflake; code: string } }
+  /** A server's webhooks changed (made, edited, moved or deleted), for whoever manages them. */
+  | { t: "webhooks_update"; d: { server_id: Snowflake; channel_id: Snowflake } }
+  /** Someone voted on, or took back a vote on, a webhook message's poll. */
+  | { t: "poll_vote_add" | "poll_vote_remove"; d: { channel_id: Snowflake; message_id: Snowflake; user_id: Snowflake; answer_id: number; total_voters?: number } }
   | { t: "settings_update"; d: { version: number; session_id: Snowflake } }
   | { t: "session_expired"; d: unknown }
   /** A guest's time in the call is over: removed, revoked, expired, left, or the call is gone. */

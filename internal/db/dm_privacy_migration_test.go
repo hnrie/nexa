@@ -26,6 +26,11 @@ func TestMigrationMovesTheOldDMDefault(t *testing.T) {
 	  (3,'c','C','h',x'00','{}',x'00',x'00','nobody',0,0);
 	INSERT INTO users(id,username,display_name,auth_hash,kdf_salt,kdf_params,public_key,enc_private_key,created_at,updated_at) VALUES
 	  (4,'d','D','h',x'00','{}',x'00',x'00',0,0);
+	-- back to how version 17 looked: undo what later migrations add
+	DROP TABLE webhooks;
+	ALTER TABLE messages DROP COLUMN webhook_id;
+	ALTER TABLE messages DROP COLUMN plain;
+	ALTER TABLE polls DROP COLUMN ended_at;
 	PRAGMA user_version = 17;`)
 	if err != nil {
 		t.Fatal(err)

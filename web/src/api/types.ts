@@ -410,7 +410,8 @@ export type MessageType =
   | "system_pin"
   | "system_call"
   | "system_member_add"
-  | "system_member_remove";
+  | "system_member_remove"
+  | "system_poll_result";
 
 export interface Message {
   id: Snowflake;
@@ -432,10 +433,42 @@ export interface Message {
   nonce?: string;
   edited_at: number | null;
   created_at: number;
+  /** Set on a message a webhook posted: which webhook, and what it said (not encrypted; see lib/webhookMessage). */
+  webhook_id?: Snowflake;
+  webhook?: unknown;
+  /** How a webhook message's poll stands, for whoever loaded it. */
+  poll_results?: PollTally;
 }
 
 export const MSG_FLAG_PINNED = 1;
 export const MSG_FLAG_SUPPRESS_EMBEDS = 4;
+/** No sound or notification; it still counts as unread. */
+export const MSG_FLAG_SUPPRESS_NOTIFICATIONS = 1 << 12;
+/** A webhook message laid out entirely by its components. */
+export const MSG_FLAG_COMPONENTS_V2 = 1 << 15;
+
+/** A poll's votes, as the server counts them for the reader. */
+export interface PollTally {
+  answer_counts: { id: number; count: number; me_voted: boolean }[];
+  total_voters: number;
+  expires_at: number | null;
+  is_finalized: boolean;
+}
+
+/** An incoming webhook, as the people who manage it see it. */
+export interface Webhook {
+  id: Snowflake;
+  type: number;
+  server_id: Snowflake;
+  channel_id: Snowflake;
+  name: string;
+  /** The blob id of its picture, served as an avatar. */
+  avatar: Snowflake | null;
+  token?: string;
+  url?: string;
+  user?: { id: Snowflake; username: string; display_name: string; avatar_id: Snowflake | null };
+  created_at: number;
+}
 
 export interface Relationship {
   user: PublicUser;

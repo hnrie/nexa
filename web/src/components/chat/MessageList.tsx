@@ -24,6 +24,7 @@ import s from "./Chat.module.css";
 import { t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
+import { sameHookSender } from "@/lib/webhookMessage";
 import { parse, plainText } from "@/markdown";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
@@ -112,6 +113,9 @@ function restoreAnchor(el: HTMLElement, a: Anchor): boolean {
 function shouldGroup(prev: DecryptedMessage | undefined, cur: DecryptedMessage): boolean {
   if (!prev) return false;
   if (prev.author_id !== cur.author_id) return false;
+  // every webhook's messages are filed under one account; one sender is one
+  // webhook posting under one name and picture
+  if (prev.webhook_id !== cur.webhook_id || !sameHookSender(prev.hook, cur.hook)) return false;
   if (cur.type !== "default" && cur.type !== "reply") return false;
   if (prev.type.startsWith("system_")) return false;
   if (cur.reply_to_id) return false;
@@ -316,7 +320,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     (m: DecryptedMessage) => {
       if (typeof document === "undefined" || document.visibilityState !== "visible") return;
       const st = channel.server_id ? useServers.getState().byId[channel.server_id] : undefined;
-      const name = st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
+      const name = m.hook?.name || st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
       const body = m.payload?.t ? plainText(parse(m.payload.t), renderCtx).slice(0, 300) : "";
       const text = body
         ? t("chat.messageList.announce", { name, text: body })

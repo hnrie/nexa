@@ -1,4 +1,4 @@
-import type { Message, Relationship } from "@/api/types";
+import { MSG_FLAG_SUPPRESS_NOTIFICATIONS, type Message, type Relationship } from "@/api/types";
 import { avatarUrl } from "@/api/users";
 import { dispatchHooks, type NexaAlert } from "@/gateway/dispatch";
 import { noticeTitle } from "@/lib/moderation";
@@ -17,6 +17,8 @@ import { desktopBridge } from "./desktopBridge";
 import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 import { mentionsMe } from "./mentionsMe";
+import { hookText } from "./webhookMessage";
+import { mediaSrc } from "./mediaLinks";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
 import { bugAlertHooks, bugNumber, bugStatusLabel, type BugAlert } from "./bugs";
 
@@ -129,6 +131,9 @@ function previewOf(m: Message, decrypted?: DecryptedMessage): string {
   const p = stored?.payload;
   if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
   if (p.t) return plainText(parse(p.t)).slice(0, 140);
+  // a webhook's message often says it all in its embeds
+  const words = stored?.hook ? hookText(stored.hook) : "";
+  if (words) return plainText(parse(words)).slice(0, 140);
   if (p.att?.length) return p.att.length === 1 ? t("notify.sentFile", { name: p.att[0]!.name }) : t("notify.sentFiles", { count: p.att.length });
   if (p.sticker) return t("notify.sentASticker");
   return t("notify.newMessage");
@@ -141,6 +146,8 @@ export function serverDefaultLevel(serverId: string): "all" | "mentions" {
 
 function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): void {
   if (mine || m.type.startsWith("system_")) return;
+  // sent to be read, not heard: it still counts as unread, and nothing else
+  if (m.flags & MSG_FLAG_SUPPRESS_NOTIFICATIONS) return;
   // nothing from someone blocked (or answering them, while those are hidden) makes a sound or a notification
   if (isQuiet(decrypted ?? m, currentBlockRules(), loadedAuthorOf(m.channel_id))) return;
   const me = useAuth.getState().me;
@@ -172,10 +179,12 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
     void showNotification("Nexa", { body: t("notify.newMessage"), tag: `ec-${m.channel_id}`, icon: "/icons/icon-192.png", silent: true }, path);
     return;
   }
-  const author = displayName(users[m.author_id]);
+  const hook = decrypted?.hook;
+  const author = hook?.name ?? displayName(users[m.author_id]);
   const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (${channelLabel(ch)})` : author;
   const body = preview === "full" ? previewOf(m, decrypted) : t("notify.newMessage");
-  void showNotification(title, { body, tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
+  const icon = hook ? ((hook.avatar_proxy_url && mediaSrc(hook.avatar_proxy_url)) || avatarUrl(hook.avatar_id ?? null, 96)) : avatarUrl(users[m.author_id]?.avatar_id ?? null, 96);
+  void showNotification(title, { body, tag: `ec-${m.channel_id}`, icon: icon ?? "/icons/icon-192.png", silent: true }, path);
 }
 
 /** A new friend request plays its own sound, and notifies while the app is not being looked at. */

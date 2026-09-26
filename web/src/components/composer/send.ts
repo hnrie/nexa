@@ -352,7 +352,9 @@ export function sendErrorText(err: unknown): string | null {
 }
 
 function replyAuthor(channelId: string, messageId: string): string | undefined {
-  return useMessages.getState().channels[channelId]?.byId[messageId]?.author_id;
+  const m = useMessages.getState().channels[channelId]?.byId[messageId];
+  // a webhook's message has nobody behind it to ping
+  return m?.webhook_id ? undefined : m?.author_id;
 }
 
 /** Re-encrypts and saves an edit. */
