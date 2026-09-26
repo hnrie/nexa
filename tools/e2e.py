@@ -113,6 +113,8 @@ class Session:
         p.click("text=Continue to nexa")
         p.wait_for_url("**/channels/@me", timeout=30000)
         self.agree_terms()
+        # an account made after the latest release has no What's New to see
+        Session.whats_new_read.add((self.base, self.name))
         p.wait_for_selector("text=Friends", timeout=15000)
 
     def agree_terms(self):
