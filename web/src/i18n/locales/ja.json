@@ -283,14 +283,14 @@
   "chat.groupMemberMenu.itsCurrentOwner": "現在のオーナー",
   "chat.groupMemberMenu.leaveGroup": "グループを抜ける",
   "chat.groupMemberMenu.removeFromGroup": "グループから外す",
-  "chat.groupMemberMenu.removeNamed": "{name} を退出させる",
+  "chat.groupMemberMenu.removeNamed": "{name} を退出させますか？",
   "chat.groupMemberMenu.takeOwnership": "オーナーになる",
-  "chat.groupMemberMenu.takeOwnershipOf": "「{group}」のオーナーになる",
+  "chat.groupMemberMenu.takeOwnershipOf": "「{group}」のオーナーになりますか？",
   "chat.groupMemberMenu.theyAreRemovedFromTheGroup": "{name} は「{group}」から外れ、メッセージが届かなくなります。戻るには新しい招待が必要です。",
   "chat.groupMemberMenu.theyBecomeTheOwnerAndYouAMember": "{name} がグループのオーナーになり、メンバーの退出やグループの削除ができるようになります。あなたは他と同じメンバーになります。",
   "chat.groupMemberMenu.theyBecomeTheOwnerInPlaceOf": "{owner} に代わって {name} がグループのオーナーになります。",
   "chat.groupMemberMenu.transferOwnership": "オーナーを譲る",
-  "chat.groupMemberMenu.transferOwnershipOf": "「{group}」のオーナー権限を譲渡",
+  "chat.groupMemberMenu.transferOwnershipOf": "「{group}」のオーナー権限を譲渡しますか？",
   "chat.groupMemberMenu.unknownUser": "不明なユーザー",
   "chat.groupMemberMenu.youBecomeTheOwnerInPlaceOf": "{owner} に代わってあなたがグループのオーナーになります。",
   "chat.groupMemberMenu.youStopReceivingMessagesFromThis": "このグループのメッセージは届かなくなり、オーナーは別のメンバーに移ります。戻るには新しい招待が必要です。",
@@ -357,7 +357,7 @@
   "chat.messageList.thisConversation": "この会話",
   "chat.messageList.tryAgain": "再試行",
   "chat.messageList.welcomeToChannel": "#{name} へようこそ",
-  "chat.messageMenu.areYouSureYouWantTo": "このメッセージを削除してもよろしいですか？",
+  "chat.messageMenu.areYouSureYouWantTo": "このメッセージは全員の画面から削除されます。元に戻せません。",
   "chat.messageMenu.copyImage": "画像をコピー",
   "chat.messageMenu.copyText": "テキストをコピー",
   "chat.messageMenu.couldNotCopyThePicture": "画像をコピーできませんでした。",
@@ -381,7 +381,7 @@
   "chat.pins.encrypted": "[暗号化]",
   "chat.pins.loading": "読み込み中…",
   "chat.pins.thatMessageCouldNotBeUnpinned": "そのメッセージのピン留めを解除できませんでした。",
-  "chat.pins.thisChannelDoesnTHaveAny": "このチャンネルにはまだピン留めされたメッセージがありません…今のところは。",
+  "chat.pins.thisChannelDoesnTHaveAny": "まだピン留めされたものはありません。",
   "chat.pins.unpin": "ピン留めを解除",
   "chat.pins.unpinThisMessage": "このメッセージのピン留めを解除",
   "chat.reactions.addReaction": "リアクションを追加",
@@ -396,7 +396,7 @@
   "chat.reactions.reactedWith": "{who} が {emoji} でリアクションしました",
   "chat.reactions.whoReacted": "{emoji} でリアクションした人",
   "chat.selectionBar.areYouSureDeleteMessages": {
-    "other": "この {count} 件のメッセージを削除しますか？元に戻せません。"
+    "other": "この {count} 件のメッセージは全員の画面から削除されます。元に戻せません。"
   },
   "chat.selectionBar.deleteMessages": {
     "other": "{count} 件のメッセージを削除"
@@ -413,7 +413,7 @@
   "chat.subchat.couldNotDeleteThatSubchat": "そのサブチャットを削除できませんでした。",
   "chat.subchat.couldNotStartThatSubchat": "そのサブチャットを作成できませんでした。",
   "chat.subchat.createSubchat": "サブチャットを作成",
-  "chat.subchat.deleteNamed": "「{name}」を削除",
+  "chat.subchat.deleteNamed": "「{name}」を削除しますか？",
   "chat.subchat.deleteSubchat": "サブチャットを削除",
   "chat.subchat.editSubchat": "サブチャットを編集",
   "chat.subchat.newSubchatName": "新しいサブチャットの名前",

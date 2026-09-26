@@ -29,10 +29,10 @@ describe("Lightbox", () => {
   it("steps through a message's pictures with the arrows, and stops at either end", () => {
     render(<Lightbox items={pictures} start={0} onClose={() => {}} />);
     const dialog = screen.getByRole("dialog");
-    expect(screen.queryByRole("button", { name: "Previous picture" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous Picture" })).toBeNull();
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
     expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("second.png");
-    fireEvent.click(screen.getByRole("button", { name: "Next picture" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next Picture" }));
     expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("third.png");
     fireEvent.keyDown(dialog, { key: "ArrowRight" });
     expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe("third.png");

@@ -283,14 +283,14 @@
   "chat.groupMemberMenu.itsCurrentOwner": "현재 소유자",
   "chat.groupMemberMenu.leaveGroup": "그룹 나가기",
   "chat.groupMemberMenu.removeFromGroup": "그룹에서 내보내기",
-  "chat.groupMemberMenu.removeNamed": "{name} 내보내기",
+  "chat.groupMemberMenu.removeNamed": "{name} 님을 내보낼까요?",
   "chat.groupMemberMenu.takeOwnership": "소유권 가져오기",
-  "chat.groupMemberMenu.takeOwnershipOf": "'{group}'의 소유권 가져오기",
+  "chat.groupMemberMenu.takeOwnershipOf": "'{group}'의 소유권을 가져올까요?",
   "chat.groupMemberMenu.theyAreRemovedFromTheGroup": "{name}이(가) '{group}'에서 나가고 메시지를 더 받지 않습니다. 돌아오려면 새 초대가 필요합니다.",
   "chat.groupMemberMenu.theyBecomeTheOwnerAndYouAMember": "{name}이(가) 그룹 소유자가 되어 멤버를 내보내고 그룹을 삭제할 수 있게 됩니다. 당신은 일반 멤버가 됩니다.",
   "chat.groupMemberMenu.theyBecomeTheOwnerInPlaceOf": "{owner} 대신 {name}이(가) 그룹 소유자가 됩니다.",
   "chat.groupMemberMenu.transferOwnership": "소유권 넘기기",
-  "chat.groupMemberMenu.transferOwnershipOf": "'{group}'의 소유권 넘기기",
+  "chat.groupMemberMenu.transferOwnershipOf": "'{group}'의 소유권을 넘길까요?",
   "chat.groupMemberMenu.unknownUser": "알 수 없는 사용자",
   "chat.groupMemberMenu.youBecomeTheOwnerInPlaceOf": "{owner} 대신 당신이 그룹 소유자가 됩니다.",
   "chat.groupMemberMenu.youStopReceivingMessagesFromThis": "이 그룹의 메시지를 더 이상 받지 않게 되고, 소유권은 다른 멤버에게 넘어갑니다. 돌아오려면 새 초대가 필요합니다.",
@@ -357,7 +357,7 @@
   "chat.messageList.thisConversation": "이 대화",
   "chat.messageList.tryAgain": "다시 시도",
   "chat.messageList.welcomeToChannel": "#{name}에 오신 것을 환영합니다",
-  "chat.messageMenu.areYouSureYouWantTo": "이 메시지를 삭제할까요?",
+  "chat.messageMenu.areYouSureYouWantTo": "이 메시지는 모두에게서 삭제됩니다. 되돌릴 수 없습니다.",
   "chat.messageMenu.copyImage": "이미지 복사",
   "chat.messageMenu.copyText": "텍스트 복사",
   "chat.messageMenu.couldNotCopyThePicture": "이미지를 복사하지 못했습니다.",
@@ -381,7 +381,7 @@
   "chat.pins.encrypted": "[암호화됨]",
   "chat.pins.loading": "불러오는 중…",
   "chat.pins.thatMessageCouldNotBeUnpinned": "그 메시지의 고정을 해제하지 못했습니다.",
-  "chat.pins.thisChannelDoesnTHaveAny": "이 채널에는 아직 고정된 메시지가 없습니다… 아직은요.",
+  "chat.pins.thisChannelDoesnTHaveAny": "아직 고정된 메시지가 없습니다.",
   "chat.pins.unpin": "고정 해제",
   "chat.pins.unpinThisMessage": "이 메시지 고정 해제",
   "chat.reactions.addReaction": "반응 추가",
@@ -396,7 +396,7 @@
   "chat.reactions.reactedWith": "{who}이(가) {emoji}(으)로 반응했습니다",
   "chat.reactions.whoReacted": "{emoji}(으)로 반응한 사람",
   "chat.selectionBar.areYouSureDeleteMessages": {
-    "other": "이 메시지 {count}개를 삭제할까요? 되돌릴 수 없습니다."
+    "other": "메시지 {count}개가 모두에게서 삭제됩니다. 되돌릴 수 없습니다."
   },
   "chat.selectionBar.deleteMessages": {
     "other": "메시지 {count}개 삭제"
@@ -413,7 +413,7 @@
   "chat.subchat.couldNotDeleteThatSubchat": "그 서브챗을 삭제하지 못했습니다.",
   "chat.subchat.couldNotStartThatSubchat": "그 서브챗을 만들지 못했습니다.",
   "chat.subchat.createSubchat": "서브챗 만들기",
-  "chat.subchat.deleteNamed": "'{name}' 삭제",
+  "chat.subchat.deleteNamed": "'{name}'을(를) 삭제할까요?",
   "chat.subchat.deleteSubchat": "서브챗 삭제",
   "chat.subchat.editSubchat": "서브챗 편집",
   "chat.subchat.newSubchatName": "새 서브챗 이름",

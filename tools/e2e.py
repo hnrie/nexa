@@ -607,14 +607,14 @@ def groups_flow(srv, alice, bob, phone):
     alice.send("group chat works")
     a.wait_for_selector("[data-id]:has-text('group chat works')", timeout=20000)
     # a group of two is still a dm here, so add carol to force a group, then invite by link
-    a.click("button[aria-label='Add friends']")
+    a.click("button[aria-label='Add Friends']")
     modal = a.locator("[role=dialog]")
     if modal.locator("[data-testid=group-invite-link]").count() == 0:
         # it was a 1:1 dm: add carol to promote it to a group
         a.locator("label:has-text('Carol') input").check()
         a.click("button:has-text('Add to group'), button:has-text('Create group')")
         a.wait_for_timeout(1500)
-        a.click("button[aria-label='Add friends']")
+        a.click("button[aria-label='Add Friends']")
     link_box = a.locator("[data-testid=group-invite-link]")
     link_box.wait_for(timeout=20000)
     for _ in range(50):

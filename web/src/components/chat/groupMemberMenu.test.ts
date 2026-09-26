@@ -55,6 +55,6 @@ describe("groupMemberMenuItems", () => {
     signIn(ADMIN);
     const openModal = vi.fn();
     groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal }).find((i) => i.id === "remove")!.onSelect!();
-    expect(openModal).toHaveBeenCalledWith("confirm", expect.objectContaining({ title: "Remove Bob", danger: true }));
+    expect(openModal).toHaveBeenCalledWith("confirm", expect.objectContaining({ title: "Remove Bob?", danger: true }));
   });
 });
