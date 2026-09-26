@@ -232,7 +232,7 @@ class Session:
         box.fill(text)
         # a phone keyboard's Enter makes a new line, so it has a send button
         if self.page.viewport_size["width"] < 768:
-            self.page.click("button[aria-label='Send message']")
+            self.page.click("button[aria-label='Send Message']")
         else:
             box.press("Enter")
 
@@ -370,7 +370,7 @@ def expressions_flow(srv, alice, bob, server_id, link):
     # she sends it from the picker; bob sees the image
     a.locator("[data-channel]:has-text('general') button").first.click()
     a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
-    a.click("button[aria-label='Select emoji']")
+    a.click("button[aria-label='Select Emoji']")
     a.fill("input[aria-label='Search emoji']", "party")
     a.locator("[role=dialog][aria-label='Expression Picker'] button[data-custom]").first.click()
     a.keyboard.press("Escape")
@@ -405,14 +405,14 @@ def expressions_flow(srv, alice, bob, server_id, link):
     alice.shot("sticker-pack")
     a.keyboard.press("Escape")
     # send the sticker from the picker
-    a.click("button[aria-label='Select emoji']")
+    a.click("button[aria-label='Select Emoji']")
     a.click("[role=dialog][aria-label='Expression Picker'] button:has-text('Stickers')")
     a.locator("[role=dialog][aria-label='Expression Picker'] button[data-sticker]").first.click()
     b.wait_for_selector("[data-id] img[alt='Wave']", timeout=20000)
     a.wait_for_selector("[data-id] img[alt='Wave']", timeout=20000)
     alice.shot("sticker-sent")
     # the picker shows GIF search is off (no Tenor key) but favourites still exist
-    a.click("button[aria-label='Select emoji']")
+    a.click("button[aria-label='Select Emoji']")
     a.click("[role=dialog][aria-label='Expression Picker'] button:has-text('GIFs')")
     a.wait_for_selector("text=/GIF search is off|No favourite GIFs/", timeout=10000)
     alice.shot("gif-tab")
@@ -654,7 +654,7 @@ def groups_flow(srv, alice, bob, phone):
     alice.shot("emoji-pack")
     a.keyboard.press("Escape")
     # it shows up in the picker and sends
-    a.click("button[aria-label='Select emoji']")
+    a.click("button[aria-label='Select Emoji']")
     a.fill("input[aria-label='Search emoji']", "blobby")
     a.locator("[role=dialog][aria-label='Expression Picker'] button[data-pack-emoji]").first.click()
     a.keyboard.press("Escape")

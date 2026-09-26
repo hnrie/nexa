@@ -96,7 +96,7 @@ def main() -> int:
             # around it shows the chat behind, whose lines the crop would cut
             # mid-word at its edge, so the messages step out of the picture.
             a.add_style_tag(content="[data-id] { visibility: hidden !important; }")
-            a.click("button[aria-label='Select emoji']")
+            a.click("button[aria-label='Select Emoji']")
             a.wait_for_selector("[data-testid=emoji-picker], [role=dialog]", timeout=15000)
             a.mouse.move(430, 150)
             time.sleep(2.0)
