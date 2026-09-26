@@ -70,9 +70,9 @@ export function ThemeBuilder({ initial, isNew, onClose }: { initial: CustomTheme
   // The app wears the draft, a frame at a time while a picker is dragged.
   const setDraftTheme = useLookDraft((d) => d.setTheme);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setDraftTheme({ tokens: resolved.tokens, scheme: resolved.scheme }));
+    const frame = requestAnimationFrame(() => setDraftTheme({ tokens: resolved.tokens, scheme: resolved.scheme, id: draft.id }));
     return () => cancelAnimationFrame(frame);
-  }, [resolved, setDraftTheme]);
+  }, [resolved, draft.id, setDraftTheme]);
   useEffect(() => () => setDraftTheme(null), [setDraftTheme]);
 
   useHoldUnsaved(dirty);

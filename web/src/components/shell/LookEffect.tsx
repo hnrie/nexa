@@ -45,7 +45,10 @@ export function LookEffect() {
   const draftCss = useLookDraft((d) => d.css);
   const mode = useSafeMode((m) => m.mode);
   const texts = useCssLinks((l) => l.texts);
+  // held in a ref: the function changes with every page, and plugins are not re-synced for that
   const navigate = useNavigate();
+  const navRef = useRef(navigate);
+  navRef.current = navigate;
   const signedIn = status === "ready" && loaded;
   const css = useMemo(() => sanitizeCustomCss(rawCss), [rawCss]);
   const pluginsJson = JSON.stringify(sanitizePlugins(rawPlugins));
@@ -111,7 +114,7 @@ export function LookEffect() {
     void loadRuntime().then((r) => {
       if (!live) return;
       r.configurePlugins({
-        navigate: (path) => navigate(path),
+        navigate: (path) => navRef.current(path),
         onMeta: (id, meta) => {
           const now = sanitizePlugins(useSettings.getState().settings.plugins);
           if (now.some((p) => p.id === id)) useSettings.getState().patch({ plugins: now.map((p) => (p.id === id ? { ...p, meta } : p)) });
@@ -122,7 +125,7 @@ export function LookEffect() {
     return () => {
       live = false;
     };
-  }, [signedIn, plugins, mode, navigate]);
+  }, [signedIn, plugins, mode]);
 
   // once a session, a while after start: have the plugins' links moved on from the approved code?
   useEffect(() => {

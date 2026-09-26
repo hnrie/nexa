@@ -18,6 +18,8 @@ export type Appearance = Pick<Settings, "theme" | "accent" | "fontScale" | "redu
 export interface ThemeDraft {
   tokens: TokenMap;
   scheme: Scheme;
+  /** The custom theme being edited, so `data-look` names it while it is. */
+  id?: string;
 }
 
 /**
@@ -128,7 +130,7 @@ function lookOf(id: string, customs: readonly CustomTheme[]): Look | null {
  * on another device) draws as Dark rather than as nothing.
  */
 export function resolveLook(a: Appearance, draft?: ThemeDraft | null): Look {
-  if (draft) return { id: "draft", scheme: draft.scheme, classic: draft.scheme, tokens: draft.tokens, underlineLinks: false };
+  if (draft) return { id: draft.id ?? "draft", scheme: draft.scheme, classic: draft.scheme, tokens: draft.tokens, underlineLinks: false };
   let id = a.theme;
   if (id === "system") id = prefersLight() ? a.systemThemes?.light ?? "light" : a.systemThemes?.dark ?? "dark";
   return lookOf(id, a.customThemes ?? []) ?? lookOf(prefersLight() && a.theme === "system" ? "light" : "dark", [])!;

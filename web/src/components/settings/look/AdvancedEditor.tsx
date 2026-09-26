@@ -1,5 +1,5 @@
 import { AlertTriangle, ChevronRight, Sparkles } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Field } from "@/components/common/TextInput";
 import { Select } from "@/components/common/Select";
@@ -7,7 +7,7 @@ import { t } from "@/i18n";
 import { fixContrast, type Issue } from "@/lib/look/contrast";
 import { sourceTokens } from "@/lib/look/customTheme";
 import { PRESETS } from "@/lib/look/presets";
-import { ALPHA_TOKENS, TOKEN_GROUPS, type TokenMap, type TokenName } from "@/lib/look/tokens";
+import { ALPHA_TOKENS, TOKEN_GROUPS, groupOf, type TokenMap, type TokenName } from "@/lib/look/tokens";
 import type { CustomTheme } from "@/lib/look/types";
 import { ColourField } from "./ColourField";
 import { GROUP_LABEL, TOKEN_LABEL } from "./labels";
@@ -24,6 +24,15 @@ export const tokenLabel = (token: TokenName): string => t(TOKEN_LABEL[token]);
 export function AdvancedEditor({ theme, tokens, issues, onChange, lastSimple }: { theme: CustomTheme; tokens: TokenMap; issues: Issue[]; onChange: (t: CustomTheme) => void; lastSimple: CustomTheme["source"] | null }) {
   const base = useMemo(() => sourceTokens(theme.source), [theme.source]);
   const byToken = useMemo(() => new Map(issues.map((i) => [i.token, i])), [issues]);
+  // Which groups are open is the person's to decide: the first one and any with
+  // a problem open by themselves, and nothing closes on its own when mended.
+  const [open, setOpen] = useState<Set<string>>(() => new Set([TOKEN_GROUPS[0].id, ...issues.map((i) => groupOf(i.token))]));
+  useEffect(() => {
+    const flagged = issues.map((i) => groupOf(i.token));
+    if (flagged.some((g) => !open.has(g))) setOpen((cur) => new Set([...cur, ...flagged]));
+    // only new problems open a group
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issues]);
   const set = (token: TokenName, value: string) => {
     const overrides = { ...theme.overrides };
     // set back to the source's own colour is not set by hand any more
@@ -80,12 +89,21 @@ export function AdvancedEditor({ theme, tokens, issues, onChange, lastSimple }: 
         </div>
       ) : null}
       <div className={s.groups}>
-        {TOKEN_GROUPS.map((g, i) => {
+        {TOKEN_GROUPS.map((g) => {
           const list = g.tokens as readonly TokenName[];
           const changed = list.filter((tk) => tk in theme.overrides).length;
           const bad = list.filter((tk) => byToken.has(tk)).length;
           return (
-            <details key={g.id} className={s.tokenGroup} open={i === 0 || bad > 0} data-group={g.id}>
+            <details
+              key={g.id}
+              className={s.tokenGroup}
+              open={open.has(g.id)}
+              onToggle={(e) => {
+                const isOpen = (e.currentTarget as HTMLDetailsElement).open;
+                if (isOpen !== open.has(g.id)) setOpen((cur) => { const next = new Set(cur); if (isOpen) next.add(g.id); else next.delete(g.id); return next; });
+              }}
+              data-group={g.id}
+            >
               <summary>
                 <ChevronRight size={16} aria-hidden="true" />
                 {t(GROUP_LABEL[g.id])}
