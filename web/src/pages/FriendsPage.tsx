@@ -23,7 +23,7 @@ import s from "@/components/friends/Friends.module.css";
 import { ReportBugButton } from "@/components/bugs/ReportBugButton";
 import bugStyles from "@/components/bugs/Bugs.module.css";
 import { guarded } from "@/lib/captcha";
-import { describeError } from "@/lib/errors";
+import { describeError, dmOpenError } from "@/lib/errors";
 
 import { t as tr_, translator } from "@/i18n";
 type Tab = "online" | "all" | "pending" | "blocked" | "add";
@@ -224,7 +224,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
       nav(`/channels/@me/${ch.id}`);
       return ch.id;
     } catch (err) {
-      toast(describeError(err, tr_("profile.profileCard.couldNotOpenAConversation")), "error");
+      toast(dmOpenError(err, tr_("profile.profileCard.couldNotOpenAConversation")), "error");
       return null;
     }
   };

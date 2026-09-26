@@ -761,7 +761,12 @@ func (h *Hub) TypingStop(ctx context.Context, uid, channelID ids.ID) {
 	if ok, err := h.canAccess(ctx, uid, ch); err != nil || !ok {
 		return
 	}
-	viewers, err := h.Viewers(ctx, channelID)
+	var viewers []ids.ID
+	if store.IsDMLike(ch.Type) {
+		viewers, err = h.st.DMShownTo(ctx, channelID)
+	} else {
+		viewers, err = h.Viewers(ctx, channelID)
+	}
 	if err != nil {
 		return
 	}
@@ -802,7 +807,12 @@ func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.
 		if blocked, err := h.st.DMBlocked(ctx, ch, uid); err != nil || blocked {
 			return nil, false
 		}
-		viewers = ch.Recipients
+		// Only those who have the conversation in their sidebar: someone who
+		// closed it, or has not been shown it because nothing has been said in
+		// it yet, is not told that someone is typing there.
+		if viewers, err = h.st.DMShownTo(ctx, ch.ID); err != nil {
+			return nil, false
+		}
 	} else {
 		if h.SendAccess == nil {
 			return nil, false

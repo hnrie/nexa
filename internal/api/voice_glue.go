@@ -337,6 +337,12 @@ func (s *Server) handleVoiceOp(ctx context.Context, c *gateway.Conn, op string, 
 			return
 		}
 		s.sfuSyncLive(st)
+		if guest == nil && s.isDM(ch) && started {
+			// A call is something new in the conversation, like a message: the
+			// people it rings have to see who is calling and where to answer,
+			// even if they closed it or were never shown it.
+			s.revealDM(ctx, ch)
+		}
 		audience := s.voiceAudience(ctx, ch)
 		s.Bcast.EmitUsers(audience, "voice_state", statePayload(st))
 		if guest == nil && s.isDM(ch) && !inSame && !wasEmpty {

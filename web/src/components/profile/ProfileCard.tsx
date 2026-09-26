@@ -4,6 +4,7 @@ import { LoaderCircle, MessageCircle, MoreHorizontal, NotebookPen, Pencil, UserP
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
+import { dmOpenError } from "@/lib/errors";
 import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
 import { confirmRemoveFriend, openBlockDialog, sendFriendRequest, unblockUser, useBusyWith } from "@/lib/friendship";
@@ -157,7 +158,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
       onClose?.();
       nav(`/channels/@me/${ch.id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("profile.profileCard.couldNotOpenAConversation"), "error");
+      toast(dmOpenError(err, t("profile.profileCard.couldNotOpenAConversation")), "error");
     }
   };
   const addFriend = () => void sendFriendRequest(user);

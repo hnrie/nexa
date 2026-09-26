@@ -64,7 +64,7 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 		u.PresencePref = "online"
 	}
 	if u.DMPrivacy == "" {
-		u.DMPrivacy = "everyone"
+		u.DMPrivacy = DefaultDMPrivacy
 	}
 	var recovery any
 	if u.RecoveryAuthHash != "" {

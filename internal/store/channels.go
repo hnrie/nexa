@@ -60,8 +60,21 @@ func (s *Store) insertChannel(ctx context.Context, q querier, c *Channel) error 
 	return err
 }
 
-// CreateDM returns the DM between a and b, creating it when missing.
+// CreateDM returns the DM between a and b, creating it when missing, in both
+// sidebars at once.
 func (s *Store) CreateDM(ctx context.Context, a, b ids.ID) (*Channel, bool, error) {
+	return s.createDM(ctx, a, b, false)
+}
+
+// StartDM is CreateDM for a opening a conversation with b: a DM it creates
+// stays out of b's sidebar until something happens in it (a message, a call;
+// UnhideDM), so nobody is shown an empty conversation that someone opened and
+// never wrote in.
+func (s *Store) StartDM(ctx context.Context, a, b ids.ID) (*Channel, bool, error) {
+	return s.createDM(ctx, a, b, true)
+}
+
+func (s *Store) createDM(ctx context.Context, a, b ids.ID, quiet bool) (*Channel, bool, error) {
 	c := &Channel{Type: "dm"}
 	var existing int64
 	now := nowMs()
@@ -90,7 +103,8 @@ func (s *Store) CreateDM(ctx context.Context, a, b ids.ID) (*Channel, bool, erro
 			return err
 		}
 		for _, uid := range []ids.ID{a, b} {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(c.ID), int64(uid), int64(a), now); err != nil {
+			hidden := quiet && uid == b
+			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at, hidden) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING`, int64(c.ID), int64(uid), int64(a), now, boolInt(hidden)); err != nil {
 				return err
 			}
 		}
@@ -594,6 +608,13 @@ func (s *Store) ReopenDM(ctx context.Context, chID, uid ids.ID) (bool, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// DMShownTo lists the participants who have a conversation in their sidebar:
+// everyone in it but those who closed it and those who have not been shown it
+// yet (StartDM).
+func (s *Store) DMShownTo(ctx context.Context, chID ids.ID) ([]ids.ID, error) {
+	return s.idList(ctx, `SELECT user_id FROM dm_participants WHERE channel_id = ? AND hidden = 0 ORDER BY added_at, user_id`, int64(chID))
 }
 
 // UnhideDM reopens a conversation for everyone who had closed it, returning

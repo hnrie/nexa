@@ -332,12 +332,6 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if s.isDM(ch) {
-		// a conversation someone closed comes back when it has something new in it
-		if reopened, err := s.Store.UnhideDM(ctx, ch.ID); err == nil && len(reopened) > 0 {
-			s.Bcast.EmitUsers(reopened, "channel_create", ch)
-		}
-	}
 	m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
 		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds}
 	if body.ReplyToID != nil {
@@ -375,6 +369,13 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		WriteError(w, err)
 		return
+	}
+	if s.isDM(ch) {
+		// A conversation someone closed, or has not been shown yet because
+		// nothing was said in it, comes back once it has something new in it.
+		// This waits for the message to be stored, so one refused above does
+		// not put an empty conversation in front of them.
+		s.revealDM(ctx, ch)
 	}
 	full, err := s.Store.MessageByID(ctx, m.ID, me.ID)
 	if err != nil {

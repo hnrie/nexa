@@ -340,6 +340,16 @@ func (s *Store) IsMember(ctx context.Context, serverID, uid ids.ID) (bool, error
 	return n > 0, err
 }
 
+// ShareServer reports whether a and b are members of at least one server
+// together.
+func (s *Store) ShareServer(ctx context.Context, a, b ids.ID) (bool, error) {
+	var n int
+	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM (SELECT 1 FROM server_members m1
+		JOIN server_members m2 ON m2.server_id = m1.server_id AND m2.user_id = ?
+		WHERE m1.user_id = ? LIMIT 1) shared`, int64(b), int64(a)).Scan(&n)
+	return n > 0, err
+}
+
 // Member loads one membership with its role ids.
 func (s *Store) Member(ctx context.Context, serverID, uid ids.ID) (*Member, error) {
 	m, err := scanMember(s.db.R.QueryRowContext(ctx, `SELECT `+memberCols+` FROM server_members WHERE server_id = ? AND user_id = ?`, int64(serverID), int64(uid)))

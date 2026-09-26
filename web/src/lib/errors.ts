@@ -91,3 +91,22 @@ export function describeError(err: unknown, fallback?: string): string {
   // InvalidStateError. It goes to the console, not to the reader.
   return fallback ?? t("modals.confirm.somethingWentWrong");
 }
+
+/**
+ * Why a direct message could not be opened. A refusal is the other person's
+ * choice of who may message them, or a block, and is said in the reader's
+ * language with what to do about it; anything else goes to describeError.
+ */
+export function dmOpenError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError) {
+    const refusals: Record<string, string> = {
+      dm_friends_servers: t("errors.dmFriendsServers"),
+      dm_friends_only: t("errors.dmFriendsOnly"),
+      dm_closed: t("errors.dmClosed"),
+      blocked: t("errors.dmBlocked"),
+    };
+    const said = refusals[err.code];
+    if (said) return said;
+  }
+  return describeError(err, fallback);
+}

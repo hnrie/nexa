@@ -225,6 +225,9 @@ func (s *Server) handleSubchatCreate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// it is listed under its conversation, which has to be in their sidebar
+	// for them to find it
+	s.revealDM(r.Context(), sub)
 	s.Bcast.EmitUsers(sub.Recipients, "channel_create", sub)
 	WriteJSON(w, http.StatusCreated, sub)
 }
