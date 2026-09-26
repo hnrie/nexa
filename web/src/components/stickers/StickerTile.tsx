@@ -80,20 +80,28 @@ export function useStickerStill(src: StillSource, place: ScreenPlace, lower = 0)
  * still while `play`.
  */
 export function StillFace({ view, src, alt, play, className }: { view: StillView; src: StillSource; alt: string; play: boolean; className?: string | undefined }) {
+  // Stickers are see-through, so the still goes once the moving one has
+  // drawn (the two would show through each other), and comes back when it stops.
+  const [live, setLive] = useState(false);
+  const playing = play && !!view.url;
+  useEffect(() => {
+    if (!playing) setLive(false);
+  }, [playing]);
+  const onReady = useCallback(() => setLive(true), []);
   return (
     <span className={className ? `${s.still} ${className}` : s.still} data-sticker-state={view.status}>
       {/* data-sticker-media: the size and backdrop rules grids already had for the sticker apply to its still */}
-      {view.url ? <img data-sticker-media className={s.stillImg} src={view.url} alt={alt} draggable={false} decoding="async" /> : null}
+      {view.url ? <img data-sticker-media className={s.stillImg} src={view.url} alt={alt} draggable={false} decoding="async" style={live && playing ? { visibility: "hidden" } : undefined} /> : null}
       {view.status === "failed" ? (
         <span className={s.failed} title={t("stickers.tile.couldNotLoadHint")}>
           <RotateCw aria-hidden="true" />
           <span className={s.failedText}>{t("stickers.tile.couldNotLoad")}</span>
         </span>
       ) : null}
-      {/* the still stays underneath until the moving one has drawn its first frame */}
-      {play && view.url ? (
+      {/* the still shows until the moving one has drawn its first frame */}
+      {playing ? (
         <span className={s.live}>
-          <StickerView format={src.format} src={fullStickerUrl(src)} alt="" className={s.fill} play renderer="canvas" eager />
+          <StickerView format={src.format} src={fullStickerUrl(src)} alt="" className={s.fill} play renderer="canvas" eager onReady={onReady} />
         </span>
       ) : null}
     </span>

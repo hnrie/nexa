@@ -33,15 +33,17 @@ interface ViewProps {
    * canvas is far lighter when there are many.
    */
   renderer?: "svg" | "canvas" | undefined;
+  /** Called once it has something to show (a grid's still under it can then go). */
+  onReady?: (() => void) | undefined;
 }
 
-export function StickerView({ format, src, alt, className, style, eager, draggable, play = true, renderer = "svg" }: ViewProps) {
-  if (format === "tgs") return <TgsView src={src} alt={alt} className={className} style={style} play={play} renderer={renderer} />;
-  if (format === "webm") return <WebmView src={src} alt={alt} className={className} style={style} play={play} />;
-  return <img data-sticker-media className={className} style={style} src={src} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" draggable={draggable} />;
+export function StickerView({ format, src, alt, className, style, eager, draggable, play = true, renderer = "svg", onReady }: ViewProps) {
+  if (format === "tgs") return <TgsView src={src} alt={alt} className={className} style={style} play={play} renderer={renderer} onReady={onReady} />;
+  if (format === "webm") return <WebmView src={src} alt={alt} className={className} style={style} play={play} onReady={onReady} />;
+  return <img data-sticker-media className={className} style={style} src={src} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" draggable={draggable} onLoad={onReady} />;
 }
 
-function WebmView({ src, alt, className, style, play }: { src: string; alt: string; className?: string | undefined; style?: CSSProperties | undefined; play: boolean }) {
+function WebmView({ src, alt, className, style, play, onReady }: { src: string; alt: string; className?: string | undefined; style?: CSSProperties | undefined; play: boolean; onReady?: (() => void) | undefined }) {
   const ref = useRef<HTMLVideoElement>(null);
   // the #t fragment makes a still video show its first frame rather than nothing
   const url = play ? src : `${src}#t=0.001`;
@@ -71,7 +73,7 @@ function WebmView({ src, alt, className, style, play }: { src: string; alt: stri
       v.currentTime = 0;
     }
   }, [play]);
-  return <video ref={ref} data-sticker-media className={className} style={style} src={url} autoPlay={play} loop muted playsInline preload={play ? "auto" : "metadata"} aria-label={alt} />;
+  return <video ref={ref} data-sticker-media className={className} style={style} src={url} autoPlay={play} loop muted playsInline preload={play ? "auto" : "metadata"} aria-label={alt} onLoadedData={onReady} />;
 }
 
 /**
@@ -108,8 +110,10 @@ interface Lottie {
 }
 
 /** A .tgs file, fetched and unzipped here, then played with lottie-web. */
-function TgsView({ src, alt, className, style, play, renderer }: { src: string; alt: string; className?: string | undefined; style?: CSSProperties | undefined; play: boolean; renderer: "svg" | "canvas" }) {
+function TgsView({ src, alt, className, style, play, renderer, onReady }: { src: string; alt: string; className?: string | undefined; style?: CSSProperties | undefined; play: boolean; renderer: "svg" | "canvas"; onReady?: (() => void) | undefined }) {
   const ref = useRef<HTMLDivElement>(null);
+  const ready = useRef(onReady);
+  ready.current = onReady;
   const anim = useRef<Lottie | null>(null);
   const playing = useRef(play);
   playing.current = play;
@@ -138,6 +142,8 @@ function TgsView({ src, alt, className, style, play, renderer }: { src: string; 
             : lottie.loadAnimation({ ...base, renderer: "svg" });
         anim.current = a;
         if (!playing.current) a.goToAndStop(0, true);
+        // its first frame is drawn on the next one the browser paints
+        requestAnimationFrame(() => alive && ready.current?.());
       } catch {
         if (alive) setFailed(true);
       }
