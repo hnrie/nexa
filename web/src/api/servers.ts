@@ -24,6 +24,8 @@ export interface ChannelPatch {
   nsfw?: boolean;
   slowmode_seconds?: number;
   user_limit?: number;
+  /** The channel's own icon (see lib/channelGlyph); "" puts the default back. */
+  glyph?: string;
 }
 
 export interface ChannelPositionPatch {

@@ -80,6 +80,8 @@ type Result struct {
 	InviteCode  string `json:"invite_code,omitempty"`
 	MemberCount int    `json:"member_count,omitempty"`
 	OnlineCount int    `json:"online_count,omitempty"`
+	// Banner is the invited server's banner, for the top of its card.
+	Banner string `json:"banner,omitempty"`
 }
 
 // Fetcher fetches previews with SSRF protection.

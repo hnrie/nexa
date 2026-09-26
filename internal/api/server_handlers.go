@@ -781,6 +781,7 @@ func (s *Server) handleServerChannelPatch(w http.ResponseWriter, r *http.Request
 		NSFW            *bool   `json:"nsfw"`
 		SlowmodeSeconds *int    `json:"slowmode_seconds"`
 		UserLimit       *int    `json:"user_limit"`
+		Glyph           *string `json:"glyph"`
 	}
 	if err := ReadJSON(w, r, &req, 8<<10); err != nil {
 		WriteError(w, err)
@@ -825,6 +826,15 @@ func (s *Server) handleServerChannelPatch(w http.ResponseWriter, r *http.Request
 		}
 		patch.UserLimit = req.UserLimit
 		changes["user_limit"] = *req.UserLimit
+	}
+	if req.Glyph != nil {
+		glyph, ok := s.channelGlyph(r.Context(), *ch.ServerID, *req.Glyph)
+		if !ok {
+			WriteError(w, E(http.StatusBadRequest, "invalid_glyph", "A channel icon is one of the app's icons, a single emoji, or one of this server's custom emoji."))
+			return
+		}
+		patch.Glyph = &glyph
+		changes["glyph"] = glyph
 	}
 	if err := s.Store.UpdateChannel(r.Context(), ch.ID, patch); err != nil {
 		WriteError(w, err)

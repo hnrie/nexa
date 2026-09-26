@@ -1,8 +1,6 @@
 import { Play } from "lucide-react";
 import { useState } from "react";
 import type { UnfurlResult } from "@/api/types";
-import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/common/Button";
 import { FavoriteButton } from "./FavoriteButton";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -196,6 +194,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
 
 export function Embeds({ list }: { list: UnfurlResult[] }) {
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
+  if (list.every((e) => e?.type === "invite")) return null;
   return (
     <div className={s.embeds}>
       {list.slice(0, 5).map((e, i) => {
@@ -204,7 +203,8 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
         // played through this server's proxy, so the host of the file never sees who is watching
         if (e.type === "video") return imagePreviews ? <VideoEmbed key={i} e={e} /> : null;
         if (e.type === "youtube") return <LinkEmbed key={i} e={e} />;
-        if (e.type === "invite") return <InviteEmbed key={i} e={e} />;
+        // drawn by InviteCards, which also covers invite links that came without a card
+        if (e.type === "invite") return null;
         if (e.title || e.description || e.player || e.media) return <LinkEmbed key={i} e={e} />;
         return null;
       })}
@@ -216,39 +216,4 @@ export function Embeds({ list }: { list: UnfurlResult[] }) {
 function VideoEmbed({ e }: { e: UnfurlResult }) {
   const src = useMediaSrc(e.image ?? e.url);
   return src ? <VideoPlayer src={src} name={fileNameOf(e.url, t("perms.video"))} width={e.image_w} height={e.image_h} /> : null;
-}
-
-/** An invite to somewhere on this instance, with a way in. */
-function InviteEmbed({ e }: { e: UnfurlResult }) {
-  const nav = useNavigate();
-  const icon = useMediaSrc(e.image);
-  const open = () => {
-    try {
-      const u = new URL(e.url, window.location.origin);
-      // Keep the fragment: it carries the key that unlocks the history.
-      if (u.origin === window.location.origin) nav(u.pathname + u.search + u.hash);
-      else window.open(e.url, "_blank", "noopener");
-    } catch {
-      window.open(e.url, "_blank", "noopener");
-    }
-  };
-  const members = typeof e.member_count === "number" ? t("chat.chatView.membersCount", { count: e.member_count }) : "";
-  const online = typeof e.online_count === "number" && e.online_count > 0 ? t("chat.embeds.onlineCount", { count: e.online_count }) : "";
-  return (
-    <div className={s.invite} data-testid="invite-embed">
-      <div className={s.inviteHead}>{t("chat.embeds.youHaveBeenInvitedToJoin")}</div>
-      <div className={s.inviteBody}>
-        {icon ? (
-          <img className={s.inviteIcon} src={icon} alt="" loading="lazy" />
-        ) : (
-          <span className={s.inviteIcon} data-blank="true">{(e.title ?? "?").slice(0, 1).toUpperCase()}</span>
-        )}
-        <div className={s.inviteText}>
-          <span className={s.inviteName} dir="auto">{e.title}</span>
-          <span className={s.inviteSub}>{[online, members].filter(Boolean).join(" · ") || e.description}</span>
-        </div>
-        <Button size="sm" variant="positive" onClick={open} data-testid="invite-join">{t("chat.embeds.join")}</Button>
-      </div>
-    </div>
-  );
 }

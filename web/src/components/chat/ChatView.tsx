@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
+import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { KeyStatusChip } from "@/components/profile/KeyVerify";
 import { Composer } from "@/components/composer/Composer";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
@@ -210,7 +211,7 @@ export function ChatView({ channel }: { channel: Channel }) {
                 <Avatar id={other} avatarId={users[other]?.avatar_id ?? null} name={name} size={24} status={otherStatus} />
               </span>
             ) : (
-              <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? (priv ? <span className={s.lockHash}><Hash size={22} /><Lock size={11} className={s.lock} /></span> : <Hash size={22} />) : <Users size={22} />}</span>
+              <span className={s.hIcon}>{isSub ? <MessageCircle size={22} /> : channel.type === "dm" ? <AtSign size={22} /> : isServer ? <ChannelGlyph channel={channel} size={22} locked={priv} /> : <Users size={22} />}</span>
             )}
             {channel.type === "dm" && other ? (
               // the other person's name is the way to their profile, as their avatar is

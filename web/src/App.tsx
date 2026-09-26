@@ -2,6 +2,7 @@ import { Suspense, useEffect } from "react";
 import { ContextMenuHost } from "@/components/common/ContextMenu";
 import { Toasts } from "@/components/common/Toasts";
 import { AppLockEffect } from "@/components/shell/AppLockEffect";
+import { AppLinks } from "@/components/shell/AppLinks";
 import { ErrorBoundary, markHealthy } from "@/components/shell/ErrorBoundary";
 import { lazyPage, markChunksHealthy } from "@/lib/lazyChunk";
 import { ThemeEffect } from "@/components/shell/ThemeEffect";
@@ -39,6 +40,7 @@ export default function App() {
         <LookEffect />
         <AppLockEffect />
         <AppRoutes />
+        <AppLinks />
         <ContextMenuHost />
         <AccountDeletedNotice />
         <Toasts />

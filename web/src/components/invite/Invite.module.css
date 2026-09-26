@@ -1,0 +1,115 @@
+/*
+ * An invite, drawn three ways from the same parts in the same order: a card
+ * in a message, the dialog a link opens, and the page a visitor lands on.
+ * The server's banner (or a strip in its own colours) runs across the top,
+ * its icon sits over the band's lower edge, then its name, who is here,
+ * what it is about, and the one thing to do.
+ *
+ * --surface is what the view is drawn on. The icon's ring is drawn in it, so
+ * the icon reads as set into the band in every theme, whatever the banner.
+ */
+.view {
+  --surface: var(--embed-bg);
+  --icon: 56px;
+  --ring: 4px;
+  --pad: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  color: var(--text);
+}
+.view[data-variant="card"] { width: 432px; max-width: 100%; border-radius: var(--radius-md); overflow: hidden; }
+.view[data-variant="dialog"],
+.view[data-variant="page"] { --surface: var(--bg-floating); --icon: 80px; --ring: 6px; --pad: 24px; }
+
+/* A banner keeps a wide slice of itself; without one the strip is short, so
+   a server with no banner does not show a large empty band. */
+.band { position: relative; flex: none; height: 44px; overflow: hidden; background: var(--band-color, var(--bg-active)); }
+.band[data-kind="banner"] { height: auto; aspect-ratio: 18 / 5; background: var(--bg-active); }
+.view[data-variant="dialog"] .band,
+.view[data-variant="page"] .band { height: 64px; }
+.view[data-variant="dialog"] .band[data-kind="banner"],
+.view[data-variant="page"] .band[data-kind="banner"] { height: auto; aspect-ratio: 16 / 6; }
+.bandImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.band[data-kind="plain"] { transition: background-color var(--transition); }
+
+/* the icon's ring box starts a ring's width early, so the picture lines up with the text under it */
+.top { position: relative; display: flex; padding-inline: calc(var(--pad) - var(--ring)) var(--pad); margin-top: calc(var(--icon) / -2 - var(--ring)); }
+.icon { flex: none; display: flex; padding: var(--ring); border-radius: calc(var(--icon) * 0.3 + var(--ring)); background: var(--surface); }
+.icon img,
+.initials { display: flex; width: var(--icon); height: var(--icon); border-radius: calc(var(--icon) * 0.3); object-fit: cover; }
+.initials { align-items: center; justify-content: center; background: var(--icon-color, var(--bg-active)); color: #fff; font-size: calc(var(--icon) * 0.36); font-weight: 700; }
+
+.body { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px var(--pad) var(--pad); }
+.main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* On a card the button stands beside the name and the counts, and a long
+   name wraps in its own column rather than running under the button. */
+.view[data-variant="card"] .body { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 16px; row-gap: 4px; }
+.cardActions { display: flex; gap: 8px; }
+.view[data-variant="card"] .desc { grid-column: 1 / -1; }
+.view[data-variant="dialog"] .body,
+.view[data-variant="page"] .body { padding-top: 12px; }
+.lead { margin: 0; font-size: 14px; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
+.name { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; color: var(--text-strong); overflow-wrap: anywhere; }
+.view[data-variant="dialog"] .name,
+.view[data-variant="page"] .name { font-size: 22px; line-height: 1.25; }
+.counts { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; line-height: 18px; color: var(--text-muted); }
+.count { display: inline-flex; align-items: center; gap: 6px; }
+.dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--status-offline); }
+.dot[data-online="true"] { background: var(--status-online); }
+.desc { margin: 6px 0 0; font-size: 14px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.view[data-variant="card"] .desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal; }
+.view[data-variant="dialog"] .desc { max-height: 30vh; overflow-y: auto; }
+.actions { display: flex; flex-direction: column; align-items: stretch; gap: 12px; margin-top: 16px; }
+.note { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+.note svg { flex: none; margin-top: 1px; }
+.error { margin: 0; font-size: 14px; color: var(--text-danger); }
+.link { align-self: center; color: var(--link); font-size: 14px; }
+
+/* the frame while loading: the same shapes, quiet */
+.view[data-loading="true"] .band { background: var(--bg-active); }
+.view[data-loading="true"] .initials { background: var(--bg-active); }
+.bar { display: block; height: 12px; border-radius: 6px; background: var(--bg-active); }
+.bar[data-w="name"] { width: 55%; height: 16px; margin-bottom: 4px; }
+.bar[data-w="counts"] { width: 40%; }
+
+/* an invite that leads nowhere any more */
+.gone { display: flex; align-items: center; gap: 12px; padding: var(--pad); }
+.goneIcon { flex: none; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: var(--bg-active); color: var(--text-muted); }
+.view[data-variant="dialog"] .goneIcon,
+.view[data-variant="page"] .goneIcon { width: 64px; height: 64px; border-radius: 18px; }
+.goneText { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.goneTitle { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.view[data-variant="dialog"] .goneTitle,
+.view[data-variant="page"] .goneTitle { font-size: 20px; }
+.goneBody { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-muted); }
+.goneMore { display: flex; flex-direction: column; gap: 12px; padding: 0 var(--pad) var(--pad); }
+
+@media (pointer: coarse) {
+  .cardActions > button { min-height: 40px; }
+  .link { display: inline-flex; align-items: center; min-height: 40px; }
+}
+
+/* the dialog a link opens in the app */
+.dialog { position: relative; border-radius: var(--radius-md); overflow: hidden; background: var(--bg-floating); }
+/* over the banner, where only a dark disc keeps a white cross readable on any picture */
+.close { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 2; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); color: #fff; transition: background var(--transition); }
+.close:hover { background: rgba(0, 0, 0, 0.72); }
+.dialog[data-plain="true"] .close { background: transparent; color: var(--text-muted); }
+.dialog[data-plain="true"] .close:hover { background: var(--bg-hover); color: var(--text); }
+.dialog .gone { padding-inline-end: 64px; }
+@media (max-width: 767px) {
+  /* a sheet from the bottom of a phone: square at the bottom, clear of the home indicator */
+  .dialog { border-radius: var(--radius-md) var(--radius-md) 0 0; }
+  .dialog .body,
+  .dialog .goneMore { padding-bottom: calc(var(--pad) + env(safe-area-inset-bottom)); }
+}
+@media (pointer: coarse) {
+  .close { width: 40px; height: 40px; }
+}
+
+/* the cards under a message, one per invite it links to */
+.cards { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 4px; max-width: 100%; }
+.cards > * { max-width: 100%; }

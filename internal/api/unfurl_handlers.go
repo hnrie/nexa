@@ -48,6 +48,14 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadGateway, "fetch_failed", "That link could not be fetched."))
 		return
 	}
+	// A short link that redirects to one of our invites gets the invite's
+	// own card, not a copy of the invite page's preview tags.
+	if res.URL != raw {
+		if inv := s.inviteUnfurl(r, res.URL); inv != nil {
+			WriteJSON(w, http.StatusOK, inv)
+			return
+		}
+	}
 	// everything the client loads from a card goes through our proxy, so
 	// opening a chat never hands the reader's address to whoever hosts the
 	// picture: the image, the site's own icon, and a file it plays inline
@@ -124,6 +132,9 @@ func (s *Server) inviteUnfurl(r *http.Request, raw string) *unfurl.Result {
 	out.OnlineCount = online
 	if srv.IconID != nil {
 		out.Image = s.Cfg.PublicURL + "/media/icon/" + srv.IconID.String()
+	}
+	if srv.BannerID != nil {
+		out.Banner = s.Cfg.PublicURL + "/media/banner/" + srv.BannerID.String()
 	}
 	return out
 }

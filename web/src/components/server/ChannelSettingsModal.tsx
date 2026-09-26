@@ -1,4 +1,4 @@
-import { Hash, Lock, Plus, Trash2, Volume2, X } from "lucide-react";
+import { Lock, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/api/client";
@@ -18,6 +18,8 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import st from "@/components/settings/Settings.module.css";
 import { OverwriteGrid } from "./PermissionGrid";
+import { ChannelIconPicker } from "./ChannelIconPicker";
+import { ChannelGlyph } from "@/components/common/ChannelGlyph";
 import { SaveBar, SettingsLayer, type NavGroup } from "./SettingsLayer";
 import s from "./ServerSettings.module.css";
 
@@ -59,6 +61,7 @@ interface ChannelEdits {
   slow?: number;
   nsfw?: boolean;
   limit?: number;
+  glyph?: string;
 }
 
 function OverviewPage({ channel }: { channel: Channel }) {
@@ -74,13 +77,15 @@ function OverviewPage({ channel }: { channel: Channel }) {
   const slow = edits.slow ?? channel.slowmode_seconds;
   const nsfw = edits.nsfw ?? channel.nsfw;
   const limit = edits.limit ?? channel.user_limit;
+  const glyph = edits.glyph ?? channel.glyph ?? "";
   const setName = (v: string) => setEdits((e) => ({ ...e, name: v }));
   const setTopic = (v: string) => setEdits((e) => ({ ...e, topic: v }));
   const setSlow = (v: number) => setEdits((e) => ({ ...e, slow: v }));
   const setNsfw = (v: boolean) => setEdits((e) => ({ ...e, nsfw: v }));
   const setLimit = (v: number) => setEdits((e) => ({ ...e, limit: v }));
+  const setGlyph = (v: string) => setEdits((e) => ({ ...e, glyph: v }));
   const reset = () => setEdits({});
-  const dirty = name !== channel.name || topic !== channel.topic || slow !== channel.slowmode_seconds || nsfw !== channel.nsfw || limit !== channel.user_limit;
+  const dirty = name !== channel.name || topic !== channel.topic || slow !== channel.slowmode_seconds || nsfw !== channel.nsfw || limit !== channel.user_limit || glyph !== (channel.glyph ?? "");
   const save = async () => {
     setBusy(true);
     try {
@@ -90,6 +95,7 @@ function OverviewPage({ channel }: { channel: Channel }) {
       if (slow !== channel.slowmode_seconds) body.slowmode_seconds = slow;
       if (nsfw !== channel.nsfw) body.nsfw = nsfw;
       if (limit !== channel.user_limit) body.user_limit = limit;
+      if (glyph !== (channel.glyph ?? "")) body.glyph = glyph;
       const ch = await serversApi.patchChannel(channel.id, body);
       upsert(ch);
       // the server tidies names and topics (text channel names become lowercase-with-dashes), so show what it kept
@@ -108,9 +114,13 @@ function OverviewPage({ channel }: { channel: Channel }) {
       <div className={st.form}>
         <Field label={channel.type === "category" ? tr_("server.channelSettings.categoryName") : tr_("server.channelSettings.channelName")} required>
           <div className={s.iconInput}>
-            {channel.type === "text" ? <Hash size={16} /> : channel.type === "voice" ? <Volume2 size={16} /> : null}
+            {/* what the channel list will show, as it is being picked below */}
+            <span className={s.nameGlyph}><ChannelGlyph channel={{ type: channel.type, server_id: channel.server_id, glyph }} size={16} /></span>
             <TextInput value={name} onChange={(e) => setName(isText ? typedChannelName(e.target.value) : e.target.value)} maxLength={100} data-testid="channel-settings-name" {...(isText ? { autoCapitalize: "none", autoCorrect: "off", spellCheck: false } : {})} />
           </div>
+        </Field>
+        <Field as="div" label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} hint={channel.type === "category" ? tr_("server.channelIcon.categoryHint") : tr_("server.channelIcon.hint")}>
+          <ChannelIconPicker channel={channel} value={glyph} onChange={setGlyph} label={channel.type === "category" ? tr_("server.channelIcon.categoryTitle") : tr_("server.channelIcon.title")} />
         </Field>
         {isText ? (
           <Field label={tr_("server.channelSettings.channelTopic")} hint={tr_("server.channelSettings.charactersLeft", { count: 1024 - topic.length })}>

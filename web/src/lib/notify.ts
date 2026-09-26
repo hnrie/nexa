@@ -2,6 +2,7 @@ import type { Message, Relationship } from "@/api/types";
 import { avatarUrl } from "@/api/users";
 import { dispatchHooks, type NexaAlert } from "@/gateway/dispatch";
 import { noticeTitle } from "@/lib/moderation";
+import { channelLabel } from "@/lib/channelGlyph";
 import { channelDisplayName } from "@/lib/names";
 import { parse, plainText } from "@/markdown";
 import { useAuth } from "@/stores/auth";
@@ -172,7 +173,7 @@ function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): voi
     return;
   }
   const author = displayName(users[m.author_id]);
-  const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (#${ch.name})` : author;
+  const title = ch && ch.type === "group_dm" ? `${author} (${channelDisplayName(ch, users, me.id)})` : ch && ch.server_id ? `${author} (${channelLabel(ch)})` : author;
   const body = preview === "full" ? previewOf(m, decrypted) : t("notify.newMessage");
   void showNotification(title, { body, tag: `ec-${m.channel_id}`, icon: avatarUrl(users[m.author_id]?.avatar_id ?? null, 96) ?? "/icons/icon-192.png", silent: true }, path);
 }

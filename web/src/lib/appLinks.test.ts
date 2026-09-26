@@ -1,0 +1,93 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { appLink, inviteLinksIn, messageTarget, setPublicUrl } from "./appLinks";
+import { parse } from "@/markdown/parse";
+
+const here = { href: "https://chat.evilion.xyz/channels/1/2", host: "chat.evilion.xyz" };
+const elsewhere = { href: "http://127.0.0.1:4000/channels/@me", host: "127.0.0.1:4000" };
+
+afterEach(() => setPublicUrl(null));
+
+describe("appLink", () => {
+  it("opens invites in the app, keeping the key in the fragment", () => {
+    expect(appLink("https://chat.evilion.xyz/invite/AbC-12_x", here)).toEqual({ kind: "invite", code: "AbC-12_x", hash: "" });
+    expect(appLink("https://chat.evilion.xyz/invite/AbC#k=3.abcdef", here)).toEqual({ kind: "invite", code: "AbC", hash: "#k=3.abcdef" });
+    expect(appLink("/invite/xyz/", here)).toEqual({ kind: "invite", code: "xyz", hash: "" });
+  });
+
+  it("routes channels, messages, sticker packs, the download page and unknown pages", () => {
+    expect(appLink("https://chat.evilion.xyz/channels/5/6/7", here)).toEqual({ kind: "route", path: "/channels/5/6/7" });
+    expect(appLink("https://chat.evilion.xyz/channels/@me/9", here)).toEqual({ kind: "route", path: "/channels/@me/9" });
+    expect(appLink("https://chat.evilion.xyz/stickers/pack/42", here)).toEqual({ kind: "route", path: "/stickers/pack/42" });
+    expect(appLink("https://chat.evilion.xyz/download", here)).toEqual({ kind: "route", path: "/download" });
+    expect(appLink("https://chat.evilion.xyz/somewhere/new?x=1#y", here)).toEqual({ kind: "route", path: "/somewhere/new?x=1#y" });
+    expect(appLink("https://chat.evilion.xyz", here)).toEqual({ kind: "route", path: "/" });
+  });
+
+  it("counts plain http and any letter case as the same site", () => {
+    expect(appLink("http://CHAT.evilion.xyz/invite/abc", here)).toEqual({ kind: "invite", code: "abc", hash: "" });
+  });
+
+  it("counts the instance's public address from a page served under another name", () => {
+    expect(appLink("https://chat.evilion.xyz/invite/abc", elsewhere)).toBeNull();
+    setPublicUrl("https://chat.evilion.xyz");
+    expect(appLink("https://chat.evilion.xyz/invite/abc", elsewhere)).toEqual({ kind: "invite", code: "abc", hash: "" });
+    expect(appLink("http://127.0.0.1:4000/channels/1", elsewhere)).toEqual({ kind: "route", path: "/channels/1" });
+    setPublicUrl("not a url");
+    expect(appLink("https://chat.evilion.xyz/invite/abc", elsewhere)).toBeNull();
+  });
+
+  it("leaves other sites, other ports and other schemes alone", () => {
+    expect(appLink("https://evilion.xyz/invite/abc", here)).toBeNull();
+    expect(appLink("https://chat.evilion.xyz.example.com/invite/abc", here)).toBeNull();
+    expect(appLink("https://chat.evilion.xyz:8443/invite/abc", here)).toBeNull();
+    expect(appLink("mailto:someone@chat.evilion.xyz", here)).toBeNull();
+    expect(appLink("javascript:alert(1)", here)).toBeNull();
+    expect(appLink("http://[::1", here)).toBeNull();
+  });
+
+  it("leaves the server's own files and guest call links to the browser", () => {
+    for (const p of ["/api/v1/users/@me", "/media/attachments/1", "/media/icon/2?size=64", "/assets/index-abc.js", "/twemoji/1f600.svg", "/sw.js", "/manifest.webmanifest", "/icons/icon-192.png", "/home/app.png", "/__download/x", "/call/AbCdEf"]) {
+      expect(appLink("https://chat.evilion.xyz" + p, here)).toBeNull();
+    }
+  });
+
+  it("leaves a jump within the same page to the browser", () => {
+    expect(appLink("#fn-1", here)).toBeNull();
+    expect(appLink("https://chat.evilion.xyz/channels/1/2#top", here)).toBeNull();
+    // the same page without a fragment is still the app's, so a message link can jump again
+    expect(appLink("https://chat.evilion.xyz/channels/1/2", here)).toEqual({ kind: "route", path: "/channels/1/2" });
+  });
+});
+
+describe("messageTarget", () => {
+  it("reads the channel and message out of a message link", () => {
+    expect(messageTarget("/channels/5/6/7")).toEqual({ channelId: "6", messageId: "7" });
+    expect(messageTarget("/channels/@me/6/7?x#y")).toEqual({ channelId: "6", messageId: "7" });
+    expect(messageTarget("/channels/5/6")).toBeNull();
+    expect(messageTarget("/invite/abc")).toBeNull();
+  });
+});
+
+describe("inviteLinksIn", () => {
+  it("finds each invite to this instance once, in order, with its key", () => {
+    const text = [
+      "join us https://chat.evilion.xyz/invite/one#k=0.aaaa",
+      "and [the other one](https://chat.evilion.xyz/invite/two)",
+      "again https://chat.evilion.xyz/invite/one",
+      "not this <https://chat.evilion.xyz/invite/quiet>",
+      "nor `https://chat.evilion.xyz/invite/code` nor https://other.example/invite/x",
+      "```\nhttps://chat.evilion.xyz/invite/block\n```",
+    ].join("\n");
+    expect(inviteLinksIn(parse(text), here)).toEqual([
+      { code: "one", hash: "#k=0.aaaa", url: "https://chat.evilion.xyz/invite/one#k=0.aaaa" },
+      { code: "two", hash: "", url: "https://chat.evilion.xyz/invite/two" },
+    ]);
+  });
+
+  it("finds invites nested anywhere in the message and stops at three", () => {
+    const links = Array.from({ length: 5 }, (_, i) => ({ type: "link", url: `https://chat.evilion.xyz/invite/c${i}`, children: [], masked: false, noEmbed: false }));
+    const tree = [{ type: "table", head: [[links[0]]], rows: [[[links[1]]], [[links[2], links[3]]]] }, { type: "details", summary: [], children: [links[4]] }];
+    expect(inviteLinksIn(tree, here).map((l) => l.code)).toEqual(["c0", "c1", "c2"]);
+    expect(inviteLinksIn(null, here)).toEqual([]);
+  });
+});

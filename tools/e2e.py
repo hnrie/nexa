@@ -270,7 +270,7 @@ def server_flow(srv, alice, bob, phone):
     b.goto(link, wait_until="networkidle")
     b.wait_for_selector("text=Test Server", timeout=15000)
     bob.shot("invite")
-    b.click("button:has-text('Accept Invite')")
+    b.click("[data-testid=invite-join]")
     b.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
     b.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
     a.wait_for_selector("[data-testid=member-list] [data-user]", timeout=15000)
@@ -343,7 +343,7 @@ def server_flow(srv, alice, bob, phone):
     a.keyboard.press("Escape")
     # carol on the phone opens the server through the drawer
     phone.page.goto(link, wait_until="networkidle")
-    phone.page.click("button:has-text('Accept Invite')")
+    phone.page.click("[data-testid=invite-join]")
     phone.page.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
     phone.page.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
     phone.shot("server")
@@ -357,7 +357,7 @@ def expressions_flow(srv, alice, bob, server_id, link):
     a, b = alice.page, bob.page
     # bob was kicked (not banned): he rejoins through the same link
     b.goto(link, wait_until="networkidle")
-    b.click("button:has-text('Accept Invite')")
+    b.click("[data-testid=invite-join]")
     b.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
     # alice uploads a custom emoji in server settings
     a.click("button:has-text('Test Server')")

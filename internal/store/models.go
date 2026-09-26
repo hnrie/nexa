@@ -175,6 +175,10 @@ type Channel struct {
 	// Locked marks a subchat that asks for a password before it opens. The
 	// password material itself is never part of a channel as sent.
 	Locked bool `json:"locked,omitempty"`
+	// Glyph is a server channel's own icon, drawn in place of its # or
+	// speaker: "icon:<name>", "emoji:<emoji>" or "custom:<emoji id>".
+	// Empty keeps the default.
+	Glyph string `json:"glyph,omitempty"`
 }
 
 // Server is a community with channels, roles and members.
@@ -302,6 +306,7 @@ type ChannelPatch struct {
 	Name            *string
 	Topic           *string
 	IconID          **ids.ID
+	Glyph           *string
 	OwnerID         *ids.ID
 	NSFW            *bool
 	SlowmodeSeconds *int

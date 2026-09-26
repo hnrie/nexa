@@ -19,6 +19,7 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
   const nav = useNavigate();
   const me = useAuth((a) => a.me);
   const toast = useUI((u) => u.toast);
+  const openModal = useUI((u) => u.openModal);
   const [mode, setMode] = useState<"create" | "join">("create");
   const [name, setName] = useState(() => (me ? t("modals.createServer.namedServer", { name: me.display_name || me.username }) : t("modals.createServer.myServer")));
   const [code, setCode] = useState("");
@@ -58,7 +59,8 @@ export function CreateServerModal({ onClose }: { onClose: () => void }) {
     if (!m) return toast(t("modals.createServer.thatDoesnTLookLikeAn"), "error");
     const hash = c.includes("#") ? c.slice(c.indexOf("#")) : "";
     onClose();
-    nav(`/invite/${m[1]}${hash}`);
+    // the same dialog an invite link opens, over the app rather than instead of it
+    openModal("joinInvite", { code: m[1], hash });
   };
 
   if (mode === "join") {

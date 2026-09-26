@@ -10,6 +10,7 @@
  */
 
 import { ApiError, api } from "@/api/client";
+import { setPublicUrl } from "@/lib/appLinks";
 
 import { t } from "@/i18n";
 const SCRIPT = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
@@ -38,9 +39,11 @@ let asking: Promise<void> | null = null;
 /** Asks the server whether captchas are on. The app does this once as it starts. */
 export function loadCaptchaConfig(): Promise<void> {
   asking ??= api
-    .request<{ captcha?: { provider?: string; site_key?: string } | null }>("GET", "/instance")
+    .request<{ captcha?: { provider?: string; site_key?: string } | null; public_url?: string }>("GET", "/instance")
     .then((info) => {
       siteKey = info.captcha?.provider === "turnstile" && info.captcha.site_key ? info.captcha.site_key : null;
+      // the same answer says which address links to this instance use
+      setPublicUrl(info.public_url);
     })
     .catch(() => {
       // unknown for now: a guarded request that needs one says so, and is retried

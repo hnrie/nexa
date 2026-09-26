@@ -3,6 +3,7 @@ import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect,
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { copyText } from "@/lib/clipboard";
+import { MentionGlyph } from "@/components/common/ChannelGlyph";
 import { ensureShortcodes, mightHaveShortcode, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import { formatStamp, type StampStyle } from "@/lib/time";
 import type { AlertKind, Align, Node, RenderCtx } from "./ast";
@@ -553,7 +554,7 @@ function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const name = channel.name;
   return (
     <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)} onKeyDown={(e) => pressed(e) && props.ctx.onChannelClick?.(props.id)}>
-      {"#" + name}
+      <MentionGlyph channel={channel} />{name}
     </span>
   );
 }

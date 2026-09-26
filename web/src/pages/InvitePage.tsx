@@ -1,31 +1,22 @@
-import { useEffect, useState } from "react";
+import { KeyRound, Lock } from "lucide-react";
+import { useEffect } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ApiError } from "@/api/client";
-import { describeError } from "@/lib/errors";
-import { servers as serversApi } from "@/api/servers";
-import type { InvitePreview } from "@/api/types";
-import { bannerUrl, iconUrl } from "@/api/users";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
+import { InviteGone, InviteSkeleton, InviteView, targetOfPreview } from "@/components/invite/InviteView";
+import { useInviteJoin } from "@/components/invite/useInviteJoin";
+import v from "@/components/invite/Invite.module.css";
 import LockPage from "@/pages/LockPage";
 import PasscodePage from "@/pages/PasscodePage";
-import { hasLock } from "@/lib/appLock";
 import OfflinePage from "@/pages/OfflinePage";
-import { initials } from "@/lib/avatarColor";
 import { parseInviteFragment } from "@/lib/inviteLink";
-import { keystore } from "@/crypto/keystore";
-import { ring } from "@/lib/keyring";
+import { loadInvitePreview, useInvitePreview } from "@/lib/invitePreviews";
 import { useAuth } from "@/stores/auth";
-import { useChannels } from "@/stores/channels";
-import { useKeys } from "@/stores/keys";
-import { useServers } from "@/stores/servers";
-import { useUsers } from "@/stores/users";
 import { usePageTitle } from "./AuthLayout";
 import s from "./InvitePage.module.css";
-import { guarded } from "@/lib/captcha";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /**
  * Where a link's key waits while its visitor logs in or registers. The key
  * cannot ride along in `?next=`: a query string reaches the server, in the
@@ -43,6 +34,14 @@ function storedFragment(code: string): string {
   }
 }
 
+function forgetFragment(code: string): void {
+  try {
+    sessionStorage.removeItem(keyStoreName(code));
+  } catch {
+    /* nothing was stored */
+  }
+}
+
 /** The public invite landing page for a server or a group chat. */
 export default function InvitePage() {
   const { code = "" } = useParams();
@@ -50,15 +49,13 @@ export default function InvitePage() {
   const nav = useNavigate();
   const status = useAuth((a) => a.status);
   const bootstrap = useAuth((a) => a.bootstrap);
-  const [preview, setPreview] = useState<InvitePreview | null>(null);
-  const alreadyIn = useServers((st) => (preview?.server ? !!st.byId[preview.server.id] : false));
-  const inGroup = useChannels((c) => (preview?.group ? !!c.byId[preview.group.id] : false));
-  const [error, setError] = useState<string | null>(null);
-  const [acceptError, setAcceptError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const entry = useInvitePreview(code);
+  const preview = entry?.status === "ready" ? entry.preview : null;
+  const target = preview ? targetOfPreview(preview, "page") : null;
   const fragment = parseInviteFragment(loc.hash) ? loc.hash : storedFragment(code);
+  const { member, busy, error, join, open } = useInviteJoin(code, fragment, target, { replace: true, onDone: () => forgetFragment(code) });
   // the lock and offline screens drawn in its place name the tab themselves
-  usePageTitle(error ? t("invite.inviteInvalid") : (preview?.server ?? preview?.group)?.name, status !== "locked" && status !== "pinlocked" && status !== "offline");
+  usePageTitle(entry?.status === "invalid" ? t("invite.invalidInvite") : target?.name, status !== "locked" && status !== "pinlocked" && status !== "offline");
 
   useEffect(() => {
     if (!parseInviteFragment(loc.hash)) return;
@@ -78,116 +75,76 @@ export default function InvitePage() {
     if (status === "ready") void import("@/gateway/session").then((m) => m.startSession());
   }, [status]);
 
-  useEffect(() => {
-    let alive = true;
-    serversApi
-      .invitePreview(code)
-      .then((p) => alive && setPreview(p))
-      .catch((err) => alive && setError(err instanceof ApiError && err.status === 404 ? t("invite.thisInviteIsInvalidOrHasExpired") : t("invite.couldNotLoadTheInvite")));
-    return () => {
-      alive = false;
-    };
-  }, [code]);
-
-  const accept = async () => {
-    if (busy || !preview) return;
-    setBusy(true);
-    setAcceptError(null);
-    try {
-      const res = await guarded("join", (captcha) => serversApi.join(code, captcha));
-      // What came back decides, rather than what the preview said and a cast
-      // through `unknown`: a field that is absent or renamed used to navigate
-      // to /channels/@me/undefined and bounce home with no explanation.
-      if ("channel" in res) {
-        if (res.users) useUsers.getState().upsert(res.users);
-        useChannels.getState().upsert(res.channel);
-        nav(`/channels/@me/${res.channel.id}`, { replace: true });
-        return;
-      }
-      if (!("server" in res)) throw new Error(t("invite.couldNotAcceptTheInvite"));
-      useUsers.getState().upsert(res.users);
-      useChannels.getState().upsert(res.server.channels);
-      useServers.getState().setFromView(res.server);
-      const key = parseInviteFragment(fragment);
-      const userId = useKeys.getState().userId;
-      if (key && userId && !ring.get(res.server.id, key.epoch)) {
-        ring.set(res.server.id, key.epoch, key.root);
-        // behind a passcode the key stays off the disk; the self-grant brings it back
-        if (!hasLock(userId)) await keystore.saveRoot(userId, res.server.id, key.epoch, key.root);
-        // a self-grant records the key server-side so other devices and later logins have it
-        await useKeys.getState().grantTo(res.server.id, key.epoch, [userId]);
-      }
-      try {
-        sessionStorage.removeItem(keyStoreName(code));
-      } catch {
-        /* nothing was stored */
-      }
-      const first = res.server.channels.find((c) => c.type === "text");
-      nav(first ? `/channels/${res.server.id}/${first.id}` : `/channels/${res.server.id}`, { replace: true });
-    } catch (err) {
-      // the invite itself is still fine, so this sits by the button rather than replacing the card
-      setAcceptError(describeError(err, t("invite.couldNotAcceptTheInvite")));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   if (status === "locked") return <LockPage />;
   if (status === "pinlocked") return <PasscodePage />;
   if (status === "offline") return <OfflinePage />;
   const next = encodeURIComponent(loc.pathname);
-  const target = preview?.server ?? preview?.group;
-  const icon = target ? iconUrl(target.icon_id, 96) : null;
-  const banner = bannerUrl(preview?.server?.banner_id ?? null, 480);
-  const isGroup = !!preview?.group;
-  const member = isGroup ? inGroup : alreadyIn;
+  const isGroup = target?.kind === "group";
+
+  let actions;
+  if (status === "ready") {
+    actions = member ? (
+      <Button size="lg" block variant="secondary" onClick={open} data-testid="invite-open">{isGroup ? t("invite.openGroup") : t("invite.openServer")}</Button>
+    ) : (
+      <>
+        <Button size="lg" block variant="positive" loading={busy} onClick={() => void join()} data-testid="invite-join">{isGroup ? t("invite.joinGroup") : t("invite.joinServer")}</Button>
+        {error ? <p className={v.error} role="alert">{error}</p> : null}
+      </>
+    );
+  } else if (status === "anonymous") {
+    actions = (
+      <>
+        <Button size="lg" block onClick={() => nav(`/login?next=${next}`)} data-testid="invite-login">{t("invite.logInToJoin")}</Button>
+        <Link to={`/register?next=${next}&invite=${encodeURIComponent(code)}`} className={v.link}>{t("invite.createAnAccount")}</Link>
+      </>
+    );
+  } else {
+    actions = <div className={s.waiting}><Spinner /></div>;
+  }
+
+  let card;
+  if (entry?.status === "invalid") {
+    card = (
+      <InviteGone variant="page">
+        <Link to="/channels/@me" className={v.link}>{t("invite.continueToTheApp")}</Link>
+      </InviteGone>
+    );
+  } else if (!target && entry?.status === "failed") {
+    card = (
+      <div className={v.view} data-variant="page" data-gone="true">
+        <div className={v.gone}>
+          <div className={v.goneText}>
+            <h1 className={v.goneTitle}>{t("invite.couldNotLoadTheInvite")}</h1>
+            <p className={v.goneBody}>{t("invite.checkYourConnection")}</p>
+          </div>
+        </div>
+        <div className={v.goneMore}>
+          <Button block onClick={() => void loadInvitePreview(code, { force: true })}>{t("invite.tryAgain")}</Button>
+        </div>
+      </div>
+    );
+  } else if (!target) {
+    card = <InviteSkeleton variant="page" />;
+  } else {
+    const inviter = preview?.inviter;
+    card = (
+      <InviteView
+        target={target}
+        variant="page"
+        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <bdi>{inviter.display_name || inviter.username}</bdi> }} /> : t("invite.youveBeenInvited")}
+        actions={actions}
+      >
+        {!member && fragment.includes("k=") ? <p className={v.note}><KeyRound size={14} aria-hidden="true" />{t("invite.thisLinkCarriesTheEncryptionKey")}</p> : null}
+        {!member && isGroup ? <p className={v.note}><Lock size={14} aria-hidden="true" />{t("invite.groupChatsAreEndToEnd")}</p> : null}
+      </InviteView>
+    );
+  }
+
   return (
     <div className={s.page}>
       {/* what this is, for someone who has never heard of it, and a way on from a dead link */}
       <Link to="/" className={s.brand} aria-label="Nexa"><NexaWordmark height={32} /></Link>
-      <main className={s.card}>
-        {!preview && !error ? <Spinner /> : null}
-        {error ? (
-          <>
-            <div className={s.iconBox} data-invalid="true">!</div>
-            <h1 className={s.title}>{t("invite.inviteInvalid")}</h1>
-            <p className={s.sub}>{error}</p>
-            <Link to="/channels/@me" className={s.link}>{t("invite.continueToTheApp")}</Link>
-          </>
-        ) : null}
-        {preview && target ? (
-          <>
-            {banner ? <div className={s.banner} style={{ backgroundImage: `url(${banner})` }} aria-hidden="true" /> : null}
-            <p className={s.kicker}>{preview.inviter ? t("invite.invitedYouToJoin", { name: preview.inviter.display_name || preview.inviter.username }) : t("invite.youveBeenInvited")}</p>
-            <div className={s.iconBox}>{icon ? <img src={icon} alt="" /> : initials(target.name)}</div>
-            <h1 className={s.title}>{target.name}</h1>
-            {preview.server?.description ? <p className={s.sub}>{preview.server.description}</p> : null}
-            <div className={s.counts}>
-              {preview.server ? <span><i className={s.online} /> {t("invite.onlineCount", { count: preview.server.online_count })}</span> : null}
-              <span><i className={s.offline} /> {isGroup ? t("invite.inThisGroupCount", { count: target.member_count }) : t("invite.membersCount", { count: target.member_count })}</span>
-            </div>
-            {status === "ready" ? (
-              member ? (
-                <Button size="lg" block onClick={() => nav(isGroup ? `/channels/@me/${target.id}` : `/channels/${target.id}`)}>{t("invite.youReAlreadyInOpen")}</Button>
-              ) : (
-                <>
-                  <Button size="lg" block loading={busy} onClick={() => void accept()}>{isGroup ? t("invite.joinGroup") : t("invite.acceptInvite")}</Button>
-                  {acceptError ? <p className={s.acceptError} role="alert">{acceptError}</p> : null}
-                </>
-              )
-            ) : status === "anonymous" ? (
-              <div className={s.authRow}>
-                <Button size="lg" block onClick={() => nav(`/login?next=${next}`)}>{t("invite.logInToAccept")}</Button>
-                <Link to={`/register?next=${next}&invite=${encodeURIComponent(code)}`} className={s.link}>{t("invite.needAnAccountRegister")}</Link>
-              </div>
-            ) : (
-              <Spinner />
-            )}
-            {fragment.includes("k=") ? <p className={s.note}>{t("invite.thisLinkCarriesTheEncryptionKey")}</p> : null}
-            {isGroup ? <p className={s.note}>{t("invite.groupChatsAreEndToEnd")}</p> : null}
-          </>
-        ) : null}
-      </main>
+      <main className={s.invite} data-testid="invite-page">{card}</main>
     </div>
   );
 }

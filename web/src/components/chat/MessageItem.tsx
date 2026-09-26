@@ -23,6 +23,7 @@ import type { MessagePayload } from "@/crypto/message";
 import { Attachments } from "./Attachments";
 import { UploadCard } from "./UploadCard";
 import { Embeds } from "./Embeds";
+import { InviteCards } from "./InviteCards";
 import { MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import type { UnfurlResult } from "@/api/types";
 import { EditMessage } from "./EditMessage";
@@ -302,6 +303,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
           {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
           {embeds ? <Embeds list={embeds} /> : null}
+          {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds} />}
           {pending === "failed" ? (
             <div className={s.failedRow}>
               <span>{t("chat.messageItem.messageFailedToSend")}</span>

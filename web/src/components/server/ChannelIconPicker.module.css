@@ -1,0 +1,14 @@
+/* The icons sit in a well like a text box's, so they read as one field of the form. */
+.picker { display: flex; flex-direction: column; gap: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-input); }
+.tile { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; min-width: 0; border-radius: var(--radius-sm); color: var(--text-muted); transition: background-color var(--transition), color var(--transition); }
+.tile:hover { background: var(--bg-hover); color: var(--text); }
+.tile[aria-checked="true"] { background: var(--bg-active); color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--brand); }
+/* "none", for a category: an empty ring, since a category has no glyph of its own */
+.none { width: 16px; height: 16px; border-radius: 50%; border: 2px dashed currentColor; opacity: 0.8; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.actions button svg { flex: none; }
+@media (pointer: coarse) {
+  .grid { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
+  .actions button { min-height: 40px; }
+}

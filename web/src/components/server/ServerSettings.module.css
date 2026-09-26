@@ -128,3 +128,6 @@
 }
 /* the banner as the channel list shows it, wider than tall, with its buttons on it */
 .serverBanner { aspect-ratio: 16 / 9; max-width: 360px; border-radius: var(--radius-sm); background: var(--bg-surface); background-size: cover; background-position: center; display: flex; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 8px; }
+/* the channel's glyph at the start of its name box, drawn by ChannelGlyph */
+.iconInput .nameGlyph { position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); display: flex; color: var(--text-muted); pointer-events: none; --glyph-cut: var(--bg-input); }
+.iconInput .nameGlyph svg { position: static; transform: none; }
