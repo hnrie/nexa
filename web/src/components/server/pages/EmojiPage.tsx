@@ -104,7 +104,7 @@ export default function EmojiPage({ serverId }: { serverId: string }) {
   const section = (label: string, list: Emoji[]) =>
     list.length === 0 ? null : (
       <>
-        <h3 className={st.h5}>{label} — {list.length}</h3>
+        <h3 className={st.h5}>{t("server.emoji.sectionCount", { label, count: list.length })}</h3>
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>

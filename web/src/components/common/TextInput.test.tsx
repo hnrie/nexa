@@ -79,8 +79,8 @@ describe("TextInput with reveal", () => {
     const input = screen.getByLabelText("Password", { selector: "input" }) as HTMLInputElement;
     expect(input.type).toBe("password");
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "Show password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show Password" }));
     expect(input.type).toBe("text");
-    expect(screen.getByRole("button", { name: "Hide password" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Hide Password" }).getAttribute("aria-pressed")).toBe("true");
   });
 });

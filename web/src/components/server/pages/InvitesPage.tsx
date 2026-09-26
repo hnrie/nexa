@@ -90,7 +90,7 @@ export default function InvitesPage({ serverId }: { serverId: string }) {
                 <tr key={i.code} data-invite={i.code}>
                   <td data-label={t("server.invites.inviter")}>{displayName(users[i.inviter_id])}</td>
                   <td data-label={t("server.invites.code")} className={s.code} dir="ltr">{i.code}</td>
-                  <td data-label={t("server.invites.channel")}>{i.channel_id && channels[i.channel_id] ? <bdi>#{channels[i.channel_id]!.name}</bdi> : "—"}</td>
+                  <td data-label={t("server.invites.channel")}>{i.channel_id && channels[i.channel_id] ? <bdi>#{channels[i.channel_id]!.name}</bdi> : t("settings.profile.none")}</td>
                   <td data-label={t("server.invites.uses")}>{i.uses}{i.max_uses ? ` / ${i.max_uses}` : ""}</td>
                   <td data-label={t("server.invites.expires")}>{i.expires_at ? formatFull(i.expires_at) : t("server.invites.never")}</td>
                   <td className={s.inviteActions}>

@@ -10,8 +10,9 @@
 .other:hover { opacity: 1; text-decoration: underline; }
 .close { flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--on-brand); }
 .close:hover { background: rgba(255, 255, 255, 0.16); }
-/* a phone's row is tight: the tagline goes, the offer itself stays */
-.tagline { display: inline; }
+/* set apart from the offer by space and weight rather than a dash; a phone's
+   row is tight, so there the tagline goes and the offer itself stays */
+.tagline { display: inline; margin-inline-start: 8px; opacity: 0.85; }
 @media (max-width: 560px) { .tagline { display: none; } }
 
 /* where the row is tight, the other platforms are one click away on the download page anyway */

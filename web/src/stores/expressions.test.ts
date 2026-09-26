@@ -34,10 +34,10 @@ describe("groupPacks", () => {
     );
     const groups = groupPacks(packs, "s1", "me");
     expect(groups.map((g) => [g.label, g.packs.map((p) => p.id)])).toEqual([
-      ["This server", ["p6", "p1"]],
-      ["My packs", ["p2"]],
+      ["This Server", ["p6", "p1"]],
+      ["My Packs", ["p2"]],
       ["Installed", ["p4", "p3"]],
-      ["Other servers", ["p5"]],
+      ["Other Servers", ["p5"]],
     ]);
     const ids = groups.flatMap((g) => g.packs.map((p) => p.id));
     expect(new Set(ids).size).toBe(ids.length);
@@ -45,7 +45,7 @@ describe("groupPacks", () => {
 
   it("leaves out groups with nothing in them", () => {
     expect(groupPacks({}, "s1", "me")).toEqual([]);
-    expect(groupPacks({ p2: pack("p2", { owner_user_id: "me" }) }, null, "me").map((g) => g.label)).toEqual(["My packs"]);
+    expect(groupPacks({ p2: pack("p2", { owner_user_id: "me" }) }, null, "me").map((g) => g.label)).toEqual(["My Packs"]);
   });
 });
 

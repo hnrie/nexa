@@ -34,7 +34,7 @@ const msg: DecryptedMessage = {
 };
 
 function box(): HTMLTextAreaElement {
-  return screen.getByLabelText("Edit your message") as HTMLTextAreaElement;
+  return screen.getByLabelText("Edit Your Message") as HTMLTextAreaElement;
 }
 
 function paste(el: HTMLTextAreaElement, text: string) {
@@ -84,7 +84,7 @@ describe("editing a message", () => {
     paste(box(), long);
     expect(box().value).toBe("hello");
     expect(screen.getByTestId("edit-notice").textContent).toContain("longer than a message can be (4,000 characters)");
-    fireEvent.click(screen.getByRole("button", { name: "Paste anyway" }));
+    fireEvent.click(screen.getByRole("button", { name: "Paste Anyway" }));
     expect(box().value).toBe("hello" + long);
     expect(screen.queryByTestId("edit-notice")).toBeNull();
     expect(screen.getByTestId("message-counter").dataset["over"]).toBe("true");

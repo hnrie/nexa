@@ -33,7 +33,7 @@ describe("RecoverPage", () => {
         <AppRoutes />
       </MemoryRouter>,
     );
-    await screen.findByText("Recover your account");
+    await screen.findByText("Recover Your Account");
     fill(container.querySelectorAll("input"), ["mara", "0".repeat(64), "new password 1", "new password 1"]);
     await act(async () => {
       fireEvent.submit(container.querySelector("form")!);

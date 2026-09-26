@@ -279,7 +279,7 @@ describe("api.request", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect(err.code).toBe("bad_response");
     expect(err.status).toBe(200);
-    expect(err.message).toBe("The server's answer could not be read.");
+    expect(err.message).toBe("The server's reply couldn't be read. Try again.");
   });
 
   it("parses the error envelope into an ApiError", async () => {

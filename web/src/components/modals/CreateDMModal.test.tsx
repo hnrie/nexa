@@ -41,11 +41,11 @@ describe("CreateDMModal adding to a group", () => {
         <CreateDMModal onClose={onClose} initial={["a", "b"]} groupId="g1" />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByText("Add to group"));
+    fireEvent.click(screen.getByText("Add to Group"));
     await waitFor(() => expect(useUI.getState().toasts.map((t) => t.text)).toEqual(["Try again."]));
     expect(onClose).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByText("Add to group"));
+    fireEvent.click(screen.getByText("Add to Group"));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(addRecipient.mock.calls.map((c) => c[1])).toEqual(["a", "b", "b"]);
     expect(useChannels.getState().byId["g1"]?.recipient_ids).toEqual(["me", "a", "b"]);
@@ -65,7 +65,7 @@ describe("CreateDMModal with nobody picked", () => {
       </MemoryRouter>,
     );
     const button = screen.getByTestId("create-dm-submit");
-    expect(button.textContent).toBe("Create group");
+    expect(button.textContent).toBe("Create Group");
     expect((button as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(button);
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
@@ -85,7 +85,7 @@ describe("CreateDMModal with nobody picked", () => {
     fireEvent.click(boxes[0]!);
     expect(button()).toBe("Create DM");
     fireEvent.click(boxes[1]!);
-    expect(button()).toBe("Create group");
+    expect(button()).toBe("Create Group");
   });
 
   it("still needs someone to add to a group that exists", () => {

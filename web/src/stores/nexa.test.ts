@@ -121,9 +121,9 @@ describe("how moderation reads", () => {
   });
 
   it("titles each notice for the member", () => {
-    expect(noticeTitle("avatar_remove", { avatar: true, banner: true })).toBe("Your profile picture and banner were removed");
-    expect(noticeTitle("avatar_remove", { banner: true })).toBe("Your profile banner was removed");
-    expect(noticeTitle("ban", {})).toBe("Your account was banned");
+    expect(noticeTitle("avatar_remove", { avatar: true, banner: true })).toBe("Your Profile Picture and Banner Were Removed");
+    expect(noticeTitle("avatar_remove", { banner: true })).toBe("Your Profile Banner Was Removed");
+    expect(noticeTitle("ban", {})).toBe("Your Account Was Banned");
   });
 
   it("says where a mute or ban stands", () => {

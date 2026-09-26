@@ -232,7 +232,7 @@ class Session:
         box.fill(text)
         # a phone keyboard's Enter makes a new line, so it has a send button
         if self.page.viewport_size["width"] < 768:
-            self.page.click("button[aria-label='Send message']")
+            self.page.click("button[aria-label='Send Message']")
         else:
             box.press("Enter")
 
@@ -299,7 +299,7 @@ def server_flow(srv, alice, bob, phone):
     a.wait_for_selector("text=Role saved.", timeout=15000)
     a.click("[data-nav=members]")
     b_row = a.locator(f"[data-member]:has-text('Bob')")
-    b_row.locator("button[aria-label='Edit roles']").click()
+    b_row.locator("button[aria-label='Edit Roles']").click()
     a.locator("label:has-text('Muted') input").check()
     time.sleep(0.5)
     a.keyboard.press("Escape")
@@ -347,7 +347,7 @@ def server_flow(srv, alice, bob, phone):
     phone.page.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
     phone.page.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
     phone.shot("server")
-    phone.page.click("button[aria-label='Open navigation']")
+    phone.page.click("button[aria-label='Open Navigation']")
     time.sleep(0.4)
     phone.shot("server-drawer")
     return server_id, link
@@ -370,9 +370,9 @@ def expressions_flow(srv, alice, bob, server_id, link):
     # she sends it from the picker; bob sees the image
     a.locator("[data-channel]:has-text('general') button").first.click()
     a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
-    a.click("button[aria-label='Select emoji']")
+    a.click("button[aria-label='Select Emoji']")
     a.fill("input[aria-label='Search emoji']", "party")
-    a.locator("[role=dialog][aria-label='Expression picker'] button[data-custom]").first.click()
+    a.locator("[role=dialog][aria-label='Expression Picker'] button[data-custom]").first.click()
     a.keyboard.press("Escape")
     alice.composer().press("End")
     alice.composer().type(" custom emoji test")
@@ -405,16 +405,16 @@ def expressions_flow(srv, alice, bob, server_id, link):
     alice.shot("sticker-pack")
     a.keyboard.press("Escape")
     # send the sticker from the picker
-    a.click("button[aria-label='Select emoji']")
-    a.click("[role=dialog][aria-label='Expression picker'] button:has-text('Stickers')")
-    a.locator("[role=dialog][aria-label='Expression picker'] button[data-sticker]").first.click()
+    a.click("button[aria-label='Select Emoji']")
+    a.click("[role=dialog][aria-label='Expression Picker'] button:has-text('Stickers')")
+    a.locator("[role=dialog][aria-label='Expression Picker'] button[data-sticker]").first.click()
     b.wait_for_selector("[data-id] img[alt='Wave']", timeout=20000)
     a.wait_for_selector("[data-id] img[alt='Wave']", timeout=20000)
     alice.shot("sticker-sent")
     # the picker shows GIF search is off (no Tenor key) but favourites still exist
-    a.click("button[aria-label='Select emoji']")
-    a.click("[role=dialog][aria-label='Expression picker'] button:has-text('GIFs')")
-    a.wait_for_selector("text=/GIF search is off|No favorite GIFs/", timeout=10000)
+    a.click("button[aria-label='Select Emoji']")
+    a.click("[role=dialog][aria-label='Expression Picker'] button:has-text('GIFs')")
+    a.wait_for_selector("text=/GIF search is off|No favourite GIFs/", timeout=10000)
     alice.shot("gif-tab")
     a.keyboard.press("Escape")
 
@@ -607,14 +607,14 @@ def groups_flow(srv, alice, bob, phone):
     alice.send("group chat works")
     a.wait_for_selector("[data-id]:has-text('group chat works')", timeout=20000)
     # a group of two is still a dm here, so add carol to force a group, then invite by link
-    a.click("button[aria-label='Add friends']")
+    a.click("button[aria-label='Add Friends']")
     modal = a.locator("[role=dialog]")
     if modal.locator("[data-testid=group-invite-link]").count() == 0:
         # it was a 1:1 dm: add carol to promote it to a group
         a.locator("label:has-text('Carol') input").check()
         a.click("button:has-text('Add to group'), button:has-text('Create group')")
         a.wait_for_timeout(1500)
-        a.click("button[aria-label='Add friends']")
+        a.click("button[aria-label='Add Friends']")
     link_box = a.locator("[data-testid=group-invite-link]")
     link_box.wait_for(timeout=20000)
     for _ in range(50):
@@ -654,9 +654,9 @@ def groups_flow(srv, alice, bob, phone):
     alice.shot("emoji-pack")
     a.keyboard.press("Escape")
     # it shows up in the picker and sends
-    a.click("button[aria-label='Select emoji']")
+    a.click("button[aria-label='Select Emoji']")
     a.fill("input[aria-label='Search emoji']", "blobby")
-    a.locator("[role=dialog][aria-label='Expression picker'] button[data-pack-emoji]").first.click()
+    a.locator("[role=dialog][aria-label='Expression Picker'] button[data-pack-emoji]").first.click()
     a.keyboard.press("Escape")
     alice.composer().press("End")
     alice.composer().press("Enter")
@@ -792,7 +792,7 @@ def security_flow(srv, out, browser):
     p.click("[data-testid=mfa-enable]")
     p.fill("[role=dialog] input[type=password]", PASSWORD)
     p.click("[role=dialog] button:has-text('Continue')")
-    p.wait_for_selector("svg[aria-label='Authenticator setup code']", timeout=30000)
+    p.wait_for_selector("svg[aria-label='Authenticator Setup Code']", timeout=30000)
     p.click("text=Can't scan it?")
     secret = p.locator("[data-testid=totp-secret]").inner_text()
     dave.shot("security-totp-setup")
@@ -1003,7 +1003,7 @@ def main():
             row.hover()
             row.locator("button[aria-label='Add Reaction']").click()
             bob.page.fill("input[aria-label='Search emoji']", "thumbs up")
-            bob.page.locator("[role=dialog][aria-label='Expression picker'] button[data-emoji]").first.click()
+            bob.page.locator("[role=dialog][aria-label='Expression Picker'] button[data-emoji]").first.click()
             alice.page.wait_for_selector("[data-me=false]:has-text('1')", timeout=20000)
             row = bob.message_row("hello")
             row.hover()
@@ -1037,7 +1037,7 @@ def main():
             phone.shot("dm")
             phone.page.goto(srv.base + "/channels/@me", wait_until="networkidle")
             phone.shot("friends")
-            phone.page.click("button[aria-label='Open navigation']")
+            phone.page.click("button[aria-label='Open Navigation']")
             time.sleep(0.4)
             phone.shot("drawer")
             server_id = link = None

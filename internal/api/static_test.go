@@ -189,7 +189,7 @@ func TestGuestCallLinkPreview(t *testing.T) {
 	b, _ := io.ReadAll(res.Body)
 	body := string(b)
 	// an invitation to a call, and nothing about whose
-	if res.StatusCode != 200 || !strings.Contains(body, `<meta property="og:title" content="Join a voice call">`) || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
+	if res.StatusCode != 200 || !strings.Contains(body, `<meta property="og:title" content="Join a Voice Call">`) || !strings.Contains(res.Header.Get("Content-Security-Policy"), "frame-ancestors 'none'") {
 		t.Errorf("guest link page: %d %q", res.StatusCode, body)
 	}
 }

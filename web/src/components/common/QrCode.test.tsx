@@ -62,6 +62,6 @@ describe("QrCode", () => {
   it("labels itself for people who cannot see it", () => {
     const svg = svgOf(URI);
     expect(svg.getAttribute("role")).toBe("img");
-    expect(svg.getAttribute("aria-label")).toBe("QR code");
+    expect(svg.getAttribute("aria-label")).toBe("QR Code");
   });
 });
