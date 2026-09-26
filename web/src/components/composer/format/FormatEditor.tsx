@@ -159,7 +159,6 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
         summary: t("composer.format.summaryPlaceholder"),
         code: t("composer.format.codeLabel"),
         alert: alertTitle,
-        task: (done) => (done ? t("render.taskDone") : t("render.taskOpen")),
       },
       names: ctx,
       onChange: () => {
@@ -541,7 +540,7 @@ function ColourTray({ marks, surfaceEl, run }: { marks: SurfaceState["marks"]; s
           );
         })}
       </div>
-      <form
+      <form noValidate
         className={s.hexForm}
         onSubmit={(e) => {
           e.preventDefault();
@@ -577,7 +576,7 @@ function LinkTray({ state, run, done }: { state: SurfaceState | null; run: (c: C
     done();
   };
   return (
-    <form
+    <form noValidate
       className={s.linkTray}
       onSubmit={(e) => {
         e.preventDefault();
@@ -601,7 +600,7 @@ function CodeTray({ lang, run }: { lang: string; run: (c: Command) => void }) {
   const [value, setValue] = useState(lang);
   const list = useId();
   return (
-    <form
+    <form noValidate
       className={s.linkTray}
       onSubmit={(e) => {
         e.preventDefault();

@@ -88,7 +88,6 @@ export interface SurfaceLabels {
   summary: string;
   code: string;
   alert: (kind: AlertKind) => string;
-  task: (checked: boolean) => string;
 }
 
 export interface SurfaceOptions {
@@ -265,7 +264,6 @@ export class FormatSurface {
       set(el, "data-num", list.ordered ? `${n}.` : null);
       set(el, "data-indent", String(list.indent));
       set(el, "data-task", list.task ? (list.checked ? "done" : "open") : null);
-      set(el, "aria-label", list.task ? labels.task(list.checked) : null);
     } else counters.length = 0;
     if (block.kind === "code") set(el, "data-lang", block.lang || labels.code);
   }
