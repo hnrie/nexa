@@ -406,7 +406,7 @@ function StaffBugPane({ reportId, onBack, onChanged }: { reportId: string; onBac
               }
         }
         composerNote={t("moderation.case.replyNote", { name: personName(reporter) })}
-        closedNote={gone ? t("bugs.staff.goneNote") : undefined}
+        closedNote={gone ? t("moderation.case.goneNote") : undefined}
       />
     </>
   );

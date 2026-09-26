@@ -17,7 +17,7 @@ import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 import { mentionsMe } from "./mentionsMe";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
-import { bugAlertHooks, bugStatusLabel, type BugAlert } from "./bugs";
+import { bugAlertHooks, bugNumber, bugStatusLabel, type BugAlert } from "./bugs";
 
 import { t } from "@/i18n";
 let navigateTo: ((path: string) => void) | null = null;
@@ -238,7 +238,7 @@ function onBugAlert(a: BugAlert): void {
   if (appOnScreen() || !notificationsEnabled(settings)) return;
   const number = a.report.number;
   const title = a.kind === "staff" ? (a.isNew ? t("bugs.notify.newTitle") : t("bugs.notify.replyTitle")) : "Nexa";
-  const body = a.kind === "staff" ? a.report.subject : a.kind === "reply" ? t("bugs.notify.teamReplied", { number }) : t("bugs.notify.statusChanged", { number, status: bugStatusLabel(a.report.status) });
+  const body = a.kind === "staff" ? a.report.subject : a.kind === "reply" ? t("bugs.feed.replied", { number: bugNumber(number) }) : t("bugs.feed.statusChanged", { number: bugNumber(number), status: bugStatusLabel(a.report.status) });
   void showNotification(title, { body, tag: `ec-bug-${a.report.id}`, icon: "/icons/icon-192.png", silent: true }, path);
 }
 
