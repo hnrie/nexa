@@ -126,6 +126,25 @@ class Session:
         p.click("[data-testid=terms-agree]")
         p.wait_for_selector("[data-testid=terms-gate]", state="detached", timeout=5000)
 
+    # accounts whose What's New has been read on each server, in this run
+    whats_new_read = set()
+
+    def dismiss_whats_new(self, timeout=6000):
+        """Closes What's New, which an account from before the latest release sees once (synced, so once per run)."""
+        key = (self.base, self.name)
+        if key in Session.whats_new_read:
+            return
+        p = self.page
+        try:
+            p.wait_for_selector("[data-testid=whats-new-done]", timeout=timeout)
+        except Exception:
+            return
+        p.click("[data-testid=whats-new-done]")
+        p.wait_for_selector("[data-testid=whats-new]", state="detached", timeout=5000)
+        # long enough for the settings save that remembers it, so the next sign-in skips it
+        p.wait_for_timeout(1500)
+        Session.whats_new_read.add(key)
+
     def login(self):
         p = self.page
         p.goto(self.base + "/login", wait_until="networkidle")
@@ -134,6 +153,7 @@ class Session:
         p.click("button[type=submit]")
         p.wait_for_url("**/channels/@me", timeout=60000)
         self.agree_terms()
+        self.dismiss_whats_new()
 
     def logout(self):
         p = self.page
