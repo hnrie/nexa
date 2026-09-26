@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { idTime } from "@/lib/ids";
@@ -27,6 +27,16 @@ export function markSeen(releases: Release[]): void {
 export function WhatsNewDialog({ releases, intro = false, onClose }: { releases: Release[]; intro?: boolean; onClose: () => void }) {
   const locale = useLocale();
   const baseId = useId();
+  const content = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  // the dialog's body is what scrolls; once it has, a line sets the title apart from what passes under it
+  useEffect(() => {
+    const body = content.current?.parentElement;
+    if (!body) return;
+    const look = () => setScrolled(body.scrollTop > 2);
+    body.addEventListener("scroll", look, { passive: true });
+    return () => body.removeEventListener("scroll", look);
+  }, []);
   return (
     <Modal
       open
@@ -40,7 +50,8 @@ export function WhatsNewDialog({ releases, intro = false, onClose }: { releases:
         </Button>
       }
     >
-      <div data-testid="whats-new">
+      <div ref={content} data-testid="whats-new">
+        <div className={s.edge} data-on={scrolled || undefined} aria-hidden="true" />
         {intro ? <p className={s.intro}>{t("whatsNew.intro")}</p> : null}
         {releases.map((r) => (
           <section key={r.id} className={s.release} aria-labelledby={`${baseId}-${r.id}`} data-release={r.id}>
