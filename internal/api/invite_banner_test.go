@@ -1,13 +1,19 @@
 package api
 
 import (
+	"context"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"evilion.xyz/chat/internal/unfurl"
 )
 
 // An invite to a server with a banner unfurls with the banner, both in the
@@ -55,5 +61,40 @@ func TestInviteBannerPreview(t *testing.T) {
 	}
 	if b, _ := unfurl()["banner"].(string); !strings.HasPrefix(b, "https://chat.example.org/media/banner/") {
 		t.Errorf("unfurl banner: %q", b)
+	}
+}
+
+// A short link that lands on one of our invites unfurls as the invite, not as
+// a copy of the invite page's preview tags.
+func TestUnfurlShortLinkToInvite(t *testing.T) {
+	srv, ts := newTestServer(t)
+	srv.Cfg.PublicURL = "http://chat.example.org"
+	tok, _ := register(t, ts, "alice")
+	view := createServer(t, ts, tok, "Short Links")
+	code := inviteFor(t, ts, tok, channelNamed(view, "general")["id"].(string))
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/s/abc" {
+			http.Redirect(w, r, "http://chat.example.org/invite/"+code, http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = io.WriteString(w, `<html><head><title>Join Short Links</title></head><body></body></html>`)
+	}))
+	defer upstream.Close()
+	// every host is this one test server, as if the short link's site and ours were both out on the internet
+	tr := &http.Transport{DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, upstream.Listener.Addr().String())
+	}}
+	t.Cleanup(tr.CloseIdleConnections)
+	srv.Unfurl = &unfurl.Service{Fetcher: &unfurl.Fetcher{Timeout: 5 * time.Second, Transport: tr, Resolver: proxyResolver{[]net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}}}}
+
+	res, body := do(t, ts, "GET", "/api/v1/unfurl?url="+url.QueryEscape("http://sho.rt/s/abc"), tok, nil)
+	if res.StatusCode != http.StatusOK || body["type"] != "invite" || body["invite_code"] != code || body["title"] != "Short Links" {
+		t.Fatalf("short link: %d %v", res.StatusCode, body)
+	}
+	// and an ordinary page stays an ordinary card
+	if _, body := do(t, ts, "GET", "/api/v1/unfurl?url="+url.QueryEscape("http://sho.rt/elsewhere"), tok, nil); body["type"] == "invite" {
+		t.Errorf("a page that is not an invite became one: %v", body)
 	}
 }
