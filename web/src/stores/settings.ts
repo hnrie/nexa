@@ -92,8 +92,7 @@ export interface Settings {
   userNotes: Record<string, string>;
   appLock: AppLockPolicy | null;
 
-  // Each area added in round 4 keeps its fields under its own heading.
-  // --- organize: server folders, pins, DM groups, the Nexa conversation ---
+  // How the server list and the DM list are arranged: folders, pins, groups, the Nexa conversation.
   /**
    * The server rail as arranged: folders, and what is pinned to the top. Null
    * until the first time the account is loaded after folders came in, when
@@ -108,7 +107,7 @@ export interface Settings {
    */
   nexaClosed: number;
 
-  // --- people: blocking ---
+  // What blocking someone hides.
   /**
    * What becomes of messages from people this account has blocked (see
    * lib/blocked.ts). hideMessages: they leave no trace at all, instead of
@@ -117,7 +116,7 @@ export interface Settings {
    */
   blocking: { hideMessages: boolean; hideReplies: boolean };
 
-  // --- look: themes, custom CSS, plugins ---
+  // Themes, custom CSS and plugins.
   /** Themes made in the theme builder; `theme` names one by its id. Checked on use (lib/look/customTheme.ts). */
   customThemes: CustomTheme[];
   /** The two themes "Sync with system" moves between. */
@@ -127,14 +126,14 @@ export interface Settings {
   /** Plugins, each pinned to the exact code that was approved (lib/look/plugins). */
   plugins: PluginEntry[];
 
-  // --- shell: what's new ---
+  // What's New.
   /**
    * The newest What's New release this account has been shown (lib/whatsNew.ts),
    * kept with the account so the pop-up comes once per account, not per device.
    */
   whatsNewSeen: string | null;
 
-  // --- search ---
+  // Search on this device.
   /**
    * Keep a search index on each of this account's devices: every message it
    * can read, decrypted there and stored there encrypted. Off, search walks
@@ -191,24 +190,19 @@ export const DEFAULT_SETTINGS: Settings = {
   userNotes: {},
   appLock: null,
 
-  // --- organize: server folders, pins, DM groups, the Nexa conversation ---
   rail: null,
   dmList: EMPTY_DM_LIST,
   nexaClosed: 0,
 
-  // --- people: blocking ---
   blocking: { hideMessages: false, hideReplies: false },
 
-  // --- look: themes, custom CSS, plugins ---
   customThemes: [],
   systemThemes: { dark: "dark", light: "light" },
   customCss: { snippet: "", snippetOn: true, links: [] },
   plugins: [],
 
-  // --- shell: what's new ---
   whatsNewSeen: null,
 
-  // --- search ---
   searchIndex: true,
   searchRecent: [],
 };
@@ -222,25 +216,20 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     notifications: { ...base.notifications, ...(inc.notifications ?? {}) },
     voice: mergeVoice(base.voice, inc.voice),
 
-    // --- organize: server folders, pins, DM groups, the Nexa conversation ---
     // read defensively, as every version of the app may have written them
     rail: "rail" in inc ? sanitizeRail(inc.rail) : base.rail,
     dmList: "dmList" in inc ? sanitizeDMList(inc.dmList) : base.dmList,
     nexaClosed: typeof inc.nexaClosed === "number" && Number.isFinite(inc.nexaClosed) ? inc.nexaClosed : base.nexaClosed,
 
-    // --- people: blocking ---
     blocking: { ...base.blocking, ...(typeof inc.blocking === "object" && inc.blocking !== null ? inc.blocking : {}) },
 
-    // --- look: themes, custom CSS, plugins ---
     customThemes: Array.isArray(inc.customThemes) ? inc.customThemes : base.customThemes,
     systemThemes: { ...base.systemThemes, ...(inc.systemThemes ?? {}) },
     customCss: { ...base.customCss, ...(inc.customCss ?? {}) },
     plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
-    // --- shell: what's new ---
     whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
 
-    // --- search ---
     searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,
     // no more than search/recent.ts keeps, whatever an older or odd copy holds
     searchRecent: Array.isArray(inc.searchRecent) ? inc.searchRecent.filter((q): q is string => typeof q === "string" && q.length <= 200).slice(0, 8) : base.searchRecent,
