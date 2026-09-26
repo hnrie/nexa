@@ -161,6 +161,14 @@ func TestFrontPagePreview(t *testing.T) {
 	if code != 200 || !strings.Contains(body, `<meta property="og:image" content="https://chat.example.org/home/app.png">`) || !strings.Contains(body, `summary_large_image`) {
 		t.Errorf("front page: %d %q", code, body)
 	}
+	// its own background from the first frame, which the page takes away once drawn
+	if !strings.Contains(body, `<style id="front-paint">`) {
+		t.Errorf("front page without its first paint: %q", body)
+	}
+	// and its words keep to the house style: no dashes standing in for commas
+	if strings.Contains(body, "—") {
+		t.Errorf("front page preview has an em dash: %q", body)
+	}
 	// and only the front page: the app's other pages keep the shared head
 	if _, body = get("/channels/@me"); strings.Contains(body, "og:image") {
 		t.Errorf("an app page took the front page's preview: %q", body)

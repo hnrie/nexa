@@ -270,9 +270,15 @@ func (s *Server) serveHomePage(w http.ResponseWriter, r *http.Request, dist stri
 	if err != nil {
 		return false
 	}
-	const title = "Nexa — chat that nobody else can read"
-	const desc = "Messages, files and calls encrypted on your device with keys the server never holds. No email address, no phone number."
+	const title = "Nexa: private chat with all the fun left in"
+	const desc = "Servers, voice and video calls, custom emoji and sticker packs. Messages, files and calls are encrypted on your device, and signing up needs no email or phone number."
 	var tags strings.Builder
+	// The front page has colours of its own, light or dark as the visitor's
+	// system prefers, while the app starts dark; until the page's code has
+	// arrived the loading screen would show the app's grey instead. This paints
+	// the page's background from the first frame, and the page removes it
+	// once it is drawn (HomePage.tsx, useFrontDocument).
+	tags.WriteString("\n<style id=\"front-paint\">@media (prefers-color-scheme: light){:root{--bg-base:#faf8fc;background:#faf8fc;color-scheme:light}}@media (prefers-color-scheme: dark){:root{--bg-base:#141018;background:#141018}}</style>")
 	meta := func(prop, content string) {
 		tags.WriteString("\n<meta property=\"" + prop + "\" content=\"" + escapeAttr(content) + "\">")
 	}
