@@ -1,0 +1,693 @@
+/* Bug reports: the form people send them with, the report as either side
+   reads it, and the bits the Nexa conversation and the panel list them by.
+   Built on the theme tokens and logical properties like the rest of the app. */
+
+/* --- the form ------------------------------------------------------------------ */
+
+.form {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.lead {
+  margin: -4px 0 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-subtle);
+  max-width: 60ch;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.fieldHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fieldLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.fieldCount {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.fieldCount[data-over] {
+  color: var(--text-danger);
+}
+.hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.fieldError {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-danger);
+}
+.description {
+  min-height: 132px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* The files: tiles in a row that wraps, the way they will arrive, with the
+   place to add more as the last tile. Before there are any, that place is a
+   wide target of its own. */
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.tile {
+  position: relative;
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+}
+.tile[data-state="failed"] {
+  border-color: var(--danger);
+}
+.tile img,
+.tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tile[data-state="uploading"] img,
+.tile[data-state="uploading"] video {
+  opacity: 0.55;
+}
+.tileBadge {
+  position: absolute;
+  inset-inline-start: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.tileRemove {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+}
+.tileRemove:hover {
+  background: var(--danger);
+}
+.tileRemove:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+/* how much of the file is up, as a bar along the bottom edge */
+.progress {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  transition: width 200ms linear;
+}
+.tileFailed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
+  color: #fff;
+}
+.addTile {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--border-strong);
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.addTile:hover,
+.drop:hover {
+  border-color: var(--brand);
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+}
+.addTile:focus-visible,
+.drop:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.drop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px dashed var(--border-strong);
+  text-align: start;
+  color: var(--text-subtle);
+}
+.dropIcon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.dropText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dropTitle {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.dropSub {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.fileErrors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* dragging files over the dialog: the whole of it takes them */
+.dropping {
+  position: absolute;
+  inset: -8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-sm);
+  border: 2px dashed var(--brand);
+  background: color-mix(in srgb, var(--bg-surface) 88%, var(--brand));
+  color: var(--text-brand);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* the facts about the device, when the reporter keeps them on */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.disclose {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-link, var(--link));
+}
+.disclose:hover {
+  text-decoration: underline;
+}
+.disclose:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.disclose svg {
+  transition: transform var(--transition);
+}
+.disclose[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 16px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.facts dt {
+  color: var(--text-muted);
+}
+.facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* codes and numbers keep reading left to right in a right-to-left page */
+.facts dd[data-ltr] {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: start;
+}
+.privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.privacy svg {
+  flex: none;
+  margin-top: 1px;
+}
+.formError {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--text-danger);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* sent: what happens next, and the way to the thread */
+.sent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+.sentIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--positive);
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+}
+.sentTitle {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.sentText {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-subtle);
+  max-width: 52ch;
+}
+
+/* --- the header buttons ------------------------------------------------------------ */
+
+.headerButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius-xs);
+  color: var(--text-subtle);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.headerButton:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.headerButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.headerButton svg {
+  flex: none;
+}
+
+/* --- a report, as either side reads it -------------------------------------------- */
+
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  container-type: inline-size;
+}
+.reportTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.reportIcon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.reportTitles {
+  flex: 1;
+  min-width: 0;
+}
+.reportSubject {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.reportMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.reportBody {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.reportBody > :global(.md-paragraph):last-of-type {
+  margin-bottom: 0;
+}
+.reportFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+/* a narrow card: the status goes under the title instead of beside it */
+@container (max-width: 420px) {
+  .reportTop {
+    flex-wrap: wrap;
+  }
+  .reportTop > .status {
+    order: 3;
+    margin-inline-start: 48px;
+  }
+}
+
+/* the status, as a small coloured label; the tones are the panel's */
+.status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-subtle);
+  background: var(--bg-active);
+}
+.status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.status[data-tone="info"] {
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+.status[data-tone="warn"] {
+  color: var(--text-warning);
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+}
+.status[data-tone="done"] {
+  color: var(--positive);
+  background: color-mix(in srgb, var(--positive) 14%, transparent);
+}
+
+/* the files of a sent report: large enough to read a screenshot's shape */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+.shot {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+button.shot:hover {
+  border-color: var(--border-strong);
+}
+button.shot:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.shotVideo {
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--brand) 8%, var(--bg-base));
+}
+.play {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-brand);
+  background: var(--brand);
+}
+.shotBusy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+.player {
+  grid-column: 1 / -1;
+  max-width: 100%;
+}
+.player > * {
+  max-width: 100%;
+}
+
+/* --- in the Nexa conversation ------------------------------------------------------ */
+
+.feedCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 640px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+}
+.feedTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.feedTitle {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.feedExcerpt {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-subtle);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.feedMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.feedMeta svg {
+  flex: none;
+}
+.quote {
+  margin: 0;
+  padding: 2px 0 2px 12px;
+  border-inline-start: 3px solid var(--border-strong);
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.statusLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 640px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  font-size: 14px;
+  color: var(--text);
+}
+.statusLine[data-tone="done"] {
+  background: color-mix(in srgb, var(--positive) 10%, var(--bg-raised));
+  border-color: color-mix(in srgb, var(--positive) 30%, transparent);
+}
+.linkButton {
+  display: inline;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--link);
+}
+.linkButton:hover {
+  text-decoration: underline;
+}
+.linkButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* finger-sized targets */
+@media (pointer: coarse) {
+  .tileRemove {
+    width: 32px;
+    height: 32px;
+  }
+  .tileRemove::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+  }
+  .headerButton {
+    height: 40px;
+  }
+  .disclose {
+    min-height: 40px;
+  }
+}
+@media (max-width: 480px) {
+  .tile,
+  .addTile {
+    width: 78px;
+    height: 78px;
+  }
+}
+:global([data-reduced-motion="true"]) .progress > span,
+:global([data-reduced-motion="true"]) .disclose svg {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress > span,
+  .disclose svg {
+    transition: none;
+  }
+}

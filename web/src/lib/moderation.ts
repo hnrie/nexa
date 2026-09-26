@@ -5,6 +5,8 @@
  */
 import { Ban, Eraser, ImageOff, KeyRound, Lock, LockOpen, Megaphone, MessageSquareOff, ShieldMinus, ShieldPlus, UserX, type LucideIcon } from "lucide-react";
 import type { CaseDetails, CaseMessage, MemberCase, ModAction, ModLogEntry, People, Person, ResetField } from "@/api/moderation";
+import type { BugStatus } from "@/api/bugs";
+import { bugStatusLabel } from "@/lib/bugs";
 import { formatStamp } from "@/lib/time";
 import { t } from "@/i18n";
 
@@ -204,12 +206,15 @@ export function personName(p: Person | undefined): string {
 
 /**
  * What a system line in a case thread says happened: a lift, a close, a
- * reopen, a mute or ban running out, or a new case taking over.
+ * reopen, a mute or ban running out, or a new case taking over. In a bug
+ * report's thread, the one system line is a change of status.
  */
-export function systemLineText(m: CaseMessage, people: People, action: ModAction, perspective: "member" | "staff"): string {
+export function systemLineText(m: Pick<CaseMessage, "author_id" | "body"> & { event: string }, people: People, action: ModAction | undefined, perspective: "member" | "staff"): string {
   const who = personName(people[m.author_id]);
   const what = action === "ban" ? t("nexa.thread.theBan") : t("nexa.thread.theMute");
   switch (m.event) {
+    case "status":
+      return t("bugs.thread.statusChanged", { who, status: bugStatusLabel(m.body as BugStatus) });
     case "lifted":
       return m.body ? t("nexa.thread.liftedWithReason", { who, what, reason: m.body }) : t("nexa.thread.lifted", { who, what });
     case "closed":

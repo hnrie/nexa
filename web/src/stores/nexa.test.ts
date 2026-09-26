@@ -80,7 +80,7 @@ describe("the Nexa conversation", () => {
     const feed = useNexa.getState().feed!;
     expect(feed.map((i) => i.kind)).toEqual(["notice", "lift"]);
     // the notice itself shows the new state too
-    expect(feed[0]!.kind !== "announcement" && feed[0]!.case.lifted_at).toBe(9_000_000);
+    expect(feed[0]!.kind === "notice" && feed[0]!.case.lifted_at).toBe(9_000_000);
   });
 
   it("puts announcements in order and takes a retracted one out", () => {
