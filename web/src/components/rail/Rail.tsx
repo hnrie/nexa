@@ -5,6 +5,7 @@ import { iconUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { NexaMark } from "@/components/common/Brand";
 import { Tooltip } from "@/components/common/Tooltip";
+import { useMediaQuery } from "@/hooks/useIsMobile";
 import { useReorder } from "@/hooks/useReorder";
 import { initials } from "@/lib/avatarColor";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
@@ -82,6 +83,8 @@ export function Rail() {
   const home = loc.pathname.startsWith("/channels/@me");
   const activeServer = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
   const openConvo = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
+  // HTML5 dragging is for a mouse; on a touch screen a held server opens its menu, which makes the same moves
+  const canDrag = useMediaQuery("(hover: hover) and (pointer: fine)");
   const [drag, setDragShown] = useState<Drag | null>(null);
   const [over, setOverShown] = useState<RailDrop | null>(null);
   // The same two for the drag events themselves, which come faster than the
@@ -143,12 +146,7 @@ export function Rail() {
     ids: shown,
     siblings: (id) => siblingIds(layout, id),
     name: (id) => servers[id]?.server.name ?? (folderById.has(id) ? folderName(folderById.get(id)!) : ""),
-    move: (id, delta) => {
-      const next = moveEntry(layout, id, delta);
-      if (next === layout) return false;
-      useSettings.getState().patch({ rail: next });
-      return true;
-    },
+    move: (id, delta) => changeRail((l) => moveEntry(l, id, delta)),
   });
 
   const onServerContext = (e: MouseEvent, id: string) => {
@@ -234,7 +232,7 @@ export function Rail() {
         data-muted={muted}
         data-drop={dropOf(id)}
         data-dragging={drag?.id === id}
-        draggable
+        draggable={canDrag}
         onDragStart={(e) => onDragStart(e, id, false)}
         onDragOver={(e) => onDragOver(e, id, folder ? "inFolder" : "server", folder?.id)}
         // entering counts as being over: a quick move sends only that, and the ring came a move late
@@ -297,7 +295,7 @@ export function Rail() {
           data-selected={!open && holdsActive}
           data-unread={!open && fUnread && !holdsActive}
           data-drop={drop === "combine" ? "combine" : undefined}
-          draggable
+          draggable={canDrag}
           onDragStart={(e) => onDragStart(e, f.id, true)}
           onDragOver={(e) => onDragOver(e, f.id, open ? "openFolder" : "folder")}
           onDragEnter={(e) => onDragOver(e, f.id, open ? "openFolder" : "folder")}

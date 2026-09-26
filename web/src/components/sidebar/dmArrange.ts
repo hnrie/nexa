@@ -45,14 +45,19 @@ function known(id: string): boolean {
  * dropped on the way; every conversation is loaded by the time anyone can
  * arrange anything.
  */
-export function changeDMList(change: (layout: DMListLayout) => DMListLayout): void {
+export function changeDMList(change: (layout: DMListLayout) => DMListLayout): boolean {
+  // not before the account's settings are in: a list arranged from the defaults would replace theirs
+  if (!useSettings.getState().loaded) return false;
   const now = useSettings.getState().settings.dmList;
   const next = change(now);
-  if (next !== now) useSettings.getState().patch({ dmList: pruneDMs(next, known) });
+  if (next === now) return false;
+  useSettings.getState().patch({ dmList: pruneDMs(next, known) });
+  return true;
 }
 
 /** A closed or left conversation is not pinned or in a group any more; one that comes back comes back to the main list. */
 export function forgetConversation(id: string): void {
+  if (!useSettings.getState().loaded) return;
   const now = useSettings.getState().settings.dmList;
   const next = forgetDM(now, id);
   if (next !== now) useSettings.getState().patch({ dmList: next });
@@ -68,6 +73,7 @@ export function closeNexa(nav?: (path: string) => void): void {
   const nexa = useNexa.getState();
   nexa.markSeen();
   const settings = useSettings.getState();
+  if (!settings.loaded) return;
   const dmList = forgetDM(settings.settings.dmList, NEXA_ID);
   settings.patch({ nexaClosed: nexa.state?.latest || Date.now(), ...(dmList !== settings.settings.dmList ? { dmList } : {}) });
 }

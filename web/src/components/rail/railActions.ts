@@ -26,11 +26,18 @@ export function currentRail(): RailLayout {
   return resolveRail(settings.rail, useServers.getState().order, settings.serverPositions);
 }
 
-/** Changes the rail and saves it with the account; nothing is saved when nothing changed. */
-export function changeRail(change: (layout: RailLayout) => RailLayout): void {
+/**
+ * Changes the rail and saves it with the account; nothing is saved when
+ * nothing changed. Returns whether it changed. Not before the account's
+ * settings are in: a rail arranged from the defaults would replace theirs.
+ */
+export function changeRail(change: (layout: RailLayout) => RailLayout): boolean {
+  if (!useSettings.getState().loaded) return false;
   const now = currentRail();
   const next = change(now);
-  if (next !== now) useSettings.getState().patch({ rail: next });
+  if (next === now) return false;
+  useSettings.getState().patch({ rail: next });
+  return true;
 }
 
 /**

@@ -115,14 +115,8 @@ export function DMSidebar() {
     ids: pinnedIds,
     canMove: (id) => pinnedIds.includes(id),
     name: (id) => rowName(id),
-    move: (id, delta) => {
-      const known = (x: string) => x === NEXA_ID || !!channels[x];
-      const now = pruneDMs(layout, known);
-      const next = movePinnedDM(now, id, delta);
-      if (next === now) return false;
-      patch({ dmList: next });
-      return true;
-    },
+    // pins of conversations that have gone are dropped first, or a move could land beside one that is not drawn
+    move: (id, delta) => changeDMList((l) => movePinnedDM(pruneDMs(l, (x) => x === NEXA_ID || !!channels[x]), id, delta)),
   });
 
   function rowName(id: string): string {
@@ -376,6 +370,9 @@ export function DMSidebar() {
         data-drop={drop}
         data-dragging={drag === g.id}
         data-group={g.id}
+        // named, so a screen reader hears which conversations are in it and where it ends
+        role="group"
+        aria-label={name}
         onDragOver={(e) => overGroup(e, g, pinned)}
         // entering counts as being over: a quick move sends only that
         onDragEnter={(e) => overGroup(e, g, pinned)}
