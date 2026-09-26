@@ -1,6 +1,6 @@
 import type { AlertKind, Align } from "@/markdown/ast";
 import { FALLBACK_SURFACE, paintColor, surfaceOf, type Surface } from "@/markdown/colors";
-import { fromMarkdown, toMarkdown, type AtomNames } from "./markdown";
+import { fromMarkdown, inlineFromMarkdown, toMarkdown, type AtomNames } from "./markdown";
 import {
   caret,
   clampPos,
@@ -1055,7 +1055,7 @@ export class FormatSurface {
     // Into a cell or a code block, and for a single line, the words go in as
     // they are; several lines are read as markdown and become blocks here.
     if (here?.kind === "code" || at.cell || !text.includes("\n")) {
-      const runs = at.cell || here?.kind === "code" ? [{ kind: "text" as const, text, marks: {} }] : pastedLine(text, this.opts.names);
+      const runs = at.cell || here?.kind === "code" ? [{ kind: "text" as const, text, marks: {} }] : inlineFromMarkdown(text, this.opts.names);
       const edit = insertAt(blocks, at, runs);
       this.apply(edit.blocks, edit.sel);
       return;

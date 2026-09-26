@@ -37,6 +37,13 @@ interface LoadState {
   names?: AtomNames;
 }
 
+/** One line of markdown as runs, block syntax left as it is: what pasting it into a line puts there. */
+export function inlineFromMarkdown(line: string, names?: AtomNames): Inline[] {
+  const out: Inline[] = [];
+  inline(parse(line, { inline: true }).filter((n) => n.type !== "br"), {}, out, { out: [], simplified: false, names });
+  return normalize(out);
+}
+
 function emptyLine(b: Block | undefined): boolean {
   return isText(b) && b.kind === "p" && !b.wrap && b.content.length === 0;
 }
