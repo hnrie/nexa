@@ -21,8 +21,9 @@ they open the app after an update, and it is how they find out what changed.
 
 ## Writing UI text
 
-- Labels use Title Case: buttons, menu items, tabs, navigation, dialog and page titles, headings,
-  column headers and toggle titles ("Add Friends", "Create Group", "Mark as Read", "Add to Group").
+- Labels use Title Case: buttons, menu items, tabs, navigation, dialog and page titles, headings
+  and column headers ("Add Friends", "Create Group", "Mark as Read", "Add to Group").
+- Checkbox and toggle labels use sentence case ("Hide their messages completely").
   Short articles, conjunctions and prepositions stay lowercase unless first or last. English only;
   the other locales follow their own language's capitalization.
 - Descriptions, hints, toasts and errors are short, plain sentences that sound like a person.
