@@ -13,7 +13,11 @@ import { EMPTY_RESULT, SearchEngine, type EngineRequest, type EngineResult } fro
 import { BlockStore, deleteIndex } from "./persist";
 
 export type Op =
-  | { op: "open"; userId: string; key: CryptoKey | null; reset: boolean }
+  /**
+   * `readOnly`: another tab of this account writes the index; this one reads
+   * what is on disk and keeps what it learns afterwards in memory only.
+   */
+  | { op: "open"; userId: string; key: CryptoKey | null; reset: boolean; readOnly?: boolean }
   | { op: "upsert"; docs: SearchDoc[] }
   | { op: "remove"; ids: string[] }
   | { op: "pin"; id: string; pinned: boolean }
@@ -89,11 +93,17 @@ export class SearchCore {
         this.store = null;
         this.userId = msg.userId;
         if (!msg.key) return { persisted: false, docs: 0, crawl: null, lost: [], counts: {} } satisfies OpenResult;
-        if (msg.reset) await deleteIndex(msg.userId);
+        if (msg.reset && !msg.readOnly) await deleteIndex(msg.userId);
         const store = new BlockStore(msg.userId, msg.key);
         try {
           const loaded = await store.load();
           for (const d of loaded.docs) this.engine.upsert(d);
+          if (msg.readOnly) {
+            // read, then let go: two tabs writing the same blocks would each
+            // overwrite what the other had added
+            store.close();
+            return { persisted: false, docs: this.engine.size, crawl: loaded.crawl, lost: [], counts: this.engine.channelCounts() } satisfies OpenResult;
+          }
           this.store = store;
           return { persisted: true, docs: this.engine.size, crawl: loaded.crawl, lost: loaded.lost, counts: this.engine.channelCounts() } satisfies OpenResult;
         } catch (err) {

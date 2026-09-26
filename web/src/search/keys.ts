@@ -52,11 +52,13 @@ export interface IndexKey {
 }
 
 /**
- * This account's index key on this device, made if there is none. Null when
- * this browser cannot keep one (local storage refused), in which case the
- * index is kept in memory only.
+ * This account's index key on this device, made if there is none (unless
+ * `create` is false: a tab that only reads another tab's index never makes
+ * one, which would leave that index unreadable). Null when there is none to
+ * be had, or this browser cannot keep one (local storage refused), in which
+ * case the index is kept in memory only.
  */
-export async function indexKeyFor(userId: string, identityPrivateKey: Uint8Array): Promise<IndexKey | null> {
+export async function indexKeyFor(userId: string, identityPrivateKey: Uint8Array, opts: { create?: boolean } = {}): Promise<IndexKey | null> {
   const aad = utf8.enc(`search-key/v1|${userId}`);
   const stored = storage.get(slot(userId));
   if (stored) {
@@ -75,6 +77,7 @@ export async function indexKeyFor(userId: string, identityPrivateKey: Uint8Array
       // new one) or damaged: a new key, and a new index with it
     }
   }
+  if (opts.create === false) return null;
   const raw = randomBytes(32);
   try {
     const iv = randomBytes(12);

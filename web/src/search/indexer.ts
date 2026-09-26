@@ -193,9 +193,69 @@ export async function querySearch(req: EngineRequest): Promise<EngineResult> {
   }
 }
 
+/*
+ * One tab writes the index; the others read it. Two tabs of the same account
+ * writing the same blocks would each overwrite what the other had just added,
+ * and messages would quietly drop out of search. The writer holds a lock
+ * (Web Locks, shared by every tab of this browser) for as long as its index is
+ * open. Another tab opens what is on disk read-only, walks only what its own
+ * searches need, keeps what it learns in memory, and takes over as the writer
+ * when the lock comes free.
+ */
+let lockRelease: (() => void) | null = null;
+let lockWait: AbortController | null = null;
+
+type LockRequest = (name: string, opts: { ifAvailable?: boolean; signal?: AbortSignal }, cb: (lock: unknown) => unknown) => Promise<unknown>;
+
+function lockApi(): { request: LockRequest } | null {
+  const locks = typeof navigator !== "undefined" ? (navigator as { locks?: { request: LockRequest } }).locks : undefined;
+  return locks ?? null;
+}
+
+const lockName = (userId: string) => `nexa-search-${userId}`;
+
+/**
+ * Takes the writer's lock if no other tab holds it: its release, null when
+ * another tab writes, or "none" where the browser has no locks to share (the
+ * tab then writes, as it did before locks).
+ */
+function takeLock(userId: string): Promise<(() => void) | null | "none"> {
+  const api = lockApi();
+  if (!api) return Promise.resolve("none");
+  return new Promise((resolve) => {
+    api
+      .request(lockName(userId), { ifAvailable: true }, (lock) => {
+        if (!lock) {
+          resolve(null);
+          return undefined;
+        }
+        return new Promise<void>((release) => resolve(release));
+      })
+      .catch(() => resolve("none"));
+  });
+}
+
+/** Waits for the writer's lock, and opens the index as its writer once it comes. */
+function waitForLock(opts: OpenOptions): void {
+  const api = lockApi();
+  if (!api) return;
+  const ctrl = new AbortController();
+  lockWait = ctrl;
+  api
+    .request(lockName(opts.userId), { signal: ctrl.signal }, () => {
+      if (ctrl.signal.aborted) return undefined;
+      return new Promise<void>((release) => void openSearchIndex({ ...opts, heldLock: release }));
+    })
+    .catch(() => undefined);
+}
+
 /** Stops the walk and ends the worker. With `flush`, what was changed is written first. */
 function shutdown(flush: boolean): void {
   gen += 1;
+  lockWait?.abort();
+  lockWait = null;
+  const release = lockRelease;
+  lockRelease = null;
   crawler?.stop();
   crawler = null;
   const be = backend;
@@ -206,12 +266,20 @@ function shutdown(flush: boolean): void {
   const last = pendingCrawl;
   pendingCrawl = null;
   useSearchIndex.setState(CLOSED);
-  if (!be) return;
-  if (!flush) {
-    be.terminate();
+  if (!be) {
+    release?.();
     return;
   }
-  const done = (): void => be.terminate();
+  if (!flush) {
+    be.terminate();
+    release?.();
+    return;
+  }
+  // the lock goes once the last writes are in, so the next writer reads them
+  const done = (): void => {
+    be.terminate();
+    release?.();
+  };
   // a write that does not come back within a couple of seconds is left
   const writes = (last ? be.call({ op: "crawl", state: last }) : Promise.resolve()).then(() => be.call({ op: "flush" }));
   void Promise.race([writes, sleep(2_000)]).then(done, done);
@@ -226,22 +294,47 @@ async function open(): Promise<void> {
   await openSearchIndex({ userId: me.id, identityPrivateKey: identity.privateKey, keep: useSettings.getState().settings.searchIndex !== false });
 }
 
+interface OpenOptions {
+  userId: string;
+  identityPrivateKey: Uint8Array | null;
+  keep: boolean;
+  /** The writer's lock, already taken (by waiting for it). */
+  heldLock?: () => void;
+}
+
 /**
  * Opens the index for an account: kept on this device (sealed under a key
  * derived from `identityPrivateKey`), or with `keep` false in memory only.
  */
-export async function openSearchIndex(opts: { userId: string; identityPrivateKey: Uint8Array | null; keep: boolean }): Promise<void> {
+export async function openSearchIndex(opts: OpenOptions): Promise<void> {
   shutdown(true);
   const g = gen;
   const userId = opts.userId;
   openFor = userId;
   useSearchIndex.setState({ ...CLOSED, mode: "opening" });
+  const keeps = opts.keep && !!opts.identityPrivateKey;
+  // this tab writes the index, or reads the one another tab writes
+  let release: (() => void) | null = opts.heldLock ?? null;
+  let writer = !!release;
+  if (!writer && keeps) {
+    const got = await takeLock(userId);
+    if (got === "none") writer = true;
+    else if (got) {
+      release = got;
+      writer = true;
+    }
+  }
+  if (g !== gen) {
+    release?.();
+    return;
+  }
+  lockRelease = release;
   const be = createBackend();
   backend = be;
   let key: Awaited<ReturnType<typeof indexKeyFor>> = null;
-  if (opts.keep && opts.identityPrivateKey) {
+  if (keeps) {
     try {
-      key = await indexKeyFor(userId, opts.identityPrivateKey);
+      key = await indexKeyFor(userId, opts.identityPrivateKey!, { create: writer });
     } catch (err) {
       console.warn("search index: no key for it on this device", err);
     }
@@ -252,14 +345,18 @@ export async function openSearchIndex(opts: { userId: string; identityPrivateKey
   if (g !== gen) return;
   let res: OpenResult;
   try {
-    res = await be.call<OpenResult>({ op: "open", userId, key: key?.key ?? null, reset: key?.fresh ?? false });
+    res = await be.call<OpenResult>({ op: "open", userId, key: key?.key ?? null, reset: key?.fresh ?? false, readOnly: !writer });
   } catch (err) {
     console.warn("search index: could not open", err);
     if (g === gen) shutdown(false);
     return;
   }
   if (g !== gen) return;
-  const mode = res.persisted ? "disk" : "memory";
+  // A reader's index is kept on this device all the same (by the writer), and
+  // it takes over the writing when the writer goes.
+  const reader = keeps && !writer;
+  if (reader) waitForLock(opts);
+  const mode = res.persisted || reader ? "disk" : "memory";
   const c = new Crawler(
     {
       list: (channelId, q, signal) => messagesApi.list(channelId, q, { signal }),
@@ -277,7 +374,8 @@ export async function openSearchIndex(opts: { userId: string; identityPrivateKey
       changed: refresh,
       save: saveCrawl,
     },
-    { background: mode === "disk", maxDocs: mode === "disk" ? MAX_DISK_DOCS : MAX_MEMORY_DOCS },
+    // only the writer walks everything; a reader walks what its searches need
+    { background: res.persisted, maxDocs: mode === "disk" ? MAX_DISK_DOCS : MAX_MEMORY_DOCS },
     parseCrawl(res.crawl),
     res.docs,
   );
