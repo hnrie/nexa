@@ -13,8 +13,8 @@ describe("NotFoundPage", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("This page doesn't exist");
-    expect(document.title).toBe("This page doesn't exist · Nexa");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("This Page Doesn't Exist");
+    expect(document.title).toBe("This Page Doesn't Exist · Nexa");
     fireEvent.click(screen.getByTestId("not-found-go"));
     expect(screen.getByText("home")).toBeTruthy();
   });

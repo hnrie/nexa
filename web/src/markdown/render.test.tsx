@@ -228,7 +228,7 @@ describe("code", () => {
     const write = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", { value: { writeText: write }, configurable: true });
     render(<Markdown source={"before\n```js\nconst a = 1;\n```\nafter"} ctx={makeCtx()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Copy code" }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy Code" }));
     await waitFor(() => expect(write).toHaveBeenCalledWith("const a = 1;"));
   });
 });

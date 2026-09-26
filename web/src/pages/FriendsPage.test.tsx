@@ -70,8 +70,8 @@ describe("a row in the friends list", () => {
   it("offers Accept and Ignore for a request, and opens the profile from the rest of the row", () => {
     render(<MemoryRouter><FriendsPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole("tab", { name: /Pending/ }));
-    expect(screen.getByTestId("friend-accept").getAttribute("aria-label")).toBe("Accept friend request");
-    expect(screen.getByTestId("friend-ignore").getAttribute("aria-label")).toBe("Ignore friend request");
+    expect(screen.getByTestId("friend-accept").getAttribute("aria-label")).toBe("Accept Friend Request");
+    expect(screen.getByTestId("friend-ignore").getAttribute("aria-label")).toBe("Ignore Friend Request");
     expect(screen.getByText("Sent you a friend request")).toBeTruthy();
     fireEvent.click(screen.getByTestId("friend-row"));
     expect(useUI.getState().modals.map((m) => m.kind)).toEqual(["profile"]);
