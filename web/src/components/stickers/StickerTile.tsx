@@ -20,11 +20,23 @@ import s from "./StickerView.module.css";
 
 /**
  * How many pixels across a grid's stills are: sharp enough at a tile's size
- * on this screen, and no bigger, so they arrive fast. Every grid uses the
- * same size, so a still made for one serves them all.
+ * on this screen, and no bigger, so they arrive fast; on a connection that
+ * says it is slow or saving data, a quarter of the bytes matters more than
+ * the last bit of sharpness. Every grid uses the same size, so a still made
+ * for one serves them all.
  */
 export function gridStillPx(): number {
-  return Math.min(256, mediaSize(100));
+  const conn = typeof navigator !== "undefined" ? (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection : undefined;
+  const slow = !!conn?.saveData || conn?.effectiveType === "slow-2g" || conn?.effectiveType === "2g" || conn?.effectiveType === "3g";
+  return Math.min(slow ? 128 : 256, mediaSize(100));
+}
+
+/**
+ * Pointing at a tile with a mouse or pen plays it; a finger on a phone is
+ * about to send it, and loading the moving sticker then only costs data.
+ */
+export function hoverPlays(e: { pointerType: string }): boolean {
+  return e.pointerType !== "touch";
 }
 
 export function stillSourceOf(pack: Pick<StickerPack, "kind">, st: Pick<Sticker, "blob_id" | "format" | "animated">): StillSource {
@@ -104,7 +116,7 @@ export function LazySticker({ sticker, pack, alt, className, root }: { sticker: 
     <span
       ref={ref}
       className={className ? `${s.lazy} ${className}` : s.lazy}
-      onPointerEnter={() => setHot(true)}
+      onPointerEnter={(e) => hoverPlays(e) && setHot(true)}
       onPointerLeave={() => setHot(false)}
       onFocus={() => setHot(true)}
       onBlur={() => setHot(false)}

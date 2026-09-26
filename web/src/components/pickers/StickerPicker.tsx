@@ -6,7 +6,7 @@ import { useAuth } from "@/stores/auth";
 import { groupPacks, searchStickers, useExpressions } from "@/stores/expressions";
 import { useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
-import { moves, StillFace, stillSourceOf, useStickerStill } from "@/components/stickers/StickerTile";
+import { hoverPlays, moves, StillFace, stillSourceOf, useStickerStill } from "@/components/stickers/StickerTile";
 import { useScreenPlace } from "@/hooks/useNearScreen";
 import { useSettings } from "@/stores/settings";
 import { focusSearchOnOpen } from "./EmojiPicker";
@@ -46,7 +46,7 @@ const StickerCell = memo(function StickerCell({ sticker, pack, onPick, root, sti
       data-sticker-state={view.status}
       tabIndex={-1}
       onClick={() => (failed ? retry() : onPick({ sticker, pack }))}
-      onPointerEnter={() => setHot(true)}
+      onPointerEnter={(e) => hoverPlays(e) && setHot(true)}
       onPointerLeave={() => setHot(false)}
       onFocus={() => setHot(true)}
       onBlur={() => setHot(false)}

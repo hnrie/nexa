@@ -3594,5 +3594,7 @@
   "whatsNew.r20260926.themesTitle": "更多主题，还能自己做",
   "whatsNew.r20260926.updatesBody": "Nexa 有新版本时，屏幕中央会提示你重新加载或更新，并会先等通话、上传或下载结束。",
   "whatsNew.r20260926.updatesTitle": "更新就绪时会告诉你",
+  "whatsNew.r202609262.stickersBody": "贴纸选择器加载更快了，即使在较慢的手机或网络上也是如此，再次打开时贴纸会立即显示。无法加载的贴纸会显示提示，并自动重试。",
+  "whatsNew.r202609262.stickersTitle": "更快的贴纸选择器",
   "whatsNew.title": "新功能"
 }

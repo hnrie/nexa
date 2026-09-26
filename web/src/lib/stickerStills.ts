@@ -76,6 +76,8 @@ interface Entry {
   watchers: Set<Watcher>;
   ticket: Ticket<Blob> | null;
   failures: number;
+  /** Tried again because someone pressed it: shown as loading, where a retry of its own keeps the failed mark up. */
+  pressed: boolean;
   permanent: boolean;
   retryAt: number;
   timer: ReturnType<typeof setTimeout> | null;
@@ -112,8 +114,8 @@ function budget(): number {
 
 function viewOf(e: Entry): StillView {
   if (e.url) return { status: "ready", url: e.url, permanent: false };
-  if (e.failures > 0) return { status: "failed", url: null, permanent: e.permanent };
-  return e.ticket || e.source ? { status: "loading", url: null, permanent: false } : IDLE;
+  if (e.failures > 0 && !e.pressed) return { status: "failed", url: null, permanent: e.permanent };
+  return e.ticket || e.source || e.pressed ? { status: "loading", url: null, permanent: false } : IDLE;
 }
 
 function notify(e: Entry): void {
@@ -214,12 +216,14 @@ async function load(e: Entry, priority: number): Promise<void> {
     e.bytes = blob.size;
     bytesKept += blob.size;
     e.failures = 0;
+    e.pressed = false;
     e.permanent = false;
     e.used = performance.now();
     notify(e);
     trim();
   } catch (err) {
     e.ticket = null;
+    e.pressed = false;
     if (isAborted(err)) {
       notify(e);
       // dropped because nobody wanted it; someone may want it again meanwhile
@@ -231,6 +235,7 @@ async function load(e: Entry, priority: number): Promise<void> {
     if (e.source) bytesKept -= e.source.size;
     e.source = null;
     e.failures++;
+    e.pressed = false;
     e.permanent = err instanceof UnsupportedError || (err instanceof HttpError && [400, 403, 404, 410].includes(err.status));
     e.retryAt = Date.now() + retryDelay(e.failures - 1);
     notify(e);
@@ -329,7 +334,7 @@ export function watchStill(src: StillSource, px: number, listener: (v: StillView
   const key = stillKey(src, px);
   let e = entries.get(key);
   if (!e) {
-    e = { key, src, px, url: null, bytes: 0, source: null, watchers: new Set(), ticket: null, failures: 0, permanent: false, retryAt: 0, timer: null, used: 0, view: IDLE };
+    e = { key, src, px, url: null, bytes: 0, source: null, watchers: new Set(), ticket: null, failures: 0, pressed: false, permanent: false, retryAt: 0, timer: null, used: 0, view: IDLE };
     entries.set(key, e);
   }
   const entry = e;
@@ -346,6 +351,7 @@ export function watchStill(src: StillSource, px: number, listener: (v: StillView
     retry() {
       if (released || entry.url || entry.ticket) return;
       entry.permanent = false;
+      entry.pressed = true;
       entry.retryAt = 0;
       if (entry.timer) {
         clearTimeout(entry.timer);

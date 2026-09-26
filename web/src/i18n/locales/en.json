@@ -3691,5 +3691,7 @@
   "whatsNew.r20260926.themesTitle": "More Themes, and Your Own",
   "whatsNew.r20260926.updatesBody": "When a new version of Nexa is ready, a prompt in the middle of the screen asks you to reload or update, and it waits for any call, upload or download to finish first.",
   "whatsNew.r20260926.updatesTitle": "Know When an Update Is Ready",
+  "whatsNew.r202609262.stickersBody": "The sticker picker fills in faster, even on a slow phone or connection, and shows your stickers at once when you open it again. A sticker that can't load says so and tries again by itself.",
+  "whatsNew.r202609262.stickersTitle": "A Faster Sticker Picker",
   "whatsNew.title": "What's New"
 }

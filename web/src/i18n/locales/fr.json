@@ -3714,5 +3714,7 @@
   "whatsNew.r20260926.themesTitle": "Plus de thèmes, et les vôtres",
   "whatsNew.r20260926.updatesBody": "Quand une nouvelle version de Nexa est prête, un message au milieu de l'écran vous propose de recharger ou de mettre à jour, et il attend d'abord la fin de tout appel, envoi ou téléchargement.",
   "whatsNew.r20260926.updatesTitle": "Sachez quand une mise à jour est prête",
+  "whatsNew.r202609262.stickersBody": "Le sélecteur de stickers se remplit plus vite, même sur un téléphone ou une connexion lents, et affiche vos stickers tout de suite quand vous le rouvrez. Un sticker qui ne peut pas se charger vous le signale et réessaie tout seul.",
+  "whatsNew.r202609262.stickersTitle": "Un sélecteur de stickers plus rapide",
   "whatsNew.title": "Nouveautés"
 }
