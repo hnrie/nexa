@@ -177,7 +177,19 @@ export default function CustomCssPage() {
                   {st.text}
                 </div>
                 <div className={look.itemActions}>
-                  <Button size="sm" variant="secondary" onClick={() => void refreshLink(link.url).then(() => toast(t("look.css.refreshed", { name: linkName(link.url) }), "info"))} loading={state?.status === "loading"} data-testid="css-link-refresh">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      void refreshLink(link.url).then(() => {
+                        const now = useCssLinks.getState().byUrl[link.url];
+                        if (now?.error) toast(fetchFailure(now.error, now.errorStatus), "error");
+                        else toast(t("look.css.refreshed", { name: linkName(link.url) }), "success");
+                      })
+                    }
+                    loading={state?.status === "loading"}
+                    data-testid="css-link-refresh"
+                  >
                     <RefreshCw size={14} aria-hidden="true" /> {t("look.css.refresh")}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => removeLink(link)} data-testid="css-link-remove">

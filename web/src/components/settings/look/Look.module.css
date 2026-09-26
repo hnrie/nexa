@@ -127,7 +127,7 @@
 .chip > span { position: absolute; inset: 0; box-shadow: inset 0 0 0 1px var(--border-strong); border-radius: inherit; }
 .chip input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .chip:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.hexInput { width: 96px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); border: 1px solid transparent; background: var(--bg-input); color: var(--text); font-family: var(--font-mono); font-size: 13px; }
+.hexInput { width: 96px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); border: 1px solid var(--border); background: var(--bg-input); color: var(--text); font-family: var(--font-mono); font-size: 13px; }
 .hexInput:focus { border-color: var(--brand); outline: none; }
 .hexInput[aria-invalid="true"] { border-color: var(--danger); }
 .iconBtn { width: 32px; height: 32px; flex: none; border-radius: var(--radius-xs); display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
