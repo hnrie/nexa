@@ -1,46 +1,69 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+/**
+ * Find or start a conversation (Ctrl+K): the one place to find anything.
+ *
+ * As you type it offers where to go (people, conversations, servers,
+ * channels) and the newest messages that match, from everywhere. Enter, or
+ * "See all results", searches: the results then fill the dialog with tabs for
+ * messages, media, links and files, a sort, and the same chips, suggestions
+ * and rows as the search above a conversation (components/search).
+ */
+import { ArrowLeft, CornerDownLeft, Hash, Search as SearchIcon, Server as ServerIcon, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
 import { ApiError } from "@/api/client";
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
-import { SearchSuggestions } from "@/components/search/SearchSuggestions";
+import { SearchBox } from "@/components/common/SearchBox";
+import { IndexStatus, useScopeProgress } from "@/components/search/IndexStatus";
+import { QueryChips } from "@/components/search/QueryChips";
+import { EVERYWHERE, useNames } from "@/components/search/scope";
+import { MessageHit, SearchResults } from "@/components/search/SearchResults";
+import { groupTitle, SearchSuggestions, SuggestionRow, useSuggestionKeys } from "@/components/search/SearchSuggestions";
+import { suggestionChannels } from "@/components/search/SearchPanel";
+import { partialAt, replacePiece, suggest, type Suggestion, type SuggestionGroup } from "@/components/search/suggest";
+import { useSearch } from "@/components/search/useSearch";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { t } from "@/i18n";
 import { channelDisplayName } from "@/lib/names";
-import { highlight, isEmptyQuery, parseQuery, search } from "@/lib/search";
-import { formatTimestamp } from "@/lib/time";
+import type { SearchDoc } from "@/search/doc";
+import type { Sort, Tab } from "@/search/engine";
+import { fold } from "@/search/text";
+import { clearRecentSearches, rememberSearch } from "@/search/recent";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectServerChannels, useChannels } from "@/stores/channels";
-import { useMessages } from "@/stores/messages";
-import { useServers } from "@/stores/servers";
 import { useRelationships } from "@/stores/relationships";
+import { useServers } from "@/stores/servers";
+import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import ss from "@/components/search/Search.module.css";
 import s from "./QuickSwitcher.module.css";
 
-import { t } from "@/i18n";
-interface Item {
+interface Place {
   id: string;
-  kind: "dm" | "friend" | "channel" | "server";
+  kind: "dm" | "group" | "friend" | "channel" | "server";
   label: string;
   sub: string;
   avatarId: string | null;
-  userId: string;
+  avatarKey: string;
   go: () => void;
 }
 
+/** How well a name matches what was typed: whole, its start, a word's start, inside it, or its letters in order. */
 function score(hay: string, q: string): number {
-  const h = hay.toLowerCase();
+  const h = fold(hay);
   if (h === q) return 100;
   if (h.startsWith(q)) return 80;
+  if (h.split(/[\s._-]+/).some((w) => w.startsWith(q))) return 60;
   if (h.includes(q)) return 50;
   let qi = 0;
   for (const c of h) if (qi < q.length && c === q[qi]) qi++;
   return qi === q.length ? 20 : -1;
 }
 
-export function QuickSwitcher() {
-  const open = useUI((u) => u.quickSwitcher);
-  const setOpen = useUI((u) => u.setQuickSwitcher);
+/** Where to go: every conversation, server and channel, and friends there is no conversation with yet. */
+function usePlaces(close: () => void): Place[] {
   const nav = useNavigate();
   const meId = useAuth((a) => a.me?.id);
   const channels = useChannels((c) => c.byId);
@@ -48,24 +71,79 @@ export function QuickSwitcher() {
   const users = useUsers((u) => u.byId);
   const rels = useRelationships((r) => r.byUser);
   const servers = useServers((st) => st.byId);
-  const messageStore = useMessages((m) => m.channels);
-  const [q, setQ] = useState("");
-  const [sel, setSel] = useState(0);
-  /** Jumping somewhere, or looking through what has been said. */
-  const [mode, setMode] = useState<"go" | "messages">("go");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setQ("");
-      setSel(0);
-      setMode("go");
-      setTimeout(() => inputRef.current?.focus(), 0);
+  return useMemo(() => {
+    const out: Place[] = [];
+    const go = (path: string) => () => {
+      close();
+      nav(path);
+    };
+    const withDM = new Set<string>();
+    for (const ch of selectDMs(channels)) {
+      const label = channelDisplayName(ch, users, meId);
+      if (ch.type === "dm") {
+        const other = ch.recipient_ids.find((id) => id !== meId) ?? "";
+        withDM.add(other);
+        out.push({ id: ch.id, kind: "dm", label, sub: `@${users[other]?.username ?? ""}`, avatarId: users[other]?.avatar_id ?? null, avatarKey: other, go: go(`/channels/@me/${ch.id}`) });
+      } else {
+        out.push({ id: ch.id, kind: "group", label, sub: t("chat.chatView.membersCount", { count: ch.recipient_ids.length }), avatarId: ch.icon_id, avatarKey: ch.id, go: go(`/channels/@me/${ch.id}`) });
+      }
     }
-  }, [open]);
+    for (const r of Object.values(rels)) {
+      if (r.type !== "friend" || withDM.has(r.user.id)) continue;
+      out.push({
+        id: `u${r.user.id}`,
+        kind: "friend",
+        label: r.nickname || r.user.display_name,
+        sub: `@${r.user.username}`,
+        avatarId: r.user.avatar_id,
+        avatarKey: r.user.id,
+        go: () => {
+          close();
+          void channelsApi
+            .createDM([r.user.id])
+            .then((ch) => {
+              upsert(ch);
+              nav(`/channels/@me/${ch.id}`);
+            })
+            .catch((err: unknown) => useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.quickSwitcher.couldNotOpenTheConversation"), "error"));
+        },
+      });
+    }
+    for (const st of Object.values(servers)) {
+      out.push({ id: `s${st.server.id}`, kind: "server", label: st.server.name, sub: t("search.switcher.server"), avatarId: st.server.icon_id, avatarKey: st.server.id, go: go(`/channels/${st.server.id}`) });
+      for (const ch of selectServerChannels(channels, st.server.id)) {
+        if (ch.type !== "text") continue;
+        out.push({ id: ch.id, kind: "channel", label: ch.name, sub: st.server.name, avatarId: null, avatarKey: ch.id, go: go(`/channels/${st.server.id}/${ch.id}`) });
+      }
+    }
+    return out;
+  }, [channels, users, rels, servers, meId, nav, upsert, close]);
+}
+
+function PlaceIcon({ p }: { p: Place }) {
+  if (p.kind === "channel") return <span className={s.glyph}><Hash size={18} /></span>;
+  if (p.kind === "group" && !p.avatarId) return <span className={s.glyph}><Users size={18} /></span>;
+  if (p.kind === "server") return p.avatarId ? <Avatar id={p.avatarKey} avatarId={p.avatarId} name={p.label} size={28} kind="icon" square /> : <span className={s.glyph}><ServerIcon size={18} /></span>;
+  return <Avatar id={p.avatarKey} avatarId={p.avatarId} name={p.label} size={28} kind={p.kind === "group" ? "icon" : "avatar"} />;
+}
+
+type Option = { id: string; kind: "place"; place: Place } | { id: string; kind: "message"; doc: SearchDoc } | { id: string; kind: "all" } | { id: string; kind: "suggestion"; sg: Suggestion };
+
+interface Section {
+  key: string;
+  title: string;
+  action?: ReactNode;
+  options: Option[];
+  /** Said under the rows: why there are none yet. */
+  note?: string;
+}
+
+export function QuickSwitcher() {
+  const open = useUI((u) => u.quickSwitcher);
+  const setOpen = useUI((u) => u.setQuickSwitcher);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen(!useUI.getState().quickSwitcher);
@@ -75,154 +153,312 @@ export function QuickSwitcher() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setOpen]);
 
-  const items = useMemo<Item[]>(() => {
-    const out: Item[] = [];
-    const dmUsers = new Set<string>();
-    for (const ch of selectDMs(channels)) {
-      const label = channelDisplayName(ch, users, meId);
-      const other = ch.type === "dm" ? (ch.recipient_ids.find((id) => id !== meId) ?? "") : "";
-      if (other) dmUsers.add(other);
-      out.push({ id: ch.id, kind: "dm", label, sub: ch.type === "dm" ? `@${users[other]?.username ?? ""}` : t("chat.chatView.membersCount", { count: ch.recipient_ids.length }), avatarId: ch.type === "dm" ? (users[other]?.avatar_id ?? null) : ch.icon_id, userId: other || ch.id, go: () => nav(`/channels/@me/${ch.id}`) });
-    }
-    for (const st of Object.values(servers)) {
-      out.push({ id: "s" + st.server.id, kind: "server", label: st.server.name, sub: t("settings.settingsScreen.server"), avatarId: null, userId: st.server.id, go: () => nav(`/channels/${st.server.id}`) });
-      for (const ch of selectServerChannels(channels, st.server.id)) {
-        if (ch.type !== "text") continue;
-        out.push({ id: ch.id, kind: "channel", label: `#${ch.name}`, sub: st.server.name, avatarId: null, userId: ch.id, go: () => nav(`/channels/${st.server.id}/${ch.id}`) });
-      }
-    }
-    for (const r of Object.values(rels)) {
-      if (r.type !== "friend" || dmUsers.has(r.user.id)) continue;
-      out.push({ id: "u" + r.user.id, kind: "friend", label: r.user.display_name, sub: `@${r.user.username}`, avatarId: r.user.avatar_id, userId: r.user.id, go: () => void channelsApi.createDM([r.user.id]).then((ch) => { upsert(ch); nav(`/channels/@me/${ch.id}`); }).catch((err: unknown) => useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.quickSwitcher.couldNotOpenTheConversation"), "error")) });
-    }
-    const query = q.trim().toLowerCase().replace(/^[@#]/, "");
-    if (!query) return out.slice(0, 10);
-    const onlyChannels = q.trim().startsWith("#");
-    return out
-      .filter((it) => !onlyChannels || it.kind === "channel")
-      .map((it) => ({ it, sc: Math.max(score(it.label.replace(/^#/, ""), query), score(it.sub.replace(/^@/, ""), query)) }))
+  if (!open) return null;
+  return <Finder onClose={() => setOpen(false)} />;
+}
+
+function Finder({ onClose }: { onClose: () => void }) {
+  const nav = useNavigate();
+  const mobile = useIsMobile();
+  const byId = useChannels((c) => c.byId);
+  const names = useNames();
+  const recent = useSettings((x) => x.settings.searchRecent);
+  const [q, setQ] = useState("");
+  const [caret, setCaret] = useState(0);
+  /** Enter was pressed: the dialog shows the full results, in tabs. */
+  const [searched, setSearched] = useState(false);
+  const [tab, setTab] = useState<Tab>("messages");
+  const [sort, setSort] = useState<Sort>("newest");
+  const [dismissed, setDismissed] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const places = usePlaces(onClose);
+
+  // Straight into the box, on a phone too: this dialog is for typing, and the
+  // keyboard coming up is what someone who opened it wants. (A dialog's own
+  // focus goes to the card on a touch screen, and autoFocus fires before the
+  // dialog is in the page, so it is asked for once it is.)
+  useEffect(() => {
+    input.current?.focus({ preventScroll: true });
+  }, []);
+
+  // An empty box starts over; the choice of tab and order stays while it is open.
+  useEffect(() => {
+    if (!q.trim()) setSearched(false);
+    setDismissed(false);
+  }, [q]);
+
+  const run = useSearch({ raw: q, scope: EVERYWHERE, tab: searched ? tab : "messages", sort: searched ? sort : "newest", names, ...(searched ? {} : { pageSize: 5 }) });
+  const { st, p } = useScopeProgress(run.channels);
+  const walking = p.done < p.total && st.mode !== "closed";
+  const candidates = useMemo(() => suggestionChannels(byId, null), [byId]);
+  const partial = useMemo(() => partialAt(q, Math.min(caret, q.length)), [q, caret]);
+  const typingFilter = !!partial?.key;
+  const groups = useMemo<SuggestionGroup[]>(() => {
+    if (dismissed) return [];
+    const all = suggest({ raw: q, caret: Math.min(caret, q.length), names, channels: candidates, nearby: [], recent, now: Date.now() });
+    // an empty box offers the last searches, and the conversations below;
+    // a plain word's people and conversations are already under "Jump to"
+    if (!q.trim()) return all.filter((g) => g.kind === "recent");
+    return searched ? all : all.filter((g) => g.kind !== "filters");
+  }, [dismissed, q, caret, names, candidates, recent, searched]);
+
+  const scored = useMemo(() => {
+    if (!q.trim()) return places.filter((pl) => pl.kind === "dm" || pl.kind === "group").slice(0, 6).map((pl) => ({ pl, sc: 0 }));
+    const hasFilters = run.parsed.tokens.some((tk) => tk.kind === "filter");
+    const query = fold(run.parsed.terms.join(" ").replace(/^[@#]/, ""));
+    if (!query || hasFilters) return [];
+    return places
+      .map((pl) => ({ pl, sc: Math.max(score(pl.label, query), score(pl.sub.replace(/^@/, ""), query) - 5) }))
       .filter((x) => x.sc >= 0)
       .sort((a, b) => b.sc - a.sc)
-      .slice(0, 10)
-      .map((x) => x.it);
-  }, [channels, users, rels, servers, meId, q, nav, upsert]);
+      .slice(0, 6);
+  }, [places, q, run.parsed]);
+  const matches = useMemo(() => scored.map((x) => x.pl), [scored]);
+  // A name typed (its start, a word's start, inside it) is where Enter goes.
+  // Letters that only happen to come in order in a long name are offered, but
+  // Enter searches the words instead: "hello" is not a trip to #a-channel-with-a-long-name.
+  const nameTyped = (scored[0]?.sc ?? 0) >= 50;
 
-  // Everything this device has decrypted, wherever it came from. The server
-  // holds only ciphertext, so this is the whole index there can be.
-  const parsed = useMemo(() => parseQuery(q), [q]);
-  const channelNames = useMemo(() => Object.fromEntries(Object.values(channels).map((c) => [c.id, c.name.toLowerCase()])), [channels]);
-  const hits = useMemo(() => {
-    if (mode !== "messages" || isEmptyQuery(parsed)) return [];
-    const all = Object.values(messageStore).flatMap((c) => Object.values(c.byId));
-    return search(all, parsed, { users, channelNames, ...(meId ? { meId } : {}) }, 40);
-  }, [mode, parsed, messageStore, users, channelNames, meId]);
-  const searchable = useMemo(() => Object.values(channels).filter((c) => c.type === "text" || c.type === "dm" || c.type === "group_dm" || c.type === "subchat"), [channels]);
+  const commit = useCallback(() => {
+    if (!q.trim()) return;
+    rememberSearch(q);
+    setSearched(true);
+    setDismissed(true);
+  }, [q]);
 
-  if (!open) return null;
-  const choose = (it: Item | undefined) => {
-    if (!it) return;
-    setOpen(false);
-    it.go();
+  const pickSuggestion = useCallback((sg: Suggestion) => {
+    setQ(sg.text);
+    setCaret(sg.caret);
+    // a recent search is searched again at once
+    if (sg.kind === "recent") {
+      rememberSearch(sg.text);
+      setSearched(true);
+      return;
+    }
+    requestAnimationFrame(() => {
+      input.current?.focus({ preventScroll: true });
+      input.current?.setSelectionRange(sg.caret, sg.caret);
+    });
+  }, []);
+  const onDate = useCallback(
+    (key: string, value: string) => {
+      const piece = partialAt(q, Math.min(caret, q.length));
+      if (!piece) return;
+      const next = replacePiece(q, piece, `${key}:${value}`, true);
+      pickSuggestion({ id: "date", kind: "date", text: next.text, caret: next.caret });
+    },
+    [q, caret, pickSuggestion],
+  );
+
+  const jump = useCallback(
+    (d: SearchDoc) => {
+      const ch = useChannels.getState().byId[d.c];
+      if (!ch) return;
+      rememberSearch(q);
+      onClose();
+      nav(ch.server_id ? `/channels/${ch.server_id}/${ch.id}/${d.id}` : `/channels/@me/${ch.id}/${d.id}`);
+      useUI.getState().setJumpTo({ channelId: ch.id, messageId: d.id });
+    },
+    [q, onClose, nav],
+  );
+
+  // Before Enter everything is one list the arrow keys go through, in the
+  // order it is drawn: suggestions, places, the messages found, "See all".
+  const sections = useMemo<Section[]>(() => {
+    if (searched) return [];
+    const out: Section[] = groups.map((g) => ({
+      key: g.kind,
+      title: groupTitle(g.kind),
+      ...(g.kind === "recent" ? { action: <button type="button" className={s.sectionAction} onMouseDown={(e) => e.preventDefault()} onClick={clearRecentSearches}>{t("search.suggest.clearRecent")}</button> } : {}),
+      options: g.items.map((sg): Option => ({ id: `sg-${sg.id}`, kind: "suggestion", sg })),
+    }));
+    if (typingFilter) return out;
+    if (matches.length) out.push({ key: "places", title: q.trim() ? t("search.switcher.jumpTo") : t("search.suggest.conversations"), options: matches.map((pl): Option => ({ id: `pl-${pl.id}`, kind: "place", place: pl })) });
+    if (!run.empty) {
+      const found = run.result.docs.slice(0, 5).map((d): Option => ({ id: `m-${d.id}`, kind: "message", doc: d }));
+      out.push({
+        key: "messages",
+        title: t("search.tab.messages"),
+        options: [...found, { id: "all", kind: "all" }],
+        ...(found.length === 0 && !run.pending ? { note: walking ? t("search.switcher.noneYet") : t("search.none.messages") } : {}),
+      });
+    }
+    return out;
+  }, [searched, groups, typingFilter, matches, q, run.empty, run.result.docs, run.pending, walking]);
+  const options = useMemo(() => sections.flatMap((sec) => sec.options), [sections]);
+  const [active, setActive] = useState(-1);
+  // A name typed lands on the place it names, so Enter goes there; words
+  // typed land on nothing, so Enter searches them and brings up the tabs.
+  // The same list worked out again (the index filling in) keeps its row.
+  const optionSig = options.map((o) => o.id).join("\n");
+  const firstIsPlace = options[0]?.kind === "place" && nameTyped;
+  useEffect(() => setActive(q.trim() && !typingFilter && firstIsPlace ? 0 : -1), [optionSig, q, typingFilter, firstIsPlace]);
+  const choose = (o: Option | undefined) => {
+    if (!o || o.kind === "all") return commit();
+    if (o.kind === "suggestion") return pickSuggestion(o.sg);
+    if (o.kind === "place") return o.place.go();
+    jump(o.doc);
   };
-  const openMessage = (channelId: string, messageId: string) => {
-    const ch = channels[channelId];
-    if (!ch) return;
-    setOpen(false);
-    nav(ch.server_id ? `/channels/${ch.server_id}/${ch.id}/${messageId}` : `/channels/@me/${ch.id}/${messageId}`);
-    useUI.getState().setJumpTo({ channelId, messageId });
+  const domId = (o: Option) => `${listId}-${o.id}`;
+
+  // after Enter the suggestions float over the results, as above a conversation
+  const floating = searched ? groups : [];
+  const sk = useSuggestionKeys(floating, pickSuggestion, () => setDismissed(true));
+
+  const keys = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.nativeEvent.isComposing) return;
+    if (searched) {
+      if (sk.key(e)) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commit();
+      } else if (e.key === "ArrowDown") {
+        const first = body.current?.querySelector<HTMLElement>("[data-result], [data-tile]");
+        if (first) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+      return;
+    }
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (options.length === 0) return;
+      e.preventDefault();
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setActive((a) => (a < 0 ? (step > 0 ? 0 : options.length - 1) : (a + step + options.length) % options.length));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      choose(active >= 0 ? options[active] : undefined);
+    } else if (e.key === "Tab" && !e.shiftKey && active >= 0 && options[active]?.kind === "suggestion") {
+      e.preventDefault();
+      choose(options[active]);
+    }
   };
-  const count = mode === "messages" ? hits.length : items.length;
-  // The arrow-key selection used to live only in `data-selected`, which is a
-  // background colour and nothing else: a screen reader following Ctrl+K heard
-  // a text box and silence. The input is the combobox, the rows are its
-  // options, and `aria-activedescendant` names the one the arrows are on
-  // without ever moving focus out of the box being typed into.
-  const listId = "qs-list";
-  const optionId = (i: number) => `qs-opt-${i}`;
-  const switchMode = (next: "go" | "messages") => {
-    setMode(next);
-    setSel(0);
-    inputRef.current?.focus();
+  const activeDom = searched ? (sk.activeId ? `${listId}-float-${sk.activeId}` : undefined) : active >= 0 && options[active] ? domId(options[active]!) : undefined;
+
+  const row = (o: Option): ReactNode => {
+    switch (o.kind) {
+      case "suggestion":
+        return <SuggestionRow item={o.sg} names={names} onDate={onDate} />;
+      case "place":
+        return (
+          <>
+            <PlaceIcon p={o.place} />
+            <span className={s.label} dir="auto">{o.place.kind === "channel" ? o.place.label : o.place.label}</span>
+            <span className={s.sub} dir="auto">
+              {o.place.kind === "friend" ? (
+                <>
+                  <UserPlus size={14} aria-hidden="true" /> {t("search.switcher.startConversation")}
+                </>
+              ) : (
+                o.place.sub
+              )}
+            </span>
+          </>
+        );
+      case "message":
+        return <MessageHit doc={o.doc} needles={run.needles} names={names} showWhere dated={false} onJump={jump} asOption />;
+      case "all":
+        return (
+          <>
+            <span className={s.glyph}><SearchIcon size={18} /></span>
+            <span className={s.label}>{run.result.counts.messages > 5 ? t("search.switcher.seeAll", { count: run.result.counts.messages }) : t("search.switcher.searchAll")}</span>
+            <span className={s.sub} aria-hidden="true"><CornerDownLeft size={14} /></span>
+          </>
+        );
+    }
   };
+
+  let content: ReactNode;
+  if (searched) {
+    content = (
+      <div className={ss.panelBody}>
+        {floating.length ? <SearchSuggestions groups={floating} active={sk.active} listId={`${listId}-float`} names={names} onPick={pickSuggestion} onHover={sk.setActive} onDate={onDate} /> : null}
+        <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} scoped={false} walking={walking} onTop={() => input.current?.focus()} />
+      </div>
+    );
+  } else {
+    let index = -1;
+    content = (
+      <div className={s.list} role="listbox" id={listId} aria-label={t("search.switcher.label")}>
+        {sections.map((sec) => (
+          <div key={sec.key} className={s.section} role="group" aria-label={sec.title}>
+            <div className={s.sectionHead}>
+              <span aria-hidden="true">{sec.title}</span>
+              {sec.action}
+            </div>
+            {sec.options.map((o) => {
+              index += 1;
+              const at = index;
+              const kind = o.kind === "suggestion" ? o.sg.kind : o.kind;
+              return (
+                <div
+                  key={o.id}
+                  id={domId(o)}
+                  role="option"
+                  aria-selected={at === active}
+                  data-active={at === active || undefined}
+                  data-kind={kind}
+                  className={s.option}
+                  // the box keeps focus (and the keyboard stays up on a phone)
+                  onMouseDown={(e) => kind !== "pickDate" && e.preventDefault()}
+                  // a pointer that moves chooses; rows sliding under a still one do not
+                  onMouseMove={() => active !== at && setActive(at)}
+                  onClick={() => kind !== "pickDate" && choose(o)}
+                  data-testid={o.kind === "place" ? "switcher-place" : o.kind === "message" ? "switcher-hit" : o.kind === "all" ? "switcher-all" : "switcher-suggestion"}
+                >
+                  {row(o)}
+                </div>
+              );
+            })}
+            {sec.note ? <p className={s.note}>{sec.note}</p> : null}
+          </div>
+        ))}
+        {q.trim() && sections.length === 0 ? <p className={s.note}>{t("search.switcher.nothing")}</p> : null}
+        {!q.trim() ? <p className={s.tip}>{t("search.switcher.tip")}</p> : null}
+      </div>
+    );
+  }
+
   return (
-    <Modal open onClose={() => setOpen(false)} width={560} bare className={s.top} ariaLabel={t("modals.quickSwitcher.quickSwitcher")}>
-      <div className={s.box}>
-        <div className={s.tabs} role="tablist" aria-label={t("modals.quickSwitcher.quickSwitcher")}>
-          <button role="tab" aria-selected={mode === "go"} {...(count > 0 ? { "aria-controls": listId } : {})} tabIndex={mode === "go" ? 0 : -1} data-on={mode === "go"} onClick={() => switchMode("go")} onKeyDown={(e) => { if (e.key === "ArrowRight") { e.preventDefault(); switchMode("messages"); } }} data-testid="switcher-mode-go">{t("modals.quickSwitcher.jumpTo")}</button>
-          <button role="tab" aria-selected={mode === "messages"} {...(count > 0 ? { "aria-controls": listId } : {})} tabIndex={mode === "messages" ? 0 : -1} data-on={mode === "messages"} onClick={() => switchMode("messages")} onKeyDown={(e) => { if (e.key === "ArrowLeft") { e.preventDefault(); switchMode("go"); } }} data-testid="switcher-mode-messages">{t("modals.quickSwitcher.messages")}</button>
-        </div>
+    <Modal open onClose={onClose} width={760} bare className={[s.top, searched ? s.tall : "", mobile ? s.full : ""].join(" ")} ariaLabel={t("sidebar.dMSidebar.findOrStartAConversation")}>
+      <div className={s.box} data-testid="switcher" data-searched={searched || undefined}>
         <div className={s.inputRow}>
-          <input
-            ref={inputRef}
-            className={s.input}
+          {mobile ? (
+            <button type="button" className={s.back} aria-label={t("search.panel.close")} onClick={onClose}>
+              <ArrowLeft size={22} />
+            </button>
+          ) : null}
+          <SearchBox
+            ref={input}
+            className={s.field}
             value={q}
-            placeholder={mode === "messages" ? t("modals.quickSwitcher.searchEverythingYouCanRead") : t("modals.quickSwitcher.whereWouldYouLikeToGo")}
-            data-testid="switcher-input"
-            role="combobox"
-            aria-expanded={count > 0}
-            {...(count > 0 ? { "aria-controls": listId } : {})}
-            aria-autocomplete="list"
-            aria-activedescendant={count > 0 ? optionId(sel) : undefined}
-            aria-label={mode === "messages" ? t("modals.quickSwitcher.searchEverythingYouCanRead") : t("modals.quickSwitcher.whereWouldYouLikeToGo")}
-            onChange={(e) => { setQ(e.target.value); setSel(0); }}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown") { e.preventDefault(); setSel((v) => Math.min(count - 1, v + 1)); }
-              else if (e.key === "ArrowUp") { e.preventDefault(); setSel((v) => Math.max(0, v - 1)); }
-              // Tab used to be the mode switch, which left the two tabs, the
-              // clear button and every result row permanently out of reach:
-              // Tab only ever toggled the mode. Ctrl+Tab and the Left/Right
-              // arrows on the tabs do that job now, and Tab does its own.
-              else if (e.key === "Tab" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); setMode((m) => (m === "go" ? "messages" : "go")); setSel(0); }
-              else if (e.key === "Enter") {
-                e.preventDefault();
-                if (mode === "messages") { const m = hits[sel]; if (m) openMessage(m.channel_id, m.id); }
-                else choose(items[sel]);
-              }
+            onChange={(v) => {
+              setQ(v);
+              setCaret(v.length);
             }}
+            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? q.length)}
+            placeholder={t("search.switcher.placeholder")}
+            aria-label={t("sidebar.dMSidebar.findOrStartAConversation")}
+            data-testid="switcher-input"
+            dir="auto"
+            role="combobox"
+            aria-expanded={searched ? floating.length > 0 : options.length > 0}
+            aria-controls={searched ? (floating.length ? `${listId}-float` : undefined) : listId}
+            aria-autocomplete="list"
+            aria-activedescendant={activeDom}
+            onKeyDown={keys}
+            onEscape={onClose}
           />
-          {q ? <button className={s.clear} aria-label={t("modals.quickSwitcher.clear")} onClick={() => { setQ(""); setSel(0); inputRef.current?.focus(); }} data-testid="switcher-clear">×</button> : null}
         </div>
-        {mode === "messages" ? <SearchSuggestions query={q} users={users} channels={searchable} onPick={(next) => { setQ(next); setSel(0); inputRef.current?.focus(); }} /> : null}
-        {/* Only a list with something in it is a listbox; an empty one with a
-            sentence inside would be a listbox whose children are not options. */}
-        <div className={s.list} {...(count > 0 ? { id: listId, role: "listbox", "aria-label": mode === "messages" ? t("modals.quickSwitcher.messages") : t("modals.quickSwitcher.jumpTo") } : {})}>
-          {mode === "go" ? (
-            <>
-              {items.length === 0 ? <div className={s.empty}>{t("modals.quickSwitcher.noMatches")}</div> : null}
-              {items.map((it, i) => (
-                <button key={it.id} id={optionId(i)} role="option" aria-selected={i === sel} tabIndex={-1} className={s.item} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => choose(it)}>
-                  {it.kind === "channel" ? <span className={s.hash}>#</span> : <Avatar id={it.userId} avatarId={it.avatarId} name={it.label.replace(/^#/, "")} size={24} />}
-                  <span className={s.label}>{it.kind === "channel" ? it.label.slice(1) : it.label}</span>
-                  <span className={s.sub}>{it.sub}</span>
-                </button>
-              ))}
-            </>
-          ) : (
-            <>
-              {isEmptyQuery(parsed) ? <div className={s.empty}>{t("modals.quickSwitcher.typeToSearchEverythingThisDevice")} <b>from:me</b> {t("modals.quickSwitcher.findsWhatYouSent")}</div> : null}
-              {!isEmptyQuery(parsed) && hits.length === 0 ? <div className={s.empty}>{t("modals.quickSwitcher.nothingMatchedOpenAConversationAnd")}</div> : null}
-              {hits.map((m, i) => {
-                const ch = channels[m.channel_id];
-                const author = users[m.author_id];
-                return (
-                  <button key={m.id} id={optionId(i)} role="option" aria-selected={i === sel} tabIndex={-1} className={s.hit} data-selected={i === sel} onMouseEnter={() => setSel(i)} onClick={() => openMessage(m.channel_id, m.id)} data-testid="switcher-hit">
-                    <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={author?.display_name ?? "?"} size={24} />
-                    <span className={s.hitBody}>
-                      <span className={s.hitHead}>
-                        <b>{author?.display_name ?? t("modals.quickSwitcher.unknown")}</b>
-                        <span className={s.sub}>{ch ? (ch.server_id ? `#${ch.name}` : channelDisplayName(ch, users, meId)) : ""} · {formatTimestamp(m.created_at)}</span>
-                      </span>
-                      <span className={s.hitText}>
-                        {m.payload?.t ? highlight(m.payload.t, parsed).map((r, k) => (r.hit ? <mark key={k}>{r.text}</mark> : <span key={k}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("modals.quickSwitcher.filesCount", { count: m.payload.att.length }) : ""}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
+        <QueryChips raw={q} parsed={run.parsed} resolved={run.resolved} names={names} onChange={setQ} />
+        <div ref={body} className={s.body}>{content}</div>
+        <div className={s.foot}>
+          {!mobile && !searched ? <span className={s.hints}>{t("search.switcher.hints")}</span> : null}
+          <IndexStatus channels={run.channels} scope={EVERYWHERE} />
         </div>
-        <div className={s.foot}>{t("modals.quickSwitcher.keyHints")}</div>
       </div>
     </Modal>
   );

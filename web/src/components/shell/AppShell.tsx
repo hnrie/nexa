@@ -21,6 +21,7 @@ import { GridChatCtx } from "./paneScope";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import { installAway } from "@/lib/away";
+import { installSearchIndex } from "@/search/indexer";
 import { installBackLayers } from "./backLayers";
 import s from "./AppShell.module.css";
 import { t } from "@/i18n";
@@ -116,6 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     installVoice();
     installAway();
+    installSearchIndex();
   }, []);
 
   // back closes the dialog, the settings or the drawer on top (see backLayers)

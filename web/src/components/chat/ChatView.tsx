@@ -1,5 +1,5 @@
 import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
@@ -24,7 +24,7 @@ import { isPrivateChannel } from "@/lib/perms";
 import { GroupMemberList } from "./GroupMemberList";
 import { MemberList } from "./MemberList";
 import { CallBanner } from "@/components/voice/CallBanner";
-import { SearchPanel } from "@/components/search/SearchPanel";
+import { SearchPanel, useSearchPlaceholder } from "@/components/search/SearchPanel";
 import sc from "@/components/search/Search.module.css";
 import { VoiceView } from "@/components/voice/VoiceView";
 import { useVoice } from "@/stores/voice";
@@ -66,6 +66,14 @@ export function ChatView({ channel }: { channel: Channel }) {
   // the header's search box works the panel's filter suggestions with the keyboard
   const searchKeys = useRef<((e: React.KeyboardEvent<HTMLInputElement>) => boolean) | null>(null);
   const [suggestActive, setSuggestActive] = useState<string | undefined>(undefined);
+  const [suggestList, setSuggestList] = useState<string | undefined>(undefined);
+  const onSuggest = useCallback((active: string | undefined, list: string | undefined) => {
+    setSuggestActive(active);
+    setSuggestList(list);
+  }, []);
+  // where the caret is in the box, so the suggestions follow a filter being edited in the middle
+  const [searchCaret, setSearchCaret] = useState(0);
+  const searchPlaceholder = useSearchPlaceholder(channel);
   // The profile of the person a DM is with, in a column beside it, as Discord shows it, remembered on
   // this device. Where it would cover the chat (a narrow window) it only opens when asked, each time.
   const [profileWide, setProfileWide] = useState(() => storage.get(PROFILE_PANEL_KEY) !== "0");
@@ -265,15 +273,20 @@ export function ChatView({ channel }: { channel: Channel }) {
             value={searchQuery}
             onChange={(v) => {
               setSearchQuery(v);
+              setSearchCaret(v.length);
               setSearchOpen(true);
             }}
-            placeholder={tr_("chat.chat.search")}
+            onSelect={(e) => setSearchCaret(e.currentTarget.selectionStart ?? searchQuery.length)}
+            placeholder={searchPlaceholder}
             aria-label={tr_("chat.chat.searchMessages")}
             title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")}
             data-testid="search-input"
+            dir="auto"
             data-header-search=""
             role="combobox"
-            aria-expanded={searchOpen}
+            aria-expanded={searchOpen && !!suggestList}
+            aria-controls={suggestList}
+            aria-autocomplete="list"
             aria-activedescendant={suggestActive}
             onFocus={() => setSearchOpen(true)}
             onClear={() => setSearchOpen(false)}
@@ -361,7 +374,7 @@ export function ChatView({ channel }: { channel: Channel }) {
         </div>
         {pins ? <PinsPanel channelId={channel.id} onClose={() => setPins(false)} /> : null}
         {/* where search covers the chat, a picked result closes it (keeping the query) so the message shows */}
-        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} inline={compactSearch} keysRef={searchKeys} onSuggest={setSuggestActive} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
+        {searchOpen ? <SearchPanel channel={channel} query={searchQuery} onQuery={setSearchQuery} caret={searchCaret} inline={compactSearch} keysRef={searchKeys} onSuggest={onSuggest} onJump={drawer ? () => setSearchOpen(false) : undefined} onClose={() => { setSearchOpen(false); setSearchQuery(""); }} /> : null}
         {isServer && serverId && (drawer ? membersOpen || membersMounted : membersOpen) ? <MemberList serverId={serverId} channelId={channel.id} drawer={drawer} open={membersOpen} /> : null}
         {drawer && membersOpen && (isServer || convo.type === "group_dm") ? <div className={s.membersBackdrop} onClick={toggleMembers} /> : null}
         {convo.type === "group_dm" && (drawer || membersOpen) ? <GroupMemberList channel={convo} drawer={drawer} open={membersOpen} /> : null}

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Download, ExternalLink, X, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, MessageSquare, X, ZoomIn, ZoomOut } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
@@ -19,6 +19,8 @@ export interface LightboxItem {
   att?: AttachmentMeta | undefined;
   /** Who sent it, under its name. */
   from?: string | undefined;
+  /** Opens the message it came from (from search's gallery, where the message is not on screen). */
+  jump?: (() => void) | undefined;
 }
 
 /** How far one press of an arrow moves a zoomed picture, as a share of the view. */
@@ -104,6 +106,8 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
   };
 
   const svg = item.type?.toLowerCase().startsWith("image/svg");
+  // a clip plays where the picture would be, with its own controls instead of the zoom
+  const video = !!item.type?.toLowerCase().startsWith("video/");
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   return createPortal(
     // a layer, so the back gesture on a phone puts the picture away rather than leaving the page under it
@@ -117,11 +121,18 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           </span>
         </div>
         <div className={s.tools}>
+          {item.jump ? (
+            <button type="button" className={s.tool} aria-label={t("chat.lightbox.goToMessage")} title={t("chat.lightbox.goToMessage")} onClick={item.jump} data-testid="lightbox-jump">
+              <MessageSquare size={20} />
+            </button>
+          ) : null}
+          {video ? null : (
           <span className={s.zoomTools}>
             <button type="button" className={s.tool} aria-label={t("chat.attachments.zoomOut")} title={t("chat.attachments.zoomOut")} onClick={() => zoom.current?.zoomBy(1 / 1.4)}><ZoomOut size={20} /></button>
             <button type="button" className={[s.tool, s.pct].join(" ")} aria-label={t("chat.lightbox.resetZoom")} title={t("chat.lightbox.resetZoom")} onClick={() => zoom.current?.reset()} disabled={scale === 1} data-testid="lightbox-zoom">{Math.round(scale * 100)}%</button>
             <button type="button" className={s.tool} aria-label={t("chat.attachments.zoomIn")} title={t("chat.attachments.zoomIn")} onClick={() => zoom.current?.zoomBy(1.4)}><ZoomIn size={20} /></button>
           </span>
+          )}
           {/* an SVG opened on its own is a page in this app's origin that can reach out to other servers */}
           {src && !svg ? <a className={s.tool} href={src} target="_blank" rel="noopener noreferrer" aria-label={t("chat.attachments.openOriginal")} title={t("chat.attachments.openOriginal")}><ExternalLink size={20} /></a> : null}
           {src ? <a className={s.tool} href={src} download={item.name} aria-label={t("chat.attachments.download")} title={t("chat.attachments.download")}><Download size={20} /></a> : null}
@@ -132,7 +143,8 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
         className={s.stageWrap}
         // a sideways swipe on a touch screen goes to the next picture, while the picture is at its own size
         onPointerDown={(e) => {
-          swipe.current = e.pointerType === "touch" && scale <= 1 && count > 1 ? { x: e.clientX, y: e.clientY } : null;
+          // not over a clip, where a sideways drag is the scrubber's
+          swipe.current = e.pointerType === "touch" && scale <= 1 && count > 1 && !video ? { x: e.clientX, y: e.clientY } : null;
         }}
         onPointerUp={(e) => {
           const from = swipe.current;
@@ -144,6 +156,11 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           step((dx < 0) !== rtl ? 1 : -1);
         }}
       >
+        {video ? (
+          <div key={index} className={s.stage} onClick={(e) => e.target === e.currentTarget && onClose()}>
+            {src ? <video className={s.video} src={src} controls autoPlay playsInline onClick={stop} /> : <span className={s.pending} onClick={stop}>{failed ? t("chat.attachments.videoUnloadable") : <Spinner size={28} />}</span>}
+          </div>
+        ) : (
         <ZoomPan key={index} className={s.stage} handle={zoom} onZoom={setScale} onIdleClick={onClose}>
           {src ? (
             <img
@@ -160,6 +177,7 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
             <span className={s.pending} onClick={stop}>{failed ? t("chat.attachments.imageUnloadable") : <Spinner size={28} />}</span>
           )}
         </ZoomPan>
+        )}
       </div>
       {count > 1 && index > 0 ? (
         <button type="button" className={[s.side, s.prev].join(" ")} aria-label={t("chat.lightbox.previous")} title={t("chat.lightbox.previous")} onClick={(e) => { stop(e); step(-1); }}>

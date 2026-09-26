@@ -13,6 +13,18 @@ function resolveAuthors(msgs: { author_id: string; mentions?: string[] }[]): voi
 
 export type { DecryptedMessage };
 
+/**
+ * Told about every page of history the chat fetches and decrypts, so the
+ * search index can take what the reader has already paid for, and notice
+ * what was edited or deleted while nobody was here to hear about it.
+ */
+export const historyHooks: ((channelId: string, page: DecryptedMessage[]) => void)[] = [];
+
+function sawPage(channelId: string, page: DecryptedMessage[]): void {
+  if (page.length === 0) return;
+  for (const h of historyHooks) h(channelId, page);
+}
+
 /** A message's files on their way up, shown in its place in the list until it is sent. */
 export interface PendingUpload {
   files: { id: string; name: string; size: number; type: string; preview: string | null }[];
@@ -337,6 +349,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       if (generation(channelId) !== gen) return;
       resolveAuthors(decrypted);
       set((s) => withChannel(s, channelId, (c) => ({ ...put(c, decrypted), loaded: true, loading: false, failed: 0, hasOlder: page.length >= PAGE, hasNewer: false })));
+      sawPage(channelId, decrypted);
     } catch {
       // Counted rather than thrown: the list shows the failure and tries again
       // after a growing pause, instead of asking again the moment loading ends.
@@ -365,6 +378,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
           const decrypted = await Promise.all(page.map(decryptForStore));
           if (generation(channelId) !== gen) return;
           get().insert(channelId, decrypted);
+          sawPage(channelId, decrypted);
           filled = page.length < PAGE;
           if (!filled) after = page[page.length - 1]!.id;
         }
@@ -428,6 +442,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       if (generation(channelId) !== gen) return;
       get().setHasOlder(channelId, page.length >= PAGE);
       get().insert(channelId, decrypted);
+      sawPage(channelId, decrypted);
     } finally {
       if (generation(channelId) === gen) get().setLoading(channelId, false);
     }
@@ -444,6 +459,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       if (generation(channelId) !== gen) return;
       resolveAuthors(decrypted);
       set((s) => withChannel(s, channelId, (c) => ({ ...put(c, decrypted), hasNewer: page.length >= PAGE })));
+      sawPage(channelId, decrypted);
     } finally {
       if (generation(channelId) === gen) get().setLoading(channelId, false);
     }
@@ -456,6 +472,7 @@ export const useMessages = create<MessagesState>()((set, get) => ({
       const decrypted = await Promise.all(page.map(decryptForStore));
       if (generation(channelId) !== gen) return;
       resolveAuthors(decrypted);
+      sawPage(channelId, decrypted);
       // The server sends up to half a page from before the target and the rest
       // from the target on; a short side means that end of the channel is in the page.
       const from = page.filter((m) => compareIds(m.id, messageId) >= 0).length;

@@ -1,236 +1,266 @@
-import { Search, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from "react";
+/**
+ * Search, from the box above a conversation.
+ *
+ * It looks in that conversation (a DM or a group, with its subchats) or in
+ * that server, and says so with a chip that widens it to everything when
+ * taken away. Beside the chat on a wide screen; on a phone or a tablet it is
+ * a sheet over the whole screen with its own box, closed by the back arrow,
+ * the back gesture or Escape.
+ *
+ * Everything below the box is the same as in the global search
+ * (QuickSwitcher): the chips, the suggestions, the tabs and the results.
+ */
+import { ArrowLeft, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MutableRefObject } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
-import { Avatar } from "@/components/common/Avatar";
-import { Button } from "@/components/common/Button";
-import type { DecryptedMessage } from "@/lib/decrypt";
-import { compareIds } from "@/lib/ids";
-import { channelDisplayName, friendNicknames, memberName } from "@/lib/names";
-import { highlight, isEmptyQuery, parseQuery, search } from "@/lib/search";
-import { formatFull, formatTimestamp } from "@/lib/time";
-import { useAuth } from "@/stores/auth";
-import { useChannels } from "@/stores/channels";
-import { useMessages } from "@/stores/messages";
-import { useRelationships } from "@/stores/relationships";
-import { useServers } from "@/stores/servers";
-import { useUI } from "@/stores/ui";
-import { useUsers } from "@/stores/users";
-import { MAX_RESULTS, useFullSearch } from "./useFullSearch";
-import { SearchSuggestions, type SuggestHandle } from "./SearchSuggestions";
+import { isTopLayer } from "@/components/common/Modal";
 import { SearchBox } from "@/components/common/SearchBox";
+import { isolate } from "@/components/server/bidi";
+import { useFocusTrap } from "@/components/common/useFocusTrap";
+import { t } from "@/i18n";
+import type { SearchDoc } from "@/search/doc";
+import type { Sort, Tab } from "@/search/engine";
+import { searchableChannels } from "@/search/indexer";
+import { clearRecentSearches, rememberSearch } from "@/search/recent";
+import { compareIds } from "@/lib/ids";
+import { useChannels } from "@/stores/channels";
+import { useSettings } from "@/stores/settings";
+import { useUI } from "@/stores/ui";
+import { IndexStatus, useScopeProgress } from "./IndexStatus";
+import { QueryChips } from "./QueryChips";
+import { EVERYWHERE, scopeName, scopeOf, useNames, type SearchScope } from "./scope";
+import { SearchResults } from "./SearchResults";
+import { SearchSuggestions, useSuggestionKeys } from "./SearchSuggestions";
+import { replacePiece, partialAt, suggest, type Suggestion } from "./suggest";
+import { useSearch } from "./useSearch";
 import s from "./Search.module.css";
 
-import { t, Tr } from "@/i18n";
-import { useRenderCtx } from "@/lib/markdownCtx";
-import { parse, plainText } from "@/markdown";
-
-/** Conversations that hold messages; categories and voice channels hold none. */
-const SEARCHABLE = new Set(["text", "dm", "group_dm", "subchat"]);
-
-/** Newest first, ties broken by id so the list never reorders under itself. */
-function newestFirst(a: DecryptedMessage, b: DecryptedMessage): number {
-  return b.created_at - a.created_at || compareIds(b.id, a.id);
+/** The words in the box of a conversation's search: "Search @Bob", "Search Nexa Design Lab". */
+export function useSearchPlaceholder(channel: Channel): string {
+  const byId = useChannels((c) => c.byId);
+  const names = useNames();
+  const scope = scopeOf(channel, byId);
+  return t("search.box.placeholder", { name: isolate(scopeName(scope, byId, names)) });
 }
 
-/**
- * Searches every message this account can read.
- *
- * Messages are end-to-end encrypted, so the server cannot do this for us and
- * there is no index to ask. What is already decrypted answers at once; behind
- * it a walk fetches the rest of the history, conversation by conversation,
- * decrypts it here and streams the matches in as they turn up. That takes as
- * long as it takes, so the panel says where it has got to and stops when asked.
- */
-export function SearchPanel({ channel, query, onClose, onQuery, onJump, inline, keysRef, onSuggest }: {
+/** The conversations offered for in:, the ones in scope first, then by how recently they were used. */
+export function suggestionChannels(byId: Record<string, Channel>, first: string[] | null): Channel[] {
+  const all = searchableChannels(byId).sort((a, b) => compareIds(b.last_message_id ?? b.id, a.last_message_id ?? a.id));
+  if (!first) return all;
+  const inside = new Set(first);
+  return [...all.filter((c) => inside.has(c.id)), ...all.filter((c) => !inside.has(c.id))];
+}
+
+export function SearchPanel({
+  channel,
+  query,
+  onQuery,
+  caret,
+  inline = false,
+  onClose,
+  onJump,
+  keysRef,
+  onSuggest,
+}: {
   channel: Channel;
   query: string;
-  onClose: () => void;
   onQuery: (v: string) => void;
-  onJump?: (() => void) | undefined;
-  /** The box is in the panel (a phone, a tablet), which then covers the chat as a dialog of its own. */
+  /** Where the caret is in the header's box, for the suggestions. */
+  caret?: number;
+  /** On a phone or tablet: a sheet over the screen with its own box. */
   inline?: boolean;
-  /** Filled with the suggestion list's key handler, for a search box outside the panel. */
+  onClose: () => void;
+  onJump?: (() => void) | undefined;
+  /** Filled with the key handler, for the box in the chat's header. */
   keysRef?: MutableRefObject<((e: KeyboardEvent<HTMLInputElement>) => boolean) | null>;
-  /** The suggestion list's id and chosen row, for a search box outside the panel. */
-  onSuggest?: (active: string | undefined) => void;
+  /** The chosen suggestion's id and the list's, for the header box's aria attributes. */
+  onSuggest?: (active: string | undefined, listId: string | undefined) => void;
 }) {
-  // Results read as the message does, not as its source: mentions by name,
-  // custom emoji as :name:, a spoiler still hidden, and no markup — a heading
-  // reads as its words, not as "## A heading".
-  const renderCtx = useRenderCtx();
-  const readable = (source: string): string => plainText(parse(source), renderCtx);
-  const suggest = useRef<SuggestHandle>(null);
-  const [activeOption, setActiveOption] = useState<string | undefined>(undefined);
-  const listId = useId();
-  if (keysRef) keysRef.current = (e) => suggest.current?.key(e) ?? false;
-  useEffect(() => onSuggest?.(activeOption), [activeOption, onSuggest]);
-  const panel = useRef<HTMLElement>(null);
-  // Where the panel covers the chat it is a dialog: focus goes in (to its box)
-  // and comes back to what opened it.
-  useEffect(() => {
-    if (!inline) return;
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    return () => {
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
-    };
-  }, [inline]);
   const nav = useNavigate();
-  const users = useUsers((u) => u.byId);
-  const meId = useAuth((a) => a.me?.id);
-  const channels = useChannels((c) => c.byId);
-  const store = useMessages((m) => m.channels);
-  const servers = useServers((st) => st.byId);
-  const rels = useRelationships((r) => r.byUser);
-  const setJumpTo = useUI((u) => u.setJumpTo);
-  const q = useMemo(() => parseQuery(query), [query]);
+  const byId = useChannels((c) => c.byId);
+  const names = useNames();
+  const home = useMemo(() => scopeOf(channel, byId), [channel, byId]);
+  const homeKey = home.kind === "all" ? "all" : `${home.kind}:${home.id}`;
+  const [scope, setScope] = useState<SearchScope>(home);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setScope(home), [homeKey]);
+  const [tab, setTab] = useState<Tab>("messages");
+  const [sort, setSort] = useState<Sort>("newest");
+  const run = useSearch({ raw: query, scope, tab, sort, names });
+  const { st, p } = useScopeProgress(run.channels);
+  const recent = useSettings((x) => x.settings.searchRecent);
+  const homeLabel = scopeName(home, byId, names);
+  const listId = useId();
+  const input = useRef<HTMLInputElement | null>(null);
+  const [ownCaret, setOwnCaret] = useState(query.length);
+  const at = inline ? ownCaret : (caret ?? query.length);
 
-  // Every conversation, not only this server's. Channels the account may not
-  // read its history in are left in: the server is the authority on that, and
-  // one refusal each is cheaper than getting the permission maths wrong here
-  // and quietly hiding a conversation from search forever.
-  const scope = useMemo(() => Object.values(channels).filter((c) => SEARCHABLE.has(c.type)), [channels]);
-  const friends = useMemo(() => friendNicknames(rels), [rels]);
-  const channelNames = useMemo(
-    () => Object.fromEntries(scope.map((c) => [c.id, channelDisplayName(c, users, meId, friends).toLowerCase()])),
-    [scope, users, meId, friends],
+  // Suggestions, put away with Escape until the query changes again.
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => setDismissed(false), [query]);
+  const nearby = useMemo(() => (home.kind === "conversation" ? (byId[home.id]?.recipient_ids ?? []) : []), [home, byId]);
+  const candidates = useMemo(() => suggestionChannels(byId, run.channels), [byId, run.channels]);
+  const groups = useMemo(
+    () => (dismissed ? [] : suggest({ raw: query, caret: Math.min(at, query.length), names, channels: candidates, nearby, recent, now: Date.now() })),
+    [dismissed, query, at, names, candidates, nearby, recent],
   );
-  // `from:` and `mentions:` take a nickname from any server, because a result
-  // can come from any of them.
-  const nicknames = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (const st of Object.values(servers)) for (const m of Object.values(st.members)) if (m.nickname) out[m.user_id] = m.nickname.toLowerCase();
-    return out;
-  }, [servers]);
-  const ctx = useMemo(() => ({ users, channelNames, nicknames, ...(meId ? { meId } : {}) }), [users, channelNames, nicknames, meId]);
+  const pick = useCallback(
+    (sg: Suggestion) => {
+      if (sg.kind === "recent") rememberSearch(sg.text);
+      onQuery(sg.text);
+      setOwnCaret(sg.caret);
+      // the caret goes where the suggestion left it: after a finished filter, or inside one still to fill
+      requestAnimationFrame(() => {
+        const el = input.current ?? document.querySelector<HTMLInputElement>("input[data-header-search]");
+        el?.focus({ preventScroll: true });
+        el?.setSelectionRange(sg.caret, sg.caret);
+      });
+    },
+    [onQuery],
+  );
+  const onDate = useCallback(
+    (key: string, value: string) => {
+      const piece = partialAt(query, Math.min(at, query.length));
+      if (!piece) return;
+      const next = replacePiece(query, piece, `${key}:${value}`, true);
+      pick({ id: "date", kind: "date", text: next.text, caret: next.caret });
+    },
+    [query, at, pick],
+  );
+  const dismiss = useCallback(() => setDismissed(true), []);
+  const sk = useSuggestionKeys(query.trim() ? groups : [], pick, dismiss);
+  const floating = query.trim() ? groups : [];
+  const activeId = sk.activeId ? `${listId}-${sk.activeId}` : undefined;
+  useEffect(() => onSuggest?.(activeId, floating.length ? listId : undefined), [activeId, floating.length, listId, onSuggest]);
 
-  // What this device has already decrypted, matched on every keystroke so the
-  // panel answers before the walk behind it has even started.
-  const loaded = useMemo(() => {
-    if (isEmptyQuery(q)) return [];
-    const all = scope.flatMap((c) => Object.values(store[c.id]?.byId ?? {}));
-    return search(all, q, ctx);
-  }, [q, scope, store, ctx]);
+  const panel = useRef<HTMLDivElement>(null);
+  const keys = (e: KeyboardEvent<HTMLInputElement>): boolean => {
+    if (sk.key(e)) return true;
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      rememberSearch(query);
+      return true;
+    }
+    // down from the box goes into the results
+    if (e.key === "ArrowDown") {
+      const first = panel.current?.querySelector<HTMLElement>("[data-result], [data-tile]");
+      if (first) {
+        e.preventDefault();
+        first.focus();
+        return true;
+      }
+    }
+    return false;
+  };
+  if (keysRef) keysRef.current = keys;
 
-  // `in:` narrows what is walked, not only what is shown: asking for one
-  // channel should not cost a walk through every other one first.
-  const scanChannels = useMemo(() => {
-    const wanted = q.in;
-    const list = wanted.length ? scope.filter((c) => wanted.some((w) => channelNames[c.id] === w || c.id === w)) : scope;
-    return list.map((c) => ({ id: c.id, lastMessageId: c.last_message_id }));
-  }, [scope, channelNames, q]);
-  const { hits, progress, cancel, restart } = useFullSearch({ query: q, raw: query, ctx, channels: scanChannels, enabled: !isEmptyQuery(q) });
-
-  const results = useMemo(() => {
-    const byId = new Map<string, DecryptedMessage>();
-    for (const m of loaded) byId.set(m.id, m);
-    for (const m of hits) byId.set(m.id, m);
-    return [...byId.values()].sort(newestFirst).slice(0, MAX_RESULTS);
-  }, [loaded, hits]);
-
-  const jump = (channelId: string, messageId: string) => {
-    const ch = channels[channelId];
+  const jump = (d: SearchDoc) => {
+    const ch = byId[d.c];
     if (!ch) return;
-    nav(ch.server_id ? `/channels/${ch.server_id}/${ch.id}/${messageId}` : `/channels/@me/${ch.id}/${messageId}`);
-    setJumpTo({ channelId, messageId });
+    rememberSearch(query);
+    nav(ch.server_id ? `/channels/${ch.server_id}/${ch.id}/${d.id}` : `/channels/@me/${ch.id}/${d.id}`);
+    useUI.getState().setJumpTo({ channelId: ch.id, messageId: d.id });
     onJump?.();
   };
 
-  const status = progress.running
-    ? t("search.search.searching", { count: progress.messages, done: progress.channelsDone, total: progress.channelsTotal })
-    : progress.messages > 0
-      ? t("search.search.searched", { count: progress.messages, total: progress.channelsTotal })
-      : t("search.search.notStarted");
+  // Covering the screen, the sheet is a dialog: focus stays in it, Escape and
+  // the back gesture close it, and focus goes back to what opened it.
+  useFocusTrap(panel, inline, () => input.current);
+  useEffect(() => {
+    if (!inline) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented || !isTopLayer(panel.current)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, [inline, onClose]);
 
-  return (
-    <aside
-      ref={panel}
-      className={s.panel}
-      data-testid="search-panel"
-      role={inline ? "dialog" : "complementary"}
-      aria-modal={inline || undefined}
-      aria-label={t("chat.chat.searchMessages")}
-      onKeyDown={(e) => {
-        // covering the chat, the panel closes on Escape itself
-        if (!inline || e.key !== "Escape" || e.defaultPrevented) return;
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
-      }}
-    >
-      <div className={s.head}>
-        {/* the count is said as it changes, politely; the running progress below is not */}
-        <span className={s.headText} role="status"><Search size={16} aria-hidden="true" /> {isEmptyQuery(q) ? t("chat.chat.search") : t("search.search.results", { count: results.length })}</span>
-        <button className={s.close} aria-label={t("search.search.closeSearch")} onClick={onClose}><X size={18} /></button>
-      </div>
-      {inline ? (
+  const walking = p.done < p.total && st.mode !== "closed";
+  const chips = (
+    <QueryChips
+      raw={query}
+      parsed={run.parsed}
+      resolved={run.resolved}
+      names={names}
+      onChange={onQuery}
+      scope={scope}
+      scopeLabel={scopeName(scope, byId, names)}
+      onWiden={() => setScope(EVERYWHERE)}
+      narrowTo={homeLabel}
+      onNarrow={() => setScope(home)}
+    />
+  );
+  const body = (
+    <div className={s.panelBody}>
+      {floating.length ? <SearchSuggestions groups={floating} active={sk.active} listId={listId} names={names} onPick={pick} onHover={sk.setActive} onDate={onDate} /> : null}
+      {run.empty ? (
+        <div className={s.intro}>
+          <p className={s.introTitle}>{scope.kind === "all" ? t("search.intro.everywhere") : t("search.intro.scoped", { name: isolate(scopeName(scope, byId, names)) })}</p>
+          <p className={s.introText}>{t("search.intro.private")}</p>
+          {/* with a filter half typed, its suggestions are the ones floating above */}
+          {query.trim() ? null : <SearchSuggestions groups={groups} active={-1} listId={`${listId}-intro`} names={names} onPick={pick} onHover={() => undefined} onDate={onDate} onClearRecent={clearRecentSearches} floating={false} />}
+        </div>
+      ) : (
+        <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} hereChannelId={channel.id} scoped={scope.kind !== "all"} onWiden={() => setScope(EVERYWHERE)} walking={walking} onTop={() => (input.current ?? document.querySelector<HTMLInputElement>("input[data-header-search]"))?.focus()} />
+      )}
+    </div>
+  );
+
+  if (!inline) {
+    return (
+      <aside ref={panel} className={s.panel} data-testid="search-panel" aria-label={t("search.panel.label")}>
+        <div className={s.panelTop}>
+          {chips ?? <span className={s.panelTitle}>{t("search.panel.label")}</span>}
+          <button type="button" className={s.close} aria-label={t("search.panel.close")} title={t("search.panel.close")} onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        {body}
+        <IndexStatus channels={run.channels} scope={scope} />
+      </aside>
+    );
+  }
+  return createPortal(
+    <div ref={panel} className={s.sheet} role="dialog" aria-modal="true" aria-label={t("search.panel.label")} data-modal-layer="" data-testid="search-panel">
+      <div className={s.sheetTop}>
+        <button type="button" className={s.back} aria-label={t("search.panel.close")} onClick={onClose} data-testid="search-back">
+          <ArrowLeft size={22} />
+        </button>
         <SearchBox
-          className={s.inlineSearch}
+          ref={input}
+          className={s.sheetBox}
           value={query}
-          onChange={onQuery}
-          placeholder={t("chat.chat.search")}
-          aria-label={t("chat.chat.searchMessages")}
+          onChange={(v) => {
+            onQuery(v);
+            setOwnCaret(v.length);
+          }}
+          placeholder={scope.kind === "all" ? t("search.box.placeholderEverywhere") : t("search.box.placeholder", { name: isolate(scopeName(scope, byId, names)) })}
+          aria-label={t("search.box.label")}
           autoFocus
           data-testid="search-input-mobile"
+          dir="auto"
           role="combobox"
-          aria-controls={listId}
-          aria-activedescendant={activeOption}
-          onKeyDown={(e) => void suggest.current?.key(e)}
+          aria-expanded={floating.length > 0}
+          aria-controls={floating.length ? listId : undefined}
+          aria-activedescendant={activeId}
+          aria-autocomplete="list"
+          onSelect={(e) => setOwnCaret(e.currentTarget.selectionStart ?? query.length)}
+          onKeyDown={(e) => void keys(e)}
         />
-      ) : null}
-      <SearchSuggestions query={query} users={users} channels={scope} nicknames={nicknames} onPick={onQuery} handle={suggest} listId={listId} onActive={setActiveOption} />
-      {isEmptyQuery(q) ? (
-        <div className={s.help}>
-          <p>{t("search.search.helpEverything")}</p>
-          <dl>
-            <dt>from:</dt><dd><Tr id="search.search.fromHint" values={{ me: <b>{t("search.search.me")}</b> }} /></dd>
-            <dt>in:</dt><dd>{t("search.search.channel")}</dd>
-            <dt>has:</dt><dd>{t("search.search.linkImageFileStickerEmbed")}</dd>
-            <dt>{t("search.search.beforeAfter")}</dt><dd>2026-01-31</dd>
-            <dt>{t("search.search.quotes")}</dt><dd>{t("search.search.exactPhrase")}</dd>
-            <dt>-word</dt><dd>{t("search.search.exclude")}</dd>
-          </dl>
-        </div>
-      ) : null}
-      <div className={s.list}>
-        {results.map((m) => {
-          const ch = channels[m.channel_id];
-          const author = users[m.author_id];
-          const name = memberName(ch?.server_id ? servers[ch.server_id]?.members[m.author_id]?.nickname : undefined, author);
-          const where = ch ? (ch.server_id ? `#${ch.name}` : channelDisplayName(ch, users, meId, friends)) : "";
-          return (
-            <button key={m.id} className={s.result} onClick={() => jump(m.channel_id, m.id)} data-result={m.id}>
-              <div className={s.resultHead}>
-                <Avatar id={m.author_id} avatarId={author?.avatar_id ?? null} name={name} size={20} />
-                <span className={s.resultName} dir="auto">{name}</span>
-                {m.channel_id !== channel.id && where ? <span className={s.resultChan}>{where}</span> : null}
-                <span className={s.resultTime} title={formatFull(m.created_at)}>{formatTimestamp(m.created_at)}</span>
-              </div>
-              <div className={s.resultText} dir="auto">
-                {m.payload?.t ? highlight(readable(m.payload.t), q).map((r, i) => (r.hit ? <mark key={i}>{r.text}</mark> : <span key={i}>{r.text}</span>)) : m.payload?.sticker ? t("chat.messageItem.sticker") : m.payload?.att?.length ? t("search.search.filesCount", { count: m.payload.att.length }) : ""}
-              </div>
-            </button>
-          );
-        })}
-        {!isEmptyQuery(q) && results.length === 0 ? (
-          <div className={s.empty}>{progress.running ? t("search.search.stillLooking") : t("search.search.noResultsAnywhere", { count: progress.messages })}</div>
-        ) : null}
       </div>
-      {!isEmptyQuery(q) && (progress.unreadable > 0 || progress.capped || progress.throttled) ? (
-        <div className={s.notes}>
-          {progress.throttled ? <span>{t("search.search.waitingForServer")}</span> : null}
-          {progress.unreadable > 0 ? <span>{t("search.search.unreadable", { count: progress.unreadable })}</span> : null}
-          {progress.capped ? <span>{t("search.search.capped", { count: progress.indexed })}</span> : null}
-        </div>
-      ) : null}
-      <div className={s.foot}>
-        <span className={s.progress} data-testid="search-progress">{isEmptyQuery(q) ? t("search.search.typeToSearch") : status}</span>
-        {isEmptyQuery(q) ? null : progress.running ? (
-          <Button size="sm" variant="secondary" onClick={cancel} data-testid="search-cancel">{t("search.search.cancel")}</Button>
-        ) : (
-          <Button size="sm" variant="secondary" onClick={restart} data-testid="search-again">{t("search.search.searchAgain")}</Button>
-        )}
-      </div>
-    </aside>
+      {chips}
+      {body}
+      <IndexStatus channels={run.channels} scope={scope} />
+    </div>,
+    document.body,
   );
 }
