@@ -19,6 +19,8 @@ import (
 const (
 	animWebPLossy    = "UklGRugAAABXRUJQVlA4WAoAAAASAAAADwAABwAAQU5JTQYAAAAAAAAAAABBTk1GZAAAAAAAAAAAAA8AAAcAAGQAAAJBTFBICgAAAAEHUMCICERE/wNWUDggOgAAALABAJ0BKhAACAAAwBIloAADXxQWlwAA/v1REJ//93m//7nz//ufP+L3//+tHP//V0X//V0X/rKwAABBTk1GUAAAAAAAAAAAAA8AAAcAAGQAAABWUDggOAAAAJQBAJ0BKhAACAAAABIloAADXxDkIAD+/8JX9C///60c//9XRf/9XRf+tHP//lK/+v3/X7qcAAAA"
 	animWebPLossless = "UklGRoQAAABXRUJQVlA4WAoAAAASAAAADwAABwAAQU5JTQYAAAAAAAAAAABBTk1GKAAAAAAAAAAAAA8AAAcAAGQAAAJWUDhMDwAAAC8PwAEABxD9j/4HIqL/AQBBTk1GKAAAAAAAAAAAAA8AAAcAAGQAAAJWUDhMDwAAAC8PwAEQBxDR/wIGIqL/AQA="
+	// 520×8, wider than an animation is ever shrunk at
+	animWebPWide = "UklGRoQAAABXRUJQVlA4WAoAAAACAAAABwIABwAAQU5JTQYAAAAAAAAAAABBTk1GKAAAAAAAAAAAAAcCAAcAAGQAAAJWUDhMDwAAAC8HwgEABxD9j/4HIqL/AQBBTk1GKAAAAAAAAAAAAAcCAAcAAGQAAABWUDhMDwAAAC8HwgEABxDR//4HIqL/AQA="
 )
 
 func mustB64(t *testing.T, s string) []byte {
@@ -117,6 +119,20 @@ func TestStillsOfMovingStickers(t *testing.T) {
 	}
 	if _, img, format = serve(w.ID, 16, true); img == nil || format != "png" || img.Bounds().Dx() != 16 || img.Bounds().Dy() != 8 {
 		t.Errorf("webp still: %s %v", format, img)
+	}
+	// a wide animated WebP keeps moving when asked for smaller, as it always
+	// has (only a still is a still); a GIF that wide becomes one, as before
+	wide := mustB64(t, animWebPWide)
+	ww, err := m.PutPublic(ctx, "sticker", bytes.NewReader(wide), lim, ids.New())
+	if err != nil || !ww.Animated || *ww.Width != 520 {
+		t.Fatal(err, ww)
+	}
+	if rec, _, _ := serve(ww.ID, 128, false); !bytes.Equal(rec.Body.Bytes(), wide) {
+		t.Error("a wide animated WebP asked for at a size is served as it is")
+	}
+	// its first frame is opaque, so the still is a JPEG
+	if _, img, format = serve(ww.ID, 128, true); img == nil || format != "jpeg" || img.Bounds().Dx() != 128 {
+		t.Errorf("wide webp still: %s", format)
 	}
 	// a picture that does not move is unaffected by still
 	flat := pngBytes(64, 64)

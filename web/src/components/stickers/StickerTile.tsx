@@ -82,7 +82,8 @@ export function useStickerStill(src: StillSource, place: ScreenPlace, lower = 0)
 export function StillFace({ view, src, alt, play, className }: { view: StillView; src: StillSource; alt: string; play: boolean; className?: string | undefined }) {
   return (
     <span className={className ? `${s.still} ${className}` : s.still} data-sticker-state={view.status}>
-      {view.url ? <img className={s.stillImg} src={view.url} alt={alt} draggable={false} decoding="async" /> : null}
+      {/* data-sticker-media: the size and backdrop rules grids already had for the sticker apply to its still */}
+      {view.url ? <img data-sticker-media className={s.stillImg} src={view.url} alt={alt} draggable={false} decoding="async" /> : null}
       {view.status === "failed" ? (
         <span className={s.failed} title={t("stickers.tile.couldNotLoadHint")}>
           <RotateCw aria-hidden="true" />
@@ -92,7 +93,7 @@ export function StillFace({ view, src, alt, play, className }: { view: StillView
       {/* the still stays underneath until the moving one has drawn its first frame */}
       {play && view.url ? (
         <span className={s.live}>
-          <StickerView format={src.format} src={fullStickerUrl(src)} alt="" className={s.fill} play renderer="canvas" />
+          <StickerView format={src.format} src={fullStickerUrl(src)} alt="" className={s.fill} play renderer="canvas" eager />
         </span>
       ) : null}
     </span>

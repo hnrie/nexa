@@ -88,7 +88,10 @@ func (m *Store) ServePublicSized(w http.ResponseWriter, r *http.Request, kind st
 	if !still && (size <= 0 || width == 0 || height == 0 || (width <= size && height <= size)) {
 		return m.ServePublic(w, r, kind, id)
 	}
-	if !still && b.Animated && width <= maxAnimatedSide && height <= maxAnimatedSide {
+	// An animated WebP never had a shrunk copy (it could not be read here
+	// before its first frame could), so it keeps moving at every size, as it
+	// always has; only a still is asked for explicitly.
+	if !still && b.Animated && ((width <= maxAnimatedSide && height <= maxAnimatedSide) || b.Mime == "image/webp") {
 		return m.ServePublic(w, r, kind, id)
 	}
 	path, mime, err := m.variant(r.Context(), b, size)
