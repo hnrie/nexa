@@ -49,6 +49,10 @@
 @media (min-width: 1080px) {
   .page { --gutter: 40px; }
 }
+/* on the biggest screens a little more of it, still never wider than the loops were filmed */
+@media (min-width: 1800px) {
+  .page { --wrap: 1320px; }
+}
 
 /* While this page is open the document scrolls, not a frame inside it. */
 :global(html[data-home]) {
@@ -144,7 +148,17 @@
 
 /* ---- the opening ------------------------------------------------------- */
 
-.hero { display: grid; grid-template-columns: minmax(0, 1fr); gap: 44px; padding-top: 40px; padding-bottom: 72px; }
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "title" "duo" "text";
+  row-gap: 32px;
+  padding-top: 36px;
+  padding-bottom: 72px;
+}
+.h1 { grid-area: title; }
+.duo { grid-area: duo; }
+.heroText { grid-area: text; min-width: 0; }
 .h1 {
   margin: 0;
   font-size: clamp(40px, 3.4vw + 22px, 72px);
@@ -153,7 +167,7 @@
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
-.lede { margin: 22px 0 0; max-width: 34em; font-size: clamp(17px, 0.4vw + 15.5px, 20px); line-height: 1.6; color: var(--ink-soft); }
+.lede { margin: 0; max-width: 34em; font-size: clamp(17px, 0.4vw + 15.5px, 20px); line-height: 1.6; color: var(--ink-soft); }
 .fine { margin: 16px 0 0; font-size: 15px; line-height: 1.5; color: var(--ink-soft); }
 
 /* ---- the two sides of one conversation ---------------------------------- */
@@ -324,7 +338,21 @@
   .ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (min-width: 1080px) {
-  .hero { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; gap: 64px; padding-top: 72px; padding-bottom: 112px; }
+  /* side by side: the headline and its paragraph stay together, level with
+     the middle of the conversation however tall either turns out */
+  .hero {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    grid-template-areas: "title duo" "text duo";
+    align-content: center;
+    column-gap: 64px;
+    row-gap: 0;
+    padding-top: 72px;
+    padding-bottom: 112px;
+  }
+  .h1 { align-self: end; }
+  .heroText { align-self: start; }
+  .duo { align-self: center; }
+  .lede { margin-top: 22px; }
   .chapter { grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); column-gap: 64px; padding-bottom: 112px; }
   .chapter::before { margin-bottom: 72px; }
   /* the chapter's name stays in view beside everything in it */

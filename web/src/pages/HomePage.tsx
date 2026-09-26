@@ -479,9 +479,14 @@ export default function HomePage() {
       </header>
 
       <main>
+        {/* In one column (a phone, a tablet held upright) the conversation
+            comes straight after the headline, so the first screen shows what
+            the page is about rather than a paragraph describing it; the
+            header keeps Get Started in reach meanwhile. */}
         <section className={s.hero} aria-labelledby="home-title">
+          <h1 id="home-title" className={s.h1}>{t("home.hero.title")}</h1>
+          <Duo still={still} />
           <div className={s.heroText}>
-            <h1 id="home-title" className={s.h1}>{t("home.hero.title")}</h1>
             <p className={s.lede}>{t("home.hero.lede")}</p>
             <div className={s.actions}>
               {start}
@@ -489,7 +494,6 @@ export default function HomePage() {
             </div>
             <p className={s.fine}>{t("home.hero.fine")}</p>
           </div>
-          <Duo still={still} />
         </section>
 
         <Chapter
