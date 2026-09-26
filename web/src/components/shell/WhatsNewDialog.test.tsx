@@ -8,7 +8,8 @@ import { RELEASES } from "@/lib/whatsNew";
 import { useAuth } from "@/stores/auth";
 import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
-import { WhatsNew } from "./WhatsNewDialog";
+import { Sparkles } from "lucide-react";
+import { WhatsNew, WhatsNewDialog } from "./WhatsNewDialog";
 
 /** An account id made at a moment, the way the server makes them. */
 const idAt = (ms: number) => (BigInt(ms - ID_EPOCH) << 22n).toString();
@@ -94,5 +95,20 @@ describe("What's New", () => {
     act(() => void vi.advanceTimersByTime(1000));
     expect(dialog()).not.toBeNull();
     box.remove();
+  });
+
+  it("shows an account that saw the first release of a day only what came after it", () => {
+    signIn(OLD, { seen: "2026-09-26" });
+    render(<WhatsNew />);
+    expect(screen.getByText("Who Can Message You")).toBeTruthy();
+    expect(screen.queryByText("Search Every Conversation")).toBeNull();
+  });
+
+  it("puts the releases of one day under one date", () => {
+    const item = (name: string) => ({ icon: Sparkles, title: `whatsNew.test.${name}Title`, body: `whatsNew.test.${name}Body` });
+    const releases = [{ id: "2026-09-26.2", items: [item("later")] }, { id: "2026-09-26", items: [item("earlier")] }, { id: "2026-09-20", items: [item("before")] }];
+    render(<WhatsNewDialog releases={releases} onClose={() => {}} />);
+    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["September 26, 2026", "September 20, 2026"]);
+    expect(screen.getAllByRole("heading", { level: 4 }).map((h) => h.textContent)).toEqual(["whatsNew.test.laterTitle", "whatsNew.test.earlierTitle", "whatsNew.test.beforeTitle"]);
   });
 });

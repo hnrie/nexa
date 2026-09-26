@@ -4,7 +4,7 @@ import { Modal } from "@/components/common/Modal";
 import { idTime } from "@/lib/ids";
 import { useInterrupt } from "@/lib/interrupt";
 import { onTermsAccepted, termsAccepted } from "@/lib/legal";
-import { laterRelease, releaseDate, unseenReleases, type Release } from "@/lib/whatsNew";
+import { laterRelease, parseRelease, releaseDate, unseenReleases, type Release } from "@/lib/whatsNew";
 import { useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
 import { t, useLocale } from "@/i18n";
@@ -23,12 +23,29 @@ export function markSeen(releases: Release[]): void {
   if (next !== now) settings.patch({ whatsNewSeen: next });
 }
 
+/**
+ * Releases of one day ("2026-09-26", then "2026-09-26.2") read as that day's
+ * list under one date, newest first, rather than as two headings saying the
+ * same thing.
+ */
+function byDay(releases: Release[]): Release[] {
+  const out: Release[] = [];
+  for (const r of releases) {
+    const last = out[out.length - 1];
+    const day = parseRelease(r.id)?.day;
+    if (last && day !== undefined && parseRelease(last.id)?.day === day) out[out.length - 1] = { id: last.id, items: [...last.items, ...r.items] };
+    else out.push(r);
+  }
+  return out;
+}
+
 /** The releases' features, newest release first. `intro` says Nexa has just been updated. */
 export function WhatsNewDialog({ releases, intro = false, onClose }: { releases: Release[]; intro?: boolean; onClose: () => void }) {
   const locale = useLocale();
   const baseId = useId();
   const content = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const days = useMemo(() => byDay(releases), [releases]);
   // the dialog's body is what scrolls; once it has, a line sets the title apart from what passes under it
   useEffect(() => {
     const body = content.current?.parentElement;
@@ -53,7 +70,7 @@ export function WhatsNewDialog({ releases, intro = false, onClose }: { releases:
       <div ref={content} data-testid="whats-new">
         <div className={s.edge} data-on={scrolled || undefined} aria-hidden="true" />
         {intro ? <p className={s.intro}>{t("whatsNew.intro")}</p> : null}
-        {releases.map((r) => (
+        {days.map((r) => (
           <section key={r.id} className={s.release} aria-labelledby={`${baseId}-${r.id}`} data-release={r.id}>
             <h3 className={s.date} id={`${baseId}-${r.id}`}>
               {releaseDate(r.id, locale)}
