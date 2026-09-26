@@ -46,9 +46,9 @@ export function PluginUpdateDialog({ entry, name, update, onClose, onAccept, onK
           <dt>{t("look.plugins.factLink")}</dt>
           <dd dir="ltr">{entry.url}</dd>
           <dt>{t("look.plugins.factApproved")}</dt>
-          <dd dir="ltr">{oldSize !== null ? `${formatBytes(oldSize)} · ${shortHash(entry.hash)}` : shortHash(entry.hash)}</dd>
+          <dd dir="ltr">{oldSize !== null ? `${formatBytes(oldSize)}, ${shortHash(entry.hash)}` : shortHash(entry.hash)}</dd>
           <dt>{t("look.plugins.factNew")}</dt>
-          <dd dir="ltr" data-testid="plugin-update-hash">{`${formatBytes(update.size)} · ${shortHash(update.hash)}`}</dd>
+          <dd dir="ltr" data-testid="plugin-update-hash">{`${formatBytes(update.size)}, ${shortHash(update.hash)}`}</dd>
         </dl>
         <details>
           <summary style={{ cursor: "pointer", fontSize: 14, fontWeight: 600, color: "var(--text-subtle)" }}>{t("look.plugins.showCode")}</summary>
