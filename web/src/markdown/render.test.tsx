@@ -347,6 +347,102 @@ describe("blocks", () => {
     expect(screen.getByText("world").tagName).toBe("STRONG");
   });
 
+  it("renders all six heading levels and a rule", () => {
+    const { container } = render(<Markdown source={"# 1\n## 2\n### 3\n#### 4\n##### 5\n###### 6\n---"} ctx={makeCtx()} />);
+    for (let n = 1; n <= 6; n++) expect(container.querySelector(`h${n}.md-h${n}`)?.textContent).toBe(String(n));
+    expect(container.querySelector("hr.md-hr")).not.toBeNull();
+  });
+
+  it("draws a checklist with read-only boxes", () => {
+    const { container } = render(<Markdown source={"- [x] done\n- [ ] open"} ctx={makeCtx()} />);
+    expect(container.querySelector("ul.md-task-list")).not.toBeNull();
+    const boxes = [...container.querySelectorAll<HTMLInputElement>("input.md-task")];
+    expect(boxes.map((b) => b.checked)).toEqual([true, false]);
+    expect(boxes.every((b) => b.disabled)).toBe(true);
+    expect(boxes.map((b) => b.getAttribute("aria-label"))).toEqual(["Done", "Not done"]);
+    expect(container.querySelector("li.md-task-item")?.getAttribute("data-checked")).toBe("true");
+  });
+
+  it("renders a table with its header, rows and alignment", () => {
+    const { container } = render(<Markdown source={"| a | b |\n|:-:|--:|\n| 1 | **2** |"} ctx={makeCtx()} />);
+    const wrap = container.querySelector(".md-table-wrap") as HTMLElement;
+    expect(wrap.querySelectorAll("thead th")).toHaveLength(2);
+    const cells = [...wrap.querySelectorAll<HTMLElement>("tbody td")];
+    expect(cells.map((c) => c.textContent)).toEqual(["1", "2"]);
+    expect(cells[0]?.style.textAlign).toBe("center");
+    expect(cells[1]?.style.textAlign).toBe("end");
+    expect(cells[1]?.querySelector("strong")).not.toBeNull();
+  });
+
+  it("names a callout by its kind", () => {
+    const { container } = render(<Markdown source={"> [!WARNING]\n> Back up first"} ctx={makeCtx()} />);
+    const note = container.querySelector(".md-alert") as HTMLElement;
+    expect(note.dataset["kind"]).toBe("warning");
+    expect(note.getAttribute("role")).toBe("note");
+    const title = note.querySelector(".md-alert-title") as HTMLElement;
+    expect(title.textContent).toBe("Warning");
+    expect(note.getAttribute("aria-labelledby")).toBe(title.id);
+    expect(note.querySelector(".md-paragraph")?.textContent).toBe("Back up first");
+  });
+
+  it("folds a section away under its summary", () => {
+    const { container } = render(<Markdown source={"::: details Logs\nline\n:::\n::: details\nx\n:::"} ctx={makeCtx()} />);
+    const sections = [...container.querySelectorAll("details.md-details")];
+    expect(sections).toHaveLength(2);
+    expect(sections[0]?.querySelector("summary")?.textContent).toBe("Logs");
+    expect(sections[0]?.hasAttribute("open")).toBe(false);
+    expect(sections[1]?.querySelector("summary")?.textContent).toBe("Details");
+  });
+
+  it("marks, raises and lowers words", () => {
+    const { container } = render(<Markdown source="==key== x^{2} H_{2}O" ctx={makeCtx()} />);
+    expect(container.querySelector("mark.md-mark")?.textContent).toBe("key");
+    expect(container.querySelector("sup.md-sup")?.textContent).toBe("2");
+    expect(container.querySelector("sub.md-sub")?.textContent).toBe("2");
+  });
+
+  it("paints coloured words in a colour that reads", () => {
+    const { container } = render(<Markdown source="[red words]{red} [lit]{on yellow}" ctx={makeCtx()} />);
+    const [red, lit] = [...container.querySelectorAll<HTMLElement>(".md-color")];
+    expect(red?.dataset["fg"]).toBe("red");
+    expect(red?.style.color).not.toBe("");
+    expect(lit?.dataset["bg"]).toBe("yellow");
+    expect(lit?.style.backgroundColor).not.toBe("");
+    expect(lit?.className).toContain("md-color-bg");
+  });
+
+  it("links footnotes both ways inside the message", () => {
+    const scrolled = vi.fn();
+    Element.prototype.scrollIntoView = scrolled;
+    const { container } = render(<Markdown source={"see[^a]\n[^a]: the note"} ctx={makeCtx()} />);
+    const ref = container.querySelector("a.md-fnref-link") as HTMLAnchorElement;
+    expect(ref.textContent).toBe("1");
+    expect(ref.getAttribute("aria-label")).toBe("Footnote 1");
+    const note = container.querySelector(".md-footnotes li") as HTMLElement;
+    expect(ref.getAttribute("href")).toBe("#" + note.id);
+    const back = note.querySelector("a.md-fnback") as HTMLAnchorElement;
+    expect(back.getAttribute("href")).toBe("#" + ref.id);
+    fireEvent.click(ref);
+    expect(scrolled).toHaveBeenCalled();
+    expect(document.activeElement).toBe(note);
+  });
+
+  it("keeps two messages' footnotes apart", () => {
+    const { container } = render(
+      <>
+        <Markdown source={"a[^1]\n[^1]: one"} ctx={makeCtx()} />
+        <Markdown source={"b[^1]\n[^1]: two"} ctx={makeCtx()} />
+      </>,
+    );
+    const ids = [...container.querySelectorAll(".md-footnotes li")].map((li) => li.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it("gives the new blocks the direction of their own words", () => {
+    const { container } = render(<Markdown source={"| a |\n|---|\n> [!NOTE]\n> x\n\n::: details s\ny\n:::"} ctx={makeCtx()} />);
+    for (const sel of [".md-table th", ".md-alert", ".md-details"]) expect(container.querySelector(sel)?.getAttribute("dir"), sel).toBe("auto");
+  });
+
   it("renders inline previews without block wrappers", () => {
     const { container } = render(<Markdown source={"# hi\n- x"} ctx={makeCtx()} inline />);
     expect(container.querySelector("h1")).toBeNull();

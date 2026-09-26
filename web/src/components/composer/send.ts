@@ -18,6 +18,7 @@ import { canI, P, useServers } from "@/stores/servers";
 import { emojiToken, packEmoji, useExpressions } from "@/stores/expressions";
 import { emojiByShortcode, emojiLoaded } from "@/components/pickers/emojiIndex";
 import { extractUrls } from "@/markdown";
+import { tooLong, tooLongMessage } from "./limit";
 import { extractMentions, type HumanNames, type MentionScope } from "./mentions";
 
 import { t } from "@/i18n";
@@ -324,15 +325,30 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
   } catch (err) {
     useMessages.getState().failPending(channelId, tmp);
     const ui = useUI.getState();
-    if (err instanceof Error && err.message === "waiting_for_key") ui.toast(t("composer.send.waitingForTheEncryptionKeyFor"), "error");
-    else if (err instanceof ApiError && err.code === "slowmode") {
+    if (err instanceof ApiError && err.code === "slowmode") {
       const secs = Number(err.retryAfter ?? 0) || 5;
       useSlowmode.getState().setUntil(channelId, Date.now() + secs * 1000);
       ui.toast(t("composer.send.slowModeTryAgain", { seconds: secs }), "error");
-    } else if (err instanceof ApiError) ui.toast(err.code === "rate_limited" ? t("composer.send.youAreSendingMessagesTooQuickly") : err.message, "error");
-    else ui.toast(t("composer.send.yourMessageCouldNotBeSent"), "error");
+    } else ui.toast(sendErrorText(err) ?? (err instanceof ApiError ? err.message : t("composer.send.yourMessageCouldNotBeSent")), "error");
     throw err;
   }
+}
+
+/**
+ * The sentence for a send or an edit that failed, where there is a better one
+ * than the error's own: sending and editing throw bare codes.
+ */
+export function sendErrorText(err: unknown): string | null {
+  if (err instanceof ApiError) {
+    if (err.code === "rate_limited") return t("composer.send.youAreSendingMessagesTooQuickly");
+    // the server's own ceiling, which only a message far past the limit reaches
+    if (err.code === "message_too_long" || err.code === "too_large") return tooLongMessage();
+    return null;
+  }
+  if (!(err instanceof Error)) return null;
+  if (err.message === "waiting_for_key") return t("composer.send.waitingForTheEncryptionKeyFor");
+  if (err.message === "too_long") return tooLongMessage();
+  return null;
 }
 
 function replyAuthor(channelId: string, messageId: string): string | undefined {
@@ -346,6 +362,8 @@ export async function editMessage(channelId: string, messageId: string, rawText:
   // a message this device cannot read cannot be edited from it: the edit
   // would replace everything with the new text, files and all
   if (!me || !existing || !existing.payload) return;
+  // the same limit as sending, whoever calls this
+  if (tooLong(rawText)) throw new Error("too_long");
   const { text, mentions, roles, everyone } = extractMentions(rawText, useUsers.getState().byId, mentionScope(channelId));
   // A reply that pinged its author keeps pinging them: the mention came from
   // the reply, not from the text, and the server replaces the list on edit.

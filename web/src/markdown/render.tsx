@@ -1,12 +1,13 @@
-import { Copy } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
-import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
+import { ChevronRight, Copy, CornerUpLeft, Info, Lightbulb, MessageSquareWarning, OctagonAlert, TriangleAlert, type LucideIcon } from "lucide-react";
+import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { copyText } from "@/lib/clipboard";
 import { ensureShortcodes, mightHaveShortcode, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import { formatStamp, type StampStyle } from "@/lib/time";
-import type { Node, RenderCtx } from "./ast";
-import { parse, plainText } from "./parse";
+import type { AlertKind, Align, Node, RenderCtx } from "./ast";
+import { FALLBACK_SURFACE, paintColor, subscribeTheme, surfaceOf, themeVersion, type Surface } from "./colors";
+import { alertTitle, parse, plainText } from "./parse";
 
 import { t } from "@/i18n";
 // ---------------------------------------------------------------------------
@@ -24,7 +25,13 @@ export function Markdown(props: { source: string; ctx: RenderCtx; inline?: boole
   // everything already on screen parses again and the names turn into emoji.
   const codes = useShortcodes(source);
   const nodes = useMemo(() => parse(source, { inline: inline === true }), [source, inline, codes]);
-  return <RenderNodes nodes={nodes} ctx={ctx} jumbo={jumbo} />;
+  // footnote links point within this message, whatever else is on the page
+  const scope = useId();
+  return (
+    <NoteScope.Provider value={scope}>
+      <RenderNodes nodes={nodes} ctx={ctx} jumbo={jumbo} />
+    </NoteScope.Provider>
+  );
 }
 
 /** Loads the shortcode table when some text might need it, and re-renders once it lands. */
@@ -64,7 +71,18 @@ function signature(node: Node, max: number): string {
     case "timestamp":
       return `${node.unix}:${node.style}`;
     case "br":
+    case "hr":
       return "";
+    case "task":
+      return node.checked ? "x" : "-";
+    case "footnoteRef":
+      return node.label.slice(0, max);
+    case "footnotes":
+      return node.notes.map((note) => note.label).join(" ").slice(0, max);
+    case "table":
+      return signatureOf(node.head.flat(), max);
+    case "details":
+      return signatureOf([...node.summary, ...node.children], max);
     case "list": {
       let out = "";
       for (const item of node.items) {
@@ -75,15 +93,18 @@ function signature(node: Node, max: number): string {
       }
       return out;
     }
-    default: {
-      let out = "";
-      for (const child of node.children) {
-        out += signature(child, max - out.length);
-        if (out.length >= max) return out.slice(0, max);
-      }
-      return out;
-    }
+    default:
+      return signatureOf(node.children, max);
   }
+}
+
+function signatureOf(list: Node[], max: number): string {
+  let out = "";
+  for (const child of list) {
+    out += signature(child, max - out.length);
+    if (out.length >= max) return out.slice(0, max);
+  }
+  return out;
 }
 
 function nodeKey(node: Node, n: number): string {
@@ -138,6 +159,30 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
         </Spoiler>
       );
+    case "mark":
+      return (
+        <mark className="md-mark">
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </mark>
+      );
+    case "sup":
+      return (
+        <sup className="md-sup">
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </sup>
+      );
+    case "sub":
+      return (
+        <sub className="md-sub">
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </sub>
+      );
+    case "color":
+      return (
+        <ColorText fg={node.fg} bg={node.bg}>
+          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+        </ColorText>
+      );
     // Every block takes the direction of its own words (dir="auto"): an
     // English line in an Arabic conversation reads, and lines up, as English.
     case "paragraph":
@@ -153,7 +198,7 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
         </blockquote>
       );
     case "heading": {
-      const Tag = (node.level === 1 ? "h1" : node.level === 2 ? "h2" : "h3") as "h1" | "h2" | "h3";
+      const Tag = `h${node.level}` as "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
       return (
         <Tag className={"md-h" + String(node.level)} dir="auto">
           <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
@@ -167,20 +212,50 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
         </small>
       );
     case "list": {
-      const items = node.items.map((item, i) => (
-        <li key={i} className="md-list-item" dir="auto">
-          <RenderNodes nodes={item} ctx={ctx} jumbo={jumbo} />
-        </li>
-      ));
+      const items = node.items.map((item, i) => {
+        const task = item[0]?.type === "task" ? item[0] : null;
+        return (
+          <li key={i} className={task ? "md-list-item md-task-item" : "md-list-item"} dir="auto" data-checked={task ? task.checked : undefined}>
+            <RenderNodes nodes={item} ctx={ctx} jumbo={jumbo} />
+          </li>
+        );
+      });
+      const tasks = node.items.some((item) => item[0]?.type === "task");
       // the list as a whole follows its first item, so its markers sit on that side
+      const cls = tasks ? "md-list md-task-list" : "md-list";
       return node.ordered ? (
-        <ol className="md-list" start={node.start} dir="auto">
+        <ol className={cls} start={node.start} dir="auto">
           {items}
         </ol>
       ) : (
-        <ul className="md-list" dir="auto">{items}</ul>
+        <ul className={cls} dir="auto">{items}</ul>
       );
     }
+    case "task":
+      // read only: a message's checklist says what its author ticked
+      return <input type="checkbox" className="md-task" checked={node.checked} disabled readOnly aria-label={node.checked ? t("render.taskDone") : t("render.taskOpen")} />;
+    case "hr":
+      return <hr className="md-hr" />;
+    case "table":
+      return <Table node={node} ctx={ctx} />;
+    case "alert":
+      return <Alert kind={node.kind} ctx={ctx} nodes={node.children} />;
+    case "details":
+      return (
+        <details className="md-details" dir="auto">
+          <summary className="md-summary">
+            <ChevronRight className="md-summary-chevron" size={16} aria-hidden="true" />
+            <span className="md-summary-text">{node.summary.length ? <RenderNodes nodes={node.summary} ctx={ctx} /> : t("render.details")}</span>
+          </summary>
+          <div className="md-details-body">
+            <RenderNodes nodes={node.children} ctx={ctx} />
+          </div>
+        </details>
+      );
+    case "footnoteRef":
+      return <FootnoteRef n={node.n} />;
+    case "footnotes":
+      return <Footnotes notes={node.notes} ctx={ctx} />;
     case "code":
       return <code className="md-inline-code">{node.text}</code>;
     case "codeblock":
@@ -237,6 +312,158 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
     case "timestamp":
       return <Timestamp unix={node.unix} style={node.style} />;
   }
+}
+
+// ---------------------------------------------------------------------------
+// tables, callouts, footnotes
+// ---------------------------------------------------------------------------
+
+const ALIGN: Record<Exclude<Align, null>, CSSProperties["textAlign"]> = { left: "start", center: "center", right: "end" };
+
+/**
+ * A table scrolls sideways inside its own box rather than widening the
+ * message; while it does, the box takes focus so the keyboard can scroll it too.
+ */
+function Table(props: { node: Extract<Node, { type: "table" }>; ctx: RenderCtx }): JSX.Element {
+  const { node, ctx } = props;
+  const ref = useRef<HTMLDivElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const check = () => setScrolls(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const cell = (nodes: Node[], c: number, head: boolean) => {
+    const align = node.align[c];
+    const style = align ? { textAlign: ALIGN[align] } : undefined;
+    const content = <RenderNodes nodes={nodes} ctx={ctx} />;
+    return head ? (
+      <th key={c} style={style} dir="auto">{content}</th>
+    ) : (
+      <td key={c} style={style} dir="auto">{content}</td>
+    );
+  };
+  return (
+    <div ref={ref} className="md-table-wrap" tabIndex={scrolls ? 0 : undefined} role={scrolls ? "region" : undefined} aria-label={scrolls ? t("render.table") : undefined}>
+      <table className="md-table">
+        <thead>
+          <tr>{node.head.map((c, i) => cell(c, i, true))}</tr>
+        </thead>
+        {node.rows.length ? (
+          <tbody>
+            {node.rows.map((row, r) => (
+              <tr key={r}>{row.map((c, i) => cell(c, i, false))}</tr>
+            ))}
+          </tbody>
+        ) : null}
+      </table>
+    </div>
+  );
+}
+
+const ALERT_ICON: Record<AlertKind, LucideIcon> = { note: Info, tip: Lightbulb, important: MessageSquareWarning, warning: TriangleAlert, caution: OctagonAlert };
+
+/** A callout: its kind named and marked in its colour, then what it says. */
+function Alert(props: { kind: AlertKind; nodes: Node[]; ctx: RenderCtx }): JSX.Element {
+  const Icon = ALERT_ICON[props.kind];
+  const titleId = useId();
+  return (
+    <div className="md-alert" data-kind={props.kind} role="note" aria-labelledby={titleId} dir="auto">
+      <p className="md-alert-title" id={titleId}>
+        <Icon size={16} aria-hidden="true" />
+        {alertTitle(props.kind)}
+      </p>
+      {props.nodes.length ? <RenderNodes nodes={props.nodes} ctx={props.ctx} /> : null}
+    </div>
+  );
+}
+
+/** What footnote links in one message are prefixed with, so two messages' notes never swap places. */
+const NoteScope = createContext("md");
+
+function noteIds(scope: string, n: number): { ref: string; note: string } {
+  const safe = scope.replace(/[^a-zA-Z0-9_-]/g, "");
+  return { ref: `${safe}-fnref-${n}`, note: `${safe}-fn-${n}` };
+}
+
+/** Scrolls to an element in the same message and puts the keyboard there, without touching the address bar. */
+function jumpTo(e: MouseEvent<HTMLAnchorElement>, id: string): void {
+  e.preventDefault();
+  const el = document.getElementById(id);
+  if (!el) return;
+  const reduce = document.documentElement.dataset["reducedMotion"] === "true" || !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView?.({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+  el.focus({ preventScroll: true });
+}
+
+function FootnoteRef(props: { n: number }): JSX.Element {
+  const ids = noteIds(useContext(NoteScope), props.n);
+  return (
+    <sup className="md-fnref">
+      <a href={"#" + ids.note} id={ids.ref} className="md-fnref-link" aria-label={t("render.footnote", { n: props.n })} onClick={(e) => jumpTo(e, ids.note)}>
+        {props.n}
+      </a>
+    </sup>
+  );
+}
+
+function Footnotes(props: { notes: Extract<Node, { type: "footnotes" }>["notes"]; ctx: RenderCtx }): JSX.Element {
+  const scope = useContext(NoteScope);
+  return (
+    <section className="md-footnotes" aria-label={t("render.footnotes")}>
+      <ol className="md-footnote-list">
+        {props.notes.map((note) => {
+          const ids = noteIds(scope, note.n);
+          return (
+            <li key={note.n} id={ids.note} tabIndex={-1} value={note.n} dir="auto">
+              <RenderNodes nodes={note.children} ctx={props.ctx} />
+              <a href={"#" + ids.ref} className="md-fnback" aria-label={t("render.footnoteBack", { n: note.n })} onClick={(e) => jumpTo(e, ids.ref)}>
+                <CornerUpLeft size={13} aria-hidden="true" />
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// coloured text
+// ---------------------------------------------------------------------------
+
+/**
+ * Words in the colour their author chose, measured against whatever they are
+ * drawn on (colors.ts). It is painted for the theme's own background first and
+ * measured again before the first paint, and again when the theme changes.
+ */
+function ColorText(props: { fg: string | null; bg: string | null; children: ReactNode }): JSX.Element {
+  const ref = useRef<HTMLSpanElement>(null);
+  const theme = useSyncExternalStore(subscribeTheme, themeVersion, themeVersion);
+  const [surface, setSurface] = useState<Surface>(FALLBACK_SURFACE);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const next = surfaceOf(el.parentElement ?? el);
+    setSurface((cur) => (sameSurface(cur, next) ? cur : next));
+  }, [theme]);
+  const paint = paintColor({ fg: props.fg, bg: props.bg }, surface);
+  const style: CSSProperties = {};
+  if (paint.color) style.color = paint.color;
+  if (paint.background) style.backgroundColor = paint.background;
+  return (
+    <span ref={ref} className={paint.background ? "md-color md-color-bg" : "md-color"} data-fg={props.fg ?? undefined} data-bg={props.bg ?? undefined} style={style}>
+      {props.children}
+    </span>
+  );
+}
+
+function sameSurface(a: Surface, b: Surface): boolean {
+  return a.bg.every((v, i) => Math.round(v) === Math.round(b.bg[i]!)) && a.text.every((v, i) => Math.round(v) === Math.round(b.text[i]!));
 }
 
 // ---------------------------------------------------------------------------

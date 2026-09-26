@@ -1,5 +1,6 @@
-import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, File as FileIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
+import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, Type, File as FileIcon } from "lucide-react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
+import { lazyPage } from "@/lib/lazyChunk";
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
 import { formatBytes } from "@/lib/time";
@@ -42,7 +43,9 @@ import s from "./Composer.module.css";
 
 import { t as tr_, Tr } from "@/i18n";
 import { formatShortDuration } from "@/lib/time";
-const MAX_LEN = 4000;
+import { MAX_MESSAGE_LENGTH, pasteOverflows, tooLong, tooLongMessage } from "./limit";
+import { MessageCounter } from "./MessageCounter";
+import { applyWrap, formatShortcut } from "./wrapShortcut";
 /** How many files one message carries. */
 const MAX_FILES = 10;
 // a stable empty tray, so a conversation with nothing in it does not re-render on every change to another
@@ -86,6 +89,13 @@ function byPrefix(query: string, ...names: string[]): number {
 }
 
 
+const loadFormatEditor = () => import("./format/FormatEditor");
+/** The formatting editor is its own download, fetched when the pointer comes near its button. */
+const FormatEditor = lazyPage(loadFormatEditor);
+function preloadFormatEditor(): void {
+  void loadFormatEditor().catch(() => undefined);
+}
+
 /** A phone-sized touch screen, where Return starts a new line. */
 function phoneKeyboard(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse) and (max-width: 767px)").matches;
@@ -124,6 +134,7 @@ export function Composer({ channel }: { channel: Channel }) {
   // this conversation's tray, which keeps going up while the box is elsewhere
   const files = useUploads((u) => u.trays[channel.id]) ?? NO_FILES;
   const [picker, setPicker] = useState(false);
+  const [formatting, setFormatting] = useState(false);
   const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: AcKind } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -189,6 +200,7 @@ export function Composer({ channel }: { channel: Channel }) {
     setText(useSettings.getState().settings.drafts[channel.id] ?? "");
     setAc(null);
     setNotice(null);
+    setFormatting(false);
     // On a touch screen a focus right after the tap that opened the conversation raises the keyboard over it.
     // In a split, only the pane you are actually in may take the caret.
     if (paneFocused && window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => taRef.current?.focus(), 0);
@@ -471,10 +483,17 @@ export function Composer({ channel }: { channel: Channel }) {
     return { replyTo: reply.messageId, ping: reply.ping };
   };
 
-  const send = () => {
-    if (remaining > 0) return toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
-    let body = text.trim();
-    if (body.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
+  /** Sends what the box holds, or what the formatting editor made; false when it did not go. */
+  const send = (raw: string = text): boolean => {
+    if (remaining > 0) {
+      toast(tr_("composer.composer.slowModeOnSeconds", { seconds: remaining }), "error");
+      return false;
+    }
+    let body = raw.trim();
+    if (tooLong(body)) {
+      toast(tooLongMessage(), "error");
+      return false;
+    }
     const cmd = runCommand(body);
     if (cmd.kind === "plugin") {
       // a plugin's command: the box empties at once, and whatever it answers is sent as the message
@@ -489,15 +508,18 @@ export function Composer({ channel }: { channel: Channel }) {
       return;
     }
     if (cmd.kind === "command") body = cmd.text;
-    else if (cmd.kind === "empty") return toast(tr_("composer.composer.commandNeedsText", { name: cmd.name }), "error");
-    else if (cmd.kind === "unknown" && sendAsIs.current !== body) {
+    else if (cmd.kind === "empty") {
+      toast(tr_("composer.composer.commandNeedsText", { name: cmd.name }), "error");
+      return false;
+    } else if (cmd.kind === "unknown" && sendAsIs.current !== body) {
       // Not published on the first try: "/ban someone" used to land in the
       // channel for all to read. Sent again unchanged, it goes as a message.
       sendAsIs.current = body;
-      return toast(tr_("composer.composer.noSuchCommand", { name: cmd.name }), "info");
+      toast(tr_("composer.composer.noSuchCommand", { name: cmd.name }), "info");
+      return false;
     }
     sendAsIs.current = null;
-    if (!body && files.length === 0) return;
+    if (!body && files.length === 0) return false;
     const channelId = channel.id;
     const opts: SendOptions = takeReply();
     // The box empties now rather than when the send is through, so anything
@@ -513,6 +535,21 @@ export function Composer({ channel }: { channel: Channel }) {
     // a message that cannot be sent stays in the list, marked, with Retry
     if (files.length) sendWithFiles(channelId, body, useUploads.getState().take(channelId), opts).catch(() => undefined);
     else sendMessage(channelId, body, opts).catch(() => undefined);
+    return true;
+  };
+
+  /** The formatting editor's markdown in place of what the box held, the caret at its end. */
+  const replaceText = (value: string) => {
+    touched.current = true;
+    setText(value);
+    persistDraft(value);
+    setAc(null);
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(value.length, value.length);
+    });
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -520,6 +557,13 @@ export function Composer({ channel }: { channel: Channel }) {
     // Korean…) belong to it: Enter confirms the word, arrows pick one. Safari
     // sends that Enter after composition ends, marked only by keyCode 229.
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    // Ctrl/Cmd+B, I, U: the selection in bold, italics or underline, as markdown
+    const marker = formatShortcut(e);
+    if (marker) {
+      e.preventDefault();
+      applyWrap(e.currentTarget, marker);
+      return;
+    }
     if (ac) {
       if (e.key === "ArrowDown") { e.preventDefault(); setAc({ ...ac, index: (ac.index + 1) % ac.items.length }); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setAc({ ...ac, index: (ac.index - 1 + ac.items.length) % ac.items.length }); return; }
@@ -560,7 +604,6 @@ export function Composer({ channel }: { channel: Channel }) {
   const selecting = useSelection((x) => x.channelId) !== null;
   const replyTarget = useMemo(() => (replyTo && replyTo.channelId === channel.id ? msgs?.byId[replyTo.messageId] : undefined), [replyTo, msgs, channel.id]);
   const replyName = useShownName(channel.id, replyTarget?.author_id);
-  const counterOn = text.length > MAX_LEN - 200;
 
   if (!canSend) {
     return (
@@ -578,6 +621,28 @@ export function Composer({ channel }: { channel: Channel }) {
           drop while all of them drew their scrim. */}
       {paneFocused ? <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} /> : null}
       {ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
+      {formatting ? (
+        <Suspense fallback={null}>
+          <FormatEditor
+            initial={text}
+            placeholder={placeholder}
+            canSend={remaining <= 0}
+            onClose={() => {
+              setFormatting(false);
+              requestAnimationFrame(() => taRef.current?.focus({ preventScroll: true }));
+            }}
+            onInsert={(md) => {
+              setFormatting(false);
+              replaceText(md);
+            }}
+            onSend={(md) => {
+              const sent = send(md);
+              if (sent) setFormatting(false);
+              return sent;
+            }}
+          />
+        </Suspense>
+      ) : null}
       {picker ? (
         <ExpressionPicker
           onClose={() => setPicker(false)}
@@ -621,7 +686,7 @@ export function Composer({ channel }: { channel: Channel }) {
         <div className={s.notice} role="status" data-testid="composer-notice">
           <span className={s.noticeText}>
             {notice.kind === "long"
-              ? tr_("composer.composer.pasteTooLong", { count: MAX_LEN })
+              ? tr_("composer.composer.pasteTooLong", { count: MAX_MESSAGE_LENGTH })
               : notice.dropped.length === 1
                 ? tr_("composer.composer.fileLeftOut", { max: MAX_FILES, name: notice.dropped[0]! })
                 : tr_("composer.composer.filesLeftOut", { max: MAX_FILES, name: notice.dropped[0]!, count: notice.dropped.length - 1 })}
@@ -706,7 +771,7 @@ export function Composer({ channel }: { channel: Channel }) {
             const el = e.currentTarget;
             const start = el.selectionStart ?? el.value.length;
             const end = el.selectionEnd ?? start;
-            if (el.value.length - (end - start) + pasted.length > MAX_LEN) {
+            if (pasteOverflows(el.value, start, end, pasted)) {
               e.preventDefault();
               setNotice({ kind: "long", text: pasted, start, end });
             }
@@ -717,11 +782,12 @@ export function Composer({ channel }: { channel: Channel }) {
           aria-label={placeholder}
         />
         <div className={s.btns}>
+          <button type="button" className={s.iconBtn} data-on={formatting} aria-label={tr_("composer.format.open")} title={tr_("composer.format.open")} onClick={() => setFormatting(true)} onPointerEnter={preloadFormatEditor} onFocus={preloadFormatEditor} data-testid="format-open"><Type size={22} /></button>
           <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
           <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
         </div>
       </div>
-      {counterOn ? <span className={s.counter} data-over={text.length > MAX_LEN}>{MAX_LEN - text.length}</span> : null}
+      <MessageCounter text={text} className={s.counter} />
       {channel.slowmode_seconds > 0 && !bypassSlowmode ? (
         <span className={s.slowmode} data-active={remaining > 0} title={tr_("composer.composer.slowModeIsEnabled")}>
           <Timer size={14} /> {remaining > 0 ? formatShortDuration(remaining) : tr_("composer.composer.slowModeIsEnabled")}

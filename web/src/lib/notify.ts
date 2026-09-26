@@ -126,7 +126,7 @@ function previewOf(m: Message, decrypted?: DecryptedMessage): string {
   const stored = decrypted ?? useMessages.getState().channels[m.channel_id]?.byId[m.id];
   const p = stored?.payload;
   if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
-  if (p.t) return plainText(parse(p.t, { inline: true })).slice(0, 140);
+  if (p.t) return plainText(parse(p.t)).slice(0, 140);
   if (p.att?.length) return p.att.length === 1 ? t("notify.sentFile", { name: p.att[0]!.name }) : t("notify.sentFiles", { count: p.att.length });
   if (p.sticker) return t("notify.sentASticker");
   return t("notify.newMessage");
@@ -216,7 +216,7 @@ function onNexa(a: NexaAlert): void {
       : a.kind === "reply"
         ? t("nexa.notify.reply", { number: a.case.number })
         : a.kind === "announcement"
-          ? a.announcement.title || plainText(parse(a.announcement.body, { inline: true })).slice(0, 140)
+          ? a.announcement.title || plainText(parse(a.announcement.body)).slice(0, 140)
           : t("nexa.notify.appeal");
   const tag = a.kind === "appeal" ? `ec-appeal-${a.caseId}` : a.kind === "announcement" ? `ec-nexa-a-${a.announcement.id}` : `ec-nexa-${a.case.id}`;
   void showNotification(title, { body, tag, icon: "/icons/icon-192.png", silent: true }, path);

@@ -98,7 +98,7 @@
    English message in an Arabic interface keeps its question mark at the end
    of the sentence and starts at the left, as in every app that shows the two
    side by side, and an Arabic one in English starts at the right. */
-.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-subtext), .pinText { unicode-bidi: plaintext; text-align: start; }
+.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-h4), .content :global(.md-h5), .content :global(.md-h6), .content :global(.md-subtext), .pinText { unicode-bidi: plaintext; text-align: start; }
 .waiting { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }
 .replyLine { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; height: 22px; font-size: 14px; color: var(--text-muted); position: relative; cursor: pointer; }
 /* the spine hooks up from the avatar column into this line; the avatar sits below it */
@@ -166,8 +166,28 @@ button.sysName:hover { text-decoration: underline; }
 .editHint { font-size: 12px; color: var(--text-muted); }
 .editHint button { color: var(--link); font: inherit; padding: 0; }
 .editHint button:hover { text-decoration: underline; }
-.editActions { display: flex; justify-content: flex-end; gap: 8px; }
+.editActions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
 .editBtn { min-height: 40px; }
+/* the characters left, the same as under the message box: at the end of the hint, or before the buttons */
+.editFoot { display: flex; align-items: baseline; gap: 12px; }
+.editFoot .editHint { min-width: 0; }
+.editCounter { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.editActions .editCounter { margin-inline-start: 0; margin-inline-end: auto; }
+.editCounter[data-over="true"] { color: var(--text-danger); font-weight: 600; }
+/* a paste held back because it would make the message too long */
+.editNotice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding-block: 6px; padding-inline: 12px 6px; border-radius: var(--radius-sm); background: var(--bg-surface); border-inline-start: 3px solid var(--warning); font-size: 14px; color: var(--text); }
+.editNoticeText { flex: 1 1 12em; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
+.editNoticeBtn { min-height: 32px; padding: 0 12px; border-radius: var(--radius-xs); background: var(--bg-active); color: var(--text); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.editNoticeBtn:hover { background: var(--bg-hover); }
+.editNoticeClose { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; border-radius: var(--radius-xs); color: var(--text-muted); }
+.editNoticeClose:hover { color: var(--text); }
+@media (pointer: coarse) { .editNoticeBtn, .editNoticeClose { min-height: 40px; } .editNoticeClose { min-width: 40px; } }
+/* a phone: the words and the close button on the first line, Paste anyway under them */
+@media (max-width: 767px) {
+  .editNoticeText { flex: 1 1 calc(100% - 56px); }
+  .editNoticeClose { order: 1; }
+  .editNoticeBtn { order: 2; margin-inline-start: auto; }
+}
 /* the emoji themselves scale from --jumbo-size; the block keeps the normal text size
    so a stray character next to them is not enormous too */
 .jumbo { line-height: 1.15; }

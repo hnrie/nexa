@@ -71,7 +71,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   // parsed when the quoted message changes, not on every render of the row
   const text = useMemo(() => {
     const mediaOnly = !!payload?.t && isOnlyMediaLinks(payload.t, (payload.embeds ?? []) as UnfurlResult[]);
-    if (payload?.t && !mediaOnly) return plainText(parse(payload.t, { inline: true }), ctx);
+    if (payload?.t && !mediaOnly) return plainText(parse(payload.t), ctx);
     if (payload?.att?.length || mediaOnly || payload?.sticker) return t("chat.messageItem.clickToSeeAttachment");
     return failed ? t("chat.messageItem.encryptedMessage") : "";
   }, [payload, failed, ctx]);

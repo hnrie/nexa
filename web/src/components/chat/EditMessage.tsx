@@ -1,8 +1,12 @@
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
+import { MAX_MESSAGE_LENGTH, pasteOverflows, tooLong, tooLongMessage } from "@/components/composer/limit";
+import { MessageCounter } from "@/components/composer/MessageCounter";
 import { humanizeMentions } from "@/components/composer/mentions";
-import { editMessage, editNames } from "@/components/composer/send";
+import { editMessage, editNames, sendErrorText } from "@/components/composer/send";
 import { useAutosize } from "@/components/composer/useAutosize";
+import { applyWrap, formatShortcut } from "@/components/composer/wrapShortcut";
 import { confirmDelete } from "./messageMenu";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useSettings } from "@/stores/settings";
@@ -22,6 +26,8 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
     return parked?.messageId === msg.id && parked.text !== null ? parked.text : humanizeMentions(msg.payload?.t ?? "", users, editNames(msg.channel_id));
   });
   const [busy, setBusy] = useState(false);
+  /** A paste that would take the message past the limit, held back until it is asked for. */
+  const [held, setHeld] = useState<{ text: string; start: number; end: number } | null>(null);
   const spellcheck = useSettings((st) => st.settings.spellcheck !== false);
   const ref = useRef<HTMLTextAreaElement>(null);
   // Phone keyboards have no Shift+Enter, so there return adds a line, as in
@@ -37,6 +43,10 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       el.setSelectionRange(el.value.length, el.value.length);
     }
   }, []);
+  const change = (value: string) => {
+    setText(value);
+    setEditDraft(msg.channel_id, msg.id, value);
+  };
   const save = async () => {
     if (busy) return;
     const body = text.trim();
@@ -44,6 +54,11 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
     // an empty box used to do nothing at all.
     if (!body && !msg.payload?.att?.length && !msg.payload?.sticker) {
       confirmDelete(msg, () => endEdit(msg.channel_id, msg.id));
+      return;
+    }
+    // held to the same limit as sending: an edit used to be a way round it
+    if (tooLong(body)) {
+      toast(tooLongMessage(), "error");
       return;
     }
     // nothing changed: close the editor without marking the message edited
@@ -56,17 +71,34 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       await editMessage(msg.channel_id, msg.id, body);
       endEdit(msg.channel_id, msg.id);
     } catch (err) {
-      // editMessage throws the bare code, which sending maps to a sentence and
-      // this path showed to the reader as `waiting_for_key`
-      if (err instanceof Error && err.message === "waiting_for_key") toast(t("composer.send.waitingForTheEncryptionKeyFor"), "error");
-      else toast(err instanceof Error ? err.message : t("chat.editMessage.couldNotSaveTheEdit"), "error");
+      // editMessage throws the bare code, which sending maps to a sentence
+      toast(sendErrorText(err) ?? (err instanceof Error ? err.message : t("chat.editMessage.couldNotSaveTheEdit")), "error");
     } finally {
       setBusy(false);
     }
   };
   const cancel = () => endEdit(msg.channel_id, msg.id);
+  const pasteAnyway = () => {
+    const h = held;
+    const el = ref.current;
+    setHeld(null);
+    if (!h || !el) return;
+    change(text.slice(0, h.start) + h.text + text.slice(h.end));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(h.start + h.text.length, h.start + h.text.length);
+    });
+  };
+  const counter = <MessageCounter text={text} className={s.editCounter} />;
   return (
     <div className={s.edit}>
+      {held ? (
+        <div className={s.editNotice} role="status" data-testid="edit-notice">
+          <span className={s.editNoticeText}>{t("composer.composer.pasteTooLong", { count: MAX_MESSAGE_LENGTH })}</span>
+          <button type="button" className={s.editNoticeBtn} onClick={pasteAnyway}>{t("composer.composer.pasteAnyway")}</button>
+          <button type="button" className={s.editNoticeClose} aria-label={t("composer.composer.dismiss")} onClick={() => setHeld(null)}><X size={16} /></button>
+        </div>
+      ) : null}
       <textarea
         aria-label={t("composer.editYourMessage")}
         ref={ref}
@@ -74,14 +106,29 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
         value={text}
         rows={1}
         spellCheck={spellcheck}
-        onChange={(e) => {
-          setText(e.target.value);
-          setEditDraft(msg.channel_id, msg.id, e.target.value);
-        }}
+        onChange={(e) => change(e.target.value)}
         disabled={busy}
+        onPaste={(e) => {
+          // Past the limit a paste waits, as it does in the message box, rather
+          // than making a message too long to save.
+          const pasted = e.clipboardData.getData("text/plain");
+          const el = e.currentTarget;
+          const start = el.selectionStart ?? el.value.length;
+          const end = el.selectionEnd ?? start;
+          if (pasted && pasteOverflows(el.value, start, end, pasted)) {
+            e.preventDefault();
+            setHeld({ text: pasted, start, end });
+          }
+        }}
         onKeyDown={(e) => {
           // an input method's own Enter and Escape (keyCode 229 in Safari) are not ours
           if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+          const marker = formatShortcut(e);
+          if (marker) {
+            e.preventDefault();
+            applyWrap(e.currentTarget, marker);
+            return;
+          }
           if (e.key === "Escape") {
             e.preventDefault();
             cancel();
@@ -93,12 +140,16 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
       />
       {touch ? (
         <div className={s.editActions}>
+          {counter}
           <Button variant="secondary" className={s.editBtn} onClick={cancel}>{t("chat.editMessage.cancel")}</Button>
           <Button className={s.editBtn} loading={busy} onClick={() => void save()}>{t("chat.editMessage.save")}</Button>
         </div>
       ) : (
-        <div className={s.editHint}>
-          <Tr id="chat.editMessage.hint" values={{ cancel: <button type="button" onClick={cancel}>{t("chat.editMessage.cancelWord")}</button>, save: <button type="button" onClick={() => void save()}>{t("chat.editMessage.saveWord")}</button> }} />
+        <div className={s.editFoot}>
+          <div className={s.editHint}>
+            <Tr id="chat.editMessage.hint" values={{ cancel: <button type="button" onClick={cancel}>{t("chat.editMessage.cancelWord")}</button>, save: <button type="button" onClick={() => void save()}>{t("chat.editMessage.saveWord")}</button> }} />
+          </div>
+          {counter}
         </div>
       )}
     </div>

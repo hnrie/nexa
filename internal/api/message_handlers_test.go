@@ -137,6 +137,65 @@ func TestEditKeepsTheKeyThatOpensIt(t *testing.T) {
 	}
 }
 
+// A message's ciphertext has one ceiling, for sending and editing alike, so an
+// edit is no way round the length a message can be; past it the answer says
+// the message is too long rather than that it is malformed.
+func TestEditIsHeldToTheSameCeilingAsSending(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	_, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB}})
+	dm := body["id"].(string)
+	createEpoch(t, ts, tokA, dm)
+
+	// An envelope whose JSON, as the server receives it, is within four bytes
+	// of n: the ciphertext is base64, so it grows four characters at a time.
+	sized := func(n int) map[string]any {
+		env := map[string]any{"v": 1, "conv": dm, "epoch": 0, "iv": b64(bytes.Repeat([]byte{1}, 12)), "ct": ""}
+		raw, _ := json.Marshal(env)
+		room := n - len(raw)
+		env["ct"] = string(bytes.Repeat([]byte("A"), room-room%4))
+		return env
+	}
+	sizeOf := func(env map[string]any) int {
+		raw, _ := json.Marshal(env)
+		return len(raw)
+	}
+	fits := sized(maxEnvelopeBytes)
+	over := sized(maxEnvelopeBytes + 8)
+	if sizeOf(fits) > maxEnvelopeBytes || sizeOf(over) <= maxEnvelopeBytes {
+		t.Fatalf("envelopes of %d and %d bytes do not straddle the ceiling", sizeOf(fits), sizeOf(over))
+	}
+	send := func(env map[string]any, nonce string) (int, map[string]any) {
+		res, body := do(t, ts, "POST", "/api/v1/channels/"+dm+"/messages", tokA, map[string]any{"ciphertext": env, "key_conv_id": dm, "key_epoch": 0, "mentions": []string{}, "nonce": nonce})
+		return res.StatusCode, body
+	}
+
+	if code, body := send(fits, "a"); code >= 300 {
+		t.Fatalf("a message right at the ceiling: %d %v", code, body)
+	}
+	if code, body := send(over, "b"); code != 413 || errCode(body) != "message_too_long" {
+		t.Errorf("a message past the ceiling: %d %v", code, body)
+	}
+
+	_, body = sendMsg(t, ts, tokA, dm, dm, 0, "short", "c", nil)
+	mid := body["id"].(string)
+	edit := func(env map[string]any) (int, map[string]any) {
+		res, body := do(t, ts, "PATCH", "/api/v1/channels/"+dm+"/messages/"+mid, tokA, map[string]any{"ciphertext": env, "key_conv_id": dm, "key_epoch": 0})
+		return res.StatusCode, body
+	}
+	if code, body := edit(over); code != 413 || errCode(body) != "message_too_long" {
+		t.Errorf("an edit past the ceiling: %d %v", code, body)
+	}
+	_, body = do(t, ts, "GET", "/api/v1/channels/"+dm+"/messages/"+mid, tokB, nil)
+	if env, _ := body["ciphertext"].(map[string]any); env == nil || env["ct"] != b64([]byte("ct:short")) {
+		t.Errorf("the refused edit changed the message: %v", body["ciphertext"])
+	}
+	if code, body := edit(fits); code != 200 {
+		t.Errorf("an edit right at the ceiling: %d %v", code, body)
+	}
+}
+
 // An edit is broadcast without the editor's own reaction flags.
 func TestEditBroadcastDoesNotCarryTheEditorsReactions(t *testing.T) {
 	_, ts := newTestServer(t)
