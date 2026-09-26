@@ -9,6 +9,7 @@ import s from "./Settings.module.css";
 
 import { t } from "@/i18n";
 import { confirmLogout } from "@/lib/confirmLogout";
+import { openReportBug } from "@/components/bugs/ReportBugButton";
 const AccountPage = lazyPage(() => import("./AccountPage"));
 const ProfilePage = lazyPage(() => import("./ProfilePage"));
 const PrivacyPage = lazyPage(() => import("./PrivacyPage"));
@@ -54,6 +55,10 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     <div className={s.navSection}>
       <div className={s.navSep} />
       <div className={s.navGroup}>
+        {/* over the settings, which stay where they were */}
+        <button className={s.navItem} onClick={() => openReportBug("settings")} data-nav="report-bug">
+          <span className={s.navLabel}>{t("bugs.report")}</span>
+        </button>
         {!inApp && !mobile ? (
           <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">
             <span className={s.navLabel}>{t("settings.settings.getTheDesktopApp")}</span>

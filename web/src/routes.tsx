@@ -19,6 +19,7 @@ const GuestCallPage = lazyPage(() => import("@/pages/GuestCallPage"));
 const LegalPage = lazyPage(() => import("@/pages/LegalPage"));
 const NexaPage = lazyPage(() => import("@/pages/NexaPage"));
 const NexaCasePage = lazyPage(() => import("@/pages/NexaCasePage"));
+const NexaBugPage = lazyPage(() => import("@/pages/NexaBugPage"));
 const NotFoundPage = lazyPage(() => import("@/pages/NotFoundPage"));
 // The app itself: its sidebars, conversations, calls and every store behind
 // them. The public pages (the front page, signing in, an invite) never load it.
@@ -39,6 +40,7 @@ const AdminUser = lazyPage(() => adminPanel().then((m) => ({ default: m.UserCase
 const AdminCases = lazyPage(() => adminPanel().then((m) => ({ default: m.CasesTab })));
 const AdminLogs = lazyPage(() => adminPanel().then((m) => ({ default: m.LogsTab })));
 const AdminAnnouncements = lazyPage(() => adminPanel().then((m) => ({ default: m.AnnouncementsTab })));
+const AdminBugs = lazyPage(() => adminPanel().then((m) => ({ default: m.BugsTab })));
 
 export function AppRoutes() {
   return (
@@ -65,6 +67,7 @@ export function AppRoutes() {
                   <Route path="@me" element={<FriendsPage />} />
                   <Route path="@me/nexa" element={<NexaPage />} />
                   <Route path="@me/nexa/cases/:caseId" element={<NexaCasePage />} />
+                  <Route path="@me/nexa/bugs/:reportId" element={<NexaBugPage />} />
                   <Route path="@admin" element={<AdminPanelPage />}>
                     <Route index element={<Navigate to="users" replace />} />
                     <Route path="users" element={<AdminUsers />} />
@@ -74,6 +77,8 @@ export function AppRoutes() {
                     <Route path="cases/:caseId" element={<AdminCases />} />
                     <Route path="logs" element={<AdminLogs />} />
                     <Route path="announcements" element={<AdminAnnouncements />} />
+                    <Route path="bugs" element={<AdminBugs />} />
+                    <Route path="bugs/:reportId" element={<AdminBugs />} />
                     <Route path="*" element={<Navigate to="users" replace />} />
                   </Route>
                   <Route path="@me/:channelId" element={<DMPage />} />

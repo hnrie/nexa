@@ -41,6 +41,7 @@ import { SelectionBar } from "./SelectionBar";
 import { TypingBar } from "./TypingBar";
 import { MutedBar } from "@/components/nexa/NexaNotices";
 import { useMute } from "@/stores/nexa";
+import { ReportBugButton, reportBugMenuItem } from "@/components/bugs/ReportBugButton";
 import s from "./Chat.module.css";
 
 import { t as tr_ } from "@/i18n";
@@ -310,6 +311,8 @@ export function ChatView({ channel }: { channel: Channel }) {
             <button className={s.hBtn} data-on={membersOpen} aria-label={tr_("chat.chat.memberList")} onClick={toggleMembers}><Users size={22} /></button>
           </Tooltip>
         ) : null}
+        {/* every conversation's header has the way to tell the team something broke; a phone has it in More */}
+        {!mobile && !isServer ? <ReportBugButton from={convo.type === "group_dm" ? "group" : "dm"} className={s.hBtn} /> : null}
         {mobile ? (
           <button
             className={s.hBtn}
@@ -327,6 +330,7 @@ export function ChatView({ channel }: { channel: Channel }) {
               if (isServer || convo.type === "group_dm") items.push({ id: "members", label: membersOpen ? tr_("chat.chat.hideMembers") : tr_("chat.chat.showMembers"), onSelect: toggleMembers });
               // a phone's call bar has no room for it, so inviting guests to the call is here too
               if (!isServer && inThisCall && (convo.type === "dm" || convo.type === "group_dm")) items.push({ id: "guests", label: tr_("chat.chat.inviteGuestsToCall"), onSelect: () => openModal("guestLink", { channelId: convo.id }) });
+              if (!isServer) items.push(reportBugMenuItem(convo.type === "group_dm" ? "group" : "dm"));
               openContextMenu({ x: anchor.left, y: anchor.bottom + 4, anchor, items, label: tr_("chat.chat.more") });
             }}
           >

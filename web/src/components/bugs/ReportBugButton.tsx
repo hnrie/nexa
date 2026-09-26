@@ -21,7 +21,7 @@ export function reportBugMenuItem(from: BugFrom): ContextMenuItem {
  * or the icon with its name where there is room for it and it is the header's
  * only action (`labelled`).
  */
-export function ReportBugButton({ from, className, labelled = false }: { from: BugFrom; className?: string | undefined; labelled?: boolean }) {
+export function ReportBugButton({ from, className, wrapClassName, labelled = false }: { from: BugFrom; className?: string | undefined; wrapClassName?: string | undefined; labelled?: boolean }) {
   const label = t("bugs.report");
   if (labelled) {
     return (
@@ -32,7 +32,7 @@ export function ReportBugButton({ from, className, labelled = false }: { from: B
     );
   }
   return (
-    <Tooltip text={label} side="bottom">
+    <Tooltip text={label} side="bottom" className={wrapClassName}>
       <button type="button" className={className} aria-label={label} onClick={() => openReportBug(from)} data-testid="report-bug">
         <Bug size={22} />
       </button>
