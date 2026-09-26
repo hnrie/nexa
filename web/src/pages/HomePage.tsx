@@ -252,7 +252,9 @@ function Duo({ still }: { still: boolean }) {
     if (jump) setSeam(at(e.clientX));
   };
   const drag = (e: React.PointerEvent<HTMLElement>) => {
-    if (dragging) setSeam(at(e.clientX));
+    // a mouse whose button came up somewhere this never heard of has stopped dragging
+    if (dragging && e.pointerType === "mouse" && !(e.buttons & 1)) setDragging(false);
+    else if (dragging) setSeam(at(e.clientX));
   };
   const drop = () => setDragging(false);
 
@@ -275,6 +277,7 @@ function Duo({ still }: { still: boolean }) {
         onPointerMove={drag}
         onPointerUp={drop}
         onPointerCancel={drop}
+        onLostPointerCapture={drop}
       >
         <Conversation lines={lines} sealed={sealed} />
         <div className={s.serverSide}>
