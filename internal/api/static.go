@@ -216,9 +216,17 @@ func (s *Server) serveInvitePage(w http.ResponseWriter, r *http.Request, dist, c
 	meta("og:title", "Join "+title)
 	meta("og:description", desc)
 	meta("og:url", res.URL)
-	meta("og:image", res.Image)
+	// A server's banner is the wide picture a preview can show across its
+	// top; without one, its icon is the small square beside the words.
+	card := "summary"
+	if res.Banner != "" {
+		meta("og:image", res.Banner+"?size=1024")
+		card = "summary_large_image"
+	} else {
+		meta("og:image", res.Image)
+	}
 	tags.WriteString("\n<meta name=\"description\" content=\"" + escapeAttr(desc) + "\">")
-	tags.WriteString("\n<meta name=\"twitter:card\" content=\"summary\">")
+	tags.WriteString("\n<meta name=\"twitter:card\" content=\"" + card + "\">")
 
 	body := string(raw)
 	if i := strings.Index(body, "</head>"); i >= 0 {

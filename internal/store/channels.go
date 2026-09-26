@@ -10,7 +10,7 @@ import (
 	"evilion.xyz/chat/internal/ids"
 )
 
-const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at`
+const channelCols = `id, server_id, type, name, topic, position, parent_id, nsfw, slowmode_seconds, user_limit, owner_id, icon_id, last_message_id, created_at, updated_at, glyph`
 
 // channelReadCols adds what is read but never written back through insertChannel.
 // The comparison is spelled as a CASE so it comes back as 0/1 on both
@@ -30,7 +30,7 @@ func scanChannel(r rowScanner) (*Channel, error) {
 	var nsfw int64
 	var updated int64
 	var locked int64
-	if err := r.Scan(&c.ID, &server, &c.Type, &c.Name, &c.Topic, &c.Position, &parent, &nsfw, &c.SlowmodeSeconds, &c.UserLimit, &owner, &icon, &last, &c.CreatedAt, &updated, &locked); err != nil {
+	if err := r.Scan(&c.ID, &server, &c.Type, &c.Name, &c.Topic, &c.Position, &parent, &nsfw, &c.SlowmodeSeconds, &c.UserLimit, &owner, &icon, &last, &c.CreatedAt, &updated, &c.Glyph, &locked); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -55,8 +55,8 @@ func (s *Store) insertChannel(ctx context.Context, q querier, c *Channel) error 
 	if c.CreatedAt == 0 {
 		c.CreatedAt = nowMs()
 	}
-	_, err := q.ExecContext(ctx, `INSERT INTO channels (`+channelCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		int64(c.ID), nullID(c.ServerID), c.Type, c.Name, c.Topic, c.Position, nullID(c.ParentID), boolInt(c.NSFW), c.SlowmodeSeconds, c.UserLimit, nullID(c.OwnerID), nullID(c.IconID), nullID(c.LastMessageID), c.CreatedAt, c.CreatedAt)
+	_, err := q.ExecContext(ctx, `INSERT INTO channels (`+channelCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		int64(c.ID), nullID(c.ServerID), c.Type, c.Name, c.Topic, c.Position, nullID(c.ParentID), boolInt(c.NSFW), c.SlowmodeSeconds, c.UserLimit, nullID(c.OwnerID), nullID(c.IconID), nullID(c.LastMessageID), c.CreatedAt, c.CreatedAt, c.Glyph)
 	return err
 }
 
@@ -482,6 +482,9 @@ func (s *Store) UpdateChannel(ctx context.Context, id ids.ID, p ChannelPatch) er
 	}
 	if p.IconID != nil {
 		set("icon_id", nullID(*p.IconID))
+	}
+	if p.Glyph != nil {
+		set("glyph", *p.Glyph)
 	}
 	if p.OwnerID != nil {
 		set("owner_id", int64(*p.OwnerID))
