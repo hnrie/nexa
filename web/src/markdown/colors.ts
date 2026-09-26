@@ -182,6 +182,10 @@ export function cssColor(value: string): Rgba | null {
 
 function drawn(value: string): Rgba | null {
   if (probe === undefined) {
+    // a test's DOM has no canvas to draw on, and says so loudly when asked
+    if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) probe = null;
+  }
+  if (probe === undefined) {
     try {
       const canvas = document.createElement("canvas");
       canvas.width = 1;

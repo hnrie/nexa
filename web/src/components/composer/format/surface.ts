@@ -1106,7 +1106,16 @@ export class FormatSurface {
       this.apply(edit.blocks, edit.sel);
       return;
     }
+    // Read as markdown, which drops blank lines at either end and spaces at
+    // the very end; a paste keeps its edges, so they are put back.
     const pasted = fromMarkdown(text, this.opts.names).blocks;
+    const lead = /^\n*/.exec(text)?.[0].length ?? 0;
+    const trail = /\n*$/.exec(text)?.[0].length ?? 0;
+    const spaces = /[ \t]+\n*$/.exec(text)?.[0].replace(/\n/g, "") ?? "";
+    const end = pasted[pasted.length - 1];
+    if (spaces && isText(end)) pasted[pasted.length - 1] = { ...end, content: normalize([...end.content, { kind: "text", text: spaces, marks: {} }]) };
+    for (let k = 0; k < lead; k++) pasted.unshift(textBlock());
+    for (let k = 0; k < trail; k++) pasted.push(textBlock());
     if (!isText(here)) {
       const out = blocks.slice();
       out.splice(at.b + 1, 0, ...pasted);
