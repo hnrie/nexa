@@ -1,0 +1,95 @@
+/* The tab strip. It lives inside .main, below the banners, so it never covers
+   the connection warning. */
+
+.tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 34px;
+  padding: 4px 6px 0;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tabList { display: flex; align-items: stretch; gap: 2px; min-width: 0; }
+.tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 96px;
+  max-width: 220px;
+  padding-inline-end: 6px;
+  border-start-start-radius: var(--radius-sm);
+  border-start-end-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
+  user-select: none;
+  white-space: nowrap;
+}
+.tab:hover { background: var(--bg-hover); color: var(--text); }
+.tab[data-selected="true"] { background: var(--bg-raised); color: var(--text-strong); }
+/* the button fills the tab, so the whole tab is the thing to press */
+.tabBtn { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; padding-inline: 10px 4px; color: inherit; font: inherit; text-align: start; cursor: pointer; border-radius: inherit; }
+.tabBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+/* where a dragged tab would land; a shadow has no logical form, so the
+   mirrored case is spelled out rather than landing on the wrong edge */
+.tab[data-drop] { box-shadow: inset 2px 0 0 var(--brand); }
+[dir="rtl"] .tab[data-drop] { box-shadow: inset -2px 0 0 var(--brand); }
+
+.tabName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.tabName > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tabName > :global(svg) { flex: none; }
+.tabName[data-unread] { color: var(--text-strong); font-weight: 600; }
+
+.tabClose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  opacity: 0;
+  /* hidden is untouchable too: a tap near a background tab's end switched to
+     nothing and closed it instead */
+  pointer-events: none;
+}
+.tab:hover .tabClose,
+.tab[data-selected="true"] .tabClose,
+.tab:focus-within .tabClose { opacity: 1; pointer-events: auto; }
+/* No hover on a touch screen to reveal it, which left a background tab with no
+   way to close it but switching to it first: there it simply shows. */
+@media (hover: none) { .tabClose { opacity: 1; pointer-events: auto; } }
+@media (pointer: coarse) { .tabClose { width: 32px; height: 32px; } }
+.tabClose:hover { background: var(--bg-active); color: var(--text-strong); }
+
+.tabAdd {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  flex: none;
+  align-self: center;
+  height: 24px;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+}
+.tabAdd:hover { background: var(--bg-hover); color: var(--text-strong); }
+@media (pointer: coarse) { .tabAdd { width: 40px; height: 32px; } }

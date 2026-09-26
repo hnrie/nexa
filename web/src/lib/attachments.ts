@@ -219,7 +219,7 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   const baseIv = newBaseIv();
   let res: { blob_id: string; size: number };
   // a new version of the app waits for the upload rather than reloading over it
-  const release = holdReload();
+  const release = holdReload("upload");
   try {
     // One request up to the server's single-request limit, pieces only above it:
     // the owner chose fewer requests over resuming mid-file for files that fit in one.

@@ -45,7 +45,7 @@ function groups(pttKey: string | null): { head: string; rows: [string, string][]
       head: t("modals.shortcutsHelp.groupTabs"),
       rows: [
         [`${mod} ${alt} ← / →`, t("modals.shortcutsHelp.switchTabs")],
-        [`${mod} ${alt} W`, t("modals.shortcutsHelp.closePaneOrTab")],
+        [`${mod} ${alt} W`, t("modals.shortcutsHelp.closeTheOpenTab")],
         [isMac ? "⌫" : "Delete", t("modals.shortcutsHelp.closeTheFocusedTab")],
       ],
     },

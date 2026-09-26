@@ -1,4 +1,4 @@
-import { ArrowLeft, AtSign, Check, ExternalLink, Info, Mail, MessagesSquare, ScrollText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, AtSign, Check, ExternalLink, Info, Mail, MessagesSquare, ScrollText, ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { admin as adminApi } from "@/api/admin";
 import { NexaTile, NexaWordmark } from "@/components/common/Brand";
@@ -6,8 +6,10 @@ import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { LegalHighlights } from "@/components/legal/LegalContent";
 import { LegalDocument } from "@/components/legal/LegalDocument";
+import { WhatsNewDialog, markSeen } from "@/components/shell/WhatsNewDialog";
 import { CONTACT_EMAIL, LEGAL_EFFECTIVE, LEGAL_VERSION, OWNER_USERNAME, termsAccepted } from "@/lib/legal";
 import { useLegalDocs } from "@/lib/legalDocs";
+import { RELEASES } from "@/lib/whatsNew";
 import { useAuth } from "@/stores/auth";
 import { t, useLocale } from "@/i18n";
 import s from "./Settings.module.css";
@@ -23,6 +25,7 @@ type Doc = "terms" | "privacy";
 export default function AboutPage() {
   const me = useAuth((a) => a.me);
   const [reading, setReading] = useState<Doc | null>(null);
+  const [news, setNews] = useState(false);
   const [server, setServer] = useState<string | null>(null);
   const docs = useLegalDocs();
   const agreed = !!me && termsAccepted(me.id);
@@ -160,8 +163,30 @@ export default function AboutPage() {
               </span>
             </span>
           </div>
+          <div className={l.row}>
+            <span className={l.rowIcon} aria-hidden="true">
+              <Sparkles size={18} />
+            </span>
+            <span className={l.rowText}>
+              <span className={l.rowTitle}>{t("whatsNew.title")}</span>
+              <span className={l.rowSub}>{t("settings.about.whatsNewSub")}</span>
+            </span>
+            <Button size="sm" variant="secondary" onClick={() => setNews(true)} data-testid="about-whats-new">
+              {t("settings.about.show")}
+            </Button>
+          </div>
         </div>
       </section>
+      {news ? (
+        <WhatsNewDialog
+          releases={RELEASES}
+          onClose={() => {
+            // read here, it counts as seen and does not pop up as well
+            markSeen(RELEASES);
+            setNews(false);
+          }}
+        />
+      ) : null}
     </>
   );
 }

@@ -6,7 +6,6 @@ import { useReadStates } from "@/stores/readStates";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
-import { usePanes } from "@/stores/panes";
 import { useAuth } from "@/stores/auth";
 import type { DecryptedMessage } from "@/lib/decrypt";
 import { applyEvent } from "./dispatch";
@@ -64,7 +63,7 @@ describe("ready after a reconnect", () => {
     useUI.setState({ activeChannelId: null });
   });
 
-  it("keeps the messages of every split pane on screen, not only the focused one", async () => {
+  it("keeps the messages of the open conversation, and lets the others load afresh", async () => {
     const list = (id: string, author: string) => ({
       ids: [id],
       byId: { [id]: { id, channel_id: "x", author_id: author, mentions: [] } as unknown as DecryptedMessage },
@@ -76,19 +75,13 @@ describe("ready after a reconnect", () => {
       pending: [],
     });
     useMessages.setState({ channels: { c1: list("1", "a"), c2: list("2", "b"), c3: list("3", "c") } });
-    usePanes.setState({
-      tabs: [{ id: "t1", root: { kind: "split", id: "s", dir: "row", children: [{ kind: "pane", id: "p1" }, { kind: "pane", id: "p2" }], sizes: [50, 50] }, focus: "p1" }],
-      active: "t1",
-      panes: { p1: { id: "p1", serverId: "s1", channelId: "c1" }, p2: { id: "p2", serverId: "s1", channelId: "c2" } },
-    });
     useUI.setState({ activeChannelId: "c1" });
     await applyEvent({ t: "ready", d: ready([chan("c1"), chan("c2"), chan("c3")], []) });
     const channels = useMessages.getState().channels;
     expect(channels["c1"]?.ids).toEqual(["1"]);
-    expect(channels["c2"]?.ids).toEqual(["2"]);
+    expect(channels["c2"]).toBeUndefined();
     expect(channels["c3"]).toBeUndefined();
     useUI.setState({ activeChannelId: null });
-    usePanes.getState().reset();
   });
 });
 

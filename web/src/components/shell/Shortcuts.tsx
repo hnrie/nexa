@@ -7,7 +7,7 @@ import { useAuth } from "@/stores/auth";
 import { channelTree, selectDMs, useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
 import { useReadStates } from "@/stores/readStates";
-import { activeTab, panesIn, usePanes } from "@/stores/panes";
+import { useTabs } from "@/stores/tabs";
 import { useUI } from "@/stores/ui";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 
@@ -65,22 +65,19 @@ export function Shortcuts() {
       // alone — and they still work in the desktop app, where nothing else
       // wants them either.
       if (mod && e.altKey && (e.key === "ArrowRight" || e.key === "ArrowLeft")) {
-        const panes = usePanes.getState();
-        if (panes.tabs.length < 2) return;
+        const tabs = useTabs.getState();
+        if (tabs.tabs.length < 2) return;
         e.preventDefault();
-        const at = panes.tabs.findIndex((t) => t.id === panes.active);
+        const at = tabs.tabs.findIndex((t) => t.id === tabs.active);
         const step = e.key === "ArrowRight" ? 1 : -1;
-        panes.selectTab(panes.tabs[(at + step + panes.tabs.length) % panes.tabs.length]!.id);
+        tabs.selectTab(tabs.tabs[(at + step + tabs.tabs.length) % tabs.tabs.length]!.id);
         return;
       }
       if (mod && e.altKey && e.code === "KeyW") {
-        const panes = usePanes.getState();
+        const tabs = useTabs.getState();
         e.preventDefault();
-        // Closing the last pane of a split leaves the tab; closing the last tab
-        // would leave nothing, so it is the pane that goes.
-        const tab = activeTab(panes);
-        if (panesIn(tab.root).length > 1) panes.closePane(tab.focus);
-        else if (panes.tabs.length > 1) panes.closeTab(panes.active);
+        // the last tab stays: closing it would leave nothing
+        if (tabs.tabs.length > 1) tabs.closeTab(tabs.active);
         return;
       }
       // Alt+↑/↓ steps through the list beside the page: the server's channels

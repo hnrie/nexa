@@ -6,18 +6,15 @@ import { ServerSidebar } from "@/components/sidebar/ServerSidebar";
 import { ModalHost } from "@/components/modals/ModalHost";
 import { NexaNotices } from "@/components/nexa/NexaNotices";
 import { TermsGate } from "@/components/legal/TermsGate";
+import { WhatsNew } from "@/components/shell/WhatsNewDialog";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
-import { UpdateBanner } from "@/components/shell/UpdateBanner";
+import { UpdatePrompt } from "@/components/shell/UpdateDialog";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { Shortcuts } from "@/components/shell/Shortcuts";
-import { PaneGrid } from "@/components/shell/PaneGrid";
-import { PaneView } from "@/components/shell/PaneView";
 import { TAB_PANEL_ID, Tabs } from "@/components/shell/Tabs";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { activeTab, paneAddress, panesIn, usePanes } from "@/stores/panes";
-import { useChannels } from "@/stores/channels";
-import { GridChatCtx } from "./paneScope";
+import { activeTab, tabAddress, useTabs } from "@/stores/tabs";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import { installAway } from "@/lib/away";
@@ -61,41 +58,31 @@ export function AppShell({ children }: { children: ReactNode }) {
   const openedSettings = useRef<string | null>(null);
   const serverId = loc.pathname.match(/^\/channels\/(\d+)/)?.[1];
   const sidebar = serverId ? <ServerSidebar serverId={serverId} /> : <DMSidebar />;
-  const tab = usePanes(activeTab);
-  const panes = panesIn(tab.root);
-  const setPaneChannel = usePanes((p) => p.setPaneChannel);
-  // the strip is only drawn once there is more than one tab or pane (see Tabs)
-  const tabCount = usePanes((p) => p.tabs.length);
-  const tabbed = tabCount > 1 || panes.length > 1;
-  // In a split, a conversation in the focused pane is drawn by the grid like
-  // every other pane (see GridChatCtx), so focus can move without a remount.
-  // Only a conversation: a voice room, Friends, the Nexa page and the admin
-  // panel are still the routed page's to draw.
-  const routedChannelId = loc.pathname.match(/^\/channels\/(?:@me|\d+)\/(\d+)$/)?.[1];
-  const routedChannel = useChannels((c) => (routedChannelId ? c.byId[routedChannelId] : undefined));
-  const gridChat = !mobile && panes.length > 1 && !!routedChannel && routedChannel.type !== "voice" && routedChannel.type !== "category";
+  const tabId = useTabs((p) => activeTab(p).id);
+  const setTabChannel = useTabs((p) => p.setTabChannel);
+  // the strip is only drawn once there is more than one tab (see Tabs)
+  const tabbed = useTabs((p) => p.tabs.length > 1);
 
-  // The address bar and the focused pane are kept as one thing, and only one
-  // of them is ever in charge at a time.
+  // The address bar and the open tab are kept as one thing, and only one of
+  // them is ever in charge at a time.
   //
   // Normally it is the address: a click in the sidebar, a link in a message,
   // the back button and a notification all navigate exactly as they always
-  // did, and the focused pane follows. The one exception is focus itself
-  // moving — to another pane, or to another tab, or because the pane you were
-  // in was closed — where the pane is in charge and the address follows it.
-  // That navigation comes straight back here with focus unchanged, and the
-  // first branch turns it into a no-op.
-  const lastFocus = useRef<string | null>(null);
+  // did, and the open tab follows. The one exception is another tab opening,
+  // because it was picked or because the open one was closed, where the tab is
+  // in charge and the address follows it. That navigation comes straight back
+  // here with the same tab open, and the first branch turns it into a no-op.
+  const lastTab = useRef<string | null>(null);
   useEffect(() => {
-    const moved = lastFocus.current !== null && lastFocus.current !== tab.focus;
-    lastFocus.current = tab.focus;
+    const moved = lastTab.current !== null && lastTab.current !== tabId;
+    lastTab.current = tabId;
     if (moved) {
-      nav(paneAddress(usePanes.getState().panes[tab.focus]));
+      nav(tabAddress(activeTab(useTabs.getState())));
       return;
     }
     const at = loc.pathname.match(/^\/channels\/(@me|\d+)(?:\/(\d+))?/);
-    setPaneChannel(tab.focus, at?.[1] === "@me" ? null : (at?.[1] ?? null), at?.[2] ?? null);
-  }, [loc.pathname, tab.focus, setPaneChannel, nav]);
+    setTabChannel(tabId, at?.[1] === "@me" ? null : (at?.[1] ?? null), at?.[2] ?? null);
+  }, [loc.pathname, tabId, setTabChannel, nav]);
 
   useEffect(() => {
     const page = params.get("settings");
@@ -248,38 +235,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection} role="status">{connectionNote ?? (connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting"))}</div>
         ) : null}
-        <UpdateBanner />
+        <UpdatePrompt />
         <RpcBanner />
         <DownloadBanner />
         <Tabs />
         {/* the page takes what the banner leaves */}
-        <div className={s.page} {...(tabbed ? { role: "tabpanel", id: TAB_PANEL_ID, "aria-labelledby": `tab-${tab.id}` } : {})}>
-          {/* The grid is here even for a single pane, so that pane is measured
-              and the menu knows whether there is room to split it. `split` is
-              what turns on the chrome — the close button and the focus ring —
-              which a lone pane has no use for. On a phone there is only ever
-              the page itself. */}
-          {mobile ? (
-            children
-          ) : (
-            <PaneGrid
-              tile={tab.root}
-              focus={tab.focus}
-              split={panes.length > 1}
-              renderPane={(paneId) => (paneId === tab.focus && !gridChat ? children : <PaneView key={paneId} paneId={paneId} />)}
-            />
-          )}
-          {/* the routed page still runs, for what it does besides drawing */}
-          {!mobile && gridChat ? (
-            <div hidden>
-              <GridChatCtx.Provider value={true}>{children}</GridChatCtx.Provider>
-            </div>
-          ) : null}
+        <div className={s.page} {...(tabbed ? { role: "tabpanel", id: TAB_PANEL_ID, "aria-labelledby": `tab-${tabId}` } : {})}>
+          {children}
         </div>
       </div>
       <ModalHost />
       <NexaNotices />
       <TermsGate />
+      <WhatsNew />
       <Shortcuts />
       <DesktopEffects />
     </div>

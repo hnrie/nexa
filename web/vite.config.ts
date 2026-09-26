@@ -68,6 +68,29 @@ function keepScriptsIntact(): Plugin {
   };
 }
 
+/** Names this build: the page carries it as __BUILD_ID__, and version.json says it to pages already open. */
+const BUILD_ID = Date.now().toString(36);
+
+/**
+ * Writes version.json beside sw.js, naming the build. An open page asks for
+ * it now and then and compares it with its own build to know a deploy has
+ * happened (src/lib/appUpdate.ts). Written after everything else, so no page
+ * hears of a build whose files are not all there yet.
+ */
+function versionFile(): Plugin {
+  let outDir = fileURLToPath(new URL("./dist", import.meta.url));
+  return {
+    name: "version-file",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    async closeBundle() {
+      await writeFile(`${outDir}/version.json`, JSON.stringify({ build: BUILD_ID }) + "\n");
+    },
+  };
+}
+
 /** How long a replaced build's files stay reachable. */
 const KEEP_ASSETS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -96,8 +119,8 @@ function pruneOldAssets(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), twemoji(), keepScriptsIntact(), pruneOldAssets()],
-  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
+  plugins: [react(), twemoji(), keepScriptsIntact(), pruneOldAssets(), versionFile()],
+  define: { __BUILD_ID__: JSON.stringify(BUILD_ID) },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     port: 5173,

@@ -59,7 +59,7 @@ let account = 0;
 
 function enqueue(channelId: string, job: () => Promise<void>): Promise<void> {
   // a new version of the app waits until the queue is through
-  const release = holdReload();
+  const release = holdReload("send");
   const mine = account;
   const run = (queues.get(channelId) ?? Promise.resolve()).then(() => (mine === account ? job() : undefined));
   const tail = run.catch(() => undefined);
@@ -250,7 +250,7 @@ async function uploadThenSend(channelId: string, meId: string, tmp: string, nonc
     const cur = pendingOf(channelId, tmp);
     if (cur?.upload) store().updatePending(channelId, tmp, { upload: { ...cur.upload, loaded: Math.min(loaded, total), speed: bytesPerSecond } });
   };
-  const release = holdReload();
+  const release = holdReload("upload");
   const ups: Awaited<ReturnType<typeof uploadStaged>>[] = [];
   try {
     let before = 0;

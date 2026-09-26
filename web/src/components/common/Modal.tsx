@@ -37,6 +37,12 @@ interface Props {
    * Called whatever the button's state, so it checks what the button checks.
    */
   onSubmit?: () => void;
+  /**
+   * Stays in the middle of the screen on a phone too, rather than rising from
+   * the bottom as a sheet: for the few dialogs that are news rather than a
+   * task, such as an update being ready.
+   */
+  centered?: boolean;
 }
 
 /** Single-line boxes, where Enter has nothing else to do. */
@@ -57,7 +63,7 @@ function shown<T extends Element>(all: T[]): T[] {
   return laidOut.length > 0 ? laidOut : all;
 }
 
-export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true, onSubmit }: Props) {
+export function Modal({ open, onClose, title, children, footer, width = 440, closeOnOverlay = true, className, bare = false, ariaLabel, closeButton = true, onSubmit, centered = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const portalRoot = usePortalRoot();
@@ -165,7 +171,7 @@ export function Modal({ open, onClose, title, children, footer, width = 440, clo
       }
     : undefined;
   return createPortal(
-    <div className={s.overlay} data-modal-overlay="" onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
+    <div className={s.overlay} data-modal-overlay="" data-centered={centered || undefined} onMouseDown={(e) => { if (closeOnOverlay && e.target === e.currentTarget) onClose(); }}>
       <div
         ref={ref}
         className={[s.card, bare ? s.bare : "", className ?? ""].join(" ")}

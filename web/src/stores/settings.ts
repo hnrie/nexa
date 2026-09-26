@@ -128,6 +128,11 @@ export interface Settings {
   plugins: PluginEntry[];
 
   // --- shell: what's new ---
+  /**
+   * The newest What's New release this account has been shown (lib/whatsNew.ts),
+   * kept with the account so the pop-up comes once per account, not per device.
+   */
+  whatsNewSeen: string | null;
 
   // --- search ---
   /**
@@ -201,6 +206,7 @@ export const DEFAULT_SETTINGS: Settings = {
   plugins: [],
 
   // --- shell: what's new ---
+  whatsNewSeen: null,
 
   // --- search ---
   searchIndex: true,
@@ -232,6 +238,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
     // --- shell: what's new ---
+    whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
 
     // --- search ---
     searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,

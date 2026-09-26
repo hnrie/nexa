@@ -1,0 +1,99 @@
+/* The update prompt and, once it is put off, the reminder at the top of the page. */
+
+.lead {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.version {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 400ms ease;
+}
+.percent {
+  flex: none;
+  min-width: 4ch;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-subtle);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+@media (pointer: coarse) {
+  .action { height: 44px; padding-inline: 20px; }
+}
+
+/* --- the reminder --------------------------------------------------------- */
+
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding-block: 4px;
+  padding-inline: 14px 8px;
+  background: color-mix(in srgb, var(--brand) 13%, var(--bg-raised));
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 26%, transparent);
+  color: var(--text);
+  font-size: 14px;
+}
+.barIcon {
+  flex: none;
+  display: flex;
+  color: var(--text-brand);
+}
+.barText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.barMeter {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.barBtn { flex: none; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+:global([data-reduced-motion="true"]) .spin { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  .fill { transition: none; }
+}
+
+@media (pointer: coarse) {
+  .bar { min-height: 48px; }
+  .barBtn { height: 40px; }
+}
+/* a phone's row is narrow: the words wrap onto two lines rather than lose their end */
+@media (max-width: 560px) {
+  .barText { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; }
+}

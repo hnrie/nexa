@@ -9,7 +9,6 @@ import { fitsUploadLimit, stage, uploadLimit, type Staged } from "@/lib/attachme
 import { useAuth } from "@/stores/auth";
 import { useMessages } from "@/stores/messages";
 import { useRelationships } from "@/stores/relationships";
-import { usePaneScope } from "@/components/shell/paneScope";
 import { useSettings } from "@/stores/settings";
 import { useSelection } from "@/stores/selection";
 import { DropOverlay } from "./DropOverlay";
@@ -101,7 +100,6 @@ function phoneKeyboard(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse) and (max-width: 767px)").matches;
 }
 export function Composer({ channel }: { channel: Channel }) {
-  const { focused: paneFocused } = usePaneScope();
   const me = useAuth((a) => a.me);
   const users = useUsers((u) => u.byId);
   const rels = useRelationships((r) => r.byUser);
@@ -186,7 +184,7 @@ export function Composer({ channel }: { channel: Channel }) {
     return () => window.removeEventListener("ec:insert-text", onInsert);
   });
   useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
-  useKeepFocused(taRef, paneFocused);
+  useKeepFocused(taRef);
 
   const name = channelDisplayName(channel, users, me?.id);
   const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
@@ -202,8 +200,7 @@ export function Composer({ channel }: { channel: Channel }) {
     setNotice(null);
     setFormatting(false);
     // On a touch screen a focus right after the tap that opened the conversation raises the keyboard over it.
-    // In a split, only the pane you are actually in may take the caret.
-    if (paneFocused && window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => taRef.current?.focus(), 0);
+    if (window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => taRef.current?.focus(), 0);
     return () => {
       // the last words typed before leaving are still waiting on the save timer
       if (draftTimer.current) {
@@ -608,7 +605,7 @@ export function Composer({ channel }: { channel: Channel }) {
   if (!canSend) {
     return (
       <div className={s.wrap}>
-          {paneFocused ? <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled /> : null}
+          <DropOverlay name={name} hash={!!channel.server_id} onFiles={() => {}} disabled />
         <div className={[s.box, s.locked].join(" ")} data-testid="composer-locked">{tr_("composer.composer.youDoNotHavePermissionTo")}</div>
       </div>
     );
@@ -616,10 +613,7 @@ export function Composer({ channel }: { channel: Channel }) {
 
   return (
     <div className={s.wrap}>
-      {/* One pane takes a dropped file, the one in focus: every pane's box
-          listened to the whole window, so the first one mounted took every
-          drop while all of them drew their scrim. */}
-      {paneFocused ? <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} /> : null}
+      <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
       {ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
       {formatting ? (
         <Suspense fallback={null}>

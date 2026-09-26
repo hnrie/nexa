@@ -14,7 +14,8 @@ they open the app after an update, and it is how they find out what changed.
   `id` is the deploy date (`"2026-09-26"`, then `"2026-09-26.2"` for a second one that day), or add
   items to the newest release if that one has not been deployed yet.
 - Each item is a lucide-react icon, a title and one or two plain sentences. Title and body are i18n
-  keys (`whatsNew.<release>.<name>Title` and `...Body`) translated into all eleven locales.
+  keys named after the release id without its dashes and dots (`whatsNew.r20260926.<name>Title`
+  and `...Body` for release `2026-09-26`), translated into all eleven locales.
 - Say what people can do now and where to find it. Small fixes and polish do not need an entry.
 - The popup is `web/src/components/shell/WhatsNewDialog.tsx`. It shows the releases an account has
   not seen yet (tracked in its synced settings) and skips releases older than the account.

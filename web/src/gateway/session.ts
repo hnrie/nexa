@@ -22,7 +22,7 @@ import { reportCrash } from "@/lib/crashReport";
 import { clearMediaCache } from "@/lib/mediaCache";
 import { keystore } from "@/crypto/keystore";
 import { workerClearTimeout, workerSetTimeout } from "@/lib/workerTimers";
-import { usePanes } from "@/stores/panes";
+import { useTabs } from "@/stores/tabs";
 import { t } from "@/i18n";
 
 let client: GatewayClient | null = null;
@@ -260,8 +260,8 @@ export async function endSession(): Promise<void> {
   // what was being picked for deleting, and the slow mode waits, were this account's
   useSelection.getState().clear();
   useSlowmode.getState().reset();
-  // tabs and split panes name another account's channels
-  usePanes.getState().reset();
+  // tabs name another account's channels
+  useTabs.getState().reset();
 }
 
 logoutHooks.push(endSession);

@@ -1,6 +1,6 @@
 // The app's service worker. It has one job: when a deploy ships a new build,
 // a new copy of this script takes over every open tab, which the page notices
-// and reloads into (see main.tsx).
+// and offers as an update (see main.tsx and lib/appUpdate.ts).
 //
 // It deliberately has no fetch handler. A worker with one is shown every
 // request its pages make, and Chrome keeps each request body alive until that
