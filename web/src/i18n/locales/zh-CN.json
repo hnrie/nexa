@@ -865,20 +865,7 @@
   "modals.modalHost.areYouSure": "确定吗？",
   "modals.quickSwitcher.clear": "清除",
   "modals.quickSwitcher.couldNotOpenTheConversation": "无法打开该对话。",
-  "modals.quickSwitcher.filesCount": {
-    "other": "[{count} 个文件]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "会找到你发过的内容。",
-  "modals.quickSwitcher.jumpTo": "跳转到",
-  "modals.quickSwitcher.keyHints": "上下移动 · 回车打开 · Ctrl+Tab 切换模式 · Esc 关闭",
   "modals.quickSwitcher.messages": "消息",
-  "modals.quickSwitcher.noMatches": "没有匹配项。",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "没有匹配到内容。打开一个对话并加载更早的消息，可以让索引更全。",
-  "modals.quickSwitcher.quickSwitcher": "快速切换",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "搜索你能读到的一切 — 试试 from:me",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "输入即可搜索本设备已解密的一切内容。",
-  "modals.quickSwitcher.unknown": "未知",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "想去哪里？",
   "modals.serverNotifications.done": "完成",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "这个服务器的每条消息都会通知你。",
   "modals.serverNotifications.muteName": "静音 {name}",
@@ -1653,43 +1640,6 @@
   "search.panel.label": "搜索",
   "search.scope.thisConversation": "此对话",
   "search.scope.thisServer": "此服务器",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "取消",
-  "search.search.capped": {
-    "other": "在最近的 {count} 条消息处停止；为了节省此标签页的内存，更早的历史未被读取。"
-  },
-  "search.search.channel": "#频道",
-  "search.search.closeSearch": "关闭搜索",
-  "search.search.exactPhrase": "精确短语",
-  "search.search.exclude": "排除",
-  "search.search.filesCount": {
-    "other": "[{count} 个文件]"
-  },
-  "search.search.fromHint": "@用户，或者 {me}",
-  "search.search.helpEverything": "在本机解密并搜索你能读到的每一条消息，涵盖所有对话。没有任何内容离开你的设备：服务器只持有密文，永远无法替你搜索。",
-  "search.search.linkImageFileStickerEmbed": "链接、图片、文件、贴纸、嵌入",
-  "search.search.me": "我",
-  "search.search.noResultsAnywhere": {
-    "other": "在已搜索的 {count} 条消息中没有结果。"
-  },
-  "search.search.notStarted": "正在开始…",
-  "search.search.quotes": "“引号”",
-  "search.search.results": {
-    "other": "{count} 条结果"
-  },
-  "search.search.searchAgain": "重新搜索",
-  "search.search.searched": {
-    "other": "已在 {total} 个对话中搜索 {count} 条消息"
-  },
-  "search.search.searching": {
-    "other": "正在搜索… {count} 条消息，{done}/{total} 个对话"
-  },
-  "search.search.stillLooking": "正在翻查你的历史记录…",
-  "search.search.typeToSearch": "输入以搜索所有对话",
-  "search.search.unreadable": {
-    "other": "有 {count} 个对话无法读取：此设备没有它们的密钥。"
-  },
-  "search.search.waitingForServer": "正在等待服务器…",
   "search.sort.label": "排序：{sort}",
   "search.sort.menu": "结果排序",
   "search.sort.newest": "最新优先",
@@ -1744,9 +1694,7 @@
   "search.suggest.pickDate": "选择日期",
   "search.suggest.pins": "置顶",
   "search.suggest.recent": "最近搜索",
-  "search.suggestions.sentAfter": "发送于此日期之后",
-  "search.suggestions.sentBefore": "发送于此日期之前",
-  "search.switcher.hints": "↑ ↓ 选择，Enter 打开，Esc 关闭",
+  "search.switcher.hints": "↑ ↓ 选择，Enter 打开或搜索，Esc 关闭",
   "search.switcher.jumpTo": "跳转到",
   "search.switcher.label": "位置和消息",
   "search.switcher.noneYet": "暂无匹配的消息。较早的消息仍在建立索引",

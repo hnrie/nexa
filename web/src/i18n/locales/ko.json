@@ -865,20 +865,7 @@
   "modals.modalHost.areYouSure": "정말인가요?",
   "modals.quickSwitcher.clear": "지우기",
   "modals.quickSwitcher.couldNotOpenTheConversation": "대화를 열지 못했습니다.",
-  "modals.quickSwitcher.filesCount": {
-    "other": "[파일 {count}개]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "은(는) 내가 보낸 것을 찾습니다.",
-  "modals.quickSwitcher.jumpTo": "이동",
-  "modals.quickSwitcher.keyHints": "위아래로 이동 · Enter로 열기 · Ctrl+Tab으로 모드 전환 · Esc로 닫기",
   "modals.quickSwitcher.messages": "메시지",
-  "modals.quickSwitcher.noMatches": "일치하는 항목이 없습니다.",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "일치하는 것이 없습니다. 대화를 열고 이전 메시지를 불러오면 색인이 넓어집니다.",
-  "modals.quickSwitcher.quickSwitcher": "빠른 전환",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "읽을 수 있는 모든 곳에서 검색 — from:me 도 써 보세요",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "입력하면 이 기기가 복호화한 모든 것을 검색합니다.",
-  "modals.quickSwitcher.unknown": "알 수 없음",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "어디로 갈까요?",
   "modals.serverNotifications.done": "완료",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "이 서버의 모든 메시지가 알림으로 옵니다.",
   "modals.serverNotifications.muteName": "{name} 음소거",
@@ -1653,43 +1640,6 @@
   "search.panel.label": "검색",
   "search.scope.thisConversation": "이 대화",
   "search.scope.thisServer": "이 서버",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "취소",
-  "search.search.capped": {
-    "other": "최근 {count}개에서 멈췄습니다. 이 탭의 메모리를 지키기 위해 더 오래된 기록은 읽지 않았습니다."
-  },
-  "search.search.channel": "#채널",
-  "search.search.closeSearch": "검색 닫기",
-  "search.search.exactPhrase": "정확한 문구",
-  "search.search.exclude": "제외",
-  "search.search.filesCount": {
-    "other": "[파일 {count}개]"
-  },
-  "search.search.fromHint": "@사용자, 또는 {me}",
-  "search.search.helpEverything": "읽을 수 있는 모든 메시지를 모든 대화에서 이 기기에서 복호화하며 검색합니다. 기기 밖으로 나가는 것은 없습니다. 서버는 암호문만 가지고 있어 대신 검색할 수 없습니다.",
-  "search.search.linkImageFileStickerEmbed": "링크, 이미지, 파일, 스티커, 임베드",
-  "search.search.me": "나",
-  "search.search.noResultsAnywhere": {
-    "other": "검색한 메시지 {count}개에서 결과가 없습니다."
-  },
-  "search.search.notStarted": "시작하는 중…",
-  "search.search.quotes": "\"따옴표\"",
-  "search.search.results": {
-    "other": "결과 {count}개"
-  },
-  "search.search.searchAgain": "다시 검색",
-  "search.search.searched": {
-    "other": "대화 {total}개에서 메시지 {count}개를 검색했습니다"
-  },
-  "search.search.searching": {
-    "other": "검색 중… 메시지 {count}개, 대화 {done}/{total}개"
-  },
-  "search.search.stillLooking": "기록을 살펴보는 중…",
-  "search.search.typeToSearch": "입력하면 모든 대화를 검색합니다",
-  "search.search.unreadable": {
-    "other": "대화 {count}개를 읽을 수 없습니다. 이 기기에 키가 없습니다."
-  },
-  "search.search.waitingForServer": "서버를 기다리는 중…",
   "search.sort.label": "정렬: {sort}",
   "search.sort.menu": "결과 정렬",
   "search.sort.newest": "최신순",
@@ -1744,9 +1694,7 @@
   "search.suggest.pickDate": "날짜 선택",
   "search.suggest.pins": "고정",
   "search.suggest.recent": "최근 검색",
-  "search.suggestions.sentAfter": "이후에 보냄",
-  "search.suggestions.sentBefore": "이전에 보냄",
-  "search.switcher.hints": "↑ ↓ 선택, Enter 열기, Esc 닫기",
+  "search.switcher.hints": "↑ ↓ 선택, Enter 열기 또는 검색, Esc 닫기",
   "search.switcher.jumpTo": "바로 가기",
   "search.switcher.label": "이동할 곳과 메시지",
   "search.switcher.noneYet": "아직 일치하는 메시지가 없어요. 이전 메시지는 색인하는 중이에요",

@@ -205,7 +205,8 @@ export function SearchPanel({
         <div className={s.intro}>
           <p className={s.introTitle}>{scope.kind === "all" ? t("search.intro.everywhere") : t("search.intro.scoped", { name: scopeName(scope, byId, names) })}</p>
           <p className={s.introText}>{t("search.intro.private")}</p>
-          <SearchSuggestions groups={groups} active={-1} listId={`${listId}-intro`} names={names} onPick={pick} onHover={() => undefined} onDate={onDate} onClearRecent={clearRecentSearches} floating={false} />
+          {/* with a filter half typed, its suggestions are the ones floating above */}
+          {query.trim() ? null : <SearchSuggestions groups={groups} active={-1} listId={`${listId}-intro`} names={names} onPick={pick} onHover={() => undefined} onDate={onDate} onClearRecent={clearRecentSearches} floating={false} />}
         </div>
       ) : (
         <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} hereChannelId={channel.id} scoped={scope.kind !== "all"} onWiden={() => setScope(EVERYWHERE)} walking={walking} />

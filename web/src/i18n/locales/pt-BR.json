@@ -902,21 +902,7 @@
   "modals.modalHost.areYouSure": "Tem certeza?",
   "modals.quickSwitcher.clear": "Limpar",
   "modals.quickSwitcher.couldNotOpenTheConversation": "Não foi possível abrir a conversa.",
-  "modals.quickSwitcher.filesCount": {
-    "one": "[{count} arquivo]",
-    "other": "[{count} arquivos]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "encontra o que você enviou.",
-  "modals.quickSwitcher.jumpTo": "Ir para",
-  "modals.quickSwitcher.keyHints": "Cima e baixo para mover · Enter para abrir · Ctrl+Tab para trocar de modo · Esc para fechar",
   "modals.quickSwitcher.messages": "Mensagens",
-  "modals.quickSwitcher.noMatches": "Nenhum resultado.",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "Nada corresponde. Abra uma conversa e carregue mensagens antigas para ampliar o índice.",
-  "modals.quickSwitcher.quickSwitcher": "Troca rápida",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "Busque em tudo que você pode ler — experimente from:me",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "Digite para pesquisar em tudo o que este dispositivo descriptografou.",
-  "modals.quickSwitcher.unknown": "Desconhecido",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "Para onde você quer ir?",
   "modals.serverNotifications.done": "Concluído",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "Cada mensagem deste servidor notifica você.",
   "modals.serverNotifications.muteName": "Silenciar {name}",
@@ -1722,51 +1708,6 @@
   "search.panel.label": "Pesquisa",
   "search.scope.thisConversation": "esta conversa",
   "search.scope.thisServer": "este servidor",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "Cancelar",
-  "search.search.capped": {
-    "one": "Parou na mensagem mais recente ({count}); o histórico mais antigo ficou sem ser lido para poupar a memória desta aba.",
-    "other": "Parou nas {count} mensagens mais recentes; o histórico mais antigo ficou sem ser lido para poupar a memória desta aba."
-  },
-  "search.search.channel": "#canal",
-  "search.search.closeSearch": "Fechar busca",
-  "search.search.exactPhrase": "frase exata",
-  "search.search.exclude": "excluir",
-  "search.search.filesCount": {
-    "one": "[{count} arquivo]",
-    "many": "[{count} arquivos]",
-    "other": "[{count} arquivos]"
-  },
-  "search.search.fromHint": "@usuário, ou {me}",
-  "search.search.helpEverything": "Procura em todas as mensagens que você pode ler, em todas as conversas, descriptografando-as aqui. Nada sai do seu dispositivo: o servidor só guarda texto cifrado e nunca pode pesquisar por você.",
-  "search.search.linkImageFileStickerEmbed": "link, imagem, arquivo, figurinha, prévia",
-  "search.search.me": "eu",
-  "search.search.noResultsAnywhere": {
-    "one": "Nenhum resultado na {count} mensagem pesquisada.",
-    "other": "Nenhum resultado nas {count} mensagens pesquisadas."
-  },
-  "search.search.notStarted": "Começando…",
-  "search.search.quotes": "\"aspas\"",
-  "search.search.results": {
-    "one": "{count} resultado",
-    "other": "{count} resultados"
-  },
-  "search.search.searchAgain": "Pesquisar de novo",
-  "search.search.searched": {
-    "one": "{count} mensagem pesquisada em {total} conversas",
-    "other": "{count} mensagens pesquisadas em {total} conversas"
-  },
-  "search.search.searching": {
-    "one": "Pesquisando… {count} mensagem, {done}/{total} conversas",
-    "other": "Pesquisando… {count} mensagens, {done}/{total} conversas"
-  },
-  "search.search.stillLooking": "Percorrendo seu histórico…",
-  "search.search.typeToSearch": "Digite para pesquisar em todas as conversas",
-  "search.search.unreadable": {
-    "one": "{count} conversa não pôde ser lida: este dispositivo não tem a chave dela.",
-    "other": "{count} conversas não puderam ser lidas: este dispositivo não tem as chaves delas."
-  },
-  "search.search.waitingForServer": "Aguardando o servidor…",
   "search.sort.label": "Ordem: {sort}",
   "search.sort.menu": "Ordenar resultados",
   "search.sort.newest": "Mais recentes primeiro",
@@ -1829,9 +1770,7 @@
   "search.suggest.pickDate": "Escolher uma data",
   "search.suggest.pins": "Fixadas",
   "search.suggest.recent": "Pesquisas recentes",
-  "search.suggestions.sentAfter": "Enviado depois de",
-  "search.suggestions.sentBefore": "Enviado antes de",
-  "search.switcher.hints": "↑ ↓ para escolher, Enter para abrir, Esc para fechar",
+  "search.switcher.hints": "↑ ↓ para escolher, Enter para abrir ou pesquisar, Esc para fechar",
   "search.switcher.jumpTo": "Ir para",
   "search.switcher.label": "Lugares e mensagens",
   "search.switcher.noneYet": "Nenhuma mensagem corresponde ainda. As mais antigas ainda estão sendo indexadas",

@@ -892,21 +892,7 @@
   "modals.modalHost.areYouSure": "Are you sure?",
   "modals.quickSwitcher.clear": "Clear",
   "modals.quickSwitcher.couldNotOpenTheConversation": "Could not open the conversation.",
-  "modals.quickSwitcher.filesCount": {
-    "one": "[{count} file]",
-    "other": "[{count} files]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "finds what you sent.",
-  "modals.quickSwitcher.jumpTo": "Jump to",
-  "modals.quickSwitcher.keyHints": "Up and down to move · Enter to open · Ctrl+Tab to switch mode · Escape to dismiss",
   "modals.quickSwitcher.messages": "Messages",
-  "modals.quickSwitcher.noMatches": "No matches.",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "Nothing matched. Open a conversation and load older messages to widen the index.",
-  "modals.quickSwitcher.quickSwitcher": "Quick switcher",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "Search everything you can read — try from:me",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "Type to search everything this device has decrypted.",
-  "modals.quickSwitcher.unknown": "Unknown",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "Where would you like to go?",
   "modals.serverNotifications.done": "Done",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "Every message in this server notifies you.",
   "modals.serverNotifications.muteName": "Mute {name}",
@@ -1326,45 +1312,6 @@
   "search.panel.label": "Search",
   "search.scope.thisConversation": "this conversation",
   "search.scope.thisServer": "this server",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "Cancel",
-  "search.search.capped": {
-    "one": "Stopped at the newest {count} message; older history was left unread to keep this tab in memory.",
-    "other": "Stopped at the newest {count} messages; older history was left unread to keep this tab in memory."
-  },
-  "search.search.channel": "#channel",
-  "search.search.closeSearch": "Close search",
-  "search.search.exactPhrase": "exact phrase",
-  "search.search.fromHint": "@user, or {me}",
-  "search.search.helpEverything": "Searches every message you can read, in every conversation, by decrypting it here. Nothing leaves your device: the server only ever holds ciphertext, and can never search it for you.",
-  "search.search.linkImageFileStickerEmbed": "link, image, file, sticker, embed",
-  "search.search.me": "me",
-  "search.search.noResultsAnywhere": {
-    "one": "No results in the {count} message searched.",
-    "other": "No results in the {count} messages searched."
-  },
-  "search.search.notStarted": "Starting…",
-  "search.search.quotes": "\"quotes\"",
-  "search.search.results": {
-    "one": "{count} result",
-    "other": "{count} results"
-  },
-  "search.search.searchAgain": "Search again",
-  "search.search.searched": {
-    "one": "Searched {count} message in {total} conversations",
-    "other": "Searched {count} messages in {total} conversations"
-  },
-  "search.search.searching": {
-    "one": "Searching… {count} message, {done}/{total} conversations",
-    "other": "Searching… {count} messages, {done}/{total} conversations"
-  },
-  "search.search.stillLooking": "Looking through your history…",
-  "search.search.typeToSearch": "Type to search every conversation",
-  "search.search.unreadable": {
-    "one": "{count} conversation could not be read: this device has no key for it.",
-    "other": "{count} conversations could not be read: this device has no key for them."
-  },
-  "search.search.waitingForServer": "Waiting for the server…",
   "search.sort.label": "Sort: {sort}",
   "search.sort.menu": "Sort results",
   "search.sort.newest": "Newest first",
@@ -1423,9 +1370,7 @@
   "search.suggest.pickDate": "Pick a date",
   "search.suggest.pins": "Pins",
   "search.suggest.recent": "Recent searches",
-  "search.suggestions.sentAfter": "Sent after",
-  "search.suggestions.sentBefore": "Sent before",
-  "search.switcher.hints": "↑ ↓ to choose, Enter to open, Esc to close",
+  "search.switcher.hints": "↑ ↓ to choose, Enter to open or search, Esc to close",
   "search.switcher.jumpTo": "Jump to",
   "search.switcher.label": "Places and messages",
   "search.switcher.noneYet": "No messages match yet. Older ones are still being indexed",
@@ -2883,11 +2828,6 @@
   "render.spoiler": "[spoiler]",
   "render.unknownRole": "unknown-role",
   "render.unknownUser": "unknown-user",
-  "search.search.exclude": "exclude",
-  "search.search.filesCount": {
-    "one": "[{count} file]",
-    "other": "[{count} files]"
-  },
   "server.channelSettings.slowmodeOff": "Off",
   "server.deleteServer.areYouSure": "Are you sure you want to delete {name}? Every channel, message and role in it is gone for everyone, permanently. There is no undo.",
   "server.emoji.deleteNamed": "Delete :{name}:",

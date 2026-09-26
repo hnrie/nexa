@@ -8,7 +8,7 @@
  * Links show their site as a letter, not its icon: fetching a site's icon
  * would tell that site what someone searched.
  */
-import { ArrowDownUp, ExternalLink, Film, Image as ImageIcon, Link as LinkIcon, Download, Paperclip, Play, SearchX, Sticker as StickerIcon } from "lucide-react";
+import { ArrowDownUp, ExternalLink, Film, Image as ImageIcon, Link as LinkIcon, Download, Paperclip, Play, SearchX, Sticker as StickerIcon, Users } from "lucide-react";
 import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
@@ -73,15 +73,22 @@ function hostOf(url: string): string {
   }
 }
 
-/** Where a result is, as its row says it: "#general", "@Bob", a group, a subchat. */
-export function useWhere(names: Names): (channelId: string) => { label: string; server: string | null } {
+/**
+ * Where a result is, as its row says it: "#general" and its server, "@Bob",
+ * a group by its name, a subchat by its name and then its conversation's.
+ */
+export function useWhere(names: Names): (channelId: string) => { label: string; server: string | null; group: boolean } {
   const byId = useChannels((c) => c.byId);
   return useMemo(
     () => (channelId: string) => {
       const ch: Channel | undefined = byId[channelId];
-      if (!ch) return { label: "", server: null };
-      const label = ch.type === "dm" ? `@${names.channel(ch)}` : names.channel(ch);
-      return { label, server: names.serverName(ch.server_id) };
+      if (!ch) return { label: "", server: null, group: false };
+      if (ch.type === "dm") return { label: `@${names.channel(ch)}`, server: null, group: false };
+      if (ch.type === "subchat") {
+        const parent = ch.parent_id ? byId[ch.parent_id] : undefined;
+        return { label: names.channel(ch), server: parent ? (parent.type === "dm" ? `@${names.channel(parent)}` : names.channel(parent)) : null, group: true };
+      }
+      return { label: names.channel(ch), server: names.serverName(ch.server_id), group: ch.type === "group_dm" };
     },
     [byId, names],
   );
@@ -134,6 +141,8 @@ export const MessageHit = memo(function MessageHit({ doc, needles, names, showWh
           <span className={s.hitName} dir="auto">{name}</span>
           {showWhere && where.label ? (
             <span className={s.hitWhere} dir="auto">
+              {/* a group has no # or @ to say what it is */}
+              {where.group ? <Users size={12} aria-hidden="true" className={s.hitWhereIcon} /> : null}
               {where.label}
               {where.server ? <span className={s.hitServer}>{where.server}</span> : null}
             </span>

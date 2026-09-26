@@ -902,21 +902,7 @@
   "modals.modalHost.areYouSure": "Êtes-vous sûr ?",
   "modals.quickSwitcher.clear": "Effacer",
   "modals.quickSwitcher.couldNotOpenTheConversation": "Impossible d’ouvrir la conversation.",
-  "modals.quickSwitcher.filesCount": {
-    "one": "[{count} fichier]",
-    "other": "[{count} fichiers]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "trouve ce que vous avez envoyé.",
-  "modals.quickSwitcher.jumpTo": "Aller à",
-  "modals.quickSwitcher.keyHints": "Haut et bas pour se déplacer · Entrée pour ouvrir · Ctrl+Tab pour changer de mode · Échap pour fermer",
   "modals.quickSwitcher.messages": "Messages",
-  "modals.quickSwitcher.noMatches": "Aucun résultat.",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "Rien ne correspond. Ouvrez une conversation et chargez d’anciens messages pour élargir l’index.",
-  "modals.quickSwitcher.quickSwitcher": "Accès rapide",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "Cherchez dans tout ce que vous pouvez lire — essayez from:me",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "Tapez pour chercher dans tout ce que cet appareil a déchiffré.",
-  "modals.quickSwitcher.unknown": "Inconnu",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "Où voulez-vous aller ?",
   "modals.serverNotifications.done": "Terminé",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "Chaque message de ce serveur vous notifie.",
   "modals.serverNotifications.muteName": "Mettre {name} en sourdine",
@@ -1722,51 +1708,6 @@
   "search.panel.label": "Recherche",
   "search.scope.thisConversation": "cette conversation",
   "search.scope.thisServer": "ce serveur",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "Annuler",
-  "search.search.capped": {
-    "one": "Arrêt au message le plus récent ({count}) ; l'historique plus ancien n'a pas été lu afin de préserver la mémoire de cet onglet.",
-    "other": "Arrêt aux {count} messages les plus récents ; l'historique plus ancien n'a pas été lu afin de préserver la mémoire de cet onglet."
-  },
-  "search.search.channel": "#salon",
-  "search.search.closeSearch": "Fermer la recherche",
-  "search.search.exactPhrase": "expression exacte",
-  "search.search.exclude": "exclure",
-  "search.search.filesCount": {
-    "one": "[{count} fichier]",
-    "many": "[{count} fichiers]",
-    "other": "[{count} fichiers]"
-  },
-  "search.search.fromHint": "@utilisateur, ou {me}",
-  "search.search.helpEverything": "Cherche dans tous les messages que vous pouvez lire, dans toutes les conversations, en les déchiffrant ici. Rien ne quitte votre appareil : le serveur ne détient que du texte chiffré et ne peut jamais chercher à votre place.",
-  "search.search.linkImageFileStickerEmbed": "lien, image, fichier, sticker, aperçu",
-  "search.search.me": "moi",
-  "search.search.noResultsAnywhere": {
-    "one": "Aucun résultat dans le {count} message parcouru.",
-    "other": "Aucun résultat dans les {count} messages parcourus."
-  },
-  "search.search.notStarted": "Démarrage…",
-  "search.search.quotes": "« guillemets »",
-  "search.search.results": {
-    "one": "{count} résultat",
-    "other": "{count} résultats"
-  },
-  "search.search.searchAgain": "Rechercher à nouveau",
-  "search.search.searched": {
-    "one": "{count} message parcouru dans {total} conversations",
-    "other": "{count} messages parcourus dans {total} conversations"
-  },
-  "search.search.searching": {
-    "one": "Recherche… {count} message, {done}/{total} conversations",
-    "other": "Recherche… {count} messages, {done}/{total} conversations"
-  },
-  "search.search.stillLooking": "Parcours de votre historique…",
-  "search.search.typeToSearch": "Saisissez du texte pour chercher dans toutes les conversations",
-  "search.search.unreadable": {
-    "one": "{count} conversation n'a pas pu être lue : cet appareil n'en a pas la clé.",
-    "other": "{count} conversations n'ont pas pu être lues : cet appareil n'en a pas les clés."
-  },
-  "search.search.waitingForServer": "En attente du serveur…",
   "search.sort.label": "Tri : {sort}",
   "search.sort.menu": "Trier les résultats",
   "search.sort.newest": "Plus récents d’abord",
@@ -1829,9 +1770,7 @@
   "search.suggest.pickDate": "Choisir une date",
   "search.suggest.pins": "Épinglés",
   "search.suggest.recent": "Recherches récentes",
-  "search.suggestions.sentAfter": "Envoyé après le",
-  "search.suggestions.sentBefore": "Envoyé avant le",
-  "search.switcher.hints": "↑ ↓ pour choisir, Entrée pour ouvrir, Échap pour fermer",
+  "search.switcher.hints": "↑ ↓ pour choisir, Entrée pour ouvrir ou rechercher, Échap pour fermer",
   "search.switcher.jumpTo": "Aller à",
   "search.switcher.label": "Lieux et messages",
   "search.switcher.noneYet": "Aucun message ne correspond pour l’instant. Les plus anciens sont encore en cours d’indexation",

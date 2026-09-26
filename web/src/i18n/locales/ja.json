@@ -865,20 +865,7 @@
   "modals.modalHost.areYouSure": "よろしいですか？",
   "modals.quickSwitcher.clear": "クリア",
   "modals.quickSwitcher.couldNotOpenTheConversation": "会話を開けませんでした。",
-  "modals.quickSwitcher.filesCount": {
-    "other": "[ファイル {count} 件]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "は自分が送ったものを探します。",
-  "modals.quickSwitcher.jumpTo": "移動先",
-  "modals.quickSwitcher.keyHints": "上下で移動 · Enter で開く · Ctrl+Tab でモード切り替え · Esc で閉じる",
   "modals.quickSwitcher.messages": "メッセージ",
-  "modals.quickSwitcher.noMatches": "一致するものがありません。",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "一致するものがありませんでした。会話を開いて古いメッセージを読み込むと、索引が広がります。",
-  "modals.quickSwitcher.quickSwitcher": "クイック切り替え",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "読めるものすべてを検索 — from:me も使えます",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "入力すると、この端末が復号したすべてを検索します。",
-  "modals.quickSwitcher.unknown": "不明",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "どこへ行きますか？",
   "modals.serverNotifications.done": "完了",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "このサーバーのすべてのメッセージが通知されます。",
   "modals.serverNotifications.muteName": "{name} をミュート",
@@ -1653,43 +1640,6 @@
   "search.panel.label": "検索",
   "search.scope.thisConversation": "この会話",
   "search.scope.thisServer": "このサーバー",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "キャンセル",
-  "search.search.capped": {
-    "other": "新しい方から {count} 件で止めました。このタブのメモリを守るため、それより古い履歴は読んでいません。"
-  },
-  "search.search.channel": "#チャンネル",
-  "search.search.closeSearch": "検索を閉じる",
-  "search.search.exactPhrase": "完全一致のフレーズ",
-  "search.search.exclude": "除外",
-  "search.search.filesCount": {
-    "other": "[ファイル {count} 件]"
-  },
-  "search.search.fromHint": "@ユーザー、または {me}",
-  "search.search.helpEverything": "読むことのできるすべてのメッセージを、すべての会話にわたってこの端末で復号しながら検索します。端末の外には何も出ません。サーバーが持っているのは暗号文だけで、代わりに検索することはできません。",
-  "search.search.linkImageFileStickerEmbed": "リンク、画像、ファイル、スタンプ、埋め込み",
-  "search.search.me": "自分",
-  "search.search.noResultsAnywhere": {
-    "other": "検索した {count} 件のメッセージに一致するものはありませんでした。"
-  },
-  "search.search.notStarted": "開始しています…",
-  "search.search.quotes": "「引用符」",
-  "search.search.results": {
-    "other": "{count} 件の結果"
-  },
-  "search.search.searchAgain": "もう一度検索",
-  "search.search.searched": {
-    "other": "{total} 件の会話で {count} 件のメッセージを検索しました"
-  },
-  "search.search.searching": {
-    "other": "検索中… {count} 件のメッセージ、{done}/{total} 件の会話"
-  },
-  "search.search.stillLooking": "履歴を調べています…",
-  "search.search.typeToSearch": "入力するとすべての会話を検索します",
-  "search.search.unreadable": {
-    "other": "{count} 件の会話は読めませんでした。この端末に鍵がありません。"
-  },
-  "search.search.waitingForServer": "サーバーを待っています…",
   "search.sort.label": "並び順：{sort}",
   "search.sort.menu": "結果の並び順",
   "search.sort.newest": "新しい順",
@@ -1744,9 +1694,7 @@
   "search.suggest.pickDate": "日付を選ぶ",
   "search.suggest.pins": "ピン留め",
   "search.suggest.recent": "最近の検索",
-  "search.suggestions.sentAfter": "この日以降に送信",
-  "search.suggestions.sentBefore": "この日以前に送信",
-  "search.switcher.hints": "↑ ↓ で選択、Enter で開く、Esc で閉じる",
+  "search.switcher.hints": "↑ ↓ で選択、Enter で開く・検索、Esc で閉じる",
   "search.switcher.jumpTo": "移動先",
   "search.switcher.label": "移動先とメッセージ",
   "search.switcher.noneYet": "まだ一致するメッセージはありません。古いメッセージはインデックス作成中です",

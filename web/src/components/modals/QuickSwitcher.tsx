@@ -277,11 +277,12 @@ function Finder({ onClose }: { onClose: () => void }) {
   }, [searched, groups, typingFilter, matches, q, run.empty, run.result.docs, run.pending, walking]);
   const options = useMemo(() => sections.flatMap((sec) => sec.options), [sections]);
   const [active, setActive] = useState(-1);
-  // A different list starts on its first row, so Enter goes where the eye
-  // goes; not while a filter is being filled in, where Enter searches as
-  // typed. The same list worked out again (the index filling in) keeps its row.
+  // A name typed lands on the place it names, so Enter goes there; words
+  // typed land on nothing, so Enter searches them and brings up the tabs.
+  // The same list worked out again (the index filling in) keeps its row.
   const optionSig = options.map((o) => o.id).join("\n");
-  useEffect(() => setActive(q.trim() && !typingFilter && optionSig ? 0 : -1), [optionSig, q, typingFilter]);
+  const firstIsPlace = options[0]?.kind === "place";
+  useEffect(() => setActive(q.trim() && !typingFilter && firstIsPlace ? 0 : -1), [optionSig, q, typingFilter, firstIsPlace]);
   const choose = (o: Option | undefined) => {
     if (!o || o.kind === "all") return commit();
     if (o.kind === "suggestion") return pickSuggestion(o.sg);

@@ -892,21 +892,7 @@
   "modals.modalHost.areYouSure": "क्या आप निश्चित हैं?",
   "modals.quickSwitcher.clear": "साफ़ करें",
   "modals.quickSwitcher.couldNotOpenTheConversation": "बातचीत नहीं खोली जा सकी।",
-  "modals.quickSwitcher.filesCount": {
-    "one": "[{count} फ़ाइल]",
-    "other": "[{count} फ़ाइलें]"
-  },
-  "modals.quickSwitcher.findsWhatYouSent": "वह ढूँढता है जो आपने भेजा है।",
-  "modals.quickSwitcher.jumpTo": "यहाँ जाएँ",
-  "modals.quickSwitcher.keyHints": "ऊपर-नीचे से चलें · Enter से खोलें · Ctrl+Tab से मोड बदलें · Esc से बंद करें",
   "modals.quickSwitcher.messages": "संदेश",
-  "modals.quickSwitcher.noMatches": "कोई मेल नहीं मिला।",
-  "modals.quickSwitcher.nothingMatchedOpenAConversationAnd": "कुछ भी मेल नहीं खाया। कोई बातचीत खोलें और पुराने संदेश लोड करें ताकि सूची बड़ी हो।",
-  "modals.quickSwitcher.quickSwitcher": "त्वरित स्विचर",
-  "modals.quickSwitcher.searchEverythingYouCanRead": "जो कुछ आप पढ़ सकते हैं उसमें खोजें — from:me आज़माएँ",
-  "modals.quickSwitcher.typeToSearchEverythingThisDevice": "टाइप करें और इस डिवाइस द्वारा डिक्रिप्ट की गई हर चीज़ में खोजें।",
-  "modals.quickSwitcher.unknown": "अज्ञात",
-  "modals.quickSwitcher.whereWouldYouLikeToGo": "कहाँ जाना चाहेंगे?",
   "modals.serverNotifications.done": "हो गया",
   "modals.serverNotifications.everyMessageInThisServerNotifies": "इस सर्वर का हर संदेश आपको सूचित करता है।",
   "modals.serverNotifications.muteName": "{name} को म्यूट करें",
@@ -1711,50 +1697,6 @@
   "search.panel.label": "खोज",
   "search.scope.thisConversation": "इस बातचीत",
   "search.scope.thisServer": "इस सर्वर",
-  "search.search.beforeAfter": "before: / after:",
-  "search.search.cancel": "रद्द करें",
-  "search.search.capped": {
-    "one": "सबसे नए {count} संदेश पर रुक गए; इस टैब की मेमोरी बचाने के लिए पुराना इतिहास नहीं पढ़ा गया।",
-    "other": "सबसे नए {count} संदेशों पर रुक गए; इस टैब की मेमोरी बचाने के लिए पुराना इतिहास नहीं पढ़ा गया।"
-  },
-  "search.search.channel": "#चैनल",
-  "search.search.closeSearch": "खोज बंद करें",
-  "search.search.exactPhrase": "हूबहू वाक्यांश",
-  "search.search.exclude": "बाहर रखें",
-  "search.search.filesCount": {
-    "one": "[{count} फ़ाइल]",
-    "other": "[{count} फ़ाइलें]"
-  },
-  "search.search.fromHint": "@उपयोक्ता, या {me}",
-  "search.search.helpEverything": "आपके पढ़ने योग्य हर संदेश को, हर बातचीत में, यहीं डिक्रिप्ट करके खोजता है। कुछ भी आपके डिवाइस से बाहर नहीं जाता: सर्वर के पास केवल सिफरटेक्स्ट होता है और वह आपके लिए कभी खोज नहीं सकता।",
-  "search.search.linkImageFileStickerEmbed": "लिंक, तस्वीर, फ़ाइल, स्टिकर, एम्बेड",
-  "search.search.me": "मैं",
-  "search.search.noResultsAnywhere": {
-    "one": "खोजे गए {count} संदेश में कोई परिणाम नहीं।",
-    "other": "खोजे गए {count} संदेशों में कोई परिणाम नहीं।"
-  },
-  "search.search.notStarted": "शुरू हो रहा है…",
-  "search.search.quotes": "\"उद्धरण\"",
-  "search.search.results": {
-    "one": "{count} परिणाम",
-    "other": "{count} परिणाम"
-  },
-  "search.search.searchAgain": "फिर से खोजें",
-  "search.search.searched": {
-    "one": "{total} बातचीत में {count} संदेश खोजा गया",
-    "other": "{total} बातचीत में {count} संदेश खोजे गए"
-  },
-  "search.search.searching": {
-    "one": "खोजा जा रहा है… {count} संदेश, {done}/{total} बातचीत",
-    "other": "खोजा जा रहा है… {count} संदेश, {done}/{total} बातचीत"
-  },
-  "search.search.stillLooking": "आपका इतिहास देखा जा रहा है…",
-  "search.search.typeToSearch": "हर बातचीत में खोजने के लिए टाइप करें",
-  "search.search.unreadable": {
-    "one": "{count} बातचीत पढ़ी नहीं जा सकी: इस डिवाइस के पास उसकी कुंजी नहीं है।",
-    "other": "{count} बातचीत पढ़ी नहीं जा सकीं: इस डिवाइस के पास उनकी कुंजियाँ नहीं हैं।"
-  },
-  "search.search.waitingForServer": "सर्वर की प्रतीक्षा…",
   "search.sort.label": "क्रम: {sort}",
   "search.sort.menu": "परिणामों का क्रम",
   "search.sort.newest": "नए पहले",
@@ -1813,9 +1755,7 @@
   "search.suggest.pickDate": "तारीख चुनें",
   "search.suggest.pins": "पिन",
   "search.suggest.recent": "हाल की खोजें",
-  "search.suggestions.sentAfter": "इसके बाद भेजा गया",
-  "search.suggestions.sentBefore": "इससे पहले भेजा गया",
-  "search.switcher.hints": "↑ ↓ से चुनें, Enter से खोलें, Esc से बंद करें",
+  "search.switcher.hints": "↑ ↓ से चुनें, Enter से खोलें या खोजें, Esc से बंद करें",
   "search.switcher.jumpTo": "यहाँ जाएँ",
   "search.switcher.label": "जगहें और संदेश",
   "search.switcher.noneYet": "अभी कोई संदेश मेल नहीं खाता। पुराने संदेश अभी इंडेक्स हो रहे हैं",

@@ -89,8 +89,12 @@
 .tab[data-empty] .tabCount { color: var(--text-placeholder); }
 .sortBtn { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-muted); font-size: 13px; font-weight: 500; white-space: nowrap; }
 .sortBtn:hover { color: var(--text); background: var(--bg-hover); }
-/* in a narrow panel the order says itself with its icon, and its name in the tooltip */
-@container (max-width: 400px) { .sortLabel { display: none; } }
+/* In a narrow panel or on a phone the four tabs keep the room: the order says
+   itself with its icon (its name is in the tooltip), and the tabs drop theirs. */
+@container (max-width: 480px) {
+  .sortLabel, .tab > svg { display: none; }
+  .tabs .tab { padding: 0 8px; }
+}
 
 /* ----- the list ----- */
 .scroller { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 12px; outline: none; }
@@ -105,6 +109,7 @@
 .hitName { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .hitWhere { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-muted); }
 .hitServer { margin-inline-start: 6px; color: var(--text-placeholder); }
+.hitWhereIcon { display: inline-block; vertical-align: -1px; margin-inline-end: 3px; }
 .hitTime { flex: none; margin-inline-start: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* a result reads, and lines up, in the direction of its own words, as the message does */
 .hitText { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; unicode-bidi: plaintext; text-align: start; }
