@@ -60,10 +60,37 @@ interface LottieItem {
   destroy(): void;
 }
 
+let player: ReturnType<typeof loadPlayer> | null = null;
+
+function loadPlayer() {
+  return import("lottie-web").then((m) => m.default);
+}
+
+/**
+ * Starts loading the Lottie player, so it arrives alongside the first
+ * animated sticker's file instead of after it. A failed load is forgotten,
+ * so the next try loads it again.
+ */
+export function warmLottie(): Promise<Awaited<ReturnType<typeof loadPlayer>>> {
+  if (!player) {
+    player = loadPlayer();
+    player.catch(() => (player = null));
+  }
+  return player;
+}
+
+/** Waits for a quiet moment, so frames are drawn between scrolls rather than during them. */
+export function idle(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestIdleCallback === "function") requestIdleCallback(() => resolve(), { timeout: 500 });
+    else setTimeout(resolve, 0);
+  });
+}
+
 /** The first frame of a Telegram animated sticker, px across. */
 export async function tgsPoster(data: Blob, px: number, signal: AbortSignal): Promise<Blob> {
   const doc: unknown = JSON.parse(await unzipTgs(data));
-  const lottie = (await import("lottie-web")).default;
+  const lottie = await warmLottie();
   if (signal.aborted) throw new AbortedError();
   const canvas = document.createElement("canvas");
   canvas.width = px;

@@ -9,6 +9,8 @@ vi.mock("./stickerPosters", () => {
     UnsupportedError,
     tgsPoster: vi.fn(async () => new Blob(["tgs-frame"], { type: "image/webp" })),
     webmPoster: vi.fn(async () => new Blob(["webm-frame"], { type: "image/webp" })),
+    warmLottie: vi.fn(async () => ({})),
+    idle: vi.fn(async () => undefined),
   };
 });
 

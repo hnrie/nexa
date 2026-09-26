@@ -20,7 +20,7 @@
  */
 import { emojiUrl, stickerUrl } from "@/api/users";
 import { isAborted, LoadQueue, loadSlots, retryDelay, type Ticket } from "./loadQueue";
-import { tgsPoster, UnsupportedError, webmPoster } from "./stickerPosters";
+import { idle, tgsPoster, UnsupportedError, warmLottie, webmPoster } from "./stickerPosters";
 
 export interface StillSource {
   kind: "sticker" | "emoji";
@@ -185,6 +185,7 @@ async function load(e: Entry, priority: number): Promise<void> {
       notify(e);
       blob = await t.promise;
     } else {
+      if (plan.draw === "tgs") void warmLottie().catch(() => undefined);
       let got = e.source;
       if (!got) {
         const t = network.add(priority, (signal) => fetchBlob(plan.url, signal));
@@ -200,8 +201,8 @@ async function load(e: Entry, priority: number): Promise<void> {
       if (plan.draw === "tgs") {
         const source = got;
         const t = drawing.add(best(e) ?? 2, async (signal) => {
-          // a breath between frames, so a long grid of them never holds the page
-          await new Promise((r) => setTimeout(r, 0));
+          // one frame per quiet moment, so a long grid of them never holds up scrolling
+          await idle();
           return tgsPoster(source, e.px, signal);
         });
         e.ticket = t;
