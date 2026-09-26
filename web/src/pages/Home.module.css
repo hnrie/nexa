@@ -301,7 +301,6 @@
   transition: background-color 120ms ease;
 }
 .small:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); text-decoration: none; }
-.small svg { flex: none; color: var(--violet-text); }
 
 /* ---- the close --------------------------------------------------------- */
 
@@ -338,6 +337,7 @@
    goes is Download: it is offered twice more further down the page, while the
    only way back in for someone who already has an account is Log In. */
 @media (max-width: 480px) {
+  .topInner { min-height: 56px; }
   .navDownload { display: none; }
   .navLink { padding-inline: 10px; }
   .navCta { padding-inline: 12px; }

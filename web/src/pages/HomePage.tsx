@@ -13,7 +13,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ChevronsLeftRight, CornerUpLeft, Eye, Hash, Lock, Mail, Pause, PhoneCall, Play } from "lucide-react";
+import { ChevronsLeftRight, CornerUpLeft, Eye, Hash, Lock, Pause, PhoneCall, Play } from "lucide-react";
 import { NexaWordmark } from "@/components/common/Brand";
 import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
@@ -547,10 +547,7 @@ export default function HomePage() {
           <Facts items={facts("people", ["data", "moderation", "reports"])} />
           <p className={s.aboutLinks}>
             <Link className={s.small} to="/about">{t("home.people.about")}</Link>
-            <a className={s.small} href={`mailto:${CONTACT_EMAIL}`}>
-              <Mail size={18} aria-hidden="true" />
-              {CONTACT_EMAIL}
-            </a>
+            <a className={s.small} href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
           </p>
         </Chapter>
 
