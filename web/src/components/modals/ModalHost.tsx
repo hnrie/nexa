@@ -25,6 +25,7 @@ import { GuestLinkModal } from "@/components/voice/GuestLinkModal";
 import type { StickerInfo } from "@/api/types";
 import { StickerPackModal } from "./StickerPackModal";
 import { BlockDialog } from "@/components/profile/BlockDialog";
+import { FolderSettingsModal } from "@/components/rail/FolderSettingsModal";
 
 import { t } from "@/i18n";
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
@@ -102,6 +103,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "stickerPack" ? <StickerPackModal onClose={close} info={modal.props?.["info"] as StickerInfo} stickerId={String(modal.props?.["stickerId"])} /> : null}
       {modal?.kind === "serverProfile" ? <ServerProfileModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={modal.props?.["userId"] as string | undefined} /> : null}
       {modal?.kind === "block" ? <BlockDialog onClose={close} userId={String(modal.props?.["userId"])} /> : null}
+      {modal?.kind === "folderSettings" ? <FolderSettingsModal onClose={close} folderId={modal.props?.["folderId"] as string | undefined} serverIds={modal.props?.["serverIds"] as string[] | undefined} /> : null}
       {/* The first opening of each of these waits for its code to arrive, and
           on a slow phone connection a tap that shows nothing for seconds is a
           tap people repeat: the dialog's place is taken at once instead. */}

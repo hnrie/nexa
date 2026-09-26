@@ -209,10 +209,15 @@ type nexaState struct {
 	Pending []memberCase `json:"pending"`
 	Unread  int          `json:"unread"`
 	// Latest is when Nexa last had anything for this account (0: never),
-	// which decides whether the Nexa conversation is listed at all.
+	// which decides whether the Nexa conversation is listed at all, where it
+	// sorts among the account's conversations, and whether one it closed
+	// comes back.
 	Latest int64             `json:"latest"`
 	People map[string]person `json:"people"`
-	Staff  *staffSummary     `json:"staff,omitempty"`
+	// OwnerID is the instance's owner (0: none yet), for every account: the
+	// app crowns the owner wherever they are listed.
+	OwnerID ids.ID        `json:"owner_id"`
+	Staff   *staffSummary `json:"staff,omitempty"`
 }
 
 // staffSummary is what staff see on arrival: how much is waiting on them.
@@ -261,13 +266,13 @@ func (s *Server) nexaState(ctx context.Context, u *store.User) (*nexaState, erro
 	if st.Latest, err = s.Store.NexaLatest(ctx, u.ID, u.CreatedAt); err != nil {
 		return nil, err
 	}
+	st.OwnerID, _ = s.Store.InstanceOwnerID(ctx)
 	if u.Flags&store.FlagAdmin != 0 {
 		counts, err := s.Store.CountModCases(ctx, now)
 		if err != nil {
 			return nil, err
 		}
-		owner, _ := s.Store.InstanceOwnerID(ctx)
-		st.Staff = &staffSummary{Counts: counts, OwnerID: owner}
+		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID}
 	}
 	st.People = s.people(ctx, who...)
 	return st, nil

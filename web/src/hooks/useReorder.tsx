@@ -38,9 +38,15 @@ interface Options {
   axis?: "vertical" | "grid";
   /** Whether this row can be moved at all. */
   canMove?: (id: string) => boolean;
+  /**
+   * For a list of lists, such as the server rail with its folders: the ids of
+   * the list this row moves within, which is also what "3 of 5" counts. Every
+   * row moves within `ids` without it.
+   */
+  siblings?: (id: string) => string[];
 }
 
-export function useReorder({ ids, move, name, axis = "vertical", canMove }: Options): Reorder {
+export function useReorder({ ids, move, name, axis = "vertical", canMove, siblings }: Options): Reorder {
   const [said, setSaid] = useState("");
   // The rows are re-rendered after a move and React puts the node somewhere
   // else in the parent, which in some browsers drops focus. Finding it again by
@@ -50,12 +56,13 @@ export function useReorder({ ids, move, name, axis = "vertical", canMove }: Opti
   const step = useCallback(
     async (id: string, delta: number) => {
       if (canMove && !canMove(id)) return;
-      const at = ids.indexOf(id);
+      const list = siblings ? siblings(id) : ids;
+      const at = list.indexOf(id);
       const to = at + delta;
-      if (at < 0 || to < 0 || to >= ids.length) return;
+      if (at < 0 || to < 0 || to >= list.length) return;
       const ok = await move(id, delta);
       if (!ok) return;
-      setSaid(t("reorder.nameIsNowIndexOfCount", { name: name(id), index: to + 1, count: ids.length }));
+      setSaid(t("reorder.nameIsNowIndexOfCount", { name: name(id), index: to + 1, count: list.length }));
       refocus.current = id;
       requestAnimationFrame(() => {
         const want = refocus.current;
@@ -71,7 +78,7 @@ export function useReorder({ ids, move, name, axis = "vertical", canMove }: Opti
         target?.focus();
       });
     },
-    [ids, move, name, canMove],
+    [ids, move, name, canMove, siblings],
   );
 
   const onKeyDown = useCallback(
@@ -93,14 +100,15 @@ export function useReorder({ ids, move, name, axis = "vertical", canMove }: Opti
   const menuItems = useCallback(
     (id: string): ContextMenuItem[] => {
       if (canMove && !canMove(id)) return [];
-      const at = ids.indexOf(id);
+      const list = siblings ? siblings(id) : ids;
+      const at = list.indexOf(id);
       const items: ContextMenuItem[] = [];
       if (at > 0) items.push({ id: "move-up", label: axis === "grid" ? t("reorder.moveEarlier") : t("reorder.moveUp"), onSelect: () => void step(id, -1) });
-      if (at >= 0 && at < ids.length - 1) items.push({ id: "move-down", label: axis === "grid" ? t("reorder.moveLater") : t("reorder.moveDown"), onSelect: () => void step(id, 1) });
+      if (at >= 0 && at < list.length - 1) items.push({ id: "move-down", label: axis === "grid" ? t("reorder.moveLater") : t("reorder.moveDown"), onSelect: () => void step(id, 1) });
       if (items.length) items[items.length - 1]!.separatorAfter = true;
       return items;
     },
-    [ids, axis, step, canMove],
+    [ids, axis, step, canMove, siblings],
   );
 
   return {

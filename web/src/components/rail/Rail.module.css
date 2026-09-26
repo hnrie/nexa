@@ -16,12 +16,41 @@
 .server .btn.hasIcon { background: transparent; }
 .initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .server[data-muted="true"] .btn { opacity: 0.6; }
-.server[data-dragging="true"] { opacity: 0.4; }
-.server[data-drop="before"]::before, .server[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 12px; height: 2px; background: var(--brand); border-radius: 1px; }
-.server[data-drop="before"]::before { top: -5px; }
-.server[data-drop="after"]::after { bottom: -5px; }
+.server[data-dragging="true"], .folder[data-dragging="true"] { opacity: 0.4; }
+/* Where a dragged server or folder will land: a line before or after an entry, or a ring round the one it joins. */
+.item[data-drop="before"]::before, .item[data-drop="after"]::after, .folder[data-drop="before"]::before, .folder[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 12px; height: 2px; background: var(--brand); border-radius: 1px; pointer-events: none; }
+.item[data-drop="before"]::before, .folder[data-drop="before"]::before { top: -5px; }
+.item[data-drop="after"]::after, .folder[data-drop="after"]::after { bottom: -5px; }
+.item[data-drop="combine"] .btn { border-radius: 16px; box-shadow: 0 0 0 3px var(--bg-base), 0 0 0 5px var(--brand); }
 .waiting .btn { background: transparent; }
 .waiting .btn > span { width: 100%; height: 100%; }
 .groupIcon { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: inherit; background: var(--bg-surface); color: var(--text-strong); }
 .waiting:hover .groupIcon { background: var(--brand); color: var(--on-brand); }
 .waiting .btn > span, .waiting .btn > span > * { border-radius: inherit; }
+
+/* The pinned servers and folders, then where they end: a short line with a pin on it. */
+.section { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pinSep { flex: none; width: 40px; height: 12px; display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
+.pinSep::before, .pinSep::after { content: ""; flex: 1; height: 2px; border-radius: 1px; background: var(--border); }
+
+/*
+ * A folder. Closed, one tile: its first servers, small, on its colour, and a
+ * rounded square where a server is round, so the two are never mistaken. Open,
+ * a sleeve of the same colour runs from its tile down behind its servers.
+ * `--folder` is the folder's colour, the accent when it has none; mixed with
+ * the theme's own surfaces, so it reads on a dark rail and on a light one.
+ */
+.folder { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.folder[data-open="true"] { width: 56px; padding-bottom: 4px; border-radius: 16px; background: color-mix(in srgb, var(--folder) 16%, var(--bg-base)); }
+.folderBtn { border-radius: 16px; background: color-mix(in srgb, var(--folder) 34%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); }
+.item.folderItem:hover .btn.folderBtn, .item.folderItem[data-selected="true"] .btn.folderBtn { background: color-mix(in srgb, var(--folder) 52%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); }
+.folder[data-open="true"] .btn.folderBtn { background: transparent; }
+.folder[data-open="true"] .item.folderItem:hover .btn.folderBtn { background: color-mix(in srgb, var(--folder) 22%, transparent); }
+.folderIcon { fill: currentColor; fill-opacity: 0.3; }
+.grid { display: grid; grid-template-columns: repeat(2, 16px); grid-auto-rows: 16px; gap: 4px; }
+.mini { width: 16px; height: 16px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--bg-raised); color: var(--text-strong); font-size: 9px; font-weight: 700; line-height: 1; }
+.mini img { width: 100%; height: 100%; object-fit: cover; }
+/* inside the sleeve, which is narrower than the rail, the pill still sits at the rail's edge */
+.folder[data-open="true"] .pill { inset-inline-start: -8px; }
+.folder[data-open="true"] .badge { inset-inline-end: -2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder) 16%, var(--bg-base)); }
+.folder[data-open="true"] .item[data-drop="before"]::before, .folder[data-open="true"] .item[data-drop="after"]::after { inset-inline: 4px; }

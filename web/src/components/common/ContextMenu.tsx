@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
+import { t } from "@/i18n";
 import { useUI, type ContextMenuItem, type ContextMenuState } from "@/stores/ui";
 import s from "./ContextMenu.module.css";
 
@@ -60,13 +62,47 @@ export function menuAnchor(el: Element, align: "start" | "end" = "end"): NonNull
   return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, align };
 }
 
+/** How long the pointer rests on an item before its submenu opens. */
+const OPEN_DELAY = 120;
+/**
+ * How long an open submenu waits once the pointer is on another item. The way
+ * from an item to its submenu runs diagonally across the items below it, and
+ * closing at the first of those made a submenu impossible to reach.
+ */
+const CLOSE_DELAY = 300;
+
+/**
+ * Whether a submenu takes the menu's place rather than opening beside it. A
+ * finger has no hover to open one with and a phone no room for two menus side
+ * by side, so there it is drilled into, with a way back at the top.
+ */
+function drills(pointer: string | null): boolean {
+  if (pointer === "touch") return true;
+  if (pointer) return false;
+  return typeof window !== "undefined" && !!window.matchMedia?.("(hover: none), (pointer: coarse)").matches;
+}
+
+type Sub = {
+  item: ContextMenuItem;
+  /** Beside the menu, or in its place. */
+  mode: "flyout" | "drill";
+  /** Whether focus goes into it: opened by a key or a click, not by resting the pointer on its item. */
+  focus: boolean;
+  /** Where its item was, to line the submenu up with it. */
+  anchor: { top: number; bottom: number };
+};
+
 /** Renders the ui store's context menu; opened by any component via useUI.openContextMenu. */
 export function ContextMenuHost() {
   const menu = useUI((st) => st.contextMenu);
   const close = useUI((st) => st.closeContextMenu);
   const ref = useRef<HTMLDivElement>(null);
+  const subRef = useRef<HTMLDivElement>(null);
   const backdrop = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [sub, setSub] = useState<Sub | null>(null);
+  const [subPos, setSubPos] = useState<{ x: number; y: number } | null>(null);
+  const subId = useId();
   const portalRoot = usePortalRoot();
   // What the menu was opened from. A menu portals to the body, so without this
   // choosing an item left focus at the very end of the document.
@@ -74,6 +110,24 @@ export function ContextMenuHost() {
   // Letters typed in a row: "de" goes to Delete rather than to Deafen and then
   // to Edit. Cleared after a pause, as every other menu in every OS does.
   const typed = useRef<{ text: string; at: number }>({ text: "", at: 0 });
+  /** The kind of pointer that last pressed inside the menu: a finger drills into submenus. */
+  const pointer = useRef<string | null>(null);
+  /** A submenu waiting to open or to close, as the pointer moves over the items. */
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const drilled = sub?.mode === "drill" ? sub.item : null;
+
+  const clearTimer = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }, []);
+
+  // A new menu starts at its top level.
+  useLayoutEffect(() => {
+    clearTimer();
+    setSub(null);
+    pointer.current = null;
+  }, [menu, clearTimer]);
+  useEffect(() => clearTimer, [clearTimer]);
 
   useLayoutEffect(() => {
     if (!menu || !ref.current) {
@@ -103,18 +157,39 @@ export function ContextMenuHost() {
     const x = Math.min(from, window.innerWidth - r.width - 8);
     const y = Math.min(menu.above ? menu.y - r.height : menu.y, window.innerHeight - r.height - 8);
     setPos({ x: Math.max(8, x), y: Math.max(8, y) });
-  }, [menu]);
+    // drilling in changes the menu's size, which is measured again
+  }, [menu, drilled]);
 
-  /** Everything the arrows can land on, in the order it is drawn. */
-  const stops = useCallback((): HTMLElement[] => {
-    const el = ref.current;
+  // A submenu beside the menu: level with its item, towards the reading
+  // direction's end, or the other way when there is no room that way.
+  useLayoutEffect(() => {
+    if (!sub || sub.mode !== "flyout" || !subRef.current || !ref.current) {
+      setSubPos(null);
+      return;
+    }
+    const box = subRef.current.getBoundingClientRect();
+    const parent = ref.current.getBoundingClientRect();
+    const rtl = document.documentElement.dir === "rtl";
+    // overlapping the menu's edge a little, so the pointer crosses no gap on its way
+    const after = parent.right - 4;
+    const before = parent.left - box.width + 4;
+    const fitsAfter = after + box.width <= window.innerWidth - 8;
+    const fitsBefore = before >= 8;
+    const x = rtl ? (fitsBefore || !fitsAfter ? before : after) : fitsAfter || !fitsBefore ? after : before;
+    // its first item level with the one it came from: the menu's padding and border above it
+    const y = Math.min(sub.anchor.top - 7, window.innerHeight - box.height - 8);
+    setSubPos({ x: Math.max(8, Math.min(x, window.innerWidth - box.width - 8)), y: Math.max(8, y) });
+  }, [sub]);
+
+  /** Everything the arrows can land on in one menu, in the order it is drawn. */
+  const stops = useCallback((el: HTMLElement | null): HTMLElement[] => {
     if (!el) return [];
     return [...el.querySelectorAll<HTMLElement>("[data-menu-stop]")].filter((x) => !(x as HTMLButtonElement).disabled);
   }, []);
 
   const moveTo = useCallback(
-    (index: number) => {
-      const list = stops();
+    (el: HTMLElement | null, index: number) => {
+      const list = stops(el);
       if (list.length === 0) return;
       const at = ((index % list.length) + list.length) % list.length;
       for (const x of list) x.tabIndex = -1;
@@ -134,7 +209,7 @@ export function ContextMenuHost() {
     // Not this frame: the menu is drawn `visibility: hidden` until the layout
     // effect above has measured it and nudged it on screen, and focus() on a
     // hidden element does nothing at all. One frame later it is visible.
-    const frame = requestAnimationFrame(() => stops()[0]?.focus({ preventScroll: true }));
+    const frame = requestAnimationFrame(() => stops(ref.current)[0]?.focus({ preventScroll: true }));
     return () => {
       cancelAnimationFrame(frame);
       const back = opener.current;
@@ -143,12 +218,49 @@ export function ContextMenuHost() {
     };
   }, [menu, stops]);
 
+  // Into a submenu opened by a key or a click: its first item, or in a menu
+  // drilled into, the first one after the way back.
+  useEffect(() => {
+    if (!sub?.focus) return;
+    if (sub.mode === "flyout" && !subPos) return;
+    const frame = requestAnimationFrame(() => {
+      if (sub.mode === "flyout") moveTo(subRef.current, 0);
+      else moveTo(ref.current, stops(ref.current).length > 1 ? 1 : 0);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sub, subPos, moveTo, stops]);
+
+  const openSub = useCallback((item: ContextMenuItem, el: HTMLElement, focus: boolean) => {
+    clearTimer();
+    const r = el.getBoundingClientRect();
+    setSub({ item, mode: drills(pointer.current) ? "drill" : "flyout", focus, anchor: { top: r.top, bottom: r.bottom } });
+  }, [clearTimer]);
+
+  /** Back to the menu the submenu came from, focus on its item when a key or a tap asked. */
+  const closeSub = useCallback(
+    (refocus: boolean) => {
+      clearTimer();
+      const id = sub?.item.id;
+      setSub(null);
+      if (!refocus || !id) return;
+      requestAnimationFrame(() => {
+        const item = [...(ref.current?.querySelectorAll<HTMLElement>("[data-submenu]") ?? [])].find((el) => el.dataset["submenu"] === id);
+        if (!item) return;
+        for (const x of stops(ref.current)) x.tabIndex = -1;
+        item.tabIndex = 0;
+        item.focus({ preventScroll: true });
+      });
+    },
+    [sub, clearTimer, stops],
+  );
+
   useEffect(() => {
     if (!menu) return;
+    const inside = (target: EventTarget | null): boolean => target instanceof Node && (!!ref.current?.contains(target) || !!subRef.current?.contains(target));
     const onDown = (e: MouseEvent) => {
       // the backdrop closes on its own click, so that the tap ends on it rather than on what it covered
       if (e.target === backdrop.current) return;
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+      if (!inside(e.target)) close();
     };
     // A phone's address bar and keyboard change the height as they come and
     // go; only a real change of width (turning the phone) moves things enough
@@ -158,7 +270,7 @@ export function ContextMenuHost() {
       if (Math.abs(window.innerWidth - width) > 1) close();
     };
     const onScroll = (e: Event) => {
-      if (ref.current && e.target instanceof Node && ref.current.contains(e.target)) return;
+      if (inside(e.target)) return;
       close();
     };
     // Escape belongs to the menu while it is open, and to nothing else. The
@@ -167,12 +279,13 @@ export function ContextMenuHost() {
     // that needs `stopImmediatePropagation`, taken in the capture phase before
     // anyone else has seen the key. Right-clicking inside settings and pressing
     // Escape used to dismiss the menu *and* the whole settings dialog behind
-    // it, unsaved edits and all.
+    // it, unsaved edits and all. In a submenu it goes back one level first.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      close();
+      if (sub) closeSub(true);
+      else close();
     };
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("mousedown", onDown);
@@ -184,14 +297,20 @@ export function ContextMenuHost() {
       window.removeEventListener("resize", onResize);
       document.removeEventListener("scroll", onScroll, true);
     };
-  }, [menu, close]);
+  }, [menu, close, sub, closeSub]);
 
   if (!menu) return null;
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const list = stops();
+  /** The keys of one menu: the one opened, or the submenu beside it. */
+  const onKeyDown = (inSub: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const el = inSub ? subRef.current : ref.current;
+    const list = stops(el);
     const at = list.indexOf(document.activeElement as HTMLElement);
     const onRange = document.activeElement instanceof HTMLInputElement && document.activeElement.type === "range";
+    // a submenu opens towards the reading direction's end and closes back the other way
+    const rtl = document.documentElement.dir === "rtl";
+    const inward = rtl ? "ArrowLeft" : "ArrowRight";
+    const outward = rtl ? "ArrowRight" : "ArrowLeft";
     if (e.key === "Tab") {
       // A menu is not part of the tab order: Tab dismisses it and puts focus
       // back where it came from, so the next Tab carries on from there.
@@ -199,24 +318,43 @@ export function ContextMenuHost() {
       close();
       return;
     }
+    if (inSub || drilled) {
+      if (e.key === outward) {
+        e.preventDefault();
+        closeSub(true);
+        return;
+      }
+      if (e.key === inward) {
+        e.preventDefault();
+        return;
+      }
+    } else if (e.key === inward || e.key === "Enter" || e.key === " ") {
+      const id = (document.activeElement as HTMLElement | null)?.dataset["submenu"];
+      const item = id ? menu.items.find((x) => x.id === id) : undefined;
+      if (item && document.activeElement instanceof HTMLElement) {
+        e.preventDefault();
+        openSub(item, document.activeElement, true);
+        return;
+      }
+    }
     if (e.key === "ArrowDown" || (e.key === "ArrowRight" && !onRange)) {
       e.preventDefault();
-      moveTo(at < 0 ? 0 : at + 1);
+      moveTo(el, at < 0 ? 0 : at + 1);
       return;
     }
     if (e.key === "ArrowUp" || (e.key === "ArrowLeft" && !onRange)) {
       e.preventDefault();
-      moveTo(at < 0 ? list.length - 1 : at - 1);
+      moveTo(el, at < 0 ? list.length - 1 : at - 1);
       return;
     }
     if (e.key === "Home") {
       e.preventDefault();
-      moveTo(0);
+      moveTo(el, 0);
       return;
     }
     if (e.key === "End") {
       e.preventDefault();
-      moveTo(list.length - 1);
+      moveTo(el, list.length - 1);
       return;
     }
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !onRange) {
@@ -228,11 +366,85 @@ export function ContextMenuHost() {
         const cand = list[(from + i) % list.length]!;
         if ((cand.textContent ?? "").trim().toLowerCase().startsWith(want)) {
           e.preventDefault();
-          moveTo((from + i) % list.length);
+          moveTo(el, (from + i) % list.length);
           return;
         }
       }
     }
+  };
+
+  const flyout = sub?.mode === "flyout" ? sub.item : null;
+
+  /** One menu's items; `top` for the menu opened, whose items may open submenus. */
+  const list = (items: ContextMenuItem[], top: boolean) =>
+    groups(items).map((g, gi) => (
+      <div key={gi} role={g.label ? "group" : "none"} {...(g.label ? { "aria-label": g.label } : {})}>
+        {g.label ? <div className={s.heading} aria-hidden="true">{g.label}</div> : null}
+        {g.items.map((item) => (
+          <div key={item.id} role="none">
+            {item.slider ? (
+              <SliderItem item={{ ...item, slider: item.slider }} />
+            ) : item.note ? (
+              // read, not chosen, so no stop for the arrows; whoever opens a menu
+              // with a note in it says the same thing in the menu's own name
+              <div className={s.note} aria-hidden="true">{item.label}</div>
+            ) : item.submenu && top ? (
+              <button
+                role="menuitem"
+                aria-haspopup="menu"
+                aria-expanded={flyout?.id === item.id}
+                {...(flyout?.id === item.id ? { "aria-controls": subId } : {})}
+                className={s.item}
+                disabled={item.disabled || item.submenu.length === 0}
+                data-menu-stop=""
+                data-submenu={item.id}
+                tabIndex={-1}
+                onClick={(e) => openSub(item, e.currentTarget, true)}
+                onPointerEnter={(e) => {
+                  if (e.pointerType === "touch" || drills(pointer.current)) return;
+                  if (flyout?.id === item.id) {
+                    clearTimer();
+                    return;
+                  }
+                  clearTimer();
+                  const el = e.currentTarget;
+                  timer.current = setTimeout(() => openSub(item, el, false), OPEN_DELAY);
+                }}
+              >
+                <span className={s.itemLabel}>{item.label}</span>
+                <ChevronRight size={16} className={s.chevron} aria-hidden="true" />
+              </button>
+            ) : (
+              <button
+                role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+                aria-checked={item.checked}
+                className={[s.item, item.danger ? s.danger : ""].join(" ")}
+                disabled={item.disabled}
+                data-menu-stop=""
+                tabIndex={-1}
+                onPointerEnter={(e) => {
+                  // on to another item of the menu: an open submenu waits a moment for the pointer, then goes
+                  if (!top || !flyout || e.pointerType === "touch") return;
+                  clearTimer();
+                  timer.current = setTimeout(() => closeSub(false), CLOSE_DELAY);
+                }}
+                onClick={() => {
+                  close();
+                  item.onSelect?.();
+                }}
+              >
+                <span className={s.itemLabel}>{item.label}</span>
+                {item.checked === undefined ? null : <span className={s.radio} data-on={item.checked} aria-hidden="true" />}
+              </button>
+            )}
+            {item.separatorAfter ? <div className={s.sep} role="separator" /> : null}
+          </div>
+        ))}
+      </div>
+    ));
+
+  const notePointer = (e: React.PointerEvent) => {
+    pointer.current = e.pointerType || null;
   };
 
   return createPortal(
@@ -255,43 +467,43 @@ export function ContextMenuHost() {
         data-modal-layer=""
         style={{ left: pos?.x ?? menu.x, top: pos?.y ?? menu.y, visibility: pos ? "visible" : "hidden" }}
         role="menu"
-        aria-label={menu.label}
-        onKeyDown={onKeyDown}
+        aria-label={drilled ? drilled.label : menu.label}
+        onKeyDown={onKeyDown(false)}
+        onPointerDownCapture={notePointer}
       >
-        {groups(menu.items).map((g, gi) => (
-          <div key={gi} role={g.label ? "group" : "none"} {...(g.label ? { "aria-label": g.label } : {})}>
-            {g.label ? <div className={s.heading} aria-hidden="true">{g.label}</div> : null}
-            {g.items.map((item) => (
-              <div key={item.id} role="none">
-                {item.slider ? (
-                  <SliderItem item={{ ...item, slider: item.slider }} />
-                ) : item.note ? (
-                  // read, not chosen, so no stop for the arrows; whoever opens a menu
-                  // with a note in it says the same thing in the menu's own name
-                  <div className={s.note} aria-hidden="true">{item.label}</div>
-                ) : (
-                  <button
-                    role={item.checked === undefined ? "menuitem" : "menuitemradio"}
-                    aria-checked={item.checked}
-                    className={[s.item, item.danger ? s.danger : ""].join(" ")}
-                    disabled={item.disabled}
-                    data-menu-stop=""
-                    tabIndex={-1}
-                    onClick={() => {
-                      close();
-                      item.onSelect?.();
-                    }}
-                  >
-                    <span className={s.itemLabel}>{item.label}</span>
-                    {item.checked === undefined ? null : <span className={s.radio} data-on={item.checked} aria-hidden="true" />}
-                  </button>
-                )}
-                {item.separatorAfter ? <div className={s.sep} role="separator" /> : null}
-              </div>
-            ))}
-          </div>
-        ))}
+        {drilled ? (
+          <>
+            <div role="none">
+              {/* the way back up, where a finger expects it: at the top */}
+              <button role="menuitem" className={[s.item, s.back].join(" ")} data-menu-stop="" tabIndex={-1} onClick={() => closeSub(true)} data-testid="menu-back">
+                <ChevronLeft size={16} className={s.chevron} aria-hidden="true" />
+                <span className={s.itemLabel}>{t("contextMenu.back")}</span>
+              </button>
+            </div>
+            {list([{ id: `${drilled.id}:heading`, label: drilled.label, heading: true }, ...(drilled.submenu ?? [])], false)}
+          </>
+        ) : (
+          list(menu.items, true)
+        )}
       </div>
+      {flyout ? (
+        <div
+          ref={subRef}
+          id={subId}
+          className={s.menu}
+          data-context-menu
+          data-modal-layer=""
+          data-submenu-of={flyout.id}
+          style={{ left: subPos?.x ?? 0, top: subPos?.y ?? 0, visibility: subPos ? "visible" : "hidden" }}
+          role="menu"
+          aria-label={flyout.label}
+          onKeyDown={onKeyDown(true)}
+          onPointerDownCapture={notePointer}
+          onPointerEnter={clearTimer}
+        >
+          {list(flyout.submenu ?? [], false)}
+        </div>
+      ) : null}
     </>,
     portalRoot,
   );

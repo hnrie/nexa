@@ -30,11 +30,58 @@
 .subItem[data-selected="true"] { background: var(--bg-active); color: var(--text-strong); }
 .subItem[data-unread="true"] { color: var(--text-strong); font-weight: 600; }
 .item[data-parent-selected="true"] { background: var(--bg-hover); }
+.navLabel { flex: 1; min-width: 0; text-align: start; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.headerLabel { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+/* a name with the owner's crown after it: the name gives way, the crown stays */
+.nameRow { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.nameRow .name { min-width: 0; }
+
+/*
+ * A group of conversations: a sleeve round its name and what is in it, so a
+ * conversation after it never reads as one of its own, wherever it sits in
+ * the list.
+ */
+.group { position: relative; margin: 2px 0 6px; padding: 0 0 2px; border-radius: var(--radius-sm); background: var(--bg-hover); }
+.group .item { margin-bottom: 0; }
+.group .item:last-of-type { margin-bottom: 0; }
+.groupHead { position: relative; display: flex; align-items: center; gap: 4px; height: 32px; padding-inline-end: 4px; color: var(--text-channel); }
+.groupHead:hover { color: var(--text); }
+.groupHead[data-unread="true"] { color: var(--text-strong); }
+.groupHead[data-unread="true"]::before { content: ""; position: absolute; inset-inline-start: -8px; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--text-strong); }
+.groupToggle { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 6px; padding-inline-start: 10px; color: inherit; font-size: 13px; font-weight: 600; text-align: start; border-radius: var(--radius-xs); }
+.groupName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { flex: none; transition: transform var(--transition); }
+.group[data-collapsed="true"] .chev { transform: rotate(-90deg); }
+[dir="rtl"] .group[data-collapsed="true"] .chev { transform: rotate(90deg); }
+.groupMore { flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: var(--radius-xs); color: var(--text-muted); opacity: 0; }
+.groupMore:hover { color: var(--text-strong); background: var(--bg-active); }
+.groupHead:focus-within .groupMore { opacity: 1; }
+.groupEmpty { padding: 0 10px 8px; font-size: 13px; line-height: 1.35; color: var(--text-muted); }
+
+/* dragging, with a mouse: where it will land */
+.item[data-dragging="true"], .group[data-dragging="true"] { opacity: 0.4; }
+.item[data-drop="before"]::after, .item[data-drop="after"]::after, .group[data-drop="before"]::after, .group[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 0; height: 2px; border-radius: 1px; background: var(--brand); pointer-events: none; }
+.item[data-drop="before"]::after, .group[data-drop="before"]::after { top: -2px; }
+.item[data-drop="after"]::after, .group[data-drop="after"]::after { bottom: -2px; }
+.group[data-drop="into"] { box-shadow: inset 0 0 0 2px var(--brand); }
+.header[data-drop="true"] { color: var(--text-brand); box-shadow: inset 0 -2px 0 var(--brand); }
+/* Nothing pinned yet: while a conversation is dragged, where to drop it to pin
+   it. A zero-height sticky holder keeps it at the top of the visible list
+   without taking any room, so nothing moves under the pointer as a drag starts. */
+.scroll { position: relative; }
+.pinZoneWrap { position: sticky; top: 0; z-index: 2; height: 0; }
+.pinZone { position: absolute; inset-inline: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 6px 8px; border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-floating); box-shadow: var(--shadow-medium); color: var(--text-muted); font-size: 13px; text-align: center; }
+.pinZone[data-drop="true"] { border-color: var(--brand); color: var(--text-brand); background: linear-gradient(var(--mention-bg), var(--mention-bg)), var(--bg-floating); }
 /* a finger's worth of room for the search box and the "+" beside Direct Messages, without moving either */
 @media (pointer: coarse) {
   .searchBtn { height: 40px; }
   .headerBtn { padding: 12px; margin: -12px -10px; }
+  .groupHead { height: 44px; }
+  .groupMore { width: 40px; height: 40px; }
 }
+/* a group's menu button shows on hover with a mouse; on a touch screen it is always there, as a hold is not obvious */
+@media (hover: hover) { .groupHead:hover .groupMore { opacity: 1; } }
+@media (hover: none) { .groupMore { opacity: 1; } }
 /* hover-only, since on iOS a tap that reveals it is taken as a hover and does not open the conversation; long-press offers Close DM */
 @media (hover: hover) { .item:hover .close { display: flex; } }
 /* reachable from the keyboard as well: it shows while the row has focus */

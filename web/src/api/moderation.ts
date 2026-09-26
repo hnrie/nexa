@@ -135,6 +135,8 @@ export interface NexaState {
   /** When Nexa last had something for this account (0: never). */
   latest: number;
   people: People;
+  /** The instance's owner, for every account ("0" when there is none yet; absent from older servers). */
+  owner_id?: Snowflake;
   /** Staff only: what is waiting on them. */
   staff?: { counts: CaseCounts; owner_id: Snowflake };
 }

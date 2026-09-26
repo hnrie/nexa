@@ -92,4 +92,40 @@ describe("useReorder", () => {
     await settle();
     expect(move).toHaveBeenLastCalledWith("b", -1);
   });
+
+  it("moves a row within its own list when the rows are lists of lists", async () => {
+    // a rail: "f" is a folder holding "x" and "y", drawn open under it
+    const lists: Record<string, string[]> = { a: ["a", "f"], f: ["a", "f"], x: ["x", "y"], y: ["x", "y"] };
+    function Nested({ move }: { move: (id: string, delta: number) => boolean }) {
+      const reorder = useReorder({ ids: ["a", "f", "x", "y"], move, name: (id) => id, siblings: (id) => lists[id] ?? [] });
+      return (
+        <div>
+          {reorder.live}
+          {["a", "f", "x", "y"].map((id) => (
+            <button key={id} data-reorder-id={id} data-testid={id} onKeyDown={reorder.onKeyDown(id)}>
+              {id}
+            </button>
+          ))}
+          <ul data-testid="menu">
+            {reorder.menuItems("x").map((m) => (
+              <li key={m.id}>{m.id}</li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    const move = vi.fn(() => true);
+    render(<Nested move={move} />);
+    // the first in its folder has nowhere up to go, though a row is drawn above it
+    fireEvent.keyDown(screen.getByTestId("x"), { key: "ArrowUp", altKey: true });
+    await settle();
+    expect(move).not.toHaveBeenCalled();
+    expect([...screen.getByTestId("menu").querySelectorAll("li")].map((li) => li.textContent)).toEqual(["move-down"]);
+    fireEvent.keyDown(screen.getByTestId("x"), { key: "ArrowDown", altKey: true });
+    await settle();
+    expect(move).toHaveBeenCalledWith("x", 1);
+    // and it is counted among its own list: 2 of 2
+    expect(screen.getByRole("status").textContent).toContain("2");
+    expect(screen.getByRole("status").textContent).not.toContain("4");
+  });
 });

@@ -1114,15 +1114,19 @@ func (s *Store) NexaUnread(ctx context.Context, uid ids.ID, createdAt int64) (in
 	return n, err
 }
 
-// NexaLatest is when Nexa last had something for the member (0: never), which
-// is what decides whether their Nexa conversation shows at all.
+// NexaLatest is when Nexa last had something for the member (0: never): a
+// notice, a lift, an announcement, or a staff reply in one of their cases.
+// It decides whether their Nexa conversation shows at all, where it sorts
+// among their conversations, and whether one they closed comes back.
 func (s *Store) NexaLatest(ctx context.Context, uid ids.ID, createdAt int64) (int64, error) {
-	var a, b, c sql.NullInt64
+	var a, b, c, d sql.NullInt64
 	err := s.db.R.QueryRowContext(ctx, `SELECT
 		(SELECT max(created_at) FROM mod_cases WHERE user_id = ?),
 		(SELECT max(lifted_at) FROM mod_cases WHERE user_id = ?),
-		(SELECT max(created_at) FROM mod_announcements WHERE created_at >= ?)`, int64(uid), int64(uid), createdAt).Scan(&a, &b, &c)
-	return max(a.Int64, b.Int64, c.Int64), err
+		(SELECT max(created_at) FROM mod_announcements WHERE created_at >= ?),
+		(SELECT max(m.created_at) FROM mod_messages m JOIN mod_cases c ON c.id = m.case_id WHERE c.user_id = ? AND m.kind = 'staff')`,
+		int64(uid), int64(uid), createdAt, int64(uid)).Scan(&a, &b, &c, &d)
+	return max(a.Int64, b.Int64, c.Int64, d.Int64), err
 }
 
 // --- accounts -------------------------------------------------------------------

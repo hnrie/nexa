@@ -21,6 +21,16 @@ export function idTime(id: string): number {
   }
 }
 
+/**
+ * The first id a snowflake made at `ms` could have, for putting a moment in
+ * time among ids: the Nexa conversation, which has a time but no message ids,
+ * sorts among the others this way. "0" for anything before the epoch.
+ */
+export function idAt(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= ID_EPOCH) return "0";
+  return (BigInt(Math.floor(ms - ID_EPOCH)) << 22n).toString();
+}
+
 let tmpCounter = 0;
 export function tmpId(): string {
   tmpCounter += 1;
