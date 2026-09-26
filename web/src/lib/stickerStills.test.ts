@@ -14,8 +14,14 @@ vi.mock("./stickerPosters", () => {
   };
 });
 
+vi.mock("./stillStore", () => ({
+  loadStill: vi.fn(async () => null),
+  saveStill: vi.fn(async () => undefined),
+}));
+
 import { peekStill, resetStills, stillPlan, watchStill, type StillSource, type StillView } from "./stickerStills";
 import { tgsPoster, UnsupportedError, webmPoster } from "./stickerPosters";
+import { loadStill, saveStill } from "./stillStore";
 
 const png = (id: string, animated = false): StillSource => ({ kind: "sticker", blobId: id, format: animated ? "gif" : "png", animated });
 
@@ -209,6 +215,27 @@ describe("stills", () => {
     expect(tgsPoster).toHaveBeenCalledTimes(1);
     expect(tgs.last().status).toBe("ready");
     expect(webm.last().status).toBe("ready");
+  });
+
+  it("keeps drawn stills for the next visit, and uses one kept from before without downloading", async () => {
+    const { calls } = network();
+    const tgs = follow({ kind: "sticker", blobId: "t1", format: "tgs", animated: true });
+    tgs.h.want(0);
+    await settle();
+    calls[0]!.answer(200);
+    await settle();
+    await vi.advanceTimersByTimeAsync(10);
+    await settle();
+    expect(tgs.last().status).toBe("ready");
+    expect(saveStill).toHaveBeenCalledWith("sticker:t1:128", expect.any(Blob));
+    // a later visit: the store has it
+    vi.mocked(loadStill).mockResolvedValueOnce(new Blob(["kept"], { type: "image/webp" }));
+    const webm = follow({ kind: "sticker", blobId: "w9", format: "webm", animated: true });
+    webm.h.want(0);
+    await settle();
+    expect(webm.last().status).toBe("ready");
+    expect(webmPoster).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(1);
   });
 
   it("marks a video this browser cannot play as failed for good", async () => {

@@ -21,6 +21,7 @@
 import { emojiUrl, stickerUrl } from "@/api/users";
 import { isAborted, LoadQueue, loadSlots, retryDelay, type Ticket } from "./loadQueue";
 import { idle, tgsPoster, UnsupportedError, warmLottie, webmPoster } from "./stickerPosters";
+import { loadStill, saveStill } from "./stillStore";
 
 export interface StillSource {
   kind: "sticker" | "emoji";
@@ -78,6 +79,9 @@ interface Entry {
   failures: number;
   /** Tried again because someone pressed it: shown as loading, where a retry of its own keeps the failed mark up. */
   pressed: boolean;
+  /** Looking for a drawn still kept from an earlier visit (stillStore.ts), and whether that has been done. */
+  checking: boolean;
+  checked: boolean;
   permanent: boolean;
   retryAt: number;
   timer: ReturnType<typeof setTimeout> | null;
@@ -115,7 +119,7 @@ function budget(): number {
 function viewOf(e: Entry): StillView {
   if (e.url) return { status: "ready", url: e.url, permanent: false };
   if (e.failures > 0 && !e.pressed) return { status: "failed", url: null, permanent: e.permanent };
-  return e.ticket || e.source || e.pressed ? { status: "loading", url: null, permanent: false } : IDLE;
+  return e.ticket || e.source || e.pressed || e.checking ? { status: "loading", url: null, permanent: false } : IDLE;
 }
 
 function notify(e: Entry): void {
@@ -133,7 +137,7 @@ function best(e: Entry): number | null {
 
 /** Forgets an entry that holds nothing and that nothing is waiting on. */
 function tidy(e: Entry): void {
-  if (e.watchers.size > 0 || e.url || e.ticket || e.timer) return;
+  if (e.watchers.size > 0 || e.url || e.ticket || e.timer || e.checking) return;
   if (e.source) bytesKept -= e.source.size;
   e.source = null;
   entries.delete(e.key);
@@ -158,8 +162,8 @@ function update(e: Entry): void {
     return;
   }
   e.used = performance.now();
-  if (e.ticket) {
-    e.ticket.setPriority(p);
+  if (e.ticket || e.checking) {
+    e.ticket?.setPriority(p);
     return;
   }
   if (e.permanent || e.timer) return;
@@ -177,13 +181,29 @@ function update(e: Entry): void {
 async function load(e: Entry, priority: number): Promise<void> {
   const plan = stillPlan(e.src, e.px);
   try {
-    let blob: Blob;
-    if (plan.draw === "webm") {
+    let blob: Blob | null = null;
+    if (plan.draw && !e.checked) {
+      // drawn on an earlier visit: no download and no drawing
+      e.checking = true;
+      notify(e);
+      blob = await loadStill(e.key);
+      e.checking = false;
+      e.checked = true;
+      if (!blob && best(e) === null) {
+        notify(e);
+        tidy(e);
+        return;
+      }
+    }
+    if (blob) {
+      // kept from before
+    } else if (plan.draw === "webm") {
       // the player fetches only what the first frame needs, so it is the download
       const t = network.add(priority, (signal) => webmPoster(plan.url, e.px, signal, STALL_MS));
       e.ticket = t;
       notify(e);
       blob = await t.promise;
+      void saveStill(e.key, blob);
     } else {
       if (plan.draw === "tgs") void warmLottie().catch(() => undefined);
       let got = e.source;
@@ -210,6 +230,7 @@ async function load(e: Entry, priority: number): Promise<void> {
         blob = await t.promise;
         if (e.source) bytesKept -= e.source.size;
         e.source = null;
+        void saveStill(e.key, blob);
       }
     }
     e.ticket = null;
@@ -236,7 +257,6 @@ async function load(e: Entry, priority: number): Promise<void> {
     if (e.source) bytesKept -= e.source.size;
     e.source = null;
     e.failures++;
-    e.pressed = false;
     e.permanent = err instanceof UnsupportedError || (err instanceof HttpError && [400, 403, 404, 410].includes(err.status));
     e.retryAt = Date.now() + retryDelay(e.failures - 1);
     notify(e);
@@ -252,8 +272,8 @@ async function load(e: Entry, priority: number): Promise<void> {
 function trim(): void {
   const limit = budget();
   if (bytesKept <= limit) return;
-  const idle = [...entries.values()].filter((e) => e.url && best(e) === null).sort((a, b) => a.used - b.used);
-  for (const e of idle) {
+  const spare = [...entries.values()].filter((e) => e.url && best(e) === null).sort((a, b) => a.used - b.used);
+  for (const e of spare) {
     if (bytesKept <= limit) break;
     URL.revokeObjectURL(e.url!);
     bytesKept -= e.bytes;
@@ -335,7 +355,7 @@ export function watchStill(src: StillSource, px: number, listener: (v: StillView
   const key = stillKey(src, px);
   let e = entries.get(key);
   if (!e) {
-    e = { key, src, px, url: null, bytes: 0, source: null, watchers: new Set(), ticket: null, failures: 0, pressed: false, permanent: false, retryAt: 0, timer: null, used: 0, view: IDLE };
+    e = { key, src, px, url: null, bytes: 0, source: null, watchers: new Set(), ticket: null, failures: 0, pressed: false, checking: false, checked: false, permanent: false, retryAt: 0, timer: null, used: 0, view: IDLE };
     entries.set(key, e);
   }
   const entry = e;
