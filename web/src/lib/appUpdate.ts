@@ -27,7 +27,7 @@ export const BUILD = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "";
 const CHECK_EVERY = 10 * 60_000;
 /** Focus and coming back into view ask again, but not more often than this. */
 const CHECK_AT_MOST = 60_000;
-/** Checks nothing else throttles (the gateway back, a new worker) still keep this far apart. */
+/** A new service worker and the ten-minute tick still keep this far from the last check. */
 const CHECK_MIN_GAP = 5_000;
 /** After Later, the prompt waits this long before it asks again. */
 export const SNOOZE_MS = 2 * 60 * 60_000;
@@ -107,9 +107,11 @@ export function startUpdateChecks(opts: { build?: string; enabled?: boolean } = 
   window.addEventListener("focus", onFocus);
   window.addEventListener("online", onFocus);
   document.addEventListener("visibilitychange", onVisibility);
-  // a deploy restarts the server, so the gateway coming back is the moment to look
+  // A deploy restarts the server, so the gateway coming back is the moment to
+  // look, however recently the last look was: the page may have loaded a
+  // moment before the deploy.
   const offGateway = useUI.subscribe((ui, prev) => {
-    if (ui.connection === "open" && prev.connection !== "open") check(CHECK_MIN_GAP);
+    if (ui.connection === "open" && prev.connection !== "open") check(0);
   });
   // An update is only ever applied in front of someone who asked for it,
   // except here: a page out of sight for a while, with nothing going on in
