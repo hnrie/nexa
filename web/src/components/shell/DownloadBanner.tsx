@@ -51,7 +51,8 @@ export function DownloadBanner() {
     <div className={s.banner} role="region" aria-label={t("shell.downloadBanner.desktopApp")} data-testid="download-banner">
       <span className={s.icon}><Monitor size={18} /></span>
       <span className={s.text}>
-        <b>{t("shell.downloadBanner.getNexaFor", { os: OS_NAME[file.os] })}</b> — {t("download.rpcSupportAndABetterExperience")}
+        <b>{t("shell.downloadBanner.getNexaFor", { os: OS_NAME[file.os] })}</b>
+        <span className={s.tagline}>{t("download.rpcSupportAndABetterExperience")}</span>
       </span>
       {sure ? (
         <>

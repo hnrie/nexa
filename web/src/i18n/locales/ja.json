@@ -2428,6 +2428,7 @@
   "server.emoji.noCustomEmojiYet": "カスタム絵文字はまだありません。",
   "server.emoji.renameEmoji": "絵文字の名前を変更",
   "server.emoji.searchEmoji": "絵文字を検索",
+  "server.emoji.sectionCount": "{label}（{count}）",
   "server.emoji.theEmojiListCouldNotBe": "絵文字の一覧を読み込み直せませんでした。",
   "server.emoji.uploadEmoji": "絵文字をアップロード",
   "server.emoji.uploadFailedFor": "{name}: アップロードに失敗しました。",

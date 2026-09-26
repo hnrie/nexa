@@ -2428,6 +2428,7 @@
   "server.emoji.noCustomEmojiYet": "아직 맞춤 이모지가 없습니다.",
   "server.emoji.renameEmoji": "이모지 이름 바꾸기",
   "server.emoji.searchEmoji": "이모지 검색",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "이모지 목록을 다시 불러오지 못했습니다.",
   "server.emoji.uploadEmoji": "이모지 업로드",
   "server.emoji.uploadFailedFor": "{name}: 업로드에 실패했습니다.",

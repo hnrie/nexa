@@ -2738,6 +2738,7 @@
   "server.emoji.noCustomEmojiYet": "لا رموز تعبيرية مخصصة بعد.",
   "server.emoji.renameEmoji": "إعادة تسمية الرمز التعبيري",
   "server.emoji.searchEmoji": "البحث في الرموز التعبيرية",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "تعذّرت إعادة تحميل قائمة الرموز التعبيرية.",
   "server.emoji.uploadEmoji": "رفع رمز تعبيري",
   "server.emoji.uploadFailedFor": "{name}: فشل الرفع.",

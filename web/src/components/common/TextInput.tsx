@@ -53,7 +53,7 @@ export function Field({ label, error, hint, required, children, className, as }:
             {label}
             {required ? <span className={s.req}> *</span> : null}
           </span>
-          {error ? <span className={s.errorText} id={errorId} role="alert"> — {error}</span> : null}
+          {error ? <><span className={s.errorText} aria-hidden="true"> · </span><span className={s.errorText} id={errorId} role="alert">{error}</span></> : null}
         </span>
       ) : null}
       {field}

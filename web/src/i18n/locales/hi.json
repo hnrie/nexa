@@ -2501,6 +2501,7 @@
   "server.emoji.noCustomEmojiYet": "अभी कोई अपना इमोजी नहीं है।",
   "server.emoji.renameEmoji": "इमोजी का नाम बदलें",
   "server.emoji.searchEmoji": "इमोजी खोजें",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "इमोजी सूची फिर से लोड नहीं हो सकी।",
   "server.emoji.uploadEmoji": "इमोजी अपलोड करें",
   "server.emoji.uploadFailedFor": "{name}: अपलोड विफल।",

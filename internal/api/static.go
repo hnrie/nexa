@@ -317,7 +317,7 @@ func (s *Server) serveGuestCallPage(w http.ResponseWriter, r *http.Request, dist
 	if err != nil {
 		return false
 	}
-	const title, desc = "Join a voice call", "You're invited to a voice call. No account needed: pick a name and join."
+	const title, desc = "Join a Voice Call", "You're invited to a voice call. No account needed: pick a name and join."
 	var tags strings.Builder
 	tags.WriteString("\n<title>" + escapeAttr(title) + "</title>")
 	for _, m := range [][2]string{{"og:type", "website"}, {"og:site_name", s.issuer()}, {"og:title", title}, {"og:description", desc}} {

@@ -2623,6 +2623,7 @@
   "server.emoji.noCustomEmojiYet": "Своих эмодзи пока нет.",
   "server.emoji.renameEmoji": "Переименовать эмодзи",
   "server.emoji.searchEmoji": "Поиск эмодзи",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "Не удалось перезагрузить список эмодзи.",
   "server.emoji.uploadEmoji": "Загрузить эмодзи",
   "server.emoji.uploadFailedFor": "{name}: загрузка не удалась.",

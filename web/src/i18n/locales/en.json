@@ -2113,6 +2113,7 @@
   "server.emoji.noCustomEmojiYet": "No custom emoji yet.",
   "server.emoji.renameEmoji": "Rename Emoji",
   "server.emoji.searchEmoji": "Search Emoji",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "The emoji list could not be reloaded.",
   "server.emoji.uploadEmoji": "Upload Emoji",
   "server.emoji.uploadFailedFor": "{name}: upload failed.",

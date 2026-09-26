@@ -92,12 +92,12 @@ export function LogsTab() {
         #{e.case_number}
       </button>
     ) : (
-      <span className={m.logDetail}>—</span>
+      <span className={m.logDetail}>{t("moderation.form.none")}</span>
     );
   // the reason as written, with what was done under it
   const why = (e: ModLogEntry) => {
     const detail = logDetail(e);
-    if (!e.reason && !detail) return <span className={m.logDetail}>—</span>;
+    if (!e.reason && !detail) return <span className={m.logDetail}>{t("moderation.form.none")}</span>;
     return (
       <>
         {e.reason ? <div className={m.logReasonText}>{e.reason}</div> : null}

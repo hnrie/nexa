@@ -26,7 +26,7 @@ export function Toasts() {
               on the button would replace its own role and the toast would stop
               being something you can press to dismiss. */}
           {x.kind === "error" ? <span role="alert">{x.text}</span> : x.text}
-          <span className="visually-hidden"> — {t("toasts.dismiss")}</span>
+          <span className="visually-hidden"> {t("toasts.dismiss")}</span>
         </button>
       ))}
     </div>,

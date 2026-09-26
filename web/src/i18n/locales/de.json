@@ -2501,6 +2501,7 @@
   "server.emoji.noCustomEmojiYet": "Noch keine eigenen Emoji.",
   "server.emoji.renameEmoji": "Emoji umbenennen",
   "server.emoji.searchEmoji": "Emojis suchen",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "Die Emoji-Liste konnte nicht neu geladen werden.",
   "server.emoji.uploadEmoji": "Emoji hochladen",
   "server.emoji.uploadFailedFor": "{name}: Upload fehlgeschlagen.",

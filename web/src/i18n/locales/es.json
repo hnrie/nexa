@@ -2520,6 +2520,7 @@
   "server.emoji.noCustomEmojiYet": "Aún no hay emoji personalizados.",
   "server.emoji.renameEmoji": "Renombrar emoji",
   "server.emoji.searchEmoji": "Buscar emojis",
+  "server.emoji.sectionCount": "{label} ({count})",
   "server.emoji.theEmojiListCouldNotBe": "No se pudo recargar la lista de emojis.",
   "server.emoji.uploadEmoji": "Subir emoji",
   "server.emoji.uploadFailedFor": "{name}: falló la subida.",

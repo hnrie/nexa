@@ -2428,6 +2428,7 @@
   "server.emoji.noCustomEmojiYet": "还没有自定义表情。",
   "server.emoji.renameEmoji": "重命名表情",
   "server.emoji.searchEmoji": "搜索表情",
+  "server.emoji.sectionCount": "{label}（{count}）",
   "server.emoji.theEmojiListCouldNotBe": "无法重新加载表情列表。",
   "server.emoji.uploadEmoji": "上传表情",
   "server.emoji.uploadFailedFor": "{name}：上传失败。",
