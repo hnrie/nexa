@@ -3044,7 +3044,7 @@
   "settings.privacy.developerMode": "Modo de desarrollador",
   "settings.privacy.directMessages": "Mensajes directos",
   "settings.privacy.downloadEverythingYourProfileFriendsServers": "Descarga todo: tu perfil, amigos, servidores y cada mensaje del que tengas las claves, descifrado en este dispositivo en un zip. Nada se descifra en el servidor.",
-  "settings.privacy.everyMessageAndFileYouSend": "Cada mensaje y archivo que envías se cifra en tu dispositivo con claves que el servidor nunca ve. Los perfiles, las reacciones y quién habla con quién son visibles para el servidor para que la aplicación funcione; el contenido de los mensajes no.",
+  "settings.privacy.everyMessageAndFileYouSend": "Cada mensaje y archivo que envías se cifra en tu dispositivo con claves que el servidor nunca ve. Los perfiles, las reacciones y quién habla con quién son visibles para el servidor para que la aplicación funcione. El contenido de los mensajes, no.",
   "settings.privacy.everyone": "Todos",
   "settings.privacy.exportMyData": "Exportar mis datos",
   "settings.privacy.fetchLinkPreviewsWhenISend": "Obtener vistas previas al enviar enlaces",
