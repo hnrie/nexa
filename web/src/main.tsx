@@ -2,9 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { reloadAllowed } from "./lib/busy";
 import { installCrashReporting } from "./lib/crashReport";
-import { downloadsSettled } from "./lib/download";
 import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
 import { installKeyboardInset } from "./lib/keyboardInset";
@@ -15,17 +13,12 @@ import "./styles/base.css";
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     // A page holds its own copy of the app until it reloads, so a deploy would
-    // otherwise sit unused until someone happened to refresh. When a new
-    // worker takes over an already-controlled page, pick the new version up.
+    // otherwise sit unused until someone happened to refresh. A new worker
+    // taking over an already-controlled page means a deploy, most likely:
+    // the page makes sure, and offers the new version (lib/appUpdate.ts).
     const wasControlled = !!navigator.serviceWorker.controller;
-    let reloading = false;
     navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (!wasControlled || reloading) return;
-      reloading = true;
-      // not in the middle of saving a file, sending one or a call, though: reloading would cut it off
-      void reloadAllowed()
-        .then(() => downloadsSettled())
-        .then(() => window.location.reload());
+      if (wasControlled) void import("./lib/appUpdate").then((m) => m.noteNewWorker()).catch(() => undefined);
     });
     // the one that streams large downloads covers only its own addresses, so none of the app's requests pass through it
     const workers = [navigator.serviceWorker.register("/sw.js"), navigator.serviceWorker.register("/download-sw.js", { scope: "/__download/" })];

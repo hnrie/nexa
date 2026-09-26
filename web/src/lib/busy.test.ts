@@ -1,4 +1,4 @@
-import { holdReload, reloadAllowed } from "./busy";
+import { holdReload, reloadAllowed, reloadHolds } from "./busy";
 
 describe("reload holds", () => {
   beforeEach(() => {
@@ -25,8 +25,8 @@ describe("reload holds", () => {
   });
 
   it("waits for every hold to be released", async () => {
-    const upload = holdReload();
-    const call = holdReload();
+    const upload = holdReload("upload");
+    const call = holdReload("call");
     const w = watch();
     await vi.advanceTimersByTimeAsync(60_000);
     upload();
@@ -39,15 +39,32 @@ describe("reload holds", () => {
   });
 
   it("keeps waiting when the next step starts right after one ends", async () => {
-    const upload = holdReload();
+    const upload = holdReload("upload");
     const w = watch();
     upload();
     await vi.advanceTimersByTimeAsync(10);
-    const send = holdReload();
+    const send = holdReload("send");
     await vi.advanceTimersByTimeAsync(5_000);
     expect(w.done()).toBe(false);
     send();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(w.done()).toBe(true);
+  });
+
+  it("says what it waits for, the longest-lasting first", () => {
+    expect(reloadHolds()).toEqual([]);
+    const send = holdReload("send");
+    const up1 = holdReload("upload");
+    const up2 = holdReload("upload");
+    const call = holdReload("call");
+    expect(reloadHolds()).toEqual(["call", "upload", "send"]);
+    call();
+    up1();
+    // one upload is still going
+    expect(reloadHolds()).toEqual(["upload", "send"]);
+    up2();
+    up2();
+    send();
+    expect(reloadHolds()).toEqual([]);
   });
 });

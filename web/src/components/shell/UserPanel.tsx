@@ -1,5 +1,5 @@
 import { Download, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Pencil, Settings } from "lucide-react";
-import { desktopBridge } from "@/lib/desktopBridge";
+import { applyUpdate } from "@/lib/appUpdate";
 import { useDesktop } from "@/stores/desktop";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, StatusDot, statusLabel } from "@/components/common/Avatar";
@@ -135,7 +135,7 @@ export function UserPanel() {
         </Tooltip>
         {update?.status === "ready" ? (
           <Tooltip text={t("shell.user.restartToUpdateTo", { version: update.version ?? t("shell.user.theNewVersion") })}>
-            <button className={[s.icon, s.update].join(" ")} onClick={() => void desktopBridge()?.updates.restart()} aria-label={t("settings.desktop.restartToUpdate")} data-testid="update-ready">
+            <button className={[s.icon, s.update].join(" ")} onClick={() => void applyUpdate("restart")} aria-label={t("settings.desktop.restartToUpdate")} data-testid="update-ready">
               <Download size={20} />
             </button>
           </Tooltip>

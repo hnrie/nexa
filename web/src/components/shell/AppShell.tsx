@@ -9,7 +9,7 @@ import { TermsGate } from "@/components/legal/TermsGate";
 import { WhatsNew } from "@/components/shell/WhatsNewDialog";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
-import { UpdateBanner } from "@/components/shell/UpdateBanner";
+import { UpdatePrompt } from "@/components/shell/UpdateDialog";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { TAB_PANEL_ID, Tabs } from "@/components/shell/Tabs";
@@ -233,7 +233,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : connection !== "open" && connection !== "idle" ? (
           <div className={s.connection} data-state={connection} role="status">{connectionNote ?? (connection === "connecting" ? t("shell.requireAuth.connecting") : t("shell.appShell.disconnectedReconnecting"))}</div>
         ) : null}
-        <UpdateBanner />
+        <UpdatePrompt />
         <RpcBanner />
         <DownloadBanner />
         <Tabs />

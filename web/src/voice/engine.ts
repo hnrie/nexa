@@ -285,7 +285,7 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
   s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
   session = s;
   useVoice.getState().setConnection("connecting");
-  releaseCall ??= holdReload();
+  releaseCall ??= holdReload("call");
   releaseAudio ??= holdAudio();
   let mic: MediaStream | null = null;
   try {

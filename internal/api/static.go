@@ -88,7 +88,7 @@ func (s *Server) staticHandler() http.Handler {
 		// app's HTML instead turns a missing script into a page the browser
 		// refuses to run, and any cache in front of this, the browser's own or
 		// a CDN's, then keeps that HTML under the script's address.
-		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" || p == "/download-sw.js" {
+		if strings.HasPrefix(p, "/assets/") || strings.HasPrefix(p, "/twemoji/") || p == "/sw.js" || p == "/download-sw.js" || p == "/version.json" {
 			w.Header().Set("Cache-Control", "no-store")
 			WriteError(w, ErrNotFound)
 			return
@@ -169,6 +169,12 @@ func serveStaticFile(w http.ResponseWriter, r *http.Request, fp, urlPath string,
 	// they never change under the same URL.
 	if strings.HasPrefix(urlPath, "/assets/") || strings.HasPrefix(urlPath, "/twemoji/") {
 		h.Set("Cache-Control", "public, max-age=31536000, immutable")
+	} else if urlPath == "/version.json" {
+		// Names the build being served, which open pages ask for to learn of
+		// a deploy (web/src/lib/appUpdate.ts): a copy kept anywhere, a CDN's
+		// included, would hide the deploy from them.
+		h.Set("Cache-Control", "no-store")
+		h.Set("CDN-Cache-Control", "no-store")
 	} else {
 		h.Set("Cache-Control", "no-cache")
 	}

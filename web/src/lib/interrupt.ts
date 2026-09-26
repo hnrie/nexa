@@ -26,14 +26,18 @@ function listen(): void {
   window.addEventListener("keydown", () => (lastKey = Date.now()), { capture: true, passive: true });
 }
 
-/** Whether someone is writing: words in the box that has focus, or a key pressed a moment ago. */
-export function writing(now = Date.now()): boolean {
-  if (now - lastKey < TYPING_MS) return true;
+/** Whether the box that has focus has words in it, which a reload or a dialog would get in the way of. */
+export function wordsInFocus(): boolean {
   const el = typeof document === "undefined" ? null : document.activeElement;
   if (el instanceof HTMLTextAreaElement) return el.value.trim() !== "";
   if (el instanceof HTMLInputElement) return TEXT_INPUTS.has(el.type) && el.value.trim() !== "";
   if (el instanceof HTMLElement && el.isContentEditable) return (el.textContent ?? "").trim() !== "";
   return false;
+}
+
+/** Whether someone is writing: words in the box that has focus, or a key pressed a moment ago. */
+export function writing(now = Date.now()): boolean {
+  return now - lastKey < TYPING_MS || wordsInFocus();
 }
 
 /** Whether the dialog called `who` may open now. */

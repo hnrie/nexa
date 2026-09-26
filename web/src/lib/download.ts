@@ -86,6 +86,11 @@ export function downloadsSettled(): Promise<void> {
   return streaming === 0 ? Promise.resolve() : new Promise((r) => waiters.push(r));
 }
 
+/** Whether a download is streaming to disk right now. */
+export function downloading(): boolean {
+  return streaming > 0;
+}
+
 function hex(u: Uint8Array): string {
   return Array.from(u, (b) => b.toString(16).padStart(2, "0")).join("");
 }
