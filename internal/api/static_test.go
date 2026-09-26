@@ -77,6 +77,69 @@ func TestStaticServing(t *testing.T) {
 	}
 }
 
+// cspDirectives splits a content security policy into its directives' sources.
+func cspDirectives(csp string) map[string][]string {
+	out := map[string][]string{}
+	for _, d := range strings.Split(csp, ";") {
+		f := strings.Fields(d)
+		if len(f) > 0 {
+			out[f[0]] = f[1:]
+		}
+	}
+	return out
+}
+
+func cspHas(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+// A person's themes may load web fonts and stylesheets over https, and
+// plugins run from blob: modules; nothing else about scripts loosens.
+func TestContentSecurityPolicy(t *testing.T) {
+	d := cspDirectives(CSP)
+	for _, want := range []struct{ dir, src string }{
+		{"script-src", "'self'"},
+		{"script-src", "blob:"},
+		{"style-src", "https:"},
+		{"style-src", "'unsafe-inline'"},
+		{"font-src", "https:"},
+		{"font-src", "data:"},
+		{"connect-src", "https:"},
+		{"object-src", "'none'"},
+		{"frame-ancestors", "'none'"},
+		{"base-uri", "'self'"},
+	} {
+		if !cspHas(d[want.dir], want.src) {
+			t.Errorf("%s lacks %s: %q", want.dir, want.src, d[want.dir])
+		}
+	}
+	// scripts still never come from the network or from strings
+	for _, never := range []string{"https:", "http:", "'unsafe-eval'", "'unsafe-inline'", "*", "data:"} {
+		if cspHas(d["script-src"], never) {
+			t.Errorf("script-src allows %s: %q", never, d["script-src"])
+		}
+	}
+	// every page the static handler writes carries this policy
+	srv, _ := newTestServer(t)
+	dist := t.TempDir()
+	os.WriteFile(filepath.Join(dist, "index.html"), []byte("<!doctype html><title>Nexa</title>"), 0o644)
+	srv.Cfg.WebDist = dist
+	ts := newHTTPTestServer(t, srv)
+	res, err := http.Get(ts.URL + "/channels/@me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.Header.Get("Content-Security-Policy") != CSP {
+		t.Errorf("app page policy: %q", res.Header.Get("Content-Security-Policy"))
+	}
+}
+
 func TestFrontPagePreview(t *testing.T) {
 	srv, _ := newTestServer(t)
 	dist := t.TempDir()

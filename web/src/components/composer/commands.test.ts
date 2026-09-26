@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parse, plainText } from "@/markdown";
-import { applyCommand, runCommand } from "./commands";
+import { applyCommand, commands, registerPluginCommand, runCommand, unregisterPluginCommand } from "./commands";
 
 describe("applyCommand", () => {
   it("renders /shrug with both arms", () => {
@@ -37,5 +37,21 @@ describe("runCommand", () => {
     expect(runCommand("/usr/bin/env node")).toEqual({ kind: "text" });
     expect(runCommand("see /etc/hosts")).toEqual({ kind: "text" });
     expect(runCommand("hello")).toEqual({ kind: "text" });
+  });
+});
+
+describe("commands from plugins", () => {
+  it("are offered and run after the app's own, which they cannot replace", async () => {
+    const run = async (args: string, channelId: string) => `${channelId}:${args}`;
+    expect(registerPluginCommand({ name: "shrug", desc: "mine", run })).toBe(false);
+    expect(registerPluginCommand({ name: "Roll", desc: "Rolls a die", run })).toBe(true);
+    expect(registerPluginCommand({ name: "roll", desc: "again", run })).toBe(false);
+    expect(commands().map((c) => c.name)).toContain("roll");
+    const r = runCommand("/roll 2d6");
+    expect(r.kind).toBe("plugin");
+    if (r.kind === "plugin") expect(await r.run("c1")).toBe("c1:2d6");
+    expect(runCommand("/shrug").kind).toBe("command");
+    unregisterPluginCommand("roll", run);
+    expect(runCommand("/roll").kind).toBe("unknown");
   });
 });

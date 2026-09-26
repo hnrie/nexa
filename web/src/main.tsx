@@ -9,6 +9,8 @@ import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
 import { installKeyboardInset } from "./lib/keyboardInset";
 import { applyRememberedAppearance } from "./lib/theme";
+import { initSafeMode } from "./lib/look/safeMode";
+import { applyRememberedSheets } from "./lib/look/styles";
 import { ensureTwemojiIndex } from "./lib/twemoji";
 import "./styles/base.css";
 
@@ -49,8 +51,11 @@ installKeyboardInset();
 ensureTwemojiIndex();
 
 // The look this device last had, on before anything is drawn: the account's
-// own settings only arrive with the gateway's ready (see ThemeEffect).
+// own settings only arrive with the gateway's ready (see ThemeEffect). Safe
+// mode is decided first, since it keeps the person's own CSS off.
+initSafeMode();
 applyRememberedAppearance();
+applyRememberedSheets();
 
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("missing #root");

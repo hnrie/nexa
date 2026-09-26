@@ -16,6 +16,8 @@ const BlockedPage = lazyPage(() => import("./BlockedPage"));
 const SecurityPage = lazyPage(() => import("./SecurityPage"));
 const DevicesPage = lazyPage(() => import("./DevicesPage"));
 const AppearancePage = lazyPage(() => import("./AppearancePage"));
+const CustomCssPage = lazyPage(() => import("./CustomCssPage"));
+const PluginsPage = lazyPage(() => import("./PluginsPage"));
 const NotificationsPage = lazyPage(() => import("./NotificationsPage"));
 const StickersPage = lazyPage(() => import("./StickersPage"));
 const VoicePage = lazyPage(() => import("./VoicePage"));
@@ -28,7 +30,7 @@ const AboutPage = lazyPage(() => import("./AboutPage"));
 function navGroups(): NavGroup[] {
   return [
     { head: t("settings.settings.userSettings"), items: [{ id: "account", label: t("settings.account.myAccount") }, { id: "profiles", label: t("settings.profile.profiles") }, { id: "privacy", label: t("settings.privacy.privacySafety") }, { id: "blocked", label: t("people.blockedPage.title") }, { id: "security", label: t("settings.security.security") }, { id: "devices", label: t("settings.devices.devices") }] },
-    { head: t("settings.settings.appSettings"), items: [{ id: "appearance", label: t("settings.appearance.appearance") }, { id: "voice", label: t("settings.voice.voiceVideo") }, { id: "notifications", label: t("settings.notifications.notifications") }, { id: "stickers", label: t("settings.stickers.expressionPacks") }] },
+    { head: t("settings.settings.appSettings"), items: [{ id: "appearance", label: t("settings.appearance.appearance") }, { id: "customCss", label: t("look.css.title") }, { id: "plugins", label: t("look.plugins.title") }, { id: "voice", label: t("settings.voice.voiceVideo") }, { id: "notifications", label: t("settings.notifications.notifications") }, { id: "stickers", label: t("settings.stickers.expressionPacks") }] },
   ];
 }
 
@@ -45,6 +47,8 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   const groups = isAdmin ? [...base, { head: t("settings.settings.instance"), items: [{ id: "admin", label: t("settings.admin.instanceAdmin") }] }] : base;
   const body =
     page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "licenses" ? <LicensesPage /> : page === "about" ? <AboutPage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage /> : <AccountPage onEditProfile={() => setPage("profiles")} />;
+  // Custom CSS and Plugins sit with Appearance (lib/look)
+  const lookPage = page === "customCss" ? <CustomCssPage /> : page === "plugins" ? <PluginsPage /> : null;
   // Log Out is an action rather than a page, so it closes the nav instead of joining a group.
   const footer = (
     <div className={s.navSection}>
@@ -65,7 +69,7 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
     // Opened at My Account is opened as a whole, from the user panel: a phone starts on the list.
     <SettingsLayer label={t("settings.settings.userSettings")} groups={groups} page={page} setPage={setPage} onClose={onClose} footer={footer} startOnList={initial === "account"}>
       {/* A blank content column on a slow link is indistinguishable from a crash. */}
-      <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{page === "blocked" ? <BlockedPage /> : body}</Suspense>
+      <Suspense fallback={<div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner label={t("chat.pins.loading")} /></div>}>{page === "blocked" ? <BlockedPage /> : (lookPage ?? body)}</Suspense>
     </SettingsLayer>
   );
 }

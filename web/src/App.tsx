@@ -5,6 +5,7 @@ import { AppLockEffect } from "@/components/shell/AppLockEffect";
 import { ErrorBoundary, markHealthy } from "@/components/shell/ErrorBoundary";
 import { lazyPage, markChunksHealthy } from "@/lib/lazyChunk";
 import { ThemeEffect } from "@/components/shell/ThemeEffect";
+import { LookEffect } from "@/components/shell/LookEffect";
 import { I18nProvider } from "@/i18n";
 import { useNexa } from "@/stores/nexa";
 import { useAppLocale } from "@/lib/appLocale";
@@ -35,6 +36,7 @@ export default function App() {
     <ErrorBoundary>
       <I18nProvider locale={locale}>
         <ThemeEffect />
+        <LookEffect />
         <AppLockEffect />
         <AppRoutes />
         <ContextMenuHost />

@@ -476,6 +476,18 @@ export function Composer({ channel }: { channel: Channel }) {
     let body = text.trim();
     if (body.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
     const cmd = runCommand(body);
+    if (cmd.kind === "plugin") {
+      // a plugin's command: the box empties at once, and whatever it answers is sent as the message
+      const channelId = channel.id;
+      const opts: SendOptions = takeReply();
+      clearForSend(channelId);
+      void cmd.run(channelId).then((out) => {
+        if (!out) return;
+        if (out.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
+        sendMessage(channelId, out, opts).catch(() => undefined);
+      });
+      return;
+    }
     if (cmd.kind === "command") body = cmd.text;
     else if (cmd.kind === "empty") return toast(tr_("composer.composer.commandNeedsText", { name: cmd.name }), "error");
     else if (cmd.kind === "unknown" && sendAsIs.current !== body) {

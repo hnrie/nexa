@@ -57,7 +57,11 @@ export const dispatchHooks: {
   onFriendRequest: ((r: Relationship) => void)[];
   /** Nexa has something new: a notice, a staff reply, an announcement, or for staff a member's appeal. */
   onNexa: ((a: NexaAlert) => void)[];
-} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [] };
+  /** A message was edited; it arrives decrypted. */
+  onMessageUpdate: ((decrypted: DecryptedMessage) => void)[];
+  /** Messages were deleted; `was` holds each one as it was loaded here, or undefined. */
+  onMessageDelete: ((channelId: string, ids: string[], was: (DecryptedMessage | undefined)[]) => void)[];
+} = { onMessage: [], onUnhandled: [], onReady: [], onFriendRequest: [], onNexa: [], onMessageUpdate: [], onMessageDelete: [] };
 
 /** The account's standing, and for staff what is waiting on them. */
 function applyNexaState(st: NexaState | undefined): void {
@@ -294,6 +298,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         else if (!before && after) useReadStates.getState().addMention(e.d.channel_id, e.d.id);
       }
       useMessages.getState().update(e.d.channel_id, decrypted);
+      for (const h of dispatchHooks.onMessageUpdate) h(decrypted);
       return;
     }
     case "message_delete": {
@@ -303,18 +308,23 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const counted = mentionedMe(e.d.channel_id, e.d.id, meId, e.d);
       // nor is a message from someone blocked counted, so its going takes nothing off
       const uncounted = quietMessage(e.d.channel_id, e.d.id, e.d.author_id);
+      const was = useMessages.getState().channels[e.d.channel_id]?.byId[e.d.id];
       useMessages.getState().remove(e.d.channel_id, e.d.id);
       if (!uncounted) useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
       if (counted && !uncounted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
+      for (const h of dispatchHooks.onMessageDelete) h(e.d.channel_id, [e.d.id], [was]);
       return;
     }
     case "message_delete_bulk": {
       const told = new Map((e.d.mentions ?? []).map((m) => [m.id, m]));
       const uncounted = new Set(e.d.ids.filter((id) => quietMessage(e.d.channel_id, id, told.get(id)?.author_id)));
       const counted = e.d.ids.filter((id) => mentionedMe(e.d.channel_id, id, meId, told.get(id)) && !uncounted.has(id));
+      const loaded = useMessages.getState().channels[e.d.channel_id]?.byId;
+      const was = e.d.ids.map((id) => loaded?.[id]);
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
       for (const id of e.d.ids) if (!uncounted.has(id)) useReadStates.getState().dropUnread(e.d.channel_id, id);
       for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);
+      for (const h of dispatchHooks.onMessageDelete) h(e.d.channel_id, e.d.ids, was);
       return;
     }
     case "reaction_add":
