@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/ids"
@@ -719,4 +718,3 @@ func (s *Server) bugCountsFor(ctx context.Context) *store.BugCounts {
 	return &c
 }
 
-var _ = time.Now

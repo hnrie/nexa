@@ -100,7 +100,7 @@ func (s *Server) handleModSummary(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"counts": counts, "owner_id": owner, "nexa_id": nexa, "staff_ids": staff, "people": s.people(ctx, staff...)})
+	WriteJSON(w, http.StatusOK, map[string]any{"counts": counts, "bugs": s.bugCountsFor(ctx), "owner_id": owner, "nexa_id": nexa, "staff_ids": staff, "people": s.people(ctx, staff...)})
 }
 
 // modUserView is one account in the grid or at the top of its case list:
