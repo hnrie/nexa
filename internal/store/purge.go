@@ -96,6 +96,7 @@ func (s *Store) DeletedAccountsWithLeftovers(ctx context.Context) ([]ids.ID, err
 		EXISTS (SELECT 1 FROM uploads WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM poll_votes WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM client_errors WHERE user_id = u.id) OR
+		EXISTS (SELECT 1 FROM bug_reports WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM bans WHERE user_id = u.id) OR
 		EXISTS (SELECT 1 FROM channel_overwrites WHERE target_id = u.id AND target_type = 'member') OR
 		EXISTS (SELECT 1 FROM mod_restrictions WHERE user_id = u.id) OR
@@ -277,16 +278,20 @@ func (s *Store) idList(ctx context.Context, q string, args ...any) ([]ids.ID, er
 // the invites and guest links it made, its unfinished uploads, its read
 // positions, recent stickers and installed packs, its per-server avatars
 // (whose pictures are let go), its Nexa read position, the crash reports its
-// devices sent, server bans and channel permissions naming it, and any mute
-// or ban still on it. The moderation cases about it, the log and the
-// usernames held for it stay: they are the record of what was done, and a
-// name taken away by a moderator stays out of anyone else's hands.
+// devices sent and the bug reports it wrote (whose files are let go), server
+// bans and channel permissions naming it, and any mute or ban still on it.
+// The moderation cases about it, the log and the usernames held for it stay:
+// they are the record of what was done, and a name taken away by a moderator
+// stays out of anyone else's hands.
 func (s *Store) PurgeUserLeftovers(ctx context.Context, uid ids.ID) error {
 	id := int64(uid)
 	// its overwrites, in whichever servers they were
 	defer s.everythingChanged()
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		if err := releaseBlobRefs(ctx, tx, `SELECT avatar_id FROM server_members WHERE user_id = ? AND avatar_id IS NOT NULL`, id); err != nil {
+			return err
+		}
+		if err := deleteUserBugReportsTx(ctx, tx, id); err != nil {
 			return err
 		}
 		for _, q := range []string{
