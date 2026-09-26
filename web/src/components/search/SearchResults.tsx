@@ -296,6 +296,8 @@ function MediaGrid({ run, names, sort, onJump }: { run: SearchRun; names: Names;
         ref={grid}
         className={s.grid}
         onKeyDown={(e) => {
+          // up from the first picture goes back to the search box (see SearchResults)
+          if (e.key === "ArrowUp" && document.activeElement === e.currentTarget.querySelector("[data-tile]")) return;
           if (moveFocusInGrid(e.currentTarget, "[data-tile]", e.key)) e.preventDefault();
         }}
       >
@@ -409,6 +411,7 @@ export function SearchResults({
   scoped,
   onWiden,
   walking,
+  onTop,
 }: {
   run: SearchRun;
   tab: Tab;
@@ -424,6 +427,8 @@ export function SearchResults({
   onWiden?: (() => void) | undefined;
   /** The index is still walking what this search covers. */
   walking: boolean;
+  /** Up from the first result: back to the search box. */
+  onTop?: (() => void) | undefined;
 }) {
   const id = useId();
   const openContextMenu = useUI((u) => u.openContextMenu);
@@ -515,7 +520,24 @@ export function SearchResults({
           <span className={s.sortLabel}>{t(SORT_LABEL[sort])}</span>
         </button>
       </div>
-      <div ref={scroller} className={s.scroller} data-search-scroller="" role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${tab}`} aria-busy={run.pending || undefined} tabIndex={-1}>
+      <div
+        ref={scroller}
+        className={s.scroller}
+        data-search-scroller=""
+        role="tabpanel"
+        id={`${id}-panel`}
+        aria-labelledby={`${id}-${tab}`}
+        aria-busy={run.pending || undefined}
+        tabIndex={-1}
+        onKeyDown={(e) => {
+          if (e.key !== "ArrowUp" || e.defaultPrevented || !onTop) return;
+          const first = scroller.current?.querySelector("[data-result], [data-tile]");
+          if (first && document.activeElement === first) {
+            e.preventDefault();
+            onTop();
+          }
+        }}
+      >
         {/* the count is said as it changes, politely */}
         <span className="visually-hidden" role="status">{run.pending ? "" : t("search.announce", { count: counts[tab] })}</span>
         {body}

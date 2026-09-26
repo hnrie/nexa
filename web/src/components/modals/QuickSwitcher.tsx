@@ -376,7 +376,7 @@ function Finder({ onClose }: { onClose: () => void }) {
     content = (
       <div className={ss.panelBody}>
         {floating.length ? <SearchSuggestions groups={floating} active={sk.active} listId={`${listId}-float`} names={names} onPick={pickSuggestion} onHover={sk.setActive} onDate={onDate} /> : null}
-        <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} scoped={false} walking={walking} />
+        <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} scoped={false} walking={walking} onTop={() => input.current?.focus()} />
       </div>
     );
   } else {

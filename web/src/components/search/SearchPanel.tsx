@@ -113,7 +113,7 @@ export function SearchPanel({
       setOwnCaret(sg.caret);
       // the caret goes where the suggestion left it: after a finished filter, or inside one still to fill
       requestAnimationFrame(() => {
-        const el = input.current ?? (document.querySelector("[data-header-search] input") as HTMLInputElement | null);
+        const el = input.current ?? document.querySelector<HTMLInputElement>("input[data-header-search]");
         el?.focus({ preventScroll: true });
         el?.setSelectionRange(sg.caret, sg.caret);
       });
@@ -210,7 +210,7 @@ export function SearchPanel({
           {query.trim() ? null : <SearchSuggestions groups={groups} active={-1} listId={`${listId}-intro`} names={names} onPick={pick} onHover={() => undefined} onDate={onDate} onClearRecent={clearRecentSearches} floating={false} />}
         </div>
       ) : (
-        <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} hereChannelId={channel.id} scoped={scope.kind !== "all"} onWiden={() => setScope(EVERYWHERE)} walking={walking} />
+        <SearchResults run={run} tab={tab} onTab={setTab} sort={sort} onSort={setSort} names={names} onJump={jump} hereChannelId={channel.id} scoped={scope.kind !== "all"} onWiden={() => setScope(EVERYWHERE)} walking={walking} onTop={() => (input.current ?? document.querySelector<HTMLInputElement>("input[data-header-search]"))?.focus()} />
       )}
     </div>
   );
