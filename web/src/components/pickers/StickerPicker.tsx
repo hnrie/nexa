@@ -21,34 +21,54 @@ export interface StickerPick {
 }
 
 /**
- * One sticker in the grid. Its picture exists only while the cell is on screen
- * or close to it, and an animated one moves only while it is pointed at or
- * focused: a picker holding every pack at once used to start every animation
- * and video in them together, which is what took phones down.
+ * One sticker in the grid, as a small still (see StickerTile.tsx): loaded
+ * while the cell is on screen or close to it, the ones in view first, and
+ * kept for the next time the picker opens. An animated one moves only while
+ * it is pointed at or focused. A cell whose still could not load says so,
+ * and pressing it tries again instead of sending something you cannot see.
  */
 const StickerCell = memo(function StickerCell({ sticker, pack, onPick, root, still }: { sticker: Sticker; pack: StickerPack; onPick: (p: StickerPick) => void; root: RefObject<HTMLDivElement | null>; still: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const near = useNearScreen(ref, root);
+  const place = useScreenPlace(ref, root);
+  const src = useMemo(() => stillSourceOf(pack, sticker), [pack, sticker]);
+  const [view, retry] = useStickerStill(src, place);
   const [hot, setHot] = useState(false);
+  const failed = view.status === "failed";
+  const label = failed ? t("stickers.tile.couldNotLoadNamed", { name: sticker.name }) : sticker.name;
   return (
     <button
       ref={ref}
       className={s.stickerCell}
-      title={sticker.name}
-      aria-label={sticker.name}
+      title={label}
+      aria-label={label}
+      aria-busy={view.status === "loading" || undefined}
       data-sticker={sticker.id}
+      data-sticker-state={view.status}
       tabIndex={-1}
-      onClick={() => onPick({ sticker, pack })}
+      onClick={() => (failed ? retry() : onPick({ sticker, pack }))}
       onPointerEnter={() => setHot(true)}
       onPointerLeave={() => setHot(false)}
       onFocus={() => setHot(true)}
       onBlur={() => setHot(false)}
     >
-      {/* a cell is about 100 px wide, so the picture is fetched at that size rather than the 160 px a message shows */}
-      {near ? <StickerView format={sticker.format} src={packImageUrl(pack, sticker, 100)} alt={sticker.name} play={hot && !still} renderer="canvas" /> : null}
+      <StillFace view={view} src={src} alt="" play={hot && !still && moves(src) && place !== "far"} />
     </button>
   );
 });
+
+/** A pack's icon in the column beside the grid: its cover, as a still like the grid's. */
+function PackIcon({ pack, cover, root }: { pack: StickerPack; cover: Sticker; root: RefObject<HTMLDivElement | null> }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const place = useScreenPlace(ref, root);
+  const src = useMemo(() => stillSourceOf(pack, cover), [pack, cover]);
+  const [view] = useStickerStill(src, place);
+  return (
+    <span ref={ref} className={s.catImg}>
+      {/* a pack's icon stays still: a column of them all moving at once is noise, and costly */}
+      <StillFace view={view} src={src} alt="" play={false} />
+    </span>
+  );
+}
 
 function prefersStill(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -101,13 +121,12 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
         <SearchBox className={s.searchBox} value={q} onChange={setQ} placeholder={t("pickers.stickerPicker.searchStickers")} aria-label={t("pickers.stickerPicker.searchStickers")} autoFocus={focusSearchOnOpen()} />
       </div>
       <div className={s.body}>
-        <div className={s.cats}>
+        <div className={s.cats} ref={catsRef} data-scroll-root="">
           {all.map((p) => {
             const cover = p.stickers.find((st) => st.id === p.cover_sticker_id) ?? p.stickers[0];
             return (
               <button key={p.id} className={s.cat} title={p.name} aria-label={p.name} onClick={() => jump(p.id)} onContextMenu={packMenu(p)}>
-                {/* a pack's icon stays still: a column of them all moving at once is noise, and costly */}
-                {cover ? <StickerView format={cover.format} src={packImageUrl(p, cover, 24)} alt="" className={s.catImg} play={false} renderer="canvas" /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
+                {cover ? <PackIcon pack={p} cover={cover} root={catsRef} /> : <span className={s.catInitial}>{p.name.slice(0, 1).toUpperCase()}</span>}
               </button>
             );
           })}

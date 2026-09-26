@@ -5,7 +5,8 @@ import type { StickerPack } from "@/api/types";
 
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { LazySticker, StickerView } from "@/components/stickers/StickerView";
+import { StickerView } from "@/components/stickers/StickerView";
+import { LazySticker } from "@/components/stickers/StickerTile";
 import { CreatePackModal, type ImportCounts } from "@/components/modals/CreatePackModal";
 import { TextInput } from "@/components/common/TextInput";
 import { PackEditor, packCount, packCover } from "@/components/server/PackEditor";
@@ -163,7 +164,7 @@ export default function StickersPage({ initialPackId }: { initialPackId?: string
                     </span>
                   </div>
                   {p.description ? <span className={s.packSub}>{p.description}</span> : null}
-                  <div className={s.browseStickers}>{p.stickers.slice(0, 4).map((x) => <LazySticker key={x.id} format={x.format} src={packImageUrl(p, x)} alt={x.name} />)}</div>
+                  <div className={s.browseStickers}>{p.stickers.slice(0, 4).map((x) => <LazySticker key={x.id} sticker={x} pack={p} alt={x.name} />)}</div>
                   {p.owner_user_id === meId ? <Button size="sm" variant="secondary" onClick={() => { setSelected(p.id); setTab((p.kind ?? "sticker") === "emoji" ? "emoji" : "stickers"); }}>{tr_("pickers.stickerPicker.edit")}</Button> : p.installed ? (
                     canRemovePack(p, meId) ? <Button size="sm" variant="secondary" onClick={() => confirmRemovePack(p, () => setFound((cur) => cur?.map((x) => (x.id === p.id ? { ...x, installed: false } : x)) ?? null))}>{tr_("composer.composer.remove")}</Button> : <Button size="sm" variant="secondary" disabled>{tr_("settings.stickers.installed")}</Button>
                   ) : <Button size="sm" loading={busy === p.id} onClick={() => void install(p)}>{tr_("settings.stickers.install")}</Button>}

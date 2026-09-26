@@ -31,3 +31,83 @@
   height: 100%;
   object-fit: contain;
 }
+
+/* A grid sticker's still (StickerTile.tsx): the picture, the moving sticker
+   over it while pointed at, a quiet placeholder while it loads, and a mark
+   when it could not. Size containment lets the mark drop its words in a
+   small tile, such as a pack's icon. */
+.still {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  container-type: size;
+}
+.stillImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.live {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.still[data-sticker-state="loading"]::before {
+  content: "";
+  width: 56%;
+  height: 56%;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  animation: waiting 1.6s ease-in-out infinite;
+}
+@keyframes waiting {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.8; }
+}
+.failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.failed svg {
+  flex: none;
+  width: min(20px, 60cqmin);
+  height: min(20px, 60cqmin);
+}
+.failedText {
+  overflow-wrap: anywhere;
+}
+@container (max-width: 64px) {
+  .failedText { display: none; }
+}
+
+/* a Telegram sticker in a message that could not load: pressing it tries again */
+.tgsFailed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.tgsFailed > svg {
+  width: 24px;
+  height: 24px;
+}
