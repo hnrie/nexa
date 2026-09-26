@@ -1,26 +1,23 @@
 NEXA - TERMS OF SERVICE
 Site: chat.evilion.xyz
-Run by: Nora (@nora in the app)
-Contact: evilionx3@proton.me
+Contact the owner (nora) here: evilionx3@proton.me
 Effective: 2026-09-24
 
-These Terms are the agreement between you and Nora, who runs Nexa.
+These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
 Policy is part of them.
 
 1. WHAT NEXA IS
 
-Nexa is a small, independent chat service. Your messages, files, and
-calls are encrypted on your device with keys the server never has.
-Nobody who runs Nexa can read them, monitor them, or switch that off.
-That is how the software works, not a promise that could be quietly
-waived later.
+Nexa is a chat service. Your messages, files, and calls are encrypted
+on your device with keys the server never has. Nobody who runs Nexa
+can read them, monitor them, or switch that off. That is how the
+software works, not a promise that could be quietly waived later.
 
-Nexa is run by Nora, with help from a small team of moderators she
-appoints (called staff in these Terms). Staff only ever work with the
-small part of Nexa that is not encrypted: public profiles, community
-membership, moderation cases, and the delivery details the server
-needs to work.
+The owner and a team of moderators (called staff in these Terms) keep
+Nexa running. Staff only ever work with the small part of Nexa that is
+not encrypted: public profiles, community membership, moderation
+cases, and the delivery details the server needs to work.
 
 2. YOUR ACCOUNT
 
@@ -172,8 +169,8 @@ new Terms.
 
 Questions, reports, appeals, or legal process:
 
-  Email: evilionx3@proton.me
-  In the app: @nora, or reply in your case thread with Nexa
+  Contact the owner (nora) here: evilionx3@proton.me
+  In the app: message @nora, or reply in your case thread with Nexa
 
 Legal requests should name the account (username or account ID),
 explain the legal basis, and include contact details for the reply.

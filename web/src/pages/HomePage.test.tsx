@@ -38,7 +38,7 @@ describe("HomePage", () => {
     await open();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Private Chat with All the Fun Left In");
     const chapters = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(chapters).toEqual(["Servers for Your People", "Voice and Video", "Emoji, Themes and Plugins", "Private by Design", "Quick on Every Device", "Run by a Person, Not a Company", "Start Chatting"]);
+    expect(chapters).toEqual(["Servers for Your People", "Voice and Video", "Emoji, Themes and Plugins", "Private by Design", "Quick on Every Device", "What You Can Count On", "Start Chatting"]);
     expect(document.querySelector("table")).toBeNull();
     expect(document.body.textContent).not.toMatch(/discord/i);
     expect(document.body.textContent).not.toContain("—");

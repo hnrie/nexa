@@ -16,8 +16,8 @@ import s from "./Legal.module.css";
 export function ContactBlock() {
   return (
     <p className={s.body} dir="auto">
-      {t("legal.contactOwner")}: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
-      {" · "}
+      {t("legal.contactHere", { user: OWNER_USERNAME })} <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+      <br />
       {t("legal.inApp", { user: `@${OWNER_USERNAME}` })}
     </p>
   );

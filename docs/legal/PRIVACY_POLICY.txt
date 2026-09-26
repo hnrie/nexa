@@ -1,7 +1,6 @@
 NEXA - PRIVACY POLICY
 Site: chat.evilion.xyz
-Run by: Nora (@nora in the app)
-Contact: evilionx3@proton.me
+Contact the owner (nora) here: evilionx3@proton.me
 Effective: 2026-09-24
 
 This policy lists exactly what Nexa holds. It is written against the
@@ -128,7 +127,7 @@ decrypted.
 - Other people see your public profile, your messages once their app
   decrypts them, and the communities and channels you share with
   them.
-- The owner and the staff she appoints see sections 3a to 3h. Staff
+- The owner and the staff they appoint see sections 3a to 3h. Staff
   use a moderation panel that shows public profiles, when accounts
   were last active, moderation cases and their threads, the log, and
   announcements. It shows nothing that is encrypted, because nothing
@@ -176,8 +175,8 @@ decrypted.
 
 8. CONTACT
 
-  Email: evilionx3@proton.me
-  In the app: @nora
+  Contact the owner (nora) here: evilionx3@proton.me
+  In the app: message @nora
 
 Please include the account name and the legal basis for any formal
 request. Replies list exactly the rows held, with times in UTC
