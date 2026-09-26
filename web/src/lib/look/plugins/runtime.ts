@@ -98,16 +98,29 @@ async function loadCode(entry: PluginEntry): Promise<Loaded> {
   return { ok: true, code: text };
 }
 
+/**
+ * How code becomes a module: a blob: URL handed to import(), which runs it as
+ * a real ES module in its own scope with no eval. Tests replace this, since
+ * Node cannot import a blob: URL.
+ */
+export const moduleLoader = {
+  async load(code: string): Promise<Record<string, unknown>> {
+    const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+    try {
+      return (await import(/* @vite-ignore */ url)) as Record<string, unknown>;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  },
+};
+
 /** Imports code as a module and finds the plugin in it; throws a readable error when there is none. */
 export async function importPlugin(code: string): Promise<NexaPlugin> {
-  const url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
   let mod: Record<string, unknown>;
   try {
-    mod = (await import(/* @vite-ignore */ url)) as Record<string, unknown>;
+    mod = await moduleLoader.load(code);
   } catch (err) {
     throw new Error(t("look.plugins.errorModule", { message: err instanceof Error ? err.message : String(err) }));
-  } finally {
-    URL.revokeObjectURL(url);
   }
   const candidate = (mod["default"] && typeof mod["default"] === "object" ? mod["default"] : mod) as Partial<NexaPlugin>;
   if (typeof candidate.start !== "function") throw new Error(t("look.plugins.errorNoStart"));
