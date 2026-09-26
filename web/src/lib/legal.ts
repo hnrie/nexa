@@ -47,10 +47,21 @@ export function previouslyAccepted(userId: string): string | null {
   }
 }
 
+const termsListeners = new Set<() => void>();
+
+/** Calls back whenever an account agrees, for what waits behind the consent gate (the What's New pop-up). */
+export function onTermsAccepted(cb: () => void): () => void {
+  termsListeners.add(cb);
+  return () => {
+    termsListeners.delete(cb);
+  };
+}
+
 export function acceptTerms(userId: string): void {
   try {
     localStorage.setItem(termsKey(userId), LEGAL_VERSION);
   } catch {
     /* private window: the gate shows again next visit, which is the safe side */
   }
+  for (const cb of [...termsListeners]) cb();
 }

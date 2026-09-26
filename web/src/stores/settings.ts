@@ -103,6 +103,11 @@ export interface Settings {
   // --- look: themes, custom CSS, plugins ---
 
   // --- shell: what's new ---
+  /**
+   * The newest What's New release this account has been shown (lib/whatsNew.ts),
+   * kept with the account so the pop-up comes once per account, not per device.
+   */
+  whatsNewSeen: string | null;
 
   // --- search ---
 }
@@ -161,6 +166,7 @@ export const DEFAULT_SETTINGS: Settings = {
   // --- look: themes, custom CSS, plugins ---
 
   // --- shell: what's new ---
+  whatsNewSeen: null,
 
   // --- search ---
 };
@@ -182,6 +188,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     // --- look: themes, custom CSS, plugins ---
 
     // --- shell: what's new ---
+    whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
 
     // --- search ---
   };

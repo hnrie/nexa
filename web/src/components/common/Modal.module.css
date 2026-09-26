@@ -19,5 +19,9 @@
   .overlay { padding: 0; padding-bottom: var(--kb-inset, 0px); align-items: flex-end; }
   .card { width: 100% !important; max-height: 92vh; max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px)); border-radius: var(--radius-md) var(--radius-md) 0 0; }
   .body:last-child, .footer { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  /* a centred dialog stays a card, clear of the notch, the home indicator and the keyboard */
+  .overlay[data-centered] { align-items: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(max(16px, env(safe-area-inset-bottom)) + var(--kb-inset, 0px)) max(16px, env(safe-area-inset-left)); }
+  .overlay[data-centered] .card { border-radius: var(--radius-md); max-height: 100%; }
+  .overlay[data-centered] .body:last-child, .overlay[data-centered] .footer { padding-bottom: 16px; }
 }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }

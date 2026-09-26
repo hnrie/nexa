@@ -1,0 +1,84 @@
+/* What's New: an update's features as one calm list, the way release notes
+   read on paper. The icon beside each is the one thing in colour. */
+
+.intro {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-subtle);
+}
+
+.release + .release {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.date {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemTitle {
+  margin: 0 0 3px;
+  padding-top: 1px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.itemBody {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .items { gap: 16px; }
+  .item { gap: 12px; }
+  .icon { width: 32px; height: 32px; }
+}
+
+@media (pointer: coarse) {
+  .done { height: 44px; padding-inline: 22px; }
+}
