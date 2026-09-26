@@ -770,7 +770,7 @@
   "look.css.save": "CSS を保存",
   "look.css.saved": "CSS を保存しました",
   "look.css.size": "{size} / {max}",
-  "look.css.tips": "いちばん簡単なのは色の変更です。テーマ作成の詳細モードにある名前がここで使えます (例: :root { --brand: #e91e63; })。クラス名は Nexa のバージョンごとに変わるので、[class*=\"_messageList_\"] のように先頭で指定してください。",
+  "look.css.tips": "いちばん簡単なのは色の変更です。テーマ作成の詳細モードにある名前がここで使えます (例: {example})。クラス名は Nexa のバージョンごとに変わるので、{selector} のように先頭で指定してください。",
   "look.css.title": "カスタム CSS",
   "look.css.tooBig": "CSS が {max} を超えています。短くするか、ファイルにしてリンクとして追加してください。",
   "look.css.unreadable": "保存した CSS をこのデバイスで読み込めませんでした。ここで保存すると置き換わります。",

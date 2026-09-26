@@ -795,7 +795,7 @@
   "look.css.save": "CSS speichern",
   "look.css.saved": "CSS gespeichert",
   "look.css.size": "{size} von {max}",
-  "look.css.tips": "Farben lassen sich am einfachsten ändern: Die Namen aus dem erweiterten Modus des Design-Editors funktionieren hier, zum Beispiel :root { --brand: #e91e63; }. Klassennamen ändern sich zwischen Nexa-Versionen, also triff ihren Anfang, etwa [class*=\"_messageList_\"].",
+  "look.css.tips": "Farben lassen sich am einfachsten ändern: Die Namen aus dem erweiterten Modus des Design-Editors funktionieren hier, zum Beispiel {example}. Klassennamen ändern sich zwischen Nexa-Versionen, also triff ihren Anfang, etwa {selector}.",
   "look.css.title": "Eigenes CSS",
   "look.css.tooBig": "Dein CSS ist größer als {max}. Kürze es oder lege es in eine Datei und füge es als Link hinzu.",
   "look.css.unreadable": "Dein gespeichertes CSS konnte auf diesem Gerät nicht gelesen werden. Speichern hier ersetzt es.",

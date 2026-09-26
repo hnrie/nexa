@@ -241,8 +241,13 @@
 .settingsBox > label, .settingsBox > div { padding-block: 10px; }
 .addRow { display: flex; flex-wrap: wrap; gap: 8px; }
 .consent { display: flex; align-items: flex-start; gap: 10px; margin-top: 14px; font-size: 14px; line-height: 1.45; color: var(--text); cursor: pointer; }
-.consent input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--danger); }
+.consent input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
+.consent[data-level="danger"] input { accent-color: var(--danger); }
 .dialogBody { display: flex; flex-direction: column; gap: 14px; }
+/* in a dialog the column's own gap spaces these */
+.dialogBody .caution, .dialogBody .consent { margin: 0; }
+.dialogBody > .segment { align-self: flex-start; }
+.inlineCode { padding: 1px 4px; border-radius: 4px; background: var(--code-bg); border: 1px solid var(--code-border); font-family: var(--font-mono); font-size: 0.92em; color: var(--text); white-space: nowrap; direction: ltr; unicode-bidi: isolate; }
 .dialogError { margin: 0; font-size: 14px; color: var(--text-danger); }
 .codeView { max-height: 240px; margin: 0; padding: 10px; overflow: auto; border-radius: var(--radius-xs); background: var(--code-bg); border: 1px solid var(--code-border); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; white-space: pre; color: var(--text); direction: ltr; text-align: start; }
 .facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 13px; }

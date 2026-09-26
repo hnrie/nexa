@@ -805,7 +805,7 @@
   "look.css.save": "Salvar CSS",
   "look.css.saved": "CSS salvo",
   "look.css.size": "{size} de {max}",
-  "look.css.tips": "As cores são o mais fácil de mudar: os nomes do modo avançado do criador de temas funcionam aqui, por exemplo :root { --brand: #e91e63; }. Os nomes de classe mudam entre versões do Nexa, então use o começo deles, como [class*=\"_messageList_\"].",
+  "look.css.tips": "As cores são o mais fácil de mudar: os nomes do modo avançado do criador de temas funcionam aqui, por exemplo {example}. Os nomes de classe mudam entre versões do Nexa, então use o começo deles, como {selector}.",
   "look.css.title": "CSS personalizado",
   "look.css.tooBig": "Seu CSS passa de {max}. Deixe mais curto ou coloque em um arquivo e adicione como link.",
   "look.css.unreadable": "Seu CSS salvo não pôde ser lido neste dispositivo. Salvar aqui substitui ele.",

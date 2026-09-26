@@ -2,7 +2,7 @@ import { Link2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/common/Button";
 import { Toggle } from "@/components/common/Toggle";
-import { t } from "@/i18n";
+import { Tr, t } from "@/i18n";
 import { dropLink, keepLink, refreshLink, useCssLinks, type LinkState } from "@/lib/look/cssLinks";
 import { useLookDraft } from "@/lib/look/draft";
 import { fetchFailure } from "@/lib/look/fetchText";
@@ -135,7 +135,7 @@ export default function CustomCssPage() {
         </div>
         {over ? <p className={s.hint} style={{ color: "var(--text-danger)" }}>{t("look.css.tooBig", { max: formatBytes(MAX_SNIPPET_BYTES) })}</p> : null}
         <p className={s.hint} style={{ marginTop: 10 }}>
-          {t("look.css.tips")}
+          <Tr id="look.css.tips" values={{ example: <code className={look.inlineCode}>{":root { --brand: #e91e63; }"}</code>, selector: <code className={look.inlineCode}>{'[class*="_messageList_"]'}</code> }} />
         </p>
       </div>
 

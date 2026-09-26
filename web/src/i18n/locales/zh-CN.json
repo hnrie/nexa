@@ -770,7 +770,7 @@
   "look.css.save": "保存 CSS",
   "look.css.saved": "CSS 已保存",
   "look.css.size": "{size} / {max}",
-  "look.css.tips": "最容易改的是颜色：主题编辑器高级模式中的名称可以在这里使用，例如 :root { --brand: #e91e63; }。类名会随 Nexa 版本变化，所以请匹配类名的开头，如 [class*=\"_messageList_\"]。",
+  "look.css.tips": "最容易改的是颜色：主题编辑器高级模式中的名称可以在这里使用，例如 {example}。类名会随 Nexa 版本变化，所以请匹配类名的开头，如 {selector}。",
   "look.css.title": "自定义 CSS",
   "look.css.tooBig": "你的 CSS 超过了 {max}。请删短一些，或放进文件后以链接方式添加。",
   "look.css.unreadable": "此设备无法读取你保存的 CSS。在这里保存会替换它。",

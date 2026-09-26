@@ -795,7 +795,7 @@
   "look.css.save": "Save CSS",
   "look.css.saved": "CSS saved",
   "look.css.size": "{size} of {max}",
-  "look.css.tips": "Colours are the easiest thing to change: the names in the theme builder's advanced mode work here, for example :root { --brand: #e91e63; }. Class names change between versions of Nexa, so match the start of one, like [class*=\"_messageList_\"].",
+  "look.css.tips": "Colours are the easiest thing to change: the names in the theme builder's advanced mode work here, for example {example}. Class names change between versions of Nexa, so match the start of one, like {selector}.",
   "look.css.title": "Custom CSS",
   "look.css.tooBig": "Your CSS is over {max}. Make it shorter, or put it in a file and add it as a link.",
   "look.css.unreadable": "Your saved CSS could not be read on this device. Saving here replaces it.",
