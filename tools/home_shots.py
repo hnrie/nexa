@@ -2,10 +2,14 @@
 """Takes the pictures the front page shows, from the app actually running.
 
 Boots a throwaway chatd on the built web dist, sets up a small server with two
-people in it, and photographs the parts the page talks about. Nothing here is
-mocked up: what the page shows is what the app draws.
+people in it, and photographs the parts the page talks about: the server
+(app.png, also the front page's link preview) and the colour themes
+(themes.png). Nothing here is mocked up: what the page shows is what the app
+draws. The two loops are tools/home_gifs.py's.
 
   PLAYWRIGHT_VENV=tools/.venv tools/.venv/bin/python tools/home_shots.py
+
+E2E_WEB_DIST and E2E_CHATD (see tools/e2e.py) point it at a build of your own.
 """
 import os, sys, time
 from pathlib import Path
@@ -56,7 +60,8 @@ def main() -> int:
             a.goto(srv.base + "/channels/@me", wait_until="networkidle")
             a.click("button[aria-label='Add a Server']")
             a.fill("[data-testid=server-name]", "Orbit")
-            a.click("button:has-text('Create')")
+            # the dialog's own button: the sidebar behind it has "Create" buttons too
+            a.click("[role=dialog] button:has-text('Create')")
             a.wait_for_url("**/channels/*/*", timeout=20000)
             a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
             server_id = a.url.split("/channels/")[1].split("/")[0]
@@ -92,47 +97,31 @@ def main() -> int:
             a.screenshot(path=str(OUT / "app.png"))
             print("wrote app.png")
 
-            # the expression picker, open on the emoji it ships with. The frame
-            # around it shows the chat behind, whose lines the crop would cut
-            # mid-word at its edge, so the messages step out of the picture.
-            a.add_style_tag(content="[data-id] { visibility: hidden !important; }")
-            a.click("button[aria-label='Select emoji']")
-            a.wait_for_selector("[data-testid=emoji-picker], [role=dialog]", timeout=15000)
-            a.mouse.move(430, 150)
-            time.sleep(2.0)
-            picker = a.locator("[role=dialog], [class*=pop]").last.bounding_box()
-            pad = 28
-            a.screenshot(path=str(OUT / "express.png"), clip={
-                "x": max(0, picker["x"] - pad),
-                "y": max(0, picker["y"] - pad),
-                "width": min(SHOT[0] - max(0, picker["x"] - pad), picker["width"] + pad * 2),
-                "height": min(SHOT[1] - max(0, picker["y"] - pad), picker["height"] + pad * 2),
+            # The colour themes, as the gallery in Settings shows them: its
+            # dark and light rows, cut out of the dialog on a window tall
+            # enough to hold both at once.
+            a.set_viewport_size({"width": SHOT[0], "height": 1400})
+            a.click("[data-testid=user-settings]")
+            a.click("[data-nav=appearance]")
+            a.wait_for_selector("[data-theme-id]", timeout=15000)
+            a.mouse.move(10, 10)
+            time.sleep(1.5)
+            rows = a.locator("[role=group]:has([data-theme-id])")
+            dark, light = rows.nth(1).bounding_box(), rows.nth(2).bounding_box()
+            # the groups above and below sit close, so the cut stays tight
+            # top and bottom rather than take half a line of either
+            pad, tight = 28, 6
+            left = min(dark["x"], light["x"]) - pad
+            top = dark["y"] - tight
+            a.screenshot(path=str(OUT / "themes.png"), clip={
+                "x": left,
+                "y": top,
+                "width": max(dark["x"] + dark["width"], light["x"] + light["width"]) + pad - left,
+                "height": light["y"] + light["height"] + tight - top,
             })
             a.keyboard.press("Escape")
-            a.evaluate("() => document.querySelectorAll('style').forEach((el) => el.textContent.includes('[data-id] { visibility') && el.remove())")
-            print("wrote express.png")
-
-            # Both of them in the server's voice channel. No cameras: the fake
-            # one the browser offers is a green test card, and most calls look
-            # like this anyway.
-            for page in (b, a):
-                page.locator("[data-channel]:has(span:text-is('General')) button").first.click()
-                page.wait_for_selector("[data-testid=voice-status]", timeout=20000)
-                time.sleep(1.0)
-            a.wait_for_function(
-                "() => document.querySelectorAll('[data-testid=voice-participants] [data-user]').length === 2",
-                timeout=20000,
-            )
-            # wait for the two of them to actually be connected to each other,
-            # so the picture is a call rather than a call starting
-            a.wait_for_function(
-                "() => !/connecting/i.test(document.body.innerText)",
-                timeout=30000,
-            )
-            a.mouse.move(400, 500)
-            time.sleep(2.5)
-            a.screenshot(path=str(OUT / "call.png"))
-            print("wrote call.png")
+            a.set_viewport_size({"width": SHOT[0], "height": SHOT[1]})
+            print("wrote themes.png")
             browser.close()
             other.close()
     finally:

@@ -78,6 +78,10 @@
   line-height: 1.6;
 }
 .page :focus-visible { outline: 2px solid var(--violet-text); outline-offset: 3px; border-radius: 6px; }
+/* no word left alone on the last line of a paragraph */
+.page p,
+.page dd,
+.page figcaption { text-wrap: pretty; }
 .page ::selection { background: color-mix(in srgb, var(--violet) 30%, transparent); }
 
 /* Every band is the same width, so their edges line up down the page. */
@@ -250,7 +254,6 @@
 .chapterBody { display: flex; flex-direction: column; gap: 36px; min-width: 0; }
 
 .frame { position: relative; margin: 0; overflow: hidden; border: 1px solid var(--rule); border-radius: 14px; background: var(--shot); }
-.frame[data-shape="square"] { max-width: 460px; }
 .frame img,
 .frame video { display: block; width: 100%; height: auto; }
 .pause {
@@ -282,8 +285,23 @@
 .ledgerSide li svg { flex: none; margin-top: 3px; color: var(--ink-soft); }
 .ledgerSide[data-sealed] li svg { color: var(--violet-text); }
 
-.aboutLinks { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; font-size: 17px; font-weight: 700; }
-.aboutLinks a { color: var(--violet-text); }
+.aboutLinks { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; }
+.small {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding-inline: 18px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1.5px var(--rule-strong);
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  transition: background-color 120ms ease;
+}
+.small:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); text-decoration: none; }
+.small svg { flex: none; color: var(--violet-text); }
 
 /* ---- the close --------------------------------------------------------- */
 

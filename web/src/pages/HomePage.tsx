@@ -13,7 +13,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ChevronsLeftRight, CornerUpLeft, Eye, Hash, Lock, Pause, PhoneCall, Play } from "lucide-react";
+import { ChevronsLeftRight, CornerUpLeft, Eye, Hash, Lock, Mail, Pause, PhoneCall, Play } from "lucide-react";
 import { NexaWordmark } from "@/components/common/Brand";
 import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
@@ -27,9 +27,10 @@ import s from "./Home.module.css";
 /**
  * The most the app takes to load, gzipped: the script and styles every page
  * starts with. tools/app_size.py measures each build against it, so the claim
- * on this page cannot drift from the truth unnoticed, as "264 KB" had.
+ * on this page cannot drift from the truth unnoticed, as "264 KB" had. (It
+ * was 208 kB when this was set, and 500 had stopped saying much.)
  */
-export const LOAD_KB_LIMIT = 500;
+export const LOAD_KB_LIMIT = 300;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {
@@ -85,7 +86,7 @@ const PEOPLE: Record<Who, { name: string; colour: string; ink: string }> = {
   // the same two colours Alice and Bob have in the call loop further down
   alice: { name: "Alice", colour: "#d6336c", ink: "#fff" },
   bob: { name: "Bob", colour: "#f0a202", ink: "#2b1b00" },
-  carol: { name: "Carol", colour: "#1f8a63", ink: "#fff" },
+  carol: { name: "Carol", colour: "#1b7a57", ink: "#fff" },
 };
 
 interface Line {
@@ -148,8 +149,11 @@ async function seal(texts: string[]): Promise<string[]> {
   }
 }
 
-/** Where the line rests, as a share of the width from the reading side. */
-const REST = 58;
+/**
+ * Where the line rests, as a share of the width from the reading side: on a
+ * phone further over, where a message has fewer words to spare.
+ */
+const restingPlace = (): number => (typeof window !== "undefined" && window.innerWidth < 600 ? 64 : 58);
 /** How close to either edge it may go: the handle stays whole inside the frame. */
 const EDGE = 4;
 
@@ -229,7 +233,7 @@ function Duo({ still }: { still: boolean }) {
   const lines = useMemo(conversation, []);
   const texts = useMemo(() => lines.flatMap((l) => (l.reply ? [l.reply.text, l.text] : [l.text])), [lines]);
   const [sealed, setSealed] = useState<string[] | null>(null);
-  const [seam, setSeam] = useState(still ? REST : 100);
+  const [seam, setSeam] = useState(() => (still ? restingPlace() : 100));
   const [dragging, setDragging] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
 
@@ -243,20 +247,17 @@ function Duo({ still }: { still: boolean }) {
 
   // The one moment the page moves on its own: once, when it can be seen.
   useEffect(() => {
-    if (still) {
-      setSeam((v) => (v === 100 ? REST : v));
-      return;
-    }
+    const settle = () => setSeam((v) => (v === 100 ? restingPlace() : v));
     const el = stage.current;
-    if (!el || typeof IntersectionObserver === "undefined") {
-      setSeam(REST);
+    if (still || !el || typeof IntersectionObserver === "undefined") {
+      settle();
       return;
     }
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
           io.disconnect();
-          setSeam((v) => (v === 100 ? REST : v));
+          settle();
         }
       },
       { threshold: 0.6 },
@@ -268,7 +269,7 @@ function Duo({ still }: { still: boolean }) {
   /** The share of the width between the reading edge and the pointer. */
   const at = (clientX: number): number => {
     const el = stage.current;
-    if (!el) return REST;
+    if (!el) return restingPlace();
     const box = el.getBoundingClientRect();
     const rtl = getComputedStyle(el).direction === "rtl";
     const from = rtl ? box.right - clientX : clientX - box.left;
@@ -351,36 +352,48 @@ function Duo({ still }: { still: boolean }) {
  */
 function Still({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
   return (
-    <figure className={s.frame} data-shape={width === height ? "square" : undefined}>
+    // never drawn wider than it was taken, which would only blur it
+    <figure className={s.frame} style={{ maxWidth: width }}>
       <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
     </figure>
   );
 }
 
 /**
- * A short loop of the app in use. It plays only while it is on screen, it can
- * be paused (it would otherwise never stop), and anyone who asked for less
- * movement gets the still it starts from instead.
+ * A short loop of the app in use. Nothing of it is fetched until it is nearly
+ * on screen, it plays only while it is, it can be paused (it would otherwise
+ * never stop), and anyone who asked for less movement gets its still instead.
+ * `from` is where the still was taken (tools/home_gifs.py), so playing starts
+ * on the very frame the still showed.
  */
-function Movie({ name, alt, still }: { name: string; alt: string; still: boolean }) {
+function Movie({ name, alt, still, from = 0 }: { name: string; alt: string; still: boolean; from?: number }) {
   const video = useRef<HTMLVideoElement>(null);
   const [paused, setPaused] = useState(false);
+  const [near, setNear] = useState(false);
   const [seen, setSeen] = useState(false);
 
   useEffect(() => {
     const el = video.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((entries) => setSeen(entries.some((e) => e.isIntersecting)), { threshold: 0.25 });
-    io.observe(el);
-    return () => io.disconnect();
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    const soon = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setNear(true), { rootMargin: "600px 0px" });
+    const now = new IntersectionObserver((entries) => setSeen(entries.some((e) => e.isIntersecting)), { threshold: 0.25 });
+    soon.observe(el);
+    now.observe(el);
+    return () => {
+      soon.disconnect();
+      now.disconnect();
+    };
   }, [still]);
 
   useEffect(() => {
     const el = video.current;
-    if (!el) return;
+    if (!el || !near) return;
     if (seen && !paused) void el.play().catch(() => undefined);
     else el.pause();
-  }, [seen, paused]);
+  }, [near, seen, paused]);
 
   if (still) {
     return (
@@ -391,8 +404,8 @@ function Movie({ name, alt, still }: { name: string; alt: string; still: boolean
   }
   return (
     <figure className={s.frame}>
-      <video ref={video} muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt} width={900} height={563}>
-        <source src={`/home/${name}.webm`} type="video/webm" />
+      <video ref={video} muted loop playsInline preload="none" poster={near ? `/home/${name}.png` : undefined} aria-label={alt} width={900} height={563}>
+        {near ? <source src={`/home/${name}.webm${from ? `#t=${from}` : ""}`} type="video/webm" /> : null}
       </video>
       <button type="button" className={s.pause} onClick={() => setPaused((p) => !p)} aria-label={paused ? t("home.movie.play") : t("home.movie.pause")}>
         {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
@@ -410,6 +423,20 @@ interface Fact {
   body: string;
 }
 
+/** The specifics of one part of the app: a name each, and a sentence. */
+function Facts({ items }: { items: Fact[] }) {
+  return (
+    <dl className={s.facts}>
+      {items.map((f) => (
+        <div key={f.title} className={s.fact}>
+          <dt>{f.title}</dt>
+          <dd>{f.body}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** One part of the app: what it is in a line, what it looks like, and the specifics. */
 function Chapter({ id, title, lede, media, facts, children }: { id: string; title: string; lede: string; media?: ReactNode; facts?: Fact[]; children?: ReactNode }) {
   return (
@@ -421,16 +448,7 @@ function Chapter({ id, title, lede, media, facts, children }: { id: string; titl
       <div className={s.chapterBody}>
         {media}
         {children}
-        {facts?.length ? (
-          <dl className={s.facts}>
-            {facts.map((f) => (
-              <div key={f.title} className={s.fact}>
-                <dt>{f.title}</dt>
-                <dd>{f.body}</dd>
-              </div>
-            ))}
-          </dl>
-        ) : null}
+        {facts?.length ? <Facts items={facts} /> : null}
       </div>
     </section>
   );
@@ -521,10 +539,10 @@ export default function HomePage() {
           id="home-yours"
           title={t("home.yours.title")}
           lede={t("home.yours.lede")}
-          media={<Still src="/home/express.png" alt={t("home.shot.express")} width={554} height={554} />}
+          media={<Still src="/home/themes.png" alt={t("home.shot.themes")} width={716} height={611} />}
           facts={facts("yours", ["emoji", "stickers", "themes", "plugins", "format"])}
         />
-        <Chapter id="home-private" title={t("home.private.title")} lede={t("home.private.lede")} facts={facts("private", ["signup", "recovery", "safety", "lock", "previews", "search", "export"])}>
+        <Chapter id="home-private" title={t("home.private.title")} lede={t("home.private.lede")} facts={facts("private", ["signup", "recovery", "safety", "twoFactor", "lock", "previews", "search", "export"])}>
           <div className={s.ledger}>
             <div className={s.ledgerSide} data-sealed="">
               <h3 className={s.h3}>{t("home.private.cantTitle")}</h3>
@@ -540,7 +558,7 @@ export default function HomePage() {
             <div className={s.ledgerSide}>
               <h3 className={s.h3}>{t("home.private.knowsTitle")}</h3>
               <ul>
-                {["account", "where", "when", "sizes"].map((k) => (
+                {["account", "where", "when", "sizes", "emoji"].map((k) => (
                   <li key={k}>
                     <Eye size={16} aria-hidden="true" />
                     <span>{t(`home.private.knows.${k}`)}</span>
@@ -554,13 +572,17 @@ export default function HomePage() {
           id="home-quick"
           title={t("home.quick.title")}
           lede={t("home.quick.lede", { size: kilobytes(LOAD_KB_LIMIT) })}
-          media={<Movie name="speed" alt={t("home.shot.speed")} still={still} />}
+          media={<Movie name="speed" alt={t("home.shot.speed")} still={still} from={2} />}
           facts={facts("quick", ["desktop", "phone", "languages"])}
         />
-        <Chapter id="home-people" title={t("home.people.title")} lede={t("home.people.lede")} facts={facts("people", ["reports"])}>
+        <Chapter id="home-people" title={t("home.people.title")} lede={t("home.people.lede")}>
+          <Facts items={facts("people", ["data", "moderation", "reports"])} />
           <p className={s.aboutLinks}>
-            <Link to="/about">{t("home.people.about")}</Link>
-            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+            <Link className={s.small} to="/about">{t("home.people.about")}</Link>
+            <a className={s.small} href={`mailto:${CONTACT_EMAIL}`}>
+              <Mail size={18} aria-hidden="true" />
+              {CONTACT_EMAIL}
+            </a>
           </p>
         </Chapter>
 

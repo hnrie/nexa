@@ -27,14 +27,16 @@ TALK = {
 }
 
 
-def clip(src: Path, stem: Path, tail: float, fps: int = 16, width: int = 900) -> None:
+def clip(src: Path, stem: Path, tail: float, fps: int = 16, width: int = 900, still: float = 0.0) -> None:
     """The last `tail` seconds of the recording, in two shapes.
 
-    A page gets the webm, which is small and smooth, and the first frame
-    becomes the poster, so the box is never empty while the loop loads and a
-    reader who asked for less movement sees it on its own. (A GIF used to be
-    made too, as a fallback inside the video element; every browser that runs
-    the app plays video, so none ever fetched it.)
+    A page gets the webm, which is small and smooth, and the frame `still`
+    seconds in becomes the poster, so the box is never empty while the loop
+    loads and a reader who asked for less movement sees it on its own. The
+    front page starts playing from that same moment (the #t= on its source in
+    HomePage.tsx), so the poster never jumps. (A GIF used to be made too, as a
+    fallback inside the video element; every browser that runs the app plays
+    video, so none ever fetched it.)
     """
     common = f"fps={fps},scale={width}:-1:flags=lanczos"
     run = lambda cmd: subprocess.run(cmd, check=True, capture_output=True)
@@ -43,7 +45,7 @@ def clip(src: Path, stem: Path, tail: float, fps: int = 16, width: int = 900) ->
         "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "36", "-row-mt", "1",
         "-pix_fmt", "yuv420p", "-an", str(stem.with_suffix(".webm")),
     ])
-    run(["ffmpeg", "-y", "-sseof", f"-{tail}", "-i", str(src), "-vf", f"scale={width}:-1:flags=lanczos", "-frames:v", "1", str(stem.with_suffix(".png"))])
+    run(["ffmpeg", "-y", "-sseof", f"-{tail}", "-i", str(src), "-ss", str(still), "-vf", f"scale={width}:-1:flags=lanczos", "-frames:v", "1", str(stem.with_suffix(".png"))])
     for ext in (".webm", ".png"):
         f = stem.with_suffix(ext)
         print(f"  {f.name}: {f.stat().st_size / 1024:.0f} KB")
@@ -152,7 +154,9 @@ def main() -> int:
             alice.ctx.close()
             video = next(iter(sorted((WORK / "speed").glob("*.webm"))), None)
             assert video is not None, "no recording of the channels"
-            clip(video, OUT / "speed", tail=8.0)
+            # its first frame is the voice channel it starts from; two seconds
+            # in, a channel with its messages says more on its own
+            clip(video, OUT / "speed", tail=8.0, still=2.0)
             b1.close()
             b2.close()
     finally:
