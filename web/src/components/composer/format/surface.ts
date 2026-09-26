@@ -987,6 +987,40 @@ export class FormatSurface {
       this.opts.onEscape?.();
       return;
     }
+    // A table's cells are fields of their own: up from its top row and down
+    // from its bottom row lead out of it, to the lines around it.
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !mod && !e.altKey && !e.shiftKey) {
+      this.syncSelection();
+      const p = this.sel.focus;
+      const block = this.blocks[p.b];
+      if (block?.kind === "table" && p.cell) {
+        const down = e.key === "ArrowDown";
+        const [r, c] = p.cell;
+        if (down ? r < block.rows.length - 1 : r > 0) {
+          stop();
+          const next = (block.rows[down ? r + 1 : r - 1]?.[c] ?? []) as Inline[];
+          this.sel = caret(p.b, Math.min(p.o, inlineLength(next)), [down ? r + 1 : r - 1, c]);
+          this.placeSelection();
+          this.emitState();
+          return;
+        }
+        stop();
+        let blocks = this.blocks;
+        let target = down ? p.b + 1 : p.b - 1;
+        if (target < 0 || target >= blocks.length) {
+          // nothing there yet: a line to go on writing in
+          blocks = blocks.slice();
+          blocks.splice(down ? p.b + 1 : 0, 0, textBlock("p", [], block.wrap));
+          target = down ? p.b + 1 : 0;
+          this.apply(blocks, caret(target, 0));
+          return;
+        }
+        this.sel = caret(target, down ? 0 : sizeAt(blocks, { b: target, o: 0 }));
+        this.placeSelection();
+        this.emitState();
+        return;
+      }
+    }
     if (e.key === "Tab" && !mod && !e.altKey) {
       this.syncSelection();
       const block = this.blocks[this.sel.focus.b];

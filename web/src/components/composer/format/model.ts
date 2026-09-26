@@ -389,8 +389,8 @@ export function splitAt(blocks: Block[], at: Pos): Edit {
     else out[at.b] = { ...block, kind: "p", list: undefined };
     return { blocks: out, sel: caret(at.b, 0) };
   }
-  if (len === 0 && block.wrap && block.wrap !== "details" && at.b > 0 && blocks[at.b - 1]?.wrap === block.wrap) {
-    // an empty line at the end of a quote or callout leaves it
+  if (len === 0 && block.wrap && at.b > 0 && blocks[at.b - 1]?.wrap === block.wrap) {
+    // an empty line at the end of a quote, callout or section leaves it (a section's summary line never does)
     const next = blocks[at.b + 1];
     if (!next || next.wrap !== block.wrap) {
       out[at.b] = { ...block, wrap: null, kind: "p" };

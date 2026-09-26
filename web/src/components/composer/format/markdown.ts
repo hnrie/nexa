@@ -257,7 +257,7 @@ export function toMarkdown(blocks: Block[]): string {
     if (prevTable && run[0]?.kind === "table") out.push("");
     if (wrap === "quote") out.push(...quoteLines(run));
     else if (wrap === "details") out.push(...detailsLines(run));
-    else if (wrap) out.push(`> [!${wrap.toUpperCase()}]`, ...flowLines(run).map((l) => (l === "" ? ">" : "> " + l)));
+    else if (wrap) out.push(`> [!${wrap.toUpperCase()}]`, ...withoutTrailingBlanks(flowLines(run)).map((l) => (l === "" ? ">" : "> " + l)));
     else out.push(...flowLines(run, prevTable));
     prevWrap = wrap;
     prevTable = !wrap && run[run.length - 1]?.kind === "table";
@@ -279,7 +279,14 @@ function detailsLines(run: Block[]): string[] {
   const head = run[0];
   const summary = isText(head) ? inlineMarkdown(head.content) : "";
   const body = isText(head) ? run.slice(1) : run;
-  return [summary ? `::: details ${summary}` : "::: details", ...flowLines(body), ":::"];
+  return [summary ? `::: details ${summary}` : "::: details", ...withoutTrailingBlanks(flowLines(body)), ":::"];
+}
+
+/** A callout or section ends at its last line with words; the parser drops the blank ones after it anyway. */
+function withoutTrailingBlanks(lines: string[]): string[] {
+  let end = lines.length;
+  while (end > 0 && lines[end - 1] === "") end -= 1;
+  return lines.slice(0, end);
 }
 
 /** Blocks with no wrap of their own, or the inside of a callout or section. */
