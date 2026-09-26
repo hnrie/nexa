@@ -141,6 +141,33 @@ describe("the engine", () => {
     expect(ask(e, "🥾").docs.map((d) => d.id)).toEqual([boot.id]);
   });
 
+  it("stays quick with a large history", () => {
+    const e = new SearchEngine();
+    const words = ["pizza", "meeting", "tomorrow", "photo", "release", "notes", "deploy", "weekend", "coffee", "design", "review", "bug"];
+    const n = 40_000;
+    for (let i = 0; i < n; i++) {
+      const w = (k: number) => words[(i * 7 + k * 13) % words.length]!;
+      e.upsert(doc(`${w(0)} ${w(1)} and ${w(2)} number${i}`, { c: `c${i % 40}`, a: `u${i % 9}` }));
+    }
+    const time = (q: string, over: Partial<EngineRequest> = {}) => {
+      const t0 = performance.now();
+      const res = ask(e, q, over);
+      return { ms: performance.now() - t0, res };
+    };
+    // a common word, a rare one, words and a filter, filters only, a scope
+    const common = time("pizza");
+    const rare = time("number1234");
+    const mixed = time("pizza from:u3", { sort: "relevance" });
+    const onlyFilters = time("during:2026");
+    const scoped = time("meeting", { scope: ["c7"] });
+    // found by its beginning: number1234 and number12340 to number12349
+    expect(rare.res.counts.messages).toBe(11);
+    expect(rare.res.docs.every((d) => d.t.includes("number1234"))).toBe(true);
+    expect(common.res.counts.messages).toBeGreaterThan(1000);
+    // generous bounds for a busy test machine; in the app this runs in a worker
+    for (const r of [common, rare, mixed, onlyFilters, scoped]) expect(r.ms).toBeLessThan(400);
+  });
+
   it("answers nothing for a filter that named nobody", () => {
     const e = new SearchEngine();
     e.upsert(doc("hello"));
