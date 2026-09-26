@@ -502,10 +502,10 @@ export function Composer({ channel }: { channel: Channel }) {
       clearForSend(channelId);
       void cmd.run(channelId).then((out) => {
         if (!out) return;
-        if (out.length > MAX_LEN) return toast(tr_("composer.composer.messagesAreLimitedTo", { count: MAX_LEN }), "error");
+        if (tooLong(out)) return toast(tooLongMessage(), "error");
         sendMessage(channelId, out, opts).catch(() => undefined);
       });
-      return;
+      return true;
     }
     if (cmd.kind === "command") body = cmd.text;
     else if (cmd.kind === "empty") {
