@@ -217,7 +217,7 @@ export default function CustomCssPage() {
       {dirty ? (
         <div key={nudge} className={[s.saveBar, nudge !== calm ? s.shake : ""].join(" ")} role="status" data-testid="save-bar">
           <span className={s.saveText}>{t("look.css.unsaved")}</span>
-          <span className={s.saveBtns}>
+          <span className={[s.saveBtns, look.touchBar].join(" ")}>
             <Button variant="ghost" onClick={() => setText(saved)} disabled={busy}>
               {t("settings.themeBuilder.reset")}
             </Button>

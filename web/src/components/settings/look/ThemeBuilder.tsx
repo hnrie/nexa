@@ -203,7 +203,7 @@ export function ThemeBuilder({ initial, isNew, onClose }: { initial: CustomTheme
       {dirty ? (
         <div key={nudge} className={[settings.saveBar, nudge !== calm ? settings.shake : ""].join(" ")} role="status" data-testid="save-bar">
           <span className={settings.saveText}>{fresh ? t("settings.themeBuilder.unsavedNew") : t("settings.themeBuilder.unsaved")}</span>
-          <span className={settings.saveBtns}>
+          <span className={[settings.saveBtns, s.touchBar].join(" ")}>
             <Button variant="ghost" onClick={fresh ? onClose : () => setDraft(saved)} data-testid="builder-discard">
               {fresh ? t("settings.themeBuilder.discard") : t("settings.themeBuilder.reset")}
             </Button>

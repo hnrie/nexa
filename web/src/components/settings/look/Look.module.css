@@ -262,4 +262,5 @@
 /* Small buttons are 32px tall, which is too small for a thumb; on a touch screen they grow. */
 @media (pointer: coarse) {
   .itemActions button, .sectionHead button, .addRow button, .groupActions button, .builderFoot button, .stateBody button, button.noticeAction { height: auto; min-height: 40px; }
+  .touchBar button { height: auto; min-height: 44px; }
 }
