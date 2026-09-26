@@ -40,7 +40,7 @@ export function FolderSettingsModal({ onClose, folderId, serverIds }: { onClose:
       open
       onClose={onClose}
       title={existing || gone ? t("organize.rail.folderSettings") : t("organize.rail.newFolderTitle")}
-      width={460}
+      width={480}
       onSubmit={save}
       footer={
         <>

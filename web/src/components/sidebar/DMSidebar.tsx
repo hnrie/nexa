@@ -19,7 +19,7 @@ import { isUnread, useReadStates } from "@/stores/readStates";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useRelationships } from "@/stores/relationships";
-import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { iconUrl } from "@/api/users";
 import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { badgeText, conversationCount } from "@/lib/unread";
@@ -69,8 +69,13 @@ export function DMSidebar() {
   const layout = settings.dmList;
   // HTML5 dragging is for a mouse; on a touch screen a held row opens its menu, which makes the same moves
   const canDrag = useMediaQuery("(hover: hover) and (pointer: fine)");
-  const [drag, setDrag] = useState<string | null>(null);
-  const [over, setOver] = useState<Over | null>(null);
+  const [drag, setDragShown] = useState<string | null>(null);
+  const [over, setOverShown] = useState<Over | null>(null);
+  // The same two for the drag events themselves, which come faster than the
+  // list is drawn: one reading the state could still see no drag at all, and
+  // a drop could land where the pointer was a moment before.
+  const dragRef = useRef<string | null>(null);
+  const overRef = useRef<Over | null>(null);
 
   // Opening the Nexa conversation while it is closed opens it again, as
   // messaging someone brings back a conversation that was closed.
@@ -132,6 +137,14 @@ export function DMSidebar() {
 
   // --- dragging, with a mouse -------------------------------------------------
 
+  const setDrag = (id: string | null) => {
+    dragRef.current = id;
+    setDragShown(id);
+  };
+  const setOver = (next: Over | null) => {
+    overRef.current = next;
+    setOverShown(next);
+  };
   const endDrag = () => {
     setDrag(null);
     setOver(null);
@@ -142,12 +155,12 @@ export function DMSidebar() {
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", id);
   };
-  const hover = (e: DragEvent, next: Over | null) => {
-    if (!drag || !next) return;
+  const hover = (e: DragEvent, next: Over) => {
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = "move";
-    if (over?.at !== next.at || over.where !== next.where) setOver(next);
+    const was = overRef.current;
+    if (was?.at !== next.at || was.where !== next.where) setOver(next);
   };
   const half = (e: DragEvent): "before" | "after" => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -156,12 +169,13 @@ export function DMSidebar() {
   /** Nothing would change where it is now: dropping here does nothing, whatever it was over before. */
   const nowhere = (e: DragEvent) => {
     e.stopPropagation();
-    if (over) setOver(null);
+    if (overRef.current) setOver(null);
   };
   /** Among the pinned ones: before or after this one. */
   const overPinned = (e: DragEvent, id: string) => {
-    if (!drag) return;
-    if (drag === id) return nowhere(e);
+    const d = dragRef.current;
+    if (!d) return;
+    if (d === id) return nowhere(e);
     const where = half(e);
     const at = layout.pins.indexOf(id);
     if (at < 0) return;
@@ -169,32 +183,32 @@ export function DMSidebar() {
   };
   /** On a group: a conversation goes in; a group goes beside it among the pinned ones, or back to the list. */
   const overGroup = (e: DragEvent, g: DMGroup, pinned: boolean) => {
-    if (!drag) return;
-    if (drag === g.id) return nowhere(e);
-    if (!isGroupId(drag)) {
-      if (groupOf(layout, drag)?.id === g.id) return nowhere(e);
+    const d = dragRef.current;
+    if (!d) return;
+    if (d === g.id) return nowhere(e);
+    if (!isGroupId(d)) {
+      if (groupOf(layout, d)?.id === g.id) return nowhere(e);
       hover(e, { at: g.id, where: "into", drop: { kind: "group", groupId: g.id } });
     } else if (pinned) overPinned(e, g.id);
-    else if (layout.pins.includes(drag)) hover(e, { at: "main", where: "main", drop: { kind: "main" } });
+    else if (layout.pins.includes(d)) hover(e, { at: "main", where: "main", drop: { kind: "main" } });
     else nowhere(e);
   };
   const overMain = (e: DragEvent) => {
-    if (!drag) return;
-    if (!layout.pins.includes(drag) && !groupOf(layout, drag)) return nowhere(e);
+    const d = dragRef.current;
+    if (!d) return;
+    if (!layout.pins.includes(d) && !groupOf(layout, d)) return nowhere(e);
     hover(e, { at: "main", where: "main", drop: { kind: "main" } });
   };
   const overTop = (e: DragEvent) => {
-    if (!drag) return;
+    if (!dragRef.current) return;
     hover(e, { at: "top", where: "top", drop: { kind: "pinned", index: 0 } });
   };
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (drag && over) {
-      const id = drag;
-      const drop = over.drop;
-      changeDMList((l) => dropDM(l, id, drop));
-    }
+    const id = dragRef.current;
+    const target = overRef.current;
+    if (id && target) changeDMList((l) => dropDM(l, id, target.drop));
     endDrag();
   };
   const dropAt = (id: string) => (over?.at === id ? over.where : undefined);
@@ -215,7 +229,7 @@ export function DMSidebar() {
     "data-reorder-id": pinned ? id : undefined,
     onDragStart: (e: DragEvent) => onDragStart(e, id),
     onKeyDown: pinned ? reorder.onKeyDown(id) : undefined,
-    ...(pinned ? { onDragOver: (e: DragEvent) => overPinned(e, id), onDrop } : {}),
+    ...(pinned ? { onDragOver: (e: DragEvent) => overPinned(e, id), onDragEnter: (e: DragEvent) => overPinned(e, id), onDrop } : {}),
   });
 
   const nexaRow = (pinned: boolean) => {
@@ -363,6 +377,8 @@ export function DMSidebar() {
         data-dragging={drag === g.id}
         data-group={g.id}
         onDragOver={(e) => overGroup(e, g, pinned)}
+        // entering counts as being over: a quick move sends only that
+        onDragEnter={(e) => overGroup(e, g, pinned)}
         onDrop={onDrop}
       >
         <div
@@ -410,6 +426,17 @@ export function DMSidebar() {
       </div>
       <div className={s.scroll}>
         {reorder.live}
+        {drag && view.pinned.length === 0 ? (
+          // Nothing pinned yet: while something is dragged, a place to pin it.
+          // It floats over the top of the list rather than pushing the list,
+          // and the row being dragged, down from under the pointer.
+          <div className={s.pinZoneWrap}>
+            <div className={s.pinZone} data-drop={dropAt("top") === "top" || undefined} onDragOver={overTop} onDragEnter={overTop} onDrop={onDrop} data-testid="dm-pin-zone">
+              <Pin size={14} aria-hidden="true" />
+              {t("organize.dm.dropToPin")}
+            </div>
+          </div>
+        ) : null}
         <button className={s.nav} data-selected={loc.pathname === "/channels/@me"} onClick={() => go("/channels/@me")} data-testid="nav-friends">
           <span className={s.navIcon}><Users size={22} /></span>
           <span className={s.navLabel}>{t("sidebar.dMSidebar.friends")}</span>
@@ -430,26 +457,20 @@ export function DMSidebar() {
         ) : null}
         {view.pinned.length > 0 ? (
           <div role="group" aria-label={t("organize.pinned")} data-testid="dm-pinned">
-            <div className={s.header} data-drop={dropAt("top") === "top" || undefined} onDragOver={overTop} onDrop={onDrop}>
+            <div className={s.header} data-drop={dropAt("top") === "top" || undefined} onDragOver={overTop} onDragEnter={overTop} onDrop={onDrop}>
               <span className={s.headerLabel}><Pin size={12} aria-hidden="true" />{t("organize.pinned")}</span>
             </div>
             {view.pinned.map((r) => renderRow(r, true))}
           </div>
-        ) : drag ? (
-          // nothing pinned yet: while something is dragged, a place to pin it
-          <div className={s.pinZone} data-drop={dropAt("top") === "top" || undefined} onDragOver={overTop} onDrop={onDrop}>
-            <Pin size={14} aria-hidden="true" />
-            {t("organize.dm.dropToPin")}
-          </div>
         ) : null}
-        <div className={s.header} data-drop={dropAt("main") === "main" || undefined} onDragOver={overMain} onDrop={onDrop} data-testid="dm-header">
+        <div className={s.header} data-drop={dropAt("main") === "main" || undefined} onDragOver={overMain} onDragEnter={overMain} onDrop={onDrop} data-testid="dm-header">
           <span>{t("sidebar.dMSidebar.directMessages")}</span>
           <button className={s.headerBtn} aria-label={t("sidebar.dMSidebar.createDm")} title={t("sidebar.dMSidebar.createDm")} onClick={() => openModal("createDM")}>
             <Plus size={16} />
           </button>
         </div>
         {nothing ? <div className={s.empty}>{t("sidebar.dMSidebar.noConversationsYetAddAFriend")}</div> : null}
-        <div onDragOver={overMain} onDrop={onDrop} data-testid="dm-main">
+        <div onDragOver={overMain} onDragEnter={overMain} onDrop={onDrop} data-testid="dm-main">
           {view.rest.map((r) => renderRow(r, false))}
         </div>
       </div>

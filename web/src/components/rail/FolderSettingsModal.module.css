@@ -6,7 +6,7 @@
 .tile { width: 48px; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in srgb, var(--folder) 34%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 /* rounded squares, the folder's own shape; the one chosen is ringed */
-.swatch { position: relative; width: 36px; height: 36px; border-radius: 10px; overflow: hidden; cursor: pointer; flex: none; }
+.swatch { position: relative; width: 32px; height: 32px; border-radius: 9px; overflow: hidden; cursor: pointer; flex: none; }
 .swatch[data-on="true"] { box-shadow: 0 0 0 2px var(--bg-floating), 0 0 0 4px var(--text-strong); }
 .swatch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .swatch:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
