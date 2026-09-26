@@ -24,7 +24,6 @@ import s from "./Chat.module.css";
 import { t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
-import { usePaneScope } from "@/components/shell/paneScope";
 import { parse, plainText } from "@/markdown";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
@@ -191,7 +190,6 @@ export function MessageList({ channel }: { channel: Channel }) {
   const renderCtx = useRenderCtx();
   // which row is pointed at or focused: only that one draws its toolbar
   const [activeRows] = useState(() => new ActiveRows());
-  const { focused: paneFocused } = usePaneScope();
   // what a screen reader is told about a message arriving (see announce below)
   const [said, setSaid] = useState<{ n: number; text: string } | null>(null);
   // Newer pages load below the reader; the loader at the top is for older ones.
@@ -316,7 +314,7 @@ export function MessageList({ channel }: { channel: Channel }) {
    */
   const announce = useCallback(
     (m: DecryptedMessage) => {
-      if (!paneFocused || typeof document === "undefined" || document.visibilityState !== "visible") return;
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
       const st = channel.server_id ? useServers.getState().byId[channel.server_id] : undefined;
       const name = st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
       const body = m.payload?.t ? plainText(parse(m.payload.t, { inline: true }), renderCtx).slice(0, 300) : "";
@@ -329,7 +327,7 @@ export function MessageList({ channel }: { channel: Channel }) {
             : "";
       if (text) setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text }));
     },
-    [paneFocused, channel.server_id, users, renderCtx],
+    [channel.server_id, users, renderCtx],
   );
 
   useLayoutEffect(() => {

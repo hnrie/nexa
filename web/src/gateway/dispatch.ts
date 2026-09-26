@@ -24,7 +24,6 @@ import type { Message, PublicUser, Relationship, ServerView } from "@/api/types"
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
-import { channelsOnScreen, usePanes } from "@/stores/panes";
 import { mentionsMe } from "@/lib/mentionsMe";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "@/lib/blocked";
 import { loadChunk } from "@/lib/lazyChunk";
@@ -192,11 +191,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "ready": {
       const d = e.d;
       // A reconnect re-sends ready. Everything else is rebuilt from the
-      // payload, but the conversations on screen — the open one and those in
-      // the split panes beside it — keep their messages, so each reader stays
-      // where they were instead of being thrown to the newest message.
+      // payload, but the conversation on screen keeps its messages, so the
+      // reader stays where they were instead of being thrown to the newest
+      // message.
       const active = useUI.getState().activeChannelId;
-      const shown = [...new Set([...(active ? [active] : []), ...channelsOnScreen()])];
+      const shown = active ? [active] : [];
       resetAll(shown);
       // Merged, not replaced: a field the gateway leaves out must not read as
       // "none" here, or the next profile save sends that back and wipes it.
@@ -337,8 +336,6 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "channel_delete":
       useChannels.getState().remove(e.d.id);
       useMessages.getState().clearChannel(e.d.id);
-      // split panes still showing it close (the focused one follows the address)
-      usePanes.getState().forgetChannel(e.d.id);
       return;
     case "channel_positions":
       useChannels.getState().applyPositions(e.d.channels);
@@ -357,7 +354,6 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         if (ch.server_id === e.d.id) {
           chans.remove(ch.id);
           useMessages.getState().clearChannel(ch.id);
-          usePanes.getState().forgetChannel(ch.id);
         }
       }
       useServers.getState().remove(e.d.id);

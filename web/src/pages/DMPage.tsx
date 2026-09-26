@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
 import { ApiError } from "@/api/client";
 import { ChatView } from "@/components/chat/ChatView";
-import { useGridDrawsChat } from "@/components/shell/paneScope";
 import { Button } from "@/components/common/Button";
 import { PaneSpinner } from "@/components/common/Spinner";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
@@ -13,7 +12,6 @@ import s from "./ServerPage.module.css";
 
 import { t } from "@/i18n";
 export default function DMPage() {
-  const gridChat = useGridDrawsChat();
   const { channelId, messageId } = useParams();
   const nav = useNavigate();
   const channel = useChannels((c) => (channelId ? c.byId[channelId] : undefined));
@@ -73,7 +71,5 @@ export default function DMPage() {
     );
   }
   if (!channel) return <PaneSpinner text={t("dM.openingConversation")} />;
-  // in a split the grid draws it, like every other pane
-  if (gridChat) return null;
   return <ChatView channel={channel} />;
 }

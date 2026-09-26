@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useAuth } from "./auth";
-import { usePanes } from "./panes";
+import { useTabs } from "./tabs";
 import { lastChannelOf, rememberChannel } from "./serverNav";
 import { useVoice } from "./voice";
 import { useSlowmode } from "./slowmode";
@@ -8,58 +8,68 @@ import { useSlowmode } from "./slowmode";
 const person = (id: string) => ({ id, username: id, display_name: id, flags: 0 }) as unknown as NonNullable<ReturnType<typeof useAuth.getState>["me"]>;
 const layout = (channelId: string) =>
   JSON.stringify({
+    tabs: [
+      { id: "t1", serverId: null, channelId: null },
+      { id: "t2", serverId: "1", channelId },
+    ],
+    active: "t2",
+  });
+/** The shape tabs were saved in while they could hold split panes. */
+const paneLayout = (channelId: string) =>
+  JSON.stringify({
     tabs: [{ id: "t1", root: { kind: "pane", id: "p1" }, focus: "p1" }, { id: "t2", root: { kind: "pane", id: "p2" }, focus: "p2" }],
     active: "t2",
-    panes: { p1: { id: "p1", serverId: null, channelId: null }, p2: { id: "p2", serverId: "s1", channelId } },
+    panes: { p1: { id: "p1", serverId: null, channelId: null }, p2: { id: "p2", serverId: "1", channelId } },
   });
+const channelOf = (tabId: string) => useTabs.getState().tabs.find((t) => t.id === tabId)?.channelId;
 
 beforeEach(() => {
   localStorage.clear();
   useAuth.setState({ me: null });
-  usePanes.getState().reset();
+  useTabs.getState().reset();
 });
 
 describe("what one account leaves on a shared browser", () => {
   it("gives each account its own tabs, and the next one starts from one empty tab", () => {
-    localStorage.setItem("ec:panes:alice", layout("c-alice"));
+    localStorage.setItem("ec:tabs:alice", layout("100"));
     useAuth.setState({ me: person("alice") });
-    expect(usePanes.getState().tabs).toHaveLength(2);
-    expect(usePanes.getState().panes["p2"]?.channelId).toBe("c-alice");
+    expect(useTabs.getState().tabs).toHaveLength(2);
+    expect(channelOf("t2")).toBe("100");
     // alice signs out, bob signs in
-    usePanes.getState().reset();
+    useTabs.getState().reset();
     useAuth.setState({ me: null });
     useAuth.setState({ me: person("bob") });
-    expect(usePanes.getState().tabs).toHaveLength(1);
-    expect(Object.values(usePanes.getState().panes).map((p) => p.channelId)).toEqual([null]);
-    // and alice's layout is still hers when she is back
-    usePanes.getState().reset();
+    expect(useTabs.getState().tabs.map((t) => t.channelId)).toEqual([null]);
+    // and alice's tabs are still hers when she is back
+    useTabs.getState().reset();
     useAuth.setState({ me: person("alice") });
-    expect(usePanes.getState().panes["p2"]?.channelId).toBe("c-alice");
+    expect(channelOf("t2")).toBe("100");
   });
 
-  it("saves the layout under the account it belongs to, and nothing while nobody is signed in", () => {
+  it("saves the tabs under the account they belong to, and nothing while nobody is signed in", () => {
     vi.useFakeTimers();
     try {
       useAuth.setState({ me: person("carol") });
-      usePanes.getState().openTab("s1", "c1");
+      useTabs.getState().openTab("1", "2");
       vi.advanceTimersByTime(500);
-      expect(JSON.parse(localStorage.getItem("ec:panes:carol") ?? "{}").tabs).toHaveLength(2);
-      usePanes.getState().reset();
+      expect(JSON.parse(localStorage.getItem("ec:tabs:carol") ?? "{}").tabs).toHaveLength(2);
+      useTabs.getState().reset();
       useAuth.setState({ me: null });
-      usePanes.getState().openTab("s1", "c2");
+      useTabs.getState().openTab("1", "3");
       vi.advanceTimersByTime(500);
-      expect(localStorage.getItem("ec:panes")).toBeNull();
-      expect(JSON.parse(localStorage.getItem("ec:panes:carol") ?? "{}").tabs).toHaveLength(2);
+      expect(Object.keys(localStorage).filter((k) => k.startsWith("ec:tabs") || k.startsWith("ec:panes"))).toEqual(["ec:tabs:carol"]);
+      expect(JSON.parse(localStorage.getItem("ec:tabs:carol") ?? "{}").tabs).toHaveLength(2);
     } finally {
       vi.useRealTimers();
     }
   });
 
   it("takes over the one layout kept before layouts were per account", () => {
-    localStorage.setItem("ec:panes", layout("c-old"));
+    localStorage.setItem("ec:panes", paneLayout("200"));
     useAuth.setState({ me: person("dave") });
-    expect(usePanes.getState().panes["p2"]?.channelId).toBe("c-old");
+    expect(channelOf("t2")).toBe("200");
     expect(localStorage.getItem("ec:panes")).toBeNull();
+    expect(localStorage.getItem("ec:tabs:dave")).not.toBeNull();
   });
 
   it("remembers the last channel of a server per account", () => {
