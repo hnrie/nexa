@@ -65,7 +65,12 @@ export function ColourField({
         <span className={s.colourName}>
           {label}
         </span>
-        {name ? <span className={s.colourVar}>{name}</span> : null}
+        {/* a CSS name reads left to right in any language */}
+        {name ? (
+          <span className={s.colourVar}>
+            <bdi dir="ltr">{name}</bdi>
+          </span>
+        ) : null}
         {hint ? <span className={s.fieldHint}>{hint}</span> : null}
         {issue ? (
           <span className={s.colourIssue}>

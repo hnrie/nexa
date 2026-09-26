@@ -10,7 +10,8 @@ export function CodeEditor({ value, onChange, label, placeholder, testId, minHei
   const gutter = useRef<HTMLDivElement>(null);
   const lines = value.split("\n").length;
   return (
-    <div className={s.editor}>
+    // code reads left to right in every language, line numbers on its left
+    <div className={s.editor} dir="ltr">
       <div className={s.gutter} ref={gutter} aria-hidden="true">
         {Array.from({ length: lines }, (_, i) => i + 1).join("\n")}
       </div>
