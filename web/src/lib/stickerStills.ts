@@ -344,6 +344,19 @@ function listenForOnline(): void {
   });
 }
 
+/**
+ * Loads the Lottie player for a grid that holds animated stickers further
+ * down, once the stills near the screen are in: scrolling to them then only
+ * waits for their own files. (A tile that needs it sooner loads it at once.)
+ */
+export function warmLottieLater(): void {
+  void new Promise((r) => setTimeout(r, 500))
+    .then(() => network.whenIdle())
+    .then(idle)
+    .then(() => warmLottie())
+    .catch(() => undefined);
+}
+
 /** What a tile would show right now, without asking for anything: a kept still shows on the first frame. */
 export function peekStill(src: StillSource, px: number): StillView {
   return entries.get(stillKey(src, px))?.view ?? IDLE;

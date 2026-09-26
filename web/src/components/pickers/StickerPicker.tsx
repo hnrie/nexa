@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import type { Sticker, StickerPack } from "@/api/types";
 import { moveFocusInGrid } from "@/lib/gridKeys";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
@@ -8,6 +8,7 @@ import { useServers } from "@/stores/servers";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { hoverPlays, moves, StillFace, stillSourceOf, useStickerStill } from "@/components/stickers/StickerTile";
 import { useScreenPlace } from "@/hooks/useNearScreen";
+import { warmLottieLater } from "@/lib/stickerStills";
 import { useSettings } from "@/stores/settings";
 import { focusSearchOnOpen } from "./EmojiPicker";
 import { SearchBox } from "@/components/common/SearchBox";
@@ -106,6 +107,11 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
   const groups = useMemo(() => groupPacks(packs, serverId, meId), [packs, serverId, meId]);
   const all = useMemo(() => groups.flatMap((g) => g.packs), [groups]);
   const results = useMemo(() => (q.trim() ? searchStickers(all, q) : null), [all, q]);
+  // a pack of Telegram animated stickers further down needs the Lottie player for its stills
+  const anyLottie = useMemo(() => all.some((p) => p.stickers.some((st) => st.format === "tgs")), [all]);
+  useEffect(() => {
+    if (anyLottie) warmLottieLater();
+  }, [anyLottie]);
   // Recently sent stickers first, resolved against the packs on this device
   // so each cell keeps its pack for sending. Anything whose pack is gone
   // (deleted, uninstalled) simply stays out of the row.

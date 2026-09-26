@@ -73,6 +73,7 @@ export class LoadQueue {
           this.waiting.splice(this.waiting.indexOf(job), 1);
           job.state = "done";
           job.reject(new AbortedError());
+          this.settleQuiet();
         } else if (job.state === "running") {
           job.ctrl.abort();
         }
@@ -86,6 +87,21 @@ export class LoadQueue {
   /** How much is running and waiting. */
   get size(): { running: number; waiting: number } {
     return { running: this.running, waiting: this.waiting.length };
+  }
+
+  private quiet: (() => void)[] = [];
+
+  /** Resolves once nothing is running or waiting, for work that should only use a free line. */
+  whenIdle(): Promise<void> {
+    if (this.running === 0 && this.waiting.length === 0) return Promise.resolve();
+    return new Promise((resolve) => this.quiet.push(resolve));
+  }
+
+  private settleQuiet(): void {
+    if (this.running > 0 || this.waiting.length > 0) return;
+    const waiting = this.quiet;
+    this.quiet = [];
+    for (const resolve of waiting) resolve();
   }
 
   private pump(): void {
@@ -110,6 +126,7 @@ export class LoadQueue {
         job.state = "done";
         this.running--;
         this.pump();
+        this.settleQuiet();
       });
     }
   }

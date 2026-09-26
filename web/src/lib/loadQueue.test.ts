@@ -92,6 +92,22 @@ describe("LoadQueue", () => {
     expect(await good.promise).toBe("yes");
   });
 
+  it("says when the line is free, after running and waiting work is done or dropped", async () => {
+    const q = new LoadQueue(() => 1);
+    let quiet = false;
+    await q.whenIdle();
+    const m = manual();
+    q.add(0, m.job("a"));
+    const b = q.add(0, m.job("b"));
+    void q.whenIdle().then(() => (quiet = true));
+    m.finish.get("a")!();
+    await tick();
+    expect(quiet).toBe(false);
+    b.cancel();
+    await tick();
+    expect(quiet).toBe(true);
+  });
+
   it("asks how many slots it has each time, so a change takes effect", async () => {
     let slots = 1;
     const q = new LoadQueue(() => slots);
