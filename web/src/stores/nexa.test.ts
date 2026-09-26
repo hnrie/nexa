@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { api } from "@/api/client";
 import type { CaseMessage, MemberCase, NexaState } from "@/api/moderation";
+import type { BugMessage, MemberBug } from "@/api/bugs";
 import { caseStanding, formatSpan, mutedSentence, noticeTitle, SPAN } from "@/lib/moderation";
 import { activeBan, activeMute, useNexa } from "./nexa";
 
@@ -36,7 +37,7 @@ beforeEach(() => {
     calls.push(`${method} ${path}`);
     return Promise.resolve({} as T);
   };
-  useNexa.setState({ state: null, people: {}, feed: null, feedMore: false, feedLoading: false, threads: {}, deleted: null });
+  useNexa.setState({ state: null, people: {}, feed: null, feedMore: false, feedLoading: false, threads: {}, bugThreads: {}, deleted: null });
 });
 
 describe("the account's standing", () => {
@@ -154,5 +155,39 @@ describe("signing out while Nexa is loading", () => {
     answer({ case: kase("7"), messages: [line("1")], people: {} });
     await thread;
     expect(useNexa.getState().threads).toEqual({});
+  });
+});
+
+describe("bug reports in the Nexa conversation", () => {
+  const bug = (over: Partial<MemberBug> = {}): MemberBug => ({ id: "70", number: 3, subject: "Calls drop", description: "It drops.", context: {}, status: "open", status_at: null, status_by: null, awaiting: "staff", attachments: [], unread: 0, last_activity_at: 100, created_at: 100, ...over });
+  const bline = (id: string, kind: BugMessage["kind"], body = "hi", event: BugMessage["event"] = ""): BugMessage => ({ id, report_id: "70", author_id: "9", kind, event, body, created_at: Number(id) });
+
+  it("shows the report once, and each reply and change of status as an item of its own", () => {
+    useNexa.setState({ feed: [] });
+    useNexa.getState().onBug(bug(), [], {}, state());
+    useNexa.getState().onBug(bug({ unread: 1 }), [bline("200", "staff")], {}, state({ unread: 1 }));
+    useNexa.getState().onBug(bug({ status: "resolved", unread: 2 }), [bline("300", "system", "resolved", "status")], {}, state({ unread: 2 }));
+    // the reporter's own reply is not news from Nexa
+    useNexa.getState().onBug(bug({ status: "resolved" }), [bline("400", "member")], {}, state());
+    const feed = useNexa.getState().feed!;
+    expect(feed.map((i) => i.kind)).toEqual(["bug", "bug_reply", "bug_status"]);
+    // every item about the report shows where it stands now
+    for (const it of feed) expect("bug" in it && it.bug.status).toBe("resolved");
+    expect(useNexa.getState().state?.unread).toBe(0);
+  });
+
+  it("adds lines to a thread that is open, once each, and reads them", () => {
+    useNexa.setState({ bugThreads: { "70": { report: bug({ unread: 1 }), messages: [bline("200", "staff")] } } });
+    useNexa.getState().onBug(bug({ unread: 2 }), [bline("300", "staff"), bline("200", "staff")], {}, state());
+    expect(useNexa.getState().bugThreads["70"]!.messages.map((m) => m.id)).toEqual(["200", "300"]);
+    useNexa.getState().markBugRead("70");
+    expect(useNexa.getState().bugThreads["70"]!.report.unread).toBe(0);
+    expect(calls).toContain("POST /bugs/70/read");
+  });
+
+  it("forgets the account's reports on sign-out", () => {
+    useNexa.setState({ bugThreads: { "70": { report: bug(), messages: [] } } });
+    useNexa.getState().reset();
+    expect(useNexa.getState().bugThreads).toEqual({});
   });
 });
