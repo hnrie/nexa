@@ -99,7 +99,7 @@ def main() -> int:
                 time.sleep(0.1)
             a.keyboard.press("Escape")
             bp.goto(link, wait_until="networkidle")
-            bp.click("button:has-text('Accept Invite')")
+            bp.click("[data-testid=invite-join]")
             bp.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
             # something to read in each one
             for n, lines in TALK.items():

@@ -105,7 +105,7 @@ def main() -> None:
 
         b = bob.page
         b.goto(link, wait_until="networkidle")
-        b.click("button:has-text('Accept Invite')")
+        b.click("[data-testid=invite-join]")
         b.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
         print("bob joined", server_id)
 

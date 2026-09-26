@@ -71,7 +71,7 @@ def main() -> int:
                 time.sleep(0.1)
             a.keyboard.press("Escape")
             b.goto(link, wait_until="networkidle")
-            b.click("button:has-text('Accept Invite')")
+            b.click("[data-testid=invite-join]")
             b.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
 
             for who, line in CHAT:
