@@ -1,0 +1,11 @@
+/*
+ * A channel's glyph, --glyph-size across. A picture (an emoji) is drawn a
+ * little inside that square: a line icon leaves a margin inside its own box,
+ * and a full-bleed picture beside it looks a size larger. The corner badge
+ * sits on a patch of --glyph-cut, the colour behind the glyph where it is
+ * drawn, so it reads as cut out of the glyph rather than stuck on top.
+ */
+.glyph { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--glyph-size); height: var(--glyph-size); line-height: 0; }
+.picture { width: calc(var(--glyph-size) * 0.86); height: calc(var(--glyph-size) * 0.86); object-fit: contain; }
+.text { font-size: calc(var(--glyph-size) * 0.8); line-height: 1; }
+.badge { position: absolute; inset-inline-end: -4px; bottom: -2px; display: flex; border-radius: 2px; background: var(--glyph-cut, var(--bg-base)); }

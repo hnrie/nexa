@@ -78,6 +78,8 @@ export interface Channel {
   overwrites?: Overwrite[];
   /** A subchat that asks for its password before it opens. */
   locked?: boolean;
+  /** A server channel's own icon in place of its # or speaker (see lib/channelGlyph); absent for none. */
+  glyph?: string;
 }
 
 /** Permission bits travel as decimal strings; `lib/perms` turns them into BigInt. */
@@ -577,6 +579,8 @@ export interface UnfurlResult {
   invite_code?: string;
   member_count?: number;
   online_count?: number;
+  /** An invite's server banner. */
+  banner?: string;
 }
 
 export interface KdfParamsJson {
