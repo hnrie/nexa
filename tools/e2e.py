@@ -545,8 +545,8 @@ def polish_flow(srv, alice, bob, server_id):
     a.fill("[data-testid=search-input]", "from:bob hi")
     a.wait_for_selector("[data-testid=search-panel] [data-result]", timeout=15000)
     a.fill("[data-testid=search-input]", "zzzz-nothing-matches")
-    a.wait_for_selector("text=No results in the", timeout=15000)
-    a.click("[data-testid=search-panel] button[aria-label='Close search']")
+    a.wait_for_selector("[data-testid=search-panel] [data-testid=search-nothing]", timeout=15000)
+    a.click("[data-testid=search-panel] button[aria-label='Close Search']")
     # the first account is the instance admin
     a.click("button[aria-label='User Settings']")
     a.click("[data-nav=admin]")
