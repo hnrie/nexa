@@ -21,7 +21,11 @@ they open the app after an update, and it is how they find out what changed.
 
 ## Writing UI text
 
-- Short, plain sentences that sound like a person. Sentence case for labels, buttons and headings.
+- Labels use Title Case: buttons, menu items, tabs, navigation, dialog and page titles, headings,
+  column headers and toggle titles ("Add Friends", "Create Group", "Mark as Read", "Add to Group").
+  Short articles, conjunctions and prepositions stay lowercase unless first or last. English only;
+  the other locales follow their own language's capitalization.
+- Descriptions, hints, toasts and errors are short, plain sentences that sound like a person.
 - Avoid em dashes; use a comma, a full stop or parentheses.
 - Describe Nexa on its own terms. Do not compare it to Discord. Naming Discord is fine only where a
   feature really talks to the Discord program (the desktop app's Rich Presence relay).
