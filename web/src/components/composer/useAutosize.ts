@@ -65,7 +65,10 @@ function neededHeight(el: HTMLTextAreaElement): number {
   }
   const cs = getComputedStyle(el);
   for (const p of COPIED) mirror.style.setProperty(p, cs.getPropertyValue(p));
-  mirror.placeholder = el.placeholder;
+  // Only what is typed decides the height. Measured with it, a placeholder
+  // too long for a phone ("Message @someone with a long name") wrapped and
+  // made the empty box two lines tall; the placeholder keeps to one line.
+  mirror.placeholder = "";
   mirror.value = el.value;
   const border = cs.boxSizing === "border-box" ? parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth) : 0;
   return mirror.scrollHeight + (border || 0);

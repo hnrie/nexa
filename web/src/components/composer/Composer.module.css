@@ -46,7 +46,7 @@
 /* each line takes the direction of what is typed on it: English in an Arabic interface, or the other way round */
 .ta { unicode-bidi: plaintext; }
 .ta:focus, .ta:focus-visible { outline: none; box-shadow: none; }
-.ta::placeholder { color: var(--text-placeholder); }
+.ta::placeholder { color: var(--text-placeholder); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ta:disabled { opacity: 0.6; }
 .btns { flex: none; display: flex; align-items: center; height: 44px; padding-inline-end: 6px; gap: 2px; }
 .iconBtn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--icon); border-radius: var(--radius-xs); }
