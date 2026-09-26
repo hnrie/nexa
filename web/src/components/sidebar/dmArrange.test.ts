@@ -53,7 +53,7 @@ describe("arranging from menus", () => {
   it("offers pinning, the groups and a new one, and taking a conversation out of its group", () => {
     const items = dmArrangeItems("20");
     expect(ids(items)).toEqual(["pin", "add-to-group", "remove-from-group"]);
-    expect(items[0]!.label).toBe("Pin conversation");
+    expect(items[0]!.label).toBe("Pin Conversation");
     const sub = items[1]!.submenu!;
     expect(ids(sub)).toEqual(["group-gwork", "new-group"]);
     expect(sub[0]!.checked).toBe(true);
