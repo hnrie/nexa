@@ -72,7 +72,8 @@ export function InviteDialog({ onClose, code, hash }: { onClose: () => void; cod
 
   return (
     <Modal open bare onClose={onClose} width={440} ariaLabel={target?.name || t("invite.invite")}>
-      <div className={s.dialog} data-testid="invite-dialog">
+      {/* with no band to sit on (a dead invite, one that would not load) the close button is drawn plain */}
+      <div className={s.dialog} data-testid="invite-dialog" data-plain={entry?.status === "invalid" || (!target && entry?.status === "failed") ? "true" : undefined}>
         <button className={s.close} onClick={onClose} aria-label={t("chat.attachments.close")}><X size={18} /></button>
         {content}
       </div>

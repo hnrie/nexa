@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { t } from "@/i18n";
 import { describeError } from "@/lib/errors";
+import { loadInvitePreview } from "@/lib/invitePreviews";
 import { acceptInvite } from "@/lib/joinInvite";
 import { useChannels } from "@/stores/channels";
 import { useServers } from "@/stores/servers";
@@ -33,6 +34,8 @@ export function useInviteJoin(code: string, hash: string, target: InviteTarget |
     setError(null);
     try {
       const path = await acceptInvite(code, hash);
+      // the cards for this invite count one more member now
+      void loadInvitePreview(code, { force: true });
       opts.onDone?.();
       nav(path, { replace: !!opts.replace });
     } catch (err) {

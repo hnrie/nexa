@@ -4,6 +4,7 @@ import type { InvitePreview, UnfurlResult } from "@/api/types";
 import { bannerUrl, iconUrl } from "@/api/users";
 import { t } from "@/i18n";
 import { avatarColor, initials } from "@/lib/avatarColor";
+import { useDominantColor } from "@/lib/dominantColor";
 import s from "./Invite.module.css";
 
 /** Where an invite leads, as the views draw it. */
@@ -72,22 +73,24 @@ export function targetOfEmbed(e: UnfurlResult): InviteTarget {
   };
 }
 
-/** The band across the top: the banner, or without one a strip in the icon's own colours. */
+/**
+ * The band across the top: the banner, or without one a strip of the colour
+ * the server's icon is mostly made of, as a profile without a banner shows
+ * its colour. With no icon either, the colour its initials are drawn on.
+ */
 function Band({ target }: { target: InviteTarget }) {
   const [failed, setFailed] = useState<string | null>(null);
-  if (target.banner && failed !== target.banner) {
+  const hasBanner = !!target.banner && failed !== target.banner;
+  const fromIcon = useDominantColor(hasBanner ? null : target.icon);
+  if (hasBanner) {
     return (
       <div className={s.band} data-kind="banner">
-        <img className={s.bandImg} src={target.banner} alt="" draggable={false} onError={() => setFailed(target.banner)} />
+        <img className={s.bandImg} src={target.banner!} alt="" draggable={false} onError={() => setFailed(target.banner)} />
       </div>
     );
   }
-  const color = target.id ? avatarColor(target.id) : undefined;
-  return (
-    <div className={s.band} data-kind="plain" style={color ? ({ "--band-color": color } as CSSProperties) : undefined}>
-      {target.icon ? <img className={s.bandWash} src={target.icon} alt="" draggable={false} onError={(ev) => (ev.currentTarget.style.display = "none")} /> : null}
-    </div>
-  );
+  const color = fromIcon ?? (target.id && !target.icon ? avatarColor(target.id) : undefined);
+  return <div className={s.band} data-kind="plain" style={color ? ({ "--band-color": color } as CSSProperties) : undefined} />;
 }
 
 function Icon({ target }: { target: InviteTarget }) {
