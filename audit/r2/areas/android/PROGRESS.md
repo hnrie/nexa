@@ -1,7 +1,7 @@
 # Progress — android
 State: auditing
-Last checkpoint: 2026-09-19T10:38Z
-Next finding id: 066
+Last checkpoint: 2026-09-19T10:46Z
+Next finding id: 085
 
 ## Inspected
 
@@ -103,16 +103,16 @@ UI pickers:
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/pickers/StickerTab.kt
 
 UI sheets:
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/ChannelSheets.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/ChannelSheets.kt
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Dismiss.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/KeyVerify.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/KeyVerify.kt
 - [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Layers.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Misc.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/sheets/ProfileSheet.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/Misc.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/sheets/ProfileSheet.kt
 
 UI settings / server:
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/settings/SettingsScreen.kt
-- [ ] android/app/src/main/java/xyz/evilion/chat/ui/server/ServerSettingsScreen.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/settings/SettingsScreen.kt
+- [x] android/app/src/main/java/xyz/evilion/chat/ui/server/ServerSettingsScreen.kt
 
 UI auth / invite / friends:
 - [ ] android/app/src/main/java/xyz/evilion/chat/ui/auth/AuthScreen.kt
@@ -152,4 +152,4 @@ Round 1 cross-check:
 - [ ] audit/product-gaps.md (Android column)
 
 ## Handoff note
-Fourth agent. Carried items settled: DROID-062 written, DROID-031 got its MessageActions/ExpressionSheet Where lines. Pickers done (063-065). Read KeyVerify.kt and ProfileSheet.kt (not yet ticked): pending to write = (a) KeyChangeDialog has no verticalScroll so Accept/Not now can be off-screen at large font (P3 a11y); (b) ProfileSheet "outgoing" cancel uses rememberCoroutineScope not detached (P3 code), Message-button failure is silent; (c) DROID-031 Where line for KeyVerify.kt:119-128 (26 dp expander row); (d) parity of ProfileSheet actions vs web ProfileCard (check Block / kick / nickname); (e) P3 parity: phone cannot create/install/discover expression packs (StickerTab.kt:175-182 vs web StickersPage.tsx) — confirm SettingsScreen has no packs page first. Next: Misc.kt, ChannelSheets.kt, then settings/server, auth/invite/friends, Strings.kt, drawables, tests, round-1 skim.
+Fourth agent. Pickers, sheets, settings, server settings done (062-079). AuthScreen, RecoveryKeyOverlay, InviteScreen, FriendsScreen READ, findings not yet written: (a) P2 ux: no autofill hints on sign-in/register (password managers cannot fill/save) — check Compose BOM >= 1.8 for ContentType; (b) P3: username/recovery-key fields have autocorrect on; (c) P2 i18n: inline English "a conversation", "N members · N online" (InviteScreen.kt:85,92), "N members"/"N channels"/"N uses of M" (ServerSettingsScreen.kt:132-133,412) — tools/android_i18n.py --dry says 6 strings in 2 files; (d) P2 i18n: FriendsScreen.kt:178 shows raw presence "Online"/"Idle"/"Dnd" capitalised; (e) InviteScreen: group-DM invite → joined.server may be null (check JoinedServer model + server invite handler); no "already a member" state; (f) DROID-074 Where lines for FriendsScreen.kt:185-206; DROID-031 Where for FriendsScreen ActionIcon 36 dp, "Send" text, KeyVerify.kt:119-128, Misc.kt:133-138, ChannelSheets.kt:404-407, ServerSettingsScreen.kt:350-361,379-389, SettingsScreen.kt:285-296; DROID-004 Where for inline error lines (AuthScreen.kt:315-318, FriendsScreen.kt:147-149). Still to check: whether the phone can block anyone at all (grep RelationshipsApi.block) → if not, P1 safety finding. Next: Strings.kt, drawables, emoji.tsv, tests, round-1 skim, then Summary.

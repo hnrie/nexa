@@ -1,7 +1,7 @@
 # Progress — web-shell-ui
 State: auditing
-Last checkpoint: 2026-09-19T10:42Z
-Next finding id: 088
+Last checkpoint: 2026-09-19T10:46Z
+Next finding id: 092
 
 ## Inspected
 
@@ -158,7 +158,7 @@ Parity (read-only, Android):
 - [x] android/.../ui/server/ServerSettingsScreen.kt
 - [x] android/.../ui/friends/FriendsScreen.kt
 - [x] android/.../ui/invite/InviteScreen.kt
-- [~] android/.../ui/sheets/* (ChannelSheets done; Misc, ProfileSheet, KeyVerify, Layers, Dismiss left)
+- [x] android/.../ui/sheets/* (ChannelSheets, Misc, ProfileSheet, KeyVerify, Layers, Dismiss)
 - [x] android/.../ui/Nav.kt
 
 Round 1:
@@ -168,18 +168,18 @@ Round 1:
 - [ ] audit/product-gaps.md (the 15 IDEA findings — re-judge as design)
 
 ## Handoff note
-Successor #4, 2026-09-19T10:39Z. Android parity: Sidebar.kt (067, 069), InviteScreen.kt (066, 068, 070),
-SettingsScreen.kt (071-079), ServerSettingsScreen.kt (080-084) done. Remaining: sheets/*
-(ChannelSheets, Misc, ProfileSheet, KeyVerify, Layers, Dismiss) -> the four round-1 reports ->
-Summary. ChannelSheets.kt done (085-087): Android has NO channel creation at all, no delete,
-no private channels, no slowmode setter. Server icon upload from the phone is still unchecked --
-web has it (ServerOverviewPage.tsx:95); if Android has none, fold it into a parity finding.
+Successor #4, 2026-09-19T10:46Z. **Android parity pass COMPLETE** (findings 066-091). Remaining: the four
+round-1 reports (audit/REVIEW.md, audit/web-ui.md, audit/web-bugs.md, audit/product-gaps.md —
+the last one's 15 IDEA findings to re-judge as design), then the Summary at the top of
+FINDINGS.md + State: audit-done.
 Checked and NOT findings (do not re-investigate): Android language switching works end to end
-(`key(Strings.epoch)` in MainActivity rebuilds the tree); `settings.settingsScreen.thisDevice`
-already ends in " . " so the session row is not glued; Android's RecoveryKeyOverlay is the best
-recovery-key presentation in the product (see WSHELL-078's note to the coordinator).
-Threads to keep scanning for:
-(a) hard-coded English — WSHELL-001/020/033/034/070; still homeless: `EmojiPage.tsx:87`
-    (`title: `Delete :name:``) — put it in the Summary addendum if no better home.
-(b) Android `runCatching { }` with nothing chained — WSHELL-062/064/076 so far.
-(c) Android pages that draw a failed fetch as a spinner or an empty state — WSHELL-064, 072.
+(`key(Strings.epoch)` in MainActivity); `settings.settingsScreen.thisDevice` already ends in a
+separator; Android's RecoveryKeyOverlay is the best recovery-key presentation in the product
+(WSHELL-078 tells the coordinator); rejecting a key change is NOT final on either platform
+(`flagChange`/`flagKeyChange` re-raise on the next `judgeKey`); `ui/sheets/Dismiss.kt` and
+`Layers.kt` are clean.
+Cross-cutting threads for the Summary:
+(a) hard-coded English — WSHELL-001/020/033/034/070/084; still homeless: `EmojiPage.tsx:87`
+    (`title: `Delete :name:``) — put it in the Summary addendum.
+(b) Android silent failures — WSHELL-062/064/076/081/090 (090 is the consolidated checklist).
+(c) Android missing confirmations on destructive actions — WSHELL-080/081/089.

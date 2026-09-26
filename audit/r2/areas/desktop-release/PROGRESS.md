@@ -1,7 +1,7 @@
 # Progress — desktop-release
 State: auditing
-Last checkpoint: 2026-09-19T10:41Z
-Next finding id: 001
+Last checkpoint: 2026-09-19T10:58Z
+Next finding id: 012
 
 Scope = BRIEF.md globs expanded with `git ls-files` (2026-09-19), plus
 `backup.sh`, `web/vite.config.ts` (prune plugin), the `deploy/` scripts and
@@ -26,34 +26,34 @@ ticked after a provenance/size check, not a read.
 - [x] desktop/src/main/permissions.ts
 - [x] desktop/src/main/config.ts
 - [x] desktop/src/main/settings.ts
-- [ ] desktop/src/main/tray.ts
-- [ ] desktop/src/main/strings.ts
-- [ ] desktop/src/main/displayPicker.ts
-- [ ] desktop/src/main/appAudio.ts
+- [x] desktop/src/main/tray.ts
+- [x] desktop/src/main/strings.ts
+- [x] desktop/src/main/displayPicker.ts
+- [x] desktop/src/main/appAudio.ts
 
 ### desktop — preload, shared, picker
-- [ ] desktop/src/preload/index.ts
-- [ ] desktop/src/shared/bridge.ts
-- [ ] desktop/src/picker/picker.html
-- [ ] desktop/src/picker/preload.ts
-- [ ] desktop/src/picker/ui.ts
+- [x] desktop/src/preload/index.ts
+- [x] desktop/src/shared/bridge.ts
+- [x] desktop/src/picker/picker.html
+- [x] desktop/src/picker/preload.ts
+- [x] desktop/src/picker/ui.ts
 
 ### desktop — Rich Presence
-- [ ] desktop/src/main/rpc/activity.ts
-- [ ] desktop/src/main/rpc/discord.ts
-- [ ] desktop/src/main/rpc/frame.ts
-- [ ] desktop/src/main/rpc/ipcServer.ts
-- [ ] desktop/src/main/rpc/paths.ts
-- [ ] desktop/src/main/rpc/service.ts
-- [ ] desktop/src/main/rpc/session.ts
-- [ ] desktop/src/main/rpc/upstream.ts
-- [ ] desktop/src/main/rpc/wsServer.ts
+- [x] desktop/src/main/rpc/activity.ts
+- [x] desktop/src/main/rpc/discord.ts
+- [x] desktop/src/main/rpc/frame.ts
+- [x] desktop/src/main/rpc/ipcServer.ts
+- [x] desktop/src/main/rpc/paths.ts
+- [x] desktop/src/main/rpc/service.ts
+- [x] desktop/src/main/rpc/session.ts
+- [x] desktop/src/main/rpc/upstream.ts
+- [x] desktop/src/main/rpc/wsServer.ts
 
 ### desktop — updater
-- [ ] desktop/src/main/update/index.ts
-- [ ] desktop/src/main/update/mac.ts
-- [ ] desktop/src/main/update/manifest.ts
-- [ ] desktop/src/main/update/releaseKey.ts
+- [x] desktop/src/main/update/index.ts
+- [x] desktop/src/main/update/mac.ts
+- [x] desktop/src/main/update/manifest.ts
+- [x] desktop/src/main/update/releaseKey.ts
 
 ### desktop — tests
 - [ ] desktop/test/activity.test.ts
@@ -67,7 +67,7 @@ ticked after a provenance/size check, not a read.
 - [ ] desktop/test/strings.test.ts
 
 ### desktop — resources
-- [ ] desktop/resources/koffi/README.md
+- [x] desktop/resources/koffi/README.md
 - [ ] desktop/resources/koffi/LICENSE.txt
 - [ ] desktop/resources/koffi/win32_x64/koffi.node   (binary: provenance, size, version)
 - [ ] desktop/resources/icon.png badge.png tray.png tray@2x.png trayTemplate.png trayTemplate@2x.png (binary: sizes)
@@ -163,13 +163,12 @@ ticked after a provenance/size check, not a read.
 - [ ] version consistency: desktop/package.json, android build.gradle, data/desktop manifests (read only), web copy
 
 ## Handoff note
-2026-09-19T10:41Z. Read the build files and main/index,window,permissions,config,
-settings. Keys are gitignored + untracked (checked). Findings being written now:
-will-redirect has no isMainFrame/frameable check (cancels subframe redirects);
-permissions.ts `pending` entry never deleted on dismiss so the display-media
-callback is called twice (dismiss + 120s timeout) - verifying whether Electron
-throws on the 2nd call; Windows/Linux have no menu so no Ctrl+R/zoom/F11;
-settings.ts typeof-loop cannot load `lastUpdateSeen` (default null) - grep to
-see if it is used; setBadge(Infinity) would throw in app.setBadgeCount;
-restartApp uses app.exit(0) which skips will-quit (stopRpc/flush).
-Next: preload/index.ts, shared/bridge.ts, then rpc/*.
+2026-09-19T10:58Z. All of desktop/src read; DESK-001..011 written. Pending
+evidence: (a) permissions.ts `pending` entry is never deleted on dismiss, so
+the display-media callback is called again at the 120 s timeout — an Electron
+throwaway test (/private/tmp/desk-audit-dm/main.js) is checking whether the
+second call throws (would be an error dialog 2 min after dismissing the
+stale-screen-permission explainer on macOS); (b) koffi.node provenance vs the
+npm 3.2.1 tarball; (c) vitest + npm audit results. setBadgeCount(Infinity) was
+tested and does NOT throw — not a finding. Next: test/*, then web bridge files,
+Go routes, publish tools.

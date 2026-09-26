@@ -16,6 +16,9 @@
 /.tools/
 *.log
 .DS_Store
+._*
+/.claude/
+/out/
 /tools/.venv/
 /tools/out/
 __pycache__/

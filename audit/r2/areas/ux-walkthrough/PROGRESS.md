@@ -1,7 +1,7 @@
 # Progress — ux-walkthrough
 State: auditing
 Last checkpoint: 2026-09-19T10:52Z
-Next finding id: 031
+Next finding id: 036
 
 ## Environment (re-create with exactly these; never web/dist, never bin/chatd)
 

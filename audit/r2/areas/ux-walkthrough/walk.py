@@ -1599,27 +1599,50 @@ def step_d8_group(base, pw):
         alice.send("hello group")
         a.wait_for_timeout(2500)
         alice.shot("group-dm-sent")
-        for tid, name in (("group-member-list", "members"), ("edit-group", "edit"), ("group-invite-link", "invite")):
-            btn = a.locator(f"[data-testid={tid}]")
-            print(f"  {tid} present:", btn.count())
-        a.locator("[data-testid=chat-more], button[aria-label*='More']").first.click()
-        a.wait_for_timeout(700)
-        alice.shot("group-dm-menu")
-        print("  group menu:", a.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if a.locator("[role=menu]").count() else "none")
-        a.keyboard.press("Escape")
+        print("  header aria:", a.locator("header").first.aria_snapshot()[:700])
+        print("  group dm sidebar row:", a.locator("[data-testid=group-member-list]").count())
     attempt(alice, "group-bits", group_bits)
     def edit_group():
-        for label in ("Edit Group", "Group Settings", "Change Icon"):
-            if a.locator(f"button:has-text('{label}')").count():
-                a.locator(f"button:has-text('{label}')").first.click()
-                a.wait_for_timeout(900)
-                alice.shot("edit-group-modal")
-                diag(alice, "edit-group")
-                a.keyboard.press("Escape")
-                break
-        else:
-            print("  no edit-group entry found from the header")
+        a.click("[data-testid=edit-group]")
+        a.wait_for_timeout(1200)
+        alice.shot("edit-group-modal")
+        diag(alice, "edit-group")
+        print("  edit-group modal:", a.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:500])
+        print("  edit-group aria:", a.locator("[role=dialog]").first.aria_snapshot()[:800])
+        a.keyboard.press("Escape")
+        a.wait_for_timeout(500)
     attempt(alice, "edit-group", edit_group)
+    def group_invite():
+        a.click("button[aria-label='Add Friends']")
+        a.wait_for_timeout(1500)
+        alice.shot("group-invite-modal")
+        diag(alice, "group-invite")
+        print("  group invite modal:", a.locator("[role=dialog]").first.inner_text().replace("\n", " | ")[:500])
+        link = a.locator("[data-testid=group-invite-link]")
+        print("  group invite link:", link.input_value()[:120] if link.count() else "none")
+        a.keyboard.press("Escape")
+    attempt(alice, "group-invite", group_invite)
+    def group_members():
+        if a.locator("button[aria-label='Show Members'], button[aria-label='Hide Members']").count():
+            a.locator("button[aria-label='Show Members'], button[aria-label='Hide Members']").first.click()
+            a.wait_for_timeout(800)
+        alice.shot("group-member-list")
+        a.locator("[data-testid=group-member-list] [data-user], [data-testid=group-member-list] button").last.click(button="right")
+        a.wait_for_timeout(700)
+        alice.shot("group-member-menu")
+        print("  group member menu:", a.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if a.locator("[role=menu]").count() else "none")
+        a.keyboard.press("Escape")
+    attempt(alice, "group-members", group_members)
+    def group_leave():
+        a.locator("[data-testid=group-member-list]").first.wait_for(timeout=5000)
+        row = a.locator("nav [class*=dmRow], aside button:has-text('Weekend plans')").first
+        if row.count():
+            row.click(button="right")
+            a.wait_for_timeout(700)
+            alice.shot("group-row-menu")
+            print("  group row menu:", a.locator("[role=menu]").first.inner_text().replace("\n", " | ")[:300] if a.locator("[role=menu]").count() else "none")
+            a.keyboard.press("Escape")
+    attempt(alice, "group-leave", group_leave)
     print("FAILS:", FAILS)
     browser.close()
 
@@ -1976,17 +1999,24 @@ def step_d12_routes(base, pw):
         p.goto(base + f"/channels/{ids['server']}/9999999999999999", wait_until="networkidle")
         p.wait_for_timeout(1800)
         w.shot("route-bad-channel")
-        print("  bad channel id ->", p.url, "|", p.locator("main").inner_text().replace("\n", " | ")[:250])
+        print("  bad channel id ->", p.url, "|", p.locator("body").inner_text().replace("\n", " | ")[:250])
         p.goto(base + "/channels/9999999999999999/9999999999999998", wait_until="networkidle")
         p.wait_for_timeout(1800)
         w.shot("route-bad-server")
-        print("  bad server id ->", p.url, "|", p.locator("main").inner_text().replace("\n", " | ")[:250])
+        print("  bad server id ->", p.url, "|", p.locator("body").inner_text().replace("\n", " | ")[:250])
     attempt(w, "bad-url-signed-in", bad_url_in)
     def offline():
         p.goto(base + f"/channels/{ids['server']}/{ids['general']}", wait_until="networkidle")
         p.wait_for_timeout(1500)
         w.ctx.set_offline(True)
-        p.wait_for_timeout(3000)
+        for secs in (3, 10, 25):
+            p.wait_for_timeout(secs * 1000 if secs == 3 else (secs - 3) * 1000)
+            w.shot(f"offline-after-{secs}s")
+            print(f"  after {secs}s offline, banner text:", p.evaluate("""() => {
+                const t = document.body.innerText;
+                const hit = t.split('\\n').filter(l => /offline|reconnect|connection|connecting|lost/i.test(l));
+                return hit.slice(0, 4);
+            }"""))
         w.shot("offline-in-channel")
         print("  offline in channel:", p.locator("body").inner_text().replace("\n", " | ")[:300])
         w.composer().fill("a message typed while offline")
@@ -1995,10 +2025,13 @@ def step_d12_routes(base, pw):
         w.shot("offline-message-sent")
         print("  offline send:", p.locator("[data-id]").last.inner_text().replace("\n", " | ")[:250],
               "| retry button:", p.locator("[data-testid=retry-send]").count())
-        p.reload(wait_until="commit")
-        p.wait_for_timeout(4000)
-        w.shot("offline-page")
-        print("  offline page:", p.locator("body").inner_text().replace("\n", " | ")[:300])
+        try:
+            p.reload(wait_until="commit")
+            p.wait_for_timeout(4000)
+            w.shot("offline-page")
+            print("  offline page:", p.locator("body").inner_text().replace("\n", " | ")[:300])
+        except Exception as e:
+            print("  reload while offline:", str(e).splitlines()[0][:120])
         w.ctx.set_offline(False)
         p.wait_for_timeout(1000)
         if p.locator("[data-testid=offline-retry]").count():

@@ -29,7 +29,7 @@ commit `d7af1d9` (working tree at audit start). Paths under
 - Status: open
 
 ### DROID-004 · P2 · a11y · Toasts are silent for TalkBack
-- Where: `MainActivity.kt:278-310`
+- Where: `MainActivity.kt:278-310`; the same for inline error and notice lines: `ui/auth/AuthScreen.kt:315-318` (sign-in errors), `ui/friends/FriendsScreen.kt:147-149` (request sent / failed), `ui/invite/InviteScreen.kt:68`, `ui/settings/SettingsScreen.kt:625-627` (`note`)
 - What: the app's only channel for "the message could not be sent", "the upload was refused", "copied" and every other notice is a `Box` + `Text` that appears for four seconds. It carries no `liveRegion` semantics, so a screen reader never announces it, and it cannot be tapped or dismissed.
 - Impact: a blind user sends a message that fails and hears nothing; the message sits marked failed in the list with no announcement.
 - Fix: `Modifier.semantics { liveRegion = LiveRegionMode.Polite }` on the toast text, or move to `SnackbarHost`, which has the semantics built in.
@@ -239,7 +239,7 @@ commit `d7af1d9` (working tree at audit start). Paths under
 - Status: open
 
 ### DROID-031 · P2 · a11y · Reaction pills, the failed-message actions and the remove-attachment cross are 11–24 dp tap targets
-- Where: `ui/chat/MessageRow.kt:435-446` (reaction pills: 24 dp tall, 4 dp apart), `:469-474` (the add-reaction pill, 24 dp), `:247-268` ("Not sent, tap to try again" and "Discard": 11 sp words with no padding, 10 dp apart), `:182-188` (author name in a 22 dp row), `:358` (reply line, 24 dp), `ui/chat/Composer.kt:327-333` (the X on a staged attachment: 18 dp), `ui/chat/MessageActions.kt:122-131` (the "more reactions" smiley on the long-press sheet: `Modifier.size(26.dp).clickable`, the only way to the full picker from a message), `ui/pickers/ExpressionSheet.kt:338-343` (the search box's clear X: 18 dp)
+- Where: `ui/chat/MessageRow.kt:435-446` (reaction pills: 24 dp tall, 4 dp apart), `:469-474` (the add-reaction pill, 24 dp), `:247-268` ("Not sent, tap to try again" and "Discard": 11 sp words with no padding, 10 dp apart), `:182-188` (author name in a 22 dp row), `:358` (reply line, 24 dp), `ui/chat/Composer.kt:327-333` (the X on a staged attachment: 18 dp), `ui/chat/MessageActions.kt:122-131` (the "more reactions" smiley on the long-press sheet: `Modifier.size(26.dp).clickable`, the only way to the full picker from a message), `ui/pickers/ExpressionSheet.kt:338-343` (the search box's clear X: 18 dp), `ui/sheets/KeyVerify.kt:119-128` (the key row expander, ~26 dp), `ui/sheets/Misc.kt:133-138` (image viewer download, 24 dp), `ui/sheets/ChannelSheets.kt:404-407` (invite copy, 20 dp), `ui/server/ServerSettingsScreen.kt:350-361` (create role, 28 dp), `:379-389` (delete role, 18 dp), `ui/settings/SettingsScreen.kt:285-296` (change avatar/banner: 14 sp text with 4 dp padding), `ui/friends/FriendsScreen.kt:127-145` ("Send", a text with 8 dp padding), `:216-230` (`ActionIcon`, 36 dp)
 - What: these are `Modifier.clickable` on plain rows and texts, which Compose does not pad to the 48 dp minimum the way it does `IconButton`. A 24 dp pill is missed by a thumb often, and the two failure actions are two 11 sp words 10 dp apart where the wrong one deletes the message. The web's pills are the same size, but a mouse is not a thumb.
 - Impact: reactions are the most-tapped control in a chat; the failure actions are the ones tapped in a hurry. Fails Android's 48 dp guideline and WCAG 2.5.8 for the failure actions.
 - Fix: `Modifier.minimumInteractiveComponentSize()` on pills (the visual stays 24 dp; the hit area grows), buttons with 12 dp padding and 16 dp between them for retry/discard, a 32 dp hit area for the tray's X.
@@ -500,4 +500,140 @@ commit `d7af1d9` (working tree at audit start). Paths under
 - What: after a failed first load the grid says "Could not reach the server" with "Try again" under it in the same muted caption style as every other hint; tapping it does nothing, and nothing else in the sheet retries. The way out is to type a letter and delete it. For a failed later page, the footer's "Try again" is tappable but only resets a flag; the next page is asked for when the grid's last visible item changes, so the person has to scroll away and back.
 - Fix: a `gifRetry` counter in `ExpressionState`; the search flow keys on `query to gifRetry`; both "Try again" texts become buttons (`TextButton`, 48 dp) that bump it, and the paging one calls the page loader directly.
 - Effort: S
+- Status: open
+
+### DROID-066 · P1 · ux · "Delete server", "Leave server", "Kick", "Delete role" and "Revoke invite" act on one tap, with no confirmation and, for most, no error
+- Where: `ui/server/ServerSettingsScreen.kt:176-204` (delete/leave: a full-width red button at the foot of the overview page; `ServersApi.delete` runs straight from `onClick`), `:263-270` (kick: a 13 sp word on the member row, failure swallowed), `:378-389` (delete role: an 18 dp trash icon inside the row whose tap opens the editor; failure swallowed), `:416-424` (revoke invite); `ui/settings/SettingsScreen.kt:174-185` (sign out, the lesser case: one tap, and it drops the phone's keys and socket); web `web/src/components/server/ServerSettingsModal.tsx:37,49` (delete is its own page in a "danger" group), `web/src/components/modals/ConfirmModal.tsx`
+- What: a server is deleted for everyone by one tap on a red button that sits directly under the navigation rows a manager scrolls through; there is no dialog and no undo. Leaving is the same tap. In the roles list the delete icon is 18 dp at the end of a row whose whole width is "edit", so a thumb aimed at the row's end deletes the role — silently, because `runCatching` has no `onFailure`. Kick has the same silence. The web asks first and reports failures.
+- Impact: an irreversible loss from a mis-tap, on the platform where mis-taps are the normal case. The delete-server path is the worst thing one tap can do in this product.
+- Fix: an `AlertDialog` before delete, leave, kick, delete role and revoke (`modals.confirm.*` strings and `server.deleteServer.*` exist), with the server's name in the delete text; the delete button under a "Danger zone" heading with a gap above it; a 48 dp `IconButton` for the trash; a toast on every failure.
+- Effort: S
+- Status: open
+
+### DROID-067 · P1 · security · The security page shows passwords in the clear as they are typed and lets the keyboard learn them
+- Where: `ui/settings/SettingsScreen.kt:197-214` (`Field`: an `OutlinedTextField` with no `visualTransformation` and no `keyboardOptions`), `:504,506` (current and new password use it), `:575` (the six-digit code: a full text keyboard)
+- What: both password boxes on the Security page are ordinary text fields. Every character stays visible on screen, autocorrect and suggestions are on, and Gboard and Samsung Keyboard add what is typed there to their personal dictionaries, so the password comes back later as a suggestion in other apps. There are no autofill hints (`ContentType.Password` / `NewPassword`), so a password manager neither fills the current password nor offers to save the new one. Round 1's DATA-LOSS list did not cover settings; the sign-in screen is checked separately (`ui/auth/AuthScreen.kt`).
+- Impact: anyone changing their password, setting up 2FA or making a recovery key on the phone — each needs the current password — types it in plain view, and the keyboard keeps it.
+- Fix: `visualTransformation = PasswordVisualTransformation()` with a show/hide eye, `KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)`, `Modifier.semantics { contentType = ContentType.Password }` (`NewPassword` for the new one); `KeyboardType.NumberPassword` for the code.
+- Effort: S
+- Status: open
+
+### DROID-068 · P2 · ux · A new recovery key is shown as un-copyable running text that the next tap replaces
+- Where: `ui/settings/SettingsScreen.kt:614-622` (`note = t("settings.settingsScreen.yourNewRecoveryKey", "key" to it)`), `:625-627` (rendered as a plain `Text` in a caption `Section("")`), `:512,530,541,551,588` (every other action on the page overwrites `note`); web `web/src/components/settings/AccountPage.tsx` (`saveThisKeyNowItWill`, a copy button, a confirmation)
+- What: "Your new recovery key: …" appears as 13 sp muted text at the bottom of the page. Compose text is not selectable without a `SelectionContainer`, so it cannot be copied; there is no Copy, no Share, no "I have saved it" gate — and any other button, or leaving the page, replaces it. The call that produced it has already invalidated the old key, so someone who fails to transcribe it in time has no recovery key and is not told so.
+- Impact: the recovery key is the only way back into an end-to-end encrypted account whose password is forgotten; the phone hands it over in the least keepable form the platform has.
+- Fix: show it through `RecoveryKeyOverlay` (the registration flow's screen: monospace box, Copy, Share, an explicit "I have saved it"), not through `note`.
+- Effort: S
+- Status: open
+
+### DROID-069 · P2 · parity · The web has an app lock; the phone has none — nor a username change, account deletion or data export
+- Where: `ui/settings/SettingsScreen.kt:486-628` (Security: password, 2FA, recovery key), `:246-330` (Account: display name, about, pronouns, status), `:437-484` (Privacy: DM privacy, blocked list); web `web/src/components/settings/SecurityPage.tsx` (`settings.security.appLock`, `passcode`, `lockAfterInactivity`, `lockWhenTheAppLosesFocus`, `lockOnceInTheBackground`), `AccountPage.tsx` (`changeYourUsername`, `deleteAccount`, `accountRemoval`), `PrivacyPage.tsx` (`exportMyData`, `shareMyActivity`, `fetchLinkPreviewsWhenISend`, `developerMode`)
+- What: the browser and desktop can put a passcode between the person and their decrypted conversations after inactivity or when the window loses focus. The phone — the device that is lost, lent to a child and read over a shoulder — opens straight into the last conversation. The phone also cannot change the username, delete the account or export data; each is a form over an endpoint the web already uses. Round 1's matrix accepted "read-and-chat" for Android; the lock is the one gap with a safety cost.
+- Fix: Security → "App lock": `androidx.biometric`'s `BiometricPrompt` with `BIOMETRIC_STRONG or DEVICE_CREDENTIAL`, a "lock after" choice (immediately / 1 / 5 / 30 minutes in the background) stored device-side, a lock screen composable over `MainScreen` until it passes (and `FLAG_SECURE`/a blank recents thumbnail while locked); username change and account deletion as two small forms; export last.
+- Effort: M
+- Status: open
+
+### DROID-070 · P2 · a11y · Settings switches have no accessible name, the theme/language/DM-privacy choices no selected state, and the muted list cannot be unmuted
+- Where: `ui/settings/SettingsScreen.kt:231-243` (`Toggle`: the label `Text` and the `Switch` are separate semantics nodes; the row is not `toggleable`), `:338-349`, `:361-377`, `:444-461` (choice rows: an 18 dp painted dot plus `clickable`, no `Role.RadioButton`, no `selected`), `ui/sheets/ChannelSheets.kt:333-347` (the mute switch, same shape), `ui/settings/SettingsScreen.kt:399-411` (muted conversations listed as plain text, no unmute; the web's NotificationsPage has `mute`/`unmute`)
+- What: TalkBack reads "Compact mode", then, as a separate element, "switch, off" — with no name; only the thumb is a target, and tapping the row text does nothing. On the theme list TalkBack reads five names and nothing says which is on; a sighted person gets an 18 dp dot. Someone who muted a conversation and wants it back has a list they can look at.
+- Fix: `Modifier.toggleable(checked, role = Role.Switch, onValueChange)` on the whole `Toggle` row and `onCheckedChange = null` on the switch; `Modifier.selectable(selected, role = Role.RadioButton)` with a `RadioButton` for the choice rows; an "Unmute" action per muted row.
+- Effort: S
+- Status: open
+
+### DROID-071 · P2 · parity · The channel settings sheet is titled "Channel", offers name and topic only, and its comment promises slow mode that is not there
+- Where: `ui/sheets/ChannelSheets.kt:274` (the doc comment), `:292` (`t("server.invites.channel")` = "Channel" as the title), `:294-332` (name, topic, Save), `:318-324` (both fields sent whatever changed; failure toasts the raw message); web `web/src/components/server/ChannelSettingsModal.tsx:44-49` (overview / permissions / delete pages), `:72-126` (topic with a 1024 counter, slow mode, age restriction)
+- What: a manager on the phone can rename a channel and set a topic. Slow mode (`slowmode_seconds`), the age-restriction flag, permission overwrites and deleting the channel are web-only. The sheet's title is a bare noun. The server tidies names (text channels become lowercase-with-dashes) and the field never shows what it kept.
+- Fix: title = the channel's name; add slow mode (the web's steps) and the NSFW toggle for text channels; "Delete channel" behind a confirm for `MANAGE_CHANNELS`; a one-line "Permission overrides can be edited on the web" until that page is built; refresh the fields from the patched channel.
+- Effort: M
+- Status: open
+
+### DROID-072 · P2 · parity · Member lists stop at 200, in one flat list with no role groups, no role colours and no search
+- Where: `ui/sheets/ChannelSheets.kt:90-105` (`ServersApi.members(serverId, limit = 200)`, one sort by online then name), `:127-131` (names in `colors.text`; `roleColor` exists in `ui/chat/MessageRow.kt:333`), `:110` (the title uses `memberCount`, the true total), `ui/server/ServerSettingsScreen.kt:241-249` (the same 200, alphabetical); web `web/src/components/chat/MemberList.tsx:30,54,111-140` (pages of 1000 until done; hoisted roles, then online, then offline; role colours; windowed)
+- What: on a server of 340 the sheet says "Members — 340" and lists 200 with nothing to say the rest exist. Names are not grouped or coloured by role, so a moderator cannot be told from anyone else, and the only way to find a person is to scroll.
+- Fix: page with `after` until a short page comes back; group as `MemberList.tsx` does; colour with `roleColor`; a filter field at the top of the sheet.
+- Effort: S
+- Status: open
+
+### DROID-073 · P2 · parity · Server management on the phone cannot ban, assign roles, set a nickname, change the icon, manage channels or packs; the audit log shows raw action identifiers
+- Where: `ui/server/ServerSettingsScreen.kt:232-274` (members: kick only), `:276-394` (roles: name and permission bits only — no colour, hoist, mentionable or order), `:127-135` (the icon is drawn, not editable), `:476` (`entry.action.replace('_', ' ')` → "member kick", "role update"), `:169-173` (no channels, emoji, stickers or encryption pages); web `web/src/components/server/ServerSettingsModal.tsx:28-37` (overview, roles, emoji, stickers, encryption, members, invites, bans, audit, delete), `MemberActionModal.tsx`, `memberMenu.ts`
+- What: a moderator who is on their phone when something happens can kick and nothing else — no ban, no role change, no nickname. The roles page can flip permission bits but cannot colour, hoist or reorder a role, so a role made on the phone is invisible in the member list. The audit log prints the wire's identifiers as prose. Round 1's matrix accepted most of this; ban and role assignment are the two a moderator actually needs at the bus stop.
+- Fix: a member action sheet (ban with reason, roles checklist, nickname) over the existing endpoints; colour/hoist on the role editor; the audit action names through the `server.auditLog.*` keys the web uses.
+- Effort: M
+- Status: open
+
+### DROID-074 · P3 · code · Failures are swallowed or misreported across the sheets and settings: pins failure shows "Nothing pinned yet", the admin page calls any error "Only instance admins can see this", and a dozen actions say nothing
+- Where: `ui/sheets/ChannelSheets.kt:154` (`getOrDefault(emptyList())` → the empty state; web `PinsPanel.tsx:59-63` has "Could not load pinned messages · Try again"), `:92-98` (members fetch), `ui/sheets/Misc.kt:174` (user search), `ui/sheets/ProfileSheet.kt:170-181` (Message), `:191,194,197,200` (relationship actions), `:196-198` ("Cancel request" runs on `rememberCoroutineScope` — the round-1 sheet-scope pattern — while every neighbour uses `detached`), `ui/settings/SettingsScreen.kt:445-450` (DM privacy), `:477` (unblock), `:658-659` (revoke session), `:676` (admin: network error → "Only instance admins can see this"), `ui/server/ServerSettingsScreen.kt:267,381-388,420,452` (kick, delete role, revoke, unban), `ui/friends/FriendsScreen.kt:185-206` (accept, decline, cancel, unblock, message), `ui/sheets/Misc.kt:136` (open attachment from the viewer)
+- What: each is `runCatching { … }` with no `onFailure`, or with a wrong one. Offline, every one of these taps does nothing and says nothing; the pins sheet lies.
+- Fix: `Session.toasts.emit(it.readable(TAG))` on each; a `failed` state with "Try again" for the pins and members loads; `detached` for the cancel-request action.
+- Effort: S
+- Status: open
+
+### DROID-075 · P3 · parity · Search covers only the messages this device has in memory — on the phone, the page that is loaded — while the web walks the whole history
+- Where: `ui/sheets/ChannelSheets.kt:214-220`, `:242` (the caption admits it); web `web/src/components/search/useFullSearch.ts:1-30`, `web/src/lib/fullSearch.ts` (`scanEverything`: pages backwards, decrypts, up to 500 hits, flushed every 150 ms)
+- What: after opening a conversation the phone holds its latest page; a search finds nothing older than that. "Only messages this device has decrypted" is honest, and it means search does not work for the thing people search for — something said last month.
+- Fix: port `scanEverything` — page backwards through the messages endpoint while the sheet is open, decrypt, match, flush hits on a timer, show "Searched N messages…" and stop when the sheet closes.
+- Effort: M
+- Status: open
+
+### DROID-076 · P3 · ux · The invite sheet has no Share, no expiry or use-limit choice, always embeds the conversation key, and never says "Copied"; the search and new-message sheets open without focus
+- Where: `ui/sheets/ChannelSheets.kt:377-388` (a fresh 7-day unlimited invite on every open, key always attached), `:399-410` (a 20 dp copy glyph; nothing after the copy on Android 12 and lower, where the system shows no confirmation), `:224-237` and `ui/sheets/Misc.kt:186-195` (search fields that need a tap before typing); web `web/src/components/modals/InviteModal.tsx` (`expireAfter`, `maxNumberOfUses`, `includeTheEncryptionKeyInThe`, `copied`)
+- What: on a phone an invite is sent through the share sheet, not the clipboard; the web's choices for expiry, uses and whether the history key rides along are absent, so a public server's invite from the phone always carries the key. A sheet whose only purpose is typing opens with the keyboard down.
+- Fix: a Share `IconButton` (`ACTION_SEND`), the three choices from the web's modal, a "Copied" toast, `FocusRequester` on the search fields.
+- Effort: S
+- Status: open
+
+### DROID-077 · P3 · a11y · The key-change dialog has no scroll: at a large font size Accept and Not now are off the bottom of the screen
+- Where: `ui/sheets/KeyVerify.kt:166-209` (`Dialog(usePlatformDefaultWidth = false)` around a `Column` with a title, two paragraphs, two safety-number blocks, a note and the buttons; no `verticalScroll`)
+- What: on a 640 dp phone at 1.5–2× font size the column is taller than the window and the buttons are clipped — the one dialog that blocks new messages until it is answered. Medium confidence from the sizes; the walkthrough can confirm at 200 %.
+- Fix: `verticalScroll` on the body with the button row pinned under it.
+- Effort: S
+- Status: open
+
+### DROID-078 · P3 · ux · The image viewer's only action is an "open with" chooser behind a download glyph labelled "Open"; there is no Save or Share
+- Where: `ui/sheets/Misc.kt:132-139` (`Lucide.Download`, `t("chat.lockedChannel.open")` as its label, a 24 dp target, `openAttachment`), `ui/chat/AttachmentViews.kt:218-228` (`ACTION_VIEW` chooser); web `Attachments.tsx:141-145` (zoom controls and "Open original")
+- What: the glyph says download, TalkBack says "Open", the tap shows "Open with…". Saving a picture to the gallery and sharing it are what people do with a photo on a phone; neither exists, for images or for any other attachment.
+- Fix: two `IconButton`s — Save (`MediaStore.Images` / `Downloads`, no permission needed on 10+, with a "Saved" toast) and Share (`ACTION_SEND` with the FileProvider URI) — with proper labels; the same two on the long-press sheet for any attachment.
+- Effort: S
+- Status: open
+
+### DROID-079 · P3 · perf · "Clear cached files" deletes the cache on the main thread, and the About page walks the cache directory while composing
+- Where: `ui/settings/SettingsScreen.kt:707` (`remember { AttachmentStore.usage() }`: a directory walk with `length()` per file), `:715-718` (`AttachmentStore.clear()`: `listFiles().forEach { delete() }` in `onClick`; the cache holds up to 768 MB in hundreds of files)
+- Fix: both through `withContext(Dispatchers.IO)` with a spinner on the button.
+- Effort: S
+- Status: open
+
+### DROID-080 · P1 · security · Nobody can be blocked from the phone: the endpoint is bound and never called
+- Where: `net/Endpoints.kt:296` (`RelationshipsApi.block` — its only mention in the app), `ui/sheets/ProfileSheet.kt:189-211` (Message, Add/Remove friend, Accept, Cancel, Unblock — no Block), `ui/chat/MessageActions.kt:103-188` (no Block), `ui/friends/FriendsScreen.kt:183-207` (Unblock only), `ui/settings/SettingsScreen.kt:466-483` (the blocked list can only unblock); web `web/src/components/profile/ProfileCard.tsx` (`profile.profileCard.block`)
+- What: every place the phone shows a person offers a way to message them and none offers a way to block them. Someone being harassed in DMs on their phone has to find a computer. Unblocking, oddly, exists in three places.
+- Impact: blocking is the one safety control a chat app must have everywhere; its absence on the device people carry is a P1 whatever the parity matrix says.
+- Fix: a "Block" row (danger colour, confirm) on the profile sheet, calling `RelationshipsApi.block`, and "Block {name}" on the long-press sheet for someone else's message; the DM's composer then shows the web's "you blocked this person" state (check `ChatView.tsx` for the copy).
+- Effort: S
+- Status: open
+
+### DROID-081 · P2 · ux · Password managers cannot fill or save the sign-in, registration or recovery forms
+- Where: `ui/auth/AuthScreen.kt:348-408` (`Field`: no autofill semantics), `:294-303` (sign-in), `:261-279` (register), `:250-254` (recover); `android/app/build.gradle.kts:167` (Compose BOM 2026.09 — `ContentType` semantics have existed since 1.8), `ui/settings/SettingsScreen.kt:504-506` (the security page's password fields, see DROID-067)
+- What: none of the fields carries `contentType`, so Google Password Manager, Bitwarden and 1Password show nothing on the sign-in screen and never offer to save a new account's password. On a phone, where a generated password is copied by hand from another app one field at a time, this is the difference between signing in and giving up; it also nudges people towards weak, typed passwords on an account whose password is the encryption key.
+- Fix: `Modifier.semantics { contentType = ContentType.Username }` / `Password` / `NewUsername` + `NewPassword` on the respective fields (the `ContentType` API in `androidx.compose.ui.autofill`), and `contentType = ContentType.Password` on the security page's current-password field. A few lines; verify with the emulator's Google autofill service.
+- Effort: S
+- Status: open
+
+### DROID-082 · P2 · i18n · Inline English on the invite and server screens, and raw presence words under friends' names
+- Where: `ui/invite/InviteScreen.kt:85` (`"a conversation"`), `:92` (`"${memberCount} ${if (== 1) "member" else "members"} · ${onlineCount} online"` — a hand-rolled plural), `ui/server/ServerSettingsScreen.kt:132-133` (`"${memberCount} members"`, `"${size} channels"`), `:412` (`"${uses} uses" + " of ${maxUses}"`), `:476` (audit actions as `member_kick` → "member kick"); `ui/friends/FriendsScreen.kt:178` (`status.replaceFirstChar { it.uppercase() }` → "Online", "Idle", "Dnd", "Offline" in every language; `shell.user.online/idle/doNotDisturb/invisible` exist in the catalogue); `tools/android_i18n.py --dry` reports "6 strings in 2 files … 4 new"
+- What: the invite screen — the first thing a newcomer sees — says "12 members · 3 online" in English under a Japanese interface; a friend's status line reads "Dnd". The audit log prints wire identifiers.
+- Fix: catalogue keys with plural forms (`invite.inviteScreen.membersOnline` `{count}` / `{online}`), the existing `shell.user.*` keys mapped from the status value, and `server.auditLog.*` action names as the web renders them; run the tool with `--write` for the four.
+- Effort: S
+- Status: open
+
+### DROID-083 · P3 · ux · Autocorrect is on for usernames, invite codes and the recovery key
+- Where: `ui/auth/AuthScreen.kt:378-381` (`KeyboardOptions(keyboardType, imeAction)` only — `autoCorrectEnabled` defaults to true, capitalisation to none), `:250,252,261,282,286,294` (username, recovery key, invite code, registration key), `ui/friends/FriendsScreen.kt:115-125` (add a friend by username), `ui/sheets/Misc.kt:186-195` (find someone by username)
+- What: Gboard "corrects" a username it does not know into a word it does (`evilion` → `evolution`) and re-cases groups of a recovery key as the person types; each such field then fails with "invalid credentials" or "that key is not valid" and nothing points at the keyboard.
+- Fix: `autoCorrectEnabled = false` (and `KeyboardType.Ascii` where only ASCII is valid) on those fields; `KeyboardCapitalization.None` is already the default.
+- Effort: S
+- Status: open
+
+### DROID-084 · P3 · test · The unit tests cover crypto, media links, the update variant and the language pick; nothing covers permissions, the gateway, the send queue, the key store or parser parity — and the markdown tests live in `CryptoTest.kt`
+- Where: `android/app/src/test/java/xyz/evilion/chat/CryptoTest.kt:190-260` (`class MarkdownTest` inside the crypto file), `AppUpdateTest.kt`, `MediaLinksTest.kt`, `i18n/PickTest.kt`; untested: `data/Perms.kt` (bits and the overwrite algorithm against `internal/perms` and `web/src/lib/perms.ts`), `net/Gateway.kt` (frame ordering, resume, backoff), `data/MessageService.kt` (queue, dedupe against the echo, retry), `data/SecureStore.kt` (round trip, the plaintext/sealed decision — DROID-011), `ui/markdown/Parser.kt` against the web's `parse.test.ts` fixtures (DROID-050 to 054)
+- What: the bugs round 1 fixed in the gateway and the settings store, and the ones this round found in the parser and the picker, are exactly the kind a small JVM test pins; none exists, so each fix can regress unnoticed. Perms parity in particular is a security property with no test on either client.
+- Fix: a shared JSON fixture of markdown inputs and expected trees consumed by `parse.test.ts` and a Kotlin test; a Perms fixture generated from `internal/perms`'s table; a `MessageService` test with a fake `Api`; move `MarkdownTest` to its own file.
+- Effort: M
 - Status: open
