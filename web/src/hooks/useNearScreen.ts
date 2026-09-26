@@ -88,14 +88,20 @@ export function watchPlace(el: Element, named: Element | null | undefined, watch
   };
 }
 
-/** Where ref's element is: far, near (within a screen) or visible. */
-export function useScreenPlace(ref: RefObject<Element | null>, rootRef?: RefObject<Element | null>): ScreenPlace {
+/**
+ * Where ref's element is: far, near (within a screen) or visible. While
+ * `enabled` is false it is not watched at all and counts as far.
+ */
+export function useScreenPlace(ref: RefObject<Element | null>, rootRef?: RefObject<Element | null>, enabled = true): ScreenPlace {
   const [place, setPlace] = useState<ScreenPlace>("far");
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || !enabled) {
+      setPlace("far");
+      return;
+    }
     return watchPlace(el, rootRef?.current, setPlace);
-  }, [ref, rootRef]);
+  }, [ref, rootRef, enabled]);
   return place;
 }
 

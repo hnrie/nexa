@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, useState, type MouseEvent, type RefObject } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import type { Sticker, StickerPack } from "@/api/types";
 import { moveFocusInGrid } from "@/lib/gridKeys";
 import { canRemovePack, confirmRemovePack } from "@/lib/packRemoval";
@@ -27,9 +27,9 @@ export interface StickerPick {
  * it is pointed at or focused. A cell whose still could not load says so,
  * and pressing it tries again instead of sending something you cannot see.
  */
-const StickerCell = memo(function StickerCell({ sticker, pack, onPick, root, still }: { sticker: Sticker; pack: StickerPack; onPick: (p: StickerPick) => void; root: RefObject<HTMLDivElement | null>; still: boolean }) {
+const StickerCell = memo(function StickerCell({ sticker, pack, onPick, root, still, active }: { sticker: Sticker; pack: StickerPack; onPick: (p: StickerPick) => void; root: RefObject<HTMLDivElement | null>; still: boolean; active: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const place = useScreenPlace(ref, root);
+  const place = useScreenPlace(ref, root, active);
   const src = useMemo(() => stillSourceOf(pack, sticker), [pack, sticker]);
   const [view, retry] = useStickerStill(src, place);
   const [hot, setHot] = useState(false);
@@ -55,6 +55,21 @@ const StickerCell = memo(function StickerCell({ sticker, pack, onPick, root, sti
     </button>
   );
 });
+
+/**
+ * A pack's grid. Its cells watch where they are only while the pack is within
+ * a screen of view, so a collection of thousands of stickers keeps the few
+ * hundred near the screen watched rather than every one of them.
+ */
+function PackGrid({ pack, root, cell }: { pack: StickerPack; root: RefObject<HTMLDivElement | null>; cell: (st: Sticker, pack: StickerPack, active: boolean) => ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const active = useScreenPlace(ref, root) !== "far";
+  return (
+    <div ref={ref} className={s.stickerGrid}>
+      {pack.stickers.map((st) => cell(st, pack, active))}
+    </div>
+  );
+}
 
 /** A pack's icon in the column beside the grid: its cover, as a still like the grid's. */
 function PackIcon({ pack, cover, root }: { pack: StickerPack; cover: Sticker; root: RefObject<HTMLDivElement | null> }) {
@@ -115,7 +130,11 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
     openContextMenu({ x: e.clientX, y: e.clientY, items });
   };
 
-  const cell = (sticker: Sticker, pack: StickerPack) => <StickerCell key={sticker.id} sticker={sticker} pack={pack} onPick={onPick} root={gridRef} still={still} />;
+  // the same function every render, so typing elsewhere does not redraw every cell
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
+  const pick = useCallback((p: StickerPick) => pickRef.current(p), []);
+  const cell = (sticker: Sticker, pack: StickerPack, active = true) => <StickerCell key={sticker.id} sticker={sticker} pack={pack} onPick={pick} root={gridRef} still={still} active={active} />;
 
   return (
     <>
@@ -173,7 +192,7 @@ export function StickerPicker({ serverId, onPick }: { serverId: string | null | 
                       {p.owner_user_id === meId ? <button className={s.sectionLink} onClick={() => edit(p)}>{t("pickers.stickerPicker.edit")}</button> : null}
                       {canRemovePack(p, meId) ? <button className={s.sectionLink} data-danger="true" onClick={() => confirmRemovePack(p)} aria-label={t("pickers.stickerPicker.removeName", { name: p.name })}>{t("composer.composer.remove")}</button> : null}
                     </div>
-                    {p.stickers.length === 0 ? <div className={s.gifNote}>{t("pickers.stickerPicker.thisPackIsEmpty")}</div> : <div className={s.stickerGrid}>{p.stickers.map((st) => cell(st, p))}</div>}
+                    {p.stickers.length === 0 ? <div className={s.gifNote}>{t("pickers.stickerPicker.thisPackIsEmpty")}</div> : <PackGrid pack={p} root={gridRef} cell={cell} />}
                   </div>
                 ))}
               </div>
