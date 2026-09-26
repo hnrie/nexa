@@ -4,7 +4,7 @@ import { useChannels } from "@/stores/channels";
 import { useKeys } from "@/stores/keys";
 import { useMessages } from "@/stores/messages";
 import { usePresence } from "@/stores/presence";
-import { useReadStates } from "@/stores/readStates";
+import { isUnread, useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { useExpressions } from "@/stores/expressions";
@@ -26,6 +26,7 @@ import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
 import { channelsOnScreen, usePanes } from "@/stores/panes";
 import { mentionsMe } from "@/lib/mentionsMe";
+import { currentBlockRules, isQuiet, loadedAuthorOf } from "@/lib/blocked";
 import { loadChunk } from "@/lib/lazyChunk";
 
 type VoiceModule = typeof import("@/voice/session");
@@ -162,6 +163,19 @@ function ensureUser(id: string): void {
  * the copy loaded here, or else by what its event says it mentioned — the
  * badge counted messages this device never loaded too.
  */
+/**
+ * Whether a message going away was one kept quiet when it came (lib/blocked):
+ * never counted, so there is nothing to take off. The loaded copy says best;
+ * failing that, whoever the event says wrote it.
+ */
+function quietMessage(channelId: string, messageId: string, author: string | undefined): boolean {
+  const rules = currentBlockRules();
+  if (rules.blocked.size === 0) return false;
+  const loaded = useMessages.getState().channels[channelId]?.byId[messageId];
+  if (loaded) return isQuiet(loaded, rules, loadedAuthorOf(channelId));
+  return !!author && rules.blocked.has(author);
+}
+
 function mentionedMe(channelId: string, messageId: string, meId: string | undefined, told?: Partial<MentionMeta>): boolean {
   if (!meId) return false;
   const loaded = useMessages.getState().channels[channelId]?.byId[messageId];
@@ -237,6 +251,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const messages = useMessages.getState();
       if (m.nonce && meId === m.author_id) messages.settle(m.channel_id, [decrypted], { nonce: m.nonce });
       else messages.insert(m.channel_id, [decrypted]);
+      // what was newest before this one, to tell whether the conversation had been read
+      const lastBefore = useChannels.getState().byId[m.channel_id]?.last_message_id ?? null;
       useChannels.getState().setLastMessage(m.channel_id, m.id);
       useTyping.getState().remove(m.channel_id, m.author_id);
       if (decrypted.decryptError === "no_key" && m.key_conv_id) useKeys.getState().markWaiting(m.key_conv_id);
@@ -252,6 +268,10 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const visible = ui.activeChannelId === m.channel_id && appOnScreen() && readingPresent(m.channel_id);
       if (mine || visible) {
         void useReadStates.getState().ack(m.channel_id, m.id);
+      } else if (isQuiet(decrypted, currentBlockRules(), loadedAuthorOf(m.channel_id))) {
+        // Someone blocked (or a reply to them, when those are hidden): no badge,
+        // no mention, and a conversation that was read up to here stays read.
+        if (!isUnread(useReadStates.getState().byChannel[m.channel_id], lastBefore)) void useReadStates.getState().ack(m.channel_id, m.id);
       } else {
         if (meId && mentionsMe(m, meId)) useReadStates.getState().bumpMentions(m.channel_id);
         // conversations count every message, so their badges say how many are waiting
@@ -265,8 +285,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const decrypted = await decryptForStore(e.d);
       if (gone()) return;
       // An edit can add a mention the badge should count or take one back
-      // that it did; the event says what the message mentioned before.
-      if (meId && e.d.was && e.d.author_id !== meId) {
+      // that it did; the event says what the message mentioned before. Someone
+      // blocked was never counted either way.
+      if (meId && e.d.was && e.d.author_id !== meId && !currentBlockRules().blocked.has(e.d.author_id)) {
         const before = mentionsMe({ ...e.d.was, channel_id: e.d.channel_id }, meId);
         const after = mentionsMe(e.d, meId);
         if (before && !after) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
@@ -280,16 +301,19 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // counted as a mention, and a mention taken back as unread but not as a
       // mention leaves a red pill on a channel with nothing left to read.
       const counted = mentionedMe(e.d.channel_id, e.d.id, meId, e.d);
+      // nor is a message from someone blocked counted, so its going takes nothing off
+      const uncounted = quietMessage(e.d.channel_id, e.d.id, e.d.author_id);
       useMessages.getState().remove(e.d.channel_id, e.d.id);
-      useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
-      if (counted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
+      if (!uncounted) useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
+      if (counted && !uncounted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
       return;
     }
     case "message_delete_bulk": {
       const told = new Map((e.d.mentions ?? []).map((m) => [m.id, m]));
-      const counted = e.d.ids.filter((id) => mentionedMe(e.d.channel_id, id, meId, told.get(id)));
+      const uncounted = new Set(e.d.ids.filter((id) => quietMessage(e.d.channel_id, id, told.get(id)?.author_id)));
+      const counted = e.d.ids.filter((id) => mentionedMe(e.d.channel_id, id, meId, told.get(id)) && !uncounted.has(id));
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
-      for (const id of e.d.ids) useReadStates.getState().dropUnread(e.d.channel_id, id);
+      for (const id of e.d.ids) if (!uncounted.has(id)) useReadStates.getState().dropUnread(e.d.channel_id, id);
       for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);
       return;
     }
@@ -299,6 +323,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "typing":
       if (e.d.user_id === meId) return;
+      // someone this account blocked is never shown typing
+      if (!e.d.stop && currentBlockRules().blocked.has(e.d.user_id)) return;
       if (e.d.stop) useTyping.getState().remove(e.d.channel_id, e.d.user_id);
       // timed from when it arrived: the server's clock and this device's rarely agree
       else useTyping.getState().add(e.d.channel_id, e.d.user_id);

@@ -9,6 +9,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useSettings } from "@/stores/settings";
 import { useUI, type ContextMenuItem } from "@/stores/ui";
 import { displayName, useUsers } from "@/stores/users";
+import { relationshipMenuItems } from "@/lib/friendship";
 
 import { t } from "@/i18n";
 export interface GroupMemberMenuCtx {
@@ -58,6 +59,12 @@ export function groupMemberMenuItems(channelId: string, userId: string, ctx: Gro
   ];
   if (!self) items.push({ id: "message", label: t("profile.profileCard.message"), onSelect: () => void messageUser(userId, ctx.nav) });
   items[items.length - 1]!.separatorAfter = true;
+  // being friends, and blocking: the same choices a profile offers
+  const people = relationshipMenuItems(userId);
+  if (people.length) {
+    items.push(...people);
+    items[items.length - 1]!.separatorAfter = true;
+  }
 
   if (manage && !isOwner) {
     items.push({

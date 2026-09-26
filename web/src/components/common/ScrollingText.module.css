@@ -1,10 +1,4 @@
 .box { display: block; min-width: 0; overflow: hidden; }
-/* while it fits, the ellipsis is what shows; once it does not, it travels */
+/* while it fits, the ellipsis is what shows; once it does not, it travels (ScrollingText moves it) */
 .inner { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
-.inner[data-scrolling] { max-width: none; overflow: visible; text-overflow: clip; animation: travel var(--dur) ease-in-out infinite; }
-@keyframes travel {
-  0%, 22% { transform: translateX(0); }
-  50%, 72% { transform: translateX(var(--shift)); }
-  100% { transform: translateX(0); }
-}
-@media (prefers-reduced-motion: reduce) { .inner[data-scrolling] { animation: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; } }
+.inner[data-scrolling] { max-width: none; overflow: visible; text-overflow: clip; will-change: transform; }

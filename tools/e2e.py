@@ -165,15 +165,15 @@ class Session:
         p.click("text=Add Friend")
         p.fill("input[aria-label=Username]", username)
         p.click("text=Send Friend Request")
-        p.wait_for_selector("text=/Success|now friends/", timeout=15000)
+        p.wait_for_selector("text=/was sent|now friends/", timeout=15000)
 
     def accept_friend(self, display):
         p = self.page
         p.goto(self.base + "/channels/@me", wait_until="networkidle")
         p.click("button:has-text('Pending')")
         row = p.locator(f"div:has(> div > span:has-text('{display}'))").first
-        p.wait_for_selector("button[aria-label=Accept]", timeout=15000)
-        p.click("button[aria-label=Accept]")
+        p.wait_for_selector("[data-testid=friend-accept]", timeout=15000)
+        p.click("[data-testid=friend-accept]")
         # accepting opens the new conversation, so come back for the list
         for _ in range(20):
             p.wait_for_timeout(300)
@@ -578,7 +578,7 @@ def groups_flow(srv, alice, bob, phone):
     a.goto(srv.base + "/channels/@me", wait_until="networkidle")
     a.click("button[aria-label='Create DM']")
     a.locator("label:has-text('Bob') input").check()
-    a.click("button:has-text('Create DM'), button:has-text('Create Group DM')")
+    a.click("button:has-text('Create DM'), button:has-text('Create group')")
     a.wait_for_url("**/channels/@me/*", timeout=20000)
     a.wait_for_selector("textarea", timeout=15000)
     group_url = a.url
@@ -590,7 +590,7 @@ def groups_flow(srv, alice, bob, phone):
     if modal.locator("[data-testid=group-invite-link]").count() == 0:
         # it was a 1:1 dm: add carol to promote it to a group
         a.locator("label:has-text('Carol') input").check()
-        a.click("button:has-text('Add to Group'), button:has-text('Create Group DM')")
+        a.click("button:has-text('Add to group'), button:has-text('Create group')")
         a.wait_for_timeout(1500)
         a.click("button[aria-label='Add friends']")
     link_box = a.locator("[data-testid=group-invite-link]")

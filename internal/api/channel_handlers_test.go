@@ -445,3 +445,70 @@ func TestGroupDMLifecycle(t *testing.T) {
 		t.Error("empty group is deleted")
 	}
 }
+
+// Creating a group with nobody picked gives a group of one: its owner, who
+// adds people later through the usual add, which hands them the key.
+func TestEmptyGroup(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, idA := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	friend(t, ts, tokA, "bob", tokB, idA)
+	ga := connectGW(t, ts, tokA)
+
+	res, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{}, "name": "Plans"})
+	if res.StatusCode != 201 || body["type"] != "group_dm" || body["owner_id"] != idA || body["name"] != "Plans" {
+		t.Fatalf("empty group: %d %v", res.StatusCode, body)
+	}
+	if r := body["recipient_ids"].([]any); len(r) != 1 || r[0] != idA {
+		t.Fatalf("an empty group holds only its owner: %v", r)
+	}
+	g := body["id"].(string)
+	if ev := ga.next("channel_create", 3*time.Second); ev == nil || ev["id"] != g {
+		t.Errorf("channel_create to the owner: %v", ev)
+	}
+	// no list at all means the same, and each press makes a new group
+	res, body = do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{})
+	if res.StatusCode != 201 || body["type"] != "group_dm" || body["id"] == g || body["name"] != "" {
+		t.Fatalf("second empty group: %d %v", res.StatusCode, body)
+	}
+	// naming only yourself is still a mistake, not a group
+	if res, body = do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idA}}); res.StatusCode != 400 || errCode(body) != "no_recipients" {
+		t.Errorf("only yourself: %d %v", res.StatusCode, body)
+	}
+
+	// the owner's key for the group is made for the owner alone
+	res, body = do(t, ts, "POST", "/api/v1/keys/epochs", tokA, map[string]any{"conv_id": g})
+	if res.StatusCode != 201 || len(body["user_ids"].([]any)) != 1 || body["user_ids"].([]any)[0] != idA {
+		t.Fatalf("epoch of a group of one: %d %v", res.StatusCode, body)
+	}
+	epoch := body["epoch"]
+	if res, body = do(t, ts, "POST", "/api/v1/keys/grants", tokA, []map[string]any{{"conv_id": g, "epoch": epoch, "user_id": idA, "wrapped_key": b64([]byte("a"))}}); res.StatusCode != 200 {
+		t.Fatalf("self grant: %d %v", res.StatusCode, body)
+	}
+	if _, body = do(t, ts, "GET", "/api/v1/keys/needs", tokA, nil); len(body["_list"].([]any)) != 0 {
+		t.Errorf("nobody else needs the key yet: %v", body)
+	}
+
+	// adding bob later lets him in and asks the key holder for a grant
+	gb := connectGW(t, ts, tokB)
+	if res, body = do(t, ts, "POST", "/api/v1/channels/"+g+"/recipients/"+idB, tokA, nil); res.StatusCode != 200 || len(body["recipient_ids"].([]any)) != 2 {
+		t.Fatalf("add bob: %d %v", res.StatusCode, body)
+	}
+	if ev := gb.next("channel_create", 3*time.Second); ev == nil || ev["id"] != g {
+		t.Errorf("bob hears of the group: %v", ev)
+	}
+	if ev := ga.next("keys_needed", 3*time.Second); ev == nil || ev["conv_id"] != g || len(ev["user_ids"].([]any)) != 1 || ev["user_ids"].([]any)[0] != idB {
+		t.Errorf("keys_needed for bob: %v", ev)
+	}
+	_, body = do(t, ts, "GET", "/api/v1/keys/needs", tokA, nil)
+	needs := body["_list"].([]any)
+	if len(needs) != 1 || needs[0].(map[string]any)["conv_id"] != g || needs[0].(map[string]any)["user_ids"].([]any)[0] != idB {
+		t.Fatalf("needs after adding bob: %v", body)
+	}
+	if res, body = do(t, ts, "POST", "/api/v1/keys/grants", tokA, []map[string]any{{"conv_id": g, "epoch": epoch, "user_id": idB, "wrapped_key": b64([]byte("b"))}}); res.StatusCode != 200 {
+		t.Fatalf("grant bob: %d %v", res.StatusCode, body)
+	}
+	if res, _ = do(t, ts, "GET", "/api/v1/channels/"+g, tokB, nil); res.StatusCode != 200 {
+		t.Error("bob can open the group")
+	}
+}

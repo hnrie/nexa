@@ -183,3 +183,21 @@
 .fullBtn:hover { background: var(--profile-chip-hover); }
 
 .small { font-size: 13px; color: var(--text-muted); }
+
+/* Where things stand with someone who is not a friend: a request either way, or a block, and what can be done about it. */
+.request { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding-block: 8px; padding-inline: 12px 8px; border-radius: 8px; background: var(--profile-chip); color: var(--text-strong); }
+.requestIcon { flex: none; color: var(--text-strong); opacity: 0.8; }
+/* wide enough for its words on one line: in the narrow preview beside a DM the buttons go under them instead */
+.requestText { flex: 1 1 160px; min-width: 0; font-size: 14px; font-weight: 600; line-height: 18px; overflow-wrap: anywhere; }
+.requestBtns { display: flex; flex-wrap: wrap; gap: 6px; margin-inline-start: auto; }
+.requestBtn { height: 32px; padding: 0 12px; border-radius: 6px; font-size: 14px; font-weight: 600; white-space: nowrap; background: var(--profile-chip-hover); color: var(--text-strong); transition: filter var(--transition), background var(--transition); }
+.requestBtn:hover:not(:disabled) { filter: brightness(1.12); }
+.requestBtn[data-primary] { background: var(--profile-accent); color: #fff; }
+.requestBtn:disabled, .bannerBtn:disabled { opacity: 0.6; cursor: default; }
+.requestBtn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+/* a request on its way */
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (pointer: coarse) {
+  .requestBtn { height: 40px; padding: 0 14px; }
+}

@@ -16,6 +16,9 @@ import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
+import { GroupAlone } from "./GroupAlone";
+import { BlockedRun } from "./BlockedRun";
+import { isQuiet, messageFate, useBlockRules, type AuthorOf } from "@/lib/blocked";
 import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -28,11 +31,14 @@ import { useServers } from "@/stores/servers";
 import { displayName } from "@/stores/users";
 import { ActiveRows, ActiveRowsProvider, rowIdOf } from "./activeRow";
 import { dispatchGeneration, dispatchHooks } from "@/gateway/dispatch";
+/** A run of messages from blocked people, folded into one row (open shows them under it). */
+type BlockedRow = { kind: "blocked"; key: string; ids: string[]; open: boolean };
 type Row =
   | { kind: "date"; key: string; ts: number }
   | { kind: "unread"; key: string }
   | { kind: "msg"; key: string; msg: DecryptedMessage; groupStart: boolean }
-  | { kind: "pending"; key: string; p: PendingMessage; groupStart: boolean };
+  | { kind: "pending"; key: string; p: PendingMessage; groupStart: boolean }
+  | BlockedRow;
 
 const GROUP_MS = 7 * 60 * 1000;
 
@@ -195,6 +201,17 @@ export function MessageList({ channel }: { channel: Channel }) {
   const unreadFrom = useRef<string | null | undefined>(undefined);
   const lastAcked = useRef<string | null>(null);
   const triedAround = useRef<string | null>(null);
+  // messages from people this account blocked, and which folded runs of them are open
+  const blockRules = useBlockRules();
+  const [openRuns, setOpenRuns] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleRun = useCallback((key: string) => {
+    setOpenRuns((cur) => {
+      const next = new Set(cur);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const ids = state?.ids ?? [];
   const byId = state?.byId ?? {};
@@ -221,14 +238,37 @@ export function MessageList({ channel }: { channel: Channel }) {
     let prev: DecryptedMessage | undefined;
     let unreadPlaced = false;
     const from = unreadFrom.current;
+    // Messages from people this account blocked fold into one row per run, or
+    // leave no trace at all (lib/blocked.ts). Dates and grouping are worked out
+    // from what is left, so a hidden message leaves no gap, no lone date line
+    // and no break in the run of messages around it.
+    const authorOf: AuthorOf = (mid) => byId[mid]?.author_id;
+    let run: BlockedRow | null = null;
     for (const id of ids) {
       const m = byId[id];
       if (!m) continue;
-      if (!prev || !sameDay(prev.created_at, m.created_at)) out.push({ kind: "date", key: `d${m.id}`, ts: m.created_at });
-      if (!unreadPlaced && from !== undefined && from !== null && compareIds(m.id, from) > 0 && m.author_id !== me?.id) {
+      const fate = messageFate(m, blockRules, authorOf);
+      if (fate === "hide") continue;
+      const newDay = !prev || !sameDay(prev.created_at, m.created_at);
+      if (newDay) out.push({ kind: "date", key: `d${m.id}`, ts: m.created_at });
+      // nothing from someone blocked is news, so the "new" line waits for what is
+      if (!unreadPlaced && from !== undefined && from !== null && compareIds(m.id, from) > 0 && m.author_id !== me?.id && !isQuiet(m, blockRules, authorOf)) {
         out.push({ kind: "unread", key: "unread" });
         unreadPlaced = true;
       }
+      if (fate === "collapse") {
+        // a run ends at the next shown message, and at a new day so the date line stays true
+        if (!run || newDay) {
+          const key = `b${m.id}`;
+          run = { kind: "blocked", key, ids: [], open: openRuns.has(key) };
+          out.push(run);
+        }
+        run.ids.push(m.id);
+        if (run.open) out.push({ kind: "msg", key: m.id, msg: m, groupStart: !shouldGroup(prev, m) });
+        prev = m;
+        continue;
+      }
+      run = null;
       out.push({ kind: "msg", key: m.id, msg: m, groupStart: !shouldGroup(prev, m) });
       prev = m;
     }
@@ -241,7 +281,9 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     return out;
     // loaded, readKnown and lastRead are listed so the rows are built again when the unread point is captured or moves
-  }, [ids, byId, pending, me?.id, loaded, readKnown, lastRead]);
+  }, [ids, byId, pending, me?.id, loaded, readKnown, lastRead, blockRules, openRuns]);
+  /** Whether a message stays quiet here: from someone blocked, or hidden for answering them. */
+  const quiet = useCallback((m: DecryptedMessage | undefined) => !!m && isQuiet(m, blockRules, (mid) => byId[mid]?.author_id), [blockRules, byId]);
 
   const newest = ids[ids.length - 1];
   const prevNewest = useRef<string | undefined>(undefined);
@@ -295,7 +337,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     if (!el) return;
     // Something new at the end that was not paged in: a message arriving live.
     const arrived = !!newest && !!prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current;
-    if (arrived && byId[newest!] && byId[newest!]!.author_id !== me?.id) announce(byId[newest!]!);
+    if (arrived && byId[newest!] && byId[newest!]!.author_id !== me?.id && !quiet(byId[newest!])) announce(byId[newest!]!);
     // Your own message always gets shown, wherever you were reading. When the
     // list stops short of the present it would land after old history, so the
     // newest page is loaded again first.
@@ -317,7 +359,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       // more, so a render that only made a message a line taller, or that
       // changed nothing at all, costs the reader nothing.
       keepHold(el);
-      if (newest && prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current && byId[newest]?.author_id !== me?.id) {
+      if (newest && prevNewest.current && compareIds(newest, prevNewest.current) > 0 && !prevHasNewer.current && byId[newest]?.author_id !== me?.id && !quiet(byId[newest])) {
         // A list that stopped short of the present only grows downwards by
         // loading pages the reader scrolled to, which are not news.
         if (!newFrom.current) newFrom.current = prevNewest.current;
@@ -326,7 +368,7 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
     prevNewest.current = newest;
     prevHasNewer.current = hasNewer;
-  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id, dropHold, keepHold, announce]);
+  }, [rows, newest, byId, me?.id, pending.length, hasNewer, returnToPresent, channel.id, dropHold, keepHold, announce, quiet]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -477,6 +519,23 @@ export function MessageList({ channel }: { channel: Channel }) {
 
   useEffect(() => {
     if (!jumpTo || jumpTo.channelId !== channel.id) return;
+    // A message from someone blocked: a folded run opens to show it, and one
+    // left out entirely is not there to go to, which is said rather than
+    // searched for and then called missing.
+    const wanted = byId[jumpTo.messageId];
+    const fate = wanted ? messageFate(wanted, blockRules, (mid) => byId[mid]?.author_id) : "show";
+    if (fate === "hide") {
+      setJumpTo(null);
+      useUI.getState().toast(t("people.blocked.jumpHidden"), "info");
+      return;
+    }
+    if (fate === "collapse") {
+      const run = rows.find((r): r is BlockedRow => r.kind === "blocked" && r.ids.includes(jumpTo.messageId));
+      if (run && !run.open) {
+        setOpenRuns((cur) => new Set(cur).add(run.key));
+        return;
+      }
+    }
     // the id comes from the address bar, so it is escaped before it is a selector
     const el = scrollRef.current?.querySelector<HTMLElement>(`[data-id="${cssValue(jumpTo.messageId)}"]`);
     if (el) {
@@ -508,12 +567,12 @@ export function MessageList({ channel }: { channel: Channel }) {
       triedAround.current = jumpTo.messageId;
       void useMessages.getState().loadAround(channel.id, jumpTo.messageId).catch(() => {});
     }
-  }, [jumpTo, channel.id, rows, loading, setJumpTo, dropHold]);
+  }, [jumpTo, channel.id, rows, loading, setJumpTo, dropHold, byId, blockRules]);
 
   // "3 new messages since 4:32 PM": what came in below the reader since the news began
   const newSince = (): string => {
     const from = newFrom.current;
-    const fresh = from ? ids.filter((id) => compareIds(id, from) > 0 && byId[id]?.author_id !== me?.id) : [];
+    const fresh = from ? ids.filter((id) => compareIds(id, from) > 0 && byId[id]?.author_id !== me?.id && !quiet(byId[id])) : [];
     const first = fresh.length ? byId[fresh[0]!] : undefined;
     return first ? t("chat.messageList.newMessagesSince", { count: fresh.length, time: formatTime(first.created_at) }) : t("chat.messageList.newMessages");
   };
@@ -553,16 +612,18 @@ export function MessageList({ channel }: { channel: Channel }) {
         </div>
       );
     }
+    // a group of one (made with nobody picked) says how to fill it
+    const alone = channel.type === "group_dm" && channel.recipient_ids.length <= 1;
     return (
       <div className={s.empty}>
         {channel.type === "group_dm" && channel.icon_id ? <div className={s.emptyAvatar}><Avatar id={channel.id} avatarId={channel.icon_id} name={name} size={80} kind="icon" /></div> : null}
         <h2 className={s.emptyName}>{channel.server_id ? t("chat.messageList.welcomeToChannel", { name }) : name}</h2>
-        <p className={s.emptyText}>
+        {alone ? <GroupAlone channelId={channel.id} /> : <p className={s.emptyText}>
           {channel.server_id
             ? <Tr id="chat.messageList.channelStart" values={{ name: <b>#{name}</b> }} />
             : <Tr id="chat.messageList.groupStart" values={{ name: <b>{name}</b> }} />}
           {channel.server_id && channel.topic ? ` ${channel.topic}` : ""} {t("chat.messageList.endToEnd")}
-        </p>
+        </p>}
       </div>
     );
   }, [channel, users, me?.id, byIdChannels]);
@@ -655,6 +716,7 @@ export function MessageList({ channel }: { channel: Channel }) {
             {rows.map((row, i) => {
               if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
               if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
+              if (row.kind === "blocked") return <BlockedRun key={row.key} runKey={row.key} count={row.ids.length} open={row.open} compact={compact} onToggle={toggleRun} />;
               if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} upload={row.p.upload} />;
               return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
             })}

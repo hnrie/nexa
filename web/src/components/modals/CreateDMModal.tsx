@@ -33,8 +33,11 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   const shown = friends.filter((r) => !q || r.user.display_name.toLowerCase().includes(q.toLowerCase()) || r.user.username.includes(q.toLowerCase()));
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX ? p : [...p, id]));
 
+  // Nobody picked makes a group of one, to add people to later; adding to a
+  // group that exists needs someone to add.
+  const canCreate = !group || picked.length > 0;
   const create = async () => {
-    if (picked.length === 0 || busy) return;
+    if (!canCreate || busy) return;
     setBusy(true);
     try {
       if (group) {
@@ -60,7 +63,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   };
 
   return (
-    <Modal open onClose={onClose} title={t("modals.createDM.selectFriends")} width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={picked.length === 0}>{group ? t("modals.createDM.addToGroup") : picked.length > 1 ? t("modals.createDM.createGroupDm") : t("modals.createDM.createDm")}</Button>}>
+    <Modal open onClose={onClose} title={t("modals.createDM.selectFriends")} width={440} footer={<Button block onClick={() => void create()} loading={busy} disabled={!canCreate} data-testid="create-dm-submit">{group ? t("modals.createDM.addToGroup") : picked.length === 1 ? t("modals.createDM.createDm") : t("modals.createDM.createGroupDm")}</Button>}>
       <p className={s.hint}>{group ? t("modals.createDM.addAnyoneYouAreFriendsWith") : picked.length >= MAX ? t("modals.createDM.addTheRestWithAnInvite") : t("modals.createDM.pickFriendsToStartAGroup")}</p>
       <TextInput value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("modals.createDM.typeTheUsernameOfAFriend")} aria-label={t("modals.createDM.typeTheUsernameOfAFriend")} autoFocus />
       {/* Picked friends as chips: a search that filtered someone's row out
@@ -80,7 +83,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
           })}
         </div>
       ) : null}
-      {picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} aria-label={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
+      {!group && picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} aria-label={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
       <div className={s.list}>
         {shown.length === 0 ? <div className={s.empty}>{friends.length === 0 ? t("modals.createDM.addSomeFriendsFirst") : t("modals.createDM.noFriendsMatch")}</div> : null}
         {shown.map((r) => (

@@ -70,8 +70,11 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	ctx := r.Context()
+	// Nobody picked is a group with only its owner in it, to add people to
+	// later (the default branch, whose checks have no one to check). A list
+	// naming only yourself is a mistake rather than that.
 	switch {
-	case len(recipients) == 0:
+	case len(recipients) == 0 && len(req.RecipientIDs) > 0:
 		WriteError(w, E(http.StatusBadRequest, "no_recipients", "Pick at least one other person."))
 		return
 	case len(recipients) == 1:

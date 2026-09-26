@@ -29,10 +29,14 @@
 .search input:focus { border-color: var(--brand); }
 .search svg { position: absolute; inset-inline-end: 12px; top: 12px; color: var(--text-muted); }
 .section { font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-channel); margin: 0 0 8px; letter-spacing: 0.02em; }
-.row { display: flex; align-items: center; gap: 12px; height: 62px; margin: 0 -10px; padding: 0 10px; border-top: 1px solid var(--border-subtle); border-radius: var(--radius-sm); }
-/* the picture and the name are one button, as wide as the row leaves them */
+.row { position: relative; display: flex; align-items: center; gap: 12px; height: 62px; margin: 0 -10px; padding: 0 10px; border-top: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer; }
+/* The picture and the name are one button, and its hit area is stretched over
+   the whole row, gaps around the action buttons included, so a press anywhere
+   opens the profile. The buttons sit above it and keep their own jobs. */
 .rowMain { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: 12px; padding: 0; color: inherit; text-align: start; border-radius: var(--radius-sm); cursor: pointer; }
-.rowMain:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.rowMain::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-sm); }
+.rowMain:focus-visible { outline: none; }
+.rowMain:focus-visible::after { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .row:hover { background: var(--bg-hover); border-color: transparent; }
 .row:hover + .row { border-color: transparent; }
 .rowText { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
@@ -42,12 +46,18 @@
 @media (hover: hover) { .row:hover .rowUser { opacity: 1; } }
 /* touch screens never reveal the username, so it takes no room from the name */
 @media (hover: none) { .rowUser { display: none; } }
-.rowSub { font-size: 14px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.subUser { display: none; }
+.rowSub { display: flex; align-items: center; min-width: 0; font-size: 14px; line-height: 18px; color: var(--text-muted); white-space: nowrap; }
+.subUser { display: none; flex: 0 1 auto; max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
 @media (hover: none) { .subUser { display: inline; } }
-.actions { display: flex; gap: 8px; }
+.subText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.subStatus { flex: 1; min-width: 0; }
+/* above the stretched row button; the gaps between them fall through to it */
+.actions { position: relative; z-index: 1; display: flex; gap: 8px; pointer-events: none; }
+.actions > * { pointer-events: auto; }
 .act { width: 36px; height: 36px; border-radius: 50%; background: var(--bg-surface); color: var(--text-subtle); display: flex; align-items: center; justify-content: center; }
 .act:hover { color: var(--text-strong); background: var(--bg-active); }
+.act:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.act:disabled { opacity: 0.55; cursor: default; }
 .act.ok:hover { color: var(--positive); }
 .act.no:hover { color: var(--danger); }
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 64px 16px; color: var(--text-muted); text-align: center; }

@@ -1,0 +1,20 @@
+/* The block dialog: what blocking does, then the two choices about their messages. */
+.body { margin: 0 0 16px; font-size: 16px; line-height: 1.4; color: var(--text); }
+.choices { display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); }
+.choice { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); cursor: pointer; }
+.choice:hover { background: var(--bg-hover); }
+/* the second choice hangs off the first, lined up under its words */
+.choice[data-nested] { padding-inline-start: 42px; }
+.choice[data-disabled] { cursor: not-allowed; }
+.choice[data-disabled]:hover { background: transparent; }
+.choice[data-disabled] .choiceText { opacity: 0.55; }
+.choice input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--brand); cursor: inherit; }
+.choiceText { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.choiceLabel { font-size: 15px; font-weight: 500; line-height: 1.3; color: var(--text-strong); }
+.choiceHint { font-size: 13px; line-height: 1.35; color: var(--text-muted); }
+.note { margin: 12px 0 0; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+@media (pointer: coarse) {
+  .choice { min-height: 44px; }
+  .choice input { width: 22px; height: 22px; margin-top: 0; }
+  .choice[data-nested] { padding-inline-start: 46px; }
+}

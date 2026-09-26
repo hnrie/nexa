@@ -16,6 +16,7 @@ import { desktopBridge } from "./desktopBridge";
 import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 import { mentionsMe } from "./mentionsMe";
+import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
 
 import { t } from "@/i18n";
 let navigateTo: ((path: string) => void) | null = null;
@@ -138,6 +139,8 @@ export function serverDefaultLevel(serverId: string): "all" | "mentions" {
 
 function onMessage(m: Message, mine: boolean, decrypted?: DecryptedMessage): void {
   if (mine || m.type.startsWith("system_")) return;
+  // nothing from someone blocked (or answering them, while those are hidden) makes a sound or a notification
+  if (isQuiet(decrypted ?? m, currentBlockRules(), loadedAuthorOf(m.channel_id))) return;
   const me = useAuth.getState().me;
   if (!me) return;
   const settings = useSettings.getState().settings;
