@@ -26,7 +26,21 @@ func registerBody(username string) map[string]any {
 		"enc_private_key_recovery": b64([]byte("wrapped-recovery")), "recovery_auth_key": b64(key32b)}
 }
 
+// register signs up an account that anyone may message. A new account only
+// takes messages from friends and people in a server with it
+// (store.DefaultDMPrivacy), and most tests open DMs between strangers to test
+// something else; the ones about that rule use registerDefault.
 func register(t *testing.T, ts *httptest.Server, username string) (token string, id string) {
+	t.Helper()
+	token, id = registerDefault(t, ts, username)
+	if res, body := do(t, ts, "PATCH", "/api/v1/users/@me", token, map[string]any{"dm_privacy": "everyone"}); res.StatusCode != 200 {
+		t.Fatalf("register %s: open DMs: %d %v", username, res.StatusCode, body)
+	}
+	return token, id
+}
+
+// registerDefault signs up an account with the settings a new account gets.
+func registerDefault(t *testing.T, ts *httptest.Server, username string) (token string, id string) {
 	t.Helper()
 	res, body := do(t, ts, "POST", "/api/v1/auth/register", "", registerBody(username))
 	if res.StatusCode != 201 {

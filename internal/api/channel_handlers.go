@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 
 	"evilion.xyz/chat/internal/auth"
@@ -103,21 +104,34 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		if !friends {
 			switch target.DMPrivacy {
-			case "nobody":
+			case store.DMNobody:
 				WriteError(w, E(http.StatusForbidden, "dm_closed", "This user does not accept direct messages."))
 				return
-			case "friends":
+			case store.DMFriends:
 				WriteError(w, E(http.StatusForbidden, "dm_friends_only", "This user only accepts messages from friends."))
 				return
+			case store.DMFriendsServers:
+				shared, err := s.Store.ShareServer(ctx, me.ID, target.ID)
+				if err != nil {
+					WriteError(w, err)
+					return
+				}
+				if !shared {
+					WriteError(w, E(http.StatusForbidden, "dm_friends_servers", "This user only accepts messages from friends and people they share a server with."))
+					return
+				}
 			}
 		}
-		ch, created, err := s.Store.CreateDM(ctx, me.ID, target.ID)
+		// The other person is not shown the conversation yet: it reaches their
+		// sidebar with the first message or call (revealDM), not the moment
+		// someone opens it and perhaps never writes.
+		ch, created, err := s.Store.StartDM(ctx, me.ID, target.ID)
 		if err != nil {
 			WriteError(w, err)
 			return
 		}
 		if created {
-			s.Bcast.EmitUsers(ch.Recipients, "channel_create", ch)
+			s.Bcast.EmitUsers([]ids.ID{me.ID}, "channel_create", ch)
 			WriteJSON(w, http.StatusCreated, ch)
 			return
 		}
@@ -155,6 +169,25 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		s.Bcast.EmitUsers(ch.Recipients, "channel_create", ch)
 		WriteJSON(w, http.StatusCreated, ch)
+	}
+}
+
+// revealDM puts a conversation back in the sidebar of everyone in it who does
+// not have it there: whoever closed it, and whoever someone started it with
+// (StartDM) before anything was said in it. It runs when something new
+// happens in the conversation, a message or a call, before that goes out, so
+// the conversation reaches them first. A subchat is listed under the
+// conversation it belongs to, so that one comes back too.
+func (s *Server) revealDM(ctx context.Context, ch *store.Channel) {
+	if ch.Type == "subchat" && ch.ParentID != nil {
+		if reopened, err := s.Store.UnhideDM(ctx, *ch.ParentID); err == nil && len(reopened) > 0 {
+			if parent, err := s.Store.ChannelByID(ctx, *ch.ParentID); err == nil {
+				s.Bcast.EmitUsers(reopened, "channel_create", parent)
+			}
+		}
+	}
+	if reopened, err := s.Store.UnhideDM(ctx, ch.ID); err == nil && len(reopened) > 0 {
+		s.Bcast.EmitUsers(reopened, "channel_create", ch)
 	}
 }
 

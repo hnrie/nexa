@@ -26,6 +26,18 @@ const (
 // and whether it is the system account rather than a person.
 const publicFlags = FlagAdmin | FlagSystem
 
+// Who may start a direct message with an account (users.dm_privacy): anyone,
+// friends and people who share a server with it, friends, or nobody. A new
+// account takes DefaultDMPrivacy, so a stranger has to send a friend request
+// or be in a server with someone before they can message them.
+const (
+	DMEveryone       = "everyone"
+	DMFriendsServers = "friends_servers"
+	DMFriends        = "friends"
+	DMNobody         = "nobody"
+	DefaultDMPrivacy = DMFriendsServers
+)
+
 // User is a full account row. Fields tagged "-" never leave the server.
 type User struct {
 	ID              ids.ID  `json:"id"`

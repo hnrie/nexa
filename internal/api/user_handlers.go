@@ -210,8 +210,8 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		p.PresencePref = &v
 	}
 	if v, present, null := getString("dm_privacy"); present {
-		if null || !OneOf(v, "everyone", "friends", "nobody") {
-			bad("invalid_dm_privacy", "dm_privacy must be everyone, friends or nobody.")
+		if null || !OneOf(v, store.DMEveryone, store.DMFriendsServers, store.DMFriends, store.DMNobody) {
+			bad("invalid_dm_privacy", "dm_privacy must be everyone, friends_servers, friends or nobody.")
 			return
 		}
 		p.DMPrivacy = &v
