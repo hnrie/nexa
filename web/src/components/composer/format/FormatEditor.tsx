@@ -284,7 +284,7 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
           </div>
         );
       case "link":
-        return <LinkTray key={state?.link?.url ?? "new"} state={state} run={run} done={() => setTray(null)} />;
+        return <LinkTray key={state?.link?.url ?? "new"} state={state} run={run} done={() => setTray(null)} asked={tray === "link"} />;
       case "list":
         return (
           <div className={s.chips} role="group" aria-label={t("composer.format.listTools")}>
@@ -555,7 +555,7 @@ function ColourTray({ marks, surfaceEl, run }: { marks: SurfaceState["marks"]; s
   );
 }
 
-function LinkTray({ state, run, done }: { state: SurfaceState | null; run: (c: Command) => void; done: () => void }) {
+function LinkTray({ state, run, done, asked }: { state: SurfaceState | null; run: (c: Command) => void; done: () => void; asked: boolean }) {
   const existing = state?.link ?? null;
   const [url, setUrl] = useState(existing?.url ?? "");
   const [words, setWords] = useState("");
@@ -563,8 +563,11 @@ function LinkTray({ state, run, done }: { state: SurfaceState | null; run: (c: C
   const needsWords = !existing && !!state?.collapsed;
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    // on a phone the address field takes the keyboard only when tapped
-    if (window.matchMedia?.("(pointer: fine)").matches) input.current?.focus();
+    // Opened on purpose, the address field takes the keyboard (on a phone only when tapped);
+    // shown because the caret is in a link, it leaves the keyboard where it is.
+    if (asked && window.matchMedia?.("(pointer: fine)").matches) input.current?.focus();
+    // only as the tray first shows
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const apply = () => {
     const clean = cleanUrl(url);

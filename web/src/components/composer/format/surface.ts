@@ -638,9 +638,10 @@ export class FormatSurface {
           return;
         }
         // Typing over a selection that spans blocks, with marks chosen at
-        // the caret, or next to an atom, is done here; the rest is the
-        // browser's own.
-        if (across || this.pending || block?.kind === "hr") {
+        // the caret, or just after a link or inline code (whose end the
+        // browser would stretch over the new words), is done here; the rest
+        // is the browser's own.
+        if (across || this.pending || block?.kind === "hr" || (flat && this.atEdgeOfLinkOrCode(from))) {
           e.preventDefault();
           this.typeText(data);
         }
@@ -817,6 +818,19 @@ export class FormatSurface {
     this.tidy();
     this.opts.onChange();
     this.emitState();
+  }
+
+  /** Whether the caret sits just after a link or a code span, where typing should leave it behind. */
+  private atEdgeOfLinkOrCode(p: Pos): boolean {
+    const block = this.blocks[p.b];
+    const content = block && isText(block) ? block.content : block?.kind === "table" && p.cell ? (block.rows[p.cell[0]]?.[p.cell[1]] ?? []) : null;
+    if (!content || p.o === 0) return false;
+    const before = sliceMarks(content, p.o - 1);
+    const after = sliceMarks(content, p.o);
+    if (!before) return false;
+    const linkEnds = !!before.link && (!after?.link || after.link.url !== before.link.url);
+    const codeEnds = !!before.code && !after?.code;
+    return linkEnds || codeEnds;
   }
 
   /** The text of the block or cell a position is in, atoms as one character each. */
@@ -1315,6 +1329,17 @@ export class FormatSurface {
 // ---------------------------------------------------------------------------
 // DOM helpers
 // ---------------------------------------------------------------------------
+
+/** The marks of the character at an offset, or null past the end. */
+function sliceMarks(content: Inline[], offset: number): Marks | null {
+  let at = 0;
+  for (const r of content) {
+    const len = r.kind === "text" ? r.text.length : 1;
+    if (offset < at + len) return r.marks;
+    at += len;
+  }
+  return null;
+}
 
 function set(el: HTMLElement, name: string, value: string | null): void {
   if (value === null) {
