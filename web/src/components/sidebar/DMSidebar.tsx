@@ -78,11 +78,23 @@ export function DMSidebar() {
   const dragRef = useRef<string | null>(null);
   const overRef = useRef<Over | null>(null);
 
-  // Opening the Nexa conversation while it is closed opens it again, as
-  // messaging someone brings back a conversation that was closed.
+  // Going to the Nexa conversation while it is closed opens it again, as
+  // messaging someone brings back a conversation that was closed. It being
+  // closed while it is on screen is the other case: another device of this
+  // account closed it (this one closes it by leaving first), so this device
+  // goes to the default screen. Reopening it there undid the close on every
+  // device, which made it come back for no reason anyone could see.
+  const settingsLoaded = useSettings((st) => st.loaded);
+  const nexaWas = useRef<{ open: boolean; listed: boolean | null }>({ open: false, listed: null });
   useEffect(() => {
-    if (nexaOpen && nexa && nexa.latest > 0 && settings.nexaClosed && !nexaListed(nexa.latest, settings.nexaClosed)) patch({ nexaClosed: 0 });
-  }, [nexaOpen, nexa, settings.nexaClosed, patch]);
+    if (!settingsLoaded || !nexa || nexa.latest <= 0) return;
+    const listed = nexaListed(nexa.latest, settings.nexaClosed);
+    const was = nexaWas.current;
+    nexaWas.current = { open: nexaOpen, listed };
+    if (!nexaOpen || listed) return;
+    if (!was.open) patch({ nexaClosed: 0 });
+    else if (was.listed) nav("/channels/@me", { replace: true });
+  }, [settingsLoaded, nexaOpen, nexa, settings.nexaClosed, patch, nav]);
 
   // Picking something closes the phone drawer, even the page already open,
   // which navigating to the same address would not.
