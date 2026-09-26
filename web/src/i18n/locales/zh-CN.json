@@ -3414,6 +3414,9 @@
   "stickerPack.removeFromMyStickers": "从我的贴纸中移除",
   "stickerPack.stickerPack": "贴纸包",
   "stickerPack.thisPackIsPrivate": "该包是私有的，或者已经不存在了。",
+  "stickers.tile.couldNotLoad": "无法加载",
+  "stickers.tile.couldNotLoadHint": "此贴纸无法加载。它会自动重试，也可以选择它立即重试。",
+  "stickers.tile.couldNotLoadNamed": "{name} 无法加载。选择即可重试。",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3601,5 +3604,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "谁可以给你发消息",
   "whatsNew.r202609262.quietDMBody": "打开与某人的对话后，它不会再立即出现在对方的列表中。你发送第一条消息或给对方打电话时，对方才会看到。",
   "whatsNew.r202609262.quietDMTitle": "新对话从第一条消息开始",
+  "whatsNew.r202609263.stickersBody": "贴纸选择器加载更快了，即使在较慢的手机或网络上也是如此，再次打开时贴纸会立即显示。无法加载的贴纸会显示提示，并自动重试。",
+  "whatsNew.r202609263.stickersTitle": "更快的贴纸选择器",
   "whatsNew.title": "新功能"
 }

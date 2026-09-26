@@ -8,7 +8,8 @@ import type { StickerPack } from "@/api/types";
 import { NexaWordmark } from "@/components/common/Brand";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { LazySticker, StickerView } from "@/components/stickers/StickerView";
+import { StickerView } from "@/components/stickers/StickerView";
+import { LazySticker } from "@/components/stickers/StickerTile";
 import { ConfirmModal } from "@/components/modals/ConfirmModal";
 import { packCount, packCover } from "@/components/server/PackEditor";
 import { canRemovePack, removePack as removeInstalledPack, removePackQuestion } from "@/lib/packRemoval";
@@ -96,7 +97,7 @@ export default function StickerPackPage() {
             <div className={[p.grid, s.stickers].join(" ")}>
               {pack.stickers.map((st) => (
                 <div key={st.id} className={[p.cell, s.sticker].join(" ")}>
-                  <LazySticker format={st.format} src={packImageUrl(pack, st)} alt={st.name} className={p.cellImg} />
+                  <LazySticker sticker={st} pack={pack} alt={st.name} className={p.cellImg} />
                   <span className={p.cellName}>{st.name}</span>
                 </div>
               ))}

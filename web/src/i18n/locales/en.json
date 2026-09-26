@@ -3089,6 +3089,9 @@
   "stickerPack.removeFromMyStickers": "Remove from My Stickers",
   "stickerPack.stickerPack": "Sticker Pack",
   "stickerPack.thisPackIsPrivate": "This pack is private or no longer exists.",
+  "stickers.tile.couldNotLoad": "Couldn't load",
+  "stickers.tile.couldNotLoadHint": "This sticker couldn't load. It tries again by itself, or select it to try now.",
+  "stickers.tile.couldNotLoadNamed": "{name} couldn't load. Select to try again.",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3698,5 +3701,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "Who Can Message You",
   "whatsNew.r202609262.quietDMBody": "Opening a conversation with someone no longer puts it in their list. They see it when you send your first message or call them.",
   "whatsNew.r202609262.quietDMTitle": "New Conversations Wait for Your First Message",
+  "whatsNew.r202609263.stickersBody": "The sticker picker fills in faster, even on a slow phone or connection, and shows your stickers at once when you open it again. A sticker that can't load says so and tries again by itself.",
+  "whatsNew.r202609263.stickersTitle": "A Faster Sticker Picker",
   "whatsNew.title": "What's New"
 }

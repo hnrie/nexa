@@ -3799,6 +3799,9 @@
   "stickerPack.removeFromMyStickers": "إزالة من ملصقاتي",
   "stickerPack.stickerPack": "حزمة ملصقات",
   "stickerPack.thisPackIsPrivate": "هذه الحزمة خاصة أو لم تعد موجودة.",
+  "stickers.tile.couldNotLoad": "تعذّر التحميل",
+  "stickers.tile.couldNotLoadHint": "تعذّر تحميل هذا الملصق. ستُعاد المحاولة تلقائيًا، أو اختره للمحاولة الآن.",
+  "stickers.tile.couldNotLoadNamed": "تعذّر تحميل {name}. اختره لإعادة المحاولة.",
   "time.bytes": "{n} بايت",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} غ.ب",
@@ -3996,5 +3999,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "من يمكنه مراسلتك",
   "whatsNew.r202609262.quietDMBody": "لم يعد فتح محادثة مع شخص ما يضعها في قائمته. سيراها عندما ترسل رسالتك الأولى أو تتصل به.",
   "whatsNew.r202609262.quietDMTitle": "المحادثات الجديدة تنتظر رسالتك الأولى",
+  "whatsNew.r202609263.stickersBody": "أصبح منتقي الملصقات يمتلئ أسرع، حتى على هاتف أو اتصال بطيء، ويعرض ملصقاتك فورًا عند فتحه مرة أخرى. والملصق الذي يتعذّر تحميله يخبرك بذلك ويعيد المحاولة تلقائيًا.",
+  "whatsNew.r202609263.stickersTitle": "منتقي ملصقات أسرع",
   "whatsNew.title": "ما الجديد"
 }

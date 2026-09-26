@@ -1,7 +1,6 @@
 package media
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"image"
@@ -69,8 +68,11 @@ func (m *Store) removeVariants(sha string) {
 // ServePublicSized serves a public blob no larger than size on either side,
 // making and keeping the copy the first time it is asked for. An image
 // already that small, or an animation small enough to leave moving, is served
-// as it is.
-func (m *Store) ServePublicSized(w http.ResponseWriter, r *http.Request, kind string, id ids.ID, size int) bool {
+// as it is. still asks for a moving picture's first frame instead (a grid of
+// stickers shows them still until one is pointed at, and a frame weighs a
+// fraction of the whole animation); it only applies to the picture formats,
+// since Lottie and video cannot be drawn here.
+func (m *Store) ServePublicSized(w http.ResponseWriter, r *http.Request, kind string, id ids.ID, size int, still bool) bool {
 	b, err := m.st.BlobByID(r.Context(), id)
 	if err != nil || b.Kind != kind || b.Encrypted || !PublicKinds[kind] {
 		return false
@@ -79,10 +81,17 @@ func (m *Store) ServePublicSized(w http.ResponseWriter, r *http.Request, kind st
 	if b.Width != nil && b.Height != nil {
 		width, height = *b.Width, *b.Height
 	}
-	if size <= 0 || width == 0 || height == 0 || (width <= size && height <= size) {
+	still = still && b.Animated && stillable[b.Mime] && width > 0 && height > 0
+	if still && size <= 0 {
+		size = VariantSize(strconv.Itoa(max(width, height)))
+	}
+	if !still && (size <= 0 || width == 0 || height == 0 || (width <= size && height <= size)) {
 		return m.ServePublic(w, r, kind, id)
 	}
-	if b.Animated && width <= maxAnimatedSide && height <= maxAnimatedSide {
+	// An animated WebP never had a shrunk copy (it could not be read here
+	// before its first frame could), so it keeps moving at every size, as it
+	// always has; only a still is asked for explicitly.
+	if !still && b.Animated && ((width <= maxAnimatedSide && height <= maxAnimatedSide) || b.Mime == "image/webp") {
 		return m.ServePublic(w, r, kind, id)
 	}
 	path, mime, err := m.variant(r.Context(), b, size)
@@ -125,12 +134,7 @@ func (m *Store) variant(ctx context.Context, b *store.Blob, size int) (string, s
 			return p, c.mime, nil
 		}
 	}
-	src, err := os.Open(m.Path(sha))
-	if err != nil {
-		return "", "", err
-	}
-	defer src.Close()
-	img, _, err := image.Decode(bufio.NewReader(src))
+	img, err := decodeFirstFrame(m.Path(sha), b.Mime)
 	if err != nil {
 		return "", "", err
 	}
@@ -170,10 +174,17 @@ func (m *Store) variant(ctx context.Context, b *store.Blob, size int) (string, s
 	return dst, mime, nil
 }
 
-// shrink scales img down to fit within size×size, keeping its shape.
+// shrink scales img down to fit within size×size, keeping its shape. One
+// already that small keeps its size: a still of a small animation is not
+// blown up to the size it was asked for.
 func shrink(img image.Image, size int) *image.NRGBA {
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
+	if w <= size && h <= size {
+		out := image.NewNRGBA(image.Rect(0, 0, w, h))
+		draw.Draw(out, out.Bounds(), img, b.Min, draw.Src)
+		return out
+	}
 	if w >= h {
 		h = max(1, h*size/w)
 		w = size

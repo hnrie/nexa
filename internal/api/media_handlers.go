@@ -71,8 +71,10 @@ func (s *Server) handleMediaPublic(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	// ?size= asks for a copy no larger than that, so a 32-pixel avatar is not a 4096-pixel one
-	if !s.Media.ServePublicSized(w, r, kind, id, media.VariantSize(r.URL.Query().Get("size"))) {
+	// ?size= asks for a copy no larger than that, so a 32-pixel avatar is not a
+	// 4096-pixel one; ?still=1 asks for an animation's first frame
+	q := r.URL.Query()
+	if !s.Media.ServePublicSized(w, r, kind, id, media.VariantSize(q.Get("size")), q.Get("still") == "1") {
 		http.NotFound(w, r)
 	}
 }

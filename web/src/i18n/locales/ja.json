@@ -3414,6 +3414,9 @@
   "stickerPack.removeFromMyStickers": "マイスタンプから外す",
   "stickerPack.stickerPack": "スタンプパック",
   "stickerPack.thisPackIsPrivate": "このパックは非公開か、もう存在しません。",
+  "stickers.tile.couldNotLoad": "読み込めませんでした",
+  "stickers.tile.couldNotLoadHint": "このスタンプを読み込めませんでした。自動で再試行します。今すぐ試すには選択してください。",
+  "stickers.tile.couldNotLoadNamed": "{name} を読み込めませんでした。選択すると再試行します。",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3601,5 +3604,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "メッセージを送れる人",
   "whatsNew.r202609262.quietDMBody": "誰かとの会話を開いただけでは、相手のリストに表示されなくなりました。最初のメッセージを送るか通話をかけると、相手に表示されます。",
   "whatsNew.r202609262.quietDMTitle": "新しい会話は最初のメッセージから",
+  "whatsNew.r202609263.stickersBody": "スタンプの選択画面がすばやく表示されるようになりました。遅いスマホや回線でも速く、もう一度開くとすぐに表示されます。読み込めなかったスタンプはそのことが表示され、自動で再試行します。",
+  "whatsNew.r202609263.stickersTitle": "スタンプの選択がより速く",
   "whatsNew.title": "新機能"
 }

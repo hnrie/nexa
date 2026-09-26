@@ -3531,6 +3531,9 @@
   "stickerPack.removeFromMyStickers": "Quitar de mis stickers",
   "stickerPack.stickerPack": "Paquete de stickers",
   "stickerPack.thisPackIsPrivate": "Este paquete es privado o ya no existe.",
+  "stickers.tile.couldNotLoad": "No se pudo cargar",
+  "stickers.tile.couldNotLoadHint": "Este sticker no se pudo cargar. Se vuelve a intentar solo, o selecciónalo para intentarlo ahora.",
+  "stickers.tile.couldNotLoadNamed": "No se pudo cargar {name}. Selecciónalo para intentarlo de nuevo.",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3721,5 +3724,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "Quién puede escribirte",
   "whatsNew.r202609262.quietDMBody": "Abrir una conversación con alguien ya no la pone en su lista. La verá cuando le envíes tu primer mensaje o le llames.",
   "whatsNew.r202609262.quietDMTitle": "Las conversaciones nuevas esperan a tu primer mensaje",
+  "whatsNew.r202609263.stickersBody": "El selector de stickers se llena más rápido, incluso en un teléfono o una conexión lentos, y muestra tus stickers al instante cuando lo vuelves a abrir. Si un sticker no puede cargarse, te lo indica y lo vuelve a intentar solo.",
+  "whatsNew.r202609263.stickersTitle": "Un selector de stickers más rápido",
   "whatsNew.title": "Novedades"
 }

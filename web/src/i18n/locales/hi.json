@@ -3508,6 +3508,9 @@
   "stickerPack.removeFromMyStickers": "मेरे स्टिकर से हटाएँ",
   "stickerPack.stickerPack": "स्टिकर पैक",
   "stickerPack.thisPackIsPrivate": "यह पैक निजी है या अब मौजूद नहीं है।",
+  "stickers.tile.couldNotLoad": "लोड नहीं हो सका",
+  "stickers.tile.couldNotLoadHint": "यह स्टिकर लोड नहीं हो सका। यह अपने आप फिर से कोशिश करेगा, या अभी कोशिश करने के लिए इसे चुनें।",
+  "stickers.tile.couldNotLoadNamed": "{name} लोड नहीं हो सका। फिर से कोशिश करने के लिए चुनें।",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3698,5 +3701,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "कौन आपको संदेश भेज सकता है",
   "whatsNew.r202609262.quietDMBody": "किसी के साथ बातचीत खोलने से अब वह उनकी सूची में नहीं आती। जब आप पहला संदेश भेजते हैं या उन्हें कॉल करते हैं, तब वे उसे देखते हैं।",
   "whatsNew.r202609262.quietDMTitle": "नई बातचीत पहले संदेश से शुरू होती है",
+  "whatsNew.r202609263.stickersBody": "स्टिकर पिकर अब तेज़ी से भरता है, धीमे फ़ोन या कनेक्शन पर भी, और दोबारा खोलने पर आपके स्टिकर तुरंत दिखते हैं। जो स्टिकर लोड नहीं हो पाता, वह बता देता है और अपने आप फिर से कोशिश करता है।",
+  "whatsNew.r202609263.stickersTitle": "तेज़ स्टिकर पिकर",
   "whatsNew.title": "नया क्या है"
 }

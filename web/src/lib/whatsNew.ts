@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { BadgeCheck, Bug, EyeOff, FolderPlus, Link, MessageSquareDashed, MessageSquarePlus, Palette, Pin, Puzzle, RefreshCw, Search, Shapes, ShieldCheck, Type, UserCheck, Users, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Bug, EyeOff, FolderPlus, Link, MessageSquareDashed, MessageSquarePlus, Palette, Pin, Puzzle, RefreshCw, Search, Shapes, ShieldCheck, Sticker, Type, UserCheck, Users, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,10 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-09-26.3",
+    items: [{ icon: Sticker, title: "whatsNew.r202609263.stickersTitle", body: "whatsNew.r202609263.stickersBody" }],
+  },
   {
     id: "2026-09-26.2",
     items: [

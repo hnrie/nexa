@@ -3532,6 +3532,9 @@
   "stickerPack.removeFromMyStickers": "Remover das minhas figurinhas",
   "stickerPack.stickerPack": "Pacote de figurinhas",
   "stickerPack.thisPackIsPrivate": "Este pacote é privado ou não existe mais.",
+  "stickers.tile.couldNotLoad": "Não foi possível carregar",
+  "stickers.tile.couldNotLoadHint": "Não foi possível carregar esta figurinha. Ela tenta de novo sozinha, ou selecione para tentar agora.",
+  "stickers.tile.couldNotLoadNamed": "Não foi possível carregar {name}. Selecione para tentar de novo.",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3722,5 +3725,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "Quem pode enviar mensagens para você",
   "whatsNew.r202609262.quietDMBody": "Abrir uma conversa com alguém não a coloca mais na lista da pessoa. Ela vê a conversa quando você envia sua primeira mensagem ou liga para ela.",
   "whatsNew.r202609262.quietDMTitle": "Conversas novas esperam sua primeira mensagem",
+  "whatsNew.r202609263.stickersBody": "O seletor de figurinhas carrega mais rápido, mesmo em um celular ou conexão lentos, e mostra suas figurinhas na hora quando você abre de novo. Uma figurinha que não carrega avisa e tenta de novo sozinha.",
+  "whatsNew.r202609263.stickersTitle": "Um seletor de figurinhas mais rápido",
   "whatsNew.title": "Novidades"
 }

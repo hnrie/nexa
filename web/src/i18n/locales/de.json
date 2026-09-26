@@ -3508,6 +3508,9 @@
   "stickerPack.removeFromMyStickers": "Aus meinen Stickern entfernen",
   "stickerPack.stickerPack": "Sticker-Paket",
   "stickerPack.thisPackIsPrivate": "Dieses Paket ist privat oder existiert nicht mehr.",
+  "stickers.tile.couldNotLoad": "Laden fehlgeschlagen",
+  "stickers.tile.couldNotLoadHint": "Dieser Sticker konnte nicht geladen werden. Er versucht es von selbst erneut, oder wähl ihn aus, um es jetzt zu versuchen.",
+  "stickers.tile.couldNotLoadNamed": "{name} konnte nicht geladen werden. Wähl ihn aus, um es erneut zu versuchen.",
   "time.bytes": "{n} B",
   "time.dateAt": "{date} {time}",
   "time.gigabytes": "{n} GB",
@@ -3698,5 +3701,7 @@
   "whatsNew.r202609262.dmPrivacyTitle": "Wer dir schreiben kann",
   "whatsNew.r202609262.quietDMBody": "Wenn du eine Unterhaltung mit jemandem öffnest, erscheint sie nicht mehr gleich bei der anderen Person. Sie sieht sie, sobald du deine erste Nachricht schickst oder anrufst.",
   "whatsNew.r202609262.quietDMTitle": "Neue Unterhaltungen warten auf deine erste Nachricht",
+  "whatsNew.r202609263.stickersBody": "Die Sticker-Auswahl füllt sich schneller, auch auf einem langsamen Handy oder bei schwacher Verbindung, und zeigt deine Sticker sofort, wenn du sie wieder öffnest. Ein Sticker, der nicht laden kann, sagt dir das und versucht es von selbst erneut.",
+  "whatsNew.r202609263.stickersTitle": "Eine schnellere Sticker-Auswahl",
   "whatsNew.title": "Neuigkeiten"
 }
