@@ -194,7 +194,8 @@ export function ChatView({ channel }: { channel: Channel }) {
 
   return (
     <div className={s.chat}>
-      <header className={s.header}>
+      {/* the bug button measures this header to step aside where the name needs the room (ReportBugButton) */}
+      <header className={s.header} data-chat-header="">
         <PageHeaderButtons />
         {channel.type === "group_dm" ? (
           // a group's icon and name open its settings, as Discord's header does
