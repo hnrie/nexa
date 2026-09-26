@@ -16,7 +16,7 @@ import { useAuth } from "@/stores/auth";
 import { usePageTitle } from "./AuthLayout";
 import s from "./InvitePage.module.css";
 
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 /**
  * Where a link's key waits while its visitor logs in or registers. The key
  * cannot ride along in `?next=`: a query string reaches the server, in the
@@ -131,7 +131,7 @@ export default function InvitePage() {
       <InviteView
         target={target}
         variant="page"
-        lead={inviter ? t("invite.invitedYouToJoin", { name: inviter.display_name || inviter.username }) : t("invite.youveBeenInvited")}
+        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <bdi>{inviter.display_name || inviter.username}</bdi> }} /> : t("invite.youveBeenInvited")}
         actions={actions}
       >
         {!member && fragment.includes("k=") ? <p className={v.note}><KeyRound size={14} aria-hidden="true" />{t("invite.thisLinkCarriesTheEncryptionKey")}</p> : null}

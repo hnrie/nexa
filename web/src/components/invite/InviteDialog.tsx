@@ -2,8 +2,9 @@ import { KeyRound, Lock, X } from "lucide-react";
 import { useId } from "react";
 import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
-import { t } from "@/i18n";
+import { t, Tr } from "@/i18n";
 import { loadInvitePreview, useInvitePreview } from "@/lib/invitePreviews";
+import { useUI } from "@/stores/ui";
 import { InviteGone, InviteSkeleton, InviteView, targetOfPreview } from "./InviteView";
 import { useInviteJoin } from "./useInviteJoin";
 import s from "./Invite.module.css";
@@ -18,7 +19,8 @@ export function InviteDialog({ onClose, code, hash }: { onClose: () => void; cod
   const entry = useInvitePreview(code);
   const preview = entry?.status === "ready" ? entry.preview : null;
   const target = preview ? targetOfPreview(preview, "dialog") : null;
-  const { member, busy, error, join, open } = useInviteJoin(code, hash, target, { onDone: onClose });
+  // going to the server or group leaves whatever the link was in (a profile, a topic) behind too
+  const { member, busy, error, join, open } = useInviteJoin(code, hash, target, { onDone: () => useUI.getState().closeAllModals() });
   const headingId = useId();
   const isGroup = target?.kind === "group";
   const inviter = preview?.inviter;
@@ -52,7 +54,7 @@ export function InviteDialog({ onClose, code, hash }: { onClose: () => void; cod
         target={target}
         variant="dialog"
         headingId={headingId}
-        lead={inviter ? t("invite.invitedYouToJoin", { name: inviter.display_name || inviter.username }) : t("invite.youveBeenInvited")}
+        lead={inviter ? <Tr id="invite.invitedYouToJoin" values={{ name: <bdi>{inviter.display_name || inviter.username}</bdi> }} /> : t("invite.youveBeenInvited")}
         actions={
           <>
             {member ? (

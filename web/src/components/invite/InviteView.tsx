@@ -150,8 +150,9 @@ export function InviteView({ target, variant, lead, headingId, actions, children
       </div>
       <div className={s.body}>
         <div className={s.main}>
-          {lead ? <p className={s.lead} dir="auto">{lead}</p> : null}
-          <Heading id={headingId} className={s.name} dir="auto">{target.name}</Heading>
+          {lead ? <p className={s.lead}>{lead}</p> : null}
+          {/* the line follows the page's direction, as the counts under it do; the name keeps its own inside it */}
+          <Heading id={headingId} className={s.name}><bdi>{target.name}</bdi></Heading>
           <Counts target={target} />
         </div>
         {variant === "card" ? <div className={s.cardActions}>{actions}</div> : null}
