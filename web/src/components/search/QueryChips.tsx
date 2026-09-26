@@ -8,6 +8,7 @@
 import { AlertTriangle, AtSign, CalendarDays, Hash, MinusCircle, Pin, Server, Users, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/common/Avatar";
+import { isolate } from "@/components/server/bidi";
 import { t } from "@/i18n";
 import { dateRange, withoutToken, type HasKind, type QueryToken, type ResolvedQuery, type SearchQuery } from "@/lib/search";
 import { useChannels } from "@/stores/channels";
@@ -45,7 +46,7 @@ function unitOf(v: string): "day" | "month" | "year" {
 /** What one filter chip says, and whether it could be read. */
 function describe(tok: QueryToken, resolved: ResolvedQuery, names: Names, channelsById: ReturnType<typeof useChannels.getState>["byId"]): { icon: ReactNode; label: string; warn?: boolean } | null {
   const v = tok.value;
-  if (tok.kind === "exclude") return { icon: <MinusCircle size={14} />, label: t("search.chip.without", { word: v }) };
+  if (tok.kind === "exclude") return { icon: <MinusCircle size={14} />, label: t("search.chip.without", { word: isolate(v) }) };
   if (tok.kind !== "filter" || !v) return null;
   const lower = v.toLowerCase().replace(/^[@#]/, "");
   switch (tok.key) {
@@ -55,22 +56,22 @@ function describe(tok: QueryToken, resolved: ResolvedQuery, names: Names, channe
       const ids = tok.key === "from" ? resolved.from : resolved.mentions;
       // the first person the name found; a chip for each would say the same name twice
       const id = lower === "me" ? names.meId : Object.values(names.users).find((u) => u.username.toLowerCase() === lower || u.display_name.toLowerCase() === lower || (names.ctx.nicknames?.[u.id] ?? []).includes(lower) || u.id === lower)?.id;
-      if (!id || (ids && !ids.includes(id))) return { icon: <AlertTriangle size={14} />, label: t("search.chip.nobody", { name: v }), warn: true };
+      if (!id || (ids && !ids.includes(id))) return { icon: <AlertTriangle size={14} />, label: t("search.chip.nobody", { name: isolate(v) }), warn: true };
       const who = lower === "me" ? t("search.suggest.me") : names.person(id);
       return {
         icon: <Avatar id={id} avatarId={names.users[id]?.avatar_id ?? null} name={who} size={16} />,
-        label: tok.key === "from" ? t("search.chip.from", { name: who }) : t("search.chip.mentions", { name: who }),
+        label: tok.key === "from" ? t("search.chip.from", { name: isolate(who) }) : t("search.chip.mentions", { name: isolate(who) }),
       };
     }
     case "in": {
       const found = Object.entries(names.ctx.channelNames).find(([id, list]) => id === lower || list.includes(lower));
       const ch = found ? channelsById[found[0]] : undefined;
-      if (!ch) return { icon: <AlertTriangle size={14} />, label: t("search.chip.noConversation", { name: v }), warn: true };
+      if (!ch) return { icon: <AlertTriangle size={14} />, label: t("search.chip.noConversation", { name: isolate(v) }), warn: true };
       const icon = ch.type === "dm" ? <AtSign size={14} /> : ch.type === "group_dm" ? <Users size={14} /> : <Hash size={14} />;
-      return { icon, label: t("search.chip.in", { name: ch.type === "dm" ? `@${names.channel(ch)}` : names.channel(ch) }) };
+      return { icon, label: t("search.chip.in", { name: isolate(ch.type === "dm" ? `@${names.channel(ch)}` : names.channel(ch)) }) };
     }
     case "has": {
-      if (tok.invalid) return { icon: <AlertTriangle size={14} />, label: t("search.chip.badHas", { value: v }), warn: true };
+      if (tok.invalid) return { icon: <AlertTriangle size={14} />, label: t("search.chip.badHas", { value: isolate(v) }), warn: true };
       const Icon = HAS_ICONS[lower as HasKind];
       return { icon: <Icon size={14} />, label: t(HAS_CHIP[lower as HasKind]) };
     }
@@ -79,7 +80,7 @@ function describe(tok: QueryToken, resolved: ResolvedQuery, names: Names, channe
       return { icon: <Pin size={14} />, label: resolved.pinned === false && ["no", "false", "n", "0"].includes(lower) ? t("search.chip.notPinned") : t("search.chip.pinned") };
     default: {
       const range = dateRange(v);
-      if (!range || tok.invalid) return { icon: <AlertTriangle size={14} />, label: t("search.chip.badDate", { value: v }), warn: true };
+      if (!range || tok.invalid) return { icon: <AlertTriangle size={14} />, label: t("search.chip.badDate", { value: isolate(v) }), warn: true };
       const unit = unitOf(v);
       const when = formatPeriod(range.start, unit);
       const label = tok.key === "before" ? t("search.chip.before", { date: when }) : tok.key === "after" ? t("search.chip.after", { date: when }) : unit === "day" ? t("search.chip.onDay", { date: when }) : t("search.chip.duringPeriod", { date: when });
@@ -118,13 +119,13 @@ export function QueryChips({
   if (scope && scope.kind !== "all" && scopeLabel && onWiden) {
     const icon = scope.kind === "server" ? <Server size={14} /> : scopeLabel.startsWith("@") ? <AtSign size={14} /> : <Users size={14} />;
     chips.push(
-      <Chip key="scope" testId="search-scope" icon={icon} label={t("search.chip.in", { name: scopeLabel })} onRemove={onWiden} removeLabel={t("search.chip.widen", { name: scopeLabel })} />,
+      <Chip key="scope" testId="search-scope" icon={icon} label={t("search.chip.in", { name: isolate(scopeLabel) })} onRemove={onWiden} removeLabel={t("search.chip.widen", { name: isolate(scopeLabel) })} />,
     );
   }
   for (const tok of parsed.tokens) {
     const d = describe(tok, resolved, names, byId);
     if (!d) continue;
-    chips.push(<Chip key={`${tok.start}-${tok.end}`} testId="search-chip" icon={d.icon} label={d.label} warn={d.warn} onRemove={() => onChange(withoutToken(raw, tok))} removeLabel={t("search.chip.remove", { filter: d.label })} />);
+    chips.push(<Chip key={`${tok.start}-${tok.end}`} testId="search-chip" icon={d.icon} label={d.label} warn={d.warn} onRemove={() => onChange(withoutToken(raw, tok))} removeLabel={t("search.chip.remove", { filter: isolate(d.label) })} />);
   }
   const narrow = scope?.kind === "all" && narrowTo && onNarrow;
   if (chips.length === 0 && !narrow) return null;
@@ -133,7 +134,7 @@ export function QueryChips({
       {chips}
       {narrow ? (
         <button type="button" className={s.narrow} onClick={onNarrow} data-testid="search-narrow">
-          {t("search.chip.onlyIn", { name: narrowTo })}
+          {t("search.chip.onlyIn", { name: isolate(narrowTo) })}
         </button>
       ) : null}
     </div>

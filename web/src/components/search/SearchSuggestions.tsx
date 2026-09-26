@@ -7,6 +7,7 @@
 import { AtSign, CalendarDays, Clock, File, FileArchive, FileAudio, FileCode, FileSpreadsheet, FileText, Film, Hash, Image as ImageIcon, Link as LinkIcon, Music, Newspaper, Paperclip, Pin, Sticker, Users, X, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { Avatar } from "@/components/common/Avatar";
+import { isolate } from "@/components/server/bidi";
 import { t, translator } from "@/i18n";
 import type { HasKind } from "@/lib/search";
 import { forgetSearch } from "@/search/recent";
@@ -137,7 +138,7 @@ export function SuggestionRow({ item, names, onDate }: { item: Suggestion; names
             type="button"
             className={s.optRemove}
             tabIndex={-1}
-            aria-label={t("search.suggest.forget", { query: item.recent ?? "" })}
+            aria-label={t("search.suggest.forget", { query: isolate(item.recent ?? "") })}
             title={t("search.suggest.forgetShort")}
             onMouseDown={(e) => e.preventDefault()}
             onClick={(e) => {

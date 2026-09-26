@@ -443,6 +443,7 @@ function Finder({ onClose }: { onClose: () => void }) {
             placeholder={t("search.switcher.placeholder")}
             aria-label={t("sidebar.dMSidebar.findOrStartAConversation")}
             data-testid="switcher-input"
+            dir="auto"
             role="combobox"
             aria-expanded={searched ? floating.length > 0 : options.length > 0}
             aria-controls={searched ? (floating.length ? `${listId}-float` : undefined) : listId}

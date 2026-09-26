@@ -17,6 +17,7 @@ import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { isTopLayer } from "@/components/common/Modal";
 import { SearchBox } from "@/components/common/SearchBox";
+import { isolate } from "@/components/server/bidi";
 import { useFocusTrap } from "@/components/common/useFocusTrap";
 import { t } from "@/i18n";
 import type { SearchDoc } from "@/search/doc";
@@ -41,7 +42,7 @@ export function useSearchPlaceholder(channel: Channel): string {
   const byId = useChannels((c) => c.byId);
   const names = useNames();
   const scope = scopeOf(channel, byId);
-  return t("search.box.placeholder", { name: scopeName(scope, byId, names) });
+  return t("search.box.placeholder", { name: isolate(scopeName(scope, byId, names)) });
 }
 
 /** The conversations offered for in:, the ones in scope first, then by how recently they were used. */
@@ -203,7 +204,7 @@ export function SearchPanel({
       {floating.length ? <SearchSuggestions groups={floating} active={sk.active} listId={listId} names={names} onPick={pick} onHover={sk.setActive} onDate={onDate} /> : null}
       {run.empty ? (
         <div className={s.intro}>
-          <p className={s.introTitle}>{scope.kind === "all" ? t("search.intro.everywhere") : t("search.intro.scoped", { name: scopeName(scope, byId, names) })}</p>
+          <p className={s.introTitle}>{scope.kind === "all" ? t("search.intro.everywhere") : t("search.intro.scoped", { name: isolate(scopeName(scope, byId, names)) })}</p>
           <p className={s.introText}>{t("search.intro.private")}</p>
           {/* with a filter half typed, its suggestions are the ones floating above */}
           {query.trim() ? null : <SearchSuggestions groups={groups} active={-1} listId={`${listId}-intro`} names={names} onPick={pick} onHover={() => undefined} onDate={onDate} onClearRecent={clearRecentSearches} floating={false} />}
@@ -242,10 +243,11 @@ export function SearchPanel({
             onQuery(v);
             setOwnCaret(v.length);
           }}
-          placeholder={scope.kind === "all" ? t("search.box.placeholderEverywhere") : t("search.box.placeholder", { name: scopeName(scope, byId, names) })}
+          placeholder={scope.kind === "all" ? t("search.box.placeholderEverywhere") : t("search.box.placeholder", { name: isolate(scopeName(scope, byId, names)) })}
           aria-label={t("search.box.label")}
           autoFocus
           data-testid="search-input-mobile"
+          dir="auto"
           role="combobox"
           aria-expanded={floating.length > 0}
           aria-controls={floating.length ? listId : undefined}

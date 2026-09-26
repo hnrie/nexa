@@ -13,6 +13,7 @@ import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, 
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
+import { isolate } from "@/components/server/bidi";
 import { menuAnchor } from "@/components/common/ContextMenu";
 import { Lightbox, type LightboxItem } from "@/components/chat/Lightbox";
 import type { AttachmentMeta } from "@/crypto/message";
@@ -259,7 +260,7 @@ function MediaGrid({ run, names, sort, onJump }: { run: SearchRun; names: Names;
   const items: LightboxItem[] = useMemo(
     () =>
       tiles.map(({ doc, item }) => {
-        const from = t("search.media.from", { name: names.person(doc.a), date: formatShortDate(doc.ts) });
+        const from = t("search.media.from", { name: isolate(names.person(doc.a)), date: formatShortDate(doc.ts) });
         const jump = () => {
           setOpen(null);
           onJump(doc);
@@ -282,7 +283,7 @@ function MediaGrid({ run, names, sort, onJump }: { run: SearchRun; names: Names;
       }
     }
     const video = tile.item.kind === "file" ? isVideo(tile.item.att.type) : tile.item.embed.type === "video";
-    const label = t(video ? "search.media.videoFrom" : "search.media.imageFrom", { name: names.person(tile.doc.a), date: formatShortDate(tile.doc.ts) });
+    const label = t(video ? "search.media.videoFrom" : "search.media.imageFrom", { name: isolate(names.person(tile.doc.a)), date: formatShortDate(tile.doc.ts) });
     out.push(
       <button key={tile.key} type="button" className={s.tile} data-tile="" data-testid="search-media-tile" tabIndex={i === focus ? 0 : -1} aria-label={label} title={tileName(tile.item)} onFocus={() => setFocus(i)} onClick={() => setOpen(i)}>
         <MediaThumb item={tile.item} className={s.tileImg} />
@@ -324,10 +325,10 @@ function LinkRows({ run, names, onJump }: { run: SearchRun; names: Names; onJump
                   <time className={s.hitTime} dateTime={new Date(doc.ts).toISOString()} title={formatFull(doc.ts)}>{formatShortDate(doc.ts)}</time>
                 </span>
                 <span className={s.linkTitle} dir="auto">{title ?? link.url.replace(/^https?:\/\//, "")}</span>
-                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: names.person(doc.a), where: w.label })}</span>
+                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: isolate(names.person(doc.a)), where: isolate(w.label) })}</span>
               </span>
             </button>
-            <a className={s.rowAction} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={t("search.links.open", { host })} title={t("search.links.open", { host })}>
+            <a className={s.rowAction} href={link.url} target="_blank" rel="noopener noreferrer" aria-label={t("search.links.open", { host: isolate(host) })} title={t("search.links.open", { host: isolate(host) })}>
               <ExternalLink size={16} />
             </a>
           </div>
@@ -355,15 +356,15 @@ function FileRows({ run, names, onJump }: { run: SearchRun; names: Names; onJump
                   <span className={s.rowTitle} dir="auto">{att.name}</span>
                   <span className={s.hitTime}>{formatBytes(att.size)}</span>
                 </span>
-                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: names.person(doc.a), where: w.label })}</span>
+                <span className={s.rowMeta} dir="auto">{t("search.byIn", { name: isolate(names.person(doc.a)), where: isolate(w.label) })}</span>
                 <span className={s.rowMeta}>{formatShortDate(doc.ts)}</span>
               </span>
             </button>
             <button
               type="button"
               className={s.rowAction}
-              aria-label={t("search.files.download", { name: att.name })}
-              title={t("search.files.download", { name: att.name })}
+              aria-label={t("search.files.download", { name: isolate(att.name) })}
+              title={t("search.files.download", { name: isolate(att.name) })}
               onClick={() => void saveAttachment(att).catch(() => toast(t("search.files.downloadFailed"), "error"))}
             >
               <Download size={16} />

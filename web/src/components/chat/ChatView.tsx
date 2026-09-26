@@ -281,6 +281,7 @@ export function ChatView({ channel }: { channel: Channel }) {
             aria-label={tr_("chat.chat.searchMessages")}
             title={tr_("chat.chat.searchThisDeviceSDecryptedMessages")}
             data-testid="search-input"
+            dir="auto"
             data-header-search=""
             role="combobox"
             aria-expanded={searchOpen && !!suggestList}
