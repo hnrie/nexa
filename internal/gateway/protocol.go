@@ -129,6 +129,9 @@ const (
 	EvNexaAnnouncementDelete = "nexa_announcement_delete"
 	EvModCase                = "mod_case"
 	EvModLog                 = "mod_log"
+	// Bug reports, the same two ways: to the reporter through Nexa, and to staff.
+	EvNexaBug = "nexa_bug"
+	EvModBug  = "mod_bug"
 )
 
 // Presence is a user's visible status.
