@@ -639,3 +639,5 @@ function TableTray({ table, run }: { table: NonNullable<SurfaceState["table"]>; 
     </div>
   );
 }
+
+export default FormatEditor;
