@@ -1,4 +1,4 @@
-import { AtSign, ChevronLeft, Hash, Lock, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
+import { AtSign, ChevronLeft, MessageCircle, MoreVertical, Phone, Pin, Search, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";

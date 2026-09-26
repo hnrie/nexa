@@ -1,4 +1,4 @@
-import { Hash, Lock, MessageCircle, Plus, Users, Volume2, X } from "lucide-react";
+import { Lock, MessageCircle, Plus, Users, X } from "lucide-react";
 import { useRef, useState } from "react";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
