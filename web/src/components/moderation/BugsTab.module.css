@@ -1,0 +1,223 @@
+/* The Bug Reports tab. It sits in the panel's case workspace
+   (Moderation.module.css) and keeps its look; what is here is the list's own
+   rows, which carry more than a case's: who sent it, the start of what it
+   says, and its files. */
+
+/* a little wider than the case list, for the thumbnails */
+.workspace {
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+}
+
+.tools {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.toolRow {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+.search {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sort {
+  flex: none;
+  width: auto;
+  max-width: 45%;
+  height: 32px;
+  padding: 0 6px;
+  font-size: 13.5px;
+}
+@media (pointer: coarse) {
+  .sort {
+    height: 40px;
+    font-size: 16px;
+  }
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chips > button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.filesChip[aria-pressed="true"] {
+  background: var(--bg-selected);
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+/* One report. The subject is the button that opens it, stretched over the
+   whole row; the reporter's name sits above that, as its own way to their
+   profile. */
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-areas:
+    "avatar main"
+    "avatar who"
+    ". preview"
+    ". files";
+  column-gap: 10px;
+  row-gap: 3px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+}
+.row:hover {
+  background: var(--bg-hover);
+}
+.row[data-selected] {
+  background: var(--bg-selected);
+}
+.row:focus-within:has(.rowMain:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+.rowAvatar {
+  grid-area: avatar;
+  position: relative;
+  z-index: 1;
+  cursor: pointer;
+  line-height: 0;
+  align-self: start;
+}
+.rowMain {
+  grid-area: main;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  text-align: start;
+  color: inherit;
+  outline: none;
+}
+.rowMain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.rowNumber {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.rowSubject {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row[data-waiting] .rowSubject {
+  font-weight: 700;
+}
+.rowTime {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.rowWho {
+  grid-area: who;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+}
+.reporter {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reporter:not(:disabled):hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.reporter:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.rowStatus {
+  height: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 0 6px;
+}
+.rowPreview {
+  grid-area: preview;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-subtle);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.rowFiles {
+  grid-area: files;
+  margin-top: 4px;
+}
+
+.paneIcon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+}
+
+@container panel (max-width: 767px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* finger-sized targets */
+@media (pointer: coarse) {
+  .chips > button {
+    height: 40px;
+  }
+  .reporter {
+    min-height: 32px;
+  }
+}

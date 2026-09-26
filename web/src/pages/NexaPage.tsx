@@ -1,11 +1,13 @@
 import { Info, LockOpen, Megaphone } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FeedItem, People } from "@/api/moderation";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { NexaAvatar, OfficialBadge, PersonChip } from "@/components/nexa/NexaBits";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
+import { BugFeedEntry, bugFeedKind, isBugItem, type BugItem } from "@/components/bugs/BugFeed";
+import { ReportBugButton } from "@/components/bugs/ReportBugButton";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { fullDate } from "@/lib/moderation";
@@ -69,6 +71,8 @@ export default function NexaPage() {
         <span className={s.headerName}>Nexa</span>
         <OfficialBadge />
         <span className={s.headerSub}>{t("nexa.headerSub")}</span>
+        <span className={s.spacer} />
+        <ReportBugButton from="nexa" labelled />
       </header>
       <div className={s.feed} ref={scroller} onScroll={onScroll}>
         {more ? (
@@ -93,7 +97,15 @@ export default function NexaPage() {
         ) : feed.length === 0 ? (
           <p className={s.empty}>{t("nexa.empty")}</p>
         ) : (
-          feed.map((it) => <FeedEntry key={it.kind === "announcement" ? `a${it.announcement.id}` : `${it.kind}${it.case.id}`} item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/cases/${id}`)} />)
+          feed.map((it) =>
+            isBugItem(it) ? (
+              <FeedFrame key={it.kind === "bug" ? `bug${it.bug.id}` : `bugline${it.message.id}`} kind={it.kind} kindLabel={bugFeedKind(it)} at={it.at}>
+                <BugFeedEntry item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/bugs/${id}`)} />
+              </FeedFrame>
+            ) : (
+              <FeedEntry key={it.kind === "announcement" ? `a${it.announcement.id}` : `${it.kind}${it.case.id}`} item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/cases/${id}`)} />
+            ),
+          )
         )}
       </div>
       <p className={s.systemFooter} role="note">
@@ -104,7 +116,27 @@ export default function NexaPage() {
   );
 }
 
-function FeedEntry({ item, people, onOpen }: { item: FeedItem; people: People; onOpen: (caseId: string) => void }) {
+/** One item of the conversation from Nexa, with the kind of item it is and when it came. */
+function FeedFrame({ kind, kindLabel, at, children }: { kind: string; kindLabel: string; at: number; children: ReactNode }) {
+  return (
+    <article className={s.feedItem} data-kind={kind} data-testid={`nexa-item-${kind}`}>
+      <NexaAvatar size={40} />
+      <div className={s.feedBody}>
+        <div className={s.feedHead}>
+          <span className={s.lineName}>Nexa</span>
+          <OfficialBadge compact />
+          <span className={s.feedKind}>{kindLabel}</span>
+          <time className={s.lineTime} dateTime={new Date(at).toISOString()} title={fullDate(at)}>
+            {formatTimestamp(at)}
+          </time>
+        </div>
+        {children}
+      </div>
+    </article>
+  );
+}
+
+function FeedEntry({ item, people, onOpen }: { item: Exclude<FeedItem, BugItem>; people: People; onOpen: (caseId: string) => void }) {
   const ctx = useRenderCtx();
   const kind = item.kind === "announcement" ? t("nexa.kind.announcement") : item.kind === "lift" ? t("nexa.kind.update") : t("nexa.kind.notice");
   return (

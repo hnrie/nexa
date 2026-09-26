@@ -20,6 +20,8 @@ import { copyAndSay } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
 import { useAuth } from "@/stores/auth";
 import s from "@/components/friends/Friends.module.css";
+import { ReportBugButton } from "@/components/bugs/ReportBugButton";
+import bugStyles from "@/components/bugs/Bugs.module.css";
 import { guarded } from "@/lib/captcha";
 import { describeError } from "@/lib/errors";
 
@@ -112,6 +114,7 @@ export default function FriendsPage() {
       <header className={s.header}>
         <PageHeaderButtons />
         <div className={s.title}><Users size={22} /> <span className={s.titleText}>{tr_("sidebar.dMSidebar.friends")}</span></div>
+        <ReportBugButton from="friends" className={bugStyles.friendsBug} wrapClassName={bugStyles.friendsBugWrap} />
         <div className={s.tabs} role="tablist" aria-label={tr_("sidebar.dMSidebar.friends")}>
           {tabs.map((x) => (
             <button key={x.id} className={s.tab} role="tab" aria-selected={tab === x.id} tabIndex={tab === x.id ? 0 : -1} onKeyDown={onTabKey} data-selected={tab === x.id} onClick={() => setTab(x.id)}>

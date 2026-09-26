@@ -85,6 +85,8 @@ type Server struct {
 	limExpr    *ratelimit.Limiter
 	limImport  *ratelimit.Limiter
 	limCrash   *ratelimit.Limiter
+	limBug     *ratelimit.Limiter
+	limBugFile *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -195,6 +197,12 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limImport: ratelimit.New(ratelimit.Every(10, time.Hour), 6, 2*time.Hour),
 		// crash reports, per account: a broken page reports a burst, not a flood
 		limCrash: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
+		// bug reports, per account: someone who hit a few bugs in one sitting
+		// can send them all, and the team is not flooded by one account
+		limBug: ratelimit.New(ratelimit.Every(4, time.Hour), 4, 2*time.Hour),
+		// files for bug reports, per account: five to a report, a few reports,
+		// and room to add one again after taking it out
+		limBugFile: ratelimit.New(ratelimit.Every(30, time.Hour), 15, 2*time.Hour),
 	}
 }
 
@@ -206,7 +214,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "message": s.limMsg,
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
-		"import": s.limImport, "crash": s.limCrash,
+		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
 	}
 }
 

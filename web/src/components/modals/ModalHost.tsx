@@ -26,6 +26,7 @@ import type { StickerInfo } from "@/api/types";
 import { StickerPackModal } from "./StickerPackModal";
 import { BlockDialog } from "@/components/profile/BlockDialog";
 import { FolderSettingsModal } from "@/components/rail/FolderSettingsModal";
+import type { BugFrom } from "@/components/bugs/ReportBugModal";
 
 import { t } from "@/i18n";
 const SettingsModal = lazyPage(() => import("@/components/settings/SettingsModal"));
@@ -36,6 +37,7 @@ const MemberActionModal = lazyPage(() => import("@/components/server/MemberActio
 const SubchatModal = lazyPage(() => import("./SubchatModal"));
 const VerifyKeyModal = lazyPage(() => import("./VerifyKeyModal"));
 const KeyChangeModal = lazyPage(() => import("./KeyChangeModal"));
+const ReportBugModal = lazyPage(() => import("@/components/bugs/ReportBugModal"));
 
 /** Stands in for a dialog whose code is still on its way. */
 function Loading({ onClose }: { onClose: () => void }) {
@@ -117,6 +119,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
         {modal?.kind === "memberAction" ? <MemberActionModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={String(modal.props?.["userId"])} action={modal.props?.["action"] as "kick" | "ban" | "timeout" | "roles"} /> : null}
         {modal?.kind === "verifyKey" ? <VerifyKeyModal onClose={close} userId={String(modal.props?.["userId"])} /> : null}
         {modal?.kind === "keyChange" ? <KeyChangeModal onClose={close} /> : null}
+        {modal?.kind === "reportBug" ? <ReportBugModal onClose={close} from={modal.props?.["from"] as BugFrom | undefined} /> : null}
       </Suspense>
     </>
   );

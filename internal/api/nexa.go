@@ -224,6 +224,9 @@ type nexaState struct {
 type staffSummary struct {
 	Counts  store.ModCaseCounts `json:"counts"`
 	OwnerID ids.ID              `json:"owner_id"`
+	// Bugs counts the bug reports in each view of their tab (nil when they
+	// could not be read).
+	Bugs *store.BugCounts `json:"bugs,omitempty"`
 }
 
 func (s *Server) nexaState(ctx context.Context, u *store.User) (*nexaState, error) {
@@ -272,7 +275,7 @@ func (s *Server) nexaState(ctx context.Context, u *store.User) (*nexaState, erro
 		if err != nil {
 			return nil, err
 		}
-		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID}
+		st.Staff = &staffSummary{Counts: counts, OwnerID: st.OwnerID, Bugs: s.bugCountsFor(ctx)}
 	}
 	st.People = s.people(ctx, who...)
 	return st, nil
@@ -345,12 +348,17 @@ func (s *Server) handleNexa(w http.ResponseWriter, r *http.Request) {
 }
 
 // feedItem is one thing in the member's Nexa conversation: a notice about a
-// case, a lifted mute or ban, or an announcement.
+// case, a lifted mute or ban, an announcement, a bug report they sent, or a
+// reply or a change of status in one.
 type feedItem struct {
-	Kind         string            `json:"kind"` // notice | lift | announcement
+	Kind         string            `json:"kind"` // notice | lift | announcement | bug | bug_reply | bug_status
 	At           int64             `json:"at"`
 	Case         *memberCase       `json:"case,omitempty"`
 	Announcement *announcementView `json:"announcement,omitempty"`
+	// Bug is the report the item is about; Message is the staff reply or the
+	// status line, for bug_reply and bug_status.
+	Bug     *memberBug        `json:"bug,omitempty"`
+	Message *store.BugMessage `json:"message,omitempty"`
 }
 
 // announcementView is an announcement as anyone sees it; the author is in the
@@ -401,6 +409,41 @@ func (s *Server) handleNexaFeed(w http.ResponseWriter, r *http.Request) {
 		v := toAnnouncementView(a)
 		items = append(items, feedItem{Kind: "announcement", At: a.CreatedAt, Announcement: &v})
 	}
+	// the reports they sent, and what the team said in them since
+	reports, err := s.Store.BugReportsForUser(ctx, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	bugs, err := s.memberBugs(ctx, me.ID, reports)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	bugByID := make(map[ids.ID]*memberBug, len(bugs))
+	for i := range bugs {
+		b := &bugs[i]
+		bugByID[b.ID] = b
+		if keep(b.CreatedAt) {
+			items = append(items, feedItem{Kind: "bug", At: b.CreatedAt, Bug: b})
+		}
+	}
+	news, err := s.Store.BugNewsForUser(ctx, me.ID, before, feedPage+1)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	for _, m := range news {
+		b := bugByID[m.ReportID]
+		if b == nil {
+			continue
+		}
+		kind := "bug_reply"
+		if m.Kind == store.ModMsgSystem {
+			kind = "bug_status"
+		}
+		items = append(items, feedItem{Kind: kind, At: m.CreatedAt, Bug: b, Message: m})
+	}
 	sort.SliceStable(items, func(i, j int) bool { return items[i].At > items[j].At })
 	more := len(items) > feedPage
 	if more {
@@ -416,6 +459,9 @@ func (s *Server) handleNexaFeed(w http.ResponseWriter, r *http.Request) {
 		}
 		if it.Announcement != nil {
 			who = append(who, it.Announcement.AuthorID)
+		}
+		if it.Message != nil {
+			who = append(who, it.Message.AuthorID)
 		}
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"items": items, "has_more": more, "people": s.people(ctx, who...)})

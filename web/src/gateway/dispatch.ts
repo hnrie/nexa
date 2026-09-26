@@ -24,6 +24,7 @@ import type { Message, PublicUser, Relationship, ServerView } from "@/api/types"
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
 import { emitModEvent, useModeration } from "@/stores/moderation";
+import { bugAlertHooks } from "@/lib/bugs";
 import { mentionsMe } from "@/lib/mentionsMe";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "@/lib/blocked";
 import { loadChunk } from "@/lib/lazyChunk";
@@ -78,6 +79,7 @@ function applyNexaState(st: NexaState | undefined): void {
   if (st.staff) {
     useModeration.getState().setCounts(st.staff.counts);
     useModeration.getState().setOwner(st.staff.owner_id);
+    useModeration.getState().setBugCounts(st.staff.bugs);
   }
 }
 
@@ -512,6 +514,21 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "mod_log":
       emitModEvent({ type: "log", entry: e.d.entry, people: e.d.people });
+      return;
+    case "nexa_bug": {
+      useNexa.getState().onBug(e.d.report, e.d.messages, e.d.people, e.d.state);
+      applyNexaState(e.d.state);
+      // the team said something: a reply, or a new status
+      const said = e.d.messages.find((m) => m.kind === "staff") ?? e.d.messages.find((m) => m.kind === "system");
+      if (said) for (const h of bugAlertHooks) h({ kind: said.kind === "staff" ? "reply" : "status", report: e.d.report });
+      return;
+    }
+    case "mod_bug":
+      useModeration.getState().setBugCounts(e.d.counts);
+      emitModEvent({ type: "bug", report: e.d.report, messages: e.d.messages, people: e.d.people });
+      // a new report, or the reporter writing, is what the staff are waiting for
+      if (!e.d.report.last_message) for (const h of bugAlertHooks) h({ kind: "staff", report: e.d.report, isNew: true });
+      else if (e.d.messages.some((m) => m.kind === "member")) for (const h of bugAlertHooks) h({ kind: "staff", report: e.d.report, isNew: false });
       return;
     case "account_banned":
       // the socket was shut on a ban; what the ban screen needs comes over REST

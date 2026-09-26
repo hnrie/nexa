@@ -111,7 +111,8 @@ export function Rail() {
   if (nexaUnread > 0) unread = true;
   homeCount += nexaUnread;
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
-  const needsReply = useModeration((m) => m.counts?.needs_reply ?? 0);
+  // cases the member wrote in last, and bug reports waiting for an answer
+  const needsReply = useModeration((m) => (m.counts?.needs_reply ?? 0) + (m.bugCounts?.waiting ?? 0));
   const inPanel = loc.pathname.startsWith("/channels/@admin");
   // like the people themselves waiting at the door: who sent something, and how much
   const waiting = unreadConversations(channels, reads, settings, openConvo).slice(0, MAX_WAITING);

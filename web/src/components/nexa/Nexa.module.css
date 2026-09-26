@@ -522,6 +522,15 @@
 .systemLine[data-event="replaced"] .systemIcon {
   color: var(--warning);
 }
+.systemLine[data-status="resolved"] .systemIcon {
+  color: var(--positive);
+}
+.systemLine[data-status="in_progress"] .systemIcon {
+  color: var(--warning);
+}
+.systemLine[data-status="open"] .systemIcon {
+  color: var(--text-brand);
+}
 .systemText {
   flex: 1;
   min-width: 0;

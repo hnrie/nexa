@@ -20,6 +20,7 @@ import type {
   VoiceState,
 } from "@/api/types";
 import type { Announcement, CaseCounts, CaseMessage, MemberCase, ModLogEntry, NexaState, People, StaffCase } from "@/api/moderation";
+import type { BugCounts, BugMessage, MemberBug, StaffBug } from "@/api/bugs";
 
 /** What a deleted message mentioned, which is what unread badges counted it by. */
 export interface MentionMeta {
@@ -88,6 +89,10 @@ export type GatewayEvent =
   | { t: "mod_case"; d: { case: StaffCase; messages: CaseMessage[]; people: People; counts: CaseCounts } }
   /** Staff: a new line in the punishment log. */
   | { t: "mod_log"; d: { entry: ModLogEntry; people: People } }
+  /** One of this account's bug reports moved: sent from another device, answered, or given a new status. */
+  | { t: "nexa_bug"; d: { report: MemberBug; messages: BugMessage[]; people: People; state: NexaState } }
+  /** Staff: a bug report arrived or changed, with any new lines of its thread. */
+  | { t: "mod_bug"; d: { report: StaffBug; messages: BugMessage[]; people: People; counts: BugCounts } }
   /** Not from the server: the gateway was closed because the account is banned. */
   | { t: "account_banned"; d?: undefined }
   | { t: "heartbeat_ack"; d?: undefined };

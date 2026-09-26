@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { create } from "zustand";
 import type { Announcement, CaseCounts, CaseMessage, ModLogEntry, People, StaffCase } from "@/api/moderation";
+import type { BugCounts, BugMessage, StaffBug } from "@/api/bugs";
 
 /**
  * The staff's side: how much is waiting on them (the rail and sidebar show
@@ -13,13 +14,17 @@ export type ModEvent =
   | { type: "case"; case: StaffCase; messages: CaseMessage[]; people: People }
   | { type: "log"; entry: ModLogEntry; people: People }
   | { type: "announcement"; announcement: Announcement; people: People }
-  | { type: "announcement_gone"; id: string };
+  | { type: "announcement_gone"; id: string }
+  | { type: "bug"; report: StaffBug; messages: BugMessage[]; people: People };
 
 interface ModerationStore {
   counts: CaseCounts | null;
+  /** How many bug reports each view of the Bug Reports tab holds; `waiting` is what the badges count. */
+  bugCounts: BugCounts | null;
   ownerId: string | null;
   people: People;
   setCounts: (c: CaseCounts | undefined) => void;
+  setBugCounts: (c: BugCounts | null | undefined) => void;
   setOwner: (id: string | undefined) => void;
   mergePeople: (p: People | undefined) => void;
   reset: () => void;
@@ -27,12 +32,14 @@ interface ModerationStore {
 
 export const useModeration = create<ModerationStore>()((set) => ({
   counts: null,
+  bugCounts: null,
   ownerId: null,
   people: {},
   setCounts: (counts) => counts && set({ counts }),
+  setBugCounts: (bugCounts) => bugCounts && set({ bugCounts }),
   setOwner: (id) => id && set({ ownerId: id }),
   mergePeople: (p) => p && set((s) => ({ people: { ...s.people, ...p } })),
-  reset: () => set({ counts: null, ownerId: null, people: {} }),
+  reset: () => set({ counts: null, bugCounts: null, ownerId: null, people: {} }),
 }));
 
 const listeners = new Set<(e: ModEvent) => void>();

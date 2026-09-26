@@ -1096,8 +1096,9 @@ func (s *Store) SetNexaSeen(ctx context.Context, uid ids.ID, at int64) error {
 }
 
 // NexaUnread counts what is waiting for the member from Nexa: notices and
-// announcements that arrived after they last looked, and staff replies in
-// their cases they have not read. createdAt is when their account was made;
+// announcements that arrived after they last looked, staff replies in their
+// cases they have not read, and staff replies and status changes in their bug
+// reports they have not read. createdAt is when their account was made;
 // announcements from before it were never theirs.
 func (s *Store) NexaUnread(ctx context.Context, uid ids.ID, createdAt int64) (int, error) {
 	seen, err := s.NexaSeen(ctx, uid)
@@ -1109,24 +1110,28 @@ func (s *Store) NexaUnread(ctx context.Context, uid ids.ID, createdAt int64) (in
 		(SELECT count(*) FROM mod_cases WHERE user_id = ? AND created_at > ?) +
 		(SELECT count(*) FROM mod_cases WHERE user_id = ? AND lifted_at IS NOT NULL AND lifted_at > ?) +
 		(SELECT count(*) FROM mod_announcements WHERE created_at > ? AND created_at >= ?) +
-		(SELECT count(*) FROM mod_messages m JOIN mod_cases c ON c.id = m.case_id WHERE c.user_id = ? AND m.kind = 'staff' AND m.id > c.member_read_id)`,
-		int64(uid), seen, int64(uid), seen, seen, createdAt, int64(uid)).Scan(&n)
+		(SELECT count(*) FROM mod_messages m JOIN mod_cases c ON c.id = m.case_id WHERE c.user_id = ? AND m.kind = 'staff' AND m.id > c.member_read_id) +
+		(SELECT count(*) FROM bug_messages m JOIN bug_reports r ON r.id = m.report_id WHERE r.user_id = ? AND `+bugNews+` AND m.id > r.member_read_id)`,
+		int64(uid), seen, int64(uid), seen, seen, createdAt, int64(uid), int64(uid)).Scan(&n)
 	return n, err
 }
 
 // NexaLatest is when Nexa last had something for the member (0: never): a
-// notice, a lift, an announcement, or a staff reply in one of their cases.
-// It decides whether their Nexa conversation shows at all, where it sorts
-// among their conversations, and whether one they closed comes back.
+// notice, a lift, an announcement, a staff reply in one of their cases, a bug
+// report they sent, or a staff reply or status change in one. It decides
+// whether their Nexa conversation shows at all, where it sorts among their
+// conversations, and whether one they closed comes back.
 func (s *Store) NexaLatest(ctx context.Context, uid ids.ID, createdAt int64) (int64, error) {
-	var a, b, c, d sql.NullInt64
+	var a, b, c, d, e, f sql.NullInt64
 	err := s.db.R.QueryRowContext(ctx, `SELECT
 		(SELECT max(created_at) FROM mod_cases WHERE user_id = ?),
 		(SELECT max(lifted_at) FROM mod_cases WHERE user_id = ?),
 		(SELECT max(created_at) FROM mod_announcements WHERE created_at >= ?),
-		(SELECT max(m.created_at) FROM mod_messages m JOIN mod_cases c ON c.id = m.case_id WHERE c.user_id = ? AND m.kind = 'staff')`,
-		int64(uid), int64(uid), createdAt, int64(uid)).Scan(&a, &b, &c, &d)
-	return max(a.Int64, b.Int64, c.Int64, d.Int64), err
+		(SELECT max(m.created_at) FROM mod_messages m JOIN mod_cases c ON c.id = m.case_id WHERE c.user_id = ? AND m.kind = 'staff'),
+		(SELECT max(created_at) FROM bug_reports WHERE user_id = ?),
+		(SELECT max(m.created_at) FROM bug_messages m JOIN bug_reports r ON r.id = m.report_id WHERE r.user_id = ? AND `+bugNews+`)`,
+		int64(uid), int64(uid), createdAt, int64(uid), int64(uid), int64(uid)).Scan(&a, &b, &c, &d, &e, &f)
+	return max(a.Int64, b.Int64, c.Int64, d.Int64, e.Int64, f.Int64), err
 }
 
 // --- accounts -------------------------------------------------------------------

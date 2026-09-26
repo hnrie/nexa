@@ -8,6 +8,7 @@
  * itself — and the app says so wherever one is written.
  */
 import { api } from "./client";
+import type { BugCounts, BugMessage, MemberBug } from "./bugs";
 import type { PublicUser, Snowflake } from "./types";
 
 export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete";
@@ -137,8 +138,8 @@ export interface NexaState {
   people: People;
   /** The instance's owner, for every account ("0" when there is none yet; absent from older servers). */
   owner_id?: Snowflake;
-  /** Staff only: what is waiting on them. */
-  staff?: { counts: CaseCounts; owner_id: Snowflake };
+  /** Staff only: what is waiting on them (bug report counts are absent from older servers). */
+  staff?: { counts: CaseCounts; owner_id: Snowflake; bugs?: BugCounts };
 }
 
 export interface Announcement {
@@ -151,7 +152,11 @@ export interface Announcement {
 
 export type FeedItem =
   | { kind: "notice" | "lift"; at: number; case: MemberCase }
-  | { kind: "announcement"; at: number; announcement: Announcement };
+  | { kind: "announcement"; at: number; announcement: Announcement }
+  /** A bug report the member sent. */
+  | { kind: "bug"; at: number; bug: MemberBug }
+  /** A staff reply in one of the member's bug reports, or a change of its status. */
+  | { kind: "bug_reply" | "bug_status"; at: number; bug: MemberBug; message: BugMessage };
 
 export type BlockReason = "" | "self" | "system" | "deleted" | "owner" | "staff";
 
@@ -228,7 +233,7 @@ export const nexa = {
 };
 
 export const moderation = {
-  summary(): Promise<{ counts: CaseCounts; owner_id: Snowflake; nexa_id: Snowflake; staff_ids: Snowflake[]; people: People }> {
+  summary(): Promise<{ counts: CaseCounts; bugs?: BugCounts | null; owner_id: Snowflake; nexa_id: Snowflake; staff_ids: Snowflake[]; people: People }> {
     return api.request("GET", "/moderation/summary");
   },
   users(p: { q?: string; show?: GridShow; sort?: GridSort; cursor?: string; limit?: number }): Promise<{ users: ModUser[]; next_cursor: string }> {

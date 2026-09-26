@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
 import { nexa as nexaApi, type Announcement, type CaseMessage, type FeedItem, type MemberCase, type NexaState, type People, type Restriction } from "@/api/moderation";
+import { bugs as bugsApi, type BugMessage, type MemberBug } from "@/api/bugs";
+import { clearBugFiles } from "@/lib/bugMedia";
 
 /**
  * The account's side of Nexa: its standing (a mute or ban in force, notices
@@ -14,6 +16,12 @@ import { nexa as nexaApi, type Announcement, type CaseMessage, type FeedItem, ty
 export interface Thread {
   case: MemberCase;
   messages: CaseMessage[];
+}
+
+/** One of the account's bug reports, with its thread with the team. */
+export interface BugThread {
+  report: MemberBug;
+  messages: BugMessage[];
 }
 
 /** A deletion notice, kept past sign-out so it can be read on the way out. */
@@ -30,6 +38,7 @@ interface NexaStore {
   feedMore: boolean;
   feedLoading: boolean;
   threads: Record<string, Thread>;
+  bugThreads: Record<string, BugThread>;
   /** Survives reset: shown over the sign-in page after a moderator deletes the account. */
   deleted: DeletedNotice | null;
 
@@ -46,6 +55,11 @@ interface NexaStore {
   markThreadRead: (caseId: string) => void;
   markSeen: () => void;
   ack: (caseId: string) => Promise<void>;
+  loadBugThread: (reportId: string) => Promise<BugThread>;
+  /** A report of this account's moved: sent from another device, answered, or given a new status. */
+  onBug: (report: MemberBug, messages: BugMessage[], people: People, st: NexaState) => void;
+  replyBug: (reportId: string, body: string) => Promise<void>;
+  markBugRead: (reportId: string) => void;
   dismissDeleted: () => void;
   /** Forgets the account's Nexa state on sign-out; a deletion notice stays. */
   reset: () => void;
@@ -57,7 +71,17 @@ function sortFeed(items: FeedItem[]): FeedItem[] {
 }
 
 function feedKey(it: FeedItem): string {
-  return it.kind === "announcement" ? `a:${it.announcement.id}` : `${it.kind}:${it.case.id}`;
+  switch (it.kind) {
+    case "announcement":
+      return `a:${it.announcement.id}`;
+    case "bug":
+      return `bug:${it.bug.id}`;
+    case "bug_reply":
+    case "bug_status":
+      return `bugline:${it.message.id}`;
+    default:
+      return `${it.kind}:${it.case.id}`;
+  }
 }
 
 /** Puts items into a feed, replacing the ones already there. */
@@ -75,7 +99,24 @@ function caseIntoFeed(feed: FeedItem[] | null, c: MemberCase): FeedItem[] | null
   return mergeFeed(feed, items);
 }
 
-function appendLines(existing: CaseMessage[], lines: CaseMessage[]): CaseMessage[] {
+/**
+ * A report changed: its own item and every line about it show the new state,
+ * and what the team just said joins the conversation.
+ */
+export function bugIntoFeed(feed: FeedItem[] | null, report: MemberBug, lines: BugMessage[]): FeedItem[] | null {
+  if (!feed) return feed;
+  const items: FeedItem[] = [{ kind: "bug", at: report.created_at, bug: report }];
+  for (const it of feed) {
+    if ((it.kind === "bug_reply" || it.kind === "bug_status") && it.bug.id === report.id) items.push({ ...it, bug: report });
+  }
+  for (const m of lines) {
+    if (m.kind === "staff") items.push({ kind: "bug_reply", at: m.created_at, bug: report, message: m });
+    else if (m.kind === "system" && m.event === "status") items.push({ kind: "bug_status", at: m.created_at, bug: report, message: m });
+  }
+  return mergeFeed(feed, items);
+}
+
+function appendLines<M extends { id: string }>(existing: M[], lines: M[]): M[] {
   const seen = new Set(existing.map((m) => m.id));
   const out = [...existing];
   for (const m of lines) if (!seen.has(m.id)) out.push(m);
@@ -93,6 +134,7 @@ export const useNexa = create<NexaStore>()((set, get) => ({
   feedMore: false,
   feedLoading: false,
   threads: {},
+  bugThreads: {},
   deleted: null,
 
   setState: (st) => {
@@ -212,12 +254,55 @@ export const useNexa = create<NexaStore>()((set, get) => ({
     await nexaApi.ack(caseId);
   },
 
+  loadBugThread: async (reportId) => {
+    const gen = generation;
+    const r = await bugsApi.thread(reportId);
+    const thread: BugThread = { report: r.report, messages: r.messages };
+    if (gen !== generation) return thread;
+    set((s) => ({ bugThreads: { ...s.bugThreads, [reportId]: thread }, people: { ...s.people, ...r.people }, feed: bugIntoFeed(s.feed, r.report, []) }));
+    return thread;
+  },
+
+  onBug: (report, messages, people, st) => {
+    set((s) => {
+      const open = s.bugThreads[report.id];
+      return {
+        state: st,
+        people: { ...s.people, ...people, ...st.people },
+        feed: bugIntoFeed(s.feed, report, messages),
+        bugThreads: open ? { ...s.bugThreads, [report.id]: { report, messages: appendLines(open.messages, messages) } } : s.bugThreads,
+      };
+    });
+  },
+
+  replyBug: async (reportId, body) => {
+    const r = await bugsApi.reply(reportId, body);
+    set((s) => {
+      const open = s.bugThreads[reportId];
+      return {
+        bugThreads: { ...s.bugThreads, [reportId]: { report: r.report, messages: appendLines(open?.messages ?? [], r.messages) } },
+        feed: bugIntoFeed(s.feed, r.report, []),
+      };
+    });
+  },
+
+  markBugRead: (reportId) => {
+    const t = get().bugThreads[reportId];
+    if (!t || t.report.unread === 0) return;
+    const last = t.messages[t.messages.length - 1];
+    if (!last) return;
+    const report = { ...t.report, unread: 0 };
+    set((s) => ({ bugThreads: { ...s.bugThreads, [reportId]: { ...t, report } }, feed: bugIntoFeed(s.feed, report, []) }));
+    void bugsApi.read(reportId, last.id).catch(() => undefined);
+  },
+
   dismissDeleted: () => set({ deleted: null }),
 
   reset: () => {
     generation += 1;
     feedRequest = null;
-    set({ state: null, people: {}, feed: null, feedMore: false, feedLoading: false, threads: {} });
+    clearBugFiles();
+    set({ state: null, people: {}, feed: null, feedMore: false, feedLoading: false, threads: {}, bugThreads: {} });
   },
 }));
 

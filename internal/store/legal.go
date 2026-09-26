@@ -84,6 +84,9 @@ type AccountRecord struct {
 	KeyGrants int // key_grants, user_id = them
 
 	Crashes []LegalCrash // client_errors, user_id = them
+
+	BugReports     []LegalBugReport // bug_reports, user_id = them, with bug_attachments
+	BugThreadLines int              // bug_messages in their reports
 }
 
 // LegalSettings describes the client-encrypted settings blob without opening
@@ -356,6 +359,17 @@ type LegalCrash struct {
 	CreatedAt int64
 }
 
+// LegalBugReport is a bug report the account sent the instance's staff. Its
+// text and files are not end-to-end encrypted: the staff have to read them.
+type LegalBugReport struct {
+	ID        ids.ID
+	Number    int64
+	Subject   string
+	Status    string
+	Files     int
+	CreatedAt int64
+}
+
 // AccountRecord reads back everything keyed to one account, in one pass over
 // the reader pool. It is a snapshot rather than a transaction on purpose: the
 // report says the instant it was taken and the counts are as of then, which is
@@ -385,6 +399,7 @@ func (s *Store) AccountRecord(ctx context.Context, id ids.ID) (*AccountRecord, e
 		(*Store).legalExpressions,
 		(*Store).legalKeys,
 		(*Store).legalCrashes,
+		(*Store).legalBugReports,
 	} {
 		if err := step(s, ctx, rec, uid); err != nil {
 			return nil, err
@@ -908,4 +923,25 @@ func (s *Store) legalCrashes(ctx context.Context, rec *AccountRecord, uid int64)
 		rec.Crashes = append(rec.Crashes, c)
 	}
 	return rows.Err()
+}
+
+func (s *Store) legalBugReports(ctx context.Context, rec *AccountRecord, uid int64) error {
+	rows, err := s.db.R.QueryContext(ctx, `SELECT id, number, subject, status, attachment_count, created_at FROM bug_reports WHERE user_id = ? ORDER BY id DESC LIMIT ?`, uid, LegalListCap)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var b LegalBugReport
+		if err := rows.Scan(&b.ID, &b.Number, &b.Subject, &b.Status, &b.Files, &b.CreatedAt); err != nil {
+			rows.Close()
+			return err
+		}
+		rec.BugReports = append(rec.BugReports, b)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	return s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM bug_messages m JOIN bug_reports r ON r.id = m.report_id WHERE r.user_id = ?`, uid).Scan(&rec.BugThreadLines)
 }

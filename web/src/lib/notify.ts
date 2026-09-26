@@ -17,6 +17,7 @@ import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 import { mentionsMe } from "./mentionsMe";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
+import { bugAlertHooks, bugNumber, bugStatusLabel, type BugAlert } from "./bugs";
 
 import { t } from "@/i18n";
 let navigateTo: ((path: string) => void) | null = null;
@@ -222,6 +223,25 @@ function onNexa(a: NexaAlert): void {
   void showNotification(title, { body, tag, icon: "/icons/icon-192.png", silent: true }, path);
 }
 
+/**
+ * Something new about a bug report: for the reporter, the team replied or
+ * changed its status; for staff, a report arrived or its reporter wrote. It
+ * sounds and notifies like a message from Nexa, and stays quiet the same ways.
+ */
+function onBugAlert(a: BugAlert): void {
+  const me = useAuth.getState().me;
+  if (!me || doNotDisturb()) return;
+  const path = a.kind === "staff" ? `/channels/@admin/bugs/${a.report.id}` : `/channels/@me/nexa/bugs/${a.report.id}`;
+  if (appOnScreen() && typeof location !== "undefined" && location.pathname === path) return;
+  const settings = useSettings.getState().settings;
+  if (settings.notifications.sounds) void playSound("message");
+  if (appOnScreen() || !notificationsEnabled(settings)) return;
+  const number = a.report.number;
+  const title = a.kind === "staff" ? (a.isNew ? t("bugs.notify.newTitle") : t("bugs.notify.replyTitle")) : "Nexa";
+  const body = a.kind === "staff" ? a.report.subject : a.kind === "reply" ? t("bugs.feed.replied", { number: bugNumber(number) }) : t("bugs.feed.statusChanged", { number: bugNumber(number), status: bugStatusLabel(a.report.status) });
+  void showNotification(title, { body, tag: `ec-bug-${a.report.id}`, icon: "/icons/icon-192.png", silent: true }, path);
+}
+
 let installed = false;
 export function installNotifications(): void {
   if (installed) return;
@@ -229,6 +249,7 @@ export function installNotifications(): void {
   dispatchHooks.onMessage.push(onMessage);
   dispatchHooks.onFriendRequest.push(onFriendRequest);
   dispatchHooks.onNexa.push(onNexa);
+  bugAlertHooks.push(onBugAlert);
   // a phone can only play sounds once a tap has let the page make noise
   installAudioUnlock();
   // the recorded sounds come down once the app has settled, so the first message is not late

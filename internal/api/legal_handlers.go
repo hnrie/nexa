@@ -306,6 +306,7 @@ func (s *Server) renderLegalReport(rec *store.AccountRecord, by *store.User) str
 	legalExpressions(d, rec)
 	legalKeys(d, rec)
 	legalCrashes(d, rec)
+	legalBugReports(d, rec)
 	legalUnavailable(d)
 	legalNotCollected(d)
 	s.legalProvenance(d, rec, by)
@@ -831,6 +832,27 @@ func legalCrashes(d *legalDoc, rec *store.AccountRecord) {
 	d.blank()
 }
 
+func legalBugReports(d *legalDoc, rec *store.AccountRecord) {
+	d.head("BUG REPORTS", "bug_reports, bug_attachments, bug_messages")
+	if len(rec.BugReports) == 0 {
+		d.empty("No bug reports from this account are held.")
+		return
+	}
+	d.field("Lines in their report threads:", legalCount(rec.BugThreadLines))
+	d.blank()
+	for _, b := range rec.BugReports {
+		d.item("report #" + strconv.FormatInt(b.Number, 10) + " (id " + b.ID.String() + ") on " + legalTime(b.CreatedAt) + ", status " + b.Status + ", " + legalCount(b.Files) + " files attached")
+		d.cont(legalText(b.Subject))
+	}
+	d.capped(len(rec.BugReports))
+	d.note("A bug report is what the member chose to send this instance's staff about a")
+	d.note("problem with the app: a subject, a description, any screenshots or recordings")
+	d.note("they added and, if they left it on, their app version, browser, system and")
+	d.note("screen size. Reports and their threads with the staff are not end-to-end")
+	d.note("encrypted, are held in readable form, and can be produced.")
+	d.blank()
+}
+
 func legalUnavailable(d *legalDoc) {
 	d.head("DATA NOT AVAILABLE", "stated limitation of the service")
 	d.para(
@@ -977,12 +999,13 @@ func (s *Server) legalProvenance(d *legalDoc, rec *store.AccountRecord, by *stor
 // queries by eye, which is what a reader of the report would have to do, and
 // broken into lines so it stays readable in a filing.
 var legalTablesRead = []string{
-	"attachments, audit_log, bans, blobs, channel_overwrites, channel_unlocks,",
-	"channels, client_errors, dm_participants, emojis, guest_links, invites,",
-	"key_epochs, key_grants, member_roles, messages, mfa_backup_codes, pins,",
-	"poll_votes, reactions, read_states, relationships, roles, server_members,",
-	"servers, sessions, sticker_installs, sticker_packs, stickers, uploads,",
-	"user_mfa, user_settings, users.",
+	"attachments, audit_log, bans, blobs, bug_attachments, bug_messages,",
+	"bug_reports, channel_overwrites, channel_unlocks, channels, client_errors,",
+	"dm_participants, emojis, guest_links, invites, key_epochs, key_grants,",
+	"member_roles, messages, mfa_backup_codes, mod_cases, mod_log, mod_messages,",
+	"pins, poll_votes, reactions, read_states, relationships, roles,",
+	"server_members, servers, sessions, sticker_installs, sticker_packs,",
+	"stickers, uploads, user_mfa, user_settings, username_holds, users.",
 }
 
 // legalListCapDoc is how many conversations the document itself lists before it

@@ -60,7 +60,8 @@ export function DMSidebar() {
   // was closed only once it says something new; while it is open it shows.
   const nexaShown = !!nexa && nexa.latest > 0 && (nexaListed(nexa.latest, settings.nexaClosed) || nexaOpen);
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
-  const needsReply = useModeration((m) => m.counts?.needs_reply ?? 0);
+  // cases the member wrote in last, and bug reports waiting for an answer
+  const needsReply = useModeration((m) => (m.counts?.needs_reply ?? 0) + (m.bugCounts?.waiting ?? 0));
   const active = loc.pathname.match(/^\/channels\/@me\/(\d+)/)?.[1];
   // A subchat keeps its conversation highlighted, with its siblings listed
   // underneath, so you can see where you are.
@@ -449,7 +450,7 @@ export function DMSidebar() {
           <button className={s.nav} data-selected={loc.pathname.startsWith("/channels/@admin")} onClick={() => go("/channels/@admin")} data-testid="nav-moderation">
             <span className={s.navIcon}><Shield size={22} /></span>
             <span style={{ flex: 1, textAlign: "start" }}>{t("moderation.navLabel")}</span>
-            {needsReply > 0 ? <span className={s.mention} aria-label={t("moderation.needsReplyCount", { count: needsReply })}>{badgeText(needsReply)}</span> : null}
+            {needsReply > 0 ? <span className={s.mention} aria-label={t("moderation.waitingCount", { count: needsReply })}>{badgeText(needsReply)}</span> : null}
           </button>
         ) : null}
         {view.pinned.length > 0 ? (

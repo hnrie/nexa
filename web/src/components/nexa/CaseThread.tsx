@@ -1,4 +1,4 @@
-import { CircleCheck, Clock, History, LockOpen, RotateCcw, SendHorizontal, ShieldAlert, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleDot, Clock, History, LockOpen, RotateCcw, SendHorizontal, ShieldAlert, type LucideIcon } from "lucide-react";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { CaseMessage, ModAction, People } from "@/api/moderation";
 import { Avatar } from "@/components/common/Avatar";
@@ -17,11 +17,15 @@ export const MAX_CASE_MESSAGE = 2000;
 /** Lines from the same writer this close together share one header. */
 const GROUP_GAP = 7 * 60_000;
 
+/** A line of a thread: a moderation case's, or a bug report's, which has the same shape. */
+export type ThreadLine = Pick<CaseMessage, "id" | "author_id" | "kind" | "body" | "created_at"> & { event: string };
+
 interface Props {
-  messages: CaseMessage[];
+  messages: ThreadLine[];
   people: People;
   perspective: "member" | "staff";
-  action: ModAction;
+  /** The case's action, which some of its system lines name; a bug report has none. */
+  action?: ModAction;
   /** Shown above the first line: the case itself. */
   header?: ReactNode;
   /** Sends a line; the composer is left out without it. */
@@ -32,13 +36,16 @@ interface Props {
   closedNote?: string;
   /** Called when the newest line is on screen, so it can be marked read. */
   onSeen?: () => void;
+  /** What the empty thread and the composer say, when not a case's words. */
+  emptyNote?: string;
+  placeholder?: string;
 }
 
 /**
  * A case's thread: the member, the staff (who write as Nexa, with their own
  * name shown), and a line for everything that happened to the case.
  */
-export function CaseThread({ messages, people, perspective, action, header, onSend, composerNote, closedNote, onSeen }: Props) {
+export function CaseThread({ messages, people, perspective, action, header, onSend, composerNote, closedNote, onSeen, emptyNote, placeholder }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const seenRef = useRef(onSeen);
@@ -67,7 +74,7 @@ export function CaseThread({ messages, people, perspective, action, header, onSe
     <div className={s.thread}>
       <div className={s.threadScroll} ref={scroller} onScroll={onScroll} data-testid="case-thread">
         {header ? <div className={s.threadHeader}>{header}</div> : null}
-        {messages.length === 0 ? <p className={s.threadEmpty}>{perspective === "member" ? t("nexa.thread.emptyMember") : t("nexa.thread.emptyStaff")}</p> : null}
+        {messages.length === 0 ? <p className={s.threadEmpty}>{emptyNote ?? (perspective === "member" ? t("nexa.thread.emptyMember") : t("nexa.thread.emptyStaff"))}</p> : null}
         <ol className={s.lines}>
           {messages.map((m, i) => {
             const prev = messages[i - 1];
@@ -90,12 +97,12 @@ export function CaseThread({ messages, people, perspective, action, header, onSe
           })}
         </ol>
       </div>
-      {onSend ? <Composer onSend={onSend} note={composerNote} /> : closedNote ? <p className={s.threadClosed}>{closedNote}</p> : null}
+      {onSend ? <Composer onSend={onSend} note={composerNote} placeholder={placeholder} /> : closedNote ? <p className={s.threadClosed}>{closedNote}</p> : null}
     </div>
   );
 }
 
-function Line({ m, people, perspective, grouped }: { m: CaseMessage; people: People; perspective: "member" | "staff"; grouped: boolean }) {
+function Line({ m, people, perspective, grouped }: { m: ThreadLine; people: People; perspective: "member" | "staff"; grouped: boolean }) {
   const ctx = useRenderCtx();
   const openModal = useUI((u) => u.openModal);
   const author = people[m.author_id];
@@ -157,14 +164,14 @@ function Line({ m, people, perspective, grouped }: { m: CaseMessage; people: Peo
   );
 }
 
-const SYSTEM_ICONS: Record<string, LucideIcon> = { lifted: LockOpen, closed: CircleCheck, reopened: RotateCcw, expired: Clock, replaced: ShieldAlert };
+const SYSTEM_ICONS: Record<string, LucideIcon> = { lifted: LockOpen, closed: CircleCheck, reopened: RotateCcw, expired: Clock, replaced: ShieldAlert, status: CircleDot };
 
-function SystemLine({ m, people, action, perspective }: { m: CaseMessage; people: People; action: ModAction; perspective: "member" | "staff" }) {
+function SystemLine({ m, people, action, perspective }: { m: ThreadLine; people: People; action: ModAction | undefined; perspective: "member" | "staff" }) {
   const Icon = SYSTEM_ICONS[m.event] ?? History;
   const icon = <Icon size={16} />;
   const text = systemLineText(m, people, action, perspective);
   return (
-    <li className={s.systemLine} data-event={m.event}>
+    <li className={s.systemLine} data-event={m.event} data-status={m.event === "status" ? m.body : undefined}>
       <span className={s.systemIcon} aria-hidden="true">
         {icon}
       </span>
@@ -176,7 +183,7 @@ function SystemLine({ m, people, action, perspective }: { m: CaseMessage; people
   );
 }
 
-function Composer({ onSend, note }: { onSend: (body: string) => Promise<void>; note?: ReactNode }) {
+function Composer({ onSend, note, placeholder = t("nexa.thread.placeholder") }: { onSend: (body: string) => Promise<void>; note?: ReactNode; placeholder?: string | undefined }) {
   const toast = useUI((u) => u.toast);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -224,8 +231,8 @@ function Composer({ onSend, note }: { onSend: (body: string) => Promise<void>; n
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
           rows={1}
-          placeholder={t("nexa.thread.placeholder")}
-          aria-label={t("nexa.thread.placeholder")}
+          placeholder={placeholder}
+          aria-label={placeholder}
           data-testid="case-composer"
           disabled={busy}
         />
