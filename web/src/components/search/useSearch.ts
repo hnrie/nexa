@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { isEmptyQuery, needlesOf, parseQuery, resolveQuery, type ResolvedQuery, type SearchQuery } from "@/lib/search";
 import { EMPTY_RESULT, type EngineResult, type Sort, type Tab } from "@/search/engine";
 import { demandIndex, querySearch, useSearchIndex } from "@/search/indexer";
+import { currentBlockRules, useBlockRules } from "@/lib/blocked";
 import { useChannels } from "@/stores/channels";
 import { scopeChannels, type Names, type SearchScope } from "./scope";
 
@@ -24,14 +25,15 @@ const REFRESH_MS = 600;
 /**
  * Authors whose messages are left out of search results.
  *
- * This is the one place search results are filtered by who wrote them. When
- * the setting to hide blocked people's messages fully lands (lib/blocked.ts,
- * from the "people" work), this is where it goes: return the ids of the
- * people whose messages should not exist for this reader, and the index
- * leaves them out of every tab and every count.
+ * This is the one place search results are filtered by who wrote them: the
+ * people this reader blocked, while "Hide their messages completely" is on,
+ * so their messages do not exist here either, in any tab or count. With it
+ * off, a conversation folds their messages away but still has them, and so
+ * does search.
  */
 export function authorsHiddenFromSearch(): string[] {
-  return [];
+  const rules = currentBlockRules();
+  return rules.hideMessages ? [...rules.blocked] : [];
 }
 
 export interface SearchRun {
@@ -54,6 +56,8 @@ export interface SearchRun {
 export function useSearch(args: { raw: string; scope: SearchScope; tab: Tab; sort: Sort; names: Names; enabled?: boolean; pageSize?: number }): SearchRun {
   const { raw, scope, tab, sort, names, enabled = true, pageSize = PAGE_SIZE } = args;
   const byId = useChannels((c) => c.byId);
+  // blocking someone, or changing what blocking hides, asks again
+  const blockRules = useBlockRules();
   const parsed = useMemo(() => parseQuery(raw), [raw]);
   const resolved = useMemo(() => resolveQuery(parsed, names.ctx), [parsed, names.ctx]);
   const empty = isEmptyQuery(parsed);
@@ -124,7 +128,7 @@ export function useSearch(args: { raw: string; scope: SearchScope; tab: Tab; sor
     };
     // `tick` asks again as the index fills in; `limit` fetches the next page
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, empty, key, limit, tick]);
+  }, [enabled, empty, key, limit, tick, blockRules]);
 
   const hasMore = result.total > result.docs.length;
   const more = useCallback(() => {
