@@ -792,7 +792,7 @@ def security_flow(srv, out, browser):
     p.click("[data-testid=mfa-enable]")
     p.fill("[role=dialog] input[type=password]", PASSWORD)
     p.click("[role=dialog] button:has-text('Continue')")
-    p.wait_for_selector("svg[aria-label='Authenticator setup code']", timeout=30000)
+    p.wait_for_selector("svg[aria-label='Authenticator Setup Code']", timeout=30000)
     p.click("text=Can't scan it?")
     secret = p.locator("[data-testid=totp-secret]").inner_text()
     dave.shot("security-totp-setup")
