@@ -182,6 +182,12 @@ button.sysName:hover { text-decoration: underline; }
 .editNoticeClose { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; border-radius: var(--radius-xs); color: var(--text-muted); }
 .editNoticeClose:hover { color: var(--text); }
 @media (pointer: coarse) { .editNoticeBtn, .editNoticeClose { min-height: 40px; } .editNoticeClose { min-width: 40px; } }
+/* a phone: the words and the close button on the first line, Paste anyway under them */
+@media (max-width: 767px) {
+  .editNoticeText { flex: 1 1 calc(100% - 56px); }
+  .editNoticeClose { order: 1; }
+  .editNoticeBtn { order: 2; margin-inline-start: auto; }
+}
 /* the emoji themselves scale from --jumbo-size; the block keeps the normal text size
    so a stray character next to them is not enormous too */
 .jumbo { line-height: 1.15; }

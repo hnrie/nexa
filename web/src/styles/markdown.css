@@ -77,7 +77,7 @@ img.md-emoji-jumbo { width: var(--jumbo-size, 48px); height: var(--jumbo-size, 4
 
 /* A checklist: the box stands where the bullet would, and it is only a record of what was ticked. */
 .md-task-item { list-style: none; }
-.md-task { appearance: none; -webkit-appearance: none; display: inline-grid; place-content: center; width: 15px; height: 15px; margin: 0; margin-inline-start: -21px; margin-inline-end: 6px; vertical-align: -2px; border: 1.5px solid var(--text-muted); border-radius: 4px; background: transparent; opacity: 1; cursor: default; }
+.md-task { appearance: none; -webkit-appearance: none; display: inline-grid; place-content: center; width: 15px; height: 15px; margin: 0; margin-inline-start: -21px; margin-inline-end: 6px; vertical-align: middle; position: relative; top: -1px; border: 1.5px solid var(--text-muted); border-radius: 4px; background: transparent; opacity: 1; cursor: default; }
 .md-task:checked { background: var(--brand); border-color: var(--brand); }
 .md-task:checked::before { content: ""; width: 4px; height: 8px; margin-top: -2px; border: solid var(--on-brand); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 

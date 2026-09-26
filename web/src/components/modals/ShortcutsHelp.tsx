@@ -33,6 +33,15 @@ function groups(pttKey: string | null): { head: string; rows: [string, string][]
       ],
     },
     {
+      head: t("modals.shortcutsHelp.groupFormatting"),
+      rows: [
+        [`${mod} B / I / U`, t("modals.shortcutsHelp.boldItalicUnderline")],
+        [`${mod} ${shift} X`, t("modals.shortcutsHelp.strikeThrough")],
+        [`${mod} K`, t("modals.shortcutsHelp.addLink")],
+        [`${mod} Enter`, t("modals.shortcutsHelp.sendFromEditor")],
+      ],
+    },
+    {
       head: t("modals.shortcutsHelp.groupTabs"),
       rows: [
         [`${mod} ${alt} ← / →`, t("modals.shortcutsHelp.switchTabs")],
