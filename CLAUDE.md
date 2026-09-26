@@ -29,6 +29,8 @@ they open the app after an update, and it is how they find out what changed.
   the other locales follow their own language's capitalization.
 - Descriptions, hints, toasts and errors are short, plain sentences that sound like a person.
 - Avoid em dashes; use a comma, a full stop or parentheses.
+- Never describe the owner in the third person or sell Nexa as run by one person, in the app, the
+  home page or the Terms. Contact details read "Contact the owner (nora) here: ...".
 - Describe Nexa on its own terms. Do not compare it to Discord. Naming Discord is fine only where a
   feature really talks to the Discord program (the desktop app's Rich Presence relay).
 - Never hardcode user-visible English: use `t("key")` / `<Tr>` from `@/i18n`, and add every new key
