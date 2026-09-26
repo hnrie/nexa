@@ -7,6 +7,8 @@ interface ChannelsState {
   upsert: (c: Channel | Channel[]) => void;
   remove: (id: string) => void;
   setLastMessage: (channelId: string, messageId: string) => void;
+  /** Where the newest message is after some were deleted, which can be further back, or none. */
+  resetLastMessage: (channelId: string, messageId: string | null) => void;
   applyPositions: (list: { id: string; position: number; parent_id: Snowflake | null }[]) => void;
   clear: () => void;
 }
@@ -33,6 +35,12 @@ export const useChannels = create<ChannelsState>()((set) => ({
       const ch = s.byId[channelId];
       if (!ch) return s;
       if (ch.last_message_id && compareIds(ch.last_message_id, messageId) >= 0) return s;
+      return { byId: { ...s.byId, [channelId]: { ...ch, last_message_id: messageId } } };
+    }),
+  resetLastMessage: (channelId, messageId) =>
+    set((s) => {
+      const ch = s.byId[channelId];
+      if (!ch || ch.last_message_id === messageId) return s;
       return { byId: { ...s.byId, [channelId]: { ...ch, last_message_id: messageId } } };
     }),
   applyPositions: (list) =>

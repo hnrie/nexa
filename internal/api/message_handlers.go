@@ -122,8 +122,21 @@ type mentionsBefore struct {
 // bulkDeleteEvent is message_delete_bulk's payload: the ids, and what those
 // of them that mentioned anyone mentioned, for readers whose unread badges
 // counted messages they never loaded.
-func bulkDeleteEvent(ch ids.ID, d *store.Deleted) map[string]any {
-	return map[string]any{"channel_id": ch, "ids": d.IDs, "mentions": d.Mentions}
+func (s *Server) bulkDeleteEvent(ctx context.Context, ch ids.ID, d *store.Deleted) map[string]any {
+	ev := map[string]any{"channel_id": ch, "ids": d.IDs, "mentions": d.Mentions}
+	s.withLastMessage(ctx, ev, ch)
+	return ev
+}
+
+// withLastMessage adds where a channel's newest message now is to an event
+// that takes messages away. Taking the newest one left clients pointing at a
+// message that was gone, and a channel whose last message nobody can read up
+// to stays unread however long it is looked at. Left out when the channel
+// cannot be read, so a client keeps what it has.
+func (s *Server) withLastMessage(ctx context.Context, ev map[string]any, chID ids.ID) {
+	if ch, err := s.Store.ChannelByID(ctx, chID); err == nil {
+		ev["last_message_id"] = ch.LastMessageID
+	}
 }
 
 // allowedRoleMentions keeps the role mentions a message may make: roles of the
@@ -488,8 +501,10 @@ func (s *Server) handleMessageDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	// what it mentioned goes along: a reader who never loaded it had it
 	// counted in an unread badge, and nothing else says to take it back
-	s.Bcast.EmitChannel(ch.ID, "message_delete", map[string]any{"id": mid, "channel_id": ch.ID, "author_id": m.AuthorID,
-		"mentions": m.Mentions, "mention_roles": m.MentionRoles, "mention_everyone": m.MentionEveryone})
+	ev := map[string]any{"id": mid, "channel_id": ch.ID, "author_id": m.AuthorID,
+		"mentions": m.Mentions, "mention_roles": m.MentionRoles, "mention_everyone": m.MentionEveryone}
+	s.withLastMessage(r.Context(), ev, ch.ID)
+	s.Bcast.EmitChannel(ch.ID, "message_delete", ev)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -539,7 +554,7 @@ func (s *Server) handleMessageBulkDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if len(deleted.IDs) > 0 {
-		s.Bcast.EmitChannel(ch.ID, "message_delete_bulk", bulkDeleteEvent(ch.ID, deleted))
+		s.Bcast.EmitChannel(ch.ID, "message_delete_bulk", s.bulkDeleteEvent(r.Context(), ch.ID, deleted))
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ids": deleted.IDs})
 }
@@ -584,6 +599,7 @@ func (s *Server) handleAck(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
+	states[0].Manual = body.Manual
 	s.Bcast.EmitUsers([]ids.ID{me.ID}, "read_state", states[0])
 	WriteJSON(w, http.StatusOK, states[0])
 }

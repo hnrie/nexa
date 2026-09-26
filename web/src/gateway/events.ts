@@ -35,8 +35,8 @@ export type GatewayEvent =
   | { t: "ready"; d: ReadyPayload }
   | { t: "message_create"; d: Message }
   | { t: "message_update"; d: Message & { was?: Pick<Message, "mentions" | "mention_roles" | "mention_everyone"> } }
-  | { t: "message_delete"; d: { id: Snowflake; channel_id: Snowflake } & Partial<MentionMeta> }
-  | { t: "message_delete_bulk"; d: { ids: Snowflake[]; channel_id: Snowflake; mentions?: MentionMeta[] } }
+  | { t: "message_delete"; d: { id: Snowflake; channel_id: Snowflake; last_message_id?: Snowflake | null } & Partial<MentionMeta> }
+  | { t: "message_delete_bulk"; d: { ids: Snowflake[]; channel_id: Snowflake; mentions?: MentionMeta[]; last_message_id?: Snowflake | null } }
   | { t: "reaction_add" | "reaction_remove"; d: { channel_id: Snowflake; message_id: Snowflake; user_id: Snowflake; emoji: string } }
   | { t: "typing"; d: { channel_id: Snowflake; user_id: Snowflake; ts: number; stop?: boolean } }
   | { t: "channel_create" | "channel_update"; d: Channel }

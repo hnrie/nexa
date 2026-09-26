@@ -68,14 +68,30 @@ describe("read states", () => {
     expect(acks).toHaveLength(1);
   });
 
-  it("lets a state set on purpose win over a failed ack", async () => {
+  it("lets Mark Unread win over a failed ack", async () => {
     fail = new TypeError("Failed to fetch");
     await useReadStates.getState().ack("7", "50");
-    useReadStates.getState().set({ channel_id: "7", last_read_message_id: "20", last_ack_at: 0, mention_count: 0 });
+    useReadStates.getState().set({ channel_id: "7", last_read_message_id: "20", last_ack_at: 0, mention_count: 0, manual: true });
     fail = null;
     ready("20");
     expect(useReadStates.getState().byChannel["7"]!.lastReadId).toBe("20");
     expect(acks).toHaveLength(1);
+  });
+
+  it("keeps a conversation read when an older ack is answered after a newer one", async () => {
+    ready("10");
+    await useReadStates.getState().ack("7", "40");
+    await useReadStates.getState().ack("7", "50");
+    // the answer to the first ack comes last, still counting a mention in 50
+    useReadStates.getState().set({ channel_id: "7", last_read_message_id: "40", last_ack_at: 0, mention_count: 1 });
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "50", mentions: 0, unread: 0 });
+    // the same answer for the newest is taken, and so is a newer one from another device
+    useReadStates.getState().set({ channel_id: "7", last_read_message_id: "50", last_ack_at: 0, mention_count: 0 });
+    useReadStates.getState().set({ channel_id: "7", last_read_message_id: "60", last_ack_at: 0, mention_count: 0 });
+    expect(useReadStates.getState().byChannel["7"]!.lastReadId).toBe("60");
+    // Mark Unread, here or on another device, moves it back
+    useReadStates.getState().set({ channel_id: "7", last_read_message_id: "30", last_ack_at: 0, mention_count: 2, manual: true });
+    expect(useReadStates.getState().byChannel["7"]).toEqual({ lastReadId: "30", mentions: 2, unread: 0 });
   });
 
   it("counts a conversation's unread messages until it is read, and takes back deleted ones", async () => {

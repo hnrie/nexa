@@ -453,6 +453,10 @@ type ReadState struct {
 	// UnreadCount counts other people's unread messages in a DM or group DM,
 	// up to MaxUnreadCount; it is zero for server channels.
 	UnreadCount int `json:"unread_count"`
+	// Manual is set on the state Mark Unread leaves, the one change that moves
+	// the marker back: a client takes that from any device, and otherwise keeps
+	// a marker it already has further on (an older ack answered late).
+	Manual bool `json:"manual,omitempty"`
 }
 
 // MaxUnreadCount is where a conversation's unread count stops counting.

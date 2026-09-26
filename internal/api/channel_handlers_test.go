@@ -245,8 +245,15 @@ func TestMessagesEndToEndWithGateway(t *testing.T) {
 	}
 	// ack
 	res, body = do(t, ts, "POST", "/api/v1/channels/"+dm+"/messages/"+replyID+"/ack", tokA, nil)
-	if res.StatusCode != 200 || body["last_read_message_id"] != replyID || body["mention_count"].(float64) != 0 {
+	if res.StatusCode != 200 || body["last_read_message_id"] != replyID || body["mention_count"].(float64) != 0 || body["manual"] != nil {
 		t.Errorf("ack: %d %v", res.StatusCode, body)
+	}
+	// an ordinary ack never moves the marker back; Mark Unread does, and says so
+	if res, body = do(t, ts, "POST", "/api/v1/channels/"+dm+"/messages/"+mid+"/ack", tokA, nil); res.StatusCode != 200 || body["last_read_message_id"] != replyID {
+		t.Errorf("older ack: %d %v", res.StatusCode, body)
+	}
+	if res, body = do(t, ts, "POST", "/api/v1/channels/"+dm+"/messages/"+mid+"/ack", tokA, map[string]any{"manual": true}); res.StatusCode != 200 || body["last_read_message_id"] != mid || body["manual"] != true {
+		t.Errorf("mark unread: %d %v", res.StatusCode, body)
 	}
 	// typing via REST reaches bob
 	if res, _ = do(t, ts, "POST", "/api/v1/channels/"+dm+"/typing", tokA, nil); res.StatusCode != 204 {
@@ -262,8 +269,9 @@ func TestMessagesEndToEndWithGateway(t *testing.T) {
 	if res, _ = do(t, ts, "DELETE", "/api/v1/channels/"+dm+"/messages/"+mid, tokA, nil); res.StatusCode != 204 {
 		t.Error("delete by author")
 	}
-	if ev := gb.next("message_delete", 3*time.Second); ev == nil || ev["id"] != mid {
-		t.Error("message_delete event")
+	// it says where the channel's newest message now is, never the one that went
+	if ev := gb.next("message_delete", 3*time.Second); ev == nil || ev["id"] != mid || ev["last_message_id"] == nil || ev["last_message_id"] == mid {
+		t.Errorf("message_delete event: %v", ev)
 	}
 	if res, _ = do(t, ts, "GET", "/api/v1/channels/"+dm+"/messages/"+mid, tokA, nil); res.StatusCode != 404 {
 		t.Error("deleted message 404")

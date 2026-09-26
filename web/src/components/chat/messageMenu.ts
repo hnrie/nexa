@@ -171,7 +171,7 @@ export function markUnread(msg: DecryptedMessage): void {
       if (m && m.author_id !== meId && mentionsMe(m, meId)) mentions += 1;
     }
   }
-  useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: mentions });
+  useReadStates.getState().set({ channel_id: msg.channel_id, last_read_message_id: prev === "0" ? null : prev, last_ack_at: Date.now(), mention_count: mentions, manual: true });
   void (async () => {
     // The two acks say opposite things, and nothing used to sequence them: the
     // forced one is what Mark Unread means, so it lands last. At the top of a

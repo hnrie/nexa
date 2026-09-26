@@ -1821,7 +1821,7 @@ func (s *Server) handleBanPut(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for ch, d := range deleted {
-			s.Bcast.EmitChannel(ch, "message_delete_bulk", bulkDeleteEvent(ch, d))
+			s.Bcast.EmitChannel(ch, "message_delete_bulk", s.bulkDeleteEvent(r.Context(), ch, d))
 		}
 	}
 	w.WriteHeader(http.StatusNoContent)

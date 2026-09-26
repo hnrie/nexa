@@ -209,7 +209,7 @@ func (s *Server) purgeAccount(r *http.Request, uid ids.ID, opt purgeOptions) err
 			break
 		}
 		for ch, d := range batch {
-			s.Bcast.EmitChannel(ch, "message_delete_bulk", bulkDeleteEvent(ch, d))
+			s.Bcast.EmitChannel(ch, "message_delete_bulk", s.bulkDeleteEvent(ctx, ch, d))
 		}
 	}
 	refs, err := s.Store.PurgeUserReactions(ctx, uid, maxReactionEvents)

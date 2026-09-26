@@ -1261,7 +1261,9 @@ func (s *Server) handleWebhookMessageDelete(w http.ResponseWriter, r *http.Reque
 		writeDiscordError(w, err)
 		return
 	}
-	s.Bcast.EmitChannel(m.ChannelID, "message_delete", map[string]any{"id": m.ID, "channel_id": m.ChannelID, "author_id": m.AuthorID,
-		"mentions": m.Mentions, "mention_roles": m.MentionRoles, "mention_everyone": m.MentionEveryone})
+	ev := map[string]any{"id": m.ID, "channel_id": m.ChannelID, "author_id": m.AuthorID,
+		"mentions": m.Mentions, "mention_roles": m.MentionRoles, "mention_everyone": m.MentionEveryone}
+	s.withLastMessage(r.Context(), ev, m.ChannelID)
+	s.Bcast.EmitChannel(m.ChannelID, "message_delete", ev)
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -69,6 +69,12 @@ function fromServer(rs: ReadState): ChannelRead {
 export const useReadStates = create<ReadStatesState>()((set, get) => ({
   byChannel: {},
   set: (rs) => {
+    // Two acks sent close together can be answered out of order, and the
+    // older answer arriving last put a conversation that was being read back
+    // to unread, with nothing left to ack it again. Only Mark Unread moves
+    // the marker back; any other state behind the one here is out of date.
+    const cur = get().byChannel[rs.channel_id];
+    if (!rs.manual && cur?.lastReadId && (!rs.last_read_message_id || compareIds(rs.last_read_message_id, cur.lastReadId) < 0)) return;
     // a state set on purpose (marked unread, or read on another device) replaces any ack still waiting
     unsent.delete(rs.channel_id);
     set((s) => ({ byChannel: { ...s.byChannel, [rs.channel_id]: fromServer(rs) } }));

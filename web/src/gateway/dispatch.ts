@@ -321,6 +321,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const uncounted = quietMessage(e.d.channel_id, e.d.id, e.d.author_id);
       const was = useMessages.getState().channels[e.d.channel_id]?.byId[e.d.id];
       useMessages.getState().remove(e.d.channel_id, e.d.id);
+      // the newest message gone, the channel's last is an older one: read up to that, it is read
+      if (e.d.last_message_id !== undefined) useChannels.getState().resetLastMessage(e.d.channel_id, e.d.last_message_id);
       if (!uncounted) useReadStates.getState().dropUnread(e.d.channel_id, e.d.id);
       if (counted && !uncounted) useReadStates.getState().dropMention(e.d.channel_id, e.d.id);
       for (const h of dispatchHooks.onMessageDelete) h(e.d.channel_id, [e.d.id], [was]);
@@ -334,6 +336,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       const loaded = useMessages.getState().channels[e.d.channel_id]?.byId;
       const was = e.d.ids.map((id) => loaded?.[id]);
       useMessages.getState().removeMany(e.d.channel_id, e.d.ids);
+      if (e.d.last_message_id !== undefined) useChannels.getState().resetLastMessage(e.d.channel_id, e.d.last_message_id);
       for (const id of e.d.ids) if (!uncounted.has(id)) useReadStates.getState().dropUnread(e.d.channel_id, id);
       for (const id of counted) useReadStates.getState().dropMention(e.d.channel_id, id);
       for (const h of dispatchHooks.onMessageDelete) h(e.d.channel_id, e.d.ids, was);

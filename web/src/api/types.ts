@@ -484,6 +484,8 @@ export interface ReadState {
   mention_count: number;
   /** Other people's unread messages in a DM or group DM, up to 100; absent or 0 elsewhere. */
   unread_count?: number;
+  /** Set by Mark Unread, the one change that moves the read marker back. */
+  manual?: boolean;
 }
 
 export interface KeyGrant {
