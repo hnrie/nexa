@@ -1,27 +1,35 @@
 /**
- * The front page: what Nexa is, in as few words as it takes.
+ * The front page: what Nexa is, shown before it is said.
  *
- * Every claim here is one the app keeps, shown with pictures and short loops
- * taken from it actually running (tools/home_shots.py, tools/home_gifs.py)
- * rather than an illustration of it. Blocks appear as they are scrolled to and
- * the pictures sit on a plane that tips towards the pointer; all of it holds
- * still for anyone who asked for less motion.
+ * It opens on one conversation drawn twice, as the people in it read it and
+ * as the server holds it, with a line between the two that anyone can move.
+ * Below that, each part of the app gets a chapter of the same shape (a
+ * heading, a line, a picture or a loop taken from the app running, and the
+ * specifics), so a first visit can be read in one pass.
+ *
+ * The page keeps colours of its own that follow the visitor's light or dark
+ * preference rather than the app's theme, and it scrolls the document itself,
+ * so a phone's browser bars can get out of the way as it is read.
  */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import {
-  AtSign, Gauge, Images, KeyRound, Languages, Link2, Lock, MessagesSquare,
-  MonitorPlay, ScanSearch, Smile, Sparkles, UserPlus, ZoomIn,
-} from "lucide-react";
+import { ChevronsLeftRight, CornerUpLeft, Eye, Hash, Lock, Pause, PhoneCall, Play } from "lucide-react";
 import { NexaWordmark } from "@/components/common/Brand";
-import { FloatingPlane } from "@/components/common/FloatingPlane";
 import { hasSavedSession, useAuth } from "@/stores/auth";
 import { useSettings } from "@/stores/settings";
-import { useReveal } from "@/hooks/useReveal";
 import { currentPlatform } from "@/lib/platform";
-import { t, translator } from "@/i18n";
-import s from "./Home.module.css";
 import { CONTACT_EMAIL } from "@/lib/legal";
+import { t, translator } from "@/i18n";
+// The headings' weight, which the app itself never uses: it arrives with this page only.
+import "@fontsource/noto-sans/800.css";
+import s from "./Home.module.css";
+
+/**
+ * The most the app takes to load, gzipped: the script and styles every page
+ * starts with. tools/app_size.py measures each build against it, so the claim
+ * on this page cannot drift from the truth unnoticed, as "264 KB" had.
+ */
+export const LOAD_KB_LIMIT = 500;
 
 /** Whether this visitor has asked for less movement, by either route. */
 function useStillness(): boolean {
@@ -37,113 +45,411 @@ function useStillness(): boolean {
   return setting || system;
 }
 
-/** One block that fades up the first time it is seen. */
-function Reveal({ children, delay = 0, className }: { children: ReactNode; delay?: number; className?: string }) {
-  const [ref, seen] = useReveal<HTMLDivElement>();
+/** The page's own background in each scheme, for the browser's bars (Home.module.css has the rest). */
+const PAPER = { light: "#faf8fc", dark: "#141018" };
+
+/**
+ * Hands the document to this page while it is open: the app's body is a
+ * fixed frame that never scrolls, and this page is a long read. Done before
+ * the first paint, so there is no frame of the app's colours in between; the
+ * style the server put in the front page's head for the same reason (see
+ * serveHomePage) has done its job by then and goes.
+ */
+function useFrontDocument() {
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset["home"] = "";
+    document.getElementById("front-paint")?.remove();
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const before = meta?.getAttribute("content") ?? null;
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const paint = () => meta?.setAttribute("content", mq?.matches ? PAPER.dark : PAPER.light);
+    paint();
+    mq?.addEventListener("change", paint);
+    return () => {
+      mq?.removeEventListener("change", paint);
+      delete root.dataset["home"];
+      if (meta && before !== null) meta.setAttribute("content", before);
+      // the next page starts at its top, not wherever this one was left
+      window.scrollTo(0, 0);
+    };
+  }, []);
+}
+
+/* ------------------------------------------------------------------------ */
+/* The two sides of one conversation                                          */
+/* ------------------------------------------------------------------------ */
+
+type Who = "alice" | "bob" | "carol";
+const PEOPLE: Record<Who, { name: string; colour: string; ink: string }> = {
+  // the same two colours Alice and Bob have in the call loop further down
+  alice: { name: "Alice", colour: "#d6336c", ink: "#fff" },
+  bob: { name: "Bob", colour: "#f0a202", ink: "#2b1b00" },
+  carol: { name: "Carol", colour: "#1f8a63", ink: "#fff" },
+};
+
+interface Line {
+  who: Who;
+  /** Minutes past 21:00, shown in the reader's own clock. */
+  at: number;
+  text: string;
+  reply?: { who: Who; text: string };
+}
+
+function conversation(): Line[] {
+  const m2 = t("home.duo.m2");
+  return [
+    { who: "carol", at: 12, text: t("home.duo.m1") },
+    { who: "bob", at: 14, text: m2 },
+    { who: "alice", at: 15, text: t("home.duo.m3"), reply: { who: "bob", text: m2 } },
+    { who: "carol", at: 17, text: t("home.duo.m4") },
+  ];
+}
+
+function clock(minutes: number): string {
+  const when = new Date(2026, 0, 3, 21, minutes);
+  try {
+    return new Intl.DateTimeFormat(translator().locale, { hour: "numeric", minute: "2-digit" }).format(when);
+  } catch {
+    return `21:${String(minutes).padStart(2, "0")}`;
+  }
+}
+
+function base64(bytes: Uint8Array): string {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/**
+ * The conversation as the server would be handed it: each text sealed with
+ * AES-GCM under a key made for this page view and never kept, nonce first,
+ * as base64. It is real ciphertext rather than a picture of some. Where the
+ * browser offers no WebCrypto (a page not served over HTTPS) random bytes of
+ * the same length stand in, which read the same to anyone but a key holder.
+ */
+async function seal(texts: string[]): Promise<string[]> {
+  const bytes = texts.map((text) => new TextEncoder().encode(text));
+  try {
+    const subtle = globalThis.crypto.subtle;
+    const key = await subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt"]);
+    return await Promise.all(
+      bytes.map(async (plain) => {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const sealed = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv }, key, plain));
+        const out = new Uint8Array(iv.length + sealed.length);
+        out.set(iv);
+        out.set(sealed, iv.length);
+        return base64(out);
+      }),
+    );
+  } catch {
+    return bytes.map((plain) => base64(crypto.getRandomValues(new Uint8Array(plain.length + 28))));
+  }
+}
+
+/** Where the line rests, as a share of the width from the reading side. */
+const REST = 58;
+/** How close to either edge it may go: the handle stays whole inside the frame. */
+const EDGE = 4;
+
+function Avatar({ who }: { who: Who }) {
+  const p = PEOPLE[who];
   return (
-    <div ref={ref as React.RefObject<HTMLDivElement>} className={[s.reveal, className].filter(Boolean).join(" ")} data-seen={seen || undefined} style={delay ? { transitionDelay: `${delay}ms` } : undefined}>
-      {children}
+    <span className={s.avatar} style={{ background: p.colour, color: p.ink }} aria-hidden="true">
+      {p.name[0]}
+    </span>
+  );
+}
+
+/**
+ * A message's words. On the server's side they are kept, unseen, to hold the
+ * same space, and the ciphertext is laid over them: the two drawings then
+ * line up exactly, name for name and line for line.
+ */
+function Words({ text, sealed, className }: { text: string; sealed?: string | undefined; className?: string | undefined }) {
+  if (sealed === undefined) return <span className={className} dir="auto">{text}</span>;
+  return (
+    <span className={[className, s.sealedWords].join(" ")}>
+      <span className={s.unseen}>{text}</span>
+      <span className={s.cipher} dir="ltr">{sealed}</span>
+    </span>
+  );
+}
+
+function Conversation({ lines, sealed, server }: { lines: Line[]; sealed: string[] | null; server?: boolean }) {
+  // the server's drawing seals every text; a reply's quote is a text as well
+  let n = 0;
+  const next = () => (server ? (sealed?.[n++] ?? "") : undefined);
+  return (
+    <div className={s.convo} data-side={server ? "server" : "you"} aria-hidden={server || undefined}>
+      <div className={s.convoTop}>
+        <Hash size={18} aria-hidden="true" />
+        <span>{t("home.duo.channel")}</span>
+      </div>
+      <ol className={s.convoLines}>
+        {lines.map((line, i) => (
+          <li key={i} className={s.line}>
+            {line.reply ? (
+              <div className={s.replyTo}>
+                <CornerUpLeft size={14} aria-hidden="true" />
+                <span className={s.replyName}>{PEOPLE[line.reply.who].name}</span>
+                <Words text={line.reply.text} sealed={next()} className={s.replyText} />
+              </div>
+            ) : null}
+            <div className={s.lineRow}>
+              <Avatar who={line.who} />
+              <div className={s.lineMain}>
+                <div className={s.lineHead}>
+                  <span className={s.name}>{PEOPLE[line.who].name}</span>
+                  <time className={s.time}>{clock(line.at)}</time>
+                </div>
+                <Words text={line.text} sealed={next()} className={s.text} />
+              </div>
+            </div>
+          </li>
+        ))}
+        <li className={s.event}>
+          <PhoneCall size={16} aria-hidden="true" />
+          <span>{t("home.duo.call", { name: PEOPLE.bob.name })}</span>
+          <time className={s.time}>{clock(18)}</time>
+        </li>
+      </ol>
     </div>
   );
 }
 
 /**
- * A picture of the app, in a frame that reads as a window.
- *
- * Its own size is given even though the CSS scales it to the column: without
- * one the browser has nothing to reserve, and four large pictures arriving one
- * by one each shove the page down under whoever is reading it — and under the
- * observer that decides when a block has been scrolled to.
+ * The same conversation twice, as its people read it and as the server holds
+ * it, with a line between them. The line comes in from the far side once, the
+ * first time the whole thing is in view, and then goes wherever it is dragged
+ * (or moved with the arrow keys: the slider under it is a real one).
  */
-function Shot({ src, alt, width, height, eager = false }: { src: string; alt: string; width: number; height: number; eager?: boolean }) {
+function Duo({ still }: { still: boolean }) {
+  const lines = useMemo(conversation, []);
+  const texts = useMemo(() => lines.flatMap((l) => (l.reply ? [l.reply.text, l.text] : [l.text])), [lines]);
+  const [sealed, setSealed] = useState<string[] | null>(null);
+  const [seam, setSeam] = useState(still ? REST : 100);
+  const [dragging, setDragging] = useState(false);
+  const stage = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void seal(texts).then((out) => alive && setSealed(out));
+    return () => {
+      alive = false;
+    };
+  }, [texts]);
+
+  // The one moment the page moves on its own: once, when it can be seen.
+  useEffect(() => {
+    if (still) {
+      setSeam((v) => (v === 100 ? REST : v));
+      return;
+    }
+    const el = stage.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setSeam(REST);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          setSeam((v) => (v === 100 ? REST : v));
+        }
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [still]);
+
+  /** The share of the width between the reading edge and the pointer. */
+  const at = (clientX: number): number => {
+    const el = stage.current;
+    if (!el) return REST;
+    const box = el.getBoundingClientRect();
+    const rtl = getComputedStyle(el).direction === "rtl";
+    const from = rtl ? box.right - clientX : clientX - box.left;
+    return Math.max(EDGE, Math.min(100 - EDGE, (from / box.width) * 100));
+  };
+
+  const grab = (e: React.PointerEvent<HTMLElement>, jump: boolean) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+    if (jump) setSeam(at(e.clientX));
+  };
+  const drag = (e: React.PointerEvent<HTMLElement>) => {
+    if (dragging) setSeam(at(e.clientX));
+  };
+  const drop = () => setDragging(false);
+
+  const style = { "--seam": `${seam}%` } as CSSProperties;
   return (
-    <FloatingPlane>
-      <figure className={s.shot}>
-        <div className={s.chrome}><i /><i /><i /></div>
-        {/* The first picture is the largest thing on the page and in view as
-            it opens: asked for with the page rather than once laid out, which
-            is what "lazy" would do to it. The rest wait to be scrolled to. */}
-        <img src={src} alt={alt} width={width} height={height} {...(eager ? ({ fetchpriority: "high" } as Record<string, string>) : { loading: "lazy" as const })} decoding="async" />
-      </figure>
-    </FloatingPlane>
+    <figure className={s.duo}>
+      <div className={s.duoLegend} aria-hidden="true">
+        <span>{t("home.duo.you")}</span>
+        <span className={s.duoLegendServer}>{t("home.duo.server")}</span>
+      </div>
+      <div
+        ref={stage}
+        className={s.stage}
+        style={style}
+        data-dragging={dragging || undefined}
+        data-still={still || undefined}
+        // With a mouse, a press anywhere moves the line there. A finger only
+        // moves it from the handle, so a thumb scrolling past never does.
+        onPointerDown={(e) => e.pointerType === "mouse" && grab(e, true)}
+        onPointerMove={drag}
+        onPointerUp={drop}
+        onPointerCancel={drop}
+      >
+        <Conversation lines={lines} sealed={sealed} />
+        <div className={s.serverSide}>
+          <Conversation lines={lines} sealed={sealed} server />
+        </div>
+        <input
+          className={s.seamInput}
+          type="range"
+          min={EDGE}
+          max={100 - EDGE}
+          step={1}
+          value={Math.round(Math.min(seam, 100 - EDGE))}
+          onChange={(e) => setSeam(Number(e.target.value))}
+          aria-label={t("home.duo.slider")}
+          aria-valuetext={t("home.duo.sliderValue", { percent: Math.round(100 - seam) })}
+        />
+        <div className={s.seam} aria-hidden="true">
+          <span
+            className={s.knob}
+            onPointerDown={(e) => {
+              // the frame under it would take this press as a jump as well
+              e.stopPropagation();
+              grab(e, false);
+            }}
+          >
+            <ChevronsLeftRight size={20} />
+          </span>
+        </div>
+      </div>
+      <figcaption className={s.duoCaption}>{t("home.duo.caption")}</figcaption>
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/* Pictures and loops of the app                                              */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * A picture of the app. Its own size is given even though the CSS scales it
+ * to the column: without one the browser has nothing to reserve, and pictures
+ * arriving one by one would each shove the page down under whoever is reading.
+ */
+function Still({ src, alt, width, height }: { src: string; alt: string; width: number; height: number }) {
+  return (
+    <figure className={s.frame} data-shape={width === height ? "square" : undefined}>
+      <img src={src} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
+    </figure>
   );
 }
 
 /**
- * A short loop of the app in use. The video is a fraction of the size of the
- * same thing as a GIF, and the GIF is there for anything that cannot play it.
- * It plays on its own and never ends, so for anyone who asked for less movement
- * the still it would have started from is shown on its own instead.
+ * A short loop of the app in use. It plays only while it is on screen, it can
+ * be paused (it would otherwise never stop), and anyone who asked for less
+ * movement gets the still it starts from instead.
  */
-function Loop({ name, alt, width, height }: { name: string; alt: string; width: number; height: number }) {
-  const still = useStillness();
-  return (
-    <FloatingPlane>
-      <figure className={s.shot}>
-        <div className={s.chrome}><i /><i /><i /></div>
-        {still ? (
-          <img src={`/home/${name}.png`} alt={alt} width={width} height={height} loading="lazy" decoding="async" />
-        ) : (
-          // Every browser that runs the app plays video, so the GIF that sat
-          // inside as a fallback was never fetched by anyone; the poster is what
-          // shows until the loop arrives.
-          <video autoPlay muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt} width={width} height={height}>
-            <source src={`/home/${name}.webm`} type="video/webm" />
-          </video>
-        )}
+function Movie({ name, alt, still }: { name: string; alt: string; still: boolean }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [paused, setPaused] = useState(false);
+  const [seen, setSeen] = useState(false);
+
+  useEffect(() => {
+    const el = video.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => setSeen(entries.some((e) => e.isIntersecting)), { threshold: 0.25 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [still]);
+
+  useEffect(() => {
+    const el = video.current;
+    if (!el) return;
+    if (seen && !paused) void el.play().catch(() => undefined);
+    else el.pause();
+  }, [seen, paused]);
+
+  if (still) {
+    return (
+      <figure className={s.frame}>
+        <img src={`/home/${name}.png`} alt={alt} width={900} height={563} loading="lazy" decoding="async" />
       </figure>
-    </FloatingPlane>
-  );
-}
-
-/** A tick or a cross in the comparison, which a screen reader says as a word rather than as "check mark". */
-function Mark({ yes }: { yes: boolean }) {
+    );
+  }
   return (
-    <>
-      <span aria-hidden="true">{yes ? "✓" : "✕"}</span>
-      <span className="visually-hidden">{yes ? t("home.compare.yes") : t("home.compare.no")}</span>
-    </>
+    <figure className={s.frame}>
+      <video ref={video} muted loop playsInline preload="none" poster={`/home/${name}.png`} aria-label={alt} width={900} height={563}>
+        <source src={`/home/${name}.webm`} type="video/webm" />
+      </video>
+      <button type="button" className={s.pause} onClick={() => setPaused((p) => !p)} aria-label={paused ? t("home.movie.play") : t("home.movie.pause")}>
+        {paused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}
+      </button>
+    </figure>
   );
 }
 
-const POINTS = () => [
-  { icon: Lock, title: t("home.point.encryptedTitle"), body: t("home.point.encryptedBody") },
-  { icon: MessagesSquare, title: t("home.point.subchatsTitle"), body: t("home.point.subchatsBody") },
-  { icon: Smile, title: t("home.point.packsTitle"), body: t("home.point.packsBody") },
-  { icon: AtSign, title: t("home.point.noEmailTitle"), body: t("home.point.noEmailBody") },
-  { icon: UserPlus, title: t("home.point.guestsTitle"), body: t("home.point.guestsBody") },
-  { icon: ScanSearch, title: t("home.point.searchTitle"), body: t("home.point.searchBody") },
-  { icon: KeyRound, title: t("home.point.lockTitle"), body: t("home.point.lockBody") },
-  { icon: Link2, title: t("home.point.previewsTitle"), body: t("home.point.previewsBody") },
-  { icon: ZoomIn, title: t("home.point.zoomTitle"), body: t("home.point.zoomBody") },
-  { icon: Sparkles, title: t("home.point.presenceTitle"), body: t("home.point.presenceBody") },
-  { icon: Images, title: t("home.point.exportTitle"), body: t("home.point.exportBody") },
-  { icon: Languages, title: t("home.point.languagesTitle"), body: t("home.point.languagesBody") },
-];
+/* ------------------------------------------------------------------------ */
+/* Chapters                                                                   */
+/* ------------------------------------------------------------------------ */
 
-/**
- * The most the app takes to load, gzipped: the script and styles every page
- * starts with. tools/app_size.py measures each build against it, so the claim
- * on this page cannot drift from the truth unnoticed, as "264 KB" had.
- */
-export const LOAD_KB_LIMIT = 500;
+interface Fact {
+  title: string;
+  body: string;
+}
+
+/** One part of the app: what it is in a line, what it looks like, and the specifics. */
+function Chapter({ id, title, lede, media, facts, children }: { id: string; title: string; lede: string; media?: ReactNode; facts?: Fact[]; children?: ReactNode }) {
+  return (
+    <section className={s.chapter} aria-labelledby={id}>
+      <div className={s.chapterHead}>
+        <h2 id={id} className={s.h2}>{title}</h2>
+        <p className={s.chapterLede}>{lede}</p>
+      </div>
+      <div className={s.chapterBody}>
+        {media}
+        {children}
+        {facts?.length ? (
+          <dl className={s.facts}>
+            {facts.map((f) => (
+              <div key={f.title} className={s.fact}>
+                <dt>{f.title}</dt>
+                <dd>{f.body}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+const facts = (area: string, names: string[]): Fact[] => names.map((n) => ({ title: t(`home.${area}.${n}Title`), body: t(`home.${area}.${n}Body`) }));
 
 /** A number with its unit, as the reader's language writes it. */
-function amount(value: number, unit: "kilobyte" | "millisecond" | "megabyte"): string {
+function kilobytes(value: number): string {
   try {
-    return new Intl.NumberFormat(translator().locale, { style: "unit", unit }).format(value);
+    return new Intl.NumberFormat(translator().locale, { style: "unit", unit: "kilobyte" }).format(value);
   } catch {
-    return `${value} ${unit === "kilobyte" ? "KB" : unit === "megabyte" ? "MB" : "ms"}`;
+    return `${value} kB`;
   }
 }
 
-const NUMBERS = () => [
-  { value: t("home.speed.under", { size: amount(LOAD_KB_LIMIT, "kilobyte") }), label: t("home.speed.size") },
-  { value: amount(50, "millisecond"), label: t("home.speed.switch") },
-  { value: amount(50, "megabyte"), label: t("home.speed.memory") },
-];
-
 export default function HomePage() {
+  useFrontDocument();
+  const still = useStillness();
   const signedIn = useAuth((a) => !!a.me) || hasSavedSession();
   const [os, setOs] = useState<string | null>(null);
   useEffect(() => {
@@ -156,141 +462,131 @@ export default function HomePage() {
     };
   }, []);
 
+  const start = signedIn ? (
+    <Link className={s.primary} to="/channels/@me">{t("home.nav.open")}</Link>
+  ) : (
+    <Link className={s.primary} to="/register">{t("home.nav.getStarted")}</Link>
+  );
+
   return (
     <div className={s.page}>
       <header className={s.top}>
-        <Link to="/" className={s.logo} aria-label="Nexa"><NexaWordmark height={26} /></Link>
-        <nav className={s.nav}>
-          <Link className={[s.quiet, s.navDownload].join(" ")} to="/download">{t("home.nav.download")}</Link>
-          {signedIn ? (
-            <Link className={s.cta} to="/channels/@me">{t("home.nav.open")}</Link>
-          ) : (
-            <>
-              <Link className={s.quiet} to="/login">{t("home.nav.logIn")}</Link>
-              <Link className={s.cta} to="/register">{t("home.nav.getStarted")}</Link>
-            </>
-          )}
-        </nav>
+        <div className={s.topInner}>
+          <Link to="/" className={s.logo} aria-label="Nexa">
+            <NexaWordmark height={24} />
+          </Link>
+          <nav className={s.nav}>
+            <Link className={[s.navLink, s.navDownload].join(" ")} to="/download">{t("home.nav.download")}</Link>
+            {signedIn ? (
+              <Link className={s.navCta} to="/channels/@me">{t("home.nav.open")}</Link>
+            ) : (
+              <>
+                <Link className={s.navLink} to="/login">{t("home.nav.logIn")}</Link>
+                <Link className={s.navCta} to="/register">{t("home.nav.getStarted")}</Link>
+              </>
+            )}
+          </nav>
+        </div>
       </header>
 
-      <section className={s.hero}>
-        <div className={s.glow} aria-hidden="true" />
-        <Reveal>
-          <h1 className={s.h1}>{t("home.hero.title")}</h1>
-          <p className={s.lede}>{t("home.hero.lede")}</p>
-          <div className={s.actions}>
-            <Link className={s.big} to={signedIn ? "/channels/@me" : "/register"}>{signedIn ? t("home.nav.open") : t("home.hero.start")}</Link>
-            <Link className={s.bigQuiet} to="/download">{os ? t("home.hero.downloadFor", { os }) : t("home.nav.download")}</Link>
-          </div>
-          <p className={s.fine}>{t("home.hero.fine")}</p>
-        </Reveal>
-        <Reveal delay={90} className={s.heroShot}>
-          <Shot src="/home/app.png" alt={t("home.shot.app")} width={1440} height={900} eager />
-        </Reveal>
-      </section>
-
-      <section className={s.strip}>
-        <Reveal>
-          <h2 className={s.h2}>{t("home.calls.title")}</h2>
-          <p className={s.body}>{t("home.calls.body")}</p>
-          <ul className={s.list}>
-            <li>{t("home.calls.a")}</li>
-            <li>{t("home.calls.b")}</li>
-            <li>{t("home.calls.c")}</li>
-          </ul>
-        </Reveal>
-        <Reveal delay={80}><Loop name="call-loop" alt={t("home.shot.call")} width={900} height={563} /></Reveal>
-      </section>
-
-      <section className={s.strip} data-flip="">
-        <Reveal>
-          <h2 className={s.h2}>{t("home.speed.title")}</h2>
-          <p className={s.body}>{t("home.speed.body")}</p>
-          <div className={s.numbers}>
-            {NUMBERS().map((n) => (
-              <div key={n.label} className={s.number}>
-                <span className={s.numberValue}>{n.value}</span>
-                <span className={s.numberLabel}>{n.label}</span>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-        <Reveal delay={80}><Loop name="speed" alt={t("home.shot.speed")} width={900} height={563} /></Reveal>
-      </section>
-
-      <section className={s.strip}>
-        <Reveal>
-          <h2 className={s.h2}>{t("home.express.title")}</h2>
-          <p className={s.body}>{t("home.express.body")}</p>
-        </Reveal>
-        <Reveal delay={80}><Shot src="/home/express.png" alt={t("home.shot.express")} width={554} height={554} /></Reveal>
-      </section>
-
-      <section className={s.points}>
-        {POINTS().map((p, i) => (
-          <Reveal key={p.title} delay={(i % 3) * 70}>
-            <div className={s.point}>
-              <span className={s.pointIcon}><p.icon size={20} /></span>
-              <h2 className={s.pointTitle}>{p.title}</h2>
-              <p className={s.pointBody}>{p.body}</p>
+      <main>
+        <section className={s.hero} aria-labelledby="home-title">
+          <div className={s.heroText}>
+            <h1 id="home-title" className={s.h1}>{t("home.hero.title")}</h1>
+            <p className={s.lede}>{t("home.hero.lede")}</p>
+            <div className={s.actions}>
+              {start}
+              <Link className={s.secondary} to="/download">{os ? t("home.hero.downloadFor", { os }) : t("home.nav.download")}</Link>
             </div>
-          </Reveal>
-        ))}
-      </section>
-
-      <section className={s.compare}>
-        <Reveal>
-          <h2 className={s.h2}>{t("home.compare.title")}</h2>
-          <p className={s.body}>{t("home.compare.body")}</p>
-          <table className={s.table}>
-            <thead>
-              <tr><th /><th>Nexa</th><th>{t("home.compare.them")}</th></tr>
-            </thead>
-            <tbody>
-              {[
-                ["home.compare.e2ee", true, false],
-                ["home.compare.subchats", true, false],
-                ["home.compare.packs", true, false],
-                ["home.compare.emojiEverywhere", true, false],
-                ["home.compare.noEmail", true, false],
-                ["home.compare.guests", true, false],
-                ["home.compare.lock", true, false],
-                ["home.compare.zoom", true, false],
-                ["home.compare.rpc", true, true],
-                ["home.compare.calls", true, true],
-              ].map(([key, ours, theirs]) => (
-                <tr key={String(key)}>
-                  <td>{t(String(key))}</td>
-                  <td data-yes={ours || undefined}><Mark yes={!!ours} /></td>
-                  <td data-yes={theirs || undefined}><Mark yes={!!theirs} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Reveal>
-      </section>
-
-      <section className={s.end}>
-        <Reveal className={s.endInner}>
-          <NexaWordmark height={44} className={s.endMark} />
-          <p className={s.body}>{t("home.end.body")}</p>
-          <div className={s.actions}>
-            <Link className={s.big} to={signedIn ? "/channels/@me" : "/register"}>{signedIn ? t("home.nav.open") : t("home.hero.start")}</Link>
-            <Link className={s.bigQuiet} to="/download">{t("home.nav.download")}</Link>
+            <p className={s.fine}>{t("home.hero.fine")}</p>
           </div>
-        </Reveal>
-      </section>
+          <Duo still={still} />
+        </section>
+
+        <Chapter
+          id="home-servers"
+          title={t("home.servers.title")}
+          lede={t("home.servers.lede")}
+          media={<Still src="/home/app.png" alt={t("home.shot.app")} width={1440} height={900} />}
+          facts={facts("servers", ["roles", "private", "invites", "subchats", "folders"])}
+        />
+        <Chapter
+          id="home-calls"
+          title={t("home.calls.title")}
+          lede={t("home.calls.lede")}
+          media={<Movie name="call-loop" alt={t("home.shot.call")} still={still} />}
+          facts={facts("calls", ["share", "volume", "talk", "address", "guests", "zoom"])}
+        />
+        <Chapter
+          id="home-yours"
+          title={t("home.yours.title")}
+          lede={t("home.yours.lede")}
+          media={<Still src="/home/express.png" alt={t("home.shot.express")} width={554} height={554} />}
+          facts={facts("yours", ["emoji", "stickers", "themes", "plugins", "format"])}
+        />
+        <Chapter id="home-private" title={t("home.private.title")} lede={t("home.private.lede")} facts={facts("private", ["signup", "recovery", "safety", "lock", "previews", "search", "export"])}>
+          <div className={s.ledger}>
+            <div className={s.ledgerSide} data-sealed="">
+              <h3 className={s.h3}>{t("home.private.cantTitle")}</h3>
+              <ul>
+                {["messages", "files", "calls", "keys", "settings"].map((k) => (
+                  <li key={k}>
+                    <Lock size={16} aria-hidden="true" />
+                    <span>{t(`home.private.cant.${k}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className={s.ledgerSide}>
+              <h3 className={s.h3}>{t("home.private.knowsTitle")}</h3>
+              <ul>
+                {["account", "where", "when", "sizes"].map((k) => (
+                  <li key={k}>
+                    <Eye size={16} aria-hidden="true" />
+                    <span>{t(`home.private.knows.${k}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Chapter>
+        <Chapter
+          id="home-quick"
+          title={t("home.quick.title")}
+          lede={t("home.quick.lede", { size: kilobytes(LOAD_KB_LIMIT) })}
+          media={<Movie name="speed" alt={t("home.shot.speed")} still={still} />}
+          facts={facts("quick", ["desktop", "phone", "languages"])}
+        />
+        <Chapter id="home-people" title={t("home.people.title")} lede={t("home.people.lede")} facts={facts("people", ["reports"])}>
+          <p className={s.aboutLinks}>
+            <Link to="/about">{t("home.people.about")}</Link>
+            <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+          </p>
+        </Chapter>
+
+        <section className={s.end} aria-labelledby="home-end">
+          <h2 id="home-end" className={s.endTitle}>{t("home.end.title")}</h2>
+          <p className={s.endBody}>{t("home.end.body")}</p>
+          <div className={s.actions}>
+            {start}
+            <Link className={s.secondary} to="/download">{t("home.nav.download")}</Link>
+          </div>
+        </section>
+      </main>
 
       <footer className={s.foot}>
-        <span>{t("home.foot.tagline")}</span>
-        <span className={s.footLinks}>
-          <Link to="/about">{t("legal.aboutTitle")}</Link>
-          <Link to="/terms">{t("legal.termsTitle")}</Link>
-          <Link to="/privacy">{t("legal.privacyTitle")}</Link>
-          <a href={`mailto:${CONTACT_EMAIL}`}>{t("legal.contactOwner")}</a>
-          <Link to="/download">{t("home.nav.download")}</Link>
-          <Link to="/login">{t("home.nav.logIn")}</Link>
-        </span>
+        <div className={s.footInner}>
+          <NexaWordmark height={20} className={s.footMark} />
+          <p className={s.footTag}>{t("home.foot.tagline")}</p>
+          <ul className={s.footLinks}>
+            <li><Link to="/about">{t("legal.aboutTitle")}</Link></li>
+            <li><Link to="/terms">{t("legal.termsTitle")}</Link></li>
+            <li><Link to="/privacy">{t("legal.privacyTitle")}</Link></li>
+            <li><a href={`mailto:${CONTACT_EMAIL}`}>{t("legal.contactOwner")}</a></li>
+            <li><Link to="/download">{t("home.nav.download")}</Link></li>
+            {signedIn ? null : <li><Link to="/login">{t("home.nav.logIn")}</Link></li>}
+          </ul>
+        </div>
       </footer>
     </div>
   );
