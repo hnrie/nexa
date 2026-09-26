@@ -146,6 +146,15 @@ describe("dropEntry", () => {
     expect(dropEntry(base, "4", { id: "6", where: "after" }).rest).toEqual(["2", "3", folder("fa", ["5"]), "6", "4"]);
   });
 
+  it("moves a server from one folder to another, onto it or among its servers", () => {
+    const two: RailLayout = { pinned: [folder("fp", ["7", "8"])], rest: [folder("fa", ["4", "5"]), "6"] };
+    expect(dropEntry(two, "7", { id: "fa", where: "combine" })).toEqual({ pinned: [folder("fp", ["8"])], rest: [folder("fa", ["4", "5", "7"]), "6"] });
+    expect(dropEntry(two, "4", { id: "8", where: "before" })).toEqual({ pinned: [folder("fp", ["7", "4", "8"])], rest: [folder("fa", ["5"]), "6"] });
+    // the last one out of a folder takes the folder with it
+    const one: RailLayout = { pinned: [], rest: [folder("fa", ["4"]), folder("fb", ["5"])] };
+    expect(dropEntry(one, "4", { id: "fb", where: "combine" })).toEqual({ pinned: [], rest: [folder("fb", ["5", "4"])] });
+  });
+
   it("removes the folder its last server was dragged out of", () => {
     const one: RailLayout = { pinned: [], rest: ["2", folder("fa", ["4"])] };
     expect(dropEntry(one, "4", { id: "2", where: "before" })).toEqual({ pinned: [], rest: ["4", "2"] });
