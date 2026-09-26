@@ -73,7 +73,7 @@
 .confirm > span:first-child { flex: 1 1 12em; }
 .confirmActions { display: flex; gap: 8px; }
 
-.surface { min-height: 100%; min-height: 180px; padding: 14px 16px 24px; color: var(--text); font-family: var(--font-with-emoji); font-size: 16px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; caret-color: var(--text-brand); }
+.surface { min-height: max(180px, min(38vh, 340px)); padding: 14px 16px 24px; color: var(--text); font-family: var(--font-with-emoji); font-size: 16px; line-height: 22px; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; caret-color: var(--text-brand); }
 .frame[data-narrow] .surface { min-height: 100%; }
 .surface > * { margin: 0; unicode-bidi: plaintext; text-align: start; }
 .surface > :global([data-b="h1"]) { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin-block: 12px 6px; }
