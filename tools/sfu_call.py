@@ -182,7 +182,7 @@ def join(sess, name, phone=False):
     if phone:
         box = voice.bounding_box()
         if not box or box["x"] < 0 or box["x"] >= 390:
-            p.click("button[aria-label='Open navigation']")
+            p.click("button[aria-label='Open Navigation']")
             time.sleep(0.6)
     voice.click()
     p.wait_for_selector("[data-testid=voice-status]", timeout=30000)
@@ -291,7 +291,7 @@ try:
         print("== alice's camera shows, hides and shows again without pulling again", flush=True)
         subs = lambda n: [x for x in sfu[n] if x[2].endswith("/subscribe")]
         t0 = time.time()
-        a.click("button[aria-label='Turn on camera']")
+        a.click("button[aria-label='Turn On Camera']")
         video_sel = f"[data-user='{alice_id}'][data-kind=video] video"
         shows = lambda sess: sess.page.wait_for_function(f"() => {{ const v = document.querySelector(\"{video_sel}\"); return v && v.videoWidth > 0 && v.currentTime > 0; }}", timeout=30000)
         shows(bob)
@@ -299,17 +299,17 @@ try:
         shows(carol)
         bob_subs = len(subs("bob"))
         pause(1)
-        a.click("button[aria-label='Turn off camera']")
+        a.click("button[aria-label='Turn Off Camera']")
         bob.page.wait_for_selector(video_sel, state="detached", timeout=15000)
         check(True, "turning it off goes back to her avatar")
         pause(2)
         t0 = time.time()
-        a.click("button[aria-label='Turn on camera']")
+        a.click("button[aria-label='Turn On Camera']")
         shows(bob)
         again = time.time() - t0
         check(len(subs("bob")) == bob_subs, f"on again it shows in {again:.1f}s, with no new pull ({len(subs('bob'))} subscribes, was {bob_subs})")
         bob.shot("camera")
-        a.click("button[aria-label='Turn off camera']")
+        a.click("button[aria-label='Turn Off Camera']")
 
         print("== alice's share is pulled only while watched", flush=True)
         a.click("[data-testid=screen-share]")

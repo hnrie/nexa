@@ -347,7 +347,7 @@ def server_flow(srv, alice, bob, phone):
     phone.page.wait_for_url("**/channels/" + server_id + "/*", timeout=20000)
     phone.page.wait_for_selector("[data-id]:has-text('first message in general')", timeout=20000)
     phone.shot("server")
-    phone.page.click("button[aria-label='Open navigation']")
+    phone.page.click("button[aria-label='Open Navigation']")
     time.sleep(0.4)
     phone.shot("server-drawer")
     return server_id, link
@@ -1037,7 +1037,7 @@ def main():
             phone.shot("dm")
             phone.page.goto(srv.base + "/channels/@me", wait_until="networkidle")
             phone.shot("friends")
-            phone.page.click("button[aria-label='Open navigation']")
+            phone.page.click("button[aria-label='Open Navigation']")
             time.sleep(0.4)
             phone.shot("drawer")
             server_id = link = None
