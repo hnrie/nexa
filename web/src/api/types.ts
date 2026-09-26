@@ -36,7 +36,8 @@ export interface PublicUser {
 /** The extra fields the server only ever hands to the account's owner. */
 export interface MeUser extends PublicUser {
   presence_pref: "online" | "idle" | "dnd" | "invisible";
-  dm_privacy: "everyone" | "friends" | "nobody";
+  /** Who may start a direct message with the account; "friends_servers" (friends and people in a server with it) is the default. */
+  dm_privacy: "everyone" | "friends_servers" | "friends" | "nobody";
   has_recovery: boolean;
   /** An authenticator app is required to sign in. */
   mfa_enabled?: boolean;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError, errorFrom, genericMessage } from "@/api/client";
-import { describeError } from "./errors";
+import { describeError, dmOpenError } from "./errors";
 import { ReadableError } from "./readableError";
 
 describe("describeError", () => {
@@ -49,5 +49,22 @@ describe("describeError", () => {
     const { enableLock } = await import("./appLock");
     const err = await enableLock("u-readable", { publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) }, "1379").catch((e: unknown) => e);
     expect(describeError(err)).toMatch(/at least 6 digits/i);
+  });
+});
+
+describe("dmOpenError", () => {
+  it("says why someone cannot be messaged, in the reader's words rather than the server's", () => {
+    const refused = (code: string) => dmOpenError(new ApiError(403, code, "server words"), "Could not open a conversation.");
+    const said = ["dm_friends_servers", "dm_friends_only", "dm_closed", "blocked"].map(refused);
+    for (const s of said) expect(s).not.toBe("server words");
+    expect(new Set(said).size).toBe(4);
+    expect(refused("dm_friends_servers")).toMatch(/share a server/);
+    expect(refused("dm_friends_servers")).toMatch(/friend request/);
+  });
+
+  it("leaves every other failure to describeError", () => {
+    const other = new ApiError(400, "no_recipients", "Pick at least one other person.");
+    expect(dmOpenError(other, "Could not open a conversation.")).toBe("Pick at least one other person.");
+    expect(dmOpenError(new Error("boom"), "Could not open a conversation.")).toBe("Could not open a conversation.");
   });
 });

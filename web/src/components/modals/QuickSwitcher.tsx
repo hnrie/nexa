@@ -11,7 +11,7 @@ import { ArrowLeft, CornerDownLeft, Hash, Search as SearchIcon, Server as Server
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { channels as channelsApi } from "@/api/channels";
-import { ApiError } from "@/api/client";
+import { dmOpenError } from "@/lib/errors";
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { SearchBox } from "@/components/common/SearchBox";
@@ -105,7 +105,7 @@ function usePlaces(close: () => void): Place[] {
               upsert(ch);
               nav(`/channels/@me/${ch.id}`);
             })
-            .catch((err: unknown) => useUI.getState().toast(err instanceof ApiError ? err.message : t("modals.quickSwitcher.couldNotOpenTheConversation"), "error"));
+            .catch((err: unknown) => useUI.getState().toast(dmOpenError(err, t("modals.quickSwitcher.couldNotOpenTheConversation")), "error"));
         },
       });
     }

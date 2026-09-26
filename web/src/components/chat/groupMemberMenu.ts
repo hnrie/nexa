@@ -1,4 +1,4 @@
-import { ApiError } from "@/api/client";
+import { dmOpenError } from "@/lib/errors";
 import { channels as channelsApi } from "@/api/channels";
 import { closeDM, managesGroup } from "@/components/sidebar/dmMenu";
 import { copyText } from "@/lib/clipboard";
@@ -24,7 +24,7 @@ async function messageUser(userId: string, nav: (path: string) => void): Promise
     useChannels.getState().upsert(ch);
     nav(`/channels/@me/${ch.id}`);
   } catch (err) {
-    useUI.getState().toast(err instanceof ApiError ? err.message : t("chat.groupMemberMenu.couldNotOpenTheConversation"), "error");
+    useUI.getState().toast(dmOpenError(err, t("chat.groupMemberMenu.couldNotOpenTheConversation")), "error");
   }
 }
 

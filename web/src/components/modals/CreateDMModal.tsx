@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError } from "@/api/client";
+import { dmOpenError } from "@/lib/errors";
 import { channels as channelsApi } from "@/api/channels";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -56,7 +56,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
       onClose();
       nav(`/channels/@me/${ch.id}`);
     } catch (err) {
-      toast(err instanceof ApiError ? err.message : t("modals.createDM.couldNotCreateTheConversation"), "error");
+      toast(dmOpenError(err, t("modals.createDM.couldNotCreateTheConversation")), "error");
     } finally {
       setBusy(false);
     }
