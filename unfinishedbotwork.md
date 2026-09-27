@@ -97,20 +97,24 @@ What that means in practice:
   chats" privacy toggle with "Link Only" for friends, and the Nexa notice only
   the added person sees (migration 0021).
 - Webhook 429s carry `Via`, which discord.py needs to wait instead of failing.
-
-### Not started (the owner's list before the bot work)
-
-- User polls: the composer's plus button offers "Upload a File" or "Create
-  Poll"; polls use the webhook poll system (`internal/store/polls.go`,
-  `internal/api/poll_handlers.go`, `web/src/components/chat/webhook/HookPoll.tsx`),
-  gated by the existing Create Polls permission (`perms.CreatePolls`) that server
-  owners can turn off. Keep the question and answers end-to-end encrypted in the
-  message payload; the server only needs answer count, expiry and multiselect
-  to take votes.
+- User polls from the composer's plus button (Upload a File / Create Poll),
+  under the Create Polls permission; question and answers end-to-end
+  encrypted, the server told only answer count, duration and multiselect.
+- What's New 2026-09-27 covers polls, group adds and friend request notes.
+- `internal/e2ee`: the client's cryptography in Go, byte for byte (vectors both
+  ways), plus the bot identity scheme in Go and `web/src/crypto/botIdentity.ts`
+  (see `docs/bots/crypto.md`). Not wired into the API yet.
 
 ### Bot platform
 
-Research done, nothing built yet. Read these before writing code:
+Research and the crypto groundwork are done. Slice A (server core: migration
+0022 applications and bot users, `Authorization: Bot` auth, the `/api/v10`
+routes discord.py needs to start, the `/gateway/bot` dialect, server-side bot
+crypto, `tools/discordpy_test_bot.py` passing) is being built; if it is not in
+the git log, start there. Then slice B (web: Developers area, add-to-server page,
+key grants at install, app tags, encryption notices) and slice C (developer docs
+at `/developers`, "Developers" link in the home page top bar and Settings,
+About). Read these before writing code:
 
 - `docs/bots/design.md`: the full design (executive summary first), discord.py
   internals with file and function references, the gap table against Nexa, the
