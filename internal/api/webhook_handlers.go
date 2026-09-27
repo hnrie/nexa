@@ -590,6 +590,9 @@ func (s *Server) hookAllow(w http.ResponseWriter, wh *store.Webhook, posts bool)
 			hd.Set("X-RateLimit-Reset-After", strconv.FormatFloat(secs, 'f', 3, 64))
 			hd.Set("X-RateLimit-Bucket", b.name)
 			hd.Set("X-RateLimit-Scope", "shared")
+			// discord.py waits out a 429 only when it came through a proxy it
+			// recognises by this header; without it the sender gives up at once
+			hd.Set("Via", "1.1 nexa")
 			WriteJSON(w, http.StatusTooManyRequests, map[string]any{"message": "You are being rate limited.", "retry_after": secs, "global": false})
 			return false
 		}

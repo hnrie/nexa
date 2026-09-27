@@ -603,7 +603,7 @@ func TestWebhookRateLimit(t *testing.T) {
 		t.Fatalf("sixth request in a burst: %d %s", last.StatusCode, raw)
 	}
 	body := decode(t, raw)
-	if body["retry_after"].(float64) <= 0 || body["global"] != false || last.Header.Get("X-RateLimit-Remaining") != "0" || last.Header.Get("Retry-After") == "" {
+	if body["retry_after"].(float64) <= 0 || body["global"] != false || last.Header.Get("X-RateLimit-Remaining") != "0" || last.Header.Get("Retry-After") == "" || last.Header.Get("Via") == "" {
 		t.Fatalf("429: %v %v", body, last.Header)
 	}
 }

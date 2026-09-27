@@ -93,13 +93,13 @@ What that means in practice:
 - Unread fix (acks answered out of order, deleted newest message).
 - Phone message box height fix (long placeholder).
 - Friend request notes, sealed to the recipient (migration 0020).
+- Add friends to group chats from the invite menu, "Let friends add me to group
+  chats" privacy toggle with "Link Only" for friends, and the Nexa notice only
+  the added person sees (migration 0021).
+- Webhook 429s carry `Via`, which discord.py needs to wait instead of failing.
 
-### In progress / not started (the owner's list before the bot work)
+### Not started (the owner's list before the bot work)
 
-- Add friends to group chats from the group's invite menu, a "Let friends add
-  me to group chats" privacy toggle with "Link Only" shown to friends, and a
-  notice from the Nexa account, visible only to the added person, saying who
-  added them and where to turn it off (migration 0021).
 - User polls: the composer's plus button offers "Upload a File" or "Create
   Poll"; polls use the webhook poll system (`internal/store/polls.go`,
   `internal/api/poll_handlers.go`, `web/src/components/chat/webhook/HookPoll.tsx`),
@@ -110,26 +110,77 @@ What that means in practice:
 
 ### Bot platform
 
-Not started beyond research. See "Plan" below; the research notes are in
-`docs/bots/` once committed.
+Research done, nothing built yet. Read these before writing code:
 
-## Plan for the bot platform
+- `docs/bots/design.md`: the full design (executive summary first), discord.py
+  internals with file and function references, the gap table against Nexa, the
+  encryption analysis and the phases.
+- `docs/bots/discordpy-startup.md`: the exact requests, gateway opcodes and
+  payload fields a server must answer for discord.py to reach `on_ready`, read
+  a message and reply. Required fields are marked (a missing one crashes it).
+- `docs/bots/mock-nexa.py`: a small aiohttp stand-in that answers that
+  contract; unmodified discord.py 2.7.1 passed 19/19 checks against it.
+- `tools/discordpy_test_bot.py`: the phase 1 acceptance test (PASS/FAIL lines),
+  configured with `NEXA_API` (for example `http://127.0.0.1:PORT/api/v10`) and
+  `NEXA_TOKEN`. Run it against a throwaway `chatd` (see `tools/e2e.py` for how
+  to start one on a free port; never port 8090, never build into `web/dist`).
 
-To be filled in from the research (discord.py startup sequence, gateway and
-REST requirements, the end-to-end encryption decision, phases). Until then,
-the phases are expected to be:
+## Decisions
 
-1. Applications, bot users and tokens; `Authorization: Bot <token>`;
-   `/api/v10` routes discord.py needs to start (`/users/@me`, `/gateway/bot`,
-   `/oauth2/applications/@me`); a Discord-compatible gateway (HELLO, IDENTIFY,
-   READY, GUILD_CREATE, heartbeats, RESUME) with intents; MESSAGE_CREATE with
-   content; sending messages. A test bot in `tools/` that must pass.
-2. Adding bots to servers (OAuth2 authorize page), the Developers area in the
-   app, bot tags in the UI.
-3. Application commands and interactions (slash commands, buttons, select
-   menus, modals, autocomplete, ephemeral replies), including the user side in
-   the composer and on messages.
-4. Members, roles, moderation, channels, reactions, pins, typing, invites,
-   audit log, emojis and stickers through the bot API.
-5. Threads and anything else discord.py covers that Nexa lacks, for people too.
-6. Developer documentation pages.
+- **Encryption (owner: "do whatever is best"): design 1, server-held bot
+  identity, with a fully encrypted mode later.** Each bot has an ordinary
+  X25519 identity; the browser that creates the bot generates it and wraps the
+  private key under a key derived from the bot token, plus an escrow copy sealed
+  to the owner so a token reset keeps the identity. The server stores only the
+  wrapped key, the public key and the token's SHA-256. Members' clients grant
+  conversation keys to the bot like to any member (existing `keys_needed`
+  flow); the installing admin's client grants at install. A bot gets keys in a
+  server only with Read Messages access, which needs the app's Message Content
+  toggle and the installer's consent; without it the bot sees no content and
+  its own posts are stored like webhook messages (readable, marked). While a
+  reading bot runs, the Nexa server can read the channels it sees: say so on the
+  install screen, in the channel header, in the privacy policy (`docs/legal`)
+  and in the README. Later: "Encrypted Apps", a sidecar the developer runs that
+  holds the key on their machine, same wire format (phase 6).
+- Developer docs may name discord.py and describe the API as Discord-compatible
+  (that is what the feature is), in Nexa's own words; never copy Discord's docs.
+- Apps are private by default with a "Public Bot" switch, as developers expect.
+
+## Plan for the bot platform (from docs/bots/design.md)
+
+Pointing discord.py at Nexa takes three assignments, shipped as a snippet in
+the docs: `discord.http.Route.BASE = "https://HOST/api/v10"`,
+`DiscordWebSocket.DEFAULT_GATEWAY = yarl.URL("wss://HOST/gateway/bot")`,
+`discord.utils.DISCORD_EPOCH = 1767225600000` (Nexa ids count from 2026).
+discord.py never calls `GET /gateway`. JSON answers must be exactly
+`Content-Type: application/json`; 429s need `Via`, `retry_after`, `global`.
+The bot gateway is a second protocol at `/gateway/bot` (HELLO first, heartbeat
+before IDENTIFY, per-session sequence numbers, READY with `session_id` and
+`resume_gateway_url`); Nexa's own `/gateway` stays as it is.
+
+- **P0 groundwork:** shared Discord-format errors and object serializers for
+  users, members, roles, channels and messages; docs skeleton at `/developers`.
+- **P1 log in, read, reply (largest):** applications, bot users, tokens
+  (`Authorization: Bot <token>`), `/api/v10` routes discord.py calls at start,
+  the `/gateway/bot` dialect with intents, GUILD_CREATE with the bot's member,
+  MESSAGE_CREATE/UPDATE/DELETE with content, sending/editing/deleting messages,
+  server-side bot crypto, the Developers area (create app, bot, token reset,
+  intents, invite link builder), the OAuth2 install page (scopes `bot` and
+  `applications.commands`, permissions integer), app tags and the encryption
+  notices. Exit test: `tools/discordpy_test_bot.py` passes against a throwaway
+  server, and the UI is checked at desktop and phone sizes.
+- **P2 interactions:** application commands (global and guild, bulk overwrite
+  sync), INTERACTION_CREATE, callback types, followups via webhook-token routes,
+  ephemeral replies, buttons, select menus, modals, autocomplete, and for
+  people: the slash command picker in the composer, clickable components.
+- **P3:** members and REQUEST_GUILD_MEMBERS chunking, roles, channels,
+  moderation (kick, ban, timeout), audit log, reactions, pins, typing, presence,
+  session RESUME, full rate-limit headers.
+- **P4:** threads and forum channels, for people too.
+- **P5:** polls through the bot API (user polls above first), stickers, polish.
+- **P6:** Encrypted Apps sidecar, sharding, HTTP interactions endpoint.
+
+Not feasible: bot voice audio (Nexa calls are WebRTC with frame encryption and
+the tunnel carries only HTTP); voice states and voice moderation are fine (P3).
+Planned-but-unbuilt routes answer 501 with a Discord-style error and an
+`// Unfinished:` marker. New migrations take the next free number (0022 on).
