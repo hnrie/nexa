@@ -2,7 +2,7 @@ import { ChevronDown, Lock, MessageCircle, MoreHorizontal, Pin, Plus, Shield, Us
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
-import { OwnerCrown } from "@/components/common/OwnerBadge";
+import { AdminHammer, OwnerCrown } from "@/components/common/OwnerBadge";
 import { UserPanel } from "@/components/shell/UserPanel";
 import { VoiceStatus } from "@/components/voice/VoiceStatus";
 import { useMediaQuery } from "@/hooks/useIsMobile";
@@ -11,6 +11,7 @@ import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { compareIds, idAt } from "@/lib/ids";
 import { dmListView, dropDM, groupOf, isGroupId, movePinnedDM, NEXA_ID, pruneDMs, setGroupCollapsed, type DMDrop, type DMGroup, type DMRow } from "@/lib/dmLayout";
 import { useOwnerId } from "@/lib/owner";
+import { isInstanceAdmin } from "@/stores/servers";
 import { useAuth } from "@/stores/auth";
 import { selectDMs, selectSubchats, useChannels } from "@/stores/channels";
 import { activitiesOf, customStatus, statusOf, usePresence } from "@/stores/presence";
@@ -278,6 +279,7 @@ export function DMSidebar() {
     let sub: React.ReactNode = null;
     let avatar: React.ReactNode;
     let crowned = false;
+    let admin = false;
     if (ch.type === "dm") {
       const other = ch.recipient_ids.find((uid) => uid !== meId) ?? ch.recipient_ids[0] ?? "";
       const u = users[other];
@@ -286,6 +288,7 @@ export function DMSidebar() {
       sub = <StatusLine className={s.sub} status={st} activity={act} more={Math.max(0, activitiesOf(presence[other]).length - 1)} />;
       avatar = <Avatar id={other} avatarId={u?.avatar_id ?? null} name={name} size={32} status={statusOf(presence[other])} />;
       crowned = other === ownerId;
+      admin = !crowned && isInstanceAdmin(other);
     } else {
       sub = <span className={s.sub}>{t("chat.groupMemberList.membersOnly", { count: ch.recipient_ids.length })}</span>;
       const url = iconUrl(ch.icon_id, 32);
@@ -312,8 +315,8 @@ export function DMSidebar() {
             <span className={s.text}>
               <span className={s.nameRow}>
                 <span className={s.name} dir="auto">{name}</span>
-                {/* the instance's owner, crowned wherever they are listed */}
-                {crowned ? <OwnerCrown size={14} /> : null}
+                {/* the instance's owner is crowned wherever they are listed, and its admins carry the hammer */}
+                {crowned ? <OwnerCrown size={14} /> : admin ? <AdminHammer size={14} /> : null}
               </span>
               {sub}
             </span>
