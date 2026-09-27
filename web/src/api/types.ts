@@ -30,6 +30,11 @@ export interface PublicUser {
   /** base64 X25519 public key. */
   public_key: string;
   flags: number;
+  /**
+   * Joins group chats only from an invite link ("Let friends add me to group
+   * chats" is off): friends see them as Link Only and cannot add them directly.
+   */
+  group_link_only?: boolean;
   created_at: number;
 }
 
@@ -566,6 +571,16 @@ export interface SettingsBlob {
   updated_at?: number;
 }
 
+/**
+ * Nexa's note to someone a friend put in a group directly: who added them and
+ * when. Only that person is ever sent it, until they dismiss it.
+ */
+export interface GroupAddNotice {
+  channel_id: Snowflake;
+  added_by: Snowflake;
+  added_at: number;
+}
+
 export interface ReadyPayload {
   session_id: Snowflake;
   user: MeUser;
@@ -580,6 +595,8 @@ export interface ReadyPayload {
   emojis: Emoji[];
   sticker_packs: StickerPack[];
   voice_states: VoiceState[];
+  /** This account's own notes about being added to a group by a friend, not yet dismissed. */
+  group_add_notices?: GroupAddNotice[];
   /** Only in a guest's ready: which call they are in. */
   guest?: GuestInfo;
   /** The account's moderation standing. */

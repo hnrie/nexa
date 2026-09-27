@@ -8,6 +8,7 @@ import { isUnread, useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { useExpressions } from "@/stores/expressions";
+import { useGroupAddNotices } from "@/stores/groupAddNotices";
 import { useSettings } from "@/stores/settings";
 import { useTyping } from "@/stores/typing";
 import { useUI } from "@/stores/ui";
@@ -117,6 +118,7 @@ export function resetAll(keepMessagesIn: string[] = []): void {
   useTyping.getState().clear();
   useServers.getState().clear();
   useExpressions.getState().clear();
+  useGroupAddNotices.getState().clear();
 }
 
 function usersShownIn(channelIds: string[]): Record<string, PublicUser> {
@@ -225,6 +227,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       useChannels.setState({ byId: Object.fromEntries(channels.map((c) => [c.id, c])) });
       useRelationships.getState().setMany(d.relationships);
       useReadStates.getState().setMany(d.read_states);
+      useGroupAddNotices.getState().setAll(d.group_add_notices ?? []);
       usePresence.getState().setMany(d.presences);
       for (const view of servers) useServers.getState().setFromView(view);
       useExpressions.getState().setAllEmojis(d.emojis ?? []);
@@ -363,6 +366,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
     case "channel_delete":
       useChannels.getState().remove(e.d.id);
       useMessages.getState().clearChannel(e.d.id);
+      useGroupAddNotices.getState().remove(e.d.id);
       for (const h of dispatchHooks.onMessageChange) h({ kind: "channelsGone", channelIds: [e.d.id] });
       return;
     case "channel_positions":
@@ -441,6 +445,12 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "read_state":
       useReadStates.getState().set(e.d);
+      return;
+    case "group_add_notice":
+      useGroupAddNotices.getState().add(e.d);
+      return;
+    case "group_add_notice_delete":
+      useGroupAddNotices.getState().remove(e.d.channel_id);
       return;
     case "key_grant":
       await useKeys.getState().ingestGrants([e.d]);

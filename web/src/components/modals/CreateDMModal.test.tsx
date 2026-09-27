@@ -99,3 +99,56 @@ describe("CreateDMModal with nobody picked", () => {
     expect((screen.getByTestId("create-dm-submit") as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe("CreateDMModal and friends who join groups only from a link", () => {
+  const linkOnly = (id: string, name: string): Relationship => {
+    const r = friend(id, name);
+    return { ...r, user: { ...r.user, group_link_only: true } };
+  };
+  const checkbox = (name: string) => screen.queryByRole("checkbox", { name: new RegExp(name) });
+  const submit = () => screen.getByTestId("create-dm-submit") as HTMLButtonElement;
+
+  it("shows Link Only in place of the checkbox when adding to a group", () => {
+    useChannels.setState({ byId: { g1: group } });
+    useRelationships.getState().setMany([friend("b", "bea"), linkOnly("c", "cat")]);
+    render(
+      <MemoryRouter>
+        <CreateDMModal onClose={() => undefined} groupId="g1" />
+      </MemoryRouter>,
+    );
+    expect(checkbox("bea")).toBeTruthy();
+    expect(checkbox("cat")).toBeNull();
+    expect(screen.getByRole("button", { name: "Link Only" })).toBeTruthy();
+  });
+
+  it("lets a Link Only friend be picked alone, for a direct message, but not into a group", () => {
+    useRelationships.getState().setMany([friend("b", "bea"), linkOnly("c", "cat")]);
+    render(
+      <MemoryRouter>
+        <CreateDMModal onClose={() => undefined} />
+      </MemoryRouter>,
+    );
+    expect(checkbox("cat")).toBeTruthy();
+    fireEvent.click(checkbox("bea")!);
+    // with someone else picked, cat would be put in a group
+    expect(checkbox("cat")).toBeNull();
+    expect(screen.getByRole("button", { name: "Link Only" })).toBeTruthy();
+  });
+
+  it("holds a group back while a Link Only friend picked first is in it", () => {
+    useRelationships.getState().setMany([friend("b", "bea"), linkOnly("c", "cat")]);
+    render(
+      <MemoryRouter>
+        <CreateDMModal onClose={() => undefined} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(checkbox("cat")!);
+    expect(submit().disabled).toBe(false);
+    fireEvent.click(checkbox("bea")!);
+    expect(screen.getByTestId("link-only-held").textContent).toBe("cat only joins group chats from an invite link. Remove them here and send them a link instead.");
+    expect(submit().disabled).toBe(true);
+    fireEvent.click(checkbox("cat")!);
+    expect(screen.queryByTestId("link-only-held")).toBeNull();
+    expect(submit().disabled).toBe(false);
+  });
+});

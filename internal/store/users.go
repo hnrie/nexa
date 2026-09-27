@@ -28,7 +28,7 @@ func init() {
 	})
 }
 
-const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at`
+const userCols = `id, username, display_name, auth_hash, kdf_salt, kdf_params, public_key, enc_private_key, enc_private_key_recovery, recovery_auth_hash, avatar_id, banner_id, about_me, pronouns, accent_color, accent_color_2, status_text, status_emoji, status_expires_at, presence_pref, dm_privacy, flags, created_at, updated_at, group_link_only`
 
 type rowScanner interface{ Scan(dest ...any) error }
 
@@ -36,8 +36,9 @@ func scanUser(r rowScanner) (*User, error) {
 	var u User
 	var recoveryHash sql.NullString
 	var avatar, banner, accent, accent2, statusExp sql.NullInt64
+	var linkOnly int64
 	err := r.Scan(&u.ID, &u.Username, &u.DisplayName, &u.AuthHash, &u.KDFSalt, &u.KDFParams, &u.PublicKey, &u.EncPrivateKey, &u.EncPrivateKeyRecovery, &recoveryHash,
-		&avatar, &banner, &u.AboutMe, &u.Pronouns, &accent, &accent2, &u.StatusText, &u.StatusEmoji, &statusExp, &u.PresencePref, &u.DMPrivacy, &u.Flags, &u.CreatedAt, &u.UpdatedAt)
+		&avatar, &banner, &u.AboutMe, &u.Pronouns, &accent, &accent2, &u.StatusText, &u.StatusEmoji, &statusExp, &u.PresencePref, &u.DMPrivacy, &u.Flags, &u.CreatedAt, &u.UpdatedAt, &linkOnly)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -48,6 +49,7 @@ func scanUser(r rowScanner) (*User, error) {
 	u.AvatarID, u.BannerID = idPtr(avatar), idPtr(banner)
 	u.AccentColor, u.AccentColor2 = intPtr(accent), intPtr(accent2)
 	u.StatusExpiresAt = int64Ptr(statusExp)
+	u.GroupLinkOnly = linkOnly == 1
 	return &u, nil
 }
 
@@ -82,9 +84,9 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 			}
 			return err
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
+		res, err := tx.ExecContext(ctx, `INSERT INTO users (`+userCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(username) DO NOTHING`,
 			int64(u.ID), u.Username, u.DisplayName, u.AuthHash, u.KDFSalt, u.KDFParams, u.PublicKey, u.EncPrivateKey, u.EncPrivateKeyRecovery, recovery,
-			nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt)
+			nullID(u.AvatarID), nullID(u.BannerID), u.AboutMe, u.Pronouns, nullInt(u.AccentColor), nullInt(u.AccentColor2), u.StatusText, u.StatusEmoji, nullInt64(u.StatusExpiresAt), u.PresencePref, u.DMPrivacy, u.Flags, u.CreatedAt, u.UpdatedAt, boolInt(u.GroupLinkOnly))
 		if err != nil {
 			return err
 		}
@@ -274,6 +276,9 @@ func (s *Store) UpdateProfile(ctx context.Context, id ids.ID, p ProfilePatch) er
 	}
 	if p.DMPrivacy != nil {
 		set("dm_privacy", *p.DMPrivacy)
+	}
+	if p.GroupLinkOnly != nil {
+		set("group_link_only", boolInt(*p.GroupLinkOnly))
 	}
 	if len(sets) == 0 {
 		return nil

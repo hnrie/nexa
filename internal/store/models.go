@@ -48,6 +48,8 @@ const (
 )
 
 // User is a full account row. Fields tagged "-" never leave the server.
+// GroupLinkOnly is set when friends may not add the account to a group chat
+// directly, so it joins groups only from an invite link someone sends it.
 type User struct {
 	ID              ids.ID  `json:"id"`
 	Username        string  `json:"username"`
@@ -63,6 +65,7 @@ type User struct {
 	StatusExpiresAt *int64  `json:"status_expires_at"`
 	PresencePref    string  `json:"presence_pref"`
 	DMPrivacy       string  `json:"dm_privacy"`
+	GroupLinkOnly   bool    `json:"group_link_only"`
 	Flags           int64   `json:"flags"`
 	PublicKey       []byte  `json:"public_key"`
 	CreatedAt       int64   `json:"created_at"`
@@ -77,6 +80,11 @@ type User struct {
 }
 
 // PublicUser is what other users may see.
+//
+// GroupLinkOnly says the account joins group chats only from an invite link
+// (users.group_link_only): friends picking people for a group see it as Link
+// Only. It is sent when false too, so a user_update that turns it off
+// replaces the old value instead of leaving it standing.
 type PublicUser struct {
 	ID              ids.ID  `json:"id"`
 	Username        string  `json:"username"`
@@ -92,6 +100,7 @@ type PublicUser struct {
 	StatusExpiresAt *int64  `json:"status_expires_at"`
 	PublicKey       []byte  `json:"public_key"`
 	Flags           int64   `json:"flags"`
+	GroupLinkOnly   bool    `json:"group_link_only"`
 	CreatedAt       int64   `json:"created_at"`
 }
 
@@ -99,7 +108,7 @@ type PublicUser struct {
 func (u *User) Public() PublicUser {
 	return PublicUser{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName, AvatarID: u.AvatarID, BannerID: u.BannerID,
 		AboutMe: u.AboutMe, Pronouns: u.Pronouns, AccentColor: u.AccentColor, AccentColor2: u.AccentColor2, StatusText: u.StatusText, StatusEmoji: u.StatusEmoji,
-		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, CreatedAt: u.CreatedAt}
+		StatusExpiresAt: u.StatusExpiresAt, PublicKey: u.PublicKey, Flags: u.Flags & publicFlags, GroupLinkOnly: u.GroupLinkOnly, CreatedAt: u.CreatedAt}
 }
 
 // ProfilePatch describes optional profile changes. A nil pointer means "leave
@@ -118,6 +127,7 @@ type ProfilePatch struct {
 	StatusExpiresAt **int64
 	PresencePref    *string
 	DMPrivacy       *string
+	GroupLinkOnly   *bool
 }
 
 // Session is a login on one device.

@@ -1,6 +1,7 @@
 import type {
   Channel,
   Emoji,
+  GroupAddNotice,
   Invite,
   KeyGrant,
   KeyNeed,
@@ -78,6 +79,9 @@ export type GatewayEvent =
   /** Someone voted on, or took back a vote on, a webhook message's poll. */
   | { t: "poll_vote_add" | "poll_vote_remove"; d: { channel_id: Snowflake; message_id: Snowflake; user_id: Snowflake; answer_id: number; total_voters?: number } }
   | { t: "settings_update"; d: { version: number; session_id: Snowflake } }
+  /** Nexa's note that a friend added you to a group, and its dismissal on another of your devices. */
+  | { t: "group_add_notice"; d: GroupAddNotice }
+  | { t: "group_add_notice_delete"; d: { channel_id: Snowflake } }
   | { t: "session_expired"; d: unknown }
   /** A guest's time in the call is over: removed, revoked, expired, left, or the call is gone. */
   | { t: "guest_ended"; d: { reason: string } }

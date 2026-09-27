@@ -1,0 +1,14 @@
+/* Nexa's note to someone a friend added to a group: drawn like a message, and marked as theirs alone */
+.notice { background: color-mix(in srgb, var(--brand) 7%, transparent); padding-bottom: 6px; }
+/* the message avatar's place, without the pointer: Nexa has no profile to open from here */
+.avatar { position: absolute; inset-inline-start: 16px; top: 2px; display: block; border-radius: 50%; }
+.nexa { font-size: 16px; font-weight: 500; line-height: inherit; color: var(--text-strong); }
+.link { color: var(--link); font-size: inherit; line-height: inherit; font-weight: 500; text-align: start; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+.foot { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--text-muted); }
+.foot svg { flex: none; }
+.dismiss { color: var(--link); font-size: inherit; line-height: inherit; }
+.dismiss:hover { text-decoration: underline; }
+@media (max-width: 767px) { .avatar { inset-inline-start: 12px; } }
+/* a finger-sized target without moving the line it sits on */
+@media (pointer: coarse) { .dismiss { padding: 10px 6px; margin: -10px -6px; } }

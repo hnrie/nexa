@@ -93,9 +93,10 @@ export function describeError(err: unknown, fallback?: string): string {
 }
 
 /**
- * Why a direct message could not be opened. A refusal is the other person's
- * choice of who may message them, or a block, and is said in the reader's
- * language with what to do about it; anything else goes to describeError.
+ * Why a direct message or a group could not be opened, or someone added to
+ * one. A refusal is the other person's choice of who may message them or put
+ * them in a group, or a block, and is said in the reader's language with what
+ * to do about it; anything else goes to describeError.
  */
 export function dmOpenError(err: unknown, fallback: string): string {
   if (err instanceof ApiError) {
@@ -104,6 +105,7 @@ export function dmOpenError(err: unknown, fallback: string): string {
       dm_friends_only: t("errors.dmFriendsOnly"),
       dm_closed: t("errors.dmClosed"),
       blocked: t("errors.dmBlocked"),
+      link_only: t("errors.linkOnly"),
     };
     const said = refusals[err.code];
     if (said) return said;

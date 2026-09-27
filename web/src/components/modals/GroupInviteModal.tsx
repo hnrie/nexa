@@ -16,6 +16,7 @@ import { useChannels } from "@/stores/channels";
 import { useUI } from "@/stores/ui";
 import { copyText } from "@/lib/copyText";
 import { useUsers } from "@/stores/users";
+import { GroupFriendAdder } from "./GroupFriendAdder";
 import s from "./ServerModals.module.css";
 
 import { t } from "@/i18n";
@@ -29,7 +30,11 @@ function ages(): { v: number; label: string }[] {
 }
 const USES = [0, 1, 5, 10, 25];
 
-/** A shareable link that adds whoever opens it to this group chat. */
+/**
+ * Bringing people into a group chat: friends added straight from the list (a
+ * Link Only friend is sent the link instead), or a shareable link that adds
+ * whoever opens it.
+ */
 export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; channelId: string }) {
   const channel = useChannels((c) => c.byId[channelId]);
   const users = useUsers((u) => u.byId);
@@ -78,6 +83,8 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
   return (
     <Modal open onClose={onClose} title={t("modals.groupInvite.invitePeopleTo", { name })} width={480}>
       <div className={s.form}>
+        <GroupFriendAdder channelId={channelId} />
+        <div className={s.sep} role="presentation" />
         <p className={s.hint}>{t("modals.groupInvite.anyoneWithThisLinkJoinsThe")}</p>
         <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? t("modals.groupInvite.expiresOn", { when: formatFull(invite.expires_at) }) : t("modals.groupInvite.thisLinkNeverExpires")}>
           <div className={s.linkRow}>

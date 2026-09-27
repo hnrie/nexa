@@ -14,6 +14,7 @@ export type MePatch = Partial<{
   status_expires_at: number | null;
   presence_pref: MeUser["presence_pref"];
   dm_privacy: MeUser["dm_privacy"];
+  group_link_only: boolean;
 }>;
 
 type Progress = (loaded: number, total: number) => void;

@@ -216,8 +216,17 @@ func (s *Server) handleMePatch(w http.ResponseWriter, r *http.Request) {
 		}
 		p.DMPrivacy = &v
 	}
-	// Muted, someone can still set their presence and who may message them,
-	// and take things off their profile, but not put anything new on it.
+	if v, ok := raw["group_link_only"]; ok {
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil || string(v) == "null" {
+			bad("invalid_group_link_only", "group_link_only must be true or false.")
+			return
+		}
+		p.GroupLinkOnly = &b
+	}
+	// Muted, someone can still set their presence, who may message them and
+	// who may add them to groups, and take things off their profile, but not
+	// put anything new on it.
 	filled := func(v *string) bool { return v != nil && *v != "" }
 	public := p.Username != nil || p.DisplayName != nil || p.AccentColor != nil || p.AccentColor2 != nil ||
 		filled(p.AboutMe) || filled(p.Pronouns) || filled(p.StatusText) || filled(p.StatusEmoji)

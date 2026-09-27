@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"evilion.xyz/chat/internal/auth"
+	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
 	"evilion.xyz/chat/internal/store"
@@ -17,6 +19,11 @@ const (
 	maxChannelName = 100
 )
 
+// errLinkOnly refuses to put someone in a group who has turned off "Let
+// friends add me to group chats": they join groups only from an invite link,
+// which always works for them.
+var errLinkOnly = E(http.StatusForbidden, "link_only", "They only join group chats from an invite link. Send them one in a message.")
+
 func (s *Server) channelRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /api/v1/users/@me/channels", s.authed(s.handleDMCreate))
 	mux.Handle("GET /api/v1/users/@me/channels", s.authed(s.handleDMList))
@@ -26,6 +33,7 @@ func (s *Server) channelRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /api/v1/channels/{id}/icon", s.authed(s.handleChannelIconDelete))
 	mux.Handle("POST /api/v1/channels/{id}/recipients/{uid}", s.authed(s.handleRecipientAdd))
 	mux.Handle("DELETE /api/v1/channels/{id}/recipients/{uid}", s.authed(s.handleRecipientRemove))
+	mux.Handle("DELETE /api/v1/channels/{id}/add-notice", s.authed(s.handleGroupAddNoticeDismiss))
 	mux.Handle("POST /api/v1/channels/{id}/typing", s.authed(s.handleTyping))
 	mux.Handle("POST /api/v1/channels/{id}/attachments", s.authed(s.handleAttachmentUpload))
 	mux.Handle("GET /media/attachments/{id}", s.authed(s.handleAttachmentDownload))
@@ -158,6 +166,19 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+		// a new group is still a group: whoever joins groups only from a link
+		// is sent one instead of being put in it
+		people, err := s.Store.UsersByIDs(ctx, recipients)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		for _, id := range recipients {
+			if u := people[id]; u != nil && u.GroupLinkOnly {
+				WriteError(w, errLinkOnly)
+				return
+			}
+		}
 		name, ok := CleanText(req.Name, maxChannelName)
 		if !ok {
 			WriteError(w, E(http.StatusBadRequest, "invalid_name", "Group names are at most 100 characters."))
@@ -169,8 +190,44 @@ func (s *Server) handleDMCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.Bcast.EmitUsers(ch.Recipients, "channel_create", ch)
+		for _, id := range recipients {
+			s.sendGroupAddNotice(ctx, ch.ID, id)
+		}
 		WriteJSON(w, http.StatusCreated, ch)
 	}
+}
+
+// sendGroupAddNotice gives someone a friend just put in a group Nexa's note
+// about it: who added them, and how to join groups only from links instead.
+// It goes to them alone, and is kept until they dismiss it (READY carries it
+// to a device that was offline).
+func (s *Server) sendGroupAddNotice(ctx context.Context, chID, uid ids.ID) {
+	n, err := s.Store.GroupAddNoticeIn(ctx, chID, uid)
+	if err != nil {
+		if !errors.Is(err, store.ErrNotFound) {
+			s.Log.Warn("group add notice", "channel", chID.String(), "user", uid.String(), "err", err)
+		}
+		return
+	}
+	s.Bcast.EmitUsers([]ids.ID{uid}, gateway.EvGroupAddNotice, n)
+}
+
+// handleGroupAddNoticeDismiss clears Nexa's note about who added the caller
+// to a group, on every device they are signed in on.
+func (s *Server) handleGroupAddNoticeDismiss(w http.ResponseWriter, r *http.Request) {
+	ch, me := s.channel(w, r, NeedView)
+	if ch == nil {
+		return
+	}
+	cleared, err := s.Store.DismissGroupAddNotice(r.Context(), ch.ID, me.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if cleared {
+		s.Bcast.EmitUsers([]ids.ID{me.ID}, gateway.EvGroupAddNoticeDelete, map[string]any{"channel_id": ch.ID})
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // revealDM puts a conversation back in the sidebar of everyone in it who does
@@ -359,6 +416,15 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusForbidden, "not_friends", "You can only add your friends."))
 		return
 	}
+	target, err := s.Store.UserByID(r.Context(), uid)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	if target.GroupLinkOnly {
+		WriteError(w, errLinkOnly)
+		return
+	}
 	subs, err := s.Store.AddParticipant(r.Context(), ch.ID, uid, me.ID)
 	if err != nil {
 		WriteError(w, err)
@@ -372,6 +438,7 @@ func (s *Server) handleRecipientAdd(w http.ResponseWriter, r *http.Request) {
 	s.Bcast.EmitUsers([]ids.ID{uid}, "channel_create", updated)
 	s.Bcast.EmitUsers(ch.Recipients, "channel_update", updated)
 	s.systemMessage(r, updated, me.ID, "system_member_add", []ids.ID{uid}, nil)
+	s.sendGroupAddNotice(r.Context(), ch.ID, uid)
 	// the group has never seen the newcomer's presence, nor they the group's
 	s.Bcast.PresenceChanged(uid)
 	s.Bcast.KeysMaybeNeeded(ch.ID)

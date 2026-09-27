@@ -1,7 +1,8 @@
-import { X } from "lucide-react";
+import { Link, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { dmOpenError } from "@/lib/errors";
+import { addFriendToGroup, isLinkOnly } from "@/lib/groupAdd";
 import { channels as channelsApi } from "@/api/channels";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -10,6 +11,9 @@ import { TextInput } from "@/components/common/TextInput";
 import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
+import { useUsers } from "@/stores/users";
+import { LinkOnlyTag } from "./LinkOnlyTag";
+import g from "./GroupAdd.module.css";
 import s from "./CreateDMModal.module.css";
 
 import { t } from "@/i18n";
@@ -19,6 +23,7 @@ const MAX = 49;
 export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () => void; initial?: string[]; groupId?: string | undefined }) {
   const nav = useNavigate();
   const rels = useRelationships((r) => r.byUser);
+  const users = useUsers((u) => u.byId);
   const upsert = useChannels((c) => c.upsert);
   const group = useChannels((c) => (groupId ? c.byId[groupId] : undefined));
   const toast = useUI((u) => u.toast);
@@ -32,10 +37,18 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   );
   const shown = friends.filter((r) => !q || r.user.display_name.toLowerCase().includes(q.toLowerCase()) || r.user.username.includes(q.toLowerCase()));
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX ? p : [...p, id]));
+  // A friend who joins groups only from a link can still be picked alone, for
+  // a direct message, but not for a group: adding to one, or with someone else
+  // picked. One picked first, before anyone else, holds the group back until
+  // they are taken off again.
+  const linkOnly = (id: string) => isLinkOnly(users[id] ?? rels[id]?.user);
+  const forGroup = (id: string) => !!group || picked.some((x) => x !== id);
+  const heldBy = group || picked.length > 1 ? picked.find(linkOnly) : undefined;
+  const heldName = heldBy ? (rels[heldBy]?.user.display_name ?? users[heldBy]?.display_name ?? heldBy) : "";
 
   // Nobody picked makes a group of one, to add people to later; adding to a
   // group that exists needs someone to add.
-  const canCreate = !group || picked.length > 0;
+  const canCreate = (!group || picked.length > 0) && !heldBy;
   const create = async () => {
     if (!canCreate || busy) return;
     setBusy(true);
@@ -45,7 +58,7 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
           // Someone added on an earlier try that then failed is already in, and adding them again
           // is refused before the rest are reached, so skip them and drop each success from the picks.
           if (useChannels.getState().byId[group.id]?.recipient_ids.includes(id)) continue;
-          upsert(await channelsApi.addRecipient(group.id, id));
+          await addFriendToGroup(group.id, id);
           setPicked((p) => p.filter((x) => x !== id));
         }
         onClose();
@@ -83,19 +96,42 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
           })}
         </div>
       ) : null}
+      {heldBy ? (
+        <p className={g.warn} role="alert" data-testid="link-only-held">
+          <Link size={16} aria-hidden="true" />
+          <span>{t("modals.createDM.linkOnlyInGroup", { name: heldName })}</span>
+        </p>
+      ) : null}
       {!group && picked.length > 1 ? <TextInput className={s.name} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("modals.createDM.groupNameOptional")} aria-label={t("modals.createDM.groupNameOptional")} maxLength={100} /> : null}
       <div className={s.list}>
         {shown.length === 0 ? <div className={s.empty}>{friends.length === 0 ? t("modals.createDM.addSomeFriendsFirst") : t("modals.createDM.noFriendsMatch")}</div> : null}
-        {shown.map((r) => (
-          <label key={r.user.id} className={s.row}>
-            <Avatar id={r.user.id} avatarId={r.user.avatar_id} name={r.user.display_name} size={32} />
-            <span className={s.text}>
-              <span className={s.rowName}>{r.user.display_name}</span>
-              <span className={s.rowUser}>{r.user.username}</span>
-            </span>
-            <input type="checkbox" checked={picked.includes(r.user.id)} onChange={() => toggle(r.user.id)} />
-          </label>
-        ))}
+        {shown.map((r) => {
+          const who = (
+            <>
+              <Avatar id={r.user.id} avatarId={r.user.avatar_id} name={r.user.display_name} size={32} />
+              <span className={s.text}>
+                <span className={s.rowName}>{r.user.display_name}</span>
+                <span className={s.rowUser}>{r.user.username}</span>
+              </span>
+            </>
+          );
+          // not a label: there is nothing to tick, and a click on the row would
+          // otherwise land on the Link Only button inside it
+          if (linkOnly(r.user.id) && forGroup(r.user.id) && !picked.includes(r.user.id)) {
+            return (
+              <div key={r.user.id} className={s.row} data-link-only="true">
+                {who}
+                <LinkOnlyTag name={r.user.display_name} />
+              </div>
+            );
+          }
+          return (
+            <label key={r.user.id} className={s.row}>
+              {who}
+              <input type="checkbox" checked={picked.includes(r.user.id)} onChange={() => toggle(r.user.id)} />
+            </label>
+          );
+        })}
       </div>
     </Modal>
   );

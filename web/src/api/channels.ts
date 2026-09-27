@@ -43,6 +43,10 @@ export const channels = {
   removeRecipient(id: Snowflake, uid: Snowflake): Promise<void> {
     return api.request<void>("DELETE", `/channels/${id}/recipients/${uid}`);
   },
+  /** Dismisses Nexa's note about who added you to this group, on every device. */
+  dismissAddNotice(id: Snowflake): Promise<void> {
+    return api.request<void>("DELETE", `/channels/${id}/add-notice`);
+  },
   /** Closes a DM for you; a new message brings it back. */
   /** The side conversations of a DM or group. */
   subchats(id: Snowflake): Promise<Channel[]> {

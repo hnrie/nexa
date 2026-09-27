@@ -50,6 +50,15 @@ export default function PrivacyPage() {
       toast(err instanceof ApiError ? err.message : t("settings.privacy.couldNotSave"), "error");
     }
   };
+  // kept on the server, since it is other people's apps that go by it: off,
+  // friends see this account as Link Only and send it an invite link instead
+  const setFriendsAdd = async (allowed: boolean) => {
+    try {
+      setMe(await usersApi.patchMe({ group_link_only: !allowed }));
+    } catch (err) {
+      toast(describeError(err, t("settings.privacy.couldNotSave")), "error");
+    }
+  };
   return (
     <>
       <h2 className={s.title}>{t("settings.privacy.privacySafety")}</h2>
@@ -60,6 +69,8 @@ export default function PrivacyPage() {
           <span className={s.radioText}><span className={s.radioLabel}>{o.label}</span><span className={s.radioDesc}>{o.desc}</span></span>
         </label>
       ))}
+      <h3 className={s.h5}>{t("settings.privacy.groupChats")}</h3>
+      <Toggle checked={!me.group_link_only} onChange={(v) => void setFriendsAdd(v)} label={t("settings.privacy.letFriendsAddMe")} description={t("settings.privacy.letFriendsAddMeHint")} />
       <h3 className={s.h5}>{t("server.encryption.encryption")}</h3>
       <p className={s.hint}>{t("settings.privacy.everyMessageAndFileYouSend")}</p>
       <SearchSettings />

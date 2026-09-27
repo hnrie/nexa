@@ -837,7 +837,7 @@ func (h *Hub) typingAudience(ctx context.Context, uid, channelID ids.ID) ([]ids.
 // call (filled in by GuestReady). No conversations, people or servers.
 func (h *Hub) buildGuestReady(ctx context.Context, g *store.Guest, session *store.Session) (*ReadyPayload, error) {
 	p := &ReadyPayload{SessionID: session.ID, Users: []store.PublicUser{}, Channels: []*store.Channel{}, Relationships: []store.RelationshipView{}, ReadStates: []*store.ReadState{},
-		Presences: []Presence{}, KeyGrants: []*store.KeyGrant{}, Servers: []any{}, Emojis: []*store.Emoji{}, StickerPacks: []*store.StickerPack{}, VoiceStates: []any{}}
+		Presences: []Presence{}, KeyGrants: []*store.KeyGrant{}, Servers: []any{}, Emojis: []*store.Emoji{}, StickerPacks: []*store.StickerPack{}, VoiceStates: []any{}, GroupAddNotices: []store.GroupAddNotice{}}
 	p.User = map[string]any{"id": g.ID, "username": "", "display_name": g.DisplayName, "avatar_id": nil, "flags": store.FlagGuest, "created_at": g.CreatedAt}
 	if h.GuestReady != nil {
 		if err := h.GuestReady(ctx, g, p); err != nil {
@@ -856,6 +856,9 @@ func (h *Hub) buildReady(ctx context.Context, u *store.User, session *store.Sess
 		"dm_privacy": u.DMPrivacy, "has_recovery": u.RecoveryAuthHash != ""}
 	var err error
 	if p.Channels, err = h.st.DMChannelsForUser(ctx, u.ID); err != nil {
+		return nil, err
+	}
+	if p.GroupAddNotices, err = h.st.GroupAddNotices(ctx, u.ID); err != nil {
 		return nil, err
 	}
 	rels, err := h.st.Relationships(ctx, u.ID)

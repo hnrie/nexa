@@ -125,7 +125,9 @@ func (s *Store) createDM(ctx context.Context, a, b ids.ID, quiet bool) (*Channel
 	return c, true, nil
 }
 
-// CreateGroupDM creates a group with owner and recipients.
+// CreateGroupDM creates a group with owner and recipients. Everyone but the
+// owner was put in it by the owner directly, which Nexa tells them about
+// (GroupAddNotice).
 func (s *Store) CreateGroupDM(ctx context.Context, owner ids.ID, recipients []ids.ID, name string) (*Channel, error) {
 	c := &Channel{Type: "group_dm", Name: name}
 	o := owner
@@ -137,7 +139,7 @@ func (s *Store) CreateGroupDM(ctx context.Context, owner ids.ID, recipients []id
 			return err
 		}
 		for _, uid := range members {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(c.ID), int64(uid), int64(owner), now); err != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at, add_notice_by) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING`, int64(c.ID), int64(uid), int64(owner), now, addNoticeBy(uid, owner)); err != nil {
 				return err
 			}
 		}
@@ -390,7 +392,9 @@ func (s *Store) Participants(ctx context.Context, chID ids.ID) ([]ids.ID, error)
 
 // AddParticipant adds uid to a group DM and to every subchat inside it, since
 // a subchat holds the same people as its group. It returns the subchats uid
-// joined, or ErrAlreadyExists when uid is already in the group.
+// joined, or ErrAlreadyExists when uid is already in the group. Someone added
+// by another member (addedBy is not uid) is told so by Nexa; someone who
+// joined by themselves, from an invite link, is not.
 func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) ([]ids.ID, error) {
 	var subs []ids.ID
 	err := s.Tx(ctx, func(tx *db.Tx) error {
@@ -400,7 +404,7 @@ func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) (
 			return err
 		}
 		now := nowMs()
-		res, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING`, int64(chID), int64(uid), int64(addedBy), now)
+		res, err := tx.ExecContext(ctx, `INSERT INTO dm_participants (channel_id, user_id, added_by, added_at, add_notice_by) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING`, int64(chID), int64(uid), int64(addedBy), now, addNoticeBy(uid, addedBy))
 		if err != nil {
 			return err
 		}
@@ -419,6 +423,80 @@ func (s *Store) AddParticipant(ctx context.Context, chID, uid, addedBy ids.ID) (
 		return nil
 	})
 	return subs, err
+}
+
+// addNoticeBy is what a new member's add_notice_by holds: whoever put them in
+// the group, unless they came in by themselves.
+func addNoticeBy(uid, addedBy ids.ID) any {
+	if addedBy == uid || addedBy.IsZero() {
+		return nil
+	}
+	return int64(addedBy)
+}
+
+// GroupAddNotice is Nexa's note to someone a friend put in a group directly:
+// who added them and when. Only that person is ever told, and it stays until
+// they dismiss it or leave the group.
+type GroupAddNotice struct {
+	ChannelID ids.ID `json:"channel_id"`
+	AddedBy   ids.ID `json:"added_by"`
+	AddedAt   int64  `json:"added_at"`
+}
+
+// groupAddNoticeQuery takes the member and FlagDeleted: a note naming an
+// account that has since been deleted has nobody left to name.
+const groupAddNoticeQuery = `SELECT p.channel_id, p.add_notice_by, p.added_at FROM dm_participants p JOIN channels c ON c.id = p.channel_id
+	WHERE p.user_id = ? AND p.add_notice_by IS NOT NULL AND c.type = 'group_dm'
+	AND NOT EXISTS (SELECT 1 FROM users a WHERE a.id = p.add_notice_by AND a.flags & ? != 0)`
+
+func scanGroupAddNotices(rows *sql.Rows) ([]GroupAddNotice, error) {
+	defer rows.Close()
+	out := []GroupAddNotice{}
+	for rows.Next() {
+		var ch, by, at int64
+		if err := rows.Scan(&ch, &by, &at); err != nil {
+			return nil, err
+		}
+		out = append(out, GroupAddNotice{ChannelID: ids.ID(ch), AddedBy: ids.ID(by), AddedAt: at})
+	}
+	return out, rows.Err()
+}
+
+// GroupAddNotices lists the notes uid has not dismissed, one per group.
+func (s *Store) GroupAddNotices(ctx context.Context, uid ids.ID) ([]GroupAddNotice, error) {
+	rows, err := s.db.R.QueryContext(ctx, groupAddNoticeQuery+` ORDER BY p.added_at`, int64(uid), FlagDeleted)
+	if err != nil {
+		return nil, err
+	}
+	return scanGroupAddNotices(rows)
+}
+
+// GroupAddNoticeIn is uid's note in one group, or ErrNotFound when there is
+// none: they joined from a link, made the group, or dismissed it.
+func (s *Store) GroupAddNoticeIn(ctx context.Context, chID, uid ids.ID) (*GroupAddNotice, error) {
+	rows, err := s.db.R.QueryContext(ctx, groupAddNoticeQuery+` AND p.channel_id = ?`, int64(uid), FlagDeleted, int64(chID))
+	if err != nil {
+		return nil, err
+	}
+	list, err := scanGroupAddNotices(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, ErrNotFound
+	}
+	return &list[0], nil
+}
+
+// DismissGroupAddNotice clears uid's note in a group, reporting whether there
+// was one to clear.
+func (s *Store) DismissGroupAddNotice(ctx context.Context, chID, uid ids.ID) (bool, error) {
+	res, err := s.db.W.ExecContext(ctx, `UPDATE dm_participants SET add_notice_by = NULL WHERE channel_id = ? AND user_id = ? AND add_notice_by IS NOT NULL`, int64(chID), int64(uid))
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // RemoveParticipant removes uid from a group DM and from every subchat inside

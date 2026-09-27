@@ -1,6 +1,6 @@
 import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { Channel } from "@/api/types";
+import type { Channel, GroupAddNotice } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { Spinner } from "@/components/common/Spinner";
 import { channelDisplayName } from "@/lib/names";
@@ -17,6 +17,9 @@ import { useUsers } from "@/stores/users";
 import { useChannels } from "@/stores/channels";
 import { MessageItem } from "./MessageItem";
 import { GroupAlone } from "./GroupAlone";
+import { GroupAddNoticeRow } from "./GroupAddNoticeRow";
+import { noticeSpot } from "@/lib/groupAdd";
+import { useGroupAddNotices } from "@/stores/groupAddNotices";
 import { BlockedRun } from "./BlockedRun";
 import { isQuiet, messageFate, useBlockRules, type AuthorOf } from "@/lib/blocked";
 import s from "./Chat.module.css";
@@ -38,6 +41,8 @@ type Row =
   | { kind: "unread"; key: string }
   | { kind: "msg"; key: string; msg: DecryptedMessage; groupStart: boolean }
   | { kind: "pending"; key: string; p: PendingMessage; groupStart: boolean }
+  /** Nexa's note, to this account alone, that a friend added it to the group: not a message. */
+  | { kind: "notice"; key: string; notice: GroupAddNotice }
   | BlockedRow;
 
 const GROUP_MS = 7 * 60 * 1000;
@@ -150,6 +155,7 @@ export function MessageList({ channel }: { channel: Channel }) {
   const users = useUsers((u) => u.byId);
   const byIdChannels = useChannels((c) => c.byId);
   const state = useMessages((m) => m.channels[channel.id]);
+  const addNotice = useGroupAddNotices((n) => (channel.type === "group_dm" ? n.byChannel[channel.id] : undefined));
   const loadOlder = useMessages((m) => m.loadOlder);
   const loadNewer = useMessages((m) => m.loadNewer);
   const loadInitial = useMessages((m) => m.loadInitial);
@@ -246,6 +252,19 @@ export function MessageList({ channel }: { channel: Channel }) {
     // and no break in the run of messages around it.
     const authorOf: AuthorOf = (mid) => byId[mid]?.author_id;
     let run: BlockedRow | null = null;
+    // Nexa's note about who added this account goes where noticeSpot says,
+    // and whatever follows it starts a run of its own, with a name
+    const meId = me?.id;
+    const spot = addNotice && meId && loaded ? noticeSpot(ids, byId, addNotice, meId, { hasOlder, hasNewer }) : null;
+    let noticePlaced = false;
+    let afterNotice = false;
+    const placeNotice = () => {
+      if (!addNotice || noticePlaced) return;
+      out.push({ kind: "notice", key: "group-add-notice", notice: addNotice });
+      noticePlaced = true;
+      afterNotice = true;
+    };
+    if (spot === "start") placeNotice();
     for (const id of ids) {
       const m = byId[id];
       if (!m) continue;
@@ -271,19 +290,24 @@ export function MessageList({ channel }: { channel: Channel }) {
         continue;
       }
       run = null;
-      out.push({ kind: "msg", key: m.id, msg: m, groupStart: !shouldGroup(prev, m) });
+      out.push({ kind: "msg", key: m.id, msg: m, groupStart: afterNotice || !shouldGroup(prev, m) });
+      afterNotice = false;
       prev = m;
+      if (spot && typeof spot === "object" && spot.after === m.id) placeNotice();
     }
+    // at the end, or there after all when the line it follows is not shown
+    if (spot === "end" || (spot && !noticePlaced && !hasNewer)) placeNotice();
     // Unsent messages group with what is above them exactly as sent ones do,
     // or each would flash its own avatar and name until the server answered.
     for (const p of pending) {
       const asMessage = pendingToMessage(p);
-      out.push({ kind: "pending", key: p.tmpId, p, groupStart: !shouldGroup(prev, asMessage) });
+      out.push({ kind: "pending", key: p.tmpId, p, groupStart: afterNotice || !shouldGroup(prev, asMessage) });
+      afterNotice = false;
       prev = asMessage;
     }
     return out;
     // loaded, readKnown and lastRead are listed so the rows are built again when the unread point is captured or moves
-  }, [ids, byId, pending, me?.id, loaded, readKnown, lastRead, blockRules, openRuns]);
+  }, [ids, byId, pending, me?.id, loaded, readKnown, lastRead, blockRules, openRuns, addNotice, hasOlder, hasNewer]);
   /** Whether a message stays quiet here: from someone blocked, or hidden for answering them. */
   const quiet = useCallback((m: DecryptedMessage | undefined) => !!m && isQuiet(m, blockRules, (mid) => byId[mid]?.author_id), [blockRules, byId]);
 
@@ -719,6 +743,7 @@ export function MessageList({ channel }: { channel: Channel }) {
               if (row.kind === "date") return <div key={row.key} className={s.dateDivider}><span>{formatDateDivider(row.ts)}</span></div>;
               if (row.kind === "unread") return <div key={row.key} className={s.unreadDivider}><span>{t("chat.messageList.new")}</span></div>;
               if (row.kind === "blocked") return <BlockedRun key={row.key} runKey={row.key} count={row.ids.length} open={row.open} compact={compact} onToggle={toggleRun} />;
+              if (row.kind === "notice") return <GroupAddNoticeRow key={row.key} notice={row.notice} />;
               if (row.kind === "pending") return <MessageItem key={row.key} msg={pendingToMessage(row.p)} groupStart={row.groupStart} pending={row.p.status} upload={row.p.upload} />;
               return <MessageItem key={row.key} msg={row.msg} groupStart={row.groupStart} highlight={highlight === row.msg.id} first={i < 2} />;
             })}

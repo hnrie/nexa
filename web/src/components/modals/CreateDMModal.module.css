@@ -15,3 +15,5 @@
 .rowName { min-width: 0; font-size: 16px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rowUser { flex: none; max-width: 40%; font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
+/* a Link Only friend's row has nothing to tick while picking for a group */
+.row[data-link-only="true"] { cursor: default; }

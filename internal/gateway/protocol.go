@@ -135,6 +135,10 @@ const (
 	// Bug reports, the same two ways: to the reporter through Nexa, and to staff.
 	EvNexaBug = "nexa_bug"
 	EvModBug  = "mod_bug"
+	// Nexa's note to someone a friend put in a group directly, and its
+	// dismissal on another of their devices. Only that person is sent either.
+	EvGroupAddNotice       = "group_add_notice"
+	EvGroupAddNoticeDelete = "group_add_notice_delete"
 )
 
 // Presence is a user's visible status.
@@ -163,6 +167,9 @@ type ReadyPayload struct {
 	Emojis        []*store.Emoji           `json:"emojis"`
 	StickerPacks  []*store.StickerPack     `json:"sticker_packs"`
 	VoiceStates   []any                    `json:"voice_states"`
+	// GroupAddNotices are this account's own notes from Nexa about being
+	// added to a group by a friend, not yet dismissed. Nobody else is sent them.
+	GroupAddNotices []store.GroupAddNotice `json:"group_add_notices"`
 	// Guest says which call a guest is in; only a guest's ready has it.
 	Guest any `json:"guest,omitempty"`
 	// Nexa is the account's moderation state: restrictions in force, notices

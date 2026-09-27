@@ -328,6 +328,7 @@ func legalAccount(d *legalDoc, rec *store.AccountRecord) {
 	d.field("Status expires:", legalTimeOpt(u.StatusExpiresAt))
 	d.field("Presence preference:", legalText(u.PresencePref))
 	d.field("Who may DM them:", legalText(u.DMPrivacy))
+	d.field("Joins groups by link only:", legalYesNo(u.GroupLinkOnly))
 	d.field("Avatar file id:", legalIDOpt(u.AvatarID))
 	d.field("Banner file id:", legalIDOpt(u.BannerID))
 	d.blank()
