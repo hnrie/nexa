@@ -324,6 +324,8 @@ func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
 		}
 		p.OwnerID = req.OwnerID
 	}
+	// naming the owner they already have changes nothing, and says nothing
+	handedOn := req.OwnerID != nil && (ch.OwnerID == nil || *ch.OwnerID != *req.OwnerID)
 	if err := s.Store.UpdateChannel(r.Context(), ch.ID, p); err != nil {
 		WriteError(w, err)
 		return
@@ -334,6 +336,10 @@ func (s *Server) handleChannelPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Bcast.EmitUsers(updated.Recipients, "channel_update", updated)
+	if handedOn {
+		// said in the group, as adding and removing people are: who made whom its owner
+		s.systemMessage(r, updated, me.ID, "system_owner_change", []ids.ID{*req.OwnerID}, nil)
+	}
 	WriteJSON(w, http.StatusOK, updated)
 }
 

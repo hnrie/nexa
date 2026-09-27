@@ -8,6 +8,7 @@ import { Modal } from "@/components/common/Modal";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
 import { inviteUrl } from "@/lib/inviteLink";
+import { JOIN_LINK_SETTINGS } from "@/lib/joinRequest";
 import { formatFull } from "@/lib/time";
 import { channelDisplayName } from "@/lib/names";
 import { ring } from "@/lib/keyring";
@@ -32,39 +33,64 @@ const USES = [0, 1, 5, 10, 25];
 
 /**
  * Bringing people into a group chat: friends added straight from the list (a
- * Link Only friend is sent the link instead), or a shareable link that adds
- * whoever opens it.
+ * Link Only friend is sent this link in a direct message instead, with Send
+ * Join Request), or a shareable link that adds whoever opens it.
  */
 export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; channelId: string }) {
   const channel = useChannels((c) => c.byId[channelId]);
   const users = useUsers((u) => u.byId);
   const meId = useAuth((a) => a.me?.id);
   const toast = useUI((u) => u.toast);
-  const [age, setAge] = useState(604800);
-  const [uses, setUses] = useState(0);
+  const [age, setAge] = useState(JOIN_LINK_SETTINGS.max_age);
+  const [uses, setUses] = useState(JOIN_LINK_SETTINGS.max_uses);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const key = ring.latest(channelId);
   // only the newest request may fill in the link, so a slow earlier one cannot show old settings
   const seq = useRef(0);
+  const newest = useRef<Promise<Invite> | null>(null);
 
-  const generate = async (a = age, u = uses) => {
+  /** Makes the link for these settings, and shows it while it is still the newest asked for. */
+  const make = (a: number, u: number): Promise<Invite> => {
     const n = ++seq.current;
     setBusy(true);
-    try {
-      const inv = await channelsApi.createGroupInvite(channelId, { max_age: a, max_uses: u });
-      if (n === seq.current) setInvite(inv);
-    } catch (err) {
+    const job = channelsApi.createGroupInvite(channelId, { max_age: a, max_uses: u });
+    newest.current = job;
+    void job
+      .then(
+        (inv) => {
+          if (n === seq.current) setInvite(inv);
+        },
+        () => undefined,
+      )
+      .finally(() => {
+        if (n === seq.current) setBusy(false);
+      });
+    return job;
+  };
+  /** The same, saying so when it fails and is still the newest. */
+  const generate = (a = age, u = uses) => {
+    const job = make(a, u);
+    const n = seq.current;
+    job.catch((err: unknown) => {
       if (n === seq.current) toast(err instanceof ApiError ? err.message : t("modals.groupInvite.couldNotCreateAnInvite"), "error");
-    } finally {
-      if (n === seq.current) setBusy(false);
-    }
+    });
   };
   useEffect(() => {
-    void generate();
+    generate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /**
+   * The link a join request carries: the one shown here, once the request for
+   * these settings is in, or one made now with them when that failed. A
+   * failure here is the join request's to report.
+   */
+  const joinLink = async (): Promise<string> => {
+    const shown = await newest.current?.catch(() => null);
+    const inv = shown ?? (await make(age, uses));
+    return inviteUrl(inv.code, ring.latest(channelId));
+  };
 
   if (!channel) return null;
   const name = channelDisplayName(channel, users, meId);
@@ -83,7 +109,7 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
   return (
     <Modal open onClose={onClose} title={t("modals.groupInvite.invitePeopleTo", { name })} width={480}>
       <div className={s.form}>
-        <GroupFriendAdder channelId={channelId} />
+        <GroupFriendAdder channelId={channelId} joinLink={joinLink} />
         <div className={s.sep} role="presentation" />
         <p className={s.hint}>{t("modals.groupInvite.anyoneWithThisLinkJoinsThe")}</p>
         <Field label={t("modals.createServer.inviteLink")} hint={invite?.expires_at ? t("modals.groupInvite.expiresOn", { when: formatFull(invite.expires_at) }) : t("modals.groupInvite.thisLinkNeverExpires")}>
@@ -98,12 +124,12 @@ export function GroupInviteModal({ onClose, channelId }: { onClose: () => void; 
         </div>
         <div className={s.row2}>
           <Field label={t("modals.groupInvite.expireAfter")}>
-            <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); void generate(v, uses); }}>
+            <Select value={age} onChange={(e) => { const v = Number(e.target.value); setAge(v); generate(v, uses); }}>
               {ages().map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
             </Select>
           </Field>
           <Field label={t("modals.groupInvite.maxNumberOfUses")}>
-            <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); void generate(age, v); }}>
+            <Select value={uses} onChange={(e) => { const v = Number(e.target.value); setUses(v); generate(age, v); }}>
               {USES.map((u) => <option key={u} value={u}>{u === 0 ? t("modals.groupInvite.noLimit") : t("modals.groupInvite.usesCount", { count: u })}</option>)}
             </Select>
           </Field>

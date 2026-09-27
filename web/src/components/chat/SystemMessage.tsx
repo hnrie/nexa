@@ -1,4 +1,4 @@
-import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Pin } from "lucide-react";
+import { ArrowLeftFromLine, ArrowRightToLine, ChartBar, Crown, Pin } from "lucide-react";
 import { CallLine } from "@/components/voice/CallLine";
 import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
@@ -23,13 +23,23 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   let body: React.ReactNode;
   switch (msg.type) {
     case "system_member_add":
-      body = <Tr id="chat.systemMessage.addedToGroup" values={{ actor: A, target: T }} />;
+      // joining with a link is written as adding yourself
+      body = msg.mentions[0] === msg.author_id
+        ? <Tr id="chat.systemMessage.joinedGroup" values={{ actor: A }} />
+        : <Tr id="chat.systemMessage.addedToGroup" values={{ actor: A, target: T }} />;
       break;
     case "system_member_remove":
       icon = <ArrowLeftFromLine size={18} />;
       body = msg.mentions[0] === msg.author_id
         ? <Tr id="chat.systemMessage.leftGroup" values={{ actor: A }} />
         : <Tr id="chat.systemMessage.removedFromGroup" values={{ actor: A, target: T }} />;
+      break;
+    case "system_owner_change":
+      // an instance admin taking a group over names themselves
+      icon = <Crown size={18} />;
+      body = msg.mentions[0] === msg.author_id
+        ? <Tr id="chat.systemMessage.tookOwnership" values={{ actor: A }} />
+        : <Tr id="chat.systemMessage.madeOwner" values={{ actor: A, target: T }} />;
       break;
     case "system_pin":
       icon = <Pin size={18} />;

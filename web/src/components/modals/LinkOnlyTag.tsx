@@ -7,10 +7,12 @@ import s from "./GroupAdd.module.css";
 import { t } from "@/i18n";
 
 /**
- * Shown in place of an Add button or a checkbox for a friend who joins group
- * chats only from an invite link. Pointing at it or focusing it explains; the
- * explanation is its description for a screen reader too, and a tap says it
- * where there is no pointer to hover with.
+ * Shown in place of a checkbox, in Select Friends while a new group is being
+ * put together, for a friend who joins group chats only from an invite link
+ * (a group that exists offers Send Join Request instead: JoinRequestButton).
+ * Pointing at it or focusing it explains; the explanation is its description
+ * for a screen reader too, and a tap says it where there is no pointer to
+ * hover with.
  */
 export function LinkOnlyTag({ name }: { name: string }) {
   const hintId = useId();

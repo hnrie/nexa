@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
 import { OwnerCrown } from "@/components/common/OwnerBadge";
+import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { isOwner } from "@/lib/owner";
 import { StatusLine } from "@/components/activity/StatusLine";
 import { friendNicknames } from "@/lib/names";
@@ -22,7 +23,8 @@ import { t } from "@/i18n";
 /**
  * A group's members, drawn exactly as a server's member list: online first,
  * the owner crowned, custom status or activity underneath, and a right click
- * (or long press) for what you may do to each.
+ * (or long press, or the menu key) for what you may do to each: for the
+ * owner, that includes handing the group on and removing people.
  */
 export function GroupMemberList({ channel, drawer, open }: { channel: Channel; drawer: boolean; open: boolean }) {
   const users = useUsers((u) => u.byId);
@@ -59,7 +61,8 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
             onClick={() => openModal("profile", { userId: row.id })}
             onContextMenu={(e) => {
               e.preventDefault();
-              openContextMenu({ x: e.clientX, y: e.clientY, items: groupMemberMenuItems(channel.id, row.id, { nav, openModal }) });
+              // the menu key or Shift+F10 has no pointer: the menu opens by the row
+              openContextMenu({ ...menuPoint(e), label: row.name, items: groupMemberMenuItems(channel.id, row.id, { nav, openModal }) });
             }}
           >
             <Avatar id={row.id} avatarId={users[row.id]?.avatar_id ?? null} name={row.name} size={32} status={statusOf(p)} />

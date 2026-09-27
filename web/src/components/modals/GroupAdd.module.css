@@ -1,4 +1,4 @@
-/* The friends list in a group's invite menu, and the Link Only label it shares with Select Friends. */
+/* The friends list in a group's invite menu, and the Send Join Request button and Link Only label it shares with Select Friends. */
 .adder { display: flex; flex-direction: column; gap: 8px; }
 .heading { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
 .list { list-style: none; margin: 0; padding: 0; max-height: 232px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
@@ -13,7 +13,15 @@
 .addBtn[aria-disabled="true"] { cursor: default; }
 .addBtn svg { margin-inline-end: 4px; vertical-align: -2px; }
 
-/* In place of an Add button or a checkbox: someone who joins groups only from a link */
+/* In place of an Add button: sends someone who joins groups only from a link this group's link */
+.joinBtn { flex: none; padding: 0 12px; }
+.joinBtn[aria-disabled="true"] { cursor: default; }
+.joinBtn svg { margin-inline-end: 5px; vertical-align: -2px; }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* In place of a checkbox, while a group is still being put together: someone who joins groups only from a link */
 .linkOnly {
   flex: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
   border-radius: 999px; background: var(--bg-raised); color: var(--text-muted);

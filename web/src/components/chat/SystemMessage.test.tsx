@@ -113,3 +113,30 @@ describe("a poll's closing line", () => {
     expect(text(container)).not.toContain("won");
   });
 });
+
+describe("a group's members and owner changing", () => {
+  const ANN = "3";
+  beforeEach(() => {
+    useUsers.setState({ byId: { [BOB]: { id: BOB, username: "bob", display_name: "Bob" } as PublicUser, [ANN]: { id: ANN, username: "ann", display_name: "Ann" } as PublicUser } });
+  });
+
+  it("says who made whom the owner, each name a way to their profile", () => {
+    const { container } = render(<SystemMessage msg={message({ id: "960", type: "system_owner_change", author_id: BOB, mentions: [ANN] })} />);
+    expect(text(container)).toContain("Bob made Ann the group owner.");
+    expect(screen.getByRole("button", { name: "Bob" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ann" })).toBeTruthy();
+  });
+
+  it("says someone joined when they came in with a link, rather than that they added themselves", () => {
+    const joined = render(<SystemMessage msg={message({ id: "962", type: "system_member_add", author_id: ANN, mentions: [ANN] })} />);
+    expect(text(joined.container)).toContain("Ann joined the group.");
+    joined.unmount();
+    const added = render(<SystemMessage msg={message({ id: "963", type: "system_member_add", author_id: BOB, mentions: [ANN] })} />);
+    expect(text(added.container)).toContain("Bob added Ann to the group.");
+  });
+
+  it("says it once when someone took the group over themselves", () => {
+    const { container } = render(<SystemMessage msg={message({ id: "961", type: "system_owner_change", author_id: BOB, mentions: [BOB] })} />);
+    expect(text(container)).toContain("Bob took ownership of the group.");
+  });
+});

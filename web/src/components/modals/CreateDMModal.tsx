@@ -12,6 +12,7 @@ import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
+import { JoinRequestButton, useJoinRequests, useLazyGroupLink } from "./JoinRequestButton";
 import { LinkOnlyTag } from "./LinkOnlyTag";
 import g from "./GroupAdd.module.css";
 import s from "./CreateDMModal.module.css";
@@ -31,9 +32,16 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
   const [q, setQ] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<{ n: number; text: string } | null>(null);
+  // Adding to a group that exists, a Link Only friend is sent its link in a
+  // direct message instead (one link, made on the first request). A group
+  // still being put together has no link yet: they are marked Link Only.
+  const joinLink = useLazyGroupLink(groupId ?? "");
+  const requests = useJoinRequests(groupId ?? "", joinLink, (name) => setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text: t("groupAdd.joinRequest.sentTo", { name }) })));
   const friends = useMemo(
-    () => Object.values(rels).filter((r) => r.type === "friend" && !(group?.recipient_ids ?? []).includes(r.user.id)).sort((a, b) => a.user.display_name.localeCompare(b.user.display_name)),
-    [rels, group],
+    // whoever was sent the link and has joined with it since stays, marked Sent
+    () => Object.values(rels).filter((r) => r.type === "friend" && (!(group?.recipient_ids ?? []).includes(r.user.id) || requests.sent.includes(r.user.id))).sort((a, b) => a.user.display_name.localeCompare(b.user.display_name)),
+    [rels, group, requests.sent],
   );
   const shown = friends.filter((r) => !q || r.user.display_name.toLowerCase().includes(q.toLowerCase()) || r.user.username.includes(q.toLowerCase()));
   const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= MAX ? p : [...p, id]));
@@ -116,12 +124,16 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
             </>
           );
           // not a label: there is nothing to tick, and a click on the row would
-          // otherwise land on the Link Only button inside it
-          if (linkOnly(r.user.id) && forGroup(r.user.id) && !picked.includes(r.user.id)) {
+          // otherwise land on the button inside it
+          if ((linkOnly(r.user.id) && forGroup(r.user.id) && !picked.includes(r.user.id)) || (group && requests.sent.includes(r.user.id))) {
             return (
-              <div key={r.user.id} className={s.row} data-link-only="true">
+              <div key={r.user.id} className={s.row} data-link-only="true" data-user={r.user.username}>
                 {who}
-                <LinkOnlyTag name={r.user.display_name} />
+                {group ? (
+                  <JoinRequestButton name={r.user.display_name} state={requests.stateOf(r.user.id)} onSend={() => void requests.send(r.user.id, r.user.display_name)} />
+                ) : (
+                  <LinkOnlyTag name={r.user.display_name} />
+                )}
               </div>
             );
           }
@@ -132,6 +144,9 @@ export function CreateDMModal({ onClose, initial = [], groupId }: { onClose: () 
             </label>
           );
         })}
+      </div>
+      <div className="visually-hidden" role="status">
+        {said ? <span key={said.n}>{said.text}</span> : null}
       </div>
     </Modal>
   );

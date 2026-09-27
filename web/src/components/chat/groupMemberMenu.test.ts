@@ -1,4 +1,8 @@
 import type { Channel, PublicUser } from "@/api/types";
+
+const api = vi.hoisted(() => ({ patch: vi.fn(), removeRecipient: vi.fn() }));
+vi.mock("@/api/channels", () => ({ channels: { patch: api.patch, removeRecipient: api.removeRecipient } }));
+
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
@@ -56,5 +60,38 @@ describe("groupMemberMenuItems", () => {
     const openModal = vi.fn();
     groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal }).find((i) => i.id === "remove")!.onSelect!();
     expect(openModal).toHaveBeenCalledWith("confirm", expect.objectContaining({ title: "Remove Bob?", danger: true }));
+  });
+
+  it("asks the owner before handing the group on, naming who gets it, and makes them the owner", async () => {
+    useChannels.setState({ byId: { g: { ...group, owner_id: "me" } } });
+    signIn();
+    const openModal = vi.fn();
+    const items = groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal });
+    const owner = items.find((i) => i.id === "owner")!;
+    expect(owner.label).toBe("Transfer Ownership");
+    expect(owner.danger).toBeFalsy();
+    owner.onSelect!();
+    const [kind, props] = openModal.mock.calls[0]! as [string, { title: string; body: string; confirmLabel: string; onConfirm: () => Promise<unknown> }];
+    expect(kind).toBe("confirm");
+    expect(props.title).toBe("Transfer Ownership of “Crew”?");
+    expect(props.body).toBe("Bob becomes the group's owner, able to remove people and delete the group, and you become a member like everyone else.");
+    expect(props.confirmLabel).toBe("Transfer Ownership");
+    await props.onConfirm();
+    expect(api.patch).toHaveBeenCalledWith("g", { owner_id: "bob" });
+  });
+
+  it("puts Remove from Group last among the owner's choices, as a danger, and removes once confirmed", async () => {
+    useChannels.setState({ byId: { g: { ...group, owner_id: "me" } } });
+    signIn();
+    const openModal = vi.fn();
+    const items = groupMemberMenuItems("g", "bob", { nav: vi.fn(), openModal });
+    const remove = items[items.length - 1]!;
+    expect([remove.id, remove.label, remove.danger]).toEqual(["remove", "Remove from Group", true]);
+    remove.onSelect!();
+    const props = openModal.mock.calls[0]![1] as { title: string; body: string; danger: boolean; onConfirm: () => Promise<unknown> };
+    expect(props.title).toBe("Remove Bob?");
+    expect(props.body).toBe("Bob will be removed from “Crew” and stop getting its messages. They'll need a new invite to come back.");
+    await props.onConfirm();
+    expect(api.removeRecipient).toHaveBeenCalledWith("g", "bob");
   });
 });

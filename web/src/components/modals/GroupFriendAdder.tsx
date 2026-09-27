@@ -9,18 +9,20 @@ import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
-import { LinkOnlyTag } from "./LinkOnlyTag";
+import { JoinRequestButton, useJoinRequests } from "./JoinRequestButton";
 import s from "./GroupAdd.module.css";
 
 import { t } from "@/i18n";
 
 /**
  * The caller's friends who are not in the group yet, each with an Add button,
- * or the Link Only label for a friend who joins groups only from an invite
- * link. Someone added stays in the list, marked Added, until the menu closes:
- * nothing moves under the pointer, and the keyboard stays where it was.
+ * or, for a friend who joins groups only from an invite link, Send Join
+ * Request: that sends them `joinLink`'s link in a direct message. Someone
+ * added, or sent the link, stays in the list, marked Added or Sent, until the
+ * menu closes: nothing moves under the pointer, and the keyboard stays where
+ * it was.
  */
-export function GroupFriendAdder({ channelId }: { channelId: string }) {
+export function GroupFriendAdder({ channelId, joinLink }: { channelId: string; joinLink: () => Promise<string> }) {
   const rels = useRelationships((r) => r.byUser);
   const users = useUsers((u) => u.byId);
   const members = useChannels((c) => c.byId[channelId]?.recipient_ids);
@@ -30,7 +32,11 @@ export function GroupFriendAdder({ channelId }: { channelId: string }) {
   const [added, setAdded] = useState<string[]>([]);
   const [busy, setBusy] = useState<string[]>([]);
   const [said, setSaid] = useState<{ n: number; text: string } | null>(null);
-  const memberIds = useMemo(() => (members ?? []).filter((id) => !added.includes(id)), [members, added]);
+  const say = (text: string) => setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text }));
+  const requests = useJoinRequests(channelId, joinLink, (name) => say(t("groupAdd.joinRequest.sentTo", { name })));
+  // whoever was sent the link and has joined with it since stays too, marked Sent
+  const kept = useMemo(() => [...added, ...requests.sent], [added, requests.sent]);
+  const memberIds = useMemo(() => (members ?? []).filter((id) => !kept.includes(id)), [members, kept]);
   const shown = useMemo(() => friendsToAdd(rels, users, memberIds, q), [rels, users, memberIds, q]);
   const anyFriends = useMemo(() => Object.values(rels).some((r) => r.type === "friend"), [rels]);
   const anyToAdd = useMemo(() => (q ? friendsToAdd(rels, users, memberIds, "").length > 0 : shown.length > 0), [q, rels, users, memberIds, shown.length]);
@@ -41,7 +47,7 @@ export function GroupFriendAdder({ channelId }: { channelId: string }) {
     try {
       await addFriendToGroup(channelId, id);
       setAdded((a) => [...a, id]);
-      setSaid((cur) => ({ n: (cur?.n ?? 0) + 1, text: t("modals.groupInvite.nowInGroup", { name }) }));
+      say(t("modals.groupInvite.nowInGroup", { name }));
     } catch (err) {
       toast(dmOpenError(err, t("modals.groupInvite.couldNotAddName", { name })), "error");
     } finally {
@@ -72,8 +78,8 @@ export function GroupFriendAdder({ channelId }: { channelId: string }) {
                   </span>
                   <span className={s.user}>{c.user.username}</span>
                 </span>
-                {c.linkOnly && !done ? (
-                  <LinkOnlyTag name={name} />
+                {(c.linkOnly || requests.stateOf(id) === "sent") && !done ? (
+                  <JoinRequestButton name={name} state={requests.stateOf(id)} onSend={() => void requests.send(id, name)} />
                 ) : (
                   // the same button before and after, so focus stays on it; it
                   // is never disabled outright, which would drop the focus

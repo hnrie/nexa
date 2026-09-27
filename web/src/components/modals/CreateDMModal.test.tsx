@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/client";
-import type { Channel, Relationship } from "@/api/types";
+import type { Channel, Invite, Relationship } from "@/api/types";
 import { useChannels } from "@/stores/channels";
 import { useRelationships } from "@/stores/relationships";
 import { useUI } from "@/stores/ui";
@@ -11,7 +11,16 @@ import { CreateDMModal } from "./CreateDMModal";
 
 const addRecipient = vi.fn<(id: string, uid: string) => Promise<Channel>>();
 const createDM = vi.fn<(ids: string[], name?: string) => Promise<Channel>>();
-vi.mock("@/api/channels", () => ({ channels: { addRecipient: (id: string, uid: string) => addRecipient(id, uid), createDM: (ids: string[], name?: string) => createDM(ids, name) } }));
+const createGroupInvite = vi.fn<(id: string, body: { max_age: number; max_uses: number }) => Promise<Invite>>();
+const sendMessage = vi.hoisted(() => vi.fn<(channelId: string, text: string) => Promise<void>>());
+vi.mock("@/api/channels", () => ({
+  channels: {
+    addRecipient: (id: string, uid: string) => addRecipient(id, uid),
+    createDM: (ids: string[], name?: string) => createDM(ids, name),
+    createGroupInvite: (id: string, body: { max_age: number; max_uses: number }) => createGroupInvite(id, body),
+  },
+}));
+vi.mock("@/components/composer/send", () => ({ sendMessage: (channelId: string, text: string) => sendMessage(channelId, text) }));
 
 function friend(id: string, name: string): Relationship {
   return { type: "friend", nickname: "", created_at: 0, user: { id, username: name, display_name: name, avatar_id: null } as Relationship["user"] };
@@ -24,6 +33,8 @@ afterEach(() => {
   useUI.setState({ toasts: [] });
   addRecipient.mockReset();
   createDM.mockReset();
+  createGroupInvite.mockReset();
+  sendMessage.mockReset();
 });
 
 describe("CreateDMModal adding to a group", () => {
@@ -108,7 +119,7 @@ describe("CreateDMModal and friends who join groups only from a link", () => {
   const checkbox = (name: string) => screen.queryByRole("checkbox", { name: new RegExp(name) });
   const submit = () => screen.getByTestId("create-dm-submit") as HTMLButtonElement;
 
-  it("shows Link Only in place of the checkbox when adding to a group", () => {
+  it("offers Send Join Request in place of the checkbox when adding to a group that exists", () => {
     useChannels.setState({ byId: { g1: group } });
     useRelationships.getState().setMany([friend("b", "bea"), linkOnly("c", "cat")]);
     render(
@@ -118,7 +129,36 @@ describe("CreateDMModal and friends who join groups only from a link", () => {
     );
     expect(checkbox("bea")).toBeTruthy();
     expect(checkbox("cat")).toBeNull();
-    expect(screen.getByRole("button", { name: "Link Only" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send Join Request to cat" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Link Only" })).toBeNull();
+  });
+
+  it("sends every join request from it with one link, made on the first with the invite menu's settings", async () => {
+    useChannels.setState({ byId: { g1: { ...group, name: "Pals" } } });
+    useRelationships.getState().setMany([linkOnly("c", "cat"), linkOnly("d", "dot")]);
+    createGroupInvite.mockResolvedValue({ code: "one", server_id: null, channel_id: "g1", inviter_id: "me", max_uses: 0, uses: 0, expires_at: null, created_at: 0 });
+    createDM.mockImplementation(async (ids) => ({ id: `dm-${ids[0]}`, type: "dm", name: "", recipient_ids: ["me", ids[0]!] }) as unknown as Channel);
+    sendMessage.mockResolvedValue(undefined);
+    render(
+      <MemoryRouter>
+        <CreateDMModal onClose={() => undefined} groupId="g1" />
+      </MemoryRouter>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send Join Request to cat" }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Send Join Request to dot" }));
+    });
+    expect(createGroupInvite.mock.calls).toEqual([["g1", { max_age: 604800, max_uses: 0 }]]);
+    const link = `${window.location.origin}/invite/one`;
+    expect(sendMessage.mock.calls).toEqual([
+      ["dm-c", `Join my group chat “Pals”\n${link}`],
+      ["dm-d", `Join my group chat “Pals”\n${link}`],
+    ]);
+    const row = screen.getByRole("button", { name: "Join Request Sent to cat" }).closest("[data-link-only]") as HTMLElement;
+    expect(within(row).getByText("Sent")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Join Request Sent to dot");
   });
 
   it("lets a Link Only friend be picked alone, for a direct message, but not into a group", () => {
