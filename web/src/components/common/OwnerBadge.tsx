@@ -1,4 +1,4 @@
-import { Crown, Shield } from "lucide-react";
+import { Crown, Hammer } from "lucide-react";
 import { t } from "@/i18n";
 import s from "./OwnerBadge.module.css";
 
@@ -17,16 +17,16 @@ export function OwnerBadge() {
   );
 }
 
-/** An instance admin's mark: a shield, cycling the rainbow the way the owner's crown does. */
-export function AdminShield({ size = 14 }: { size?: number }) {
-  return <Shield size={size} className={s.shield} role="img" aria-label={t("profile.profileCard.admin")} />;
+/** An instance admin's mark: a hammer, cycling the rainbow the way the owner's crown does. */
+export function AdminHammer({ size = 14 }: { size?: number }) {
+  return <Hammer size={size} className={s.hammer} role="img" aria-label={t("profile.profileCard.admin")} />;
 }
 
-/** An instance admin's badge: the shield plus "Admin" in animated rainbow text. */
+/** An instance admin's badge: the hammer plus "Admin" in animated rainbow text. */
 export function AdminBadge() {
   return (
     <span className={s.badge}>
-      <AdminShield size={12} />
+      <AdminHammer size={12} />
       <span className={s.text}>{t("profile.profileCard.admin")}</span>
     </span>
   );

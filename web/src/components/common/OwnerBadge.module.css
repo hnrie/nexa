@@ -29,9 +29,9 @@
   animation: owner-slide 4s linear infinite;
 }
 
-/* An admin's shield starts in the brand colour, so it never reads as the
+/* An admin's hammer starts in the brand colour, so it never reads as the
    owner's gold crown, and cycles the rainbow the same way. */
-.shield {
+.hammer {
   color: var(--text-brand);
   flex: none;
   animation: owner-hue 4s linear infinite;
@@ -51,7 +51,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .crown,
-  .shield,
+  .hammer,
   .text {
     animation: none;
   }
