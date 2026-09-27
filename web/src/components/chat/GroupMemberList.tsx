@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Channel } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { AdminTools, OwnerCrown } from "@/components/common/OwnerBadge";
+import { AdminShield, OwnerCrown } from "@/components/common/OwnerBadge";
 import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { isOwner } from "@/lib/owner";
 import { isInstanceAdmin } from "@/stores/servers";
@@ -71,7 +71,7 @@ export function GroupMemberList({ channel, drawer, open }: { channel: Channel; d
               <span className={s.name}>
                 {row.name}
                 {isOwner(row.id) ? <OwnerCrown /> : channel.owner_id === row.id ? <Crown size={14} className={s.crown} aria-label={t("chat.groupMemberList.groupOwner")} /> : null}
-                {!isOwner(row.id) && isInstanceAdmin(row.id) ? <AdminTools /> : null}
+                {!isOwner(row.id) && isInstanceAdmin(row.id) ? <AdminShield /> : null}
               </span>
               <StatusLine
                 className={s.sub}

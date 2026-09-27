@@ -2,7 +2,7 @@ import { Ban, Clock, Crown, Shield, UserMinus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { servers as serversApi } from "@/api/servers";
 import { Avatar } from "@/components/common/Avatar";
-import { AdminTools, OwnerCrown } from "@/components/common/OwnerBadge";
+import { AdminShield, OwnerCrown } from "@/components/common/OwnerBadge";
 import { isOwner } from "@/lib/owner";
 import { Button } from "@/components/common/Button";
 import { LoadError } from "@/components/common/LoadError";
@@ -119,7 +119,7 @@ export default function MembersPage({ serverId }: { serverId: string }) {
               <span className={s.memberName}>
                 {name}
                 {server.server.owner_id === m.user_id ? (isOwner(m.user_id) ? <OwnerCrown /> : <Crown size={14} style={{ color: "var(--warning)" }} aria-label={t("server.members.owner")} />) : null}
-                {!isOwner(m.user_id) && isInstanceAdmin(m.user_id) ? <AdminTools /> : null}
+                {!isOwner(m.user_id) && isInstanceAdmin(m.user_id) ? <AdminShield /> : null}
                 {timedOut ? <Clock size={14} style={{ color: "var(--danger)" }} aria-label={t("server.members.timedOut")} /> : null}
               </span>
               <span className={s.memberSub}><bdi>@{username}</bdi> · {t("server.members.joinedOn", { when: formatDateDivider(m.joined_at) })}</span>
