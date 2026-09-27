@@ -4,6 +4,8 @@ import type { DecryptedMessage } from "@/stores/messages";
 import { useUI } from "@/stores/ui";
 import { useUsers, displayName } from "@/stores/users";
 import { formatTimestamp } from "@/lib/time";
+import { pollVerdict, type PollVerdict } from "@/lib/poll";
+import { usePollOf } from "./usePollOf";
 import s from "./Chat.module.css";
 
 import { t, Tr } from "@/i18n";
@@ -11,7 +13,7 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
   const users = useUsers((u) => u.byId);
   const openModal = useUI((u) => u.openModal);
   const setJumpTo = useUI((u) => u.setJumpTo);
-  // a poll's closing line speaks for the webhook that posted the poll
+  // a poll's closing line speaks for whoever asked: the webhook that posted it, or the person
   const actor = msg.hook?.name ?? displayName(users[msg.author_id]);
   const target = msg.mentions[0] ? displayName(users[msg.mentions[0]]) : t("chat.systemMessage.someone");
   // names that open a profile, and the link to a pinned message, are real buttons
@@ -53,7 +55,9 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
       return <CallLine msg={msg} />;
     case "system_poll_result":
       icon = <ChartBar size={18} />;
-      body = <PollResult msg={msg} actor={<b className={s.sysName} dir="auto">{actor}</b>} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />;
+      body = !msg.webhook_id
+        ? <PersonPollResult msg={msg} actor={A} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />
+        : <PollResult msg={msg} actor={<b className={s.sysName} dir="auto">{actor}</b>} onView={() => msg.reply_to_id && setJumpTo({ channelId: msg.channel_id, messageId: msg.reply_to_id })} />;
       break;
     default:
       body = <Tr id="chat.systemMessage.didSomething" values={{ actor: A }} />;
@@ -82,14 +86,38 @@ function PollResult({ msg, actor, onView }: { msg: DecryptedMessage; actor: Reac
   const winner = fields.get("victor_answer_text");
   const emoji = fields.get("victor_answer_emoji_name");
   const percent = total ? Math.round((votes / total) * 100) : 0;
-  const outcome = total === 0
-    ? t("chat.systemMessage.pollNoVotes")
-    : winner
-      ? t("chat.systemMessage.pollWinner", { answer: emoji ? `${emoji} ${winner}` : winner, percent })
-      : t("chat.systemMessage.pollTie");
+  const outcome = verdictText(total === 0 ? { kind: "none" } : winner ? { kind: "winner", answer: emoji ? `${emoji} ${winner}` : winner, percent } : { kind: "tie" });
   return (
     <>
       <Tr id="chat.systemMessage.pollClosed" values={{ actor, question: <b className={s.sysName} dir="auto">{question}</b> }} /> {outcome}{" "}
+      <button type="button" className={s.sysLink} disabled={!msg.reply_to_id} onClick={onView}>{t("chat.systemMessage.viewPoll")}</button>
+    </>
+  );
+}
+
+/** The sentence after "…has closed.": nobody voted, a tie, or who won. A winner whose words cannot be read goes unsaid. */
+function verdictText(v: PollVerdict): string {
+  if (v.kind === "none") return t("chat.systemMessage.pollNoVotes");
+  if (v.kind === "tie") return t("chat.systemMessage.pollTie");
+  return v.answer === null ? "" : t("chat.systemMessage.pollWinner", { answer: v.answer, percent: v.percent });
+}
+
+/**
+ * How a person's poll went. Its line carries only numbers, since the server
+ * never saw what the poll asked; the words come from the poll's own message,
+ * opened here, fetched first when the list does not hold it.
+ */
+function PersonPollResult({ msg, actor, onView }: { msg: DecryptedMessage; actor: React.ReactNode; onView: () => void }) {
+  const poll = usePollOf(msg.channel_id, msg.reply_to_id);
+  const outcome = msg.poll_result ? verdictText(pollVerdict(msg.poll_result, poll)) : "";
+  return (
+    <>
+      {poll ? (
+        <Tr id="chat.systemMessage.pollClosed" values={{ actor, question: <b className={s.sysName} dir="auto">{poll.question}</b> }} />
+      ) : (
+        <Tr id="chat.systemMessage.pollClosedUntitled" values={{ actor }} />
+      )}
+      {outcome ? ` ${outcome}` : null}{" "}
       <button type="button" className={s.sysLink} disabled={!msg.reply_to_id} onClick={onView}>{t("chat.systemMessage.viewPoll")}</button>
     </>
   );

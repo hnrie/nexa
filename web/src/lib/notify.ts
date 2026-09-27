@@ -18,6 +18,7 @@ import { doNotDisturb } from "./dnd";
 import { installAudioUnlock, playSound, preloadSounds } from "./sounds";
 import { mentionsMe } from "./mentionsMe";
 import { hookText } from "./webhookMessage";
+import { pollWords } from "./poll";
 import { mediaSrc } from "./mediaLinks";
 import { currentBlockRules, isQuiet, loadedAuthorOf } from "./blocked";
 import { bugAlertHooks, bugNumber, bugStatusLabel, type BugAlert } from "./bugs";
@@ -131,6 +132,8 @@ function previewOf(m: Message, decrypted?: DecryptedMessage): string {
   const p = stored?.payload;
   if (!p) return stored?.decryptError ? t("chat.messageItem.encryptedMessage") : t("notify.newMessage");
   if (p.t) return plainText(parse(p.t)).slice(0, 140);
+  // a poll says it in its question and answers
+  if (p.poll) return pollWords(p.poll).slice(0, 140);
   // a webhook's message often says it all in its embeds
   const words = stored?.hook ? hookText(stored.hook) : "";
   if (words) return plainText(parse(words)).slice(0, 140);

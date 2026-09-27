@@ -18,6 +18,7 @@ import { CreateCategoryModal } from "./CreateCategoryModal";
 import { ServerNotificationsModal } from "./ServerNotificationsModal";
 import { ServerProfileModal } from "./ServerProfileModal";
 import { ChannelTopicModal } from "./ChannelTopicModal";
+import { CreatePollModal } from "./CreatePollModal";
 import { IncomingCallHost } from "@/components/voice/IncomingCall";
 import { ShareScreenModal } from "@/components/voice/ShareScreenModal";
 import { ScreenPermission } from "@/components/desktop/DisplayPicker";
@@ -103,6 +104,7 @@ function ModalEntry({ modal }: { modal: ModalState }) {
       {modal?.kind === "shareScreen" ? <ShareScreenModal onClose={close} /> : null}
       {modal?.kind === "guestLink" ? <GuestLinkModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "channelTopic" ? <ChannelTopicModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
+      {modal?.kind === "createPoll" ? <CreatePollModal onClose={close} channelId={String(modal.props?.["channelId"])} /> : null}
       {modal?.kind === "stickerPack" ? <StickerPackModal onClose={close} info={modal.props?.["info"] as StickerInfo} stickerId={String(modal.props?.["stickerId"])} /> : null}
       {modal?.kind === "serverProfile" ? <ServerProfileModal onClose={close} serverId={String(modal.props?.["serverId"])} userId={modal.props?.["userId"] as string | undefined} /> : null}
       {modal?.kind === "block" ? <BlockDialog onClose={close} userId={String(modal.props?.["userId"])} /> : null}

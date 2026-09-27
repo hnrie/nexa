@@ -431,6 +431,7 @@
   "chat.systemMessage.leftGroup": "{actor} 退出了群组。",
   "chat.systemMessage.pinned": "{actor} 在这个频道置顶了 {message}。",
   "chat.systemMessage.pollClosed": "{actor} 的投票 {question} 已结束。",
+  "chat.systemMessage.pollClosedUntitled": "{actor} 的投票已结束。",
   "chat.systemMessage.pollNoVotes": "没有人投票。",
   "chat.systemMessage.pollTie": "结果是平局。",
   "chat.systemMessage.pollWinner": "{answer} 以 {percent}% 胜出。",
@@ -614,6 +615,7 @@
   "composer.limit.over": {
     "other": "超出上限 {count} 个字符"
   },
+  "composer.plus.label": "上传或创建投票",
   "composer.replyingTo": "正在回复 {name}",
   "composer.send.slowModeTryAgain": "慢速模式已开启。请在 {seconds} 秒后重试。",
   "composer.send.waitingForTheEncryptionKeyFor": "正在等待这个对话的加密密钥。需要有持有密钥的人在线。",
@@ -2099,6 +2101,21 @@
   "pickers.stickerPicker.thisPackIsEmpty": "这个贴纸包是空的。",
   "poll.backToVoting": "返回投票",
   "poll.closed": "投票已结束",
+  "poll.create.addAnswer": "添加答案",
+  "poll.create.addEmoji": "为答案 {number} 添加表情",
+  "poll.create.answerNumber": "答案 {number}",
+  "poll.create.answerPlaceholder": "输入答案",
+  "poll.create.answers": "答案",
+  "poll.create.changeEmoji": "更换答案 {number} 的表情",
+  "poll.create.duration": "时长",
+  "poll.create.multiselect": "允许多选",
+  "poll.create.notAllowed": "你不能在这里创建投票。",
+  "poll.create.post": "发布",
+  "poll.create.question": "问题",
+  "poll.create.questionPlaceholder": "你想问什么？",
+  "poll.create.removeAnswer": "移除答案 {number}",
+  "poll.create.removeEmoji": "移除答案 {number} 的表情",
+  "poll.create.title": "创建投票",
   "poll.daysLeft": {
     "other": "还剩 {count} 天"
   },
@@ -3713,5 +3730,11 @@
   "whatsNew.r202609263.stickersTitle": "更快的贴纸选择器",
   "whatsNew.r202609264.webhooksBody": "让其他程序在你的频道里发消息，支持丰富的嵌入内容、链接按钮、投票和文件。在服务器设置的“集成”中新建 Webhook，然后把它的链接交给程序。",
   "whatsNew.r202609264.webhooksTitle": "Webhook",
+  "whatsNew.r20260927.groupsBody": "群聊里的“邀请成员”现在会列出你的好友，一点就能加入。如果你只想通过别人发来的链接加入群组，请在设置的“隐私与安全”中关闭“允许好友把我加入群聊”。",
+  "whatsNew.r20260927.groupsTitle": "把好友加入群聊",
+  "whatsNew.r20260927.notesBody": "添加好友时，现在可以写一段简短的留言，让对方知道你是谁。只有对方能看到。",
+  "whatsNew.r20260927.notesTitle": "好友请求可以附上留言",
+  "whatsNew.r20260927.pollsBody": "点消息框里的加号，选择“创建投票”，就能提出一个最多有十个选项的问题。投票经过端到端加密，由服务器所有者决定谁可以创建。",
+  "whatsNew.r20260927.pollsTitle": "创建投票",
   "whatsNew.title": "新功能"
 }

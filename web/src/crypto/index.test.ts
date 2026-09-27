@@ -49,6 +49,11 @@ describe("crypto module surface", () => {
       "isEnvelope",
       "webLink",
       "sanitizeEmbed",
+      "POLL_QUESTION_MAX",
+      "POLL_ANSWER_MAX",
+      "POLL_ANSWERS_MIN",
+      "POLL_ANSWERS_MAX",
+      "POLL_HOURS_MAX",
       // file
       "CHUNK",
       "encryptFile",

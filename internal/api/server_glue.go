@@ -27,6 +27,8 @@ func needBits(need string) perms.Perm {
 		return perms.ViewChannel | perms.MentionEveryone
 	case NeedWebhooks:
 		return perms.ViewChannel | perms.ManageWebhooks
+	case NeedPolls:
+		return perms.ViewChannel | perms.CreatePolls
 	default:
 		return perms.ViewChannel
 	}

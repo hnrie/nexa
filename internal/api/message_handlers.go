@@ -34,6 +34,10 @@ const (
 	maxEmojiLen      = 64
 	// maxBulkDelete bounds one bulk delete; the client sends bigger selections in batches.
 	maxBulkDelete = 100
+	// A person's poll has 2 to 10 answers and runs from an hour to two weeks.
+	minPollAnswers = 2
+	maxPollAnswers = 10
+	maxPollHours   = 14 * 24
 )
 
 func (s *Server) messageRoutes(mux *http.ServeMux) {
@@ -104,6 +108,38 @@ type messageBody struct {
 	} `json:"attachments"`
 	Nonce string `json:"nonce"`
 	Flags int64  `json:"flags"`
+	// Poll opens a poll with the message. What it asks and offers is sealed
+	// in the ciphertext with the rest of the message; this is only what the
+	// server needs to take votes (see pollBody).
+	Poll json.RawMessage `json:"poll"`
+}
+
+// pollBody is what a person's poll tells the server: how many answers it has
+// (their ids run from 1), how many hours it runs, and whether more than one
+// answer may be picked. The question and the answers' words never leave the
+// ciphertext.
+type pollBody struct {
+	Answers     *int  `json:"answer_count"`
+	Duration    *int  `json:"duration"`
+	Multiselect *bool `json:"allow_multiselect"`
+}
+
+var errBadPoll = E(http.StatusBadRequest, "bad_poll", "A poll has 2 to 10 answers and runs from 1 hour to 2 weeks.")
+
+// personPoll reads a message's poll, if it has one. Anything but an object of
+// the right shape is refused, down to a flag that is not true or false.
+func personPoll(raw json.RawMessage, now time.Time) (*store.NewPoll, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var p pollBody
+	if err := json.Unmarshal(raw, &p); err != nil || p.Answers == nil || p.Duration == nil {
+		return nil, errBadPoll
+	}
+	if *p.Answers < minPollAnswers || *p.Answers > maxPollAnswers || *p.Duration < 1 || *p.Duration > maxPollHours {
+		return nil, errBadPoll
+	}
+	return &store.NewPoll{Answers: *p.Answers, Multiselect: p.Multiselect != nil && *p.Multiselect, ExpiresAt: now.Add(time.Duration(*p.Duration) * time.Hour).UnixMilli()}, nil
 }
 
 // messageUpdateEvent is message_update's payload: the message as it is now,
@@ -345,8 +381,20 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	poll, err := personPoll(body.Poll, time.Now())
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	// anyone in a conversation may ask it something; a server says who may
+	if poll != nil && !s.isDM(ch) && s.ChannelAccess != nil {
+		if ok, _ := s.ChannelAccess(ctx, me, ch, NeedPolls); !ok {
+			WriteError(w, E(http.StatusForbidden, "cannot_create_polls", "You cannot create polls here."))
+			return
+		}
+	}
 	m := &store.Message{ChannelID: ch.ID, AuthorID: me.ID, Type: "default", Ciphertext: body.Ciphertext, KeyConvID: &env.Conv, KeyEpoch: &env.Epoch,
-		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds}
+		Mentions: dedupeIDs(body.Mentions, maxMentions), MentionRoles: s.allowedRoleMentions(ctx, me, ch, body.MentionRoles), MentionEveryone: body.MentionEveryone, Nonce: body.Nonce, Flags: body.Flags & store.MsgFlagSuppressEmbeds, NewPoll: poll}
 	if body.ReplyToID != nil {
 		target, err := s.Store.MessageByID(ctx, *body.ReplyToID, me.ID)
 		if err != nil || target.ChannelID != ch.ID {
@@ -435,6 +483,11 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 	} else {
 		if m.AuthorID != me.ID || m.Type != "default" && m.Type != "reply" {
 			WriteError(w, ErrForbidden)
+			return
+		}
+		// the question and answers are what people voted on
+		if m.Poll != nil {
+			WriteError(w, E(http.StatusBadRequest, "poll_edit", "A poll cannot be edited."))
 			return
 		}
 		if s.dmBlocked(w, r, ch, me) {

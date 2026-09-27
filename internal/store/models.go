@@ -391,10 +391,33 @@ type Message struct {
 	// api/webhook_message.go for the shape). Both are absent otherwise.
 	WebhookID *ids.ID         `json:"webhook_id,omitempty"`
 	Webhook   json.RawMessage `json:"webhook,omitempty"`
-	// Poll is how a webhook message's poll stands, for whoever loaded it.
+	// Poll is how a message's poll stands, for whoever loaded it: a webhook's
+	// poll, or a person's.
 	Poll *PollTally `json:"poll_results,omitempty"`
 	// NewPoll, on a message being inserted, opens its poll with it.
 	NewPoll *NewPoll `json:"-"`
+	// PollResult, on the line that closes a person's poll, is how it went. It
+	// is kept where a webhook's words are (messages.plain): the server wrote
+	// it, so there is nothing to seal.
+	PollResult *PollOutcome `json:"poll_result,omitempty"`
+}
+
+// PollOutcome is how a person's poll went, as the line that closes it carries
+// it: numbers only. What the poll asked and offered is sealed inside its
+// message, which the line answers, so readers put the two together. The
+// winner is 0 when nobody voted or the top answers tied.
+type PollOutcome struct {
+	Counts      []PollOutcomeCount `json:"answer_counts"`
+	TotalVotes  int                `json:"total_votes"`
+	TotalVoters int                `json:"total_voters"`
+	WinnerID    int                `json:"victor_answer_id"`
+	WinnerVotes int                `json:"victor_answer_votes"`
+}
+
+// PollOutcomeCount is one answer's votes when its poll closed.
+type PollOutcomeCount struct {
+	ID    int `json:"id"`
+	Count int `json:"count"`
 }
 
 // NewPoll is a poll opened with its message: how many answers it has (their

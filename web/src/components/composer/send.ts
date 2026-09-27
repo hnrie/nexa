@@ -1,7 +1,7 @@
 import { ApiError } from "@/api/client";
 import { messages as messagesApi } from "@/api/messages";
 import type { SendMessageRequest } from "@/api/types";
-import { encryptMessage, type AttachmentMeta, type MessagePayload } from "@/crypto/message";
+import { encryptMessage, type AttachmentMeta, type MessagePayload, type PollPayload } from "@/crypto/message";
 import { sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
 import { holdReload } from "@/lib/busy";
 import { decryptForStore } from "@/lib/decrypt";
@@ -18,6 +18,7 @@ import { canI, P, useServers } from "@/stores/servers";
 import { emojiToken, packEmoji, useExpressions } from "@/stores/expressions";
 import { emojiByShortcode, emojiLoaded } from "@/components/pickers/emojiIndex";
 import { extractUrls } from "@/markdown";
+import { pollRequest } from "@/lib/poll";
 import { tooLong, tooLongMessage } from "./limit";
 import { extractMentions, type HumanNames, type MentionScope } from "./mentions";
 
@@ -32,6 +33,8 @@ export interface SendOptions {
   flags?: number;
   /** A failed message this send replaces, dropped only once its own copy is in the store. */
   replaces?: string;
+  /** A poll: sealed in the message, with only its shape told to the server (lib/poll.ts). */
+  poll?: PollPayload;
 }
 
 /** The conversation whose keys encrypt a channel: the server tells us (itself for DMs and private channels, the server root otherwise). */
@@ -143,6 +146,7 @@ function written(channelId: string, rawText: string, opts: SendOptions): Written
   if (opts.attachments?.length) payload.att = opts.attachments.map((a) => a.meta);
   if (Array.isArray(opts.embeds) && opts.embeds.length) payload.embeds = opts.embeds;
   if (opts.sticker) payload.sticker = opts.sticker;
+  if (opts.poll) payload.poll = opts.poll;
   return { payload, mentions, roles, everyone };
 }
 
@@ -160,7 +164,7 @@ export function sendMessage(channelId: string, rawText: string, opts: SendOption
   const me = useAuth.getState().me;
   if (!me) return Promise.resolve();
   const w = written(channelId, rawText, opts);
-  if (!w.payload.t && !w.payload.att && !w.payload.sticker) return Promise.resolve();
+  if (!w.payload.t && !w.payload.att && !w.payload.sticker && !w.payload.poll) return Promise.resolve();
   const nonce = newNonce();
   const tmp = tmpId();
   const messages = useMessages.getState();
@@ -169,6 +173,16 @@ export function sendMessage(channelId: string, rawText: string, opts: SendOption
   // copy is the only place a retried message still exists.
   if (opts.replaces) messages.removePending(channelId, opts.replaces);
   return enqueue(channelId, () => deliver(channelId, me.id, w, tmp, nonce, opts));
+}
+
+/**
+ * Sends a poll, shown at once like any message and settled or failed the same
+ * way. Its question and answers go sealed in the message; the server hears
+ * only how many answers it has, how long it runs and whether several may be
+ * picked.
+ */
+export function sendPoll(channelId: string, poll: PollPayload): Promise<void> {
+  return sendMessage(channelId, "", { poll });
 }
 
 /**
@@ -316,6 +330,7 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
     if (roles.length) body.mention_roles = roles;
     if (opts.attachments?.length) body.attachments = opts.attachments.map((a) => ({ blob_id: a.blob_id, size: a.size }));
     if (opts.flags) body.flags = opts.flags;
+    if (payload.poll) body.poll = pollRequest(payload.poll);
     const sent = await messagesApi.send(channelId, body);
     const decrypted = await decryptForStore(sent);
     if (!decrypted.payload) decrypted.payload = payload;
@@ -343,6 +358,8 @@ export function sendErrorText(err: unknown): string | null {
     if (err.code === "rate_limited") return t("composer.send.youAreSendingMessagesTooQuickly");
     // the server's own ceiling, which only a message far past the limit reaches
     if (err.code === "message_too_long" || err.code === "too_large") return tooLongMessage();
+    // Create Polls taken away while the dialog was open
+    if (err.code === "cannot_create_polls") return t("poll.create.notAllowed");
     return null;
   }
   if (!(err instanceof Error)) return null;
@@ -414,6 +431,7 @@ export async function retryPending(channelId: string, tmpId: string): Promise<vo
   if (p.flags) opts.flags = p.flags;
   if (p.payload.embeds?.length) opts.embeds = p.payload.embeds;
   if (p.payload.sticker) opts.sticker = p.payload.sticker;
+  if (p.payload.poll) opts.poll = p.payload.poll;
   if (p.upload && !p.upload.done && uploading.has(tmpId)) {
     // its files never made it up: they go up again, in the same place in the list
     store.updatePending(channelId, tmpId, { status: "sending", upload: { ...p.upload, loaded: 0, speed: 0, error: null } });

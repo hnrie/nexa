@@ -48,6 +48,33 @@ export interface AttachmentMeta {
   alt?: string;
 }
 
+/** An answer's emoji: a character (its name), or one of the app's custom emoji. */
+export interface PollEmoji {
+  name: string;
+  id?: string;
+  animated?: boolean;
+}
+
+/**
+ * A person's poll. Everything it says is sealed here with the rest of the
+ * message; the server is told only how many answers there are, how long it
+ * runs and whether more than one may be picked, which is what it needs to
+ * take votes. An answer's id is its place in the list, from 1.
+ */
+export interface PollPayload {
+  question: string;
+  answers: { text: string; emoji?: PollEmoji }[];
+  /** How long it runs, in hours. The server's tally has when it really closes. */
+  hours: number;
+  multiselect: boolean;
+}
+
+export const POLL_QUESTION_MAX = 300;
+export const POLL_ANSWER_MAX = 55;
+export const POLL_ANSWERS_MIN = 2;
+export const POLL_ANSWERS_MAX = 10;
+export const POLL_HOURS_MAX = 14 * 24;
+
 export interface MessagePayload {
   t?: string;
   att?: AttachmentMeta[];
@@ -55,6 +82,7 @@ export interface MessagePayload {
   sticker?: { id: string; blob?: string; name?: string; w?: number; h?: number; animated?: boolean; format?: string };
   embeds?: unknown[];
   flags?: number;
+  poll?: PollPayload;
 }
 
 export function aadBytes(a: Aad): Uint8Array {
@@ -158,6 +186,43 @@ export function sanitizeEmbed(e: Obj): Obj {
   return out;
 }
 
+/** At most n characters (code points, so an emoji is never cut in half). */
+function cap(v: string, n: number): string {
+  const chars = Array.from(v);
+  return chars.length > n ? chars.slice(0, n).join("") : v;
+}
+
+function sanitizePollEmoji(x: unknown): PollEmoji | undefined {
+  if (!isObj(x) || typeof x["name"] !== "string" || !x["name"]) return undefined;
+  const e: PollEmoji = { name: cap(x["name"], 64) };
+  if (typeof x["id"] === "string" && /^\d{1,20}$/.test(x["id"])) e.id = x["id"];
+  if (x["animated"] === true) e.animated = true;
+  return e;
+}
+
+/**
+ * A poll as the UI can trust it: a question, 2 to 10 answers, each held to
+ * the lengths the dialog allows. An answer's id is its place in the list, so
+ * one that cannot be read spoils the poll rather than being skipped: the
+ * answers after it would take the votes meant for the ones before.
+ */
+function sanitizePoll(x: unknown): PollPayload | undefined {
+  if (!isObj(x) || typeof x["question"] !== "string" || !x["question"].trim() || !Array.isArray(x["answers"])) return undefined;
+  const list = x["answers"];
+  if (list.length < POLL_ANSWERS_MIN || list.length > POLL_ANSWERS_MAX) return undefined;
+  const answers: PollPayload["answers"] = [];
+  for (const a of list) {
+    if (!isObj(a) || typeof a["text"] !== "string") return undefined;
+    const answer: PollPayload["answers"][number] = { text: cap(a["text"], POLL_ANSWER_MAX) };
+    const emoji = sanitizePollEmoji(a["emoji"]);
+    if (emoji) answer.emoji = emoji;
+    answers.push(answer);
+  }
+  const h = x["hours"];
+  const hours = typeof h === "number" && Number.isInteger(h) && h >= 1 && h <= POLL_HOURS_MAX ? h : 24;
+  return { question: cap(x["question"], POLL_QUESTION_MAX), answers, hours, multiselect: x["multiselect"] === true };
+}
+
 /**
  * Anyone holding the key can encrypt whatever they like, and the UI trusts
  * these fields' types while rendering, so one wrong type would crash every
@@ -187,8 +252,10 @@ function sanitizePayload(p: Obj): MessagePayload {
     if (embeds.length) out.embeds = embeds;
   }
   if (isNum(p["flags"])) out.flags = p["flags"];
-  const hadContent = p["t"] !== undefined || p["att"] !== undefined || p["sticker"] !== undefined || p["embeds"] !== undefined;
-  if (hadContent && out.t === undefined && !out.att && !out.sticker && !out.embeds) {
+  const poll = sanitizePoll(p["poll"]);
+  if (poll) out.poll = poll;
+  const hadContent = p["t"] !== undefined || p["att"] !== undefined || p["sticker"] !== undefined || p["embeds"] !== undefined || p["poll"] !== undefined;
+  if (hadContent && out.t === undefined && !out.att && !out.sticker && !out.embeds && !out.poll) {
     throw new DecryptError("malformed message payload");
   }
   return out;

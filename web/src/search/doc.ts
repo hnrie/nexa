@@ -13,6 +13,7 @@ import type { AttachmentMeta, MessagePayload } from "@/crypto/message";
 import type { DecryptedMessage } from "@/lib/decrypt";
 import type { HasKind } from "@/lib/search";
 import { hookText } from "@/lib/webhookMessage";
+import { pollWords } from "@/lib/poll";
 
 /** A link preview as the message carries it, trimmed to what a result shows. */
 export interface LinkPreview {
@@ -48,8 +49,12 @@ export interface SearchDoc {
   att?: AttachmentMeta[];
   emb?: LinkPreview[];
   st?: MessagePayload["sticker"];
-  /** A webhook's message: the name it was sent as, and the words in its embeds, components and poll. */
+  /** A webhook's message: the name it was sent as. */
   hn?: string;
+  /**
+   * The words a message says beyond its text: a webhook's embeds, components
+   * and poll, or the question and answers of a person's poll.
+   */
   hx?: string;
 }
 
@@ -98,6 +103,7 @@ export function toDoc(m: DecryptedMessage): SearchDoc | null {
   const emb = (p.embeds ?? []).map(preview).filter((e): e is LinkPreview => e !== null);
   if (emb.length) doc.emb = emb;
   if (p.sticker) doc.st = { ...p.sticker };
+  if (p.poll) doc.hx = pollWords(p.poll);
   if (m.hook) {
     doc.hn = m.hook.name;
     // the content is already t; what is left is the rest of what it says

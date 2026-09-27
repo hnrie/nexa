@@ -34,6 +34,8 @@ import { servers as serversApi } from "@/api/servers";
 import { useShownName } from "@/components/chat/useShownName";
 import { createLinkPreviews } from "./linkPreviews";
 import { mentionScope, sendMessage, sendWithFiles, type SendOptions } from "./send";
+import { canCreatePoll, plusButton, type PlusOption } from "./plusMenu";
+import { menuAnchor } from "@/components/common/ContextMenu";
 import { extractMentions } from "./mentions";
 import { useUploads } from "@/stores/uploads";
 import { useAutosize } from "./useAutosize";
@@ -116,6 +118,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const isServer = !!channel.server_id;
   const canSend = !isServer || canI(serverState, P.SEND_MESSAGES, channel.id);
   const canAttach = !isServer || canI(serverState, P.ATTACH_FILES, channel.id);
+  // the plus button: files, a poll, or a menu of both where both are allowed
+  const plus = plusButton({ attach: canAttach, poll: canCreatePoll(serverState, channel) });
   const canEveryone = !isServer || canI(serverState, P.MENTION_EVERYONE, channel.id);
   const bypassSlowmode = isServer && canI(serverState, P.MANAGE_MESSAGES, channel.id);
   const slow = useSlowmode();
@@ -136,6 +140,7 @@ export function Composer({ channel }: { channel: Channel }) {
   const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: AcKind } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
   const lastTyping = useRef(0);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDraft = useRef<{ channelId: string; text: string } | null>(null);
@@ -613,6 +618,26 @@ export function Composer({ channel }: { channel: Channel }) {
     );
   }
 
+  const plusLabel = (o: PlusOption) => (o === "upload" ? tr_("composer.composer.uploadAFile") : tr_("poll.create.title"));
+  const plusDo = (o: PlusOption) => {
+    // still inside the click that chose it, which is what lets the file picker open
+    if (o === "upload") fileRef.current?.click();
+    else useUI.getState().openModal("createPoll", { channelId: channel.id });
+  };
+  const onPlus = (el: HTMLElement) => {
+    if (plus.kind === "direct") return plusDo(plus.option);
+    if (plus.kind !== "menu") return;
+    const anchor = menuAnchor(el, "start");
+    setPlusOpen(true);
+    useUI.getState().openContextMenu({ x: anchor.left, y: anchor.top - 4, anchor, above: true, label: tr_("composer.plus.label"), items: plus.options.map((o) => ({ id: o, label: plusLabel(o), onSelect: () => plusDo(o) })) });
+    const stop = useUI.subscribe((st) => {
+      if (!st.contextMenu) {
+        setPlusOpen(false);
+        stop();
+      }
+    });
+  };
+
   return (
     <div className={s.wrap}>
       <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
@@ -733,7 +758,21 @@ export function Composer({ channel }: { channel: Channel }) {
       ) : null}
       <div className={s.box}>
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
-        {canAttach ? <button className={s.attach} aria-label={tr_("composer.composer.uploadAFile")} onClick={() => fileRef.current?.click()}><CirclePlus size={24} /></button> : <span className={s.attachSpacer} />}
+        {plus.kind === "none" ? (
+          <span className={s.attachSpacer} />
+        ) : (
+          <button
+            type="button"
+            className={s.attach}
+            aria-label={plus.kind === "menu" ? tr_("composer.plus.label") : plusLabel(plus.option)}
+            aria-haspopup={plus.kind === "menu" ? "menu" : plus.option === "poll" ? "dialog" : undefined}
+            aria-expanded={plus.kind === "menu" ? plusOpen : undefined}
+            data-testid="composer-plus"
+            onClick={(e) => onPlus(e.currentTarget)}
+          >
+            <CirclePlus size={24} />
+          </button>
+        )}
         <textarea
           data-composer=""
           // a screen reader hears the suggestions and which one Enter takes

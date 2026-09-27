@@ -12,8 +12,9 @@ import (
 	"evilion.xyz/chat/internal/store"
 )
 
-// Polls come with webhook messages. Anyone who can read the channel and
-// react in it can vote; the counts, and who voted for what, are visible to
+// Polls come with webhook messages, and with people's (sealed inside the
+// message, like the rest of what they write). Anyone who can read the channel
+// and react in it can vote; the counts, and who voted for what, are visible to
 // everyone who can read it, as the question and answers are. A poll closes on
 // its own when its time runs out, and a line under it says how it went.
 
@@ -173,12 +174,20 @@ func (s *Server) closePolls(ctx context.Context) {
 			continue
 		}
 		s.Bcast.EmitChannel(d.ChannelID, "message_update", messageUpdateEvent{m, mentionsBefore{m.Mentions, m.MentionRoles, m.MentionEveryone}})
-		author, err := s.webhookUser(ctx)
-		if err != nil {
-			continue
-		}
 		mid := m.ID
-		line := &store.Message{ChannelID: d.ChannelID, AuthorID: author.ID, Type: "system_poll_result", ReplyToID: &mid, Mentions: []ids.ID{}, WebhookID: m.WebhookID, Webhook: pollResult(m)}
+		line := &store.Message{ChannelID: d.ChannelID, Type: "system_poll_result", ReplyToID: &mid, Mentions: []ids.ID{}}
+		if m.WebhookID != nil {
+			author, err := s.webhookUser(ctx)
+			if err != nil {
+				continue
+			}
+			line.AuthorID, line.WebhookID, line.Webhook = author.ID, m.WebhookID, pollResult(m)
+		} else {
+			// A person's poll speaks for whoever asked it. What it asked is
+			// sealed in its message, so the line carries only the numbers,
+			// and readers put the two together.
+			line.AuthorID, line.PollResult = m.AuthorID, pollOutcome(m)
+		}
 		if err := s.Store.InsertMessage(ctx, line); err != nil {
 			s.Log.Warn("polls: result line", "err", err)
 			continue
@@ -233,6 +242,27 @@ func pollResult(m *store.Message) json.RawMessage {
 	out, err := json.Marshal(&wmPlain{Name: p.Name, AvatarID: p.AvatarID, AvatarURL: p.AvatarURL, AvatarProxy: p.AvatarProxy, Embeds: []wmEmbed{{Type: "poll_result", Fields: fields}}})
 	if err != nil {
 		return nil
+	}
+	return out
+}
+
+// pollOutcome is how a person's poll went, in numbers alone: each answer's
+// votes, the answer that won and its votes (none on a tie, as pollResult has
+// it), and how many voted in all.
+func pollOutcome(m *store.Message) *store.PollOutcome {
+	if m.Poll == nil {
+		return nil
+	}
+	out := &store.PollOutcome{Counts: make([]store.PollOutcomeCount, 0, len(m.Poll.Counts)), TotalVoters: m.Poll.Voters}
+	for _, c := range m.Poll.Counts {
+		out.Counts = append(out.Counts, store.PollOutcomeCount{ID: c.ID, Count: c.Count})
+		out.TotalVotes += c.Count
+		switch {
+		case c.Count > out.WinnerVotes:
+			out.WinnerVotes, out.WinnerID = c.Count, c.ID
+		case c.Count == out.WinnerVotes && c.Count > 0:
+			out.WinnerID = 0
+		}
 	}
 	return out
 }

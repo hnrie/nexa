@@ -431,6 +431,7 @@
   "chat.systemMessage.leftGroup": "{actor} さんがグループを抜けました。",
   "chat.systemMessage.pinned": "{actor} さんが {message} をこのチャンネルにピン留めしました。",
   "chat.systemMessage.pollClosed": "{actor} さんの投票 {question} が締め切られました。",
+  "chat.systemMessage.pollClosedUntitled": "{actor} さんの投票が締め切られました。",
   "chat.systemMessage.pollNoVotes": "投票した人はいませんでした。",
   "chat.systemMessage.pollTie": "同票で終わりました。",
   "chat.systemMessage.pollWinner": "{answer} が {percent}% で最多でした。",
@@ -614,6 +615,7 @@
   "composer.limit.over": {
     "other": "上限を {count} 文字超えています"
   },
+  "composer.plus.label": "アップロードまたは投票を作成",
   "composer.replyingTo": "{name} に返信中",
   "composer.send.slowModeTryAgain": "低速モード中です。{seconds} 秒後にもう一度お試しください。",
   "composer.send.waitingForTheEncryptionKeyFor": "この会話の暗号鍵を待っています。鍵を持っている人がオンラインになる必要があります。",
@@ -2099,6 +2101,21 @@
   "pickers.stickerPicker.thisPackIsEmpty": "このパックは空です。",
   "poll.backToVoting": "投票に戻る",
   "poll.closed": "投票は締め切られました",
+  "poll.create.addAnswer": "回答を追加",
+  "poll.create.addEmoji": "回答 {number} に絵文字を追加",
+  "poll.create.answerNumber": "回答 {number}",
+  "poll.create.answerPlaceholder": "回答を入力",
+  "poll.create.answers": "回答",
+  "poll.create.changeEmoji": "回答 {number} の絵文字を変更",
+  "poll.create.duration": "期間",
+  "poll.create.multiselect": "複数の回答を許可する",
+  "poll.create.notAllowed": "ここでは投票を作成できません。",
+  "poll.create.post": "投稿",
+  "poll.create.question": "質問",
+  "poll.create.questionPlaceholder": "何を聞きたいですか？",
+  "poll.create.removeAnswer": "回答 {number} を削除",
+  "poll.create.removeEmoji": "回答 {number} の絵文字を外す",
+  "poll.create.title": "投票を作成",
   "poll.daysLeft": {
     "other": "残り {count} 日"
   },
@@ -3713,5 +3730,11 @@
   "whatsNew.r202609263.stickersTitle": "スタンプの選択がより速く",
   "whatsNew.r202609264.webhooksBody": "ほかのプログラムがあなたのチャンネルに投稿できるようになりました。リッチな埋め込み、リンクボタン、投票、ファイルにも対応しています。サーバー設定の「連携」でウェブフックを作成し、その URL をプログラムに渡してください。",
   "whatsNew.r202609264.webhooksTitle": "ウェブフック",
+  "whatsNew.r20260927.groupsBody": "グループチャットの「メンバーを招待」に、ワンタップで追加できるフレンドが表示されるようになりました。送られてきたリンクからだけグループに参加したい場合は、設定の「プライバシーと安全」で「フレンドが自分をグループチャットに追加できるようにする」をオフにしてください。",
+  "whatsNew.r20260927.groupsTitle": "フレンドをグループチャットに追加",
+  "whatsNew.r20260927.notesBody": "フレンドを追加するとき、短いメモを書けるようになりました。相手があなたのことをすぐにわかります。メモを読めるのは相手だけです。",
+  "whatsNew.r20260927.notesTitle": "フレンド申請にメモを添える",
+  "whatsNew.r20260927.pollsBody": "メッセージ欄のプラスボタンから「投票を作成」を選ぶと、最大10個の回答がある質問を作れます。投票はエンドツーエンドで暗号化され、誰が作成できるかはサーバーの所有者が決めます。",
+  "whatsNew.r20260927.pollsTitle": "投票を作成",
   "whatsNew.title": "新機能"
 }

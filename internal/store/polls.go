@@ -5,14 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"sort"
+	"strings"
 
 	"evilion.xyz/chat/internal/db"
 	"evilion.xyz/chat/internal/ids"
 )
 
-// Polls ride on webhook messages. What a poll asks and offers is part of the
-// message; the polls row holds only what the server enforces: how many
-// answers there are, whether more than one may be picked, and when it closes.
+// A poll rides on its message, a webhook's or a person's. What it asks and
+// offers is part of the message (sealed inside it, for a person's); the polls
+// row holds only what the server enforces: how many answers there are,
+// whether more than one may be picked, and when it closes.
 // poll_votes.option_index holds an answer's id, from 1.
 
 var (
@@ -169,15 +171,18 @@ func (s *Store) EndPoll(ctx context.Context, msgID ids.ID, now int64) (bool, err
 	return n > 0, nil
 }
 
-// hydratePolls fills the tallies of the polls among msgs, for forUser.
+// hydratePolls fills the tallies of the polls among msgs, for forUser. Any
+// message may carry one: the server cannot see which of a person's do, so it
+// asks about all of them at once, leaving out only the lines it writes itself.
 func (s *Store) hydratePolls(ctx context.Context, msgs []*Message, forUser ids.ID) error {
 	byID := map[ids.ID]*Message{}
 	var list []ids.ID
 	for _, m := range msgs {
-		if m.WebhookID != nil {
-			byID[m.ID] = m
-			list = append(list, m.ID)
+		if strings.HasPrefix(m.Type, "system_") {
+			continue
 		}
+		byID[m.ID] = m
+		list = append(list, m.ID)
 	}
 	if len(list) == 0 {
 		return nil

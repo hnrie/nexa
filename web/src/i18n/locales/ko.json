@@ -431,6 +431,7 @@
   "chat.systemMessage.leftGroup": "{actor}님이 그룹을 나갔습니다.",
   "chat.systemMessage.pinned": "{actor}님이 {message}을(를) 이 채널에 고정했습니다.",
   "chat.systemMessage.pollClosed": "{actor}님의 투표 {question}이(가) 마감되었습니다.",
+  "chat.systemMessage.pollClosedUntitled": "{actor}님의 투표가 마감되었습니다.",
   "chat.systemMessage.pollNoVotes": "아무도 투표하지 않았습니다.",
   "chat.systemMessage.pollTie": "동점으로 끝났습니다.",
   "chat.systemMessage.pollWinner": "{answer}이(가) {percent}%로 1위를 했습니다.",
@@ -614,6 +615,7 @@
   "composer.limit.over": {
     "other": "제한보다 {count}자 많음"
   },
+  "composer.plus.label": "업로드 또는 투표 만들기",
   "composer.replyingTo": "{name}에게 답장",
   "composer.send.slowModeTryAgain": "저속 모드입니다. {seconds}초 뒤에 다시 시도하세요.",
   "composer.send.waitingForTheEncryptionKeyFor": "이 대화의 암호화 키를 기다리는 중입니다. 키를 가진 사람이 접속해 있어야 합니다.",
@@ -2099,6 +2101,21 @@
   "pickers.stickerPicker.thisPackIsEmpty": "이 팩은 비어 있습니다.",
   "poll.backToVoting": "투표로 돌아가기",
   "poll.closed": "투표 마감",
+  "poll.create.addAnswer": "답 추가",
+  "poll.create.addEmoji": "답 {number}에 이모지 추가",
+  "poll.create.answerNumber": "답 {number}",
+  "poll.create.answerPlaceholder": "답을 입력하세요",
+  "poll.create.answers": "답",
+  "poll.create.changeEmoji": "답 {number}의 이모지 바꾸기",
+  "poll.create.duration": "기간",
+  "poll.create.multiselect": "여러 답 허용",
+  "poll.create.notAllowed": "여기서는 투표를 만들 수 없습니다.",
+  "poll.create.post": "게시",
+  "poll.create.question": "질문",
+  "poll.create.questionPlaceholder": "무엇을 물어볼까요?",
+  "poll.create.removeAnswer": "답 {number} 삭제",
+  "poll.create.removeEmoji": "답 {number}의 이모지 지우기",
+  "poll.create.title": "투표 만들기",
   "poll.daysLeft": {
     "other": "{count}일 남음"
   },
@@ -3713,5 +3730,11 @@
   "whatsNew.r202609263.stickersTitle": "더 빨라진 스티커 선택",
   "whatsNew.r202609264.webhooksBody": "다른 프로그램이 채널에 게시할 수 있습니다. 임베드 카드, 링크 버튼, 투표, 파일도 지원합니다. 서버 설정의 연동에서 웹후크를 만들고 URL을 프로그램에 알려 주세요.",
   "whatsNew.r202609264.webhooksTitle": "웹후크",
+  "whatsNew.r20260927.groupsBody": "그룹 채팅의 사람 초대에서 친구를 한 번에 추가할 수 있습니다. 보내 준 링크로만 그룹에 들어가고 싶다면 설정의 개인 정보 및 안전에서 친구가 나를 그룹 채팅에 추가하도록 허용을 끄세요.",
+  "whatsNew.r20260927.groupsTitle": "그룹 채팅에 친구 추가",
+  "whatsNew.r20260927.notesBody": "친구를 추가할 때 짧은 메모를 쓸 수 있습니다. 상대가 누구인지 알 수 있고, 메모는 그 사람만 읽을 수 있습니다.",
+  "whatsNew.r20260927.notesTitle": "친구 요청에 메모 남기기",
+  "whatsNew.r20260927.pollsBody": "메시지 입력란의 더하기 버튼을 누르고 투표 만들기를 선택하면 답이 최대 10개인 질문을 올릴 수 있습니다. 투표는 종단 간 암호화되며, 누가 만들 수 있는지는 서버 소유자가 정합니다.",
+  "whatsNew.r20260927.pollsTitle": "투표 만들기",
   "whatsNew.title": "새로운 기능"
 }

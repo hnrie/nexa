@@ -441,8 +441,10 @@ export interface Message {
   /** Set on a message a webhook posted: which webhook, and what it said (not encrypted; see lib/webhookMessage). */
   webhook_id?: Snowflake;
   webhook?: unknown;
-  /** How a webhook message's poll stands, for whoever loaded it. */
+  /** How a message's poll stands (a webhook's, or a person's), for whoever loaded it. */
   poll_results?: PollTally;
+  /** On the line that closes a person's poll: how it went, in numbers (the words are sealed in the poll's message). */
+  poll_result?: PollOutcome;
 }
 
 export const MSG_FLAG_PINNED = 1;
@@ -458,6 +460,30 @@ export interface PollTally {
   total_voters: number;
   expires_at: number | null;
   is_finalized: boolean;
+}
+
+/**
+ * How a person's poll went, as the line that closes it carries it: numbers
+ * only, since what the poll asked is sealed in its own message, which the
+ * line answers. The winner is 0 when nobody voted or the top answers tied.
+ */
+export interface PollOutcome {
+  answer_counts: { id: number; count: number }[];
+  total_votes: number;
+  total_voters: number;
+  victor_answer_id: number;
+  victor_answer_votes: number;
+}
+
+/**
+ * What a person's poll tells the server as it is sent: only what it needs to
+ * take votes. The question and answers go in the ciphertext.
+ */
+export interface PollRequest {
+  answer_count: number;
+  /** In hours, from 1 to 336. */
+  duration: number;
+  allow_multiselect: boolean;
 }
 
 /** An incoming webhook, as the people who manage it see it. */
@@ -710,4 +736,6 @@ export interface SendMessageRequest {
   /** Client-generated idempotency key for the send. */
   nonce: string;
   flags?: number;
+  /** Opens a poll with the message. */
+  poll?: PollRequest;
 }

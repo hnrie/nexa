@@ -28,6 +28,7 @@ import { t, Tr } from "@/i18n";
 import { cssValue } from "@/lib/cssEscape";
 import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
 import { sameHookSender } from "@/lib/webhookMessage";
+import { pollWords } from "@/lib/poll";
 import { parse, plainText } from "@/markdown";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
@@ -345,7 +346,7 @@ export function MessageList({ channel }: { channel: Channel }) {
       if (typeof document === "undefined" || document.visibilityState !== "visible") return;
       const st = channel.server_id ? useServers.getState().byId[channel.server_id] : undefined;
       const name = m.hook?.name || st?.members[m.author_id]?.nickname || useRelationships.getState().byUser[m.author_id]?.nickname || displayName(users[m.author_id]);
-      const body = m.payload?.t ? plainText(parse(m.payload.t), renderCtx).slice(0, 300) : "";
+      const body = m.payload?.t ? plainText(parse(m.payload.t), renderCtx).slice(0, 300) : m.payload?.poll ? pollWords(m.payload.poll).replace(/\n/g, ", ").slice(0, 300) : "";
       const text = body
         ? t("chat.messageList.announce", { name, text: body })
         : m.payload?.sticker

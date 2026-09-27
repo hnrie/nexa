@@ -63,7 +63,8 @@ export function messageTimes(msg: DecryptedMessage): string[] {
 
 export function canEdit(msg: DecryptedMessage): boolean {
   const me = useAuth.getState().me;
-  return !!me && msg.author_id === me.id && (msg.type === "default" || msg.type === "reply") && !!msg.payload;
+  // a poll's question and answers are what people voted on, so they stay
+  return !!me && msg.author_id === me.id && (msg.type === "default" || msg.type === "reply") && !!msg.payload && !msg.payload.poll;
 }
 
 /** Copy Image and Save Image, for a picture a menu was opened on. */

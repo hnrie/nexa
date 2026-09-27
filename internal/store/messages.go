@@ -91,7 +91,15 @@ func scanMessage(r rowScanner) (*Message, error) {
 	m.Nonce = nonce.String
 	m.WebhookID = idPtr(webhook)
 	if plain.Valid && plain.String != "" {
-		m.Webhook = json.RawMessage(plain.String)
+		if m.WebhookID == nil && m.Type == "system_poll_result" {
+			// the line closing a person's poll: numbers the server wrote itself
+			var out PollOutcome
+			if json.Unmarshal([]byte(plain.String), &out) == nil {
+				m.PollResult = &out
+			}
+		} else {
+			m.Webhook = json.RawMessage(plain.String)
+		}
 	}
 	m.Attachments = []Attachment{}
 	m.Reactions = []ReactionSummary{}
@@ -126,6 +134,12 @@ func (s *Store) InsertMessage(ctx context.Context, m *Message) error {
 	var plain any
 	if len(m.Webhook) > 0 {
 		plain = string(m.Webhook)
+	} else if m.PollResult != nil {
+		b, err := json.Marshal(m.PollResult)
+		if err != nil {
+			return err
+		}
+		plain = string(b)
 	}
 	return s.Tx(ctx, func(tx *db.Tx) error {
 		res, err := tx.ExecContext(ctx, `INSERT INTO messages (`+messageInsertCols+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_id, author_id, nonce) WHERE nonce IS NOT NULL DO NOTHING`,

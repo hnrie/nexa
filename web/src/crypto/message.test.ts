@@ -210,3 +210,51 @@ describe("isEnvelope", () => {
     expect(x.conv).toBe("c");
   });
 });
+
+describe("polls in the payload", () => {
+  const poll = {
+    question: "Lunch?",
+    answers: [{ text: "Pizza", emoji: { name: "🍕" } }, { text: "Soup" }, { text: "Salad", emoji: { id: "123456789", name: "leaf", animated: true } }],
+    hours: 24,
+    multiselect: true,
+  };
+
+  it("round trips a poll, sealed with the rest of the message", async () => {
+    const env = await encryptMessage(key, aad, { poll });
+    expect(env.ct).not.toContain("Lunch");
+    expect(await decryptMessage(key, env, aad)).toEqual({ poll });
+  });
+
+  it("holds a poll to the lengths the dialog allows, and fills in what it leaves unsaid", async () => {
+    const long = { question: "q".repeat(400), answers: [{ text: "a".repeat(80), emoji: { name: "🍕", id: "not-an-id" } }, { text: "b", emoji: { name: 5 } }], hours: 9999, multiselect: "yes" };
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: long })));
+    const out = await decryptMessage(key, env, aad);
+    expect(out.poll).toEqual({ question: "q".repeat(300), answers: [{ text: "a".repeat(55), emoji: { name: "🍕" } }, { text: "b" }], hours: 24, multiselect: false });
+  });
+
+  it("never cuts an emoji in half", async () => {
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: { ...poll, answers: [{ text: "x".repeat(54) + "🍕🍕" }, { text: "b" }] } })));
+    expect((await decryptMessage(key, env, aad)).poll?.answers[0]?.text).toBe("x".repeat(54) + "🍕");
+  });
+
+  it("keeps a message's other content when its poll is unusable", async () => {
+    for (const bad of [
+      { ...poll, question: "" },
+      { ...poll, question: 7 },
+      { ...poll, answers: [{ text: "only one" }] },
+      { ...poll, answers: Array.from({ length: 11 }, (_, i) => ({ text: `a${i}` })) },
+      // a broken answer would shift the ids of those after it, so the poll goes
+      { ...poll, answers: [{ text: "a" }, null, { text: "c" }] },
+      { ...poll, answers: [{ text: "a" }, { text: 2 }] },
+      "poll",
+    ]) {
+      const env = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "hi", poll: bad })));
+      expect(await decryptMessage(key, env, aad)).toEqual({ t: "hi" });
+    }
+  });
+
+  it("rejects a payload whose only content is a poll it cannot use", async () => {
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify({ poll: { question: "q", answers: [] } })));
+    await expect(decryptMessage(key, env, aad)).rejects.toBeInstanceOf(DecryptError);
+  });
+});

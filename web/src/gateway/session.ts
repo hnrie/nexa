@@ -14,6 +14,7 @@ import { useUploads } from "@/stores/uploads";
 import { useSelection } from "@/stores/selection";
 import { useSlowmode } from "@/stores/slowmode";
 import { forgetSends } from "@/components/composer/send";
+import { forgetFetchedPolls } from "@/components/chat/usePollOf";
 import { forgetUnsentAcks } from "@/stores/readStates";
 import { admin as adminApi } from "@/api/admin";
 import { setUploadLimits } from "@/lib/attachments";
@@ -256,6 +257,8 @@ export async function endSession(): Promise<void> {
   useUploads.getState().clear();
   forgetSends();
   useMessages.setState({ channels: {} });
+  // polls read for their closing lines were this account's to read
+  forgetFetchedPolls();
   forgetUnsentAcks();
   // what was being picked for deleting, and the slow mode waits, were this account's
   useSelection.getState().clear();

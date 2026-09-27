@@ -41,7 +41,9 @@ import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
 import { HookBody } from "./webhook/HookBody";
+import { HookPoll } from "./webhook/HookPoll";
 import { hookText } from "@/lib/webhookMessage";
+import { hookPollOf, pollWords } from "@/lib/poll";
 import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
@@ -78,6 +80,8 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const text = useMemo(() => {
     const mediaOnly = !!payload?.t && isOnlyMediaLinks(payload.t, (payload.embeds ?? []) as UnfurlResult[]);
     if (payload?.t && !mediaOnly) return plainText(parse(payload.t), ctx);
+    // a poll's words are its question and answers
+    if (payload?.poll) return pollWords(payload.poll).replace(/\n/g, " ").slice(0, 200);
     // a webhook's message says what it has to say in its embeds, as often as not
     if (hook && !payload?.att?.length) {
       const words = hookText(hook);
@@ -328,6 +332,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
             </>
           )}
           {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
+          {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
           {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
           {embeds ? <Embeds list={embeds} /> : null}
           {hook ? <HookBody msg={msg} from={name} /> : null}
@@ -414,6 +419,16 @@ function HeaderTime({ at }: { at: number }) {
       {exact ? formatExact(at) : formatTimestamp(at)}
     </time>
   );
+}
+
+/**
+ * A person's poll, drawn by the same view as a webhook's: its words from the
+ * sealed message, when it closes and its votes from the server's tally. One
+ * still on its way, or one the server keeps no poll for, takes no votes.
+ */
+function PersonPoll({ msg, poll, pending }: { msg: DecryptedMessage; poll: NonNullable<MessagePayload["poll"]>; pending: boolean }) {
+  const shaped = useMemo(() => hookPollOf(poll, msg.poll_results, msg.created_at), [poll, msg.poll_results, msg.created_at]);
+  return <HookPoll poll={shaped} tally={msg.poll_results} channelId={msg.channel_id} messageId={msg.id} readOnly={pending || !msg.poll_results} />;
 }
 
 /** A sticker in a message: 160 px, keeps its aspect; a click shows its name and, for a public pack, the pack. */

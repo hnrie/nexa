@@ -47,12 +47,14 @@ function AnswerEmoji({ a }: { a: HookPollAnswer }) {
 }
 
 /**
- * A poll a webhook posted. Pick an answer (or several, where the poll allows
- * it) and vote; until then the results stay hidden unless asked for. Once
- * voted, or once it has closed, each answer shows its share of the votes, and
- * a click on the count lists who picked it.
+ * A poll: a webhook's, or a person's in the same shape (lib/poll.ts). Pick an
+ * answer (or several, where the poll allows it) and vote; until then the
+ * results stay hidden unless asked for. Once voted, or once it has closed,
+ * each answer shows its share of the votes, and a click on the count lists
+ * who picked it. A read-only poll (one still on its way to the server) takes
+ * no votes yet.
  */
-export function HookPoll({ poll, tally, channelId, messageId }: { poll: Poll; tally: PollTally | undefined; channelId: string; messageId: string }) {
+export function HookPoll({ poll, tally, channelId, messageId, readOnly = false }: { poll: Poll; tally: PollTally | undefined; channelId: string; messageId: string; readOnly?: boolean }) {
   const toast = useUI((u) => u.toast);
   const [now, setNow] = useState(() => Date.now());
   const [picked, setPicked] = useState<number[]>([]);
@@ -91,7 +93,7 @@ export function HookPoll({ poll, tally, channelId, messageId }: { poll: Poll; ta
   };
 
   const toggle = (id: number) => {
-    if (results || busy) return;
+    if (results || busy || readOnly) return;
     setPicked((cur) => (poll.allow_multiselect ? (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]) : cur.includes(id) ? [] : [id]));
   };
 
@@ -107,7 +109,7 @@ export function HookPoll({ poll, tally, channelId, messageId }: { poll: Poll; ta
           const win = closed && top > 0 && count === top;
           if (results) {
             return (
-              <div key={a.answer_id} className={s.answer} aria-disabled="true" data-mine={mine.has(a.answer_id)} data-win={win} data-testid="poll-answer">
+              <div key={a.answer_id} className={s.answer} data-results="true" data-mine={mine.has(a.answer_id)} data-win={win} data-testid="poll-answer">
                 <span className={s.answerFill} style={{ width: `${share}%` }} aria-hidden="true" />
                 <AnswerEmoji a={a} />
                 <span className={s.answerText} dir="auto">{a.text}</span>
@@ -128,7 +130,7 @@ export function HookPoll({ poll, tally, channelId, messageId }: { poll: Poll; ta
               role={poll.allow_multiselect ? "checkbox" : "radio"}
               aria-checked={checked}
               onClick={() => toggle(a.answer_id)}
-              disabled={busy}
+              disabled={busy || readOnly}
               data-testid="poll-answer"
             >
               <AnswerEmoji a={a} />
@@ -143,7 +145,7 @@ export function HookPoll({ poll, tally, channelId, messageId }: { poll: Poll; ta
         <span aria-hidden="true">•</span>
         <span>{closed ? t("poll.closed") : expiry ? timeLeft(expiry, now) : ""}</span>
         <span className={s.pollActions}>
-          {closed ? null : voted ? (
+          {closed || readOnly ? null : voted ? (
             <button type="button" className={s.pollLink} disabled={busy} onClick={() => void send([])} data-testid="poll-remove-vote">
               {t("poll.removeVote")}
             </button>

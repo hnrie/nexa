@@ -276,6 +276,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       ensureUser(m.author_id);
       void ensureChannel(m.channel_id);
       const mine = meId === m.author_id;
+      // The line closing a person's poll speaks for whoever asked it, but the
+      // server wrote it, on a timer: it marks nothing before it read.
+      const acted = mine && m.type !== "system_poll_result";
       const ui = useUI.getState();
       // Seen means seen: the channel open, the app in front of the person, and
       // the list showing the present at the bottom of it. Without the last two
@@ -283,7 +286,7 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       // reader was — and `ui.focused` has two writers, one of which the
       // desktop app is documented to lie to.
       const visible = ui.activeChannelId === m.channel_id && appOnScreen() && readingPresent(m.channel_id);
-      if (mine || visible) {
+      if (acted || visible) {
         void useReadStates.getState().ack(m.channel_id, m.id);
       } else if (isQuiet(decrypted, currentBlockRules(), loadedAuthorOf(m.channel_id))) {
         // Someone blocked (or a reply to them, when those are hidden): no badge,
@@ -293,7 +296,8 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
         if (meId && mentionsMe(m, meId)) useReadStates.getState().bumpMentions(m.channel_id);
         // conversations count every message, so their badges say how many are waiting
         const type = useChannels.getState().byId[m.channel_id]?.type;
-        if (!type || type === "dm" || type === "group_dm") useReadStates.getState().bumpUnread(m.channel_id);
+        // none of your own, as the server counts them
+        if (!mine && (!type || type === "dm" || type === "group_dm")) useReadStates.getState().bumpUnread(m.channel_id);
       }
       for (const h of dispatchHooks.onMessage) h(m, mine, decrypted);
       return;
