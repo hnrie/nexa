@@ -42,6 +42,8 @@
 .rowText { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
 .rowName { display: flex; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .rowDisplay { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the owner's crown or an admin's hammer, centred on the name rather than on its baseline */
+.rowBadge { flex: none; display: inline-flex; align-self: center; }
 .rowUser { flex: none; font-size: 14px; font-weight: 400; color: var(--text-muted); opacity: 0; }
 @media (hover: hover) { .row:hover .rowUser { opacity: 1; } }
 /* touch screens never reveal the username, so it takes no room from the name */
