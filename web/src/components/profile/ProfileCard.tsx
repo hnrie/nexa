@@ -12,7 +12,7 @@ import type { PublicUser } from "@/api/types";
 import { bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
 import { Avatar } from "@/components/common/Avatar";
-import { OwnerBadge } from "@/components/common/OwnerBadge";
+import { AdminBadge, OwnerBadge } from "@/components/common/OwnerBadge";
 import { isOwner } from "@/lib/owner";
 import { Tooltip } from "@/components/common/Tooltip";
 import { Twemoji } from "@/components/common/Twemoji";
@@ -282,7 +282,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
               </Tooltip>
             </>
           ) : null}
-          {isOwner(user.id) ? <OwnerBadge /> : user.flags & 1 ? <span className={s.chip}>{t("profile.profileCard.admin")}</span> : null}
+          {isOwner(user.id) ? <OwnerBadge /> : user.flags & 1 ? <AdminBadge /> : null}
         </div>
         </div>
 

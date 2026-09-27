@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { servers as serversApi } from "@/api/servers";
 import type { Member, PublicUser, Role } from "@/api/types";
 import { Avatar } from "@/components/common/Avatar";
-import { OwnerCrown } from "@/components/common/OwnerBadge";
+import { AdminTools, OwnerCrown } from "@/components/common/OwnerBadge";
 import { isOwner } from "@/lib/owner";
 import { memberName } from "@/lib/names";
 import { memberMenuItems } from "@/components/server/memberMenu";
@@ -203,6 +203,7 @@ export function MemberList({ serverId, channelId, drawer, open }: { serverId: st
               <span className={s.name} style={row.color ? { color: row.color } : undefined}>
                 {name}
                 {isOwner(row.member.user_id) ? <OwnerCrown /> : st.server.owner_id === row.member.user_id ? <Crown size={14} className={s.crown} aria-label={t("chat.memberList.serverOwner")} /> : null}
+                {!isOwner(row.member.user_id) && isInstanceAdmin(row.member.user_id) ? <AdminTools /> : null}
               </span>
               <StatusLine
                 className={s.sub}

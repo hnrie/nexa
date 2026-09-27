@@ -29,6 +29,26 @@
   animation: owner-slide 4s linear infinite;
 }
 
+/* An admin's hammer and wrench: the two icons in one box, the wrench
+   mirrored so they cross like 🛠️. They start in the brand colour, so an
+   admin's mark never reads as the owner's gold crown, and cycle the same way. */
+.tools {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  color: var(--text-brand);
+  animation: owner-hue 4s linear infinite;
+}
+
+.tools svg {
+  position: absolute;
+  inset: 0;
+}
+
+.mirror {
+  transform: scaleX(-1);
+}
+
 @keyframes owner-hue {
   to {
     filter: hue-rotate(360deg);
@@ -43,6 +63,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .crown,
+  .tools,
   .text {
     animation: none;
   }
