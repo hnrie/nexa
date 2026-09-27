@@ -13,7 +13,10 @@ import { FrameCrypto, voiceKeysFor, voiceKeysVersion, type VoiceKeys } from "./e
 import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
 import { Playback } from "./playback";
 import { PlayoutDelay } from "./playoutDelay";
+import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
+import { VP8 } from "./frameSize";
+import { capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
 
 import { t as tr_ } from "@/i18n";
 import { RecentLoss, type LossTotals } from "./recentLoss";
@@ -37,6 +40,8 @@ interface Pulled {
   arrivedAt?: number;
   seen?: boolean;
   opened?: boolean;
+  /** Its picture is over the size cap, so the worker keeps it from the decoder. */
+  tooLarge?: boolean;
   /** When its packets are next counted, and how long the wait after that grows to while none come (a camera that is off). */
   checkAt?: number;
   checkEvery?: number;
@@ -64,6 +69,9 @@ interface Shown {
   audio: MediaStream | null;
   video: MediaStream | null;
   screen: MediaStream | null;
+  /** Whether the camera and the share shown are over the size cap. */
+  videoTooLarge?: boolean;
+  screenTooLarge?: boolean;
 }
 
 /** The camera is capped here, and the server charges pulls of it at this rate. */
@@ -173,32 +181,6 @@ function description(d: RTCSessionDescription | null): SfuDescription {
   return { type: d!.type as "offer" | "answer", sdp: d!.sdp };
 }
 
-/** VP8 only: the encryption keeps its payload header readable, which H.264's differs from. */
-function preferVp8(tr: RTCRtpTransceiver): void {
-  if (typeof tr.setCodecPreferences !== "function") return;
-  for (const caps of [RTCRtpReceiver.getCapabilities?.("video"), RTCRtpSender.getCapabilities?.("video")]) {
-    const vp8 = caps?.codecs.filter((c) => c.mimeType === "video/VP8" || c.mimeType === "video/rtx") ?? [];
-    if (!vp8.some((c) => c.mimeType === "video/VP8")) continue;
-    try {
-      tr.setCodecPreferences(vp8);
-      return;
-    } catch {
-      /* this list is not the one the browser checks against; try the other */
-    }
-  }
-}
-
-function capBitrate(sender: RTCRtpSender, maxBitrate: number): void {
-  try {
-    const params = sender.getParameters();
-    if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
-    params.encodings[0]!.maxBitrate = maxBitrate;
-    void sender.setParameters(params).catch(() => {});
-  } catch {
-    /* not supported */
-  }
-}
-
 /** The stream already carrying exactly these tracks, or a new one for them; null for none. */
 function streamOf(current: MediaStream | null, tracks: MediaStreamTrack[]): MediaStream | null {
   if (tracks.length === 0) return null;
@@ -284,10 +266,18 @@ export class SfuTransport implements VoiceTransport {
     this.playback = new Playback(events.onSpeaking);
     this.pc = this.newConnection();
     this.crypto.onSeen = (id, opened) => this.onFramesSeen(id, opened);
+    this.crypto.onSize = (id, over) => this.onFrameSize(id, over);
     this.refreshKeys();
     this.keyTimer = setInterval(() => this.refreshKeys(), KEY_CHECK_MS);
     this.bypassTimer = setInterval(() => void this.checkBypass(), 1_000);
-    this.lossTimer = setInterval(() => void this.checkLoss(), LOSS_CHECK_MS);
+    this.lossTimer = setInterval(() => {
+      void this.checkLoss();
+      // what is sent stays within the size cap even when the picture going in grows
+      for (const kind of ["video", "screen"] as const) {
+        const tr = this.senders[kind];
+        if (tr) void recapSender(tr.sender);
+      }
+    }, LOSS_CHECK_MS);
   }
 
   // --- the connection ----------------------------------------------------
@@ -640,8 +630,8 @@ export class SfuTransport implements VoiceTransport {
       if (media(kind) === "video") preferVp8(tr);
       // the microphone's frames carry copies of the ones before when listeners lose packets
       this.crypto.protectSender(tr.sender, media(kind), kind === "audio");
-      if (kind === "video") capBitrate(tr.sender, CAMERA_BPS);
-      if (kind === "screen") capBitrate(tr.sender, this.screenBitrate);
+      if (kind === "video") capSender(tr.sender, CAMERA_BPS);
+      if (kind === "screen") capSender(tr.sender, this.screenBitrate);
       this.senders[kind] = tr;
       added.push(kind);
     }
@@ -705,14 +695,15 @@ export class SfuTransport implements VoiceTransport {
 
   setLocalScreen(stream: MediaStream | null, bitrate = 5_000_000): void {
     this.screen = stream;
-    this.screenBitrate = bitrate;
+    // the server charges pulls of the share at this rate and holds it to the same bounds
+    this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 5_000_000);
     const missing: PubKind[] = [];
     for (const kind of ["screen", "screen_audio"] as const) {
       const tr = this.senders[kind];
       const track = this.trackFor(kind);
       if (tr) {
         void tr.sender.replaceTrack(track).catch(() => {});
-        if (kind === "screen" && track) capBitrate(tr.sender, bitrate);
+        if (kind === "screen" && track) capSender(tr.sender, this.screenBitrate);
       } else if (track) missing.push(kind);
     }
     if (missing.length) this.publish(missing);
@@ -975,10 +966,15 @@ export class SfuTransport implements VoiceTransport {
     const mid = e.transceiver.mid;
     const p = mid ? this.byMid.get(mid) : undefined;
     const cryptoId = `${mid ?? "-"}#${++this.receiverSeq}`;
+    const kind = p ? media(p.kind) : e.track.kind === "video" ? "video" : "audio";
+    // The answer to this offer takes VP8 or nothing: the worker reads VP8's
+    // header to keep oversized pictures from the decoder, so a publisher
+    // cannot get another codec past it. Every Nexa client publishes VP8.
+    const vp8 = kind === "video" && preferVp8(e.transceiver);
     try {
       // Every receiver gets its transform at once, even one this call does not know: Chromium lets
       // frames skip a receiver that has none for good, and the mid may be handed out again later.
-      this.crypto.protectReceiver(e.receiver, p ? media(p.kind) : e.track.kind === "video" ? "video" : "audio", cryptoId);
+      this.crypto.protectReceiver(e.receiver, kind, cryptoId, vp8 ? VP8 : undefined);
     } catch (err) {
       // a track that cannot be opened is not played: what arrives is sealed
       console.warn("voice: cannot decrypt a pulled track", err);
@@ -991,6 +987,7 @@ export class SfuTransport implements VoiceTransport {
     p.arrivedAt = Date.now();
     p.seen = false;
     p.opened = false;
+    p.tooLarge = false;
     p.checkAt = 0;
     p.checkEvery = undefined;
     this.present();
@@ -1007,6 +1004,17 @@ export class SfuTransport implements VoiceTransport {
         if (p.kind === "audio") this.playback.setHeld(p.userId, "voice", false);
         if (p.kind === "screen_audio") this.playback.setHeld(p.userId, "screen", false);
       }
+      return;
+    }
+  }
+
+  /** The worker found a pulled picture over the size cap, or back within it: its tile says so. */
+  private onFrameSize(id: string, over: boolean): void {
+    for (const p of this.pulled.values()) {
+      if (p.cryptoId !== id) continue;
+      if (!!p.tooLarge === over) return;
+      p.tooLarge = over;
+      this.present();
       return;
     }
   }
@@ -1082,6 +1090,8 @@ export class SfuTransport implements VoiceTransport {
         audio: streamOf(prev.audio, audio ? [audio] : []),
         video: streamOf(prev.video, video ? [video] : []),
         screen: streamOf(prev.screen, screen ? (screenAudio ? [screen, screenAudio] : [screen]) : []),
+        videoTooLarge: !!video && !!this.pulled.get(slot(userId, "video"))?.tooLarge,
+        screenTooLarge: !!screen && !!this.pulled.get(slot(userId, "screen"))?.tooLarge,
       };
       if (next.audio !== prev.audio) {
         if (next.audio) this.playback.attachVoice(userId, next.audio, this.held(userId, "audio"));
@@ -1094,6 +1104,9 @@ export class SfuTransport implements VoiceTransport {
         else this.playback.detachScreenAudio(userId);
         this.events.onRemoteStream(userId, "screen", next.screen);
       }
+      // told again with a new stream too, which starts out not too large
+      if (next.videoTooLarge !== !!prev.videoTooLarge || (next.videoTooLarge && next.video !== prev.video)) this.events.onTooLarge?.(userId, "video", !!next.videoTooLarge);
+      if (next.screenTooLarge !== !!prev.screenTooLarge || (next.screenTooLarge && next.screen !== prev.screen)) this.events.onTooLarge?.(userId, "screen", !!next.screenTooLarge);
       if (next.audio || next.video || next.screen) this.shown.set(userId, next);
       else this.shown.delete(userId);
     }

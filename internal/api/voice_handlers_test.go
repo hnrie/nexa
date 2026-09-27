@@ -68,6 +68,12 @@ func TestVoiceChannels(t *testing.T) {
 	if ev == nil || ev["from"] != idB || ev["payload"].(map[string]any)["sdp"] != "v=0" {
 		t.Fatalf("signal relay: %v", ev)
 	}
+	// the numbers a loss report carries arrive held to their range
+	gb.op(t, "voice_signal", map[string]any{"to": idA, "payload": map[string]any{"voice_loss": 1e300, "voice_delay": -5, "voice_span": "x"}})
+	ev = ga.next("voice_signal", 3*time.Second)
+	if p, _ := ev["payload"].(map[string]any); p == nil || p["voice_loss"] != float64(1) || p["voice_delay"] != float64(0) || p["voice_span"] != nil {
+		t.Fatalf("loss report relay: %v", ev)
+	}
 	gc.op(t, "voice_signal", map[string]any{"to": idA, "payload": map[string]any{}})
 	if ev := gc.next("voice_error", 3*time.Second); ev == nil || ev["code"] != "not_in_voice" {
 		t.Errorf("signal outside voice: %v", ev)

@@ -34,6 +34,11 @@ export interface TransportEvents {
   onConnection?: (state: "connecting" | "connected" | "reconnecting") => void;
   /** Something the person should hear about, like video pausing near the free allowance. */
   onError?: (code: string, message: string) => void;
+  /**
+   * Someone's camera or screen picture is over the size cap (videoCap.ts), so
+   * none of it is decoded here, or it is back within it.
+   */
+  onTooLarge?: (userId: string, kind: "video" | "screen", tooLarge: boolean) => void;
 }
 
 export interface VoiceTransport {

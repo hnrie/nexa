@@ -7,7 +7,7 @@ import { voiceFrameKey } from "@/crypto/conv";
 import { ring } from "@/lib/keyring";
 import type { FrameKind } from "./frameCrypto";
 import { guestVoiceKeys } from "./guestKeys";
-import type { FrameCryptoMessage, FrameCryptoSeen, FrameCryptoStats } from "./frameCrypto.worker";
+import type { FrameCryptoMessage, FrameCryptoSeen, FrameCryptoSize, FrameCryptoStats } from "./frameCrypto.worker";
 
 interface LegacyEncoded {
   createEncodedStreams(): { readable: ReadableStream; writable: WritableStream };
@@ -70,6 +70,8 @@ export class FrameCrypto {
   private latest: FrameCryptoStats = { type: "stats", sealed: 0, opened: 0, dropped: 0 };
   /** Told when a receiver's first frame goes through its transform, and when the first one opens. */
   onSeen: ((id: string, opened: boolean) => void) | null = null;
+  /** Told when a video receiver's picture goes over the size cap (nothing of it is decoded) or back within it. */
+  onSize: ((id: string, over: boolean) => void) | null = null;
 
   /** Whether this browser can encrypt call frames at all. */
   static supported(): boolean {
@@ -87,9 +89,10 @@ export class FrameCrypto {
 
   constructor() {
     this.worker = new Worker(new URL("./frameCrypto.worker.ts", import.meta.url), { type: "module" });
-    this.worker.onmessage = (e: MessageEvent<FrameCryptoStats | FrameCryptoSeen>) => {
+    this.worker.onmessage = (e: MessageEvent<FrameCryptoStats | FrameCryptoSeen | FrameCryptoSize>) => {
       if (e.data?.type === "stats") this.latest = e.data;
       else if (e.data?.type === "seen") this.onSeen?.(e.data.id, e.data.opened);
+      else if (e.data?.type === "size") this.onSize?.(e.data.id, e.data.over);
     };
   }
 
@@ -107,9 +110,25 @@ export class FrameCrypto {
     this.protect(sender, "encrypt", kind, undefined, voice);
   }
 
-  /** `id` names this receiver in onSeen; it must be new for every receiver, since a mid can come round again. */
-  protectReceiver(receiver: RTCRtpReceiver, kind: FrameKind, id?: string): void {
-    this.protect(receiver, "decrypt", kind, id);
+  /**
+   * `id` names this receiver in onSeen and onSize; it must be new for every
+   * receiver, since a mid can come round again. `codec` is VP8's MIME type
+   * when that is all its transceiver can negotiate.
+   */
+  protectReceiver(receiver: RTCRtpReceiver, kind: FrameKind, id?: string, codec?: string): void {
+    this.protect(receiver, "decrypt", kind, id, false, codec);
+  }
+
+  /**
+   * Holds a video receiver of a call without encryption (peer to peer) to the
+   * size cap, the check every opened frame gets. Only where the browser has
+   * RTCRtpScriptTransform: the older way needs a flag on the connection, set
+   * when it is made. True when the check is in place.
+   */
+  inspectReceiver(receiver: RTCRtpReceiver, id: string, codec?: string): boolean {
+    if (!FrameCrypto.scriptTransform()) return false;
+    receiver.transform = new RTCRtpScriptTransform(this.worker, { op: "inspect", kind: "video", id, ...(codec ? { codec } : {}) });
+    return true;
   }
 
   stats(): FrameCryptoStats {
@@ -120,8 +139,8 @@ export class FrameCrypto {
     this.worker.terminate();
   }
 
-  private protect(end: RTCRtpSender | RTCRtpReceiver, op: "encrypt" | "decrypt", kind: FrameKind, id?: string, voice = false): void {
-    const extra = { ...(id === undefined ? {} : { id }), ...(voice ? { voice } : {}) };
+  private protect(end: RTCRtpSender | RTCRtpReceiver, op: "encrypt" | "decrypt", kind: FrameKind, id?: string, voice = false, codec?: string): void {
+    const extra = { ...(id === undefined ? {} : { id }), ...(voice ? { voice } : {}), ...(codec ? { codec } : {}) };
     if (FrameCrypto.scriptTransform()) {
       end.transform = new RTCRtpScriptTransform(this.worker, { op, kind, ...extra });
       return;

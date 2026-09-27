@@ -1,5 +1,4 @@
-
-import { t } from "@/i18n";/**
+/**
  * End-to-end encryption of call frames. Calls go through Cloudflare's SFU,
  * which ends the WebRTC transport encryption, so every frame is sealed again
  * with the conversation's key before it leaves the browser. The SFU forwards

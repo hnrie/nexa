@@ -263,6 +263,9 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
     },
     onPeerState: (uid, state) => useVoice.getState().setPeer(uid, state),
     onRemoteStream: (uid, kind, stream) => useVoice.getState().setRemote(uid, kind, stream),
+    onTooLarge: (uid, kind, on) => {
+      if (session === s) useVoice.getState().setTooLarge(uid, kind, on);
+    },
     onSpeaking: (uid, on) => useVoice.getState().setSpeaking(uid, on),
     onConnection: (state) => {
       if (session !== s) return;

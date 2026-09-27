@@ -1,4 +1,5 @@
-import { MAX_SHARE_BPS, MIN_SHARE_BPS, fromStreamQuality, shareBitrate, shareVideoConstraints } from "./shareQuality";
+import type { ShareFps, ShareResolution } from "@/stores/settings";
+import { MAX_SHARE_BPS, MIN_SHARE_BPS, fromStreamQuality, isShareFps, isShareResolution, shareBitrate, shareQuality, shareVideoConstraints } from "./shareQuality";
 
 describe("screen share quality", () => {
   it("caps the picture at the chosen size, keeping its shape, and the frame rate at the chosen one", () => {
@@ -6,8 +7,26 @@ describe("screen share quality", () => {
     expect(shareVideoConstraints("1440p", 60)).toEqual({ width: { max: 2560 }, height: { max: 1440 }, frameRate: { ideal: 60, max: 60 } });
   });
 
-  it("leaves the size alone at source resolution", () => {
-    expect(shareVideoConstraints("source", 15)).toEqual({ frameRate: { ideal: 15, max: 15 } });
+  it("holds source resolution to the longest side a call carries, keeping the shape", () => {
+    expect(shareVideoConstraints("source", 15)).toEqual({ width: { max: 8192 }, height: { max: 8192 }, frameRate: { ideal: 15, max: 15 } });
+  });
+
+  it("asks for the usual size and frame rate when given ones it does not offer", () => {
+    const odd = shareVideoConstraints("16k" as ShareResolution, 100000 as ShareFps);
+    expect(odd).toEqual({ width: { max: 1920 }, height: { max: 1080 }, frameRate: { ideal: 30, max: 30 } });
+    expect(shareVideoConstraints("source", NaN as ShareFps).frameRate).toEqual({ ideal: 30, max: 30 });
+    const bps = shareBitrate("nonsense" as ShareResolution, Infinity as ShareFps);
+    expect(Number.isFinite(bps)).toBe(true);
+    expect(bps).toBe(shareBitrate("1080p", 30));
+  });
+
+  it("knows the sizes and frame rates it offers", () => {
+    for (const r of ["720p", "1080p", "1440p", "source"]) expect(isShareResolution(r)).toBe(true);
+    for (const r of ["4320p", "", null, 1080, {}]) expect(isShareResolution(r)).toBe(false);
+    for (const f of [15, 30, 60]) expect(isShareFps(f)).toBe(true);
+    for (const f of [0, 59.9, 120, 1e9, NaN, "60"]) expect(isShareFps(f)).toBe(false);
+    expect(shareQuality("1440p", 60)).toEqual({ res: "1440p", fps: 60 });
+    expect(shareQuality(undefined, 240)).toEqual({ res: "1080p", fps: 30 });
   });
 
   it("gives bigger and smoother shares more bits, within what the SFU meter accepts", () => {

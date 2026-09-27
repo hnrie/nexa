@@ -5,7 +5,8 @@
  */
 import { AudioKeeper, isHomeScreenApp } from "@/lib/audioKeeper";
 import type { ShareFps, ShareResolution, VoiceSettings } from "@/stores/settings";
-import { shareVideoConstraints } from "./shareQuality";
+import { shareQuality, shareVideoConstraints } from "./shareQuality";
+import { VIDEO_CAP } from "./videoCap";
 
 import { t } from "@/i18n";
 /** Why the microphone that opened is the one that opened. */
@@ -76,7 +77,8 @@ export type CameraFacing = "user" | "environment";
  * the way asked.
  */
 export async function getCamera(facing: CameraFacing = "user", choice?: { id: string | null; label: string | null }): Promise<MediaStream> {
-  const base: MediaTrackConstraints = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+  // no camera comes near the cap, but what is asked for stays inside it all the same
+  const base: MediaTrackConstraints = { width: { ideal: 1280, max: VIDEO_CAP.side }, height: { ideal: 720, max: VIDEO_CAP.side }, frameRate: { ideal: 30, max: VIDEO_CAP.fps } };
   const open = (deviceId: string) => navigator.mediaDevices.getUserMedia({ video: { ...base, deviceId: { exact: deviceId } }, audio: false });
   if (choice?.id) {
     try {
@@ -121,6 +123,7 @@ export function shareAudioRequested(): boolean {
 
 export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio = true): Promise<MediaStream> {
   const video = shareVideoConstraints(res, fps);
+  const rate = shareQuality(res, fps).fps;
   // System audio where the browser allows it (Chrome asks per window or tab).
   // restrictOwnAudio leaves this app's own sound out of it, the call included:
   // without it everyone in the call hears themselves come back through the
@@ -133,7 +136,7 @@ export async function getScreen(res: ShareResolution, fps: ShareFps, withAudio =
   // Under a squeezed connection the encoder gives up detail or smoothness.
   // Whoever picked 60 fps wants motion kept; anything slower is usually text.
   const track = stream.getVideoTracks()[0];
-  if (track && "contentHint" in track) track.contentHint = fps >= 60 ? "motion" : "detail";
+  if (track && "contentHint" in track) track.contentHint = rate >= 60 ? "motion" : "detail";
   return stream;
 }
 

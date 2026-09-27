@@ -135,6 +135,13 @@ describe("screen share settings", () => {
     expect(v.shareResolution).toBe("1440p");
     expect(v.shareFps).toBe(15);
   });
+
+  it("puts back a size or frame rate it does not offer", async () => {
+    await loadFrom({ doc: { voice: { shareResolution: "16384p", shareFps: 100000 } }, version: 1 });
+    const v = useSettings.getState().settings.voice;
+    expect(v.shareResolution).toBe("1080p");
+    expect(v.shareFps).toBe(30);
+  });
 });
 
 describe("how the rail and the DM list are arranged", () => {

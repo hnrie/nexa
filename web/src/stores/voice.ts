@@ -50,6 +50,12 @@ interface VoiceStore {
    * forced: it only plays once someone asks for it, and they can stop.
    */
   watching: Record<string, boolean>;
+  /**
+   * Received pictures over the size cap, as "user:video" or "user:screen":
+   * none of their frames are decoded, and their tiles say so instead of
+   * waiting for a picture that is not coming.
+   */
+  tooLarge: Record<string, boolean>;
   error: string | null;
   /**
    * The call started, but the microphone never opened: refused, or in use by
@@ -81,6 +87,7 @@ interface VoiceStore {
   setPeer: (userId: string, state: PeerState) => void;
   removePeer: (userId: string) => void;
   setRemote: (userId: string, kind: keyof RemoteMedia, stream: MediaStream | null) => void;
+  setTooLarge: (userId: string, kind: "video" | "screen", on: boolean) => void;
   setLocalVideo: (s: MediaStream | null) => void;
   setLocalScreen: (s: MediaStream | null) => void;
   setSpeaking: (userId: string, on: boolean) => void;
@@ -154,6 +161,7 @@ export const useVoice = create<VoiceStore>()((set) => ({
   ringing: {},
   focused: null,
   watching: {},
+  tooLarge: {},
   error: null,
   micBlocked: false,
   calling: null,
@@ -202,9 +210,30 @@ export const useVoice = create<VoiceStore>()((set) => ({
       delete speaking[userId];
       const watching = { ...s.watching };
       delete watching[userId];
-      return { peers, remote, speaking, watching, focused: s.focused?.startsWith(userId + ":") ? null : s.focused };
+      const tooLarge = { ...s.tooLarge };
+      delete tooLarge[`${userId}:video`];
+      delete tooLarge[`${userId}:screen`];
+      return { peers, remote, speaking, watching, tooLarge, focused: s.focused?.startsWith(userId + ":") ? null : s.focused };
     }),
-  setRemote: (userId, kind, stream) => set((s) => ({ remote: { ...s.remote, [userId]: { ...(s.remote[userId] ?? EMPTY_MEDIA), [kind]: stream } } })),
+  setRemote: (userId, kind, stream) =>
+    set((s) => {
+      const remote = { ...s.remote, [userId]: { ...(s.remote[userId] ?? EMPTY_MEDIA), [kind]: stream } };
+      // another stream, or none, has not been found too large yet
+      const key = `${userId}:${kind}`;
+      if (!s.tooLarge[key] || s.remote[userId]?.[kind] === stream) return { remote };
+      const tooLarge = { ...s.tooLarge };
+      delete tooLarge[key];
+      return { remote, tooLarge };
+    }),
+  setTooLarge: (userId, kind, on) =>
+    set((s) => {
+      const key = `${userId}:${kind}`;
+      if (!!s.tooLarge[key] === on) return s;
+      const tooLarge = { ...s.tooLarge };
+      if (on) tooLarge[key] = true;
+      else delete tooLarge[key];
+      return { tooLarge };
+    }),
   setLocalVideo: (localVideo) => set({ localVideo }),
   setLocalScreen: (localScreen) => set({ localScreen }),
   setSpeaking: (userId, on) =>
@@ -256,8 +285,8 @@ export const useVoice = create<VoiceStore>()((set) => ({
   setPttHeld: (pttHeld) => set((s) => (s.pttHeld === pttHeld ? s : { pttHeld })),
   // error goes with the rest: a refusal from a call that is over has nothing
   // to say about the next one, and it was shown again in its lobby
-  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, error: null, micBlocked: false, calling: null, connection: null, audioBlocked: false, leftAlone: null, pttHeld: false }),
-  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, error: null, micBlocked: false, calling: null, connection: null, audioBlocked: false, leftAlone: null, pttHeld: false }),
+  resetSession: () => set({ mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, focused: null, watching: {}, tooLarge: {}, error: null, micBlocked: false, calling: null, connection: null, audioBlocked: false, leftAlone: null, pttHeld: false }),
+  clear: () => set({ byChannel: {}, mine: null, joining: null, peers: {}, remote: {}, localVideo: null, localScreen: null, speaking: {}, level: 0, quality: null, ringing: {}, focused: null, watching: {}, tooLarge: {}, error: null, micBlocked: false, calling: null, connection: null, audioBlocked: false, leftAlone: null, pttHeld: false }),
 }));
 
 // Signing in (or out) swaps in that account's own volume choices.

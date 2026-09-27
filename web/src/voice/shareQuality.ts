@@ -3,6 +3,7 @@
  * browser's capture for, and how many bits the share may use.
  */
 import type { ShareFps, ShareResolution } from "@/stores/settings";
+import { VIDEO_CAP } from "./videoCap";
 
 import { t } from "@/i18n";
 export function shareResolutions(): { value: ShareResolution; label: string; box?: { width: number; height: number } }[] {
@@ -16,19 +17,34 @@ export function shareResolutions(): { value: ShareResolution; label: string; box
 
 export const SHARE_FRAME_RATES: ShareFps[] = [15, 30, 60];
 
+const SHARE_RESOLUTIONS: readonly string[] = ["720p", "1080p", "1440p", "source"];
+
+/** Whether a value from settings, saved by this or another device, is one of the share sizes on offer. */
+export function isShareResolution(v: unknown): v is ShareResolution {
+  return typeof v === "string" && SHARE_RESOLUTIONS.includes(v);
+}
+
+/** Whether a value from settings is one of the share frame rates on offer. */
+export function isShareFps(v: unknown): v is ShareFps {
+  return typeof v === "number" && (SHARE_FRAME_RATES as number[]).includes(v);
+}
+
+/** A share's size and frame rate, each the usual one (1080p, 30) when it is not one on offer. */
+export function shareQuality(res: unknown, fps: unknown): { res: ShareResolution; fps: ShareFps } {
+  return { res: isShareResolution(res) ? res : "1080p", fps: isShareFps(fps) ? fps : 30 };
+}
+
 /**
  * Capture constraints: a picture no bigger than the chosen size (a wide or tall
  * window keeps its shape inside it) at no more than the chosen frame rate.
+ * Source resolution is held to the longest side calls carry (videoCap.ts); a
+ * larger screen is scaled down to it, and the sender scales down whatever is
+ * still over the cap in pixels.
  */
 export function shareVideoConstraints(res: ShareResolution, fps: ShareFps): MediaTrackConstraints {
-  const box = shareResolutions().find((r) => r.value === res)?.box;
-  const c: MediaTrackConstraints = {};
-  if (box) {
-    c.width = { max: box.width };
-    c.height = { max: box.height };
-  }
-  c.frameRate = { ideal: fps, max: fps };
-  return c;
+  const q = shareQuality(res, fps);
+  const box = shareResolutions().find((r) => r.value === q.res)?.box ?? { width: VIDEO_CAP.side, height: VIDEO_CAP.side };
+  return { width: { max: box.width }, height: { max: box.height }, frameRate: { ideal: q.fps, max: q.fps } };
 }
 
 /** The bounds internal/realtime.ClampScreenBps holds a share's declared rate to. */
@@ -40,7 +56,8 @@ const FPS_SCALE: Record<ShareFps, number> = { 15: 0.6, 30: 1, 60: 1.5 };
 
 /** The bitrate cap for a share, which the SFU meter also charges it at. */
 export function shareBitrate(res: ShareResolution, fps: ShareFps): number {
-  return Math.min(MAX_SHARE_BPS, Math.max(MIN_SHARE_BPS, Math.round(BPS_AT_30[res] * FPS_SCALE[fps])));
+  const q = shareQuality(res, fps);
+  return Math.min(MAX_SHARE_BPS, Math.max(MIN_SHARE_BPS, Math.round(BPS_AT_30[q.res] * FPS_SCALE[q.fps])));
 }
 
 /** Reads the single "stream quality" that older versions saved. */

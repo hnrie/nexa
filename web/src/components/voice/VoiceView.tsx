@@ -48,6 +48,7 @@ import { participantsOf, useVoice } from "@/stores/voice";
 import { useVoiceLocal } from "@/stores/voiceLocal";
 import { callThroughSfu, flipCamera, guestLinksOn, holdToTalk, joinVoice, leaveVoice, pushToTalkButton, resumeCallAudio, retryMic, setStreamLocalMute, setStreamVolume, setUserLocalMute, setUserVolume, toggleCamera, toggleScreen } from "@/voice/session";
 import { canShareScreen, hasSeveralCameras } from "@/voice/media";
+import { safeAspect } from "@/voice/videoCap";
 import s from "./Voice.module.css";
 
 import { t as tr_, translator } from "@/i18n";
@@ -73,8 +74,10 @@ export function StreamVideo({ stream, muted = true, mirror = false, className, o
     const play = () => {
       if (el.paused && el.srcObject && document.visibilityState === "visible") void el.play().catch(() => {});
     };
+    // the size comes from whoever sends the picture, so its shape is held to a sane range
     const measure = () => {
-      if (el.videoWidth > 0 && el.videoHeight > 0) aspect.current?.(el.videoWidth / el.videoHeight);
+      const ratio = safeAspect(el.videoWidth, el.videoHeight);
+      if (ratio !== null) aspect.current?.(ratio);
     };
     play();
     el.addEventListener("pause", play);
@@ -349,6 +352,7 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
   const setFocused = useVoice((v) => v.setFocused);
   const watching = useVoice((v) => v.watching);
   const setWatching = useVoice((v) => v.setWatching);
+  const tooLarge = useVoice((v) => v.tooLarge);
   const volumes = useVoice((v) => v.volumes);
   const streamVolumes = useVoice((v) => v.streamVolumes);
   const streamMutes = useVoice((v) => v.streamMutes);
@@ -679,7 +683,9 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
     const color = serverState ? memberColor(serverState, t.userId) : undefined;
     const peerState = t.me || t.kind === "ringing" ? "connected" : (peers[t.userId] ?? "new");
     const live = isLive(t);
-    const playing = showsStream(t);
+    // a picture over the size cap is never decoded here: the tile says so rather than wait for it
+    const oversized = !t.me && !!t.stream && showsStream(t) && !!tooLarge[`${t.userId}:${t.kind === "screen" ? "screen" : "video"}`];
+    const playing = showsStream(t) && !oversized;
     const full = playing && tileIsFull(t);
     const box = place === "grid" ? layout : place === "focus" ? focusFit : null;
     const size: CSSProperties | undefined = box && box.width > 0 ? { width: box.width, height: box.height } : undefined;
@@ -707,6 +713,23 @@ export function VoiceView({ channel, embedded = false, guest = false }: { channe
           <StreamSurface zoomable={place === "focus"}>
             <StreamVideo stream={t.stream} mirror={t.me && t.kind === "video" && mirrored(t.stream)} className={s.video} onAspect={(r) => noteAspect(t.key, r)} />
           </StreamSurface>
+        ) : oversized ? (
+          <div className={s.offer} data-testid="picture-too-large">
+            {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}
+            {place !== "strip" && tileH >= 120 ? <div className={s.offerNote}>{t.kind === "screen" ? tr_("voice.voice.screenTooLarge", { name: nameOf(t.userId) }) : tr_("voice.voice.cameraTooLarge", { name: nameOf(t.userId) })}</div> : null}
+            {live ? (
+              <button
+                className={s.watchBtn}
+                data-testid="stop-watching"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWatching(t.userId, false);
+                }}
+              >
+                <EyeOff size={16} /> {place === "strip" ? tr_("voice.voice.stop") : tr_("voice.voice.stopWatching")}
+              </button>
+            ) : null}
+          </div>
         ) : live ? (
           <div className={s.offer}>
             {place === "strip" || tileH < 150 ? null : <Avatar id={t.userId} avatarId={users[t.userId]?.avatar_id ?? null} name={nameOf(t.userId)} size={tileH < 220 ? 40 : 56} />}

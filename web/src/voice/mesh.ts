@@ -4,11 +4,19 @@
  * relayed through the gateway. Media is DTLS-SRTP peer to peer; the server
  * never sees it. Playback goes through WebAudio so per-user volume can exceed
  * 100 % and the output device can be chosen.
+ *
+ * Video is VP8 both ways, and where the browser allows it every received
+ * video frame is held to the size cap (frameSize.ts) before it is decoded,
+ * as frames through the SFU are once opened.
  */
 import type { VoiceState } from "@/api/types";
+import { FrameCrypto } from "./e2ee";
+import { VP8 } from "./frameSize";
 import { Playback } from "./playback";
+import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { MediaKind, SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 import { RecentLoss, type LossTotals } from "./recentLoss";
+import { capSender, clampBitrate, preferVp8, recapSender } from "./videoCap";
 
 export type { MediaKind, SignalPayload, TransportEvents } from "./transport";
 
@@ -55,6 +63,15 @@ const ICE_RESTART_MS = 4_000;
 const MAX_ICE_RESTARTS = 3;
 /** How long a renegotiation offer may go unanswered before it is taken back and sent again. */
 const OFFER_DEADLINE_MS = 10_000;
+/** The camera is capped here. */
+const CAMERA_BPS = 2_500_000;
+
+/** A received video track held to the size cap, by its name in the worker. */
+interface Inspected {
+  userId: string;
+  stream: MediaStream;
+  over: boolean;
+}
 
 export class MeshTransport implements VoiceTransport {
   /** Loss is measured between readings, not over the whole call. */
@@ -75,6 +92,12 @@ export class MeshTransport implements VoiceTransport {
   /** The peers this device has been connected to, so losing them reads as reconnecting rather than a first connect. */
   private upBefore = new Set<string>();
   private lastConnection: "connecting" | "connected" | "reconnecting" | null = null;
+  /** The worker that holds received video to the size cap, made with the first video track; null where the browser cannot. */
+  private inspector: FrameCrypto | null = null;
+  private inspected = new Map<string, Inspected>();
+  /** Receivers already checked: a track that comes back in a later exchange keeps its check. */
+  private checkedReceivers = new WeakSet<RTCRtpReceiver>();
+  private receiverSeq = 0;
 
   constructor(
     private meId: string,
@@ -118,7 +141,7 @@ export class MeshTransport implements VoiceTransport {
 
   setLocalScreen(stream: MediaStream | null, bitrate = 5_000_000): void {
     this.screen = stream;
-    this.screenBitrate = bitrate;
+    this.screenBitrate = clampBitrate(bitrate, MIN_SHARE_BPS, MAX_SHARE_BPS, 5_000_000);
     this.screenStream = stream ?? new MediaStream();
     for (const p of this.peers.values()) this.syncSenders(p);
   }
@@ -224,7 +247,9 @@ export class MeshTransport implements VoiceTransport {
     p.pc.close();
     this.early.delete(userId);
     this.upBefore.delete(userId);
+    for (const [id, x] of this.inspected) if (x.userId === userId) this.inspected.delete(id);
     for (const kind of ["audio", "video", "screen"] as const) this.events.onRemoteStream(userId, kind, null);
+    for (const kind of ["video", "screen"] as const) this.events.onTooLarge?.(userId, kind, false);
     this.reportConnection();
   }
 
@@ -282,6 +307,8 @@ export class MeshTransport implements VoiceTransport {
     this.early.clear();
     for (const id of [...this.peers.keys()]) this.removePeer(id);
     this.playback.close();
+    this.inspector?.close();
+    this.inspector = null;
   }
 
   // --- signalling --------------------------------------------------------
@@ -416,7 +443,8 @@ export class MeshTransport implements VoiceTransport {
         void peer.videoSender.replaceTrack(this.videoTrack);
       } else {
         peer.videoSender = pc.addTrack(this.videoTrack, this.videoStream);
-        this.capBitrate(peer.videoSender, 2_500_000);
+        this.sendVp8(pc, peer.videoSender);
+        capSender(peer.videoSender, CAMERA_BPS);
       }
     } else if (peer.videoSender) {
       if (peer.videoSender.track) void peer.videoSender.replaceTrack(null);
@@ -436,7 +464,10 @@ export class MeshTransport implements VoiceTransport {
     for (const t of screenTracks) {
       if (!peer.screenSenders.some((s) => s.track?.id === t.id)) {
         const sender = pc.addTrack(t, this.screenStream);
-        if (t.kind === "video") this.capBitrate(sender, this.screenBitrate);
+        if (t.kind === "video") {
+          this.sendVp8(pc, sender);
+          capSender(sender, this.screenBitrate);
+        }
         peer.screenSenders.push(sender);
       }
     }
@@ -451,20 +482,16 @@ export class MeshTransport implements VoiceTransport {
     if (tr.direction !== next) tr.direction = next;
   }
 
-  private capBitrate(sender: RTCRtpSender, maxBitrate: number): void {
-    try {
-      const params = sender.getParameters();
-      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
-      params.encodings[0]!.maxBitrate = maxBitrate;
-      void sender.setParameters(params).catch(() => {});
-    } catch {
-      /* not supported */
-    }
+  /** Video goes out, and comes back on the same transceiver, in VP8. */
+  private sendVp8(pc: RTCPeerConnection, sender: RTCRtpSender): void {
+    const tr = pc.getTransceivers().find((x) => x.sender === sender);
+    if (tr) preferVp8(tr);
   }
 
   // --- receiving ---------------------------------------------------------
 
   private onTrack(peer: Peer, e: RTCTrackEvent): void {
+    if (e.track.kind === "video") this.inspect(peer, e);
     const stream = e.streams[0];
     if (!stream) return;
     let kind: MediaKind = e.track.kind === "audio" ? "audio" : "video";
@@ -484,6 +511,41 @@ export class MeshTransport implements VoiceTransport {
       if (kind === "screen" && this.playback.screenAudioStream(peer.userId) === stream && stream.getAudioTracks().length === 0) this.playback.detachScreenAudio(peer.userId);
       if (stream.getTracks().length === 0) this.events.onRemoteStream(peer.userId, kind, null);
     };
+  }
+
+  /**
+   * Holds a received video track to the size cap before it is decoded. This
+   * runs while the offer or answer carrying it is applied, before any of its
+   * frames can arrive, and asks for VP8 alone first so the answer this device
+   * gives takes nothing the check cannot read.
+   */
+  private inspect(peer: Peer, e: RTCTrackEvent): void {
+    const vp8 = preferVp8(e.transceiver);
+    if (this.checkedReceivers.has(e.receiver)) return;
+    try {
+      this.inspector ??= FrameCrypto.scriptTransform() ? this.newInspector() : null;
+      const id = `${peer.userId}#${++this.receiverSeq}`;
+      if (!this.inspector?.inspectReceiver(e.receiver, id, vp8 ? VP8 : undefined)) return;
+      this.checkedReceivers.add(e.receiver);
+      const stream = e.streams[0] ?? new MediaStream([e.track]);
+      this.inspected.set(id, { userId: peer.userId, stream, over: false });
+      e.track.addEventListener("ended", () => this.inspected.delete(id));
+    } catch (err) {
+      console.warn("voice: cannot check the size of a received picture", err);
+    }
+  }
+
+  private newInspector(): FrameCrypto {
+    const c = new FrameCrypto();
+    c.onSize = (id, over) => {
+      const x = this.inspected.get(id);
+      if (!x || x.over === over || this.closed) return;
+      x.over = over;
+      const peer = this.peers.get(x.userId);
+      const kind = peer && peer.remoteStreams.screen === x.stream.id ? "screen" : "video";
+      this.events.onTooLarge?.(x.userId, kind, over);
+    };
+    return c;
   }
 
   // --- output control ----------------------------------------------------
@@ -527,6 +589,8 @@ export class MeshTransport implements VoiceTransport {
     let n = 0;
     const streams = new Map<string, LossTotals>();
     for (const [peerId, p] of this.peers) {
+      // what is sent stays within the size cap even when the picture going in grows
+      for (const sender of [p.videoSender, ...p.screenSenders]) if (sender?.track?.kind === "video") void recapSender(sender);
       const report = await p.pc.getStats().catch(() => null);
       if (!report) continue;
       report.forEach((r) => {

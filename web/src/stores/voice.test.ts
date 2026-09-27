@@ -70,3 +70,29 @@ describe("watching screen shares", () => {
     expect(useVoice.getState().watching).toEqual({ u1: true });
   });
 });
+
+describe("pictures too large to show", () => {
+  beforeEach(() => useVoice.getState().clear());
+
+  it("marks a camera or a share, and forgets the mark with its stream or its sender", () => {
+    const v = useVoice.getState();
+    v.setRemote("u1", "screen", stream);
+    v.setTooLarge("u1", "screen", true);
+    v.setTooLarge("u1", "video", true);
+    expect(useVoice.getState().tooLarge).toEqual({ "u1:screen": true, "u1:video": true });
+    // the same stream again changes nothing
+    useVoice.getState().setRemote("u1", "screen", stream);
+    expect(useVoice.getState().tooLarge["u1:screen"]).toBe(true);
+    // another stream has not been found too large
+    useVoice.getState().setRemote("u1", "screen", {} as MediaStream);
+    expect(useVoice.getState().tooLarge).toEqual({ "u1:video": true });
+    useVoice.getState().setTooLarge("u1", "video", false);
+    expect(useVoice.getState().tooLarge).toEqual({});
+    useVoice.getState().setTooLarge("u2", "screen", true);
+    useVoice.getState().removePeer("u2");
+    expect(useVoice.getState().tooLarge).toEqual({});
+    useVoice.getState().setTooLarge("u3", "video", true);
+    useVoice.getState().resetSession();
+    expect(useVoice.getState().tooLarge).toEqual({});
+  });
+});

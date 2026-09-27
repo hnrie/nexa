@@ -3,7 +3,7 @@ import type { FavoriteGif } from "@/lib/gifFavorites";
 import { users as usersApi } from "@/api/users";
 import { ApiError } from "@/api/client";
 import { decryptSettings, encryptSettings } from "@/lib/settingsCrypto";
-import { fromStreamQuality } from "@/voice/shareQuality";
+import { fromStreamQuality, isShareFps, isShareResolution } from "@/voice/shareQuality";
 import { sanitizeRail, type RailLayout } from "@/lib/railLayout";
 import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout";
 import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
@@ -313,6 +313,9 @@ function mergeVoice(base: VoiceSettings, incoming: Partial<VoiceSettings> | unde
   const old = rest.shareResolution ? null : fromStreamQuality(streamQuality);
   const voice = { ...base, ...rest, ...(old ?? {}) };
   delete (voice as { streamQuality?: unknown }).streamQuality;
+  // a size or frame rate this version does not offer (another device's, or a damaged copy) goes back to what it was
+  if (!isShareResolution(voice.shareResolution)) voice.shareResolution = isShareResolution(base.shareResolution) ? base.shareResolution : "1080p";
+  if (!isShareFps(voice.shareFps)) voice.shareFps = isShareFps(base.shareFps) ? base.shareFps : 30;
   // Chromium's "default" and "communications" entries are no longer offered, so one saved earlier means the system's own device
   if (isAlias(voice.inputDeviceId)) Object.assign(voice, { inputDeviceId: null, inputDeviceLabel: null });
   if (isAlias(voice.outputDeviceId)) Object.assign(voice, { outputDeviceId: null, outputDeviceLabel: null });
