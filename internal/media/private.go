@@ -62,13 +62,14 @@ func SniffVideo(head []byte) (string, bool) {
 }
 
 // PutPrivate validates a picture (PNG, JPEG, GIF, WebP) or a video (MP4,
-// QuickTime, WebM) and stores it under kind. Each upload gets a row of its
-// own, even when the same bytes were sent before, so every file has exactly
-// one owner to check access against; the bytes on disk are still shared. It
-// is stored with no reference: whatever it is sent with takes one, and the
-// collector removes it a day later if nothing ever does.
+// QuickTime, WebM) and stores it under kind, without its metadata (a WebM
+// stays as it came). Each upload gets a row of its own, even when the same
+// bytes were sent before, so every file has exactly one owner to check
+// access against; the bytes on disk are still shared. It is stored with no
+// reference: whatever it is sent with takes one, and the collector removes
+// it a day later if nothing ever does.
 func (m *Store) PutPrivate(ctx context.Context, kind string, r io.Reader, lim PrivateLimits, owner ids.ID) (*store.Blob, error) {
-	tmp, sha, size, err := m.spool(r, max(lim.ImageBytes, lim.VideoBytes))
+	tmp, sha, size, err := m.spoolClean(r, max(lim.ImageBytes, lim.VideoBytes))
 	if err != nil {
 		return nil, err
 	}

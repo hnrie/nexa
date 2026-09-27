@@ -3862,6 +3862,8 @@
   "whatsNew.r202609264.webhooksTitle": "Webhooks",
   "whatsNew.r20260927.groupsBody": "Dans un groupe, Inviter des gens affiche maintenant vos amis, à ajouter en un geste. Pour ne rejoindre des groupes que par un lien qu’on vous envoie, désactivez « Autoriser mes amis à m’ajouter à des groupes » dans Réglages, Confidentialité et sécurité.",
   "whatsNew.r20260927.groupsTitle": "Ajoutez des amis aux groupes",
+  "whatsNew.r20260927.metadataBody": "Les photos et vidéos que vous envoyez ne contiennent plus d’informations cachées, comme l’endroit où elles ont été prises ou le téléphone utilisé. Ces informations sont retirées sur votre appareil avant tout envoi, sans perte de qualité.",
+  "whatsNew.r20260927.metadataTitle": "Plus d’informations cachées dans les photos et vidéos",
   "whatsNew.r20260927.notesBody": "Quand vous ajoutez quelqu’un en ami, vous pouvez maintenant écrire une courte note pour qu’il sache qui vous êtes. Seule cette personne peut la lire.",
   "whatsNew.r20260927.notesTitle": "Ajoutez une note à vos demandes d’ami",
   "whatsNew.r20260927.pollsBody": "Touchez le bouton + de la zone de message et choisissez Créer un sondage pour poser une question avec jusqu’à dix réponses. Les sondages sont chiffrés de bout en bout, et les propriétaires de serveur choisissent qui peut en créer.",

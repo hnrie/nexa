@@ -4,6 +4,7 @@ import { b64 } from "@/crypto/bytes";
 import { FRAME_LEN, HEADER_LEN, chunkCount, encryptChunks, encryptedSize, frameOffset, newBaseIv, newFileKey } from "@/crypto/fileChunks";
 import type { AttachmentMeta } from "@/crypto/message";
 import { holdReload } from "./busy";
+import { scrubFile } from "./scrubMetadata";
 import type { PieceReply, PieceRequest } from "./upload.worker";
 
 import { t } from "@/i18n";
@@ -46,10 +47,16 @@ export interface Staged {
 }
 
 let seq = 0;
-export function stage(file: File): Staged {
+/**
+ * Readies a picked file for sending. A photo or a video loses the hidden
+ * details it carries first (scrubMetadata.ts), so what is previewed, measured,
+ * encrypted and sent is the cleaned file.
+ */
+export async function stage(file: File): Promise<Staged> {
+  const clean = await scrubFile(file);
   seq += 1;
-  const preview = file.type.startsWith("image/") || file.type.startsWith("video/") ? URL.createObjectURL(file) : null;
-  return { id: `f${seq}`, file, name: file.name, spoiler: false, preview, progress: 0, error: null };
+  const preview = clean.type.startsWith("image/") || clean.type.startsWith("video/") ? URL.createObjectURL(clean) : null;
+  return { id: `f${seq}`, file: clean, name: file.name, spoiler: false, preview, progress: 0, error: null };
 }
 
 async function imageDims(file: File): Promise<{ w: number; h: number } | null> {

@@ -3863,6 +3863,8 @@
   "whatsNew.r202609264.webhooksTitle": "Webhooks",
   "whatsNew.r20260927.groupsBody": "Convidar pessoas, numa conversa em grupo, agora mostra seus amigos para adicionar com um toque. Para entrar em grupos só por um link que te mandarem, desative “Permitir que amigos me adicionem a conversas em grupo” em Configurações, Privacidade e Segurança.",
   "whatsNew.r20260927.groupsTitle": "Adicione amigos a conversas em grupo",
+  "whatsNew.r20260927.metadataBody": "As fotos e os vídeos que você envia não levam mais informações ocultas, como o lugar onde foram feitos ou o celular usado. Essas informações são removidas no seu dispositivo antes do envio, e a qualidade continua a mesma.",
+  "whatsNew.r20260927.metadataTitle": "Fotos e vídeos sem informações ocultas",
   "whatsNew.r20260927.notesBody": "Ao adicionar alguém como amigo, agora você pode escrever uma nota curta para a pessoa saber quem é você. Só ela pode ler.",
   "whatsNew.r20260927.notesTitle": "Adicione uma nota ao pedido de amizade",
   "whatsNew.r20260927.pollsBody": "Toque no botão + da caixa de mensagem e escolha Criar enquete para fazer uma pergunta com até dez respostas. As enquetes têm criptografia de ponta a ponta, e os donos do servidor decidem quem pode criá-las.",

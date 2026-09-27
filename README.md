@@ -82,8 +82,13 @@ and for restart/stop/update/backup commands.
   ciphertext plus the metadata it needs (author, channel, mentions, reactions, sizes).
   A recovery key shown once at registration can restore the identity if the password
   is lost. Details: `docs/superpowers/specs/2026-09-11-chat-design.md` §6.
+- **Photos and videos lose their hidden metadata** (location, camera, serial numbers,
+  times, XMP, IPTC) without being re-encoded: the app strips an attachment before it
+  encrypts it (`web/src/lib/scrubMetadata.ts`), and the server strips the pictures and
+  videos it keeps readable (`internal/media/scrub.go`). Both follow the same rules and
+  are checked against `internal/media/testdata/scrub`.
 - **Webhook messages are the exception.** A program posting to a webhook's URL holds no
-  key, so what it sends reaches the server readable and is kept as it came
+  key, so what it sends reaches the server readable and is kept that way
   (`messages.plain`, its files as plain blobs); the app marks every such message as not
   end-to-end encrypted. The URL's token is stored as a SHA-256 hash, and sealed with the
   server secret so managers can copy the URL again. Pictures linked from elsewhere load

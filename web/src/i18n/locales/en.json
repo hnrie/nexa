@@ -3834,6 +3834,8 @@
   "whatsNew.r202609264.webhooksTitle": "Webhooks",
   "whatsNew.r20260927.groupsBody": "Invite People in a group chat now lists your friends, to add in one tap. To join groups only from a link someone sends you, turn off “Let friends add me to group chats” in Settings, Privacy & Safety.",
   "whatsNew.r20260927.groupsTitle": "Add Friends to Group Chats",
+  "whatsNew.r20260927.metadataBody": "Photos and videos you send no longer carry hidden details, such as where they were taken or which phone took them. These details are removed on your device before anything is sent, and the quality stays the same.",
+  "whatsNew.r20260927.metadataTitle": "No Hidden Details in Photos and Videos",
   "whatsNew.r20260927.notesBody": "Add Friend now lets you write a short note, so people know who is asking. Only the person you add can read it.",
   "whatsNew.r20260927.notesTitle": "Add a Note to Friend Requests",
   "whatsNew.r20260927.pollsBody": "Tap the plus button in the message box and choose Create Poll to ask a question with up to ten answers. Polls are end-to-end encrypted, and server owners choose who can make them.",

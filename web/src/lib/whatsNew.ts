@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { BadgeCheck, Bug, EyeOff, FolderPlus, Link, MessageSquareDashed, MessageSquarePlus, Palette, Pin, Puzzle, RefreshCw, Search, Shapes, ShieldCheck, Sticker, StickyNote, Type, UserCheck, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Bug, EyeOff, FolderPlus, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, Palette, Pin, Puzzle, RefreshCw, Search, Shapes, ShieldCheck, Sticker, StickyNote, Type, UserCheck, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -31,6 +31,7 @@ export const RELEASES: Release[] = [
       { icon: Vote, title: "whatsNew.r20260927.pollsTitle", body: "whatsNew.r20260927.pollsBody" },
       { icon: UsersRound, title: "whatsNew.r20260927.groupsTitle", body: "whatsNew.r20260927.groupsBody" },
       { icon: StickyNote, title: "whatsNew.r20260927.notesTitle", body: "whatsNew.r20260927.notesBody" },
+      { icon: MapPinOff, title: "whatsNew.r20260927.metadataTitle", body: "whatsNew.r20260927.metadataBody" },
     ],
   },
   {

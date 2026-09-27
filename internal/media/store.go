@@ -140,9 +140,29 @@ func (m *Store) spool(r io.Reader, max int64) (path string, sha string, size int
 	return path, hex.EncodeToString(h.Sum(nil)), n, nil
 }
 
-// PutPublic validates an image upload and stores it under kind.
+// spoolClean is spool for a file kept readable: a picture's or a video's
+// metadata is taken out first (scrub.go), so the hash and size are those of
+// the bytes kept, and the same photo sent twice still shares one file.
+func (m *Store) spoolClean(r io.Reader, max int64) (path string, sha string, size int64, err error) {
+	path, sha, size, err = m.spool(r, max)
+	if err != nil {
+		return "", "", 0, err
+	}
+	changed, err := scrubFile(path)
+	if err == nil && changed {
+		sha, size, err = hashFile(path)
+	}
+	if err != nil {
+		os.Remove(path)
+		return "", "", 0, err
+	}
+	return path, sha, size, nil
+}
+
+// PutPublic validates an image upload and stores it under kind, without its
+// metadata.
 func (m *Store) PutPublic(ctx context.Context, kind string, r io.Reader, lim Limits, owner ids.ID) (*store.Blob, error) {
-	tmp, sha, size, err := m.spool(r, lim.MaxBytes)
+	tmp, sha, size, err := m.spoolClean(r, lim.MaxBytes)
 	if err != nil {
 		return nil, err
 	}

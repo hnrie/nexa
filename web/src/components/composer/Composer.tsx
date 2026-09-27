@@ -154,6 +154,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const lastSelect = useRef("");
   /** A message that looked like a command the app does not have, sent once already: the second time it goes as it is. */
   const sendAsIs = useRef<string | null>(null);
+  /** Files being staged, so a later pick still lands after an earlier one. */
+  const staging = useRef<Promise<void>>(Promise.resolve());
   // Link previews are made by the sender (so recipients never fetch the
   // address) and ride inside the encrypted payload. They are asked for when
   // the message is sent, never while it is typed: a link in a draft that is
@@ -424,7 +426,8 @@ export function Composer({ channel }: { channel: Channel }) {
       toast(tr_("composer.composer.noUploadPermission"), "error");
       return;
     }
-    const staged: Staged[] = [];
+    // taken now: a paste's or a drop's files cannot be read once the event is over
+    const picked: File[] = [];
     for (const f of Array.from(list)) {
       const max = uploadLimit();
       if (!fitsUploadLimit(f.size)) {
@@ -432,18 +435,24 @@ export function Composer({ channel }: { channel: Channel }) {
         toast(tr_("composer.composer.overServerLimit", { name: f.name, limit: gb >= 1 ? tr_("composer.composer.gigabytes", { n: Math.round(gb * 10) / 10 }) : tr_("composer.composer.megabytes", { n: Math.round(max / (1024 * 1024)) }) }), "error");
         continue;
       }
-      staged.push(stage(f));
+      picked.push(f);
     }
-    if (!staged.length) return;
-    // Files past the limit are let go (their previews with them), and the box
-    // says which, right above the files, until it is dismissed: a toast at the
-    // top of the window was gone before anyone saw it, and named nobody.
-    const room = Math.max(0, MAX_FILES - (useUploads.getState().trays[channel.id]?.length ?? 0));
-    const dropped = staged.slice(room);
-    for (const f of dropped) if (f.preview) URL.revokeObjectURL(f.preview);
-    setNotice(dropped.length ? { kind: "files", dropped: dropped.map((f) => f.name) } : null);
-    const kept = staged.slice(0, room);
-    if (kept.length) useUploads.getState().add(channel.id, kept);
+    if (!picked.length) return;
+    const channelId = channel.id;
+    // Staging takes a photo's or a video's hidden details out, which reads a
+    // little of each file first; the files join the tray when that is done.
+    staging.current = staging.current.then(async () => {
+      const staged: Staged[] = await Promise.all(picked.map(stage));
+      // Files past the limit are let go (their previews with them), and the box
+      // says which, right above the files, until it is dismissed: a toast at the
+      // top of the window was gone before anyone saw it, and named nobody.
+      const room = Math.max(0, MAX_FILES - (useUploads.getState().trays[channelId]?.length ?? 0));
+      const dropped = staged.slice(room);
+      for (const f of dropped) if (f.preview) URL.revokeObjectURL(f.preview);
+      setNotice(dropped.length ? { kind: "files", dropped: dropped.map((f) => f.name) } : null);
+      const kept = staged.slice(0, room);
+      if (kept.length) useUploads.getState().add(channelId, kept);
+    }).catch(() => toast(tr_("composer.composer.uploadFailed"), "error"));
   };
 
   /** A paste would take the box past the limit: it goes in only if asked, or goes as a file. */

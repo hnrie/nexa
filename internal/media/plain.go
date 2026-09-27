@@ -26,10 +26,10 @@ const maxSniffSide = 1 << 15
 // PutPlain stores a webhook's file, of any type, with no reference: the
 // message it goes out with takes one, and the collector removes it a day
 // later if none ever does. declared is the type the sender gave, used when
-// the bytes do not say what they are. It returns the blob and the type to
-// show it as.
+// the bytes do not say what they are. A picture or a video is stored without
+// its metadata. It returns the blob and the type to show it as.
 func (m *Store) PutPlain(ctx context.Context, r io.Reader, max int64, owner ids.ID, declared string) (*store.Blob, error) {
-	tmp, sha, size, err := m.spool(r, max)
+	tmp, sha, size, err := m.spoolClean(r, max)
 	if err != nil {
 		return nil, err
 	}
