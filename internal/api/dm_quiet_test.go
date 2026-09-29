@@ -206,7 +206,7 @@ func TestNewDMSubchatShowsTheConversation(t *testing.T) {
 // server with; the other choices work as they did.
 func TestDMPrivacyFriendsAndServerMembers(t *testing.T) {
 	_, ts := newTestServer(t)
-	register(t, ts, "owner") // the first account is the instance admin
+	register(t, ts, "owner") // the first account is the Nexa admin
 	tokB, idB := registerDefault(t, ts, "bob")
 	if _, me := do(t, ts, "GET", "/api/v1/users/@me", tokB, nil); me["dm_privacy"] != "friends_servers" {
 		t.Fatalf("a new account's dm_privacy: %v", me["dm_privacy"])

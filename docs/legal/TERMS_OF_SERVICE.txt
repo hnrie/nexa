@@ -1,7 +1,7 @@
 NEXA - TERMS OF SERVICE
 Site: chat.evilion.xyz
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-09-24
+Effective: 2026-09-28
 
 These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
@@ -42,8 +42,8 @@ cases, and the delivery details the server needs to work.
 - Nobody who runs Nexa holds a key to any of it. There is no admin
   panel, setting, or software switch that decrypts content already
   sent, and no way to intercept future content in readable form.
-- A few things are not end-to-end encrypted, because the instance
-  itself has to read them: your public profile, moderation cases and
+- A few things are not end-to-end encrypted, because Nexa itself
+  has to read them: your public profile, moderation cases and
   the threads that go with them, and announcements from Nexa. Section
   6 explains them.
 - The Privacy Policy lists exactly what is stored and who can see it.
@@ -119,7 +119,7 @@ here has a way to read them.
 
 6. NEXA, THE OFFICIAL ACCOUNT
 
-- Nexa (@nexa, marked Official) is how the instance reaches you: it
+- The Nexa account (@nexa, marked Official) is how Nexa reaches you: it
   sends moderation notices and announcements. Nobody can message Nexa
   directly or add it as a friend.
 - Moderation case threads are a conversation with the moderation

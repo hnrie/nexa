@@ -1,8 +1,8 @@
 /**
  * Twemoji file names.
  *
- * Every emoji in the app is drawn with Twitter's artwork, served from this
- * instance, so the same picture appears on every platform and no third party
+ * Every emoji in the app is drawn with Twitter's artwork, served by
+ * Nexa itself, so the same picture appears on every platform and no third party
  * learns who is reading what. The naming follows Twemoji's own rule: the code
  * points in lower-case hex joined by dashes, with the variation selector
  * dropped unless the sequence is joined with a zero-width joiner.

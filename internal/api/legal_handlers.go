@@ -16,9 +16,9 @@ import (
 // process about one account.
 //
 // Every platform of any size publishes a guide telling officers what it holds
-// and what it does not; a one-person instance needs the same thing, and needs
-// it more, because the person answering the letter is also the person who has
-// to be sure the answer is complete and true. So this is a read of the tables
+// and what it does not; Nexa needs the same thing, and needs it more, because
+// whoever answers the letter also has to be sure the answer is complete and
+// true. So this is a read of the tables
 // and nothing else: no new column, no new log, no retention that would not
 // exist if this file were deleted.
 //
@@ -38,7 +38,7 @@ func (s *Server) legalRoutes(mux *http.ServeMux) {
 // handleLegalReport compiles the document for one account. It is guarded and
 // rate-limited exactly as the other admin routes are, through s.admin.
 //
-// Only the instance owner may compile one. It carries what nothing else in
+// Only the owner of Nexa may compile one. It carries what nothing else in
 // the admin tools shows — the account's addresses and devices, its private
 // relationship notes — about anyone, the owner and the other staff included,
 // whom the moderation tools deliberately keep out of each other's reach.
@@ -48,7 +48,7 @@ func (s *Server) handleLegalReport(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	} else if owner != me.ID {
-		WriteError(w, E(http.StatusForbidden, "owner_only", "Only the instance owner can compile a legal report."))
+		WriteError(w, E(http.StatusForbidden, "owner_only", "Only the owner of Nexa can compile a legal report."))
 		return
 	}
 	who := strings.TrimPrefix(strings.TrimSpace(r.URL.Query().Get("user")), "@")
@@ -98,7 +98,7 @@ func (s *Server) accountFor(ctx context.Context, who string) (*store.User, error
 	}
 	u, err := s.Store.UserByUsername(ctx, strings.ToLower(who))
 	if err != nil {
-		return nil, E(http.StatusNotFound, "no_such_account", "No account on this instance has that username or id.")
+		return nil, E(http.StatusNotFound, "no_such_account", "No account on Nexa has that username or id.")
 	}
 	return u, nil
 }
@@ -227,12 +227,12 @@ func legalBytes(n int64) string {
 	return out
 }
 
-// legalFlags spells out the account's flag bits, which are the only status this
-// instance keeps for an account.
+// legalFlags spells out the account's flag bits, which are the only status Nexa
+// keeps for an account.
 func legalFlags(f int64) string {
 	var on []string
 	if f&store.FlagAdmin != 0 {
-		on = append(on, "instance administrator")
+		on = append(on, "Nexa administrator")
 	}
 	if f&store.FlagDisabled != 0 {
 		on = append(on, "disabled by an administrator")
@@ -256,9 +256,9 @@ func (s *Server) renderLegalReport(rec *store.AccountRecord, by *store.User) str
 	d.line("NEXA — LAW ENFORCEMENT RESPONSE")
 	d.line("Records held for a single account, as of the snapshot below.")
 	d.blank()
-	d.field("Instance:", "Nexa")
+	d.field("Service:", "Nexa")
 	d.field("Address:", legalText(s.Cfg.PublicURL))
-	d.field("Operator:", "the instance administrator, reachable through "+legalText(s.Cfg.PublicURL))
+	d.field("Operator:", "the administrator of Nexa, reachable through "+legalText(s.Cfg.PublicURL))
 	d.field("Software:", "chatd "+legalText(s.Version))
 	d.field("Snapshot taken:", legalTime(rec.TakenAt))
 	d.field("Report compiled by:", "@"+by.Username+" (account id "+by.ID.String()+")")
@@ -270,12 +270,11 @@ func (s *Server) renderLegalReport(rec *store.AccountRecord, by *store.User) str
 	d.para(
 		"HOW TO READ THIS DOCUMENT",
 		"",
-		"This is a single-operator deployment of Nexa, an end-to-end-encrypted chat",
-		"server. The document is a direct read of the records this instance already",
-		"holds about the account named above, taken in one pass at the instant given",
-		"above. Nothing in it was inferred, enriched or obtained from a third party:",
-		"each line is a column of a row that exists in the database, and each section",
-		"names the tables it came from.",
+		"Nexa is an end-to-end-encrypted chat service. This document is a direct read",
+		"of the records Nexa already holds about the account named above, taken in",
+		"one pass at the instant given above. Nothing in it was inferred, enriched or",
+		"obtained from a third party: each line is a column of a row that exists in",
+		"the database, and each section names the tables it came from.",
 		"",
 		"Message content, call media and attachment content are end-to-end encrypted.",
 		"The operator holds no key to any of it and cannot produce it. Sections headed",
@@ -293,6 +292,7 @@ func (s *Server) renderLegalReport(rec *store.AccountRecord, by *store.User) str
 	legalCredentials(d, rec)
 	legalSessions(d, rec)
 	legalMFA(d, rec)
+	legalDiscordLink(d, rec)
 	legalSettings(d, rec)
 	legalRelationships(d, rec)
 	legalCommunities(d, rec)
@@ -333,7 +333,7 @@ func legalAccount(d *legalDoc, rec *store.AccountRecord) {
 	d.field("Banner file id:", legalIDOpt(u.BannerID))
 	d.blank()
 	d.note("Every field above was typed by the account holder except the id, the times")
-	d.note("and the flags. None of it is verified by this instance: there is no identity")
+	d.note("and the flags. None of it is verified by Nexa: there is no identity")
 	d.note("check at registration, so a display name or an \"about me\" is a claim and")
 	d.note("nothing more.")
 	d.blank()
@@ -366,7 +366,7 @@ func legalSessions(d *legalDoc, rec *store.AccountRecord) {
 	d.head("LOGIN SESSIONS AND IP ADDRESSES", "sessions, channel_unlocks")
 	d.para(
 		"  One row per signed-in device that has not been signed out or expired. This",
-		"  is the only place this instance writes an IP address for an account.",
+		"  is the only place Nexa writes an IP address for an account.",
 		"",
 		"  The address is the one the session was opened from, recorded once when the",
 		"  session was created and never updated afterwards. It is therefore a record of",
@@ -375,7 +375,7 @@ func legalSessions(d *legalDoc, rec *store.AccountRecord) {
 		"  new account in; it is not separately labelled as such.",
 		"",
 		"  Sessions are deleted when the holder signs out, when an administrator disables",
-		"  the account, and when they go idle past the instance's session lifetime. A",
+		"  the account, and when they go idle past Nexa's session lifetime. A",
 		"  deleted session leaves nothing behind, so this list is what exists now and not",
 		"  a history of every login ever made.",
 	)
@@ -417,6 +417,33 @@ func legalMFA(d *legalDoc, rec *store.AccountRecord) {
 	d.note("The authenticator seed is stored sealed with a key that exists only on this")
 	d.note("server, and the backup codes are stored as keyed hashes. Neither is produced:")
 	d.note("they are credentials for getting into the account, not records of its use.")
+	d.blank()
+}
+
+func legalDiscordLink(d *legalDoc, rec *store.AccountRecord) {
+	d.head("LINKED DISCORD ACCOUNT", "discord_links")
+	if rec.Discord == nil {
+		d.empty("No Discord account is linked; no row exists.")
+		return
+	}
+	l := rec.Discord
+	d.field("Discord user id:", legalText(l.DiscordID))
+	d.field("Discord username:", legalText(l.Username))
+	if l.GlobalName != "" {
+		d.field("Discord display name:", legalText(l.GlobalName))
+	}
+	d.field("Linked:", legalTime(l.CreatedAt))
+	d.field("Last changed:", legalTime(l.UpdatedAt))
+	d.field("In the activity server:", legalYesNo(l.InGuild))
+	if l.LeftAt > 0 {
+		d.field("Left it:", legalTime(l.LeftAt))
+	}
+	d.blank()
+	d.note("The account holder linked this Discord account so that what Discord says")
+	d.note("they are doing (a song, a game) shows on Nexa. Nexa's bot hears it while it")
+	d.note("happens and keeps it in memory only; no history of it is written anywhere.")
+	d.note("The OAuth tokens are stored sealed with a key that exists only on this server")
+	d.note("and are not produced: they are credentials, not records of use.")
 	d.blank()
 }
 
@@ -626,7 +653,7 @@ func legalFiles(d *legalDoc, rec *store.AccountRecord) {
 		}
 		d.capped(len(rec.PlainBlobs))
 		d.note("These are profile pictures, banners, community icons, custom emoji and")
-		d.note("stickers. They are the only files on this instance that are stored as they")
+		d.note("stickers. They are the only files on Nexa that are stored as they")
 		d.note("were uploaded, and their SHA-256 is of the file itself.")
 		d.blank()
 	}
@@ -736,12 +763,12 @@ func legalModeration(d *legalDoc, rec *store.AccountRecord) {
 		d.capped(len(rec.AuditOnThem))
 	}
 	d.note("The audit log is per community and is written by the people who moderate that")
-	d.note("community, for their own use. It is not an instance-wide record of the")
-	d.note("account; the instance's own record follows.")
+	d.note("community, for their own use. It is not a Nexa-wide record of the")
+	d.note("account; Nexa's own record follows.")
 	d.blank()
-	d.field("Instance cases on them:", legalCount(len(rec.ModCases)))
+	d.field("Nexa cases on them:", legalCount(len(rec.ModCases)))
 	d.field("Lines in their case threads:", legalCount(rec.ModThreadLines))
-	d.field("Instance actions by them:", legalCount(rec.ModActionsTaken))
+	d.field("Nexa actions by them:", legalCount(rec.ModActionsTaken))
 	d.blank()
 	for _, c := range rec.ModCases {
 		line := "case #" + strconv.FormatInt(c.Number, 10) + " (" + c.Action + ") by account " + c.ModeratorID.String() + " on " + legalTime(c.CreatedAt) + ", reason: " + legalText(c.Reason)
@@ -762,7 +789,7 @@ func legalModeration(d *legalDoc, rec *store.AccountRecord) {
 	if len(rec.UsernameHolds) > 0 {
 		d.blank()
 	}
-	d.note("Instance cases are actions this instance's staff took through its moderation")
+	d.note("Nexa cases are actions Nexa's staff took through its moderation")
 	d.note("panel: removing a profile picture, resetting profile fields, muting, banning")
 	d.note("or deleting an account. Each case has a thread between the member and the")
 	d.note("staff; those threads are not end-to-end encrypted and are held in readable")
@@ -846,7 +873,7 @@ func legalBugReports(d *legalDoc, rec *store.AccountRecord) {
 		d.cont(legalText(b.Subject))
 	}
 	d.capped(len(rec.BugReports))
-	d.note("A bug report is what the member chose to send this instance's staff about a")
+	d.note("A bug report is what the member chose to send Nexa's staff about a")
 	d.note("problem with the app: a subject, a description, any screenshots or recordings")
 	d.note("they added and, if they left it on, their app version, browser, system and")
 	d.note("screen size. Reports and their threads with the staff are not end-to-end")
@@ -910,19 +937,19 @@ func legalNotCollected(d *legalDoc) {
 	d.head("DATA NOT COLLECTED", "absent columns, verified against the schema")
 	d.para(
 		"  A law-enforcement request commonly asks for the categories below. None of",
-		"  them is withheld: no column exists for any of them anywhere in this",
-		"  instance's schema, so there is nothing to search, preserve or produce. They",
+		"  them is withheld: no column exists for any of them anywhere in Nexa's",
+		"  schema, so there is nothing to search, preserve or produce. They",
 		"  are listed rather than omitted so that the point does not have to be raised",
 		"  a second time.",
 	)
 	d.item("Email address. Registration asks for a username, a display name and a")
 	d.cont("password. No email address is collected, at registration or afterwards,")
 	d.cont("and no column for one exists. There is no email verification, no password")
-	d.cont("reset by email, and this instance sends no email at all.")
+	d.cont("reset by email, and Nexa sends no email at all.")
 	d.item("Telephone number, and any SMS or call verification.")
 	d.item("Legal name, date of birth, age, government identifier, or any identity")
 	d.cont("document. Nothing about an account is verified by anybody.")
-	d.item("Payment, billing or subscription records. This instance charges nothing,")
+	d.item("Payment, billing or subscription records. Nexa charges nothing,")
 	d.cont("has no payment processor and holds no financial data.")
 	d.item("A registration-IP or last-known-IP field. Addresses are written in exactly")
 	d.cont("one place, the session row, which is above. The address on a session is")
@@ -931,14 +958,14 @@ func legalNotCollected(d *legalDoc) {
 	d.item("An IP or access history. The server's own request log records the method,")
 	d.cont("the path, the status, the size and the duration of each request and does")
 	d.cont("not record the address it came from. Any reverse proxy or network")
-	d.cont("provider in front of this instance keeps its own logs under its own")
-	d.cont("retention; those are not this instance's records and are not read here.")
+	d.cont("provider in front of Nexa keeps its own logs under its own")
+	d.cont("retention; those are not Nexa's records and are not read here.")
 	d.item("Presence, online-time, last-seen or typing history. Who is online is held")
 	d.cont("in memory for as long as a connection lasts and is never written down.")
 	d.cont("The session's last-activity time above is the nearest thing that exists.")
 	d.item("Call records. Who was in a call, with whom, and for how long is held in")
 	d.cont("memory for the life of the call and is not written to any table. The only")
-	d.cont("figure kept is one instance-wide monthly byte total for capacity")
+	d.cont("figure kept is one Nexa-wide monthly byte total for capacity")
 	d.cont("planning, which is not attributed to any account.")
 	d.item("Device identifiers, advertising identifiers, or push-notification tokens.")
 	d.cont("Notifications are delivered over the connection the app already holds")
@@ -962,7 +989,7 @@ func (s *Server) legalProvenance(d *legalDoc, rec *store.AccountRecord, by *stor
 	d.field("Subject account:", "@"+rec.User.Username+" (id "+rec.User.ID.String()+")")
 	d.field("Compiled by:", "@"+by.Username+" (id "+by.ID.String()+")")
 	d.field("Software:", "chatd "+legalText(s.Version))
-	d.field("Instance address:", legalText(s.Cfg.PublicURL))
+	d.field("Service address:", legalText(s.Cfg.PublicURL))
 	d.blank()
 	d.note("Tables read for this report:")
 	for _, l := range legalTablesRead {
@@ -974,7 +1001,7 @@ func (s *Server) legalProvenance(d *legalDoc, rec *store.AccountRecord, by *stor
 	d.cont("account. They are keyed to the link, not to an account, and each is a")
 	d.cont("different person; where this account made such links, the links are above.")
 	d.item("key_flags, polls, realtime_usage, instance_settings, schema bookkeeping —")
-	d.cont("keyed to a conversation, a message, a month or the instance, never to an")
+	d.cont("keyed to a conversation, a message, a month or Nexa as a whole, never to an")
 	d.cont("account.")
 	d.blank()
 	d.para(

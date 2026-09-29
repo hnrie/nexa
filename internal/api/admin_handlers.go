@@ -26,7 +26,7 @@ func (s *Server) adminRoutes(mux *http.ServeMux) {
 func (s *Server) admin(h http.HandlerFunc) http.Handler {
 	return s.authed(func(w http.ResponseWriter, r *http.Request) {
 		if auth.UserFrom(r.Context()).Flags&store.FlagAdmin == 0 {
-			WriteError(w, E(http.StatusForbidden, "admin_only", "Only instance admins can do that."))
+			WriteError(w, E(http.StatusForbidden, "admin_only", "Only Nexa admins can do that."))
 			return
 		}
 		h(w, r)
@@ -127,7 +127,7 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if owner == id && id != me.ID {
-		WriteError(w, E(http.StatusForbidden, "owner_protected", "The instance owner's access cannot be changed."))
+		WriteError(w, E(http.StatusForbidden, "owner_protected", "The owner's access cannot be changed."))
 		return
 	}
 	// The owner is the oldest admin, so making an older account an admin
@@ -135,7 +135,7 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 	// admin could move the owner's protection to an account of their
 	// choosing and then act on the owner like anyone else.
 	if req.Admin != nil && *req.Admin && u.Flags&store.FlagAdmin == 0 && owner != 0 && u.ID < owner && me.ID != owner {
-		WriteError(w, E(http.StatusForbidden, "owner_protected", "Only the instance owner can make this account an admin: it would become the owner."))
+		WriteError(w, E(http.StatusForbidden, "owner_protected", "Only the owner of Nexa can make this account an admin: it would become the owner."))
 		return
 	}
 	reason, ok := CleanText(req.Reason, maxModReason)
@@ -160,7 +160,7 @@ func (s *Server) handleAdminUserPatch(w http.ResponseWriter, r *http.Request) {
 			clear |= store.FlagAdmin
 		}
 	}
-	// instance admins see every private channel of the servers they are in,
+	// Nexa admins see every private channel of the servers they are in,
 	// so gaining or losing that changes their view (and who holds the keys)
 	isAdmin := func(f int64) bool { return f&store.FlagAdmin != 0 && f&(store.FlagDisabled|store.FlagDeleted) == 0 }
 	var servers []*store.Server

@@ -14,7 +14,7 @@ import (
 // A request rejected for one field must leave every field alone. Validating
 // and writing one at a time meant an admin who read "registration_key is too
 // long" and reasonably concluded nothing had changed had in fact closed
-// registration on the instance.
+// registration on Nexa.
 func TestRejectedSettingsPatchChangesNothing(t *testing.T) {
 	_, ts := newTestServer(t)
 	tok, _ := register(t, ts, "alice")

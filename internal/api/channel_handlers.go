@@ -474,7 +474,7 @@ func (s *Server) handleRecipientRemove(w http.ResponseWriter, r *http.Request) {
 	if uid != me.ID && mutedFor(w, r) {
 		return
 	}
-	// an instance admin outranks everyone in a group but its owner, as in a server
+	// a Nexa admin outranks everyone in a group but its owner, as in a server
 	if uid != me.ID && ch.OwnerID != nil && *ch.OwnerID == uid {
 		WriteError(w, E(http.StatusForbidden, "is_owner", "The group's owner cannot be removed. Transfer ownership first."))
 		return

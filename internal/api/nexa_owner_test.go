@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Every account learns who owns the instance, not only the staff: the app
+// Every account learns who owns Nexa, not only the staff: the app
 // crowns the owner in anyone's list of conversations.
 func TestNexaStateNamesTheOwnerToEveryone(t *testing.T) {
 	_, ts := newTestServer(t)

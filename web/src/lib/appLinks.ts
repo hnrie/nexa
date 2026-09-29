@@ -4,7 +4,7 @@
  * A link to one of Nexa's own pages (an invite, a channel, a message, a
  * sticker pack, the download page) opens inside the app instead of a new tab:
  * in the desktop app a new tab is the system browser, and on the web it is a
- * second copy of the app. The instance's public address counts as well as the
+ * second copy of the app. Nexa's public address counts as well as the
  * page's own, so a link someone copied from https://chat.example.org works on
  * a page the same server serves under another name, and plain http counts
  * because it only redirects to https.
@@ -22,7 +22,7 @@ export interface InviteLinkRef {
 
 let publicHost: string | null = null;
 
-/** Remembers the instance's public address, as GET /instance reports it. */
+/** Remembers Nexa's public address, as GET /instance reports it. */
 export function setPublicUrl(url: string | null | undefined): void {
   try {
     publicHost = url ? new URL(url).host.toLowerCase() : null;
@@ -84,7 +84,7 @@ export function messageTarget(path: string): { channelId: string; messageId: str
 export const MAX_INVITE_CARDS = 3;
 
 /**
- * The invites to this instance that a message links to, in order and each
+ * The invites to Nexa that a message links to, in order and each
  * once. `nodes` is the message's parsed markdown: a link in code is not a
  * link, and one written as <url> asked for no preview.
  */

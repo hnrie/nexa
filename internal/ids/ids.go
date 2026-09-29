@@ -45,7 +45,7 @@ var (
 	// backwards — an NTP correction after a suspend, someone running date —
 	// could leave the loop below spinning at full speed, holding this mutex,
 	// until the clock caught up: an hour's jump is an hour in which nothing on
-	// the instance can create anything at all.
+	// Nexa can create anything at all.
 	started   = time.Now()
 	startedNs = started.UnixNano()
 	now       = func() int64 { return (startedNs + int64(time.Since(started))) / int64(time.Millisecond) }

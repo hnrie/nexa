@@ -62,7 +62,7 @@ and for restart/stop/update/backup commands.
 - **Voice and video**: voice channels and DM calls with ringing, camera,
   screen share up to source resolution at 60 fps, push-to-talk or voice activity,
   per-user volume to 200 %, server mute/deafen/move, and a link-quality readout.
-- **Instance admin**: stats, registration policy, and enabling or disabling accounts.
+- **Nexa admin**: stats, registration policy, and enabling or disabling accounts.
 - **Apps**: a desktop app (Electron) for Windows, macOS and Linux, offered by the
   download page; the web app runs everywhere else, phones included.
 - **Your data**: a one-click zip export of everything this device can decrypt.
@@ -125,6 +125,9 @@ described in `tools/README.md`.
 URL, data directory, upload limits (Cloudflare's free plan caps request bodies at 100 MB),
 registration mode (`open`, `invite` with a shared `REGISTRATION_KEY`, or `closed`), the
 admin username, optional Cloudflare Realtime keys for calls (and TURN credentials for peer
-to peer ones), an optional Klipy key for GIF search.
-The registration mode and key can also be changed at runtime from Settings → Instance
+to peer ones), an optional Klipy key for GIF search, and optional Discord activity sync
+(`DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`, and
+`DISCORD_ACTIVITY_GUILD_ID` to name the bot's server; see `chatd.env.example` for the
+Developer Portal settings and the OAuth redirect it needs).
+The registration mode and key can also be changed at runtime from Settings → Nexa
 Admin, which overrides the file until you clear it.

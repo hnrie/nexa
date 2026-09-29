@@ -29,7 +29,7 @@ import (
 // Who may file reports, and when. A muted account still can: a report goes to
 // the staff alone, never to anyone the mute protects, and the limits below
 // keep it from becoming a way to flood them. A banned account cannot send new
-// ones or write in old ones: it is out of the instance, and its ban's case
+// ones or write in old ones: it is out of Nexa, and its ban's case
 // thread is already its line to the staff. It can still read what it sent.
 var bugReadRoutes = []string{
 	"GET /api/v1/bugs",

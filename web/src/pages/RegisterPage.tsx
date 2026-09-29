@@ -38,7 +38,7 @@ export default function RegisterPage() {
   const passwordInput = useRef<HTMLInputElement>(null);
   const confirmInput = useRef<HTMLInputElement>(null);
   const strengthId = useId();
-  // Whether this instance takes sign-ups at all, asked before the form is
+  // Whether Nexa takes sign-ups at all, asked before the form is
   // filled in: it used to be learned after a whole form and a key derivation,
   // with the field it needed folded away under "Have an invite?".
   const [policy, setPolicy] = useState<"open" | "invite" | "closed" | null>(null);
@@ -154,7 +154,7 @@ export default function RegisterPage() {
           <TextInput ref={confirmInput} type="password" reveal value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" required />
         </Field>
         {needsInvite ? (
-          // this instance only takes people who were invited, so the field is part of the form
+          // Nexa only takes people who were invited, so the field is part of the form
           <Field label={t("register.inviteRegistrationKey")} required hint={t("register.youNeedAnInviteOrRegistration")}>
             <TextInput value={inviteKey} onChange={(e) => setInviteKey(e.target.value)} autoCapitalize="none" spellCheck={false} required />
           </Field>

@@ -315,7 +315,7 @@ export function DMSidebar() {
             <span className={s.text}>
               <span className={s.nameRow}>
                 <span className={s.name} dir="auto">{name}</span>
-                {/* the instance's owner is crowned wherever they are listed, and its admins carry the hammer */}
+                {/* the owner of Nexa is crowned wherever they are listed, and its admins carry the hammer */}
                 {crowned ? <OwnerCrown size={14} /> : admin ? <AdminHammer size={14} /> : null}
               </span>
               {sub}

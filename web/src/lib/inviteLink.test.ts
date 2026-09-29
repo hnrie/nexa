@@ -20,7 +20,7 @@ describe("invite link key fragment", () => {
 });
 
 describe("shownInvite", () => {
-  it("reads an invite to this instance without its key, and leaves every other address alone", () => {
+  it("reads an invite to Nexa without its key, and leaves every other address alone", () => {
     const origin = window.location.origin;
     const host = window.location.host;
     expect(shownInvite(`${origin}/invite/LK3Zv5qH#k=0.Pam7abHfXosNdN9IkK6BEA89-isbcIuhTJB2kkoqs3g`)).toBe(`${host}/invite/LK3Zv5qH`);

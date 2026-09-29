@@ -6,6 +6,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { channelDisplayName } from "@/lib/names";
 import { compareIds } from "@/lib/ids";
 import { setReadingPresent } from "@/lib/readPosition";
+import { interactedWithin, onInteraction } from "@/lib/interaction";
 import { formatDateDivider, formatTime, sameDay } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
 import { useMessages, type DecryptedMessage, type PendingMessage } from "@/stores/messages";
@@ -34,7 +35,7 @@ import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { displayName } from "@/stores/users";
 import { ActiveRows, ActiveRowsProvider, rowIdOf } from "./activeRow";
-import { dispatchGeneration, dispatchHooks } from "@/gateway/dispatch";
+import { onReadyApplied, readyApplied } from "@/gateway/dispatch";
 /** A run of messages from blocked people, folded into one row (open shows them under it). */
 type BlockedRow = { kind: "blocked"; key: string; ids: string[]; open: boolean };
 type Row =
@@ -49,30 +50,19 @@ type Row =
 const GROUP_MS = 7 * 60 * 1000;
 
 /**
- * The session whose ready has been applied. A conversation opened straight
+ * Whether this session's read positions are in. A conversation opened straight
  * from the address bar can load its messages before ready arrives, while
  * nothing is known yet about how far it was read: the "new" line was placed
  * against nothing (so never shown) and the newest message acked at once,
  * which undid Mark Unread and every unread message waiting there.
  */
-let readyIn = -1;
-const readyWatchers = new Set<() => void>();
-dispatchHooks.onReady.push(() => {
-  readyIn = dispatchGeneration();
-  for (const fn of readyWatchers) fn();
-});
-
-/** Whether this session's read positions are in. */
 function useReadStatesKnown(): boolean {
-  const [known, setKnown] = useState(() => readyIn === dispatchGeneration());
+  const [known, setKnown] = useState(readyApplied);
   useEffect(() => {
     if (known) return;
-    const check = () => setKnown(readyIn === dispatchGeneration());
-    readyWatchers.add(check);
-    check();
-    return () => {
-      readyWatchers.delete(check);
-    };
+    const off = onReadyApplied(() => setKnown(readyApplied()));
+    setKnown(readyApplied());
+    return off;
   }, [known]);
   return known;
 }
@@ -85,6 +75,9 @@ function useReadStatesKnown(): boolean {
  * takes that growth back off again.
  */
 const HOLD_AFTER_LOAD_MS = 1500;
+
+/** How soon after a click or a key leaving a conversation counts as having read it. */
+const LEAVE_MS = 3000;
 
 /** A row of the list and how far its top sat below the top of the box. */
 type Anchor = { id: string; top: number };
@@ -239,7 +232,12 @@ export function MessageList({ channel }: { channel: Channel }) {
   if (seenLastRead.current !== lastRead) {
     const before = seenLastRead.current;
     seenLastRead.current = lastRead;
-    if (unreadFrom.current !== undefined && before !== null && (lastRead === null || compareIds(lastRead, before) < 0)) unreadFrom.current = lastRead ?? "0";
+    if (unreadFrom.current !== undefined && before !== null && (lastRead === null || compareIds(lastRead, before) < 0)) {
+      unreadFrom.current = lastRead ?? "0";
+      // Unread on purpose stays unread while it is looked at, clicked around in
+      // and left: only a message newer than what is here now reads it again.
+      lastAcked.current = state?.ids[state.ids.length - 1] ?? null;
+    }
   }
 
   const rows = useMemo<Row[]>(() => {
@@ -523,16 +521,38 @@ export function MessageList({ channel }: { channel: Channel }) {
     }
   }, [channel.id, hasOlder, hasNewer, loading, loaded, ids.length, loadOlder, loadNewer]);
 
-  useEffect(() => {
+  // What the checks below need from the latest render, for the ones that run outside of one.
+  const live = useRef({ loaded, readKnown, hasNewer, newest, readState });
+  live.current = { loaded, readKnown, hasNewer, newest, readState };
+  /** Marks the newest message read when the list is showing it: the present, scrolled to the bottom. */
+  const ackIfPresent = useCallback(() => {
+    const v = live.current;
     // Wait for the first page: the unread point is taken from the read state
     // on that render, and acking earlier would move it to the newest message.
     // A list that stops short of the present has not shown the newest message.
-    if (!loaded || !readKnown || hasNewer || !newest || !focused || !atBottom.current || typeof document === "undefined" || document.visibilityState !== "visible") return;
-    if (lastAcked.current === newest) return;
-    if (readState?.lastReadId && compareIds(readState.lastReadId, newest) >= 0 && readState.mentions === 0) return;
-    lastAcked.current = newest;
-    void ack(channel.id, newest);
-  }, [loaded, readKnown, hasNewer, newest, focused, readState, ack, channel.id, reachedBottom]);
+    if (!v.loaded || !v.readKnown || v.hasNewer || !v.newest || !atBottom.current || typeof document === "undefined" || document.visibilityState !== "visible") return;
+    if (lastAcked.current === v.newest) return;
+    if (v.readState?.lastReadId && compareIds(v.readState.lastReadId, v.newest) >= 0 && v.readState.mentions === 0) return;
+    lastAcked.current = v.newest;
+    void ack(channel.id, v.newest);
+  }, [ack, channel.id]);
+
+  useEffect(() => {
+    if (focused) ackIfPresent();
+  }, [loaded, readKnown, hasNewer, newest, focused, readState, reachedBottom, ackIfPresent]);
+
+  // A click, a key or a wheel turned in the window means the person is looking
+  // at it, whatever its focus says (lib/interaction). And leaving the
+  // conversation from its newest message, by a click or a key in the app, is
+  // having read it: the list is gone before the desktop app's word that its
+  // window is in front arrives, so it used to stay unread.
+  useEffect(() => {
+    const off = onInteraction(ackIfPresent);
+    return () => {
+      off();
+      if (interactedWithin(LEAVE_MS)) ackIfPresent();
+    };
+  }, [ackIfPresent]);
 
   // A list too short to scroll never sends the scroll that asks for older
   // messages — after most of a page was deleted, or on a tall screen — so it

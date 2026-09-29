@@ -124,7 +124,7 @@ func (s *Server) parentOf(r *http.Request, ch *store.Channel) *store.Channel {
 }
 
 // canManageSubchat decides who may rename or delete one: whoever opened it,
-// whoever manages the group it sits in (its owner or an instance admin), or
+// whoever manages the group it sits in (its owner or a Nexa admin), or
 // either side of a one-to-one DM, where there is no hierarchy to appeal to.
 func (s *Server) canManageSubchat(r *http.Request, ch *store.Channel, me *store.User) bool {
 	if ch.OwnerID != nil && *ch.OwnerID == me.ID {

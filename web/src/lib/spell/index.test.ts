@@ -21,7 +21,7 @@ describe("wordsOf", () => {
   });
 
   it("skips single letters, words in capitals, words with a capital inside and words glued to digits", () => {
-    expect(words("a I HTML iPhone JavaScript abc123 x2 ok")).toEqual(["ok"]);
+    expect(words("a I HTML iPhone JavaScript abc123 x2 fine")).toEqual(["fine"]);
   });
 
   it("knows how people chat", () => {
@@ -48,5 +48,15 @@ describe("wordAt", () => {
 
   it("finds nothing on a word that is not checked", () => {
     expect(wordAt("see https://exmaple.com", 12)).toBeNull();
+  });
+});
+
+describe("chat words", () => {
+  it("leaves contractions typed without their apostrophe alone, capitalised or not", () => {
+    expect(words("Ive been happy and ive been busy, dont worry im fine")).toEqual(["been", "happy", "and", "been", "busy", "worry", "fine"]);
+  });
+
+  it("knows ok", () => {
+    expect(words("ok sounds good")).toEqual(["sounds", "good"]);
   });
 });

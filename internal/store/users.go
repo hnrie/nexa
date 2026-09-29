@@ -210,10 +210,10 @@ func escapeLike(s string) string {
 
 // CountUsers returns the number of accounts people made. Nexa's is not one,
 // nor is the one webhooks post as:
-// the first person to register must still find the instance empty, since
+// the first person to register must still find Nexa empty, since
 // that is what makes them its admin.
 // CountAdminsEver counts accounts that hold the admin flag, deleted ones
-// included: whether this instance has ever been set up.
+// included: whether Nexa has ever been set up.
 func (s *Store) CountAdminsEver(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.R.QueryRowContext(ctx, `SELECT count(*) FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, NotPeople).Scan(&n)
@@ -366,7 +366,7 @@ func (s *Store) UpdateRecovery(ctx context.Context, id ids.ID, recoveryHash stri
 
 // SetUserFlags overwrites the flags bitfield.
 func (s *Store) SetUserFlags(ctx context.Context, id ids.ID, flags int64) error {
-	// admin, disabled and deleted all decide who is an instance admin
+	// admin, disabled and deleted all decide who is a Nexa admin
 	defer s.everythingChanged()
 	res, err := s.db.W.ExecContext(ctx, `UPDATE users SET flags = ?, updated_at = ? WHERE id = ?`, flags, nowMs(), int64(id))
 	if err != nil {

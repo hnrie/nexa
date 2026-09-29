@@ -36,7 +36,7 @@ function blockedText(b: ModUser["blocked"]): string {
 }
 
 /**
- * Every account on the instance, as cards: who they are, where they stand,
+ * Every account on Nexa, as cards: who they are, where they stand,
  * and the two ways in — act on them, or read their cases.
  */
 export function UserGrid() {

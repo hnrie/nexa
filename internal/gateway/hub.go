@@ -54,7 +54,7 @@ type Hub struct {
 	// that, because its old sockets are still registered until the ping loop
 	// notices. This sits at roughly twice that worst honest case, which still
 	// leaves an account nowhere near enough to matter on its own against the
-	// instance-wide cap.
+	// Nexa-wide cap.
 	//
 	// Going over refuses the newest rather than closing the oldest. The cost
 	// this bounds is buildReady, which runs once per accepted connection, so
@@ -66,9 +66,9 @@ type Hub struct {
 	// It has to clear an office or a school behind one NAT by a wide margin —
 	// shutting a building out is a worse failure than letting an abuser hold
 	// a few hundred sockets — so it sits at sixteen accounts' worth, and the
-	// instance-wide cap is what actually bounds the process.
+	// Nexa-wide cap is what actually bounds the process.
 	maxConnsPerIP int
-	// maxConns is the whole instance's ceiling, so no combination of accounts
+	// maxConns is the whole server's ceiling, so no combination of accounts
 	// and addresses can take the process past a known number of goroutines and
 	// send buffers.
 	maxConns int
@@ -127,6 +127,14 @@ type Hub struct {
 	// Restricted reports an account's moderation restrictions: a banned one
 	// is refused at identify, and a muted one cannot type or set a status.
 	Restricted func(ctx context.Context, uid ids.ID) (muted, banned bool)
+
+	// linked holds activities that come from outside any connection: what a
+	// person's linked Discord account says they are doing (internal/discordsync).
+	// They are kept while the person is offline here, and shown once they are back.
+	linkedMu    sync.Mutex
+	linked      map[ids.ID][]Activity
+	linkedTimer map[ids.ID]*time.Timer
+	linkedAt    map[ids.ID]time.Time
 }
 
 // AppLookup finds a Discord Rich Presence application.
@@ -138,6 +146,7 @@ type AppLookup interface {
 func New(st *store.Store, authn *auth.Authenticator, log *slog.Logger, publicURL string) *Hub {
 	h := &Hub{st: st, auth: authn, log: log, conns: map[ids.ID]map[*conn]struct{}{},
 		byIP: map[string]int{}, waiting: map[string]int{},
+		linked: map[ids.ID][]Activity{}, linkedTimer: map[ids.ID]*time.Timer{}, linkedAt: map[ids.ID]time.Time{},
 		heartbeatTimeout: 60 * time.Second, identifyTimeout: 10 * time.Second, sendBuffer: 256,
 		maxConnsPerUser: 32, maxConnsPerIP: 256, maxConns: 4096, maxWaitingPerIP: 32,
 		// Two a second per address, sustained, with room for a burst of tabs
@@ -198,8 +207,8 @@ const (
 func (h *Hub) admitWaiting(ip string) error {
 	// An address the proxy in front did not tell us about arrives as loopback,
 	// and then every visitor shares one bucket; counting them together would
-	// shut the instance rather than an abuser out, so the per-address limits
-	// stand down and the instance-wide one carries it.
+	// shut Nexa rather than an abuser out, so the per-address limits
+	// stand down and the Nexa-wide one carries it.
 	shared := sharedAddress(ip)
 	if !shared && h.connectRate != nil {
 		if ok, _ := h.connectRate.Allow("gw:" + ip); !ok {
@@ -238,7 +247,7 @@ func (h *Hub) totalWaitingLocked() int {
 }
 
 // sharedAddress reports an address that says nothing about who the visitor is,
-// so the per-address caps would be counting the whole instance as one person.
+// so the per-address caps would be counting the whole server as one person.
 func sharedAddress(ip string) bool {
 	if ip == "" {
 		return true
@@ -460,7 +469,7 @@ func (h *Hub) register(c *conn) (bool, error) {
 	defer h.mu.Unlock()
 	set := h.conns[c.userID]
 	// The socket being registered already holds a waiting slot, so it is
-	// counted once either way and the instance total does not double-count it.
+	// counted once either way and the server's total does not double-count it.
 	if h.total+h.totalWaitingLocked() > h.maxConns {
 		return false, tooManyForInstance
 	}

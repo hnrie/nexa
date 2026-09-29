@@ -30,7 +30,7 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusBadRequest, "bad_url", "url is required and must be under 2048 characters."))
 		return
 	}
-	// An invite to this instance is answered from our own records: no fetch,
+	// An invite to Nexa is answered from our own records: no fetch,
 	// and the reader gets a card they can join from.
 	if res := s.inviteUnfurl(r, raw); res != nil {
 		WriteJSON(w, http.StatusOK, res)
@@ -71,7 +71,7 @@ func (s *Server) handleUnfurl(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, &out)
 }
 
-// inviteCodeOf returns the code when raw is an invite link to this instance.
+// inviteCodeOf returns the code when raw is an invite link to Nexa.
 func (s *Server) inviteCodeOf(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" {

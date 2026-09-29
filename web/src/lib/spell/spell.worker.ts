@@ -6,6 +6,7 @@
  * added themselves.
  */
 import nspell from "nspell";
+import { pluralStems } from "./inflect";
 import { rank } from "./rank";
 // The affix rules are small and come inside this script. The word lists are
 // half a megabyte each and are fetched from the site, which the page's
@@ -49,7 +50,9 @@ function correct(word: string): boolean {
   if (checkers.some((c) => c.correct(w))) return true;
   // the word lists spell "café" as "cafe": an accented spelling of a word they know is right too
   const plain = w.normalize("NFD").replace(/\p{M}/gu, "");
-  return plain !== w && checkers.some((c) => c.correct(plain));
+  if (plain !== w && checkers.some((c) => c.correct(plain))) return true;
+  // they give many nouns no plural ("detection" but not "detections"): a plural of a word they know is right
+  return pluralStems(w).some((stem) => personal.has(stem) || checkers.some((c) => c.correct(stem)));
 }
 
 function suggest(word: string): string[] {

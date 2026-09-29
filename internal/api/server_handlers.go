@@ -1865,10 +1865,10 @@ type serverCounts struct {
 // the hub's read lock once per member. On a large server that is tens of
 // thousands of lock acquisitions per request, contending directly with the
 // register and unregister that need the write lock — so a handful of
-// concurrent invite previews stalled every new WebSocket on the instance. Now
+// concurrent invite previews stalled every new WebSocket on Nexa. Now
 // it takes one snapshot of who is online, intersects it with the membership,
 // and keeps the answer for a moment.
-// forgetCounts drops a server's cached counts, so a change this instance made
+// forgetCounts drops a server's cached counts, so a change Nexa made
 // itself is visible on the invite page at once rather than up to the TTL later.
 func (s *Server) forgetCounts(serverID ids.ID) {
 	s.countsMu.Lock()

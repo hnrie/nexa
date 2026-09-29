@@ -9,8 +9,6 @@
 # web
 /web/node_modules/
 /web/dist/
-# the key desktop releases are signed with; losing it stops every installed app updating
-/desktop/update-key.pem
 
 # tooling
 /.tools/

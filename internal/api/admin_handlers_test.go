@@ -9,7 +9,7 @@ func TestAdminAndInstance(t *testing.T) {
 	_, ts := newTestServer(t)
 	tokA, idA := register(t, ts, "alice") // first account is the admin
 	tokB, idB := register(t, ts, "bob")
-	// public instance info
+	// public info about Nexa
 	res, body := do(t, ts, "GET", "/api/v1/instance", "", nil)
 	if res.StatusCode != 200 || body["registration"] != "open" || body["needs_key"] != false {
 		t.Fatalf("instance: %d %v", res.StatusCode, body)

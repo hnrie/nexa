@@ -39,7 +39,7 @@ export const DEFAULT_KDF: KdfParams = { m: 65536, t: 3, p: 1, v: 1 };
  * `internal/api/auth_handlers.go`, which is what it accepts when a client
  * *submits* parameters. Mirroring them exactly means no account that the server
  * ever allowed to register can be refused by its own client: every account on
- * the live instance is at DEFAULT_KDF, which is comfortably inside this range.
+ * every account on Nexa is at DEFAULT_KDF, which is comfortably inside this range.
  *
  * The ceiling matters as much as the floor in practice. Without it a hostile
  * server wedges a device by asking for a gibibyte of memory and twenty passes,

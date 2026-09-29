@@ -8,8 +8,14 @@ manifests (latest*.yml) into chatd's DESKTOP_DIR, then writes manifest.json,
 which /api/v1/desktop/latest serves to the download page and banner. Files of
 older releases are left in place, so updates already downloading can finish;
 the update manifests always name the newest.
+
+The Mac manifest is published as latest-mac-2.yml, the feed the Mac app reads
+from 1.1.0 on (desktop/src/main/update/mac.ts). latest-mac.yml belongs to the
+copies before that, which cannot update themselves to this version; it and the
+files it names stay as they are, and the page offers those copies the new
+version as a download instead (web/src/lib/macReplacement.ts).
 """
-import argparse, hashlib, json, os, re, shutil, subprocess, sys, time
+import argparse, hashlib, json, os, re, shutil, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,6 +24,9 @@ ROOT = Path(__file__).resolve().parent.parent
 PATTERN = re.compile(r"^nexa-(?:Setup-)?(?P<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)-(?P<os>win|mac|linux)-(?P<arch>x64|arm64|x86_64|amd64|aarch64)\.(?P<ext>exe|dmg|zip|AppImage|deb)$")
 KIND = {"exe": "installer", "dmg": "installer", "zip": "zip", "AppImage": "appimage", "deb": "deb"}
 OS = {"win": "windows", "mac": "mac", "linux": "linux"}
+# electron-builder's name for a feed, and the name it is published under
+FEEDS = {"latest.yml": "latest.yml", "latest-linux.yml": "latest-linux.yml", "latest-mac.yml": "latest-mac-2.yml"}
+OLD_MAC_FEED = "latest-mac.yml"
 ARCH = {"x64": "x64", "x86_64": "x64", "amd64": "x64", "arm64": "arm64", "aarch64": "arm64"}
 
 
@@ -57,9 +66,14 @@ def prune(dest: Path, keep: int) -> None:
     old = sorted(by_version, key=version_key, reverse=True)[keep:]
     if not old:
         return
+    # what latest-mac.yml names stays: copies older than its release still update to it
+    feed = dest / OLD_MAC_FEED
+    named = set(re.findall(r"nexa-[^\s'\"]+", feed.read_text())) if feed.is_file() else set()
     freed = 0
     for v in old:
         for p in by_version[v]:
+            if p.name.removesuffix(".blockmap") in named:
+                continue
             freed += p.stat().st_size
             p.unlink()
     print(f"removed {', '.join(sorted(old, key=version_key))} ({freed / (1 << 30):.1f} GB); kept the newest {keep}")
@@ -107,22 +121,10 @@ def main() -> int:
         print(f"{version} is already published in {dest}. Bump desktop/package.json, or pass --republish.", file=sys.stderr)
         return 1
 
-    # Signed first, and only then copied. "Nothing was published" has to mean
-    # nothing: signing after the copy left a directory full of a version whose
-    # manifest never landed, which the guard above then read as "already
-    # published" and refused to retry.
-    # Sign the manifests before they are published. Without a signature the
-    # only thing an app can check is a hash that came from the same host as
-    # the file, which catches a bad download and nothing else.
-    sign = subprocess.run(
-        ["node", "scripts/sign-release.mjs", str(dist)],
-        cwd=str(ROOT / "desktop"), capture_output=True, text=True,
-    )
-    if sign.returncode != 0:
-        print(sign.stdout + sign.stderr, file=sys.stderr)
-        print("could not sign the release; nothing was published", file=sys.stderr)
+    unknown = [y.name for y in manifests if y.name not in FEEDS]
+    if unknown:
+        print(f"update manifests this script does not know where to publish: {', '.join(unknown)}", file=sys.stderr)
         return 1
-    print(sign.stdout.rstrip())
 
     dest.mkdir(parents=True, exist_ok=True)
     files = []
@@ -133,16 +135,11 @@ def main() -> int:
             shutil.copy2(blockmap, dest / blockmap.name)
         files.append({"os": OS[m["os"]], "arch": ARCH[m["arch"]], "kind": KIND[m["ext"]], "name": p.name, "size": p.stat().st_size, "sha256": sha256(p)})
         print(f"  {p.name} ({p.stat().st_size / 1048576:.1f} MB)")
-    # the update manifests and their signatures go last, once everything they
-    # name is in place
+    # the update manifests go last, once everything they name is in place
     for y in manifests:
-        for src in (y, y.with_name(y.name + ".sig")):
-            if not src.exists():
-                print(f"missing {src.name}", file=sys.stderr)
-                return 1
-            tmp = dest / (src.name + ".tmp")
-            shutil.copy2(src, tmp)
-            tmp.replace(dest / src.name)
+        tmp = dest / (FEEDS[y.name] + ".tmp")
+        shutil.copy2(y, tmp)
+        tmp.replace(dest / FEEDS[y.name])
     manifest = {"version": version, "released_at": int(time.time() * 1000), "files": files}
     tmp = dest / "manifest.json.tmp"
     tmp.write_text(json.dumps(manifest, indent=2))

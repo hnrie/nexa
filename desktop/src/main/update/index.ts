@@ -13,7 +13,7 @@ import { app, net } from "electron";
 import { EventEmitter } from "node:events";
 import type { UpdateState } from "../../shared/bridge";
 import { compareVersions, parseManifest } from "./manifest";
-import { canReplace, installMacUpdate, stageMacUpdate, type MacUpdate } from "./mac";
+import { MAC_FEED, canReplace, installMacUpdate, stageMacUpdate, type MacUpdate } from "./mac";
 
 const FIRST_CHECK_MS = 10_000;
 const EVERY_MS = 60_000;
@@ -121,7 +121,7 @@ export class Updater extends EventEmitter {
   }
 
   private async checkMac(): Promise<void> {
-    const newer = await this.newerThanRunning("latest-mac.yml");
+    const newer = await this.newerThanRunning(MAC_FEED);
     if (!newer) {
       this.set({ status: "idle", lastCheck: Date.now() });
       return;

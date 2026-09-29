@@ -4,7 +4,7 @@
  * `nexa` is a member's own: their Nexa conversation (notices about actions
  * taken on their account, lifted mutes and bans, announcements) and their case
  * threads, where they can appeal. `moderation` is the staff's panel. None of it
- * is end-to-end encrypted — a case thread is a conversation with the instance
+ * is end-to-end encrypted — a case thread is a conversation with Nexa
  * itself — and the app says so wherever one is written.
  */
 import { api } from "./client";
@@ -136,7 +136,7 @@ export interface NexaState {
   /** When Nexa last had something for this account (0: never). */
   latest: number;
   people: People;
-  /** The instance's owner, for every account ("0" when there is none yet; absent from older servers). */
+  /** The owner of Nexa, for every account ("0" when there is none yet; absent from older servers). */
   owner_id?: Snowflake;
   /** Staff only: what is waiting on them (bug report counts are absent from older servers). */
   staff?: { counts: CaseCounts; owner_id: Snowflake; bugs?: BugCounts };

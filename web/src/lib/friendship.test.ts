@@ -23,7 +23,7 @@ const api = vi.hoisted(() => ({
   setNote: vi.fn(),
 }));
 vi.mock("@/api/relationships", () => ({ relationships: api }));
-// no captcha on this instance: the request goes straight out
+// no captcha on Nexa: the request goes straight out
 vi.mock("@/lib/captcha", () => ({ guarded: (_action: string, send: (c: string | null) => Promise<unknown>) => send(null) }));
 
 import { acceptFriendRequest, addRequestNote, blockUser, dropFriendRequest, relationshipMenuItems, sendFriendRequest, unblockUser, useRelationshipBusy } from "./friendship";

@@ -29,7 +29,7 @@ function tabOf(path: string): Tab {
 /**
  * The Admin & Moderation panel: every account at a glance, the cases waiting
  * on the staff, the record of everything done, and announcements to everyone.
- * Only instance admins get here; the server refuses everyone else anyway.
+ * Only Nexa admins get here; the server refuses everyone else anyway.
  */
 export default function AdminPanelPage() {
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & FLAG_ADMIN) !== 0);

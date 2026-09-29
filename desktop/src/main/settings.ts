@@ -22,6 +22,8 @@ export interface Stored {
   lastUpdateSeen: string | null;
   /** The page's words for the tray, the menu bar and the offline page, so the next launch is already in its language. */
   strings: NativeStrings | null;
+  /** A copy outside Applications whose offer to move there was turned down (macOS), so it is not made again. */
+  declinedMove: string | null;
 }
 
 export const DEFAULTS: Stored = {
@@ -36,6 +38,7 @@ export const DEFAULTS: Stored = {
   movedSocket: null,
   lastUpdateSeen: null,
   strings: null,
+  declinedMove: null,
 };
 
 export class SettingsStore {
@@ -52,6 +55,7 @@ export class SettingsStore {
       if (raw.bounds && typeof raw.bounds === "object") this.data.bounds = raw.bounds;
       if (raw.movedSocket && typeof raw.movedSocket === "object") this.data.movedSocket = raw.movedSocket;
       if (raw.strings && typeof raw.strings === "object") this.data.strings = raw.strings;
+      if (typeof raw.declinedMove === "string") this.data.declinedMove = raw.declinedMove;
       if (!Array.isArray(this.data.hiddenApps)) this.data.hiddenApps = [];
     } catch {
       /* first run, or a damaged file: defaults */

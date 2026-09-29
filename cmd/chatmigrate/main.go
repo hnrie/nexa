@@ -229,6 +229,9 @@ var keyColumns = []struct{ table, cols string }{
 	// a webhook's URL is its token: one that came across wrong stops every
 	// program posting through it
 	{"webhooks", "id, token_hash, token_sealed"},
+	// a linked Discord account's sealed tokens: ones that came across wrong
+	// cannot put it back in the activity server
+	{"discord_links", "user_id, discord_id, access_sealed, refresh_sealed"},
 }
 
 // sameBytes checks that the values that matter are identical on both sides.

@@ -49,7 +49,7 @@ export const CLOSE_RATE_LIMITED = 4008;
 export const CLOSE_TOO_MANY = 4009;
 /**
  * A socket turned away for being one too many (for the account, the address or
- * the whole instance) gets the same answer if it asks again at once. It waits
+ * the whole server) gets the same answer if it asks again at once. It waits
  * this long instead, doubling each time up to the cap.
  */
 const CROWDED_BACKOFF_MS = 30_000;

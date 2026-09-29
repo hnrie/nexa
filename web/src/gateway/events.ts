@@ -1,3 +1,4 @@
+import type { DiscordState } from "@/api/connections";
 import type {
   Channel,
   Emoji,
@@ -101,6 +102,8 @@ export type GatewayEvent =
   | { t: "nexa_bug"; d: { report: MemberBug; messages: BugMessage[]; people: People; state: NexaState } }
   /** Staff: a bug report arrived or changed, with any new lines of its thread. */
   | { t: "mod_bug"; d: { report: StaffBug; messages: BugMessage[]; people: People; counts: BugCounts } }
+  /** This account's linked Discord account changed: linked, unlinked, out of the activity server or back in it. */
+  | { t: "discord_link"; d: DiscordState }
   /** Not from the server: the gateway was closed because the account is banned. */
   | { t: "account_banned"; d?: undefined }
   | { t: "heartbeat_ack"; d?: undefined };

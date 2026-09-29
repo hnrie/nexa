@@ -92,7 +92,7 @@ written. After a whole backup it deletes all but the newest five of each kind
 (`KEEP=10 bash backup.sh` keeps ten). `backup/` is on the same disk as the data,
 so it covers a bad deploy or a mistake, not a dead disk: copy it somewhere else
 as well (`BACKUP_DIR=/mnt/elsewhere bash backup.sh` writes there directly).
-`chatd.env` holds this instance's settings and keys (Cloudflare, Klipy,
+`chatd.env` holds Nexa's settings and keys (Cloudflare, Klipy,
 Turnstile); keep a copy of it somewhere safe too.
 
 Never copy the live `data/chat.db` by hand: without its `-wal` file the copy
@@ -121,8 +121,9 @@ on a Mac and served by chatd from `DESKTOP_DIR` (default `data/desktop`) at
 `/api/v1/desktop/latest`.
 
 ```
-# bump "version" in desktop/package.json first, then:
+# on the Mac: bump "version" in desktop/package.json first, then
 make desktop            # desktop/dist: Windows .exe, macOS .dmg/.zip (Intel and Apple Silicon), Linux .AppImage/.deb
+# copy desktop/dist into the server's checkout (rsync -a desktop/dist/ server:chat/desktop/dist/), then there
 make publish-desktop    # copies them and the update manifests into data/desktop; no restart needed
 ```
 
@@ -130,8 +131,16 @@ Running apps find the new version within a minute and show "A new version is her
 Desktop App → Check for updates). Windows and the AppImage install it on restart;
 the Mac build swaps itself in on restart (it is not signed, so macOS's own
 updater cannot); a .deb only says a new version is out. Builds are unsigned:
-Windows shows "Windows protected your PC" (More info → Run anyway) and macOS
-wants a right-click → Open the first time; the download page says so.
+Windows shows "Windows protected your PC" (More info → Run anyway), and macOS
+wants System Settings → Privacy & Security → Open Anyway the first time; the
+download page says so.
+
+The Mac app reads `latest-mac-2.yml` from 1.1.0 on. Copies before that read
+`latest-mac.yml`, which stays at their last release (1.0.5) because they cannot
+update themselves to 1.1.0; the publish script leaves it and the files it names
+alone. The page inside those copies offers the new version's disk image
+(`web/src/lib/macReplacement.ts`); opened from there, the new app closes the old
+one and moves into Applications in its place (`desktop/src/main/succession.ts`).
 
 ## Moving to Postgres
 
@@ -154,7 +163,7 @@ The SQLite file is left alone, so unsetting `DATABASE_URL` puts things back
 exactly as they were. `backup.sh` copies SQLite only; back Postgres up with
 `pg_dump`, and keep backing up `data/server.secret` with it.
 
-Run one chatd per instance, whichever database is behind it. Gateway events,
+Run one chatd, whichever database is behind it. Gateway events,
 presence and calls live in the memory of the process holding the sockets, so
 two processes behind one address would each see only their own half: a message
 sent through one would never reach the people connected to the other.

@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Redis is the shared state when several chatd processes serve one instance.
+// Redis is the shared state when several chatd processes serve one Nexa.
 //
 // Presence is a set per user holding the processes that see them, each member
 // with its own expiry, so a process that dies stops counting on its own rather

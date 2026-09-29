@@ -171,7 +171,7 @@ type wmGalleryItem struct {
 }
 
 // wmEmoji is a button's or an answer's emoji: a Unicode one by Name, or a
-// custom one by ID (this instance's custom emoji ids).
+// custom one by ID (Nexa's custom emoji ids).
 type wmEmoji struct {
 	ID       *ids.ID `json:"id,omitempty"`
 	Name     string  `json:"name,omitempty"`

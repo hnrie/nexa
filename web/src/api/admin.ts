@@ -42,7 +42,7 @@ export const admin = {
     return api.request<AdminSettings>("PATCH", "/admin/settings", body);
   },
   /**
-   * Compiles what this instance holds about one account, for an officer who has
+   * Compiles what Nexa holds about one account, for an officer who has
    * served valid legal process. `user` is a username or an account id. This
    * reads existing rows and writes nothing.
    */

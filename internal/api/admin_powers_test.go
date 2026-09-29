@@ -191,7 +191,7 @@ func TestInstanceAdminManagesGroupsTheyAreIn(t *testing.T) {
 	}
 }
 
-// The configured admin username sets an instance up; once it has an admin,
+// The configured admin username sets Nexa up; once it has an admin,
 // the name is an ordinary one — freed by a rename, it cannot be registered
 // into admin powers.
 func TestTheConfiguredAdminNameIsOnlyForSettingUp(t *testing.T) {
@@ -200,11 +200,11 @@ func TestTheConfiguredAdminNameIsOnlyForSettingUp(t *testing.T) {
 	ownerTok, _ := register(t, ts, "owner")
 	_, me := do(t, ts, "GET", "/api/v1/users/@me", ownerTok, nil)
 	if int64(me["flags"].(float64))&store.FlagAdmin == 0 {
-		t.Fatal("the first account is the instance's admin")
+		t.Fatal("the first account is Nexa's admin")
 	}
 	bossTok, _ := register(t, ts, "boss")
 	_, me = do(t, ts, "GET", "/api/v1/users/@me", bossTok, nil)
 	if int64(me["flags"].(float64))&store.FlagAdmin != 0 {
-		t.Error("registering the configured name made an admin on a set-up instance")
+		t.Error("registering the configured name made an admin once Nexa was set up")
 	}
 }

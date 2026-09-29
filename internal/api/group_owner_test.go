@@ -21,7 +21,7 @@ func listHas(list []any, id string) bool {
 // stops letting anyone in.
 func TestOwnerRemovesAMember(t *testing.T) {
 	_, ts := newTestServer(t)
-	register(t, ts, "admin") // the first account runs the instance; nobody in the group does
+	register(t, ts, "admin") // the first account runs Nexa; nobody in the group does
 	tokA, idA := register(t, ts, "alice")
 	tokB, idB := register(t, ts, "bob")
 	tokC, idC := register(t, ts, "carol")
@@ -104,7 +104,7 @@ func TestOwnerRemovesAMember(t *testing.T) {
 		t.Errorf("carol comes back through the old link: %d %v", res.StatusCode, body)
 	}
 
-	// and the owner cannot be put out, even by an instance admin (admin_powers_test)
+	// and the owner cannot be put out, even by a Nexa admin (admin_powers_test)
 	if res, body := do(t, ts, "DELETE", "/api/v1/channels/"+g+"/recipients/"+idA, tokB, nil); res.StatusCode != 403 {
 		t.Errorf("bob removing the owner: %d %v", res.StatusCode, body)
 	}

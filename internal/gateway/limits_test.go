@@ -168,8 +168,8 @@ func TestUnidentifiedSocketsAreCapped(t *testing.T) {
 }
 
 // An address the proxy in front did not name arrives as loopback. Holding the
-// whole instance to one address's allowance would shut everyone out, so the
-// per-address caps stand down there and only the instance-wide one applies.
+// whole server to one address's allowance would shut everyone out, so the
+// per-address caps stand down there and only the Nexa-wide one applies.
 func TestUnknownAddressesShareNoAllowance(t *testing.T) {
 	e := newEnv(t)
 	e.hub.SetLimits(0, 1, 0, 1)
@@ -182,7 +182,7 @@ func TestUnknownAddressesShareNoAllowance(t *testing.T) {
 	}
 }
 
-// The whole instance has a ceiling too, so no combination of accounts and
+// The whole server has a ceiling too, so no combination of accounts and
 // addresses takes the process past a known number of goroutines.
 func TestInstanceWideCap(t *testing.T) {
 	e := newEnv(t)
@@ -199,7 +199,7 @@ func TestInstanceWideCap(t *testing.T) {
 		}
 	}
 	if _, err := e.dialFrom(t, "203.0.113.21"); err == nil {
-		t.Fatal("the instance cap let a third connection through")
+		t.Fatal("the server-wide cap let a third connection through")
 	}
 }
 
@@ -282,7 +282,7 @@ func rawSocket(t *testing.T) *websocket.Conn {
 // goLive runs holding pendMu, which Hub.EmitUsers reaches while holding
 // h.mu.RLock — and one blocked reader of an RWMutex queues every waiting
 // writer behind it. A blocking send in there would therefore stop register,
-// unregister and every later emitter on the whole instance, so it must never
+// unregister and every later emitter on the whole server, so it must never
 // block, whatever the send buffer is set to.
 func TestGoLiveNeverBlocks(t *testing.T) {
 	e := newEnv(t)
@@ -300,7 +300,7 @@ func TestGoLiveNeverBlocks(t *testing.T) {
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
-			t.Fatalf("%s blocked; every emitter on the instance would block with it", what)
+			t.Fatalf("%s blocked; every emitter on Nexa would block with it", what)
 		}
 	}
 

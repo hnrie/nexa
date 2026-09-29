@@ -35,7 +35,7 @@ export function SystemMessage({ msg }: { msg: DecryptedMessage }) {
         : <Tr id="chat.systemMessage.removedFromGroup" values={{ actor: A, target: T }} />;
       break;
     case "system_owner_change":
-      // an instance admin taking a group over names themselves
+      // a Nexa admin taking a group over names themselves
       icon = <Crown size={18} />;
       body = msg.mentions[0] === msg.author_id
         ? <Tr id="chat.systemMessage.tookOwnership" values={{ actor: A }} />

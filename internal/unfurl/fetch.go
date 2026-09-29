@@ -83,7 +83,7 @@ type Result struct {
 	// preview runs another site's code, pinned to an address built here.
 	Player     string `json:"player,omitempty"`
 	PlayerSite string `json:"player_site,omitempty"`
-	// InviteCode is set when the link is an invite to this instance, so the
+	// InviteCode is set when the link is an invite to Nexa, so the
 	// client can offer to join instead of opening a page.
 	InviteCode  string `json:"invite_code,omitempty"`
 	MemberCount int    `json:"member_count,omitempty"`

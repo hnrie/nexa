@@ -47,7 +47,7 @@ describe("groupMemberMenuItems", () => {
     expect(ids("me")).toEqual(["profile", "mention", "leave"]);
   });
 
-  it("gives an instance admin the owner's actions, short of removing the owner", () => {
+  it("gives a Nexa admin the owner's actions, short of removing the owner", () => {
     signIn(ADMIN);
     expect(ids("bob")).toEqual(["profile", "mention", "message", "add-friend", "block", "owner", "remove"]);
     expect(ids("owner")).toEqual(["profile", "mention", "message", "add-friend", "block"]);

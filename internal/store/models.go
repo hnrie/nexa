@@ -16,7 +16,7 @@ const (
 	// ever carries it: guests live in their own table, and the flag only
 	// travels with the stand-in user the call code works with.
 	FlagGuest int64 = 8
-	// FlagSystem marks the account the instance itself speaks as: Nexa, which
+	// FlagSystem marks the account Nexa itself speaks as: Nexa, which
 	// delivers moderation notices and announcements. Nobody signs in as it,
 	// and nobody can message, befriend or moderate it.
 	FlagSystem int64 = 16

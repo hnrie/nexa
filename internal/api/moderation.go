@@ -14,7 +14,7 @@ import (
 	"evilion.xyz/chat/internal/store"
 )
 
-// The moderation panel's side of Nexa: the staff (instance admins) look
+// The moderation panel's side of Nexa: the staff (Nexa admins) look
 // through accounts, act on them, work the case threads, read the log and
 // send announcements. The member's side is in nexa.go; the actions themselves
 // are in moderation_actions.go.
@@ -77,7 +77,7 @@ func blockError(code string) *Error {
 	case blockDeleted:
 		return E(http.StatusGone, "moderate_deleted", "That account has been deleted.")
 	case blockOwner:
-		return E(http.StatusForbidden, "moderate_owner", "The instance owner cannot be moderated.")
+		return E(http.StatusForbidden, "moderate_owner", "The owner of Nexa cannot be moderated.")
 	default:
 		return E(http.StatusForbidden, "moderate_staff", "Staff cannot be moderated. Take away their admin access first.")
 	}

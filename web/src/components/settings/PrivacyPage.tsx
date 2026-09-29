@@ -77,9 +77,6 @@ export default function PrivacyPage() {
       <h3 className={s.h5}>{t("settings.privacy.linkPreviews")}</h3>
       <Toggle checked={settings.linkPreviews} onChange={(v) => patch({ linkPreviews: v })} label={t("settings.privacy.fetchLinkPreviewsWhenISend")} description={t("settings.privacy.yourDeviceAsksTheServerTo")} />
       <Toggle checked={settings.imagePreviews} onChange={(v) => patch({ imagePreviews: v })} label={t("settings.privacy.showEmbeddedImagesAndGifsFrom")} description={t("settings.privacy.picturesGifsAndVideosFromLinks")} />
-      <h3 className={s.h5}>{t("settings.privacy.activity")}</h3>
-      <Toggle checked={settings.shareActivity !== false} onChange={(v) => patch({ shareActivity: v })} label={t("settings.privacy.shareMyActivity")} description={t("settings.privacy.inTheDesktopAppYourRich")} />
-      <Toggle checked={settings.autoIdle !== false} onChange={(v) => patch({ autoIdle: v })} label={t("settings.privacy.goIdleWhenAway")} description={t("settings.privacy.goIdleWhenAwayHint")} />
       <h3 className={s.h5}>{t("settings.privacy.yourData")}</h3>
       <p className={s.hint} style={{ marginBottom: 8 }}>{t("settings.privacy.downloadEverythingYourProfileFriendsServers")}</p>
       <Button size="sm" variant="secondary" loading={exporting} onClick={() => void runExport()} data-testid="export-data">{t("settings.privacy.exportMyData")}</Button>

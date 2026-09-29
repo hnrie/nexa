@@ -68,10 +68,10 @@ const (
 	// CloseRateLimited tells the client it sent too much; it reconnects.
 	CloseRateLimited websocket.StatusCode = 4008
 	// CloseTooManyConnections says this socket was one too many for the
-	// account, the address or the instance. Reconnecting at once only gets the
+	// account, the address or the whole server. Reconnecting at once only gets the
 	// same answer; the client should close a tab or wait.
 	CloseTooManyConnections websocket.StatusCode = 4009
-	// CloseBanned says the account is banned from the instance. The session
+	// CloseBanned says the account is banned from Nexa. The session
 	// still works for the ban screen and an appeal, so the client keeps it and
 	// stops reconnecting instead of signing out.
 	CloseBanned websocket.StatusCode = 4003
@@ -207,7 +207,7 @@ func (c *conn) goLive(ready ServerFrame) {
 	// They are written not to block anyway. A caller here holds pendMu, which
 	// Hub.EmitUsers reaches while holding h.mu.RLock; one blocked reader of an
 	// RWMutex queues every waiting writer behind it, so register, unregister
-	// and every later emitter on the whole instance would stop with it. A
+	// and every later emitter on the whole server would stop with it. A
 	// dropped connection is a price worth paying to keep that impossible
 	// rather than merely unlikely.
 	send := func(f ServerFrame) bool {

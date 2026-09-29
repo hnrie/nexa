@@ -27,7 +27,7 @@ describe("appLink", () => {
     expect(appLink("http://CHAT.evilion.xyz/invite/abc", here)).toEqual({ kind: "invite", code: "abc", hash: "" });
   });
 
-  it("counts the instance's public address from a page served under another name", () => {
+  it("counts Nexa's public address from a page served under another name", () => {
     expect(appLink("https://chat.evilion.xyz/invite/abc", elsewhere)).toBeNull();
     setPublicUrl("https://chat.evilion.xyz");
     expect(appLink("https://chat.evilion.xyz/invite/abc", elsewhere)).toEqual({ kind: "invite", code: "abc", hash: "" });
@@ -69,7 +69,7 @@ describe("messageTarget", () => {
 });
 
 describe("inviteLinksIn", () => {
-  it("finds each invite to this instance once, in order, with its key", () => {
+  it("finds each invite to Nexa once, in order, with its key", () => {
     const text = [
       "join us https://chat.evilion.xyz/invite/one#k=0.aaaa",
       "and [the other one](https://chat.evilion.xyz/invite/two)",

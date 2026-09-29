@@ -41,7 +41,7 @@ export function inviteUrl(code: string, key?: InviteKey | null): string {
 }
 
 /**
- * How an invite link to this instance reads in a message: its address
+ * How an invite link to Nexa reads in a message: its address
  * without the key, which is most of its length and nothing a reader needs to
  * see. The link still carries the key when it is opened. Null for any other
  * address, or an invite with no key to hide.

@@ -44,6 +44,12 @@ export function DesktopEffects() {
       offlineBody: t("desktop.native.offlineBody"),
       offlineRetry: t("desktop.native.offlineRetry"),
       about: t("desktop.native.about"),
+      moveTitle: t("desktop.native.moveTitle"),
+      moveBody: t("desktop.native.moveBody"),
+      moveReplaceBody: t("desktop.native.moveReplaceBody"),
+      moveButton: t("desktop.native.moveButton"),
+      notNow: t("desktop.native.notNow"),
+      moveFailed: t("desktop.native.moveFailed"),
     });
   }, [locale]);
 

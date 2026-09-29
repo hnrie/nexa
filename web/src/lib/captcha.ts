@@ -42,7 +42,7 @@ export function loadCaptchaConfig(): Promise<void> {
     .request<{ captcha?: { provider?: string; site_key?: string } | null; public_url?: string }>("GET", "/instance")
     .then((info) => {
       siteKey = info.captcha?.provider === "turnstile" && info.captcha.site_key ? info.captcha.site_key : null;
-      // the same answer says which address links to this instance use
+      // the same answer says which address links to Nexa use
       setPublicUrl(info.public_url);
     })
     .catch(() => {

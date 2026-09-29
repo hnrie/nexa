@@ -32,7 +32,7 @@ describe("twemojiCode", () => {
     expect(twemojiUrl("")).toBeNull();
   });
 
-  it("builds a URL served by this instance, not a CDN", () => {
+  it("builds a URL served by Nexa, not a CDN", () => {
     const url = twemojiUrl("😀");
     expect(url).toBe("/twemoji/1f600.svg");
     expect(url).not.toMatch(/^https?:/);

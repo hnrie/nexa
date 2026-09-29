@@ -9,6 +9,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useVoice } from "@/stores/voice";
 import { useNexa } from "@/stores/nexa";
+import { useDiscord } from "@/stores/discord";
 import { useModeration } from "@/stores/moderation";
 import { useUploads } from "@/stores/uploads";
 import { useSelection } from "@/stores/selection";
@@ -251,6 +252,7 @@ export async function endSession(): Promise<void> {
   // a deletion notice stays, to be read on the sign-in page
   useNexa.getState().reset();
   useModeration.getState().reset();
+  useDiscord.getState().clear();
   // files picked or on their way belong to the account that picked them, and
   // so do messages still being sent or left failed: the next person on this
   // tab must neither read them nor, with Retry, send them as their own

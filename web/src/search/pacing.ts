@@ -1,5 +1,5 @@
 /**
- * How the app walks message history without being a nuisance to the instance
+ * How the app walks message history without being a nuisance to the server
  * or the tab: the search index's crawl and the data export both page through
  * whole conversations, and both go at this pace.
  */

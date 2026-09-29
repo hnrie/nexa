@@ -8,7 +8,7 @@ import (
 	"evilion.xyz/chat/internal/ids"
 )
 
-// This file answers one question and only one: what does this instance already
+// This file answers one question and only one: what does Nexa already
 // hold about a single account? It is read-only by design. An operator served
 // with legal process has to be able to say exactly what they have and exactly
 // what they do not, and the honest way to do that is to read the rows back
@@ -24,7 +24,7 @@ import (
 // The renderer needs the number too, to say when a list it printed was capped.
 const LegalListCap = 500
 
-// AccountRecord is every row this instance holds that is keyed to one account,
+// AccountRecord is every row Nexa holds that is keyed to one account,
 // grouped by the table it came from. The credential columns of the user row are
 // deliberately not copied into it: they are secrets that protect the account,
 // they are not evidence about it, and a struct that never carries them cannot
@@ -87,6 +87,21 @@ type AccountRecord struct {
 
 	BugReports     []LegalBugReport // bug_reports, user_id = them, with bug_attachments
 	BugThreadLines int              // bug_messages in their reports
+
+	Discord *LegalDiscord // discord_links, user_id = them
+}
+
+// LegalDiscord is the Discord account linked for showing Discord activity.
+// The OAuth tokens are credentials sealed with the server secret, not records
+// of use, and are not produced.
+type LegalDiscord struct {
+	DiscordID  string
+	Username   string
+	GlobalName string
+	InGuild    bool
+	LeftAt     int64
+	CreatedAt  int64
+	UpdatedAt  int64
 }
 
 // LegalSettings describes the client-encrypted settings blob without opening
@@ -219,7 +234,7 @@ type LegalBlobKind struct {
 }
 
 // LegalBlob is one stored file that is not encrypted — an avatar, a banner, a
-// server icon, an emoji, a sticker. These are the only files on this instance
+// server icon, an emoji, a sticker. These are the only files on Nexa
 // the operator can actually produce, because they are the only ones stored as
 // they were uploaded.
 type LegalBlob struct {
@@ -296,9 +311,9 @@ type LegalBan struct {
 	CreatedAt  int64
 }
 
-// LegalModCase is an action the instance's own staff took against this
+// LegalModCase is an action Nexa's own staff took against this
 // account (the moderation panel), which unlike a community's audit log is
-// instance-wide.
+// Nexa-wide.
 type LegalModCase struct {
 	ID          ids.ID
 	Number      int64
@@ -313,7 +328,7 @@ type LegalModCase struct {
 
 // LegalAudit is a moderation action taken against this account inside one
 // community. The audit log is per-community and is written by whoever moderates
-// that community, not by the instance.
+// that community, not by Nexa.
 type LegalAudit struct {
 	ID        ids.ID
 	ServerID  ids.ID
@@ -359,7 +374,7 @@ type LegalCrash struct {
 	CreatedAt int64
 }
 
-// LegalBugReport is a bug report the account sent the instance's staff. Its
+// LegalBugReport is a bug report the account sent Nexa's staff. Its
 // text and files are not end-to-end encrypted: the staff have to read them.
 type LegalBugReport struct {
 	ID        ids.ID
@@ -400,12 +415,25 @@ func (s *Store) AccountRecord(ctx context.Context, id ids.ID) (*AccountRecord, e
 		(*Store).legalKeys,
 		(*Store).legalCrashes,
 		(*Store).legalBugReports,
+		(*Store).legalDiscord,
 	} {
 		if err := step(s, ctx, rec, uid); err != nil {
 			return nil, err
 		}
 	}
 	return rec, nil
+}
+
+func (s *Store) legalDiscord(ctx context.Context, rec *AccountRecord, uid int64) error {
+	l, err := s.DiscordLinkOf(ctx, ids.ID(uid))
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	rec.Discord = &LegalDiscord{DiscordID: l.DiscordID, Username: l.Username, GlobalName: l.GlobalName, InGuild: l.InGuild, LeftAt: l.LeftAt, CreatedAt: l.CreatedAt, UpdatedAt: l.UpdatedAt}
+	return nil
 }
 
 func (s *Store) legalSettings(ctx context.Context, rec *AccountRecord, uid int64) error {
@@ -802,7 +830,7 @@ func (s *Store) legalModeration(ctx context.Context, rec *AccountRecord, uid int
 	return s.legalInstanceModeration(ctx, rec, uid)
 }
 
-// legalInstanceModeration reads what the instance's own staff did about the
+// legalInstanceModeration reads what Nexa's own staff did about the
 // account, and what it said back in its case threads.
 func (s *Store) legalInstanceModeration(ctx context.Context, rec *AccountRecord, uid int64) error {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT id, number, action, reason, moderator_id, expires_at, lifted_at, status, created_at FROM mod_cases WHERE user_id = ? ORDER BY id LIMIT ?`, uid, LegalListCap)

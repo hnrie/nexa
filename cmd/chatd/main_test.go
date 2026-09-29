@@ -102,7 +102,7 @@ func TestLoadOrCreateSecretRefusesARestoreWithoutIt(t *testing.T) {
 	}
 }
 
-// Several chatd processes are not one instance; a configuration that asks for
+// Several chatd processes are not one Nexa; a configuration that asks for
 // a second one is told so at startup.
 func TestProcessWarning(t *testing.T) {
 	if w := processWarning(config.Config{}); w != "" {
@@ -112,7 +112,7 @@ func TestProcessWarning(t *testing.T) {
 		t.Errorf("Redis alone only shares rate limits, which is fine: %q", w)
 	}
 	for _, c := range []config.Config{{NodeID: 3}, {NodeID: 3, RedisURL: "redis://x"}} {
-		if w := processWarning(c); !strings.Contains(w, "one process") {
+		if w := processWarning(c); !strings.Contains(w, "a single process") {
 			t.Errorf("%+v: want the one-process warning, got %q", c, w)
 		}
 	}

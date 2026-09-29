@@ -40,7 +40,7 @@ const known = new Map<string, string | null>();
 
 /**
  * The main colour of a picture at `url`, once it has loaded; null until
- * then, and for a picture that cannot be read. Only for this instance's own
+ * then, and for a picture that cannot be read. Only for Nexa's own
  * pictures, which the page may read back: another site's would taint the
  * canvas.
  */

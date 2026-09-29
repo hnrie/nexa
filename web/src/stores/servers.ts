@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { Member, Role, Server, ServerView } from "@/api/types";
 import { ALL, base, compute, has, highestPosition, P, toPermMember, toPermRoles, type PermRole } from "@/lib/perms";
 
-/** The flag bit marking an account that runs the instance. */
+/** The flag bit marking an account that runs Nexa. */
 const USER_FLAG_ADMIN = 1;
 import { useAuth } from "./auth";
 import { useChannels } from "./channels";
@@ -164,7 +164,7 @@ function recomputeMine(st: ServerState): bigint {
 }
 
 /**
- * Whether an account runs this instance. Like the server's owner, it holds
+ * Whether an account runs Nexa. Like the server's owner, it holds
  * every permission in any server it is a member of; the server agrees.
  */
 export function isInstanceAdmin(userId: string): boolean {

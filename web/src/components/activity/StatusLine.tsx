@@ -9,7 +9,7 @@
  * Long statuses scroll rather than ending in an ellipsis, since the part worth
  * reading is usually the part that got cut.
  */
-import { Gamepad2, Music, Trophy, Tv } from "lucide-react";
+import { Gamepad2, Music, Radio, Trophy, Tv } from "lucide-react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { ScrollingText } from "@/components/common/ScrollingText";
 import type { Activity } from "@/api/types";
@@ -17,9 +17,9 @@ import { activityParts } from "@/lib/activity";
 import s from "./Activity.module.css";
 
 import { t } from "@/i18n";
-const ICON: Record<number, typeof Music> = { 0: Gamepad2, 2: Music, 3: Tv, 5: Trophy };
+const ICON: Record<number, typeof Music> = { 0: Gamepad2, 1: Radio, 2: Music, 3: Tv, 5: Trophy };
 /** What each activity type is called, per render so it follows the language. */
-const labels = (): Record<number, string> => ({ 0: t("activity.statusLine.playingAGame"), 2: t("activity.statusLine.listeningToMusic"), 3: t("activity.statusLine.watching"), 5: t("activity.statusLine.competing") });
+const labels = (): Record<number, string> => ({ 0: t("activity.statusLine.playingAGame"), 1: t("activity.statusLine.streaming"), 2: t("activity.statusLine.listeningToMusic"), 3: t("activity.statusLine.watching"), 5: t("activity.statusLine.competing") });
 
 export function ActivityIcon({ type, size = 12, more = 0 }: { type: number; size?: number; more?: number }) {
   const Icon = ICON[type] ?? Gamepad2;

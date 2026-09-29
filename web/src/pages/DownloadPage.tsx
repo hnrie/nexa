@@ -146,7 +146,7 @@ export default function DownloadPage() {
               <h2 className={s.label}>{t("download.theFirstTimeYouOpenIt")}</h2>
               <ul className={s.notes}>
                 <li><Tr id="download.firstRunWindows" values={{ windows: <b>{t("download.windows")}</b>, moreInfo: <b>{t("download.moreInfo")}</b>, runAnyway: <b>{t("download.runAnyway")}</b> }} /></li>
-                <li><Tr id="download.firstRunMac" values={{ macos: <b>macOS</b>, open: <b>{t("chat.lockedChannel.open")}</b> }} /></li>
+                <li><Tr id="download.firstRunMac" values={{ macos: <b>macOS</b>, openAnyway: <b>{t("download.openAnyway")}</b> }} /></li>
                 <li><Tr id="download.firstRunLinux" values={{ linux: <b>{t("download.linux")}</b>, chmod: <code>{t("download.chmodX")}</code> }} /></li>
               </ul>
             </div>

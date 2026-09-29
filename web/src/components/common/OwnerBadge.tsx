@@ -20,12 +20,12 @@ export function OwnerBadge() {
   );
 }
 
-/** An instance admin's mark: a hammer, cycling the rainbow the way the owner's crown does. */
+/** A Nexa admin's mark: a hammer, cycling the rainbow the way the owner's crown does. */
 export function AdminHammer({ size = 14 }: { size?: number }) {
   return <Hammer size={size} className={s.hammer} role="img" aria-label={t("profile.profileCard.admin")} />;
 }
 
-/** An instance admin's badge: the hammer plus "Admin" in animated rainbow text. */
+/** A Nexa admin's badge: the hammer plus "Admin" in animated rainbow text. */
 export function AdminBadge() {
   return (
     <Tooltip text={t("profile.profileCard.adminTip")} side="top">

@@ -1142,7 +1142,7 @@ func (s *Store) SystemUser(ctx context.Context) (*User, error) {
 }
 
 // StaffIDs lists every account that can use the moderation panel: the
-// instance admins who can sign in.
+// Nexa admins who can sign in.
 func (s *Store) StaffIDs(ctx context.Context) ([]ids.ID, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted|NotPeople)
 	if err != nil {
@@ -1160,7 +1160,7 @@ func (s *Store) StaffIDs(ctx context.Context) ([]ids.ID, error) {
 	return out, rows.Err()
 }
 
-// InstanceOwnerID is the instance's owner: its oldest admin account, which is
+// InstanceOwnerID is the owner of Nexa: its oldest admin account, which is
 // the one that set it up (the first account made is an admin by default).
 // Nobody can moderate it or take its access away, so it stays the oldest.
 func (s *Store) InstanceOwnerID(ctx context.Context) (ids.ID, error) {

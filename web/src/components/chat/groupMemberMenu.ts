@@ -31,8 +31,8 @@ async function messageUser(userId: string, nav: (path: string) => void): Promise
 /**
  * Context menu for someone in a group's member list: profile, mention and
  * message for everyone, and for whoever manages the group (its owner or an
- * instance admin) handing ownership on and removing people. The owner
- * outranks an instance admin, so is never offered for removal.
+ * Nexa admin) handing ownership on and removing people. The owner
+ * outranks a Nexa admin, so is never offered for removal.
  */
 export function groupMemberMenuItems(channelId: string, userId: string, ctx: GroupMemberMenuCtx): ContextMenuItem[] {
   const ch = useChannels.getState().byId[channelId];

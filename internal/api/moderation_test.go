@@ -192,7 +192,7 @@ func TestNexaSystemAccount(t *testing.T) {
 }
 
 // The Nexa account can exist before anyone registers; the first person must
-// still become the instance's admin.
+// still become Nexa's admin.
 func TestFirstAccountIsAdminEvenAfterNexa(t *testing.T) {
 	srv, ts := newTestServer(t)
 	if _, err := srv.systemUser(t.Context()); err != nil {
@@ -852,13 +852,13 @@ func TestLegalReportListsInstanceCases(t *testing.T) {
 		t.Fatalf("%d %v", res.StatusCode, body)
 	}
 	doc := body["document"].(string)
-	for _, want := range []string{"Instance cases on them:", "case #1 (mute)", "rude words", "append-only"} {
+	for _, want := range []string{"Nexa cases on them:", "case #1 (mute)", "rude words", "append-only"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("report lacks %q", want)
 		}
 	}
-	if strings.Contains(doc, "no instance-wide moderation log") {
-		t.Error("report still says there is no instance-wide moderation log")
+	if strings.Contains(doc, "no Nexa-wide moderation log") {
+		t.Error("report still says there is no Nexa-wide moderation log")
 	}
 }
 

@@ -42,7 +42,7 @@ export function targetOfPreview(p: InvitePreview, variant: InviteVariant): Invit
   return null;
 }
 
-/** The id in one of this instance's own picture addresses, and nothing from anywhere else. */
+/** The id in one of Nexa's own picture addresses, and nothing from anywhere else. */
 function mediaId(url: string | undefined, kind: "icon" | "banner"): string | null {
   if (!url) return null;
   try {
@@ -56,7 +56,7 @@ function mediaId(url: string | undefined, kind: "icon" | "banner"): string | nul
 
 /**
  * What a link card sealed into the message says about the invite, drawn until
- * the server answers. Its pictures are only ever this instance's own: the
+ * the server answers. Its pictures are only ever Nexa's own: the
  * card came from the sender's device, and an address in it is not trusted.
  */
 export function targetOfEmbed(e: UnfurlResult): InviteTarget {

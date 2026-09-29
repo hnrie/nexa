@@ -26,7 +26,7 @@ export function canDelete(msg: DecryptedMessage): boolean {
   const me = useAuth.getState().me;
   if (!me) return false;
   if (msg.author_id === me.id) return true;
-  // whoever runs the instance can take down any message
+  // whoever runs Nexa can take down any message
   if (isInstanceAdmin(me.id)) return true;
   const ch = useChannels.getState().byId[msg.channel_id];
   if (!ch) return false;

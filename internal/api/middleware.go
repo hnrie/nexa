@@ -96,7 +96,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 		h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), geolocation=()")
-		// Browsers only honour this over HTTPS, which is how the instance is
+		// Browsers only honour this over HTTPS, which is how Nexa is
 		// reached; it stops a first visit being quietly downgraded.
 		h.Set("Strict-Transport-Security", "max-age=31536000")
 		// A page this one opens cannot reach back into it.

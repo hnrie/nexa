@@ -127,6 +127,7 @@ func main() {
 	srv.WireServers(hub)
 	srv.WireVoice(hub)
 	srv.WireActivities(hub)
+	srv.WireDiscord(hub)
 	// last: it wraps the ready extras the others installed
 	srv.WireModeration(hub)
 	srv.Extra = append(srv.Extra, func(mux *http.ServeMux) { mux.Handle("GET /gateway", hub) })
@@ -138,6 +139,7 @@ func main() {
 	srv.StartGuests(ctx)
 	srv.StartModeration(ctx)
 	srv.StartPolls(ctx)
+	srv.StartDiscord(ctx)
 	// whatever deleted accounts still own goes, now and every hour after
 	srv.StartAccountSweep(ctx)
 	// what runs beside the requests, waited for at shutdown: the meter
@@ -207,7 +209,7 @@ func processWarning(cfg config.Config) string {
 	if cfg.NodeID == 0 {
 		return ""
 	}
-	return "NODE_ID is set, but chatd runs as one process per instance: a second process would never see the first one's events, presence or calls, REDIS_URL or not. Run one chatd (deploy/README.md, \"Moving to Postgres\")."
+	return "NODE_ID is set, but chatd runs as a single process: a second process would never see the first one's events, presence or calls, REDIS_URL or not. Run one chatd (deploy/README.md, \"Moving to Postgres\")."
 }
 
 // maintenance runs periodic cleanups: unreferenced blobs and expired sessions.

@@ -160,7 +160,7 @@ func TestPermissionCacheFollowsEveryWrite(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, false, false, false},
-		{"becoming an instance admin", func(t *testing.T, w *permWorld) {
+		{"becoming a Nexa admin", func(t *testing.T, w *permWorld) {
 			if _, err := w.s.ChangeUserFlags(ctx, w.bob.ID, FlagAdmin, 0); err != nil {
 				t.Fatal(err)
 			}

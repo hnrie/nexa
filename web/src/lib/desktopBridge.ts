@@ -22,6 +22,13 @@ export interface NativeStrings {
   offlineBody: string;
   offlineRetry: string;
   about: string;
+  /** The Mac app's offer to move itself into Applications, replacing an older copy (app 1.1.0 and later). */
+  moveTitle?: string;
+  moveBody?: string;
+  moveReplaceBody?: string;
+  moveButton?: string;
+  notNow?: string;
+  moveFailed?: string;
 }
 
 /** A Rich Presence activity as a program sent it to the desktop app, cleaned there. */

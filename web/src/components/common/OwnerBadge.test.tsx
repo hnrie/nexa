@@ -37,11 +37,11 @@ describe("the badges on a profile", () => {
       );
       fireEvent.mouseEnter(screen.getByTestId("owner-badge").parentElement!);
       act(() => void vi.advanceTimersByTime(400));
-      expect(screen.getByRole("tooltip").textContent).toBe("Owner of this Nexa instance");
+      expect(screen.getByRole("tooltip").textContent).toBe("Owner of Nexa");
       fireEvent.mouseLeave(screen.getByTestId("owner-badge").parentElement!);
       fireEvent.mouseEnter(screen.getByTestId("admin-badge").parentElement!);
       act(() => void vi.advanceTimersByTime(400));
-      expect(screen.getByRole("tooltip").textContent).toBe("Admin of this Nexa instance");
+      expect(screen.getByRole("tooltip").textContent).toBe("Admin of Nexa");
     } finally {
       vi.useRealTimers();
     }

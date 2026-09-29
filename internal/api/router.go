@@ -11,6 +11,7 @@ import (
 
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/config"
+	"evilion.xyz/chat/internal/discordsync"
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
@@ -91,6 +92,7 @@ type Server struct {
 	limHookCh  *ratelimit.Limiter
 	limHookMgr *ratelimit.Limiter
 	limVote    *ratelimit.Limiter
+	limDiscord *ratelimit.Limiter
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
@@ -98,6 +100,10 @@ type Server struct {
 	Apps *rpcapps.Cache
 	// activityHub resolves activity previews the way the gateway shows them.
 	activityHub *gateway.Hub
+	// Discord shows linked Discord accounts' activity (nil when not configured; see WireDiscord).
+	Discord *discordsync.Service
+	// discordAPI points the Discord service at a fake Discord, in tests.
+	discordAPI string
 	// Voice tracks who is in which voice channel (set by WireVoice).
 	Voice *voice.Registry
 	// hub is the gateway, for whether a guest is still connected (set by WireVoice).
@@ -169,8 +175,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limUpload:  ratelimit.New(ratelimit.Every(60, time.Minute), 60, time.Hour),
 		limUnfurl:  ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
 		// The media proxy fetches from somewhere else on the caller's behalf,
-		// so an unmetered one is both a way to exhaust this instance's
-		// bandwidth and a way to aim this instance at someone else's.
+		// so an unmetered one is both a way to exhaust Nexa's
+		// bandwidth and a way to aim Nexa at someone else's.
 		limProxy: ratelimit.New(ratelimit.Every(120, time.Minute), 60, 10*time.Minute),
 		// re-signing old media links, per account: a conversation scrolled
 		// back through asks once per screenful, up to a hundred links a time
@@ -197,7 +203,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// filling the disk is not.
 		limExpr: ratelimit.New(ratelimit.Every(120, time.Minute), 200, 10*time.Minute),
 		// Telegram imports, per account: each pulls up to 200 files through
-		// the instance's one bot token.
+		// Nexa's one bot token.
 		limImport: ratelimit.New(ratelimit.Every(10, time.Hour), 6, 2*time.Hour),
 		// crash reports, per account: a broken page reports a burst, not a flood
 		limCrash: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
@@ -217,6 +223,8 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limHookMgr: ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
 		// votes on polls, per account: a change of mind is a click
 		limVote: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
+		// linking Discord and rejoining its activity server, per account: each calls Discord
+		limDiscord: ratelimit.New(ratelimit.Every(10, time.Minute), 10, 10*time.Minute),
 	}
 }
 
@@ -229,7 +237,7 @@ func (s *Server) limiters() map[string]*ratelimit.Limiter {
 		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
-		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote,
+		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord,
 	}
 }
 
@@ -243,7 +251,7 @@ func (s *Server) StartLimiters(ctx context.Context) {
 }
 
 // ShareLimiters makes every rate limit count across chatd processes rather
-// than once per process, which is what an instance behind more than one of
+// than once per process, which is what Nexa behind more than one of
 // them needs: otherwise two processes let twice as much through.
 func (s *Server) ShareLimiters(shared ratelimit.Shared) {
 	for name, l := range s.limiters() {

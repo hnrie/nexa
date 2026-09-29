@@ -1,6 +1,8 @@
 /* a Rich Presence activity: the card in a profile, and the line under a name */
 .card { display: flex; flex-direction: column; gap: 10px; }
 .heading { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* where an activity came from, when it is not the desktop app: a quiet tag after the heading */
+.source { margin-inline-start: 6px; padding: 0 5px; border-radius: 3px; background: var(--bg-active); font-size: 10px; font-weight: 600; text-transform: none; color: var(--text-muted); vertical-align: 1px; }
 .row { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .art { position: relative; flex: none; width: 72px; height: 72px; }
 .large { width: 72px; height: 72px; border-radius: var(--radius-sm); object-fit: cover; background: var(--bg-active); display: block; }

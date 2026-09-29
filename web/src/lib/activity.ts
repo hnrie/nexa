@@ -14,6 +14,8 @@ import { t } from "@/i18n";
  */
 function lineFor(type: number, name: string): string {
   switch (type) {
+    case 1:
+      return t("activity.streamingName", { name });
     case 2:
       return t("activity.listeningToName", { name });
     case 3:

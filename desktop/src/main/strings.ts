@@ -26,6 +26,12 @@ const ENGLISH: NativeStrings = {
   offlineBody: "Check your connection. Trying again in a few seconds.",
   offlineRetry: "Try now",
   about: "End to end encrypted chat, voice and servers.",
+  moveTitle: "Move Nexa to Applications?",
+  moveBody: "Nexa works best from your Applications folder. It moves itself there and opens again.",
+  moveReplaceBody: "This replaces the older Nexa in your Applications folder.",
+  moveButton: "Move to Applications",
+  notNow: "Not Now",
+  moveFailed: "Nexa couldn't move itself to Applications. Drag it there from the disk image instead.",
 };
 
 let current: NativeStrings = { ...ENGLISH };

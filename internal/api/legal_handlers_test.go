@@ -9,7 +9,7 @@ import (
 )
 
 // The law-enforcement report has two jobs that pull against each other: say
-// everything the instance holds, and say nothing it does not. The tests below
+// everything Nexa holds, and say nothing it does not. The tests below
 // check both ends — that a real trail shows up in the document, and that the
 // secrets sitting next to that trail in the same tables do not.
 func TestLegalReport(t *testing.T) {
@@ -139,13 +139,13 @@ func TestLegalReport(t *testing.T) {
 		t.Errorf("alice should be mentioned once, reads %q", got)
 	}
 
-	// Compiling a report is a read. Nothing about the instance changes, and in
+	// Compiling a report is a read. Nothing about Nexa changes, and in
 	// particular nothing lands in a community's audit log, where the people who
 	// moderate that community would see that one of their members is the
 	// subject of legal process.
 	_, after := do(t, ts, "GET", "/api/v1/admin/stats", tokA, nil)
 	if after["users"].(float64) != 2 || after["messages"].(float64) != 1 {
-		t.Errorf("the report changed the instance: %v", after)
+		t.Errorf("the report changed something: %v", after)
 	}
 	serverID, err := ids.Parse(sid)
 	if err != nil {
@@ -164,7 +164,7 @@ func TestLegalReport(t *testing.T) {
 
 // An account that has done nothing at all is the case the renderer is most
 // likely to get wrong, and the one an officer is most likely to be given: a
-// name from somewhere else that turns out to have barely used the instance.
+// name from somewhere else that turns out to have barely used Nexa.
 func TestLegalReportEmptyAccount(t *testing.T) {
 	_, ts := newTestServer(t)
 	tokA, _ := register(t, ts, "alice")

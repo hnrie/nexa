@@ -33,7 +33,10 @@ type Activity struct {
 	Buttons           []ActivityButton    `json:"buttons,omitempty"`
 	Instance          bool                `json:"instance,omitempty"`
 	IconURL           string              `json:"icon_url,omitempty"`
-	CreatedAt         int64               `json:"created_at"`
+	// Source is "discord" for an activity heard from the person's linked
+	// Discord account rather than from the desktop app.
+	Source    string `json:"source,omitempty"`
+	CreatedAt int64  `json:"created_at"`
 }
 
 // ActivityTimestamps are in milliseconds. A start alone counts up; a start and
@@ -140,7 +143,7 @@ func normalizeActivity(in activityInput, app *appInfo, now time.Time, proxy func
 		return Activity{}, false
 	}
 	switch in.Type {
-	case 0, 2, 3, 5:
+	case 0, 1, 2, 3, 5:
 		out.Type = in.Type
 	}
 	if d := in.StatusDisplayType; d != nil && *d >= 0 && *d <= 2 {
@@ -461,11 +464,10 @@ func (h *Hub) activitiesChanged(c *conn) {
 	c.actMu.Unlock()
 }
 
-// activitiesOf is what the user is doing, as reported by the connection that
-// spoke most recently.
+// activitiesOf is what the user is doing: as reported by the connection that
+// spoke most recently, then whatever their linked Discord account adds.
 func (h *Hub) activitiesOf(uid ids.ID) []Activity {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
 	var best []Activity
 	var at time.Time
 	for c := range h.conns[uid] {
@@ -475,7 +477,113 @@ func (h *Hub) activitiesOf(uid ids.ID) []Activity {
 		}
 		c.actMu.Unlock()
 	}
-	return best
+	h.mu.RUnlock()
+	h.linkedMu.Lock()
+	linked := h.linked[uid]
+	h.linkedMu.Unlock()
+	return mergeActivities(best, linked)
+}
+
+// mergeActivities puts a linked Discord account's activities after the
+// desktop app's, less what the desktop app already shows: the same
+// application, or the same name and kind. A program the desktop app hears
+// also reaches Discord through its relay, so both report it; the desktop
+// app's copy is kept while it lasts, and Discord's shows once it is gone.
+func mergeActivities(own, linked []Activity) []Activity {
+	if len(linked) == 0 {
+		return own
+	}
+	out := make([]Activity, 0, min(maxActivities, len(own)+len(linked)))
+	out = append(out, own...)
+	for _, l := range linked {
+		if len(out) >= maxActivities {
+			break
+		}
+		dup := false
+		for _, o := range own {
+			if (l.ApplicationID != "" && l.ApplicationID == o.ApplicationID) || (l.Type == o.Type && strings.EqualFold(l.Name, o.Name)) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// SetLinkedActivities replaces what a person's linked Discord account says
+// they are doing. They are cleaned and resolved exactly as the desktop app's
+// are, and everyone who sees the person hears of a change, no more than once
+// a second.
+func (h *Hub) SetLinkedActivities(uid ids.ID, raw []json.RawMessage) {
+	if len(raw) > maxActivities {
+		raw = raw[:maxActivities]
+	}
+	h.linkedMu.Lock()
+	prev := h.linked[uid]
+	h.linkedMu.Unlock()
+	var list []Activity
+	if len(raw) > 0 {
+		list = h.resolveActivities(raw, prev)
+		for i := range list {
+			list[i].Source = "discord"
+		}
+	}
+	h.linkedMu.Lock()
+	same := sameActivities(prev, list)
+	if len(list) == 0 {
+		delete(h.linked, uid)
+	} else {
+		h.linked[uid] = list
+	}
+	h.linkedMu.Unlock()
+	if !same {
+		h.linkedChanged(uid)
+	}
+}
+
+// LinkedActivities is what a person's linked Discord account is showing, for tests and the settings page.
+func (h *Hub) LinkedActivities(uid ids.ID) []Activity {
+	h.linkedMu.Lock()
+	defer h.linkedMu.Unlock()
+	return append([]Activity(nil), h.linked[uid]...)
+}
+
+func sameActivities(a, b []Activity) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	x, _ := json.Marshal(a)
+	y, _ := json.Marshal(b)
+	return string(x) == string(y)
+}
+
+// linkedChanged tells everyone who sees the person, at most once a second: a
+// change that has to wait goes out with whatever is newest by then.
+func (h *Hub) linkedChanged(uid ids.ID) {
+	h.linkedMu.Lock()
+	if h.linkedTimer[uid] != nil {
+		h.linkedMu.Unlock()
+		return
+	}
+	wait := time.Second - time.Since(h.linkedAt[uid])
+	if wait <= 0 {
+		h.linkedAt[uid] = time.Now()
+		h.linkedMu.Unlock()
+		h.PresenceChanged(uid)
+		return
+	}
+	h.linkedTimer[uid] = time.AfterFunc(wait, func() {
+		defer h.recoverTimer("linked activity flush")
+		h.linkedMu.Lock()
+		delete(h.linkedTimer, uid)
+		h.linkedAt[uid] = time.Now()
+		h.linkedMu.Unlock()
+		h.PresenceChanged(uid)
+	})
+	h.linkedMu.Unlock()
 }
 
 // broadcastUser sends a user's presence as it stands now, from the account as

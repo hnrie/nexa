@@ -104,6 +104,13 @@ export interface NativeStrings {
   offlineBody: string;
   offlineRetry: string;
   about: string;
+  /** The Mac app's offer to move itself into Applications, replacing an older copy (succession.ts). */
+  moveTitle: string;
+  moveBody: string;
+  moveReplaceBody: string;
+  moveButton: string;
+  notNow: string;
+  moveFailed: string;
 }
 
 export const IPC = {

@@ -285,7 +285,7 @@ func parseWebhookBody(raw map[string]any, opts whParseOpts) (*whInput, *formErro
 				if n := utf8.RuneCountInString(name); n > whMaxName {
 					errs.add(fieldPath("username"), "BASE_TYPE_BAD_LENGTH", fmt.Sprintf("Must be between 1 and %d in length.", whMaxName))
 				} else if reservedDisplayName(name) {
-					errs.add(fieldPath("username"), "USERNAME_INVALID_CONTAINS", "That name belongs to the instance's own account.")
+					errs.add(fieldPath("username"), "USERNAME_INVALID_CONTAINS", "That name belongs to Nexa's own account.")
 				}
 				in.Username = strings.Join(strings.Fields(name), " ")
 			}

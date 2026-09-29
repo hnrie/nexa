@@ -28,7 +28,7 @@ func toPermOverwrites(list []Overwrite) []perms.Overwrite {
 	return out
 }
 
-// IsInstanceAdmin reports whether an account runs this instance. In any server
+// IsInstanceAdmin reports whether an account runs Nexa. In any server
 // it is a member of, such an account holds every permission its owner does.
 // A lookup that fails answers no; the permission functions below return the
 // error instead, so a database hiccup is a 500 there rather than a 403.
@@ -37,7 +37,7 @@ func (s *Store) IsInstanceAdmin(ctx context.Context, uid ids.ID) bool {
 	return err == nil && admins[uid]
 }
 
-// instanceAdmins reads every instance admin.
+// instanceAdmins reads every Nexa admin.
 func (s *Store) instanceAdmins(ctx context.Context) (map[ids.ID]bool, error) {
 	rows, err := s.db.R.QueryContext(ctx, `SELECT id FROM users WHERE flags & ? != 0 AND flags & ? = 0`, FlagAdmin, FlagDisabled|FlagDeleted)
 	if err != nil {

@@ -20,7 +20,7 @@ const MAX_TITLE = 120;
 const MAX_BODY = 4000;
 
 /**
- * Messages to everyone on the instance, sent through Nexa. Each lands in every
+ * Messages to everyone on Nexa, sent through Nexa. Each lands in every
  * account's Nexa conversation with the name of whoever wrote it, and can be
  * taken back; the log keeps both.
  */

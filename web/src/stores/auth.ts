@@ -110,7 +110,7 @@ async function deriveAll(password: string, salt: Uint8Array, params: KdfParams) 
  *
  * Nothing is derived below the floor. It is the server's own rule for what a
  * client may register with, so no account it ever accepted can be refused here:
- * every account on the live instance is at DEFAULT_KDF, well inside it.
+ * every account on Nexa is at DEFAULT_KDF, well inside it.
  */
 function toParams(p: KdfParamsJson): KdfParams {
   return acceptServerKdf(p);

@@ -25,7 +25,7 @@ type Config struct {
 	DatabaseURL string
 	// RedisURL points at a Redis (redis://…) that the rate limits count in,
 	// so a restart does not hand everyone a fresh allowance. It does not make
-	// several chatd processes one instance: gateway events, presence and calls
+	// several chatd processes one Nexa: gateway events, presence and calls
 	// stay inside the process that has the sockets, so run one chatd.
 	RedisURL string
 	// DesktopDir holds published desktop app installers and update manifests,
@@ -39,7 +39,7 @@ type Config struct {
 	RegistrationKey string // when Registration == "invite": a shared key accepted at register time
 	AdminUsername   string
 	// StunURLs are the STUN servers handed to clients. "none" in STUN_URLS
-	// turns them off, which is what a LAN-only instance wants.
+	// turns them off, which is what a LAN-only setup wants.
 	StunURLs       []string
 	TurnURLs       []string
 	TurnUsername   string
@@ -56,6 +56,16 @@ type Config struct {
 	// TelegramBotToken enables Telegram sticker pack imports. The token never
 	// leaves this server: the client only ever sends a pack URL.
 	TelegramBotToken string
+	// DiscordClientID, DiscordClientSecret and DiscordBotToken turn on showing
+	// people's Discord activity (internal/discordsync): all three, or it is off.
+	// DiscordGuildID names the Discord server the bot watches presence in;
+	// empty, it is the bot's only server.
+	DiscordClientID     string
+	DiscordClientSecret string
+	DiscordBotToken     string
+	DiscordGuildID      string
+	// DiscordAPIURL is Discord's REST API; only end-to-end tests point it at a fake.
+	DiscordAPIURL string
 	// TurnstileSiteKey and TurnstileSecretKey turn on Cloudflare Turnstile
 	// captchas for the actions bots abuse. Both are free to get; without them
 	// nothing asks for a captcha.
@@ -82,7 +92,7 @@ type Config struct {
 	LogFile    string
 	SessionTTL time.Duration
 	// NodeID would tell processes sharing one database apart in the ids they
-	// hand out, 0–1023. chatd runs as one process per instance, so it stays 0
+	// hand out, 0–1023. chatd runs as a single process, so it stays 0
 	// and startup warns when it is not.
 	NodeID int
 }
@@ -127,6 +137,11 @@ func Load(getenv func(string) string) (Config, error) {
 	str("TURN_API_TOKEN", &c.TurnAPIToken)
 	str("KLIPY_API_KEY", &c.KlipyAPIKey)
 	str("TELEGRAM_BOT_TOKEN", &c.TelegramBotToken)
+	str("DISCORD_CLIENT_ID", &c.DiscordClientID)
+	str("DISCORD_CLIENT_SECRET", &c.DiscordClientSecret)
+	str("DISCORD_BOT_TOKEN", &c.DiscordBotToken)
+	str("DISCORD_ACTIVITY_GUILD_ID", &c.DiscordGuildID)
+	str("DISCORD_API_URL", &c.DiscordAPIURL)
 	str("TURNSTILE_SITE_KEY", &c.TurnstileSiteKey)
 	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
 	str("REALTIME_APP_ID", &c.RealtimeAppID)

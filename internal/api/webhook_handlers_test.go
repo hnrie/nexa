@@ -133,7 +133,7 @@ func TestWebhookManagement(t *testing.T) {
 	if hook["name"] != "Deploys" || hook["token"] != f.hookToken || !strings.HasSuffix(hook["url"].(string), f.hookURL) || hook["user"].(map[string]any)["id"] != f.ownerID {
 		t.Fatalf("webhook view: %v", hook)
 	}
-	// names are 1-80 characters, and not the instance's own
+	// names are 1-80 characters, and not Nexa's own
 	for _, name := range []string{"", strings.Repeat("x", 81), "Nexa"} {
 		if res, _ := do(t, ts, "POST", "/api/v1/channels/"+f.channelID+"/webhooks", f.owner, map[string]any{"name": name}); res.StatusCode != 400 {
 			t.Fatalf("name %q: %d", name, res.StatusCode)

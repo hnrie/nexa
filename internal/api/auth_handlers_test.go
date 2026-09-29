@@ -108,13 +108,13 @@ func TestRegistrationModes(t *testing.T) {
 	if res, _ := do(t, ts, "POST", "/api/v1/auth/register", "", b); res.StatusCode != 201 {
 		t.Errorf("invite with key: %d", res.StatusCode)
 	}
-	// the first account set the instance up, so the configured admin name
+	// the first account set Nexa up, so the configured admin name
 	// is an ordinary name by now
 	srv.Cfg.AdminUsername = "boss"
 	srv.Cfg.Registration = "open"
 	res, body := do(t, ts, "POST", "/api/v1/auth/register", "", registerBody("boss"))
 	if res.StatusCode != 201 || body["user"].(map[string]any)["flags"].(float64) != 0 {
-		t.Errorf("ADMIN_USERNAME on a set-up instance: %d %v", res.StatusCode, body)
+		t.Errorf("ADMIN_USERNAME once Nexa is set up: %d %v", res.StatusCode, body)
 	}
 }
 
@@ -308,7 +308,7 @@ func TestReadJSONRejectsTrailingAndBig(t *testing.T) {
 	_ = http.StatusOK
 }
 
-// On an invite-only instance an invite lets in as many accounts as it has
+// While sign-ups are invite-only an invite lets in as many accounts as it has
 // uses. A one-use code seen by many used to let all of them sign up, since
 // signing up only checked that it was still live; now the sign-up spends the
 // use, and the new account's first join through it rides on that use.

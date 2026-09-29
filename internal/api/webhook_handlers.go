@@ -225,7 +225,7 @@ func (s *Server) webhookChannel(w http.ResponseWriter, r *http.Request, id ids.I
 }
 
 // cleanWebhookName checks a webhook's name: 1 to 80 characters on one line,
-// and not a name only the instance's own account may use.
+// and not a name only Nexa's own account may use.
 func cleanWebhookName(raw string) (string, *Error) {
 	name, _ := CleanText(raw, 1<<12)
 	name = strings.Join(strings.Fields(name), " ")
@@ -233,7 +233,7 @@ func cleanWebhookName(raw string) (string, *Error) {
 		return "", E(http.StatusBadRequest, "bad_name", "A webhook's name is 1 to 80 characters.")
 	}
 	if reservedDisplayName(name) {
-		return "", E(http.StatusBadRequest, "reserved_name", "That name belongs to the instance's own account.")
+		return "", E(http.StatusBadRequest, "reserved_name", "That name belongs to Nexa's own account.")
 	}
 	return name, nil
 }

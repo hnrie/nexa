@@ -1,7 +1,7 @@
 NEXA - PRIVACY POLICY
 Site: chat.evilion.xyz
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-09-24
+Effective: 2026-09-28
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
@@ -110,6 +110,17 @@ h) Day to day running: unfinished upload progress (expected and
    request logs (page, result, size, and duration, with no IP
    address recorded there).
 
+i) Activity and a linked Discord account (optional): what the
+   desktop app or a linked Discord account says you are doing, such
+   as a game or a song, goes to the people who can see your status
+   while it lasts and is kept in memory only, never written down. If
+   you link a Discord account (Settings, Activity), Nexa keeps its
+   Discord ID, username, display name, and picture, when you linked
+   it, whether it is in the small Discord server Nexa's bot reads
+   activity in, and Discord's sign in tokens for it, sealed with a key
+   only the server has, so the bot can add it back to that server.
+   Unlinking deletes all of it at once.
+
 4. WHAT IS NEVER COLLECTED
 
 No email address. No phone number. No legal name, birth date, age, or
@@ -127,7 +138,7 @@ decrypted.
 - Other people see your public profile, your messages once their app
   decrypts them, and the communities and channels you share with
   them.
-- The owner and the staff they appoint see sections 3a to 3h. Staff
+- The owner and the staff they appoint see sections 3a to 3i. Staff
   use a moderation panel that shows public profiles, when accounts
   were last active, moderation cases and their threads, the log, and
   announcements. It shows nothing that is encrypted, because nothing
@@ -136,6 +147,10 @@ decrypted.
   Nothing is sold or shared, except as forced by a valid legal order
   (see Terms section 5), and even then only what exists above.
   Encrypted content still cannot be handed over.
+- Linking a Discord account is up to you. When you do, Discord knows
+  your Discord account was linked to Nexa and added to Nexa's
+  activity server, and Nexa's bot reads your Discord presence there.
+  Discord's own privacy policy covers what Discord keeps.
 
 6. HOW LONG THINGS ARE KEPT
 
@@ -147,6 +162,8 @@ decrypted.
 - Unfinished uploads, and files nothing points at any more: removed
   after a day.
 - Crash reports: only the newest 500 are kept.
+- A linked Discord account: until you unlink it or delete your
+  account.
 - Moderation cases, case threads, held usernames, and the moderation
   log: kept as the moderation record, including after an account is
   deleted.
@@ -162,9 +179,9 @@ decrypted.
   packs, the servers and group chats you own (for everyone in them),
   and your direct message conversations, for both people in them. Its
   profile is overwritten, and its sessions, relationships, settings,
-  keys, second factor, and crash reports are deleted. An empty
-  stand-in named Deleted User is all that is left, and nobody can sign
-  in as it.
+  keys, second factor, linked Discord account, and crash reports are
+  deleted. An empty stand-in named Deleted User is all that is left,
+  and nobody can sign in as it.
 - When someone you have a direct message conversation with deletes
   their own account, that conversation is deleted for you too.
 - When staff delete an account, everything it posted and uploaded is

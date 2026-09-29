@@ -299,7 +299,7 @@ function FriendRow({ rel, presenceUser }: { rel: Relationship; presenceUser: Rel
         <span className={s.rowText}>
           <span className={s.rowName}>
             <span className={s.rowDisplay} dir="auto">{name}</span>
-            {/* the instance's owner is crowned here as in every list, and its admins carry the hammer */}
+            {/* the owner of Nexa is crowned here as in every list, and its admins carry the hammer */}
             {isOwner(rel.user.id) ? (
               <span className={s.rowBadge}><OwnerCrown size={14} /></span>
             ) : isInstanceAdmin(rel.user.id) || (rel.user.flags & 1) !== 0 ? (

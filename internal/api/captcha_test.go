@@ -68,7 +68,7 @@ func TestCaptchaGuardsAbusableActions(t *testing.T) {
 	srv.Cfg.PublicURL = "https://chat.example"
 	defer turnstileStandIn(t, "secret-key")()
 
-	// the public instance info says how to show it, and never gives the secret away
+	// the public info about Nexa says how to show it, and never gives the secret away
 	res, info := do(t, ts, "GET", "/api/v1/instance", "", nil)
 	captcha, _ := info["captcha"].(map[string]any)
 	if res.StatusCode != 200 || captcha["provider"] != "turnstile" || captcha["site_key"] != "site-key" {

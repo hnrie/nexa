@@ -344,3 +344,31 @@ func TestRapidActivityUpdatesSettleOnTheLast(t *testing.T) {
 		t.Errorf("%d presence frames for 15 quick updates", frames)
 	}
 }
+
+func TestMergeActivitiesPrefersTheDesktopAppsCopy(t *testing.T) {
+	own := []Activity{{ApplicationID: "356875570916753438", Name: "Minecraft", Type: 0}, {Name: "Music Player", Type: 2}}
+	linked := []Activity{
+		{ApplicationID: "356875570916753438", Name: "Minecraft", Type: 0, Source: "discord"},
+		{Name: "music player", Type: 2, Source: "discord"},
+		{Name: "Spotify", Type: 2, Source: "discord"},
+		{Name: "Music Player", Type: 3, Source: "discord"},
+	}
+	got := mergeActivities(own, linked)
+	if len(got) != 4 || got[0].Source != "" || got[1].Source != "" || got[2].Name != "Spotify" || got[3].Type != 3 {
+		t.Fatalf("merged: %+v", got)
+	}
+	if got := mergeActivities(nil, linked[2:3]); len(got) != 1 || got[0].Name != "Spotify" {
+		t.Fatalf("linked alone: %+v", got)
+	}
+	five := []Activity{{Name: "a"}, {Name: "b"}, {Name: "c"}, {Name: "d"}, {Name: "e"}}
+	if got := mergeActivities(five, linked[2:3]); len(got) != 5 {
+		t.Fatalf("over the cap: %d", len(got))
+	}
+}
+
+func TestNormalizeKeepsStreaming(t *testing.T) {
+	a, ok := normalizeActivity(activityInput{Name: "Twitch", Type: 1, DetailsURL: "https://www.twitch.tv/someone"}, nil, time.Now(), nil)
+	if !ok || a.Type != 1 || a.DetailsURL == "" {
+		t.Fatalf("stream: %+v %v", a, ok)
+	}
+}

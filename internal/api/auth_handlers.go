@@ -119,7 +119,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	mode, regKey := s.registrationPolicy(ctx)
-	// On an invite-only instance, an invite lets in as many accounts as it has
+	// While sign-ups are invite-only, an invite lets in as many accounts as it has
 	// uses: signing up spends one, and the account's first join through the
 	// invite then rides on it. Checking only that the invite was live let
 	// anyone who saw a one-use code sign up until someone joined with it.
@@ -187,8 +187,8 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, err)
 		return
 	}
-	// The instance's first account runs it, and so may the account the
-	// operator named — but only to set the instance up. Once anyone has been
+	// Nexa's first account runs it, and so may the account the
+	// operator named — but only to set Nexa up. Once anyone has been
 	// an admin, the configured name is just a name: otherwise, the moment it
 	// was freed (a rename, a deletion) anyone could register it and walk in.
 	first := count == 0
@@ -228,7 +228,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Two first sign-ups at once both counted nobody before them; the older
-	// of the two keeps the instance, and the other becomes an ordinary account.
+	// of the two keeps Nexa, and the other becomes an ordinary account.
 	if first {
 		if oldest, err := s.Store.OldestAccountID(ctx); err == nil && oldest != u.ID {
 			if flags, err := s.Store.ChangeUserFlags(ctx, u.ID, 0, store.FlagAdmin); err == nil {

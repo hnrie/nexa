@@ -243,6 +243,12 @@ func (s *Server) purgeAccount(r *http.Request, uid ids.ID, opt purgeOptions) err
 	if err := s.Store.PurgeUserLeftovers(ctx, uid); err != nil {
 		return err
 	}
+	// A linked Discord account: its tokens go, and so does its activity.
+	if s.Discord != nil {
+		s.Discord.Forget(ctx, uid)
+	} else if _, err := s.Store.DeleteDiscordLink(ctx, uid); err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
 	// And last the account itself, down to the stand-in row everything else
 	// still points at, which nobody can sign in as.
 	if err := s.Store.DeleteAccount(ctx, uid); err != nil {

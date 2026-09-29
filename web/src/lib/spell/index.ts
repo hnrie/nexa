@@ -17,9 +17,17 @@ import { useSettings } from "@/stores/settings";
 const CHAT_WORDS = new Set(
   (
     "lol lmao lmfao rofl omg omfg idk idc imo imho tbh ngl btw fyi brb afk gg ggs ggwp irl jk smh fr rn nvm pls plz thx ty tysm np yw " +
-    "ikr wdym wyd hbu hru wbu ig istg lowkey highkey bruh yall oki okie kk kinda sorta wanna gotta dunno lemme gimme ya yea yep yup nah " +
+    "ikr wdym wyd hbu hru wbu ig istg lowkey highkey bruh yall oki okie kk kinda sorta wanna gotta gonna dunno lemme gimme ya yea yep yup nah " +
     "hmm hmmm mhm uhh umm ooh aww awww haha hahaha hehe heh xd pfp dm dms gif gifs meme memes emoji emojis ofc ily ilysm gn gm ttyl lmk " +
-    "tho thru ur vc pc ui ux api apis wifi fomo yolo sus pog poggers vibe vibes rizz stan simp nexa youtube tiktok twitch reddit github"
+    "tho thru ur vc pc ui ux api apis wifi fomo yolo sus pog poggers vibe vibes rizz stan simp nexa youtube tiktok twitch reddit github " +
+    // contractions typed without their apostrophe, as nearly everyone does in chat
+    "ok im ive dont didnt doesnt isnt wasnt arent werent couldnt shouldnt wouldnt havent hasnt hadnt mustnt neednt youre youve youll youd " +
+    "theyre theyve theyll theyd weve thats whats wheres whos hows whys theres heres itll thatll wouldve couldve shouldve mustve mightve " +
+    "whatre whered howd whod hes shes imma ima cmon " +
+    // the internet's own words
+    "livestream livestreams livestreamed livestreaming streamer streamers gamer gamers gameplay signup signups unfollow unfollowed " +
+    "vlog vlogs vlogger laggy spammy config configs async frontend backend bluetooth youtuber youtubers iphone iphones spotify discord " +
+    "screenshotted selfies hashtags subreddit subreddits emote emotes"
   ).split(" "),
 );
 

@@ -71,7 +71,7 @@ func fetch(t *testing.T, ts *httptest.Server, path, tok string) (int, string, []
 
 func TestBugReportsFromFormToThread(t *testing.T) {
 	_, ts := newTestServer(t)
-	aliceTok, _ := register(t, ts, "alice") // the first account is the instance's admin
+	aliceTok, _ := register(t, ts, "alice") // the first account is Nexa's admin
 	bobTok, bobID := register(t, ts, "bob")
 	carolTok, _ := register(t, ts, "carol")
 	ga := connectGW(t, ts, aliceTok)

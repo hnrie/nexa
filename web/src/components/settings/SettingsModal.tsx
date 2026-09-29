@@ -13,6 +13,7 @@ import { openReportBug } from "@/components/bugs/ReportBugButton";
 const AccountPage = lazyPage(() => import("./AccountPage"));
 const ProfilePage = lazyPage(() => import("./ProfilePage"));
 const PrivacyPage = lazyPage(() => import("./PrivacyPage"));
+const ActivityPage = lazyPage(() => import("./ActivityPage"));
 const BlockedPage = lazyPage(() => import("./BlockedPage"));
 const SecurityPage = lazyPage(() => import("./SecurityPage"));
 const DevicesPage = lazyPage(() => import("./DevicesPage"));
@@ -30,7 +31,7 @@ const AboutPage = lazyPage(() => import("./AboutPage"));
 /** The navigation, built per render so it follows the language. */
 function navGroups(): NavGroup[] {
   return [
-    { head: t("settings.settings.userSettings"), items: [{ id: "account", label: t("settings.account.myAccount") }, { id: "profiles", label: t("settings.profile.profiles") }, { id: "privacy", label: t("settings.privacy.privacySafety") }, { id: "blocked", label: t("people.blockedPage.title") }, { id: "security", label: t("settings.security.security") }, { id: "devices", label: t("settings.devices.devices") }] },
+    { head: t("settings.settings.userSettings"), items: [{ id: "account", label: t("settings.account.myAccount") }, { id: "profiles", label: t("settings.profile.profiles") }, { id: "privacy", label: t("settings.privacy.privacySafety") }, { id: "activity", label: t("settings.activity.title") }, { id: "blocked", label: t("people.blockedPage.title") }, { id: "security", label: t("settings.security.security") }, { id: "devices", label: t("settings.devices.devices") }] },
     { head: t("settings.settings.appSettings"), items: [{ id: "appearance", label: t("settings.appearance.appearance") }, { id: "customCss", label: t("look.css.title") }, { id: "plugins", label: t("look.plugins.title") }, { id: "voice", label: t("settings.voice.voiceVideo") }, { id: "notifications", label: t("settings.notifications.notifications") }, { id: "stickers", label: t("settings.stickers.expressionPacks") }] },
   ];
 }
@@ -45,9 +46,9 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
   // About is last of all: Terms, Privacy, encryption note, and owner contact.
   const appItems = [...(inApp ? [{ id: "desktop", label: t("settings.desktop.desktopApp") }] : []), { id: "licenses", label: t("settings.licenses.licenses") }, { id: "about", label: t("settings.about.title") }];
   const base = navGroups().map((g, i) => (i === 1 ? { ...g, items: [...g.items, ...appItems] } : g));
-  const groups = isAdmin ? [...base, { head: t("settings.settings.instance"), items: [{ id: "admin", label: t("settings.admin.instanceAdmin") }] }] : base;
+  const groups = isAdmin ? [...base, { head: t("settings.settings.administration"), items: [{ id: "admin", label: t("settings.admin.nexaAdmin") }] }] : base;
   const body =
-    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "licenses" ? <LicensesPage /> : page === "about" ? <AboutPage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage /> : <AccountPage onEditProfile={() => setPage("profiles")} />;
+    page === "profiles" ? <ProfilePage /> : page === "privacy" ? <PrivacyPage /> : page === "activity" ? <ActivityPage /> : page === "security" ? <SecurityPage /> : page === "devices" ? <DevicesPage /> : page === "appearance" ? <AppearancePage /> : page === "notifications" ? <NotificationsPage /> : page === "stickers" ? <StickersPage initialPackId={packId} /> : page === "voice" ? <VoicePage /> : page === "licenses" ? <LicensesPage /> : page === "about" ? <AboutPage /> : page === "admin" && isAdmin ? <AdminPage /> : page === "desktop" && inApp ? <DesktopPage onActivity={() => setPage("activity")} /> : <AccountPage onEditProfile={() => setPage("profiles")} />;
   // Custom CSS and Plugins sit with Appearance (lib/look)
   const lookPage = page === "customCss" ? <CustomCssPage /> : page === "plugins" ? <PluginsPage /> : null;
   // Log Out is an action rather than a page, so it closes the nav instead of joining a group.

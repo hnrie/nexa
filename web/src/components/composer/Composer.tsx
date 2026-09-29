@@ -1,4 +1,4 @@
-import { CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, Type, File as FileIcon } from "lucide-react";
+import { ChevronUp, CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, Type, File as FileIcon } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
 import { lazyPage } from "@/lib/lazyChunk";
 import type { Channel } from "@/api/types";
@@ -43,6 +43,7 @@ import { menuAnchor } from "@/components/common/ContextMenu";
 import { extractMentions } from "./mentions";
 import { useUploads } from "@/stores/uploads";
 import { useAutosize } from "./useAutosize";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { RefObject } from "react";
 import s from "./Composer.module.css";
 
@@ -151,6 +152,9 @@ export function Composer({ channel }: { channel: Channel }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
+  // a phone keeps the box as wide as it can: formatting, the preview and emoji wait behind one button
+  const mobile = useIsMobile();
+  const [toolsOpen, setToolsOpen] = useState(false);
   const lastTyping = useRef(0);
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDraft = useRef<{ channelId: string; text: string } | null>(null);
@@ -662,6 +666,29 @@ export function Composer({ channel }: { channel: Channel }) {
     if (o === "upload") fileRef.current?.click();
     else useUI.getState().openModal("createPoll", { channelId: channel.id });
   };
+  /** The phone's one button for formatting, the preview and emoji, opening a menu above it. */
+  const onTools = (el: HTMLElement) => {
+    const anchor = menuAnchor(el, "end");
+    setToolsOpen(true);
+    useUI.getState().openContextMenu({
+      x: anchor.right,
+      y: anchor.top - 4,
+      anchor,
+      above: true,
+      label: tr_("composer.more.label"),
+      items: [
+        { id: "formatting", label: tr_("composer.more.formatting"), onSelect: () => { preloadFormatEditor(); setFormatting(true); } },
+        { id: "preview", label: tr_("composer.preview.show"), checked: preview, toggle: true, onSelect: () => setPreview((v) => !v) },
+        { id: "emoji", label: tr_("composer.more.emoji"), onSelect: () => setPicker(true) },
+      ],
+    });
+    const stop = useUI.subscribe((st) => {
+      if (!st.contextMenu) {
+        setToolsOpen(false);
+        stop();
+      }
+    });
+  };
   const onPlus = (el: HTMLElement) => {
     if (plus.kind === "direct") return plusDo(plus.option);
     if (plus.kind !== "menu") return;
@@ -863,9 +890,27 @@ export function Composer({ channel }: { channel: Channel }) {
         />
         <SpellLines target={taRef} text={text} />
         <div className={s.btns}>
-          <button type="button" className={s.iconBtn} data-on={preview} aria-pressed={preview} aria-label={preview ? tr_("composer.preview.hide") : tr_("composer.preview.show")} title={preview ? tr_("composer.preview.hide") : tr_("composer.preview.show")} onClick={() => setPreview((v) => !v)} data-testid="preview-toggle"><Eye size={22} /></button>
-          <button type="button" className={s.iconBtn} data-on={formatting} aria-label={tr_("composer.format.open")} title={tr_("composer.format.open")} onClick={() => setFormatting(true)} onPointerEnter={preloadFormatEditor} onFocus={preloadFormatEditor} data-testid="format-open"><Type size={22} /></button>
-          <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
+          {mobile ? (
+            <button
+              type="button"
+              className={s.iconBtn}
+              data-on={toolsOpen || preview || formatting || picker}
+              data-picker-toggle={picker || undefined}
+              aria-label={tr_("composer.more.label")}
+              aria-haspopup="menu"
+              aria-expanded={toolsOpen}
+              onClick={(e) => (picker ? setPicker(false) : onTools(e.currentTarget))}
+              data-testid="composer-tools"
+            >
+              <ChevronUp size={24} />
+            </button>
+          ) : (
+            <>
+              <button type="button" className={s.iconBtn} data-on={preview} aria-pressed={preview} aria-label={preview ? tr_("composer.preview.hide") : tr_("composer.preview.show")} title={preview ? tr_("composer.preview.hide") : tr_("composer.preview.show")} onClick={() => setPreview((v) => !v)} data-testid="preview-toggle"><Eye size={22} /></button>
+              <button type="button" className={s.iconBtn} data-on={formatting} aria-label={tr_("composer.format.open")} title={tr_("composer.format.open")} onClick={() => setFormatting(true)} onPointerEnter={preloadFormatEditor} onFocus={preloadFormatEditor} data-testid="format-open"><Type size={22} /></button>
+              <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
+            </>
+          )}
           <button className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : ""].join(" ")} aria-label={tr_("composer.composer.sendMessage")} title={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)} data-testid="send-button"><SendHorizontal size={22} /></button>
         </div>
       </div>

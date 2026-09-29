@@ -36,7 +36,7 @@ class Server:
         # STUN_URLS=none keeps ICE to host candidates: both browsers are on this
         # machine, and a public STUN server that times out only adds flakiness.
         # E2E_WEB_DIST and E2E_CHATD test a build without first putting it
-        # where the instance running for real on this machine serves from.
+        # where the live Nexa on this machine serves from.
         web_dist = os.environ.get("E2E_WEB_DIST") or str(ROOT / "web/dist")
         chatd = os.environ.get("E2E_CHATD") or str(ROOT / "bin/chatd")
         # GUEST_LINKS_P2P: calls here go peer to peer, where guest links are off unless asked for
@@ -547,10 +547,10 @@ def polish_flow(srv, alice, bob, server_id):
     a.fill("[data-testid=search-input]", "zzzz-nothing-matches")
     a.wait_for_selector("[data-testid=search-panel] [data-testid=search-nothing]", timeout=15000)
     a.click("[data-testid=search-panel] button[aria-label='Close Search']")
-    # the first account is the instance admin
+    # the first account is the Nexa admin
     a.click("button[aria-label='User Settings']")
     a.click("[data-nav=admin]")
-    a.wait_for_selector("text=Instance Admin", timeout=15000)
+    a.wait_for_selector("text=Nexa Admin", timeout=15000)
     a.wait_for_selector("text=Registration", timeout=15000)
     alice.shot("admin")
     # flip registration to closed and back
@@ -960,13 +960,33 @@ def media_flow(srv, alice, bob, path):
     print("  media: both old previews signed again and shown; nothing fetched from another site")
 
 
+def reads_flow(srv, alice, bob):
+    """A conversation looked at and left is read, even when the page believed its
+    window was not in front as the message arrived (the desktop app says so a
+    moment after the click that brings it forward), and opened after the
+    session's ready (its page is a chunk of its own, loaded on the way in)."""
+    alice.open_dm_with("Bob")
+    dm = alice.page.url.rstrip("/").split("/")[-1]
+    bob.page.goto(f"{srv.base}/channels/@me/{dm}", wait_until="networkidle")
+    alice.page.evaluate("() => { document.hasFocus = () => false; window.dispatchEvent(new Event('blur')); }")
+    alice.page.wait_for_timeout(300)
+    bob.send("read me while you look away")
+    alice.page.wait_for_selector("text=read me while you look away", timeout=15000)
+    alice.page.click("text=Friends")
+    alice.page.wait_for_timeout(1500)
+    assert alice.page.locator(f"[data-waiting='{dm}']").count() == 0, "a conversation looked at and left stays unread"
+    alice.page.reload(wait_until="networkidle")
+    alice.page.wait_for_timeout(1500)
+    assert alice.page.locator(f"[data-waiting='{dm}']").count() == 0, "the server still has it unread"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "tools/out"))
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--serve", action="store_true", help="keep the server running afterwards and print its URL")
-    ap.add_argument("--flows", default="all", help="comma-separated subset: server,expressions,voice,polish,groups,security,media,files (register/friends/dm always run)")
+    ap.add_argument("--flows", default="all", help="comma-separated subset: reads,server,expressions,voice,polish,groups,security,media,files (register/friends/dm always run)")
     args = ap.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -1040,6 +1060,9 @@ def main():
             phone.page.click("button[aria-label='Open Navigation']")
             time.sleep(0.4)
             phone.shot("drawer")
+            if want("reads"):
+                print("read marks")
+                reads_flow(srv, alice, bob)
             server_id = link = None
             if any(want(f) for f in ("server", "expressions", "voice", "polish")):
                 print("servers")

@@ -336,7 +336,7 @@ export interface AdminStats {
   blob_bytes: number;
   online: number;
   version: string;
-  /** This month's estimated call traffic against the instance's allowance; absent when calls are not metered. */
+  /** This month's estimated call traffic against Nexa's allowance; absent when calls are not metered. */
   realtime?: { month: string; used_bytes: number; limit_bytes: number; video_paused: boolean; calls_paused: boolean } | null;
 }
 
@@ -354,7 +354,7 @@ export interface AdminSettings {
 }
 
 /**
- * A compiled law-enforcement response: everything this instance already holds
+ * A compiled law-enforcement response: everything Nexa already holds
  * about one account, as a document to send back to an officer.
  *
  * `document` is English legal prose written by the server and is deliberately
@@ -565,7 +565,7 @@ export interface Presence {
 }
 
 /** 0 playing, 2 listening, 3 watching, 5 competing (Discord's Rich Presence types). */
-export type ActivityType = 0 | 2 | 3 | 5;
+export type ActivityType = 0 | 1 | 2 | 3 | 5;
 
 /**
  * A Rich Presence activity as chatd sends it: cleaned to Discord's limits,
@@ -588,6 +588,8 @@ export interface Activity {
   buttons?: { label: string; url: string }[];
   instance?: boolean;
   icon_url?: string;
+  /** "discord" for what the person's linked Discord account says, rather than the desktop app. */
+  source?: "discord";
   created_at: number;
 }
 
@@ -657,7 +659,7 @@ export interface UnfurlResult {
   /** A video player's frame, built by the server from a fixed list of sites. */
   player?: string;
   player_site?: string;
-  /** Set when the link invites you somewhere on this instance. */
+  /** Set when the link invites you somewhere on Nexa. */
   invite_code?: string;
   member_count?: number;
   online_count?: number;

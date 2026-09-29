@@ -1,6 +1,7 @@
 import { Pin, Plus, Shield, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import type { Channel } from "@/api/types";
 import { iconUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { NexaMark } from "@/components/common/Brand";
@@ -10,10 +11,11 @@ import { useReorder } from "@/hooks/useReorder";
 import { initials } from "@/lib/avatarColor";
 import { channelDisplayName, friendNicknames } from "@/lib/names";
 import { entryId, moveEntry, resolveRail, siblingIds, dropEntry, type RailDrop, type RailEntry, type ServerFolder } from "@/lib/railLayout";
-import { badgeText, conversationCount, serverUnread, unreadConversations } from "@/lib/unread";
+import { badgeText, serverUnread, unreadConversations } from "@/lib/unread";
+import { compareIds, idAt } from "@/lib/ids";
 import { useAuth } from "@/stores/auth";
 import { useChannels } from "@/stores/channels";
-import { useReadStates, isUnread } from "@/stores/readStates";
+import { useReadStates } from "@/stores/readStates";
 import { useRelationships } from "@/stores/relationships";
 import { useServers } from "@/stores/servers";
 import { useSettings } from "@/stores/settings";
@@ -26,6 +28,7 @@ import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { lastChannelOf } from "@/stores/serverNav";
 import { useNexa } from "@/stores/nexa";
 import { useModeration } from "@/stores/moderation";
+import { NexaAvatar } from "@/components/nexa/NexaBits";
 import { FolderFace } from "./FolderFace";
 import { adoptRail, changeRail, folderMenuItems, folderName, serverArrangeItems, toggleFolder } from "./railActions";
 import s from "./Rail.module.css";
@@ -43,6 +46,9 @@ export function homeLabel(messages: number, requests: number): string {
 
 /** How many waiting conversations the rail shows under home; the DM list has the rest. */
 const MAX_WAITING = 10;
+
+/** A conversation with messages waiting, or Nexa's (no channel), and when it last spoke as an id to sort by. */
+type Waiting = { channel: Channel | null; count: number; at: string };
 
 /** What is being dragged: a server, or a whole folder. */
 type Drag = { id: string; folder: boolean };
@@ -94,28 +100,24 @@ export function Rail() {
   const overRef = useRef<RailDrop | null>(null);
   const railRef = useRef<HTMLElement>(null);
 
-  // Home works like a server: a pill while something is waiting, and a count of
-  // every message waiting in a conversation plus the friend requests to answer
-  let unread = false;
-  let homeCount = 0;
-  for (const ch of Object.values(channels)) {
-    if (ch.type !== "dm" && ch.type !== "group_dm") continue;
-    if (isUnread(reads[ch.id], ch.last_message_id)) unread = true;
-    homeCount += conversationCount(ch, reads[ch.id], settings);
-  }
+  // Home's pill and count are for friend requests alone. A conversation with
+  // messages waiting already stands under it with its own count, and a second
+  // number on home for the same messages was one badge too many.
   const friendRequests = useMemo(() => Object.values(rels).filter((r) => r.type === "incoming").length, [rels]);
-  homeCount += friendRequests;
-  // what Nexa sent waits under home, like any conversation; once its conversation is closed, only something new counts
+  // what Nexa sent waits under home like any conversation; once its conversation is closed, only something new counts
   const nexaClosed = settings.nexaClosed;
-  const nexaUnread = useNexa((n) => (n.state && nexaListed(n.state.latest, nexaClosed) ? n.state.unread : 0));
-  if (nexaUnread > 0) unread = true;
-  homeCount += nexaUnread;
+  const nexaState = useNexa((n) => n.state);
+  const nexaOpen = loc.pathname.startsWith("/channels/@me/nexa");
+  const nexaUnread = nexaState && !nexaOpen && nexaListed(nexaState.latest, nexaClosed) ? nexaState.unread : 0;
   const isAdmin = useAuth((a) => ((a.me?.flags ?? 0) & 1) !== 0);
   // cases the member wrote in last, and bug reports waiting for an answer
   const needsReply = useModeration((m) => (m.counts?.needs_reply ?? 0) + (m.bugCounts?.waiting ?? 0));
   const inPanel = loc.pathname.startsWith("/channels/@admin");
-  // like the people themselves waiting at the door: who sent something, and how much
-  const waiting = unreadConversations(channels, reads, settings, openConvo).slice(0, MAX_WAITING);
+  // like the people themselves waiting at the door: who sent something, and how much; Nexa among them, by when it spoke
+  const waiting: Waiting[] = unreadConversations(channels, reads, settings, openConvo).map((w) => ({ ...w, at: w.channel.last_message_id ?? w.channel.id }));
+  if (nexaUnread > 0 && nexaState) waiting.push({ channel: null, count: nexaUnread, at: idAt(nexaState.latest) });
+  waiting.sort((a, b) => compareIds(b.at, a.at));
+  waiting.splice(MAX_WAITING);
 
   const layout = useMemo(() => resolveRail(settings.rail, order, settings.serverPositions), [settings.rail, order, settings.serverPositions]);
   // the order an account had before folders becomes its layout, once its settings are in
@@ -331,14 +333,14 @@ export function Rail() {
   return (
     <nav className={s.rail} aria-label={t("rail.rail.servers")} ref={railRef} onDragEnd={endDrag}>
       {reorder.live}
-      <div className={s.item} data-selected={home} data-unread={(unread || friendRequests > 0) && !home} data-testid="home">
+      <div className={s.item} data-selected={home} data-unread={friendRequests > 0 && !home} data-testid="home">
         <span className={s.pill} />
         <Tooltip text={t("sidebar.dMSidebar.directMessages")} side="right">
-          <button className={s.btn} aria-label={homeCount > 0 ? t("rail.rail.directMessagesWith", { what: homeLabel(homeCount - friendRequests, friendRequests) }) : t("sidebar.dMSidebar.directMessages")} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
+          <button className={s.btn} aria-label={friendRequests > 0 ? t("rail.rail.directMessagesWith", { what: homeLabel(0, friendRequests) }) : t("sidebar.dMSidebar.directMessages")} onClick={() => nav("/channels/@me", { state: { keepDrawer: true } })}>
             <NexaMark size={30} />
           </button>
         </Tooltip>
-        {homeCount > 0 ? <span className={s.badge} aria-hidden="true" data-testid="home-count">{badgeText(homeCount)}</span> : null}
+        {friendRequests > 0 ? <span className={s.badge} aria-hidden="true" data-testid="home-count">{badgeText(friendRequests)}</span> : null}
       </div>
       {isAdmin ? (
         <div className={s.item} data-selected={inPanel} data-unread={needsReply > 0 && !inPanel} data-testid="rail-moderation">
@@ -352,6 +354,27 @@ export function Rail() {
         </div>
       ) : null}
       {waiting.map(({ channel: ch, count }) => {
+        if (!ch) {
+          const label = t("rail.rail.channelUnread", { name: "Nexa", what: count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count }) });
+          return (
+            <div key="nexa" className={[s.item, s.waiting].join(" ")} data-unread="true" data-waiting="nexa">
+              <span className={s.pill} />
+              <Tooltip text="Nexa" side="right">
+                <button
+                  className={[s.btn, s.hasIcon].join(" ")}
+                  aria-label={label}
+                  onClick={() => {
+                    nav("/channels/@me/nexa");
+                    useUI.getState().setLeftOpen(false);
+                  }}
+                >
+                  <NexaAvatar size={48} />
+                </button>
+              </Tooltip>
+              <span className={s.badge} aria-hidden="true" data-testid="waiting-count">{badgeText(count)}</span>
+            </div>
+          );
+        }
         const name = channelDisplayName(ch, users, meId, nicknames);
         const other = ch.type === "dm" ? (ch.recipient_ids.find((id) => id !== meId) ?? ch.recipient_ids[0] ?? "") : "";
         const label = t("rail.rail.channelUnread", { name, what: count > 99 ? t("rail.rail.moreThan99Unread") : t("rail.rail.unreadMessagesCount", { count }) });

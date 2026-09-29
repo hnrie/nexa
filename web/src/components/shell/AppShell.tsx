@@ -9,6 +9,7 @@ import { TermsGate } from "@/components/legal/TermsGate";
 import { WhatsNew } from "@/components/shell/WhatsNewDialog";
 import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
+import { DiscordBanner } from "@/components/shell/DiscordBanner";
 import { UpdatePrompt } from "@/components/shell/UpdateDialog";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
 import { EmojiDetails } from "@/components/chat/EmojiDetails";
@@ -19,6 +20,7 @@ import { activeTab, tabAddress, useTabs } from "@/stores/tabs";
 import { useUI } from "@/stores/ui";
 import { installVoice } from "@/voice/session";
 import { installAway } from "@/lib/away";
+import { installDiscord } from "@/stores/discord";
 import { installSearchIndex } from "@/search/indexer";
 import { installBackLayers } from "./backLayers";
 import s from "./AppShell.module.css";
@@ -105,6 +107,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     installVoice();
     installAway();
+    installDiscord();
     installSearchIndex();
   }, []);
 
@@ -238,6 +241,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ) : null}
         <UpdatePrompt />
         <RpcBanner />
+        <DiscordBanner />
         <DownloadBanner />
         <Tabs />
         {/* the page takes what the banner leaves */}

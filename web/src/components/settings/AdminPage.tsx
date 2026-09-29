@@ -17,7 +17,7 @@ import s from "@/components/server/ServerSettings.module.css";
 
 import { t as tr_, translator } from "@/i18n";
 import { LoadError } from "@/components/common/LoadError";
-/** User settings → Instance Admin (admins only): stats, registration policy, users. */
+/** User settings → Nexa Admin (admins only): stats, registration policy, users. */
 export default function AdminPage() {
   const toast = useUI((u) => u.toast);
   const meId = useAuth((a) => a.me?.id);
@@ -66,8 +66,8 @@ export default function AdminPage() {
   };
   return (
     <>
-      <h2 className={st.title}>{tr_("settings.admin.instanceAdmin")}</h2>
-      <p className={st.hint}>{tr_("settings.admin.youRunThisInstanceTheseSettings")}</p>
+      <h2 className={st.title}>{tr_("settings.admin.nexaAdmin")}</h2>
+      <p className={st.hint}>{tr_("settings.admin.theseSettingsApplyToEveryone")}</p>
       <h3 className={st.h5}>{tr_("server.channelSettings.overview")}</h3>
       {stats ? (
         // on the page's own background the box was invisible, and each value sat 600px from its name
@@ -130,7 +130,7 @@ export default function AdminPage() {
           {tr_("settings.admin.openPanel")}
         </Button>
       </div>
-      {/* the server compiles these for the instance owner alone */}
+      {/* the server compiles these for the owner of Nexa alone */}
       {isOwner ? <LegalResponse /> : null}
       <CrashLog />
     </>
@@ -141,7 +141,7 @@ export default function AdminPage() {
  * Answering legal process about one account.
  *
  * Every platform of any size can tell an officer what it holds; this does the
- * same for whoever runs this instance. The button reads the rows that already
+ * same for whoever runs Nexa. The button reads the rows that already
  * exist and writes a document out of them — it collects nothing new, and the
  * document says in plain terms which categories are end-to-end encrypted and
  * therefore cannot be produced at all, so the same request does not come back.
@@ -194,7 +194,7 @@ function LegalResponse() {
   return (
     <>
       <h3 className={st.h5}>{tr_("settings.admin.legal.lawEnforcementResponse")}</h3>
-      <p className={st.hint}>{tr_("settings.admin.legal.compileWhatThisInstanceHolds")}</p>
+      <p className={st.hint}>{tr_("settings.admin.legal.compileWhatNexaHolds")}</p>
       <div className={s.searchRow} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
         <TextInput
           value={who}
@@ -229,7 +229,7 @@ function LegalResponse() {
   );
 }
 
-/** What has been breaking, for whoever runs this instance. */
+/** What has been breaking, for whoever runs Nexa. */
 function CrashLog() {
   const [list, setList] = useState<ClientErrorReport[] | null>(null);
   const [failed, setFailed] = useState(false);

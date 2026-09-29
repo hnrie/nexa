@@ -94,7 +94,7 @@ export class ErrorBoundary extends Component<Props, State> {
             {lookActive() ? <button className={s.secondary} onClick={enterSafeMode} data-testid="crash-safe-mode">{t("look.safe.startSafe")}</button> : null}
           </div>
           {lookActive() ? <p className={s.note}>{t("look.safe.crashHint")}</p> : null}
-          <p className={s.note}>{t("shell.errorBoundary.ifItKeepsHappeningTellWhoever")}</p>
+          <p className={s.note}>{t("shell.errorBoundary.ifItKeepsHappening")}</p>
         </div>
       </div>
     );

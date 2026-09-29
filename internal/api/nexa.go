@@ -18,14 +18,14 @@ import (
 	"evilion.xyz/chat/internal/textutil"
 )
 
-// Nexa is the account the instance speaks as. It delivers moderation notices
+// Nexa is the account the service itself speaks as. It delivers moderation notices
 // and announcements, and each notice opens onto its case: a private thread
 // with the moderation team where the member can appeal or ask questions.
 //
 // This file is the member's side of that: what their app is told on arrival,
 // their Nexa conversation, and their own case threads. The staff's side is in
 // moderation.go. Nothing here is end-to-end encrypted — a case thread is a
-// conversation with the instance itself — and the app says so where one is
+// conversation with Nexa itself — and the app says so where one is
 // written.
 
 // nexaMemberRoutes are the member's own side of Nexa. They stay open to muted
@@ -214,7 +214,7 @@ type nexaState struct {
 	// comes back.
 	Latest int64             `json:"latest"`
 	People map[string]person `json:"people"`
-	// OwnerID is the instance's owner (0: none yet), for every account: the
+	// OwnerID is the owner of Nexa (0: none yet), for every account: the
 	// app crowns the owner wherever they are listed.
 	OwnerID ids.ID        `json:"owner_id"`
 	Staff   *staffSummary `json:"staff,omitempty"`
@@ -653,7 +653,7 @@ type systemAccount struct {
 }
 
 // systemUser returns the Nexa account, making it the first time it is asked
-// for on an instance that has none.
+// for on a database that has none.
 func (s *Server) systemUser(ctx context.Context) (*store.User, error) {
 	s.system.mu.Lock()
 	defer s.system.mu.Unlock()

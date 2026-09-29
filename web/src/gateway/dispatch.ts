@@ -24,6 +24,7 @@ import { ring } from "@/lib/keyring";
 import type { Message, PublicUser, Relationship, ServerView } from "@/api/types";
 import { nexa as nexaApi, type Announcement, type MemberCase, type NexaState } from "@/api/moderation";
 import { useNexa } from "@/stores/nexa";
+import { useDiscord } from "@/stores/discord";
 import { emitModEvent, useModeration } from "@/stores/moderation";
 import { bugAlertHooks } from "@/lib/bugs";
 import { mentionsMe } from "@/lib/mentionsMe";
@@ -102,6 +103,29 @@ export function endDispatchSession(): void {
 /** The session events are being applied for, so one queued before it ended can be dropped. */
 export function dispatchGeneration(): number {
   return sessionGen;
+}
+
+/**
+ * The session whose ready has been applied, and who wants to know when one is.
+ * Kept here, where ready is applied, rather than by whoever cares: a hook a
+ * lazily loaded page added when it loaded missed the ready that came before
+ * it, and a conversation opened after that never knew its read positions were
+ * in, so it never marked anything read.
+ */
+let readyGen = -1;
+const readyListeners = new Set<() => void>();
+
+/** Whether this session's ready, and every read position with it, has been applied. */
+export function readyApplied(): boolean {
+  return readyGen === sessionGen;
+}
+
+/** Calls fn whenever a ready has been applied; returns how to stop. */
+export function onReadyApplied(fn: () => void): () => void {
+  readyListeners.add(fn);
+  return () => {
+    readyListeners.delete(fn);
+  };
 }
 
 // Channels are not cleared here: ready replaces them in one step, because a
@@ -256,8 +280,11 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       applyLockPolicy();
       await useKeys.getState().ingestGrants(d.key_grants);
       if (gone()) return;
+      readyGen = sessionGen;
+      for (const fn of [...readyListeners]) fn();
       for (const h of dispatchHooks.onReady) h();
       void useKeys.getState().reconcile();
+      void useDiscord.getState().load();
       for (const id of shown) void useMessages.getState().syncGap(id);
       return;
     }
@@ -452,6 +479,9 @@ export async function applyEvent(e: GatewayEvent): Promise<void> {
       return;
     case "group_add_notice":
       useGroupAddNotices.getState().add(e.d);
+      return;
+    case "discord_link":
+      useDiscord.getState().set(e.d);
       return;
     case "group_add_notice_delete":
       useGroupAddNotices.getState().remove(e.d.channel_id);

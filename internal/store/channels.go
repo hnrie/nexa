@@ -351,7 +351,7 @@ func (s *Store) SubchatsFor(ctx context.Context, parentID ids.ID) ([]*Channel, e
 	// second connection while this one holds an open result set meant eight
 	// concurrent calls could take all eight readers with their cursors and
 	// then all wait for a ninth — a deadlock that only ends when each client
-	// gives up, with every other read on the instance queued behind it.
+	// gives up, with every other read on Nexa queued behind it.
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return nil, err

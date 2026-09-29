@@ -21,7 +21,7 @@ import (
 // the largest server rather than with anything its sender did.
 //
 // So each server's permission inputs — owner, roles, members with their roles
-// and timeouts, overwrites by channel, which channels exist, and the instance
+// and timeouts, overwrites by channel, which channels exist, and the Nexa
 // admins — are loaded once into a snapshot and answered from memory. Every
 // write that could change an answer goes through this package and bumps a
 // version once it commits; a snapshot built against an older version is never
@@ -57,7 +57,7 @@ type serverSnapshot struct {
 	// channels maps each channel of the server to its type, in channelOrder
 	channels     map[ids.ID]string
 	channelOrder []ids.ID
-	// admins are the instance admins as of the same version: an admin holds
+	// admins are the Nexa admins as of the same version: an admin holds
 	// every permission its owner does in any server it is a member of
 	admins map[ids.ID]bool
 
@@ -75,7 +75,7 @@ type serverSnapshot struct {
 // permCache holds the snapshots.
 type permCache struct {
 	mu sync.Mutex
-	// global is bumped by writes that reach past one server (instance admins,
+	// global is bumped by writes that reach past one server (Nexa admins,
 	// an account's deletion); servers[id] by writes to one server. A snapshot's
 	// version is their sum, and both only grow, so any write changes it.
 	global  uint64
@@ -309,7 +309,7 @@ func (s *Store) loadSnapshot(ctx context.Context, serverID ids.ID, version uint6
 	return snap, rows.Err()
 }
 
-// admins returns the instance admins, from memory while no write has changed
+// admins returns the Nexa admins, from memory while no write has changed
 // them. The map is shared: callers must not change it.
 func (s *Store) admins(ctx context.Context) (map[ids.ID]bool, error) {
 	c := s.perm
@@ -368,7 +368,7 @@ func (snap *serverSnapshot) member(uid ids.ID, now int64) (perms.Member, bool) {
 }
 
 // privileged reports whether uid holds every permission in this server: its
-// owner, or an instance admin.
+// owner, or a Nexa admin.
 func (snap *serverSnapshot) privileged(uid ids.ID) bool {
 	return snap.ownerID == uid || snap.admins[uid]
 }

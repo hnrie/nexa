@@ -217,7 +217,7 @@ func (s *Server) handleBlock(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrNotFound)
 		return
 	}
-	// what Nexa sends is how the instance reaches everyone; there is no
+	// what Nexa sends is how it reaches everyone; there is no
 	// conversation with it to close
 	if isSystem(target) {
 		WriteError(w, E(http.StatusForbidden, "nexa_system", "Nexa is the system account and can't be blocked."))

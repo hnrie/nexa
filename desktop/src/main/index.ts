@@ -11,6 +11,7 @@ import { chooseDisplaySource, handleDisplayMedia, lockPermissions, openScreenSet
 import { RpcService } from "./rpc/service";
 import { PasteGate } from "./pasteGate";
 import { SettingsStore } from "./settings";
+import { offerMoveToApplications, retireOlderCopies } from "./succession";
 import { createTray, fillTray, type TrayActions } from "./tray";
 import { Updater } from "./update";
 import { nativeStrings, setNativeStrings, stringsDiffer } from "./strings";
@@ -36,6 +37,8 @@ let rpc: RpcService | null = null;
 let updater: Updater | null = null;
 const pasteGate = new PasteGate();
 
+// an older copy still running would hold the lock the two share (macOS; succession.ts)
+if (app.isPackaged) retireOlderCopies(log);
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -78,6 +81,9 @@ async function start(): Promise<void> {
   win.webContents.on("before-input-event", (_e, input) => pasteGate.key(input.type, input.key, input.shift));
   handleDisplayMedia(() => win, log);
   applicationMenu(() => win, () => void updater?.check());
+  // a copy opened from the disk image or Downloads offers to move into Applications, once
+  // the page has had a moment to send its words over
+  win.webContents.once("did-finish-load", () => setTimeout(() => void offerMoveToApplications(settings, win, log), 3000));
 
   win.on("close", (e) => {
     if (quitting || !settings.get("closeToTray")) return;

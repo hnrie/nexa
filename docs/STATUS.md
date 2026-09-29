@@ -46,7 +46,7 @@ participants, the voice status block, and the Voice & Video settings page.
 ## Phase 5 — polish ✅
 
 Client-side message search with Discord-style filters over the decrypted history,
-the instance admin page (stats, runtime registration policy, enable/disable and promote
+the Nexa admin page (stats, runtime registration policy, enable/disable and promote
 accounts), a zip data export, friend nicknames that flow through DM names, private
 per-user notes, quick switcher over servers and channels, and the mobile pass.
 

@@ -5,6 +5,7 @@ import { Modal } from "@/components/common/Modal";
 import { applyUpdate, cancelUpdate, isSnoozed, snoozeUpdate, startUpdateChecks, useAppUpdate, type Applying, type Waiting } from "@/lib/appUpdate";
 import { desktopBridge, type UpdateState } from "@/lib/desktopBridge";
 import { useInterrupt } from "@/lib/interrupt";
+import { useMacReplacement, type Replacement } from "@/lib/macReplacement";
 import { useDesktop } from "@/stores/desktop";
 import { useVoice } from "@/stores/voice";
 import { t, useLocale } from "@/i18n";
@@ -15,12 +16,16 @@ import s from "./Update.module.css";
  * app restarted into it loads the newest web app anyway.
  * ready: downloaded, a restart installs it. downloading: on its way.
  * manual: a build that cannot update itself (a .deb), so the download page.
+ * replace: a Mac app too old to update itself to the new version, which it
+ * is offered to download instead (lib/macReplacement.ts). It comes first:
+ * nothing else it could install is newer.
  */
 export type Offer =
   | { kind: "web"; key: string }
-  | { kind: "ready" | "downloading" | "manual"; key: string; version: string | null; progress: number; url: string | null };
+  | { kind: "ready" | "downloading" | "manual" | "replace"; key: string; version: string | null; progress: number; url: string | null };
 
-export function offerOf(web: string | null, desktop: UpdateState | null, inApp: boolean): Offer | null {
+export function offerOf(web: string | null, desktop: UpdateState | null, inApp: boolean, replacement: Replacement | null = null): Offer | null {
+  if (replacement) return { kind: "replace", key: `replace:${replacement.version}`, version: replacement.version, progress: 0, url: replacement.url };
   if (inApp && desktop) {
     const version = desktop.version ?? null;
     // one key for the whole of one version, so Later holds while it downloads and once it is ready
@@ -79,7 +84,8 @@ export function UpdatePrompt() {
   const desktop = useDesktop((d) => d.update);
   const inCall = useVoice((v) => !!v.mine);
   const [, wake] = useState(0);
-  const offer = offerOf(web, desktop, !!desktopBridge());
+  const replacement = useMacReplacement();
+  const offer = offerOf(web, desktop, !!desktopBridge(), replacement);
 
   useEffect(() => startUpdateChecks(), []);
 
@@ -97,7 +103,7 @@ export function UpdatePrompt() {
   if (!offer) return null;
 
   const go = () => {
-    if (offer.kind === "manual") {
+    if (offer.kind === "manual" || offer.kind === "replace") {
       if (offer.url) window.open(offer.url, "_blank", "noopener");
       // the page is open elsewhere; the reminder stays until the new version is installed
       snoozeUpdate(offer.key);
@@ -123,7 +129,15 @@ function Progress({ value }: { value: number }) {
 
 function UpdateDialog({ offer, onGo, onLater }: { offer: Offer; onGo: () => void; onLater: () => void }) {
   const web = offer.kind === "web";
-  const body = web ? t("shell.update.webBody") : offer.kind === "ready" ? t("shell.update.readyBody") : offer.kind === "downloading" ? t("shell.update.downloadingBody") : t("shell.update.manualBody");
+  const body = web
+    ? t("shell.update.webBody")
+    : offer.kind === "ready"
+      ? t("shell.update.readyBody")
+      : offer.kind === "downloading"
+        ? t("shell.update.downloadingBody")
+        : offer.kind === "replace"
+          ? t("shell.update.replaceBody")
+          : t("shell.update.manualBody");
   return (
     <Modal
       open
@@ -137,7 +151,7 @@ function UpdateDialog({ offer, onGo, onLater }: { offer: Offer; onGo: () => void
             {t("shell.update.later")}
           </Button>
           <Button className={s.action} onClick={onGo} data-testid="update-go">
-            {web ? t("shell.update.reload") : t("shell.update.update")}
+            {web ? t("shell.update.reload") : offer.kind === "replace" ? t("shell.update.download") : t("shell.update.update")}
           </Button>
         </>
       }
@@ -164,7 +178,9 @@ function UpdateReminder({ offer, onGo }: { offer: Offer; onGo: () => void }) {
         ? t("shell.update.appReady")
         : offer.kind === "downloading"
           ? t("shell.update.appDownloading")
-          : t("shell.update.appOut");
+          : offer.kind === "replace"
+            ? t("shell.update.replaceOut")
+            : t("shell.update.appOut");
   return (
     <div className={s.bar} role="region" aria-label={t("shell.update.title")} data-testid="update-reminder" data-kind={offer.kind}>
       <span className={s.barIcon} aria-hidden="true">
@@ -180,7 +196,7 @@ function UpdateReminder({ offer, onGo }: { offer: Offer; onGo: () => void }) {
         </Button>
       ) : (
         <Button size="sm" className={s.barBtn} onClick={onGo} data-testid="update-reminder-go">
-          {offer.kind === "web" ? t("shell.update.reload") : t("shell.update.update")}
+          {offer.kind === "web" ? t("shell.update.reload") : offer.kind === "replace" ? t("shell.update.download") : t("shell.update.update")}
         </Button>
       )}
     </div>

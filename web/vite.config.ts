@@ -10,7 +10,7 @@ const API = process.env["VITE_API_TARGET"] ?? "http://127.0.0.1:8090";
 const TWEMOJI_DIR = fileURLToPath(new URL("./node_modules/@twemoji/svg", import.meta.url));
 
 /**
- * Serves Twemoji from this instance instead of a CDN, so rendering an emoji
+ * Serves Twemoji from Nexa instead of a CDN, so rendering an emoji
  * never tells a third party who is reading what.
  */
 function twemoji(): Plugin {

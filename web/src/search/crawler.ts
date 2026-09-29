@@ -342,7 +342,7 @@ export class Crawler {
         if (signal.aborted) throw err;
         if (err instanceof ApiError && (err.status === 403 || err.status === 404)) return null;
         if (!retryable(err) || attempt >= MAX_RETRIES) throw err;
-        // A 429 is the instance telling us to slow down; waiting it out is the
+        // A 429 is the server telling us to slow down; waiting it out is the
         // whole point of pacing, and the search says it is waiting so the
         // pause is not read as a hang.
         this.throttled = true;

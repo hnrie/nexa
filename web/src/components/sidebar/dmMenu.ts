@@ -65,7 +65,7 @@ export async function purgeDM(channelId: string, nav?: (p: string) => void): Pro
   }
 }
 
-/** Whether you may do what a group's owner does: you own it, or you run this instance. */
+/** Whether you may do what a group's owner does: you own it, or you run Nexa. */
 export function managesGroup(ch: Channel | undefined): boolean {
   const me = useAuth.getState().me;
   if (!ch || ch.type !== "group_dm" || !me) return false;

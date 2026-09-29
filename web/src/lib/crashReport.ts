@@ -1,8 +1,8 @@
 /**
  * Crash reporting.
  *
- * Every uncaught error, rejected promise and render crash is sent to this
- * instance so whoever runs it can see what is breaking, instead of only the
+ * Every uncaught error, rejected promise and render crash is sent to Nexa
+ * so whoever runs it can see what is breaking, instead of only the
  * person it broke for. Nothing from a conversation is included: the report is
  * the error, where in the code it came from, and which build it was.
  */

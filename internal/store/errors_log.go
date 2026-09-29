@@ -30,7 +30,7 @@ const KeepClientErrors = 500
 // it is the one most likely to be hit in a tight loop — a render error that
 // re-renders and crashes again — so running it on every insert put up to a
 // couple of thousand scan-and-delete statements a minute through SQLite's
-// single writer connection, starving every real write on the instance. Every
+// single writer connection, starving every real write on Nexa. Every
 // fiftieth report is enough to keep the table bounded.
 const trimSlack = 50
 
