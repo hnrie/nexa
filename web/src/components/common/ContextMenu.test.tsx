@@ -308,3 +308,91 @@ describe("ContextMenuHost submenus", () => {
     expect(useUI.getState().contextMenu).toBeNull();
   });
 });
+
+describe("ContextMenuHost items", () => {
+  it("shows an item that switches something on and off as a tick box, with its keys", async () => {
+    render(<ContextMenuHost />);
+    act(() =>
+      useUI.getState().openContextMenu({
+        x: 10,
+        y: 10,
+        items: [
+          { id: "cut", label: "Cut", keys: "Ctrl+X" },
+          { id: "send", label: "Show Send Message Button", checked: true, toggle: true },
+          { id: "mic", label: "Default Microphone", checked: false },
+        ],
+      }),
+    );
+    await settle();
+    expect(screen.getByRole("menuitem", { name: /Cut/ }).textContent).toContain("Ctrl+X");
+    expect(screen.getByRole("menuitemcheckbox", { name: /Show Send Message Button/ }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("menuitemradio", { name: /Default Microphone/ }).getAttribute("aria-checked")).toBe("false");
+  });
+});
+
+describe("ContextMenuHost that leaves focus where it was", () => {
+  function openOnBox() {
+    const box = document.createElement("textarea");
+    box.value = "some words";
+    document.body.append(box);
+    box.focus();
+    box.setSelectionRange(5, 10);
+    act(() =>
+      useUI.getState().openContextMenu({
+        x: 10,
+        y: 10,
+        keepFocus: true,
+        items: [
+          { id: "cut", label: "Cut" },
+          { id: "copy", label: "Copy" },
+          { id: "paste", label: "Paste" },
+        ],
+      }),
+    );
+    return box;
+  }
+
+  afterEach(() => {
+    document.querySelectorAll("textarea").forEach((t) => t.remove());
+  });
+
+  it("leaves focus and the selection in the text box it was opened on", async () => {
+    render(<ContextMenuHost />);
+    const box = openOnBox();
+    await settle();
+    expect(document.activeElement).toBe(box);
+    expect([box.selectionStart, box.selectionEnd]).toEqual([5, 10]);
+  });
+
+  it("does not take focus when an item is pressed", async () => {
+    render(<ContextMenuHost />);
+    openOnBox();
+    await settle();
+    const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    screen.getByRole("menuitem", { name: "Copy" }).dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+  });
+
+  it("takes the keyboard at the first key, and nothing reaches the text box", async () => {
+    render(<ContextMenuHost />);
+    const box = openOnBox();
+    await settle();
+    const typed = vi.fn();
+    box.addEventListener("keydown", typed);
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(label()).toBe("Cut");
+    expect(typed).not.toHaveBeenCalled();
+    act(() => box.focus());
+    fireEvent.keyDown(box, { key: "p" });
+    expect(label()).toBe("Paste");
+  });
+
+  it("closes for Tab and for shortcuts, which go on to the page", async () => {
+    render(<ContextMenuHost />);
+    const box = openOnBox();
+    await settle();
+    fireEvent.keyDown(box, { key: "c", ctrlKey: true });
+    expect(useUI.getState().contextMenu).toBeNull();
+  });
+});
+

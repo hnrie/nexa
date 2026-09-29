@@ -1,6 +1,7 @@
 import { Play } from "lucide-react";
-import { useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { UnfurlResult } from "@/api/types";
+import { trimUrl } from "@/markdown/parse";
 import { FavoriteButton } from "./FavoriteButton";
 import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
@@ -110,14 +111,127 @@ function publishedOn(ms: number | undefined): string | null {
   return formatShortDate(ms);
 }
 
+/** An address in a page's words, as far as the words around it let it go. */
+const RE_ADDRESS = /https?:\/\/[^\s<>"]+/gi;
+
+/** A page's words with the addresses in them made into links, each opening in a new tab. */
+export function linkify(text: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let at = 0;
+  for (const m of text.matchAll(RE_ADDRESS)) {
+    const start = m.index ?? 0;
+    // the full stop or bracket after an address belongs to the sentence
+    const url = trimUrl(m[0]);
+    if (start < at || !/^https?:\/\/\S/i.test(url)) continue;
+    if (start > at) out.push(text.slice(at, start));
+    out.push(
+      <a key={start} className="md-link" href={url} target="_blank" rel="noopener noreferrer">
+        {url}
+      </a>,
+    );
+    at = start + url.length;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return out;
+}
+
+/**
+ * A page's description as it wrote it: its line breaks kept and its addresses
+ * made into links. A long one shows its first lines until asked for the rest.
+ */
+function Description({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [folds, setFolds] = useState(false);
+  const parts = useMemo(() => linkify(text), [text]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || open) return;
+    const check = () => setFolds(el.scrollHeight > el.clientHeight + 1);
+    check();
+    // a narrower window folds lines that fitted before
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open]);
+  return (
+    <>
+      <div ref={ref} className={s.desc} data-open={open} dir="auto">
+        {parts}
+      </div>
+      {folds || open ? (
+        <button type="button" className={s.more} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          {open ? t("chat.embeds.showLess") : t("chat.embeds.showMore")}
+        </button>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A card's picture, which opens in the viewer like any other. A page that
+ * asks for its picture large (twitter:card) has it across the card, one that
+ * asks for a thumbnail has it small beside the words, and one that says
+ * neither has it large when it is big enough to be worth it.
+ */
+function CardPicture({ e, src, large }: { e: UnfurlResult; src: string; large: boolean }) {
+  const [open, setOpen] = useState(false);
+  const name = imageNameFromUrl(src);
+  const show = () => setOpen(true);
+  // a width and a shape rather than a height, so a narrow screen shrinks it whole instead of squeezing it
+  const fit = large ? fitCard(e.image_w, e.image_h, 400, 300) : undefined;
+  return (
+    <>
+      <img
+        className={large ? s.large : s.thumb}
+        src={src}
+        // the picture is most of what a large preview says, so it is named
+        alt={large ? e.title || e.site_name || t("chat.embeds.linkPreviewImage") : ""}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        style={fit ? { width: fit.width, aspectRatio: `${fit.width} / ${fit.height}` } : undefined}
+        data-image-src={src}
+        data-image-name={name}
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        aria-label={large ? undefined : t("chat.embeds.linkPreviewImage")}
+        onClick={show}
+        onKeyDown={(ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ") return;
+          ev.preventDefault();
+          show();
+        }}
+      />
+      {open ? <Lightbox items={[{ src, name: name || "image" }]} onClose={() => setOpen(false)} /> : null}
+    </>
+  );
+}
+
+/**
+ * Whether an author is only the site's own account: "@youtube" beside
+ * "YouTube". Previews made before the server stopped taking the site's
+ * account for the author still carry one.
+ */
+export function siteAccount(author: string | undefined, site: string | undefined): boolean {
+  if (!author?.startsWith("@") || !site) return false;
+  const handle = author.slice(1).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const name = site.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!handle || !name) return false;
+  // a short handle is only the site's when it is the site's whole name
+  return handle === name || (handle.length >= 3 && name.length >= 3 && (name.includes(handle) || handle.includes(name)));
+}
+
 /** The line above the title: the site's icon, its name, the author, the date. */
 function CardHead({ e }: { e: UnfurlResult }) {
   const icon = useMediaSrc(e.icon);
   const when = publishedOn(e.published_at);
+  const byline = siteAccount(e.author, e.site_name) ? undefined : e.author;
   const author = e.author_url ? (
-    <a href={e.author_url} target="_blank" rel="noopener noreferrer">{e.author || e.author_url.replace(/^https?:\/\//, "")}</a>
-  ) : e.author ? (
-    <span>{e.author}</span>
+    <a href={e.author_url} target="_blank" rel="noopener noreferrer">{byline || e.author_url.replace(/^https?:\/\//, "")}</a>
+  ) : byline ? (
+    <span>{byline}</span>
   ) : null;
   if (!e.site_name && !author && !when && !icon) return null;
   return (
@@ -141,14 +255,14 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
   const image = useMediaSrc(e.image);
   const media = useMediaSrc(e.media);
   const src = playerSrc(e);
-  const big = !!e.image && (e.image_w ?? 0) >= 400;
+  const big = !!e.image && (e.image_layout === "large" || (e.image_layout !== "thumbnail" && (e.image_w ?? 0) >= 400));
   const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer" dir="auto">{e.title}</a> : null;
   if (src) {
     return (
       <div className={s.card} style={e.color ? { borderInlineStartColor: e.color } : undefined}>
         <CardHead e={e} />
         {title}
-        {e.description ? <div className={s.desc} dir="auto">{e.description}</div> : null}
+        {e.description ? <Description text={e.description} /> : null}
         <div className={s.video}>
           {play ? (
             <iframe
@@ -174,9 +288,9 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
         <div className={s.cardText}>
           <CardHead e={e} />
           {title}
-          {e.description ? <div className={s.desc} dir="auto">{e.description}</div> : null}
+          {e.description ? <Description text={e.description} /> : null}
         </div>
-        {image && !big && !e.media ? <img className={s.thumb} src={image} alt="" loading="lazy" referrerPolicy="no-referrer" data-image-src={image} data-image-name={imageNameFromUrl(image)} /> : null}
+        {image && !big && !e.media ? <CardPicture e={e} src={image} large={false} /> : null}
       </div>
       {/* a file this browser plays on its own; the page it came from runs nothing */}
       {media && e.media_kind === "video" ? (
@@ -185,8 +299,7 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
         // the app's own player, as for an uploaded voice note, not the browser's grey bar
         <div className={s.audio}><AudioPlayer src={media} name={fileNameOf(e.url, t("chat.embeds.audio"))} /></div>
       ) : image && big ? (
-        // the picture is most of what the preview says, so it is named
-        <img className={s.large} src={image} alt={e.title || e.site_name || t("chat.embeds.linkPreviewImage")} loading="lazy" referrerPolicy="no-referrer" style={fitCard(e.image_w, e.image_h, 400, 300)} data-image-src={image} data-image-name={imageNameFromUrl(image)} />
+        <CardPicture e={e} src={image} large />
       ) : null}
     </div>
   );

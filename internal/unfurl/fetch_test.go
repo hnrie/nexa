@@ -38,10 +38,11 @@ func fetcherFor(t *testing.T, h http.Handler) (*Fetcher, *httptest.Server) {
 		Timeout:   5 * time.Second,
 		Transport: tr,
 		Resolver: fakeResolver{
-			"example.test":    {"8.8.8.8"},
-			"other.test":      {"1.1.1.1"},
-			"www.youtube.com": {"8.8.8.8"},
-			"youtu.be":        {"8.8.8.8"},
+			"example.test":     {"8.8.8.8"},
+			"www.example.test": {"8.8.8.8"},
+			"other.test":       {"1.1.1.1"},
+			"www.youtube.com":  {"8.8.8.8"},
+			"youtu.be":         {"8.8.8.8"},
 		},
 	}
 	return f, srv
@@ -109,8 +110,8 @@ func TestFetchOpenGraph(t *testing.T) {
 	if res.Title != "Open Graph Title" {
 		t.Errorf("Title = %q", res.Title)
 	}
-	if res.Description != "A description with newlines." {
-		t.Errorf("Description = %q, want whitespace collapsed", res.Description)
+	if res.Description != "A description\nwith newlines." {
+		t.Errorf("Description = %q, want spaces collapsed and the line break kept", res.Description)
 	}
 	if res.SiteName != "Example Site" {
 		t.Errorf("SiteName = %q", res.SiteName)
@@ -632,5 +633,180 @@ func TestFetcherDefaults(t *testing.T) {
 	f = &Fetcher{Timeout: time.Second, MaxBytes: 10, UserAgent: "x"}
 	if f.timeout() != time.Second || f.maxBytes() != 10 || f.userAgent() != "x" {
 		t.Error("explicit fields not honoured")
+	}
+}
+
+// A post says what it says line by line; a page's own source wrapped over
+// several indented lines reads as the one line it is.
+func TestFetchKeepsLineBreaks(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"first line\nsecond line", "first line\nsecond line"},
+		{"one\r\ntwo", "one\ntwo"},
+		{"para one\n\n\n\npara two", "para one\n\npara two"},
+		{"\n    Wrapped for the\n    people who edit it.\n\n    Next paragraph.\n", "Wrapped for the people who edit it.\n\nNext paragraph."},
+		{"  lots   of \t spaces  ", "lots of spaces"},
+	}
+	for _, tc := range cases {
+		// the words go in as the page has them, real line breaks and all
+		page := `<html><head><meta property="og:title" content="t"><meta property="og:description" content="` + tc.in + `"></head></html>`
+		f, _ := fetcherFor(t, body("text/html", page))
+		res := mustFetch(t, f, "http://example.test/page")
+		if res.Description != tc.want {
+			t.Errorf("description %q => %q, want %q", tc.in, res.Description, tc.want)
+		}
+	}
+}
+
+// Some pages escape their tags' words twice, and "&quot;" was printed on the card.
+func TestFetchDoubleEscapedText(t *testing.T) {
+	const page = `<html><head><meta property="og:title" content="Portal 2 &amp;amp; more">
+<meta property="og:description" content="The &amp;quot;Perpetual Testing Initiative&amp;quot; is here &amp;#8212; enjoy"></head></html>`
+	f, _ := fetcherFor(t, body("text/html", page))
+	res := mustFetch(t, f, "http://example.test/page")
+	if res.Title != "Portal 2 & more" {
+		t.Errorf("Title = %q", res.Title)
+	}
+	if res.Description != `The "Perpetual Testing Initiative" is here — enjoy` {
+		t.Errorf("Description = %q", res.Description)
+	}
+}
+
+func TestFetchImageLayout(t *testing.T) {
+	cases := map[string]string{"summary_large_image": "large", "player": "large", "summary": "thumbnail", "": ""}
+	for card, want := range cases {
+		page := fmt.Sprintf(`<html><head><title>t</title><meta name="twitter:card" content=%q>
+<meta property="og:image" content="https://cdn.example.test/a.png"></head></html>`, card)
+		f, _ := fetcherFor(t, body("text/html", page))
+		res := mustFetch(t, f, "http://example.test/page")
+		if res.ImageLayout != want {
+			t.Errorf("twitter:card %q => ImageLayout %q, want %q", card, res.ImageLayout, want)
+		}
+	}
+}
+
+// The site's own account is not the author: "YouTube · @youtube" said nothing twice.
+func TestFetchAuthorIsNotTheSiteAccount(t *testing.T) {
+	cases := []struct{ tags, want string }{
+		{`<meta name="twitter:site" content="@site"><meta name="twitter:creator" content="@Site">`, ""},
+		{`<meta name="twitter:site" content="@site">`, ""},
+		{`<meta name="twitter:site" content="@site"><meta name="twitter:creator" content="@writer">`, "@writer"},
+		{`<meta name="author" content="Ada Lovelace"><meta name="twitter:site" content="@site">`, "Ada Lovelace"},
+	}
+	for _, tc := range cases {
+		f, _ := fetcherFor(t, body("text/html", "<html><head><title>t</title>"+tc.tags+"</head></html>"))
+		res := mustFetch(t, f, "http://example.test/page")
+		if res.Author != tc.want {
+			t.Errorf("%s => Author %q, want %q", tc.tags, res.Author, tc.want)
+		}
+	}
+}
+
+func TestFetchSiteNameWithoutWWW(t *testing.T) {
+	f, _ := fetcherFor(t, body("text/html", "<html><head><title>t</title></head></html>"))
+	res := mustFetch(t, f, "http://www.example.test/page")
+	if res.SiteName != "example.test" {
+		t.Errorf("SiteName = %q, want the address without www.", res.SiteName)
+	}
+}
+
+// A picture the page gives no size for is measured from its first bytes, so
+// the card has its shape before the picture arrives.
+func TestFetchMeasuresImageWithoutSize(t *testing.T) {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 300, 150))); err != nil {
+		t.Fatal(err)
+	}
+	var gotRange string
+	mux := http.NewServeMux()
+	mux.Handle("/page", body("text/html", `<html><head><title>t</title><meta property="og:image" content="/cover.png"></head></html>`))
+	mux.HandleFunc("/cover.png", func(w http.ResponseWriter, r *http.Request) {
+		gotRange = r.Header.Get("Range")
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(buf.Bytes())
+	})
+	f, _ := fetcherFor(t, mux)
+	res := mustFetch(t, f, "http://example.test/page")
+	if res.ImageW != 300 || res.ImageH != 150 {
+		t.Errorf("dims = %dx%d, want 300x150", res.ImageW, res.ImageH)
+	}
+	if gotRange != "bytes=0-65535" {
+		t.Errorf("Range = %q, want only the head asked for", gotRange)
+	}
+}
+
+// A thumbnail is cropped to a square whatever its size, so it is not measured.
+func TestFetchDoesNotMeasureThumbnail(t *testing.T) {
+	asked := false
+	mux := http.NewServeMux()
+	mux.Handle("/page", body("text/html", `<html><head><title>t</title><meta name="twitter:card" content="summary"><meta property="og:image" content="/icon.png"></head></html>`))
+	mux.HandleFunc("/icon.png", func(w http.ResponseWriter, r *http.Request) { asked = true })
+	f, _ := fetcherFor(t, mux)
+	res := mustFetch(t, f, "http://example.test/page")
+	if asked || res.ImageW != 0 {
+		t.Errorf("thumbnail was measured: asked=%v dims=%dx%d", asked, res.ImageW, res.ImageH)
+	}
+}
+
+// YouTube's phone site names its video in the body, under a head that only
+// says "YouTube": the body is read when the head names nothing.
+func TestFetchReadsTheBodyWhenTheHeadNamesNothing(t *testing.T) {
+	const page = `<html><head><title>YouTube</title><meta name="description" content="Share your videos"></head>
+<body><svg><title>Menu</title></svg><div><meta property="og:title" content="The Video"><meta property="og:description" content="What it is about"></div></body></html>`
+	f, _ := fetcherFor(t, body("text/html", page))
+	res := mustFetch(t, f, "http://example.test/watch")
+	if res.Title != "The Video" || res.Description != "What it is about" {
+		t.Errorf("res = %q / %q, want the body's tags", res.Title, res.Description)
+	}
+}
+
+// A head that names the page is all there is to read, and an icon's title in
+// the body is never taken for the page's.
+func TestFetchStopsAtTheBodyWhenTheHeadNamesThePage(t *testing.T) {
+	const page = `<html><head><meta property="og:title" content="From the head"></head>
+<body><meta property="og:description" content="from the body"></body></html>`
+	f, _ := fetcherFor(t, body("text/html", page))
+	res := mustFetch(t, f, "http://example.test/page")
+	if res.Title != "From the head" || res.Description != "" {
+		t.Errorf("res = %q / %q", res.Title, res.Description)
+	}
+	const untitled = `<html><head></head><body><svg><title>Close</title></svg><meta property="og:description" content="words"></body></html>`
+	f, _ = fetcherFor(t, body("text/html", untitled))
+	res = mustFetch(t, f, "http://example.test/page")
+	if res.Title != "" || res.Description != "words" {
+		t.Errorf("untitled res = %q / %q, want no title from the body's icon", res.Title, res.Description)
+	}
+}
+
+// The media proxy passes no SVG, so an SVG icon was only ever a broken
+// picture: the PNG a site names beside it is used instead.
+func TestFetchSkipsSVGIcons(t *testing.T) {
+	const page = `<html><head><title>t</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" href="/other.svg?v=2">
+<link rel="alternate icon" type="image/png" href="/favicon.png">
+</head></html>`
+	f, _ := fetcherFor(t, body("text/html", page))
+	res := mustFetch(t, f, "http://example.test/page")
+	if res.Icon != "http://example.test/favicon.png" {
+		t.Errorf("Icon = %q, want the PNG", res.Icon)
+	}
+}
+
+// The sender's app waits only a moment for a preview: a page slow to answer
+// goes out with its picture unmeasured rather than late.
+func TestFetchMeasuresOnlyWhileThereIsTime(t *testing.T) {
+	asked := false
+	mux := http.NewServeMux()
+	mux.HandleFunc("/page", func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(80 * time.Millisecond)
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(`<html><head><title>t</title><meta property="og:image" content="/cover.png"></head></html>`))
+	})
+	mux.HandleFunc("/cover.png", func(w http.ResponseWriter, r *http.Request) { asked = true })
+	f, _ := fetcherFor(t, mux)
+	f.MeasureWithin = 20 * time.Millisecond
+	res := mustFetch(t, f, "http://example.test/page")
+	if asked || res.ImageW != 0 || res.Image == "" {
+		t.Errorf("slow page: asked=%v dims=%dx%d image=%q", asked, res.ImageW, res.ImageH, res.Image)
 	}
 }

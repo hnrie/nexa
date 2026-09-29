@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
@@ -209,9 +209,10 @@ export function ContextMenuHost() {
     // Not this frame: the menu is drawn `visibility: hidden` until the layout
     // effect above has measured it and nudged it on screen, and focus() on a
     // hidden element does nothing at all. One frame later it is visible.
-    const frame = requestAnimationFrame(() => stops(ref.current)[0]?.focus({ preventScroll: true }));
+    // (not for a menu that leaves focus where it was until a key is pressed: keepFocus)
+    const frame = menu.keepFocus ? 0 : requestAnimationFrame(() => stops(ref.current)[0]?.focus({ preventScroll: true }));
     return () => {
-      cancelAnimationFrame(frame);
+      if (frame) cancelAnimationFrame(frame);
       const back = opener.current;
       opener.current = null;
       if (back && document.contains(back)) back.focus({ preventScroll: true });
@@ -281,11 +282,32 @@ export function ContextMenuHost() {
     // Escape used to dismiss the menu *and* the whole settings dialog behind
     // it, unsaved edits and all. In a submenu it goes back one level first.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (sub) closeSub(true);
+        else close();
+        return;
+      }
+      // A menu that left focus where it was opened (keepFocus) takes the
+      // keyboard at the first key, as a menu of the system's own does: the
+      // arrows and letters move into it and nothing reaches the text box
+      // underneath. Tab and shortcuts with a modifier go on and close it.
+      if (!menu.keepFocus || inside(document.activeElement) || e.isComposing) return;
+      if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta" || e.key === "CapsLock") return;
+      if (e.key === "Tab" || e.ctrlKey || e.metaKey || e.altKey) {
+        close();
+        return;
+      }
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (sub) closeSub(true);
-      else close();
+      const list = stops(ref.current);
+      if (e.key === "ArrowUp" || e.key === "End") {
+        moveTo(ref.current, list.length - 1);
+        return;
+      }
+      const at = e.key.length === 1 && e.key !== " " ? list.findIndex((x) => (x.textContent ?? "").trim().toLowerCase().startsWith(e.key.toLowerCase())) : -1;
+      moveTo(ref.current, Math.max(at, 0));
     };
     document.addEventListener("keydown", onKey, true);
     document.addEventListener("mousedown", onDown);
@@ -297,9 +319,20 @@ export function ContextMenuHost() {
       window.removeEventListener("resize", onResize);
       document.removeEventListener("scroll", onScroll, true);
     };
-  }, [menu, close, sub, closeSub]);
+  }, [menu, close, sub, closeSub, stops, moveTo]);
 
   if (!menu) return null;
+
+  /**
+   * A click in a menu that leaves focus where it was opened (keepFocus) does
+   * not take focus either, so a text box's selection stays in view until the
+   * item acts on it. A slider still takes the press it needs to be dragged.
+   */
+  const keepFocusDown = menu.keepFocus
+    ? (e: React.MouseEvent) => {
+        if (!(e.target instanceof Element && e.target.closest("input"))) e.preventDefault();
+      }
+    : undefined;
 
   /** The keys of one menu: the one opened, or the submenu beside it. */
   const onKeyDown = (inSub: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -399,7 +432,8 @@ export function ContextMenuHost() {
                 data-menu-stop=""
                 data-submenu={item.id}
                 tabIndex={-1}
-                onClick={(e) => openSub(item, e.currentTarget, true)}
+                // opened with a key it takes focus; with a click only where the menu took focus itself
+                onClick={(e) => openSub(item, e.currentTarget, !menu.keepFocus || e.detail === 0)}
                 onPointerEnter={(e) => {
                   if (e.pointerType === "touch" || drills(pointer.current)) return;
                   if (flyout?.id === item.id) {
@@ -416,9 +450,9 @@ export function ContextMenuHost() {
               </button>
             ) : (
               <button
-                role={item.checked === undefined ? "menuitem" : "menuitemradio"}
+                role={item.checked === undefined ? "menuitem" : item.toggle ? "menuitemcheckbox" : "menuitemradio"}
                 aria-checked={item.checked}
-                className={[s.item, item.danger ? s.danger : ""].join(" ")}
+                className={[s.item, item.danger ? s.danger : "", item.strong ? s.strong : ""].join(" ")}
                 disabled={item.disabled}
                 data-menu-stop=""
                 tabIndex={-1}
@@ -434,7 +468,12 @@ export function ContextMenuHost() {
                 }}
               >
                 <span className={s.itemLabel}>{item.label}</span>
-                {item.checked === undefined ? null : <span className={s.radio} data-on={item.checked} aria-hidden="true" />}
+                {item.keys ? <span className={s.keys} aria-hidden="true">{item.keys}</span> : null}
+                {item.checked === undefined ? null : item.toggle ? (
+                  <span className={s.tick} data-on={item.checked} aria-hidden="true">{item.checked ? <Check size={12} strokeWidth={3.5} /> : null}</span>
+                ) : (
+                  <span className={s.radio} data-on={item.checked} aria-hidden="true" />
+                )}
               </button>
             )}
             {item.separatorAfter ? <div className={s.sep} role="separator" /> : null}
@@ -470,6 +509,7 @@ export function ContextMenuHost() {
         aria-label={drilled ? drilled.label : menu.label}
         onKeyDown={onKeyDown(false)}
         onPointerDownCapture={notePointer}
+        onMouseDown={keepFocusDown}
       >
         {drilled ? (
           <>
@@ -499,6 +539,7 @@ export function ContextMenuHost() {
           aria-label={flyout.label}
           onKeyDown={onKeyDown(true)}
           onPointerDownCapture={notePointer}
+          onMouseDown={keepFocusDown}
           onPointerEnter={clearTimer}
         >
           {list(flyout.submenu ?? [], false)}

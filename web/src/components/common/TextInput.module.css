@@ -6,7 +6,24 @@
 .hint { font-size: 12px; color: var(--text-muted); }
 .input { height: 40px; padding: 0 10px; background: var(--bg-input); border: 1px solid transparent; border-radius: var(--radius-xs); color: var(--text); font-size: 16px; outline: none; transition: border-color var(--transition); width: 100%; }
 .input::placeholder { color: var(--text-placeholder); }
-.input:focus { border-color: var(--brand); }
+/* A text box in use shows it with a quiet edge and its caret. The accent's
+   border with the page's focus ring round it read as a stray highlight. */
+.input:focus { border-color: var(--border-strong); }
+.input:focus-visible { outline: none; }
+/* A select opens on a list drawn in the theme where the browser allows it
+   (Chromium's customizable select), and on the system's own list elsewhere. */
+@supports (appearance: base-select) {
+  select.input, select.input::picker(select) { appearance: base-select; }
+  select.input { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  select.input:hover { border-color: var(--border); }
+  select.input::picker-icon { color: var(--text-muted); transition: rotate var(--transition); }
+  select.input:open::picker-icon { rotate: 180deg; }
+  select.input::picker(select) { margin-block: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-high); }
+  select.input option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border-radius: var(--radius-xs); font-size: 15px; cursor: pointer; }
+  select.input option:hover, select.input option:focus-visible { background: var(--bg-hover); color: var(--text-strong); outline: none; }
+  select.input option:checked { background: var(--bg-selected); color: var(--text-strong); font-weight: 600; }
+  select.input option::checkmark { order: 1; margin-inline-start: auto; color: var(--text-brand); }
+}
 .invalid, .hasError .input { border-color: var(--danger); }
 /* the eye sits inside the box, at its end */
 .revealWrap { position: relative; display: block; width: 100%; }

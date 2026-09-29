@@ -159,8 +159,13 @@ function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   return a;
 }
 
-const EMBED_STRINGS = ["url", "type", "title", "description", "site_name", "image", "video_id", "mime", "color", "invite_code"];
-const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count"];
+// Everything a link's card draws. The card's icon, author, date, playable file
+// and video player were kept out of this list when they were added, so no
+// message ever showed them: whatever is not here is thrown away on arrival.
+const EMBED_STRINGS = ["url", "type", "title", "description", "site_name", "image", "video_id", "mime", "color", "invite_code", "author", "author_url", "icon", "media", "media_mime", "player", "player_site", "banner"];
+const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count", "published_at", "media_w", "media_h"];
+/** Fields that only mean something as one of a few words. */
+const EMBED_CHOICES: Record<string, readonly string[]> = { media_kind: ["video", "audio"], image_layout: ["large", "thumbnail"] };
 
 /**
  * Whether a link in an embed may be followed or loaded: an http(s) address,
@@ -174,7 +179,12 @@ export function webLink(v: string): boolean {
   return /^https?:\/\//i.test(v);
 }
 
-const EMBED_LINKS = new Set(["url", "image"]);
+/**
+ * The fields that are addresses. Pictures and files still only load through
+ * this server (lib/mediaLinks), and a player only opens for the sites the card
+ * allows (Embeds); this keeps anything but a web address out of them at all.
+ */
+const EMBED_LINKS = new Set(["url", "image", "author_url", "icon", "media", "player", "banner"]);
 
 export function sanitizeEmbed(e: Obj): Obj {
   const out: Obj = {};
@@ -183,6 +193,10 @@ export function sanitizeEmbed(e: Obj): Obj {
     if (typeof v === "string" && (!EMBED_LINKS.has(k) || webLink(v))) out[k] = v;
   }
   for (const k of EMBED_NUMBERS) if (isNum(e[k])) out[k] = e[k];
+  for (const [k, allowed] of Object.entries(EMBED_CHOICES)) {
+    const v = e[k];
+    if (typeof v === "string" && allowed.includes(v)) out[k] = v;
+  }
   return out;
 }
 

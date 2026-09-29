@@ -1,0 +1,16 @@
+/* The card that names an emoji in a message: drawn on the page, like tooltips and menus */
+.card {
+  position: fixed; z-index: var(--z-tooltip); display: flex; align-items: center; gap: 12px;
+  max-width: min(300px, calc(100vw - 8px)); padding: 10px 14px 10px 10px;
+  background: var(--bg-floating); color: var(--text); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: in 110ms ease-out;
+}
+/* only pointed at, it never stands in the pointer's way */
+.card[data-pinned="false"] { pointer-events: none; }
+@keyframes in { from { opacity: 0; transform: translateY(3px); } }
+.picture { flex: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; }
+.img { display: block; width: 48px; height: 48px; object-fit: contain; }
+.glyph { font-size: 40px; line-height: 1; }
+.words { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name { font-size: 15px; font-weight: 600; line-height: 20px; color: var(--text-strong); overflow-wrap: anywhere; }
+.sub { font-size: 13px; line-height: 17px; color: var(--text-muted); overflow-wrap: anywhere; }

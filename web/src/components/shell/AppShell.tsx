@@ -11,6 +11,7 @@ import { DownloadBanner } from "@/components/shell/DownloadBanner";
 import { RpcBanner } from "@/components/shell/RpcBanner";
 import { UpdatePrompt } from "@/components/shell/UpdateDialog";
 import { DesktopEffects } from "@/components/desktop/DesktopEffects";
+import { EmojiDetails } from "@/components/chat/EmojiDetails";
 import { Shortcuts } from "@/components/shell/Shortcuts";
 import { TAB_PANEL_ID, Tabs } from "@/components/shell/Tabs";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -250,6 +251,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <WhatsNew />
       <Shortcuts />
       <DesktopEffects />
+      <EmojiDetails />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { portalRoot } from "@/hooks/usePortalRoot";
+import { luminance, mixOk, readableOn, toHex } from "@/lib/color";
+import { surfaceOf } from "@/markdown/colors";
 import s from "./Tooltip.module.css";
 
 type Side = "top" | "right" | "bottom" | "left";
@@ -19,6 +21,19 @@ function coarsePointer(): boolean {
 }
 
 const GAP = 8;
+
+/**
+ * A tooltip's colours: a shade of whatever its trigger sits on, a little
+ * lighter over a dark surface and a little darker over a light one, so it
+ * belongs to the panel it came from (a profile card's own colours included)
+ * rather than being the same black box on every one of them. The words on it
+ * are whichever of black and white reads on that shade.
+ */
+export function tooltipPaint(el: Element): { bg: string; fg: string } {
+  const under = toHex(surfaceOf(el).bg);
+  const bg = luminance(under) < 0.18 ? mixOk(under, "#ffffff", 0.14) : mixOk(under, "#000000", 0.08);
+  return { bg, fg: readableOn(bg) };
+}
 
 /**
  * Places the bubble beside the trigger, nudged back on screen if it would not
@@ -69,6 +84,7 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState<{ left: number; top: number; side: Side; arrow: number } | null>(null);
+  const [paint, setPaint] = useState<{ bg: string; fg: string } | null>(null);
   const tipId = useId();
 
   const clear = useCallback(() => {
@@ -83,6 +99,7 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
     const anchor = wrap.current?.getBoundingClientRect();
     const box = bubble.current?.getBoundingClientRect();
     if (anchor && box) setAt(place(anchor, box, side));
+    if (wrap.current) setPaint(tooltipPaint(wrap.current));
   }, [open, side, text]);
 
   const show = () => {
@@ -142,7 +159,12 @@ export function Tooltip({ text, side = "top", children, className, delay = 250 }
               className={s.tip}
               role="tooltip"
               data-side={at?.side ?? side}
-              style={at ? ({ left: at.left, top: at.top, "--arrow": `${at.arrow}px` } as React.CSSProperties) : { left: -9999, top: -9999 }}
+              style={
+                {
+                  ...(at ? { left: at.left, top: at.top, "--arrow": `${at.arrow}px` } : { left: -9999, top: -9999 }),
+                  ...(paint ? { "--tooltip-bg": paint.bg, "--tooltip-text": paint.fg } : {}),
+                } as React.CSSProperties
+              }
             >
               {text}
             </span>,

@@ -3,6 +3,13 @@
  * for bold, italics or underline, or loses it when it already has it.
  */
 
+/**
+ * The markdown a selection can be wrapped in: bold, italics, underline,
+ * strikethrough, a spoiler, inline code. The shortcuts take the first three;
+ * a text box's right-click menu offers them all (lib/textMenu).
+ */
+export type WrapMarker = "**" | "*" | "__" | "~~" | "||" | "`";
+
 /** The marker each shortcut wraps with; italics take `*` so that `snake_case` never matters. */
 const MARKERS: Record<string, "**" | "*" | "__"> = { b: "**", i: "*", u: "__" };
 
@@ -38,6 +45,8 @@ function runAfter(text: string, at: number, ch: string): number {
 function has(marker: string, run: number): boolean {
   // a run of three stars is bold and italic at once; two is bold alone
   if (marker === "*") return run === 1 || run >= 3;
+  // one backtick is inline code; three would be a code block
+  if (marker.length === 1) return run === 1;
   return run >= 2;
 }
 
@@ -49,7 +58,7 @@ function has(marker: string, run: number): boolean {
  * and with nothing selected the markers go around the caret, ready to type
  * between.
  */
-export function toggleWrap(text: string, start: number, end: number, marker: "**" | "*" | "__"): Wrapped {
+export function toggleWrap(text: string, start: number, end: number, marker: WrapMarker): Wrapped {
   const ch = marker.charAt(0);
   const m = marker.length;
   if (start === end) {
@@ -98,7 +107,7 @@ export function toggleWrap(text: string, start: number, end: number, marker: "**
  * Ctrl+Z takes it back like any typing. Returns the new value; the caller's
  * onChange also sees it, from the input event the edit fires.
  */
-export function applyWrap(el: HTMLTextAreaElement, marker: "**" | "*" | "__"): string {
+export function applyWrap(el: HTMLTextAreaElement, marker: WrapMarker): string {
   const w = toggleWrap(el.value, el.selectionStart ?? 0, el.selectionEnd ?? 0, marker);
   el.focus();
   el.setSelectionRange(w.from, w.to);

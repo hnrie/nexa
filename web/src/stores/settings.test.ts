@@ -179,3 +179,25 @@ describe("device settings", () => {
     expect([v.cameraDeviceId, v.cameraDeviceLabel]).toEqual(["cam1", "Webcam"]);
   });
 });
+
+describe("typing settings", () => {
+  it("starts with no Send button on a computer and no words of its own", async () => {
+    await loadFrom({ doc: { theme: "dark" }, version: 1 });
+    const st = useSettings.getState().settings;
+    expect(st.sendButton).toBe(false);
+    expect(st.spellWords).toEqual([]);
+  });
+
+  it("reads the Send button and the dictionary's words defensively", async () => {
+    await loadFrom({ doc: { sendButton: "yes", spellWords: ["nexa", 7, "", "x".repeat(65), "kito"] }, version: 1 });
+    const st = useSettings.getState().settings;
+    expect(st.sendButton).toBe(false);
+    expect(st.spellWords).toEqual(["nexa", "kito"]);
+  });
+
+  it("keeps a Send button switched on", async () => {
+    await loadFrom({ doc: { sendButton: true, spellWords: ["wiz"] }, version: 1 });
+    expect(useSettings.getState().settings.sendButton).toBe(true);
+    expect(useSettings.getState().settings.spellWords).toEqual(["wiz"]);
+  });
+});

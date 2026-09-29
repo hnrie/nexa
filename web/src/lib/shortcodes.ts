@@ -9,6 +9,8 @@
 
 /** name -> the emoji itself. */
 let table: Map<string, string> | null = null;
+/** The emoji, without variation selectors -> the name it goes by. */
+let names: Map<string, string> | null = null;
 let loading: Promise<void> | null = null;
 let version = 0;
 const listeners = new Set<() => void>();
@@ -37,13 +39,20 @@ function charsOf(hexcode: string): string {
   return out;
 }
 
-function add(map: Map<string, string>, hexcode: string, raw: string | string[]): void {
+/** U+FE0F: whether it is there or not, the emoji is the same one. */
+const VARIATION = /\uFE0F/g;
+
+function add(map: Map<string, string>, reverse: Map<string, string>, hexcode: string, raw: string | string[]): void {
   const emoji = charsOf(hexcode);
   if (!emoji) return;
-  for (const name of Array.isArray(raw) ? raw : [raw]) {
+  const list = Array.isArray(raw) ? raw : [raw];
+  for (const name of list) {
     const key = name.toLowerCase();
     if (!map.has(key)) map.set(key, emoji);
   }
+  // the first name a set gives is the one it goes by
+  const plain = emoji.replace(VARIATION, "");
+  if (list[0] && !reverse.has(plain)) reverse.set(plain, list[0].toLowerCase());
 }
 
 /** Starts loading the table if it is not here yet. Safe to call on every render. */
@@ -58,10 +67,12 @@ export function ensureShortcodes(): void {
   ])
     .then(([iamcal, base]) => {
       const map = new Map<string, string>();
+      const reverse = new Map<string, string>();
       // iamcal first, so its name wins where the two sets disagree
-      for (const [hexcode, raw] of Object.entries(iamcal.default as Record<string, string | string[]>)) add(map, hexcode, raw);
-      for (const [hexcode, raw] of Object.entries(base.default as Record<string, string | string[]>)) add(map, hexcode, raw);
+      for (const [hexcode, raw] of Object.entries(iamcal.default as Record<string, string | string[]>)) add(map, reverse, hexcode, raw);
+      for (const [hexcode, raw] of Object.entries(base.default as Record<string, string | string[]>)) add(map, reverse, hexcode, raw);
       table = map;
+      names = reverse;
       version += 1;
       retryWait = 0;
       for (const fn of listeners) fn();
@@ -77,6 +88,15 @@ export function ensureShortcodes(): void {
 /** The emoji for a `:name:`, or undefined while the table is still loading. */
 export function shortcodeToEmoji(name: string): string | undefined {
   return table?.get(name.toLowerCase());
+}
+
+/**
+ * The name an emoji goes by, without its colons: the one that brings it back
+ * when typed as `:name:`. Undefined while the table is still loading, and for
+ * an emoji no set names.
+ */
+export function emojiShortcode(emoji: string): string | undefined {
+  return names?.get(emoji.replace(VARIATION, ""));
 }
 
 export function shortcodesReady(): boolean {

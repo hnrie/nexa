@@ -18,6 +18,12 @@ export interface ContextMenuItem {
   separatorAfter?: boolean;
   /** Marks the chosen one of a set of choices, such as the microphone in use. */
   checked?: boolean;
+  /** With `checked`: the item switches one thing on and off, a tick box rather than one choice of a set. */
+  toggle?: boolean;
+  /** The keys that do the same, shown quietly at the item's end: "Ctrl+X". */
+  keys?: string;
+  /** Drawn in bold, as a spelling offered for a misspelled word is. */
+  strong?: boolean;
   /** A small title over the items that follow it; not an item itself. */
   heading?: boolean;
   /** A line of information, such as when a message was sent: read, never chosen. */
@@ -47,6 +53,13 @@ export interface ContextMenuState {
    * where it starts out.
    */
   anchor?: { left: number; right: number; top: number; bottom: number; align: "start" | "end" };
+  /**
+   * Leaves focus where the menu was opened until a key is pressed, as a menu
+   * of the system's own does, so a text box keeps its selection showing while
+   * its menu is open. The first key moves focus into the menu. For a menu
+   * opened with the mouse; one opened from the keyboard takes focus at once.
+   */
+  keepFocus?: boolean;
 }
 
 export interface Toast {

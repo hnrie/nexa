@@ -40,7 +40,7 @@
 /* --- a theme as a very small Nexa (ThemeMiniature) --- */
 .mini { position: absolute; inset: 0; display: grid; grid-template-columns: 11% 29% 1fr; background: var(--bg-base); overflow: hidden; }
 .mini i { display: block; border-radius: 999px; }
-.miniRail { display: flex; flex-direction: column; align-items: center; gap: 5%; padding-top: 18%; }
+.miniRail { display: flex; flex-direction: column; align-items: center; gap: 5%; padding-top: 18%; background: color-mix(in oklab, var(--bg-base) var(--rail-shade), #000); }
 .miniRail i { width: 62%; aspect-ratio: 1; background: var(--bg-surface); }
 .miniRail .miniLogo { background: var(--brand); border-radius: 30%; }
 .miniSide { display: flex; flex-direction: column; gap: 9%; padding: 22% 10% 0 6%; }
@@ -168,8 +168,9 @@
 .specHead svg { color: var(--icon); }
 .specBody { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
 .specMsg { display: flex; gap: 10px; padding: 6px 12px; }
-.specMsg[data-mention] { background: var(--mention-bg); box-shadow: inset 2px 0 0 var(--warning); }
-[dir="rtl"] .specMsg[data-mention] { box-shadow: inset -2px 0 0 var(--warning); }
+/* drawn as a message that mentions you is (Chat.module.css) */
+.specMsg[data-mention] { background: color-mix(in srgb, var(--brand) 9%, transparent); box-shadow: inset 2px 0 0 var(--focus-ring); }
+[dir="rtl"] .specMsg[data-mention] { box-shadow: inset -2px 0 0 var(--focus-ring); }
 .specMsg[data-hover] { background: var(--bg-message-hover); }
 .specAvatar { flex: none; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; background: var(--brand); color: var(--on-brand); }
 .specAvatar[data-alt] { background: var(--positive); color: var(--on-positive); }

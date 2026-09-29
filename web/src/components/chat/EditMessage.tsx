@@ -1,10 +1,12 @@
 import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/common/Button";
+import { SpellLines, useSpellActive } from "@/components/common/SpellLines";
 import { MAX_MESSAGE_LENGTH, pasteOverflows, tooLong, tooLongMessage } from "@/components/composer/limit";
 import { MessageCounter } from "@/components/composer/MessageCounter";
 import { humanizeMentions } from "@/components/composer/mentions";
-import { editMessage, editNames, sendErrorText } from "@/components/composer/send";
+import { editMessage, editNames, mentionScope, sendErrorText } from "@/components/composer/send";
+import { closeShortcode, typedColon } from "@/components/composer/shortcodeTyping";
 import { useAutosize } from "@/components/composer/useAutosize";
 import { applyWrap, formatShortcut } from "@/components/composer/wrapShortcut";
 import { confirmDelete } from "./messageMenu";
@@ -29,6 +31,8 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
   /** A paste that would take the message past the limit, held back until it is asked for. */
   const [held, setHeld] = useState<{ text: string; start: number; end: number } | null>(null);
   const spellcheck = useSettings((st) => st.settings.spellcheck !== false);
+  const ownSpelling = useSpellActive();
+  const tone = useSettings((st) => st.settings.skinTone);
   const ref = useRef<HTMLTextAreaElement>(null);
   // Phone keyboards have no Shift+Enter, so there return adds a line, as in
   // the composer, and saving and cancelling get real buttons.
@@ -105,8 +109,18 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
         className={s.editTa}
         value={text}
         rows={1}
-        spellCheck={spellcheck}
-        onChange={(e) => change(e.target.value)}
+        spellCheck={spellcheck && !ownSpelling}
+        data-spell={ownSpelling ? "" : undefined}
+        data-markdown=""
+        onChange={(e) => {
+          // a :name: typed out in full becomes its emoji as its closing colon goes in, as in the message box
+          const el = e.currentTarget;
+          const own = (name: string) => (mentionScope(msg.channel_id).emoji ?? []).some((em) => !em.fallback && em.name.toLowerCase() === name);
+          const closed = typedColon(e.nativeEvent) ? closeShortcode(el.value, el.selectionStart ?? el.value.length, tone, own) : null;
+          if (!closed) return change(el.value);
+          change(closed.value);
+          requestAnimationFrame(() => ref.current?.setSelectionRange(closed.caret, closed.caret));
+        }}
         disabled={busy}
         onPaste={(e) => {
           // Past the limit a paste waits, as it does in the message box, rather
@@ -138,6 +152,7 @@ export function EditMessage({ msg }: { msg: DecryptedMessage }) {
           }
         }}
       />
+      <SpellLines target={ref} text={text} />
       {touch ? (
         <div className={s.editActions}>
           {counter}

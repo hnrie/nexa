@@ -8,6 +8,15 @@ interface Props {
   title?: string;
   /** Class used when there is no picture and the glyph has to do. */
   fallbackClassName?: string;
+  /**
+   * A box to draw the picture in, for an emoji in the words of a message. The
+   * picture lets the pointer through to the box: pressed on a picture, a
+   * browser starts no selection, so a drag that began on an emoji, or across a
+   * message of nothing but emoji, selected nothing and could not be copied.
+   * The box, or the glyph, is also what EmojiDetails names on hover, so it
+   * carries no title of its own.
+   */
+  boxClassName?: string;
 }
 
 /**
@@ -20,7 +29,7 @@ const failures = new Map<string, number>();
  * One emoji, drawn with Twemoji so it looks the same on every device. If the
  * set has no picture for it, the platform's own glyph is shown instead.
  */
-export function Twemoji({ text, className, title, fallbackClassName }: Props) {
+export function Twemoji({ text, className, title, fallbackClassName, boxClassName }: Props) {
   const [, bump] = useState(0);
   useEffect(() => {
     if (twemojiIndexSettled()) return;
@@ -32,13 +41,14 @@ export function Twemoji({ text, className, title, fallbackClassName }: Props) {
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
   const candidates = twemojiIndexSettled() ? twemojiCandidates(text).filter((u) => !failed.has(u) && (failures.get(u) ?? 0) < 2) : [];
   const src = candidates[0];
-  if (!src) return <span className={fallbackClassName ?? className}>{text}</span>;
-  return (
+  const card = boxClassName ? "unicode" : undefined;
+  if (!src) return <span className={fallbackClassName ?? className} data-emoji-card={card}>{text}</span>;
+  const img = (
     <img
       className={className}
       src={src}
       alt={text}
-      title={title ?? text}
+      title={boxClassName ? undefined : (title ?? text)}
       draggable={false}
       loading="lazy"
       decoding="async"
@@ -48,4 +58,5 @@ export function Twemoji({ text, className, title, fallbackClassName }: Props) {
       }}
     />
   );
+  return boxClassName ? <span className={boxClassName} data-emoji-card={card}>{img}</span> : img;
 }

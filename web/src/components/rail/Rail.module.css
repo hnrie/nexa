@@ -1,4 +1,5 @@
-.rail { width: var(--rail-w); height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; background: var(--bg-base); }
+/* a shade deeper than the sidebar, with a hairline for a theme whose sidebar is black already (tokens.css) */
+.rail { width: var(--rail-w); height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; background: var(--bg-rail); border-inline-end: 1px solid var(--border-subtle); }
 .rail::-webkit-scrollbar { display: none; }
 .item { position: relative; width: 100%; display: flex; justify-content: center; }
 .pill { position: absolute; inset-inline-start: 0; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--text-strong); opacity: 0; transition: height var(--transition), opacity var(--transition), margin-top var(--transition); }
@@ -11,7 +12,7 @@
 .add:hover .btn { background: var(--positive) !important; color: var(--on-positive); }
 .add .btn { color: var(--positive); }
 .sep { width: 32px; height: 2px; border-radius: 1px; background: var(--border); margin: 2px 0; }
-.badge { position: absolute; inset-inline-end: 6px; bottom: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: var(--on-danger); font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg-base); }
+.badge { position: absolute; inset-inline-end: 6px; bottom: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: var(--on-danger); font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--bg-rail); }
 .server .btn { font-size: 16px; font-weight: 600; color: var(--text-strong); }
 .server .btn.hasIcon { background: transparent; }
 .initials { padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
@@ -21,7 +22,7 @@
 .item[data-drop="before"]::before, .item[data-drop="after"]::after, .folder[data-drop="before"]::before, .folder[data-drop="after"]::after { content: ""; position: absolute; inset-inline: 12px; height: 2px; background: var(--brand); border-radius: 1px; pointer-events: none; }
 .item[data-drop="before"]::before, .folder[data-drop="before"]::before { top: -5px; }
 .item[data-drop="after"]::after, .folder[data-drop="after"]::after { bottom: -5px; }
-.item[data-drop="combine"] .btn { border-radius: 16px; box-shadow: 0 0 0 3px var(--bg-base), 0 0 0 5px var(--brand); }
+.item[data-drop="combine"] .btn { border-radius: 16px; box-shadow: 0 0 0 3px var(--bg-rail), 0 0 0 5px var(--brand); }
 .waiting .btn { background: transparent; }
 .waiting .btn > span { width: 100%; height: 100%; }
 .groupIcon { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: inherit; background: var(--bg-surface); color: var(--text-strong); }
@@ -41,7 +42,7 @@
  * the theme's own surfaces, so it reads on a dark rail and on a light one.
  */
 .folder { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.folder[data-open="true"] { width: 56px; padding-bottom: 4px; border-radius: 16px; background: color-mix(in srgb, var(--folder) 16%, var(--bg-base)); }
+.folder[data-open="true"] { width: 56px; padding-bottom: 4px; border-radius: 16px; background: color-mix(in srgb, var(--folder) 16%, var(--bg-rail)); }
 .folderBtn { border-radius: 16px; background: color-mix(in srgb, var(--folder) 34%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); }
 .item.folderItem:hover .btn.folderBtn, .item.folderItem[data-selected="true"] .btn.folderBtn { background: color-mix(in srgb, var(--folder) 52%, var(--bg-surface)); color: color-mix(in srgb, var(--folder) 72%, var(--text-strong)); }
 .folder[data-open="true"] .btn.folderBtn { background: transparent; }
@@ -52,5 +53,5 @@
 .mini img { width: 100%; height: 100%; object-fit: cover; }
 /* inside the sleeve, which is narrower than the rail, the pill still sits at the rail's edge */
 .folder[data-open="true"] .pill { inset-inline-start: -8px; }
-.folder[data-open="true"] .badge { inset-inline-end: -2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder) 16%, var(--bg-base)); }
+.folder[data-open="true"] .badge { inset-inline-end: -2px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--folder) 16%, var(--bg-rail)); }
 .folder[data-open="true"] .item[data-drop="before"]::before, .folder[data-open="true"] .item[data-drop="after"]::after { inset-inline: 4px; }

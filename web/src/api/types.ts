@@ -663,6 +663,8 @@ export interface UnfurlResult {
   online_count?: number;
   /** An invite's server banner. */
   banner?: string;
+  /** How the page asks for its picture: across the card, or small beside the words. Unset leaves it to the picture's size. */
+  image_layout?: "large" | "thumbnail";
 }
 
 export interface KdfParamsJson {

@@ -136,7 +136,34 @@ function LoadFailed({ error, what, onRetry }: { error: LoadError; what: keyof ty
   );
 }
 
-function ImageAttachment({ att, onOpen }: { att: AttachmentMeta; onOpen: () => void }) {
+/** A picture's place in a message's grid of pictures: how many of its six columns and rows it spans, and its shape. */
+export interface Tile {
+  col: number;
+  row: number;
+  /** Left out for a tile as tall as the rows beside it. */
+  ratio?: string;
+}
+
+/**
+ * Where each of a message's pictures goes when it has more than one, on a
+ * grid of six columns filled a row at a time: two side by side, three as one
+ * large beside two small, four two by two, and more three to a row with the
+ * one or two left over across the top. Every tile's shape is known before its
+ * picture arrives, so the message never jumps as they come in.
+ */
+export function mosaicLayout(n: number): Tile[] {
+  const square = { col: 2, row: 1, ratio: "1 / 1" };
+  const half = { col: 3, row: 1, ratio: "3 / 2" };
+  if (n <= 1) return [];
+  if (n === 2) return [{ col: 3, row: 1, ratio: "1 / 1" }, { col: 3, row: 1, ratio: "1 / 1" }];
+  if (n === 3) return [{ col: 4, row: 2 }, square, square];
+  if (n === 4) return [half, half, half, half];
+  const over = n % 3;
+  const top = over === 1 ? [{ col: 6, row: 1, ratio: "2 / 1" }] : over === 2 ? [half, half] : [];
+  return [...top, ...Array.from({ length: n - over }, () => square)];
+}
+
+function ImageAttachment({ att, onOpen, tile }: { att: AttachmentMeta; onOpen: () => void; tile?: Tile }) {
   const ref = useRef<HTMLDivElement>(null);
   const auto = att.size <= AUTO_LOAD_MAX;
   const { url, error, wanted, load, retry } = useDecrypted(att, ref, auto);
@@ -145,8 +172,12 @@ function ImageAttachment({ att, onOpen }: { att: AttachmentMeta; onOpen: () => v
   const open = () => {
     if (url) onOpen();
   };
+  // in a grid the tile gives the shape, and the picture is cut to fill it
+  const box = tile
+    ? { gridColumn: `span ${tile.col}`, gridRow: `span ${tile.row}`, ...(tile.ratio ? { aspectRatio: tile.ratio } : {}) }
+    : { width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` };
   return (
-    <div ref={ref} className={s.imgWrap} data-spoiler={!revealed} style={{ width: dims.width, aspectRatio: `${dims.width} / ${dims.height}` }} onClick={() => (revealed ? open() : setRevealed(true))}>
+    <div ref={ref} className={s.imgWrap} data-tile={tile ? "" : undefined} data-spoiler={!revealed} style={box} onClick={() => (revealed ? open() : setRevealed(true))}>
       {att.type === "image/gif" && revealed ? <FavoriteButton url={`attach:${att.blob_id}`} w={att.w} h={att.h} att={att} className={s.favStar} /> : null}
       {url ? (
         // the picture is the way into the viewer, for a keyboard as for a pointer
@@ -296,13 +327,22 @@ export function Attachments({ list, from }: { list: AttachmentMeta[]; from?: str
     () => pictures.filter((a) => !a.spoiler || a.blob_id === viewing).map((a) => ({ name: a.name, type: a.type, att: a, from })),
     [pictures, viewing, from],
   );
+  // two pictures or more share one grid, in the order they were sent, ahead of the message's other files
+  const tiles = pictures.length > 1 ? mosaicLayout(pictures.length) : null;
   return (
     <div className={s.att}>
+      {tiles ? (
+        <div className={s.mosaic} data-count={pictures.length} data-testid="picture-grid">
+          {pictures.map((att, i) => (
+            <ImageAttachment key={att.blob_id} att={att} tile={tiles[i]} onOpen={() => setViewing(att.blob_id)} />
+          ))}
+        </div>
+      ) : null}
       {list.map((att) => {
         const t = att.type || "";
         // showing or playing a file means holding all of it, so past a point it is only offered as a download
         const inline = att.size <= INLINE_MAX;
-        if (inline && t.startsWith("image/")) return <ImageAttachment key={att.blob_id} att={att} onOpen={() => setViewing(att.blob_id)} />;
+        if (inline && t.startsWith("image/")) return tiles ? null : <ImageAttachment key={att.blob_id} att={att} onOpen={() => setViewing(att.blob_id)} />;
         if (inline && t.startsWith("video/")) return <VideoAttachment key={att.blob_id} att={att} />;
         if (inline && t.startsWith("audio/")) return <AudioAttachment key={att.blob_id} att={att} />;
         return <FileAttachment key={att.blob_id} att={att} />;

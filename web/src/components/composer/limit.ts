@@ -11,14 +11,14 @@ export const MAX_MESSAGE_LENGTH = 4000;
 /** The counter shows once this few characters are left. */
 const COUNTER_FROM = 200;
 
-/** Characters left before the limit; below zero once past it. */
-export function charsLeft(text: string): number {
-  return MAX_MESSAGE_LENGTH - text.length;
+/** Characters left before the limit (a message's, or another's such as an About Me's); below zero once past it. */
+export function charsLeft(text: string, max: number = MAX_MESSAGE_LENGTH): number {
+  return max - text.length;
 }
 
 /** Whether the counter shows: near the limit or past it. */
-export function counterShown(text: string): boolean {
-  return charsLeft(text) < COUNTER_FROM;
+export function counterShown(text: string, max: number = MAX_MESSAGE_LENGTH): boolean {
+  return charsLeft(text, max) < COUNTER_FROM;
 }
 
 /** Whether a message is too long to send or save, leading and trailing space aside, as sending trims them. */

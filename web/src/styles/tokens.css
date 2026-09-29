@@ -277,3 +277,20 @@
   --text-danger: #fb5b60;
   color-scheme: dark;
 }
+
+/*
+ * The server rail is a step deeper than the sidebar beside it, so the two
+ * never read as one flat slab: the sidebar's own colour mixed with black, a
+ * little in a light theme and more in a dark one. It follows --bg-base, so
+ * every preset and custom theme gets its own, and the theme gallery's pictures
+ * mix theirs with --rail-shade from the theme each one shows. A sidebar that
+ * is black already has no darker step, so the rail and the conversation also
+ * carry a hairline edge (Rail, AppShell).
+ */
+:root {
+  --rail-shade: 78%;
+  --bg-rail: color-mix(in oklab, var(--bg-base) var(--rail-shade), #000);
+}
+[data-theme="light"] {
+  --rail-shade: 95%;
+}

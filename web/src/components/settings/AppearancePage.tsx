@@ -1,4 +1,4 @@
-import { Check, Pipette } from "lucide-react";
+import { Check, Pipette, X } from "lucide-react";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
 import { Toggle } from "@/components/common/Toggle";
@@ -9,6 +9,7 @@ import { readableOn } from "@/lib/color";
 import { newThemeId, themeTokens } from "@/lib/look/customTheme";
 import type { CustomTheme } from "@/lib/look/types";
 import { resolveLook } from "@/lib/theme";
+import { forget } from "@/lib/spell";
 import { ImportThemeDialog } from "./look/ImportThemeDialog";
 import { startingColours } from "./look/SimpleEditor";
 import { ThemeBuilder } from "./look/ThemeBuilder";
@@ -161,6 +162,23 @@ export default function AppearancePage() {
       <Toggle checked={st.underlineLinks} onChange={(v) => patch({ underlineLinks: v })} label={tr_("settings.appearance.alwaysUnderlineLinks")} description={tr_("settings.appearance.makesLinksEasierToSpotIn")} />
       <h3 className={s.h5}>{tr_("settings.appearance.typing")}</h3>
       <Toggle checked={st.spellcheck !== false} onChange={(v) => patch({ spellcheck: v })} label={tr_("settings.appearance.spellCheck")} description={tr_("settings.appearance.underlinesMisspelledWordsInTheMessage")} />
+      {st.spellWords.length ? (
+        // the words added from the right-click menu, each one a click away from being checked again
+        <div className={s.spellWords} role="group" aria-labelledby="spell-words-head" data-testid="spell-words">
+          <div className={s.spellWordsHead} id="spell-words-head">{tr_("settings.appearance.yourWords")}</div>
+          <div className={s.spellWordList}>
+            {st.spellWords.map((w) => (
+              <span key={w} className={s.spellWord}>
+                <span dir="auto">{w}</span>
+                <button type="button" className={s.spellWordRemove} aria-label={tr_("settings.appearance.removeWord", { word: w })} title={tr_("settings.appearance.removeWord", { word: w })} onClick={() => forget(w)}>
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      <Toggle checked={st.sendButton} onChange={(v) => patch({ sendButton: v })} label={tr_("settings.appearance.sendButton")} description={tr_("settings.appearance.sendButtonHint")} />
     </div>
   );
 }

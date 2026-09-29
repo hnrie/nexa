@@ -55,4 +55,26 @@ describe("useKeepFocused", () => {
     screen.getByRole("button").dispatchEvent(new MouseEvent("pointerup", { bubbles: true, button: 0 }));
     expect(document.activeElement).toBe(screen.getByLabelText("Focused pane"));
   });
+
+  it("leaves a selection of nothing but emoji where it is, to be copied", () => {
+    render(
+      <>
+        <p data-testid="message">
+          <span className="md-emoji-box">
+            <img alt={"\u{1F525}"} src="/twemoji/1f525.svg" />
+          </span>
+        </p>
+        <Box enabled label="Message" />
+      </>,
+    );
+    const message = screen.getByTestId("message");
+    const range = document.createRange();
+    range.selectNodeContents(message);
+    document.getSelection()!.removeAllRanges();
+    document.getSelection()!.addRange(range);
+    // the selection's own text has no alt text in it, which read as nothing selected
+    expect(document.getSelection()!.toString()).toBe("");
+    message.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, button: 0 }));
+    expect(document.activeElement).not.toBe(screen.getByLabelText("Message"));
+  });
 });

@@ -3,11 +3,19 @@
 .replyBar + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
 .replyBar b { color: var(--text); font-weight: 600; }
 .replyWho { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.replyWords { margin-inline-start: 8px; color: var(--text-muted); unicode-bidi: isolate; }
 .replyBtns { flex: none; display: flex; align-items: center; gap: 12px; }
 .pingBtn { font-size: 12px; font-weight: 700; color: var(--text-muted); }
 .pingBtn[data-on="true"] { color: var(--text-brand); }
 .closeBtn { display: inline-flex; color: var(--text-muted); }
 .closeBtn:hover { color: var(--text); }
+/* the eye's preview: the message as it will look once sent, seen only by the one writing it */
+.preview { margin-bottom: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-surface); max-height: min(40vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
+.previewHead { display: flex; align-items: center; gap: 6px; padding: 8px 10px 0 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.previewNote { flex: 1; min-width: 0; }
+.previewMsg { display: flex; align-items: flex-start; gap: 16px; padding: 6px 16px 12px; }
+.previewBody { flex: 1; min-width: 0; }
+.previewName { font-size: 16px; font-weight: 500; line-height: 22px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the files waiting to go: how many of how many, then a strip that scrolls sideways */
 .trayWrap { background: var(--bg-composer); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .trayHead { display: flex; justify-content: space-between; gap: 8px; padding: 10px 16px 0; font-size: 12px; font-weight: 600; color: var(--text-muted); }
@@ -82,8 +90,10 @@
   .noticeClose { order: 1; }
   .noticeActions { order: 2; flex-basis: 100%; justify-content: flex-end; }
 }
-/* every touch screen gets a send button, a tablet as much as a phone */
+/* every touch screen gets a send button, a tablet as much as a phone; a computer when it is asked for */
 @media (max-width: 767px), (pointer: coarse) { .sendMobile { display: flex; } }
+.sendMobile.sendShown { display: flex; }
+.send:disabled { opacity: 0.5; cursor: default; }
 .locked { align-items: center; padding: 0 16px; color: var(--text-muted); font-size: 16px; cursor: not-allowed; }
 .attachSpacer { width: 16px; flex: none; }
 .slowmode { position: absolute; inset-inline-start: 30px; bottom: 4px; pointer-events: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }

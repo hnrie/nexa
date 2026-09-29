@@ -1,7 +1,7 @@
 import { Check, Hash, Link2, Lock, MailOpen, MoreHorizontal, Pencil, Pin, PinOff, Reply, RotateCw, SmilePlus, Trash2 } from "lucide-react";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/common/Avatar";
-import { Markdown, emojiCount, isEmojiOnly, parse, plainText } from "@/markdown";
+import { Markdown, isEmojiOnly, parse, plainText } from "@/markdown";
 import { useRowRenderCtx } from "@/lib/markdownCtx";
 import { formatExact, formatFull, formatTime, formatTimestamp } from "@/lib/time";
 import { useAuth } from "@/stores/auth";
@@ -30,6 +30,7 @@ import { EditMessage } from "./EditMessage";
 import { isOnlyMediaLinks } from "./mediaLinks";
 import { Reactions } from "./Reactions";
 import { StickerPopout } from "./StickerPopout";
+import { ReplyWords, useReplyWords } from "./ReplyWords";
 import { SystemMessage } from "./SystemMessage";
 import { Tooltip } from "@/components/common/Tooltip";
 import { menuAnchor } from "@/components/common/ContextMenu";
@@ -73,23 +74,9 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
   const ctx = useRowRenderCtx();
   // what someone blocked wrote is not quoted back, even over a reply to it
   const targetBlocked = useRelationships((r) => (target ? r.byUser[target.author_id]?.type === "blocked" : false));
-  const payload = target?.payload;
-  const failed = !!target?.decryptError;
-  // parsed when the quoted message changes, not on every render of the row
   const hook = target?.hook;
-  const text = useMemo(() => {
-    const mediaOnly = !!payload?.t && isOnlyMediaLinks(payload.t, (payload.embeds ?? []) as UnfurlResult[]);
-    if (payload?.t && !mediaOnly) return plainText(parse(payload.t), ctx);
-    // a poll's words are its question and answers
-    if (payload?.poll) return pollWords(payload.poll).replace(/\n/g, " ").slice(0, 200);
-    // a webhook's message says what it has to say in its embeds, as often as not
-    if (hook && !payload?.att?.length) {
-      const words = hookText(hook);
-      if (words) return plainText(parse(words), ctx).slice(0, 200);
-    }
-    if (payload?.att?.length || mediaOnly || payload?.sticker) return t("chat.messageItem.clickToSeeAttachment");
-    return failed ? t("chat.messageItem.encryptedMessage") : "";
-  }, [payload, failed, ctx, hook]);
+  // its words with their formatting, parsed when the quoted message changes, not on every render of the row
+  const words = useReplyWords(target);
   if (!msg.reply_to_id) return null;
   const replyTo = msg.reply_to_id;
   // Jumping works whether or not the original is loaded: the list fetches the
@@ -127,7 +114,7 @@ function ReplyPreview({ msg }: { msg: DecryptedMessage }) {
         {name}
       </button>
       <button type="button" className={s.replyText} dir="auto" title={t("chat.messageItem.goToOriginal")} onClick={(e) => { e.stopPropagation(); jump(); }}>
-        {text}
+        <ReplyWords words={words} ctx={ctx} />
       </button>
     </div>
   );
@@ -185,13 +172,9 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const mediaOnly = !!embeds && imagePreviews && isOnlyMediaLinks(msg.payload?.t ?? "", embeds);
   const text = mediaOnly ? "" : (msg.payload?.t ?? "");
   const nodes = useMemo(() => (text ? parse(text) : []), [text]);
+  // A message of nothing but emoji draws them big, all at one size: shrinking
+  // them as there were more made two messages side by side look mismatched.
   const jumbo = useMemo(() => nodes.length > 0 && isEmojiOnly(nodes), [nodes]);
-  // one to three emoji get the big treatment; a wall of them shrinks so it still fits a line
-  const jumboSize = useMemo(() => {
-    if (!jumbo) return undefined;
-    const n = emojiCount(nodes);
-    return n <= 3 ? 48 : n <= 8 ? 36 : 28;
-  }, [jumbo, nodes]);
 
   const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null, anchor?: ContextMenuState["anchor"]) => {
     setMenuOpen(true);
@@ -320,7 +303,7 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
       {editing ? (
         <EditMessage msg={msg} />
       ) : (
-        <div id={bodyId} className={[s.content, jumbo ? s.jumbo : ""].join(" ")} style={jumboSize ? ({ "--jumbo-size": `${jumboSize}px` } as React.CSSProperties) : undefined}>
+        <div id={bodyId} className={[s.content, jumbo ? s.jumbo : ""].join(" ")}>
           {msg.decryptError === "no_key" ? (
             <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
           ) : msg.decryptError === "bad" ? (

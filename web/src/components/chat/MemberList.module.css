@@ -1,4 +1,5 @@
-.list { width: var(--members-w); flex: none; border-inline-start: 1px solid var(--border-subtle); overflow-y: auto; overscroll-behavior: contain; padding: 8px 8px 16px; background: var(--bg-raised); }
+/* beside the conversation it takes the sidebar's colour, so the conversation stands out between the two */
+.list { width: var(--members-w); flex: none; border-inline-start: 1px solid var(--border-subtle); overflow-y: auto; overscroll-behavior: contain; padding: 8px 8px 16px; background: var(--bg-base); }
 .head { height: 40px; padding: 18px 8px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-channel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row { display: flex; align-items: center; gap: 12px; height: 42px; margin: 1px 0; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); width: 100%; text-align: start; }
 .row:hover { background: var(--bg-hover); color: var(--text); }
@@ -16,7 +17,7 @@
    the conversation (ChatView's useIsNarrow). It is mounted as it opens, so the
    slide-in is an animation; the slide-out is the transition. */
 @media (max-width: 1099px) {
-  .list { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; z-index: 40; width: min(300px, 84vw); border-inline-start: 1px solid var(--border); box-shadow: var(--shadow-high); transform: translateX(100%); transition: transform 200ms ease; padding-top: 12px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .list { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; z-index: 40; width: min(300px, 84vw); border-inline-start: 1px solid var(--border); background: var(--bg-raised); box-shadow: var(--shadow-high); transform: translateX(100%); transition: transform 200ms ease; padding-top: 12px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   [dir="rtl"] .list { transform: translateX(-100%); }
   .list[data-open="true"], [dir="rtl"] .list[data-open="true"] { transform: none; animation: slideIn 200ms ease; }
   [dir="rtl"] .list[data-open="true"] { animation-name: slideInRtl; }

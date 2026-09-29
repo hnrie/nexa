@@ -172,6 +172,30 @@ describe("encryptMessage / decryptMessage", () => {
       embeds: [{ url: "https://e.x", type: "link" }],
     });
   });
+
+  it("keeps everything a link's card draws, with only web addresses and known words in it", async () => {
+    const card = {
+      url: "https://e.x/post",
+      type: "link",
+      title: "T",
+      author: "Ada",
+      author_url: "https://e.x/ada",
+      icon: "/media/proxy/1-s/aWNvbg",
+      published_at: 1_790_000_000_000,
+      media: "/media/proxy/1-s/bWVkaWE",
+      media_kind: "audio",
+      media_mime: "audio/mpeg",
+      media_w: 640,
+      media_h: 360,
+      player: "https://player.vimeo.com/video/123456",
+      player_site: "Vimeo",
+      banner: "/media/banner/9",
+      image_layout: "large",
+    };
+    const forged = { t: "x", embeds: [card, { url: "https://e.y", author_url: "javascript:alert(1)", icon: "//elsewhere.test/i.png", media_kind: "flash", image_layout: "huge", player: "data:text/html,hi", published_at: "soon" }] };
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify(forged)));
+    expect((await decryptMessage(key, env, aad)).embeds).toEqual([card, { url: "https://e.y" }]);
+  });
 });
 
 describe("isEnvelope", () => {

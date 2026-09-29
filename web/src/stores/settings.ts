@@ -68,6 +68,10 @@ export interface Settings {
   locale: string | null;
   /** Underline misspelled words while typing, with suggestions on a right click. */
   spellcheck: boolean;
+  /** Words this account added to its dictionary (lib/spell), in lower case. */
+  spellWords: string[];
+  /** A Send button beside the message box on a computer too; touch screens always have one. */
+  sendButton: boolean;
   linkPreviews: boolean;
   imagePreviews: boolean;
   /** Read aloud the messages a webhook sends to be read aloud, in the conversation open in front of you (lib/tts.ts). */
@@ -155,6 +159,8 @@ export const DEFAULT_SETTINGS: Settings = {
   underlineLinks: false,
   locale: null,
   spellcheck: true,
+  spellWords: [],
+  sendButton: false,
   linkPreviews: true,
   imagePreviews: true,
   tts: true,
@@ -232,6 +238,9 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
     whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
+
+    spellWords: Array.isArray(inc.spellWords) ? inc.spellWords.filter((w): w is string => typeof w === "string" && w.length > 0 && w.length <= 64).slice(-2000) : base.spellWords,
+    sendButton: typeof inc.sendButton === "boolean" ? inc.sendButton : base.sendButton,
 
     searchIndex: typeof inc.searchIndex === "boolean" ? inc.searchIndex : base.searchIndex,
     // no more than search/recent.ts keeps, whatever an older or odd copy holds

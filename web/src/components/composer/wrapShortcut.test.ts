@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { formatShortcut, toggleWrap, type Wrapped } from "./wrapShortcut";
+import { formatShortcut, toggleWrap, type WrapMarker, type Wrapped } from "./wrapShortcut";
 
 /** The text after a toggle, with the selection marked as [ and ]. */
-function after(text: string, start: number, end: number, marker: "**" | "*" | "__"): string {
+function after(text: string, start: number, end: number, marker: WrapMarker): string {
   const w: Wrapped = toggleWrap(text, start, end, marker);
   const out = text.slice(0, w.from) + w.insert + text.slice(w.to);
   return out.slice(0, w.start) + "[" + out.slice(w.start, w.end) + "]" + out.slice(w.end);
 }
 
 /** Selects the part of `text` between [ and ] and toggles. */
-function toggle(marked: string, marker: "**" | "*" | "__"): string {
+function toggle(marked: string, marker: WrapMarker): string {
   const start = marked.indexOf("[");
   const end = marked.indexOf("]") - 1;
   return after(marked.replace("[", "").replace("]", ""), start, end, marker);
@@ -68,5 +68,20 @@ describe("the formatting shortcuts", () => {
     expect(after("ab", 1, 1, "**")).toBe("a**[]**b");
     expect(after("a****b", 3, 3, "**")).toBe("a[]b");
     expect(after("a**b", 2, 2, "*")).toBe("a[]b");
+  });
+});
+
+describe("the formatting the right-click menu adds", () => {
+  it("wraps in strikethrough, a spoiler or inline code, and takes each off again", () => {
+    expect(toggle("say [hello]", "~~")).toBe("say ~~[hello]~~");
+    expect(toggle("say ~~[hello]~~", "~~")).toBe("say [hello]");
+    expect(toggle("the [end]", "||")).toBe("the ||[end]||");
+    expect(toggle("the ||[end]||", "||")).toBe("the [end]");
+    expect(toggle("run [npm test]", "`")).toBe("run `[npm test]`");
+    expect(toggle("run `[npm test]`", "`")).toBe("run [npm test]");
+  });
+
+  it("reads three backticks as a code block rather than inline code, so it wraps again inside them", () => {
+    expect(toggle("```[x]```", "`")).toBe("````[x]````");
   });
 });

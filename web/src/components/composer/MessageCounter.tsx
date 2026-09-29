@@ -7,9 +7,9 @@ import { t } from "@/i18n";
  * the formatting editor. The number is what the eye reads; a screen reader
  * hears the sentence.
  */
-export function MessageCounter({ text, className }: { text: string; className?: string }) {
-  if (!counterShown(text)) return null;
-  const left = charsLeft(text);
+export function MessageCounter({ text, className, max }: { text: string; className?: string; max?: number }) {
+  if (!counterShown(text, max)) return null;
+  const left = charsLeft(text, max);
   return (
     <span className={className} data-over={left < 0} data-testid="message-counter">
       <span aria-hidden="true">{left}</span>

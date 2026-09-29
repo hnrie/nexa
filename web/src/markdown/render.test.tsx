@@ -158,13 +158,20 @@ describe("emoji", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders a custom emoji image", () => {
+  it("renders a custom emoji image in a box that says which one it is", () => {
     const { container } = render(<Markdown source="<:smile:123>" ctx={makeCtx()} />);
     const img = container.querySelector("img.md-emoji") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe("https://cdn.test/emojis/123.webp");
     expect(img.getAttribute("alt")).toBe(":smile:");
-    expect(img.getAttribute("title")).toBe(":smile:");
+    // the details card names it; a title would show a second tooltip over it
+    expect(img.hasAttribute("title")).toBe(false);
     expect(img.className).not.toContain("md-emoji-jumbo");
+    const box = img.parentElement as HTMLElement;
+    expect(box.className).toBe("md-emoji-box");
+    expect(box.dataset["emojiCard"]).toBe("custom");
+    expect(box.dataset["emojiId"]).toBe("123");
+    expect(box.dataset["emojiName"]).toBe("smile");
+    expect(box.dataset["emojiAnimated"]).toBeUndefined();
   });
 
   it("uses the animated url and the jumbo class", () => {
@@ -172,6 +179,8 @@ describe("emoji", () => {
     const img = container.querySelector("img.md-emoji") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe("https://cdn.test/emojis/9.gif");
     expect(img.className).toContain("md-emoji-jumbo");
+    expect(img.parentElement?.className).toBe("md-emoji-box md-emoji-box-jumbo");
+    expect(img.parentElement?.dataset["emojiAnimated"]).toBe("true");
   });
 
   it("draws a unicode emoji with the bundled twemoji artwork", () => {
@@ -179,7 +188,10 @@ describe("emoji", () => {
     const img = container.querySelector("img.md-emoji") as HTMLImageElement;
     expect(img.getAttribute("src")).toBe("/twemoji/1f600.svg");
     expect(img.getAttribute("alt")).toBe("\u{1F600}");
+    expect(img.hasAttribute("title")).toBe(false);
     expect(img.className).toContain("md-emoji-jumbo");
+    // the box takes the pointer, so a drag can start on the emoji and copy it
+    expect(img.parentElement?.dataset["emojiCard"]).toBe("unicode");
   });
 
   it("falls back to the platform glyph when there is no artwork", () => {
@@ -189,6 +201,8 @@ describe("emoji", () => {
     fireEvent.error(img);
     const span = container.querySelector(".md-emoji-unicode") as HTMLElement;
     expect(span.textContent).toBe("\u{1F600}");
+    expect(span.dataset["emojiCard"]).toBe("unicode");
+    expect(container.querySelector(".md-emoji-box")).toBeNull();
   });
 });
 
@@ -448,5 +462,15 @@ describe("blocks", () => {
     expect(container.querySelector("h1")).toBeNull();
     expect(container.querySelector("ul")).toBeNull();
     expect(container.textContent).toBe("# hi- x");
+  });
+});
+
+describe("invite links", () => {
+  it("read without their key, which the link keeps", () => {
+    const url = `${window.location.origin}/invite/LK3Zv5qH#k=0.Pam7abHfXosNdN9IkK6BEA89-isbcIuhTJB2kkoqs3g`;
+    const { container } = render(<Markdown source={`join us ${url}`} ctx={makeCtx()} />);
+    const a = container.querySelector("a") as HTMLAnchorElement;
+    expect(a.textContent).toBe(`${window.location.host}/invite/LK3Zv5qH`);
+    expect(a.getAttribute("href")).toBe(url);
   });
 });

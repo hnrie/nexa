@@ -5,6 +5,7 @@ import { Button } from "@/components/common/Button";
 import { Modal } from "@/components/common/Modal";
 import { Select } from "@/components/common/Select";
 import { Field, TextInput } from "@/components/common/TextInput";
+import { Toggle } from "@/components/common/Toggle";
 import { Twemoji } from "@/components/common/Twemoji";
 import { sendPoll } from "@/components/composer/send";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
@@ -173,9 +174,11 @@ export function CreatePollModal({ onClose, channelId }: { onClose: () => void; c
             ))}
           </div>
           {rows.length < POLL_ANSWERS_MAX ? (
-            <Button variant="ghost" size="sm" className={s.add} onClick={addRow} data-testid="poll-add-answer">
-              <Plus size={16} aria-hidden="true" /> {t("poll.create.addAnswer")}
-            </Button>
+            // a row of its own, its plus in the emoji column and its words where an answer's go
+            <button type="button" className={s.add} onClick={addRow} data-testid="poll-add-answer">
+              <span className={s.addIcon} aria-hidden="true"><Plus size={18} /></span>
+              <span className={s.addText}>{t("poll.create.addAnswer")}</span>
+            </button>
           ) : null}
         </Field>
         <Field label={t("poll.create.duration")}>
@@ -185,10 +188,7 @@ export function CreatePollModal({ onClose, channelId }: { onClose: () => void; c
             ))}
           </Select>
         </Field>
-        <label className={s.check}>
-          <input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} data-testid="poll-multi" />
-          <span>{t("poll.create.multiselect")}</span>
-        </label>
+        <Toggle checked={multi} onChange={setMulti} label={t("poll.create.multiselect")} />
       </div>
       {picker ? (
         <ExpressionPicker

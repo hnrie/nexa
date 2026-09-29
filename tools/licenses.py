@@ -39,6 +39,11 @@ OUT = ROOT / "web/src/data/licenses.json"
 # the web client, so that is what comes first.
 PARTS = ["web", "desktop", "server", "assets"]
 
+# Hunspell dictionaries whose "(MIT AND BSD)" is the npm wrapper's MIT and the word
+# lists' own terms; what ships is the word lists. Their terms are a set of notices
+# each asking to be kept with its permission text, so that text is kept whole.
+WORD_LISTS = {"dictionary-en": "SCOWL", "dictionary-en-gb": "SCOWL"}
+
 # The files a package may keep its licence in, most specific first. `LICENSE-MIT`
 # and friends are how a dual-licensed package names them.
 LICENSE_FILE = re.compile(r"^(LICEN[CS]E|COPYING|UNLICENSE)([.\-_].*)?$", re.I)
@@ -83,6 +88,7 @@ LICENSE_NAMES = {
     "MPL-2.0": "Mozilla Public License 2.0",
     "OFL-1.1": "SIL Open Font License 1.1",
     "Python-2.0": "Python License 2.0",
+    "SCOWL": "SCOWL and Ispell word list licences",
     "Unlicense": "The Unlicense",
     "Zlib": "zlib License",
 }
@@ -181,22 +187,23 @@ class Collector:
         self.texts: dict[str, Counter[str]] = {}
         self.unknown: list[str] = []
 
-    def add(self, *, part: str, name: str, version: str, license_: str | None, url: str, text: str | None, notice: str | None = None) -> None:
+    def add(self, *, part: str, name: str, version: str, license_: str | None, url: str, text: str | None, notice: str | None = None, whole: bool = False) -> None:
         spdx = license_ or (detect(text) if text else None)
         if not spdx:
             self.unknown.append(f"{part}/{name}")
             spdx = "Unknown"
         entry: dict[str, str] = {"part": part, "name": name, "version": version, "license": spdx, "url": url}
         # A notice given by name beats one read out of a file, because it is given
-        # where the file that ships has none to read.
-        line = notice or (copyright_of(text) if text else None)
+        # where the file that ships has none to read. A licence kept whole carries
+        # its notices itself.
+        line = notice or (copyright_of(text) if text and not whole else None)
         if line:
             entry["copyright"] = line
         if text:
             # Every real copy of a licence is a vote for what the shared text should
             # be; the one most packages ship wins, so a single mangled file cannot
             # become the text everyone reads.
-            self.texts.setdefault(spdx, Counter())[without_copyright(text)] += 1
+            self.texts.setdefault(spdx, Counter())[text.replace("\r\n", "\n").strip() + "\n" if whole else without_copyright(text)] += 1
         self.packages.append(entry)
 
 
@@ -271,10 +278,13 @@ def npm_part(collector: Collector, part: str, project: Path, roots: list[str]) -
         # "Apache", a URL — but ships a text we can read is filed under what it ships.
         if spdx and spdx not in LICENSE_NAMES and text:
             spdx = detect(text) or spdx
+        # Only the word lists of these reach a reader (the spell checker fetches the
+        # .aff and .dic files), and they are under the terms their licence file quotes.
+        spdx = WORD_LISTS.get(name, spdx)
         # whoever follows this is on an https page; an old http address only downgrades
         homepage = re.sub(r"^http://", "https://", homepage)
         url = homepage if homepage.startswith("https://") else f"https://www.npmjs.com/package/{name}"
-        collector.add(part=part, name=name, version=info.get("version", ""), license_=spdx, url=url, text=text)
+        collector.add(part=part, name=name, version=info.get("version", ""), license_=spdx, url=url, text=text, whole=name in WORD_LISTS)
         count += 1
     return count
 

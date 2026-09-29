@@ -50,4 +50,10 @@ export interface RenderCtx {
   onUserClick?: (id: string, el: HTMLElement) => void;
   onChannelClick?: (id: string) => void;
   revealSpoilers?: boolean; // when true spoilers render revealed
+  /**
+   * Drawn as a picture of a message, such as the line over a reply: no link,
+   * mention or spoiler in it takes a click or the keyboard, since the whole
+   * line is already the way to the message.
+   */
+  inert?: boolean;
 }

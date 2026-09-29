@@ -1,0 +1,5 @@
+/* A copy of the box's text over it, where only the lines under misspelled
+   words show: the rest is hidden but keeps its room, emoji included (colour
+   emoji ignore a transparent text colour). */
+.layer { position: absolute; margin: 0; overflow: hidden; pointer-events: none; user-select: none; -webkit-user-select: none; visibility: hidden; background: none; border-style: solid; border-color: transparent; color: transparent; }
+.wrong { visibility: visible; color: transparent; text-decoration-line: underline; text-decoration-style: wavy; text-decoration-color: var(--text-danger); text-decoration-thickness: 1.5px; text-decoration-skip-ink: none; text-underline-offset: 2px; }

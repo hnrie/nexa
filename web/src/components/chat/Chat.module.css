@@ -65,8 +65,13 @@
 .msg[data-menu="true"] { background: var(--bg-message-hover); }
 @media (hover: hover) { .msg:hover { background: var(--bg-message-hover); } }
 .msg[data-group-start="true"] { margin-top: 17px; padding-top: 2px; }
-.msg[data-mentioned="true"] { background: var(--mention-bg); }
-.msg[data-mentioned="true"]::before { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 2px; background: var(--warning); }
+/* A message that mentions you is lit in the theme's own accent, lightly, with
+   an edge in the accent's readable shade. It used to be a heavy wash of the
+   accent under a gold edge: two colours that fought, and the loudest thing on
+   a grey page. */
+.msg[data-mentioned="true"] { background: color-mix(in srgb, var(--brand) 9%, transparent); }
+@media (hover: hover) { .msg[data-mentioned="true"]:hover { background: color-mix(in srgb, var(--brand) 13%, transparent); } }
+.msg[data-mentioned="true"]::before { content: ""; position: absolute; inset-inline-start: 0; top: 0; bottom: 0; width: 2px; background: var(--focus-ring); }
 .msg[data-highlight="true"] { animation: flash 2s ease-out; }
 @keyframes flash { 0% { background: color-mix(in srgb, var(--brand) 40%, transparent); } 100% { background: transparent; } }
 /* Which row you landed on is the whole point of jumping to it, so when motion
@@ -197,6 +202,11 @@ button.sysName:hover { text-decoration: underline; }
 .imgWrap img[role="button"] { cursor: pointer; }
 .imgWrap img:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .imgWrap { position: relative; border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-input); cursor: pointer; max-width: 100%; }
+/* A message's pictures, two or more, share one grid (Attachments' mosaicLayout):
+   each is cut to fill its tile, and opens whole in the viewer. The grid is as
+   wide as one picture on its own may be, and rounds its outer corners only. */
+.mosaic { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; width: min(550px, 100%); border-radius: var(--radius-sm); overflow: hidden; }
+.mosaic > .imgWrap { border-radius: 0; max-width: none; min-width: 0; }
 .imgWrap img, .imgWrap video { display: block; width: 100%; height: 100%; object-fit: cover; }
 .imgWrap[data-spoiler="true"] img, .imgWrap[data-spoiler="true"] video { filter: blur(44px); }
 .spoilerTag { position: absolute; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; }

@@ -29,10 +29,12 @@
   animation: owner-slide 4s linear infinite;
 }
 
-/* An admin's hammer starts in the brand colour, so it never reads as the
-   owner's gold crown, and cycles the rainbow the same way. */
+/* An admin's hammer starts violet, so it never reads as the owner's gold
+   crown, and cycles the rainbow the same way. A fixed colour, not the theme's
+   accent: a profile card in its own colours sets that to plain white or black,
+   and turning the hue of a grey leaves it grey. */
 .hammer {
-  color: var(--text-brand);
+  color: #a855f7;
   flex: none;
   animation: owner-hue 4s linear infinite;
 }

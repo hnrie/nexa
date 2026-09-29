@@ -39,3 +39,20 @@ export function inviteUrl(code: string, key?: InviteKey | null): string {
   const base = `${window.location.origin}/invite/${code}`;
   return key ? `${base}#${encodeInviteKey(key)}` : base;
 }
+
+/**
+ * How an invite link to this instance reads in a message: its address
+ * without the key, which is most of its length and nothing a reader needs to
+ * see. The link still carries the key when it is opened. Null for any other
+ * address, or an invite with no key to hide.
+ */
+export function shownInvite(url: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const u = new URL(url);
+    if (u.origin !== window.location.origin || !/^\/invite\/[A-Za-z0-9_-]+\/?$/.test(u.pathname) || !u.hash) return null;
+    return u.host + u.pathname.replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+}

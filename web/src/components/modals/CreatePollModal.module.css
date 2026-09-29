@@ -10,9 +10,11 @@
 .emojiClear:hover { background: var(--danger); color: var(--on-danger); }
 .remove { flex: none; width: 36px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); }
 .remove:hover { background: var(--bg-hover); color: var(--danger); }
-.add { align-self: flex-start; margin-top: 8px; gap: 6px; }
-.check { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; color: var(--text); cursor: pointer; }
-.check input { flex: none; margin: 2px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
+/* Add Answer lines up with the answers above it: its plus sits in their emoji column, its words where theirs start */
+.add { display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; margin-top: 8px; padding: 0; border: 1px dashed var(--border); border-radius: var(--radius-xs); color: var(--text-muted); font-size: 15px; font-weight: 500; text-align: start; }
+.add:hover { border-color: var(--border-strong); background: var(--bg-hover); color: var(--text); }
+.addIcon { flex: none; width: 44px; display: flex; align-items: center; justify-content: center; }
+.addText { padding-inline-start: 11px; }
 @media (pointer: coarse) {
   .emojiClear { width: 24px; height: 24px; top: -8px; inset-inline-end: -8px; }
   .remove { width: 44px; height: 44px; }

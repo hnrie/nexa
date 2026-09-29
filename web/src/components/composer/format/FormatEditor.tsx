@@ -43,7 +43,9 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Modal } from "@/components/common/Modal";
+import { useSpellHighlights } from "@/components/common/SpellLines";
 import { Tooltip } from "@/components/common/Tooltip";
+import { modKeys, useTextMenu, type TextFormat } from "@/lib/textMenu";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import type { AlertKind, Align } from "@/markdown/ast";
 import { COLOR_NAMES, colorToken, FALLBACK_SURFACE, subscribeTheme, surfaceOf, swatchColor, type Surface } from "@/markdown/colors";
@@ -62,12 +64,19 @@ interface Props {
   placeholder: string;
   /** Puts the markdown in the message box. */
   onInsert: (markdown: string) => void;
-  /** Sends the markdown; false when it could not go (too long), and the editor stays. */
-  onSend: (markdown: string) => boolean;
+  /** Sends the markdown; false when it could not go (too long), and the editor stays. Without it there is no Send, only Insert (an About Me). */
+  onSend?: (markdown: string) => boolean;
   /** Closes without touching the message box. */
   onClose: () => void;
-  canSend: boolean;
+  canSend?: boolean;
+  /** The editor's title, "Format Your Message" unless said otherwise. */
+  title?: string;
+  /** The longest the text may be, a message's unless said otherwise. */
+  max?: number;
 }
+
+/** The formatting a text box's right-click menu offers, as the surface's marks. */
+const MENU_FLAGS: Record<TextFormat, Flag> = { bold: "b", italic: "i", underline: "u", strike: "s", spoiler: "spoiler", code: "code" };
 
 type Tray = "style" | "color" | "callout" | "more" | "link";
 
@@ -134,7 +143,7 @@ function useNarrow(): boolean {
  * On a phone it is a sheet as tall as the space above the keyboard, with the
  * toolbar at its foot, where the thumb is.
  */
-export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, canSend }: Props) {
+export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, canSend = true, title, max }: Props) {
   const ctx = useRenderCtx();
   const narrow = useNarrow();
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -190,19 +199,43 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
   const current = () => ctl.current?.markdown() ?? markdown;
   const dirty = () => current().trim() !== initial.trim();
 
+  const insert = () => onInsert(current());
   const send = () => {
+    // with nothing to send to, Ctrl+Enter puts the words in the box
+    if (!onSend) return insert();
     if (!canSend) return;
     const md = current();
     if (!md.trim()) return;
     if (onSend(md)) return;
   };
-  const insert = () => onInsert(current());
   const requestClose = () => {
     if (dirty()) setConfirming(true);
     else onClose();
   };
   const toggleTray = (next: Tray) => setTray((cur) => (cur === next ? null : next));
   latest.current = { send, close: requestClose, link: () => setTray("link"), tray };
+
+  // Nexa's own spell checker marks the surface, and its right-click menu
+  // offers spellings, this editor's own undo and the marks of the toolbar
+  const ownSpelling = useSpellHighlights(surfaceRef);
+  useEffect(() => {
+    const el = surfaceRef.current;
+    if (!el) return;
+    el.spellcheck = !ownSpelling;
+    if (ownSpelling) el.setAttribute("data-spell", "");
+    else el.removeAttribute("data-spell");
+  }, [ownSpelling]);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useTextMenu(surfaceRef, {
+    format: (f) => run({ t: "mark", flag: MENU_FLAGS[f] }),
+    formatKeys: { bold: modKeys("B"), italic: modKeys("I"), underline: modKeys("U"), strike: modKeys("X", true), code: modKeys("E") },
+    undo: () => run({ t: "undo" }),
+    redo: () => run({ t: "redo" }),
+    canUndo: () => !!stateRef.current?.canUndo,
+    canRedo: () => !!stateRef.current?.canRedo,
+    insert: (text) => run({ t: "text", text }),
+  });
 
   const marks = state?.marks ?? {};
   const inCode = state?.kind === "code";
@@ -320,8 +353,8 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
     </div>
   );
 
-  const counter = <MessageCounter text={markdown} className={s.counter} />;
-  const sendButton = (
+  const counter = <MessageCounter text={markdown} className={s.counter} max={max} />;
+  const sendButton = !onSend ? null : (
     <button type="button" className={s.send} onMouseDown={(e) => e.preventDefault()} onClick={send} disabled={!canSend || !markdown.trim()} data-testid="format-send">
       <SendHorizontal size={18} aria-hidden="true" />
       <span>{t("composer.format.send")}</span>
@@ -334,13 +367,13 @@ export function FormatEditor({ initial, placeholder, onInsert, onSend, onClose, 
   );
 
   return (
-    <Modal open onClose={requestClose} bare ariaLabel={t("composer.format.title")} width={780} className={s.sheet} closeOnOverlay>
+    <Modal open onClose={requestClose} bare ariaLabel={title ?? t("composer.format.title")} width={780} className={s.sheet} closeOnOverlay>
       <div className={s.frame} data-narrow={narrow || undefined} data-testid="format-editor">
         <header className={s.head}>
           <button type="button" className={s.close} onClick={requestClose} aria-label={t("composer.format.close")} data-testid="format-close">
             <X size={20} aria-hidden="true" />
           </button>
-          <h2 className={s.title} id={titleId}>{t("composer.format.title")}</h2>
+          <h2 className={s.title} id={titleId}>{title ?? t("composer.format.title")}</h2>
           {narrow ? (
             <div className={s.headActions}>
               {counter}

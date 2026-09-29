@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { BadgeCheck, Bug, EyeOff, FolderPlus, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, Palette, Pin, Puzzle, RefreshCw, Search, Shapes, ShieldCheck, Sticker, StickyNote, Type, UserCheck, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Bug, ClipboardCopy, Eye, EyeOff, FolderPlus, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Newspaper, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, Smile, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,23 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-09-27.2",
+    items: [
+      { icon: PanelsTopLeft, title: "whatsNew.r202609272.layoutTitle", body: "whatsNew.r202609272.layoutBody" },
+      { icon: MousePointerClick, title: "whatsNew.r202609272.textMenuTitle", body: "whatsNew.r202609272.textMenuBody" },
+      { icon: SpellCheck, title: "whatsNew.r202609272.spellingTitle", body: "whatsNew.r202609272.spellingBody" },
+      { icon: Smile, title: "whatsNew.r202609272.emojiTitle", body: "whatsNew.r202609272.emojiBody" },
+      { icon: Keyboard, title: "whatsNew.r202609272.typingTitle", body: "whatsNew.r202609272.typingBody" },
+      { icon: Reply, title: "whatsNew.r202609272.repliesTitle", body: "whatsNew.r202609272.repliesBody" },
+      { icon: Eye, title: "whatsNew.r202609272.sendPreviewTitle", body: "whatsNew.r202609272.sendPreviewBody" },
+      { icon: SendHorizontal, title: "whatsNew.r202609272.sendButtonTitle", body: "whatsNew.r202609272.sendButtonBody" },
+      { icon: UserPen, title: "whatsNew.r202609272.aboutMeTitle", body: "whatsNew.r202609272.aboutMeBody" },
+      { icon: LayoutGrid, title: "whatsNew.r202609272.gridTitle", body: "whatsNew.r202609272.gridBody" },
+      { icon: ClipboardCopy, title: "whatsNew.r202609272.copyTitle", body: "whatsNew.r202609272.copyBody" },
+      { icon: Newspaper, title: "whatsNew.r202609272.previewsTitle", body: "whatsNew.r202609272.previewsBody" },
+    ],
+  },
   {
     id: "2026-09-27",
     items: [

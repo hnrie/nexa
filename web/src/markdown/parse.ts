@@ -62,7 +62,9 @@ export const RE_HEADING = /^(#{1,6})[ \t](.*)$/;
 const RE_HEADING_CLOSE = /(?:^|[ \t]+)#+[ \t]*$/;
 export const RE_SUBTEXT = /^-# (.*)$/;
 export const RE_HR = /^[ \t]{0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/;
-export const RE_LIST = /^([ \t]*)(?:([-*+])|(\d{1,9})([.)]))[ \t]+(.*)$/;
+// A bullet is "-" or "*". A "+" at the start of a line is someone saying "plus",
+// and was turned into a dot.
+export const RE_LIST = /^([ \t]*)(?:([-*])|(\d{1,9})([.)]))[ \t]+(.*)$/;
 const RE_TASK = /^\[([ xX])\](?:[ \t]+(.*))?$/;
 export const RE_ALERT = /^\[!(note|tip|important|warning|caution)\](?:[ \t]+(.*))?$/i;
 export const RE_DETAILS_OPEN = /^:::[ \t]*details(?:[ \t]+(.*))?$/i;
@@ -1210,19 +1212,6 @@ export function isEmojiOnly(nodes: Node[]): boolean {
   };
   walk(nodes);
   return ok && count >= 1 && count <= MAX_JUMBO_EMOJI;
-}
-
-/** How many emoji a jumbo message holds, so the renderer can shrink big walls of them. */
-export function emojiCount(nodes: Node[]): number {
-  let count = 0;
-  const walk = (list: Node[]): void => {
-    for (const node of list) {
-      if (node.type === "emoji" || node.type === "unicodeEmoji") count += 1;
-      else if (node.type === "paragraph") walk(node.children);
-    }
-  };
-  walk(nodes);
-  return count;
 }
 
 /** Names for mentions; without them a mention flattens to its raw id. */

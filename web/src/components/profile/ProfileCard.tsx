@@ -273,10 +273,17 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
           ) : null}
         </div>
         <div className={s.user}>
-          <span>{friend && rel.nickname ? `${user.display_name} · ${user.username}` : user.username}</span>
+          {/* A nickname you gave hides their own name, so it is added here; a name the line already shows is not said twice. */}
+          {friend && rel.nickname && user.display_name && user.display_name !== rel.nickname && user.display_name.toLowerCase() !== user.username.toLowerCase() ? (
+            <>
+              <span>{user.display_name}</span>
+              <span className={s.sep} aria-hidden="true">·</span>
+            </>
+          ) : null}
+          <span>{user.username}</span>
           {user.pronouns ? (
             <>
-              <span className={s.sep} aria-hidden="true">•</span>
+              <span className={s.sep} aria-hidden="true">·</span>
               <Tooltip text={t("settings.profile.pronouns")} side="top">
                 <span className={s.pronouns} data-testid="profile-pronouns">{user.pronouns}</span>
               </Tooltip>

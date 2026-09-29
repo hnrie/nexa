@@ -1,0 +1,12 @@
+/* looks like the other text boxes on the page, with the message box's tools along its foot */
+.box { position: relative; display: flex; flex-direction: column; background: var(--bg-input); border: 1px solid transparent; border-radius: var(--radius-xs); transition: border-color var(--transition); }
+.box:focus-within { border-color: var(--border-strong); }
+.ta { display: block; width: 100%; min-height: 132px; margin: 0; padding: 10px 10px 4px; background: transparent; border: 0; outline: none; resize: vertical; color: var(--text); font-size: 16px; line-height: 22px; font-family: var(--font-with-emoji); unicode-bidi: plaintext; }
+.ta::placeholder { color: var(--text-placeholder); }
+.ta:focus, .ta:focus-visible { outline: none; }
+.tools { display: flex; justify-content: flex-end; gap: 2px; padding: 0 6px 6px; }
+.tool { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--icon); }
+.tool:hover { color: var(--text); background: var(--bg-hover); }
+.tool[data-on="true"] { color: var(--text-brand); }
+.tool:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+@media (pointer: coarse) { .tool { width: 44px; height: 44px; } }

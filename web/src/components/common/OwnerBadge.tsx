@@ -1,5 +1,6 @@
 import { Crown, Hammer } from "lucide-react";
 import { t } from "@/i18n";
+import { Tooltip } from "./Tooltip";
 import s from "./OwnerBadge.module.css";
 
 /** The owner's crown: the same Crown icon used for server owners, cycling rainbow. */
@@ -10,10 +11,12 @@ export function OwnerCrown({ size = 14 }: { size?: number }) {
 /** The owner's badge: crown plus "Owner" in animated rainbow text. */
 export function OwnerBadge() {
   return (
-    <span className={s.badge}>
-      <OwnerCrown size={12} />
-      <span className={s.text}>{t("profile.profileCard.owner")}</span>
-    </span>
+    <Tooltip text={t("profile.profileCard.ownerTip")} side="top">
+      <span className={s.badge} tabIndex={0} data-testid="owner-badge">
+        <OwnerCrown size={12} />
+        <span className={s.text}>{t("profile.profileCard.owner")}</span>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -25,9 +28,11 @@ export function AdminHammer({ size = 14 }: { size?: number }) {
 /** An instance admin's badge: the hammer plus "Admin" in animated rainbow text. */
 export function AdminBadge() {
   return (
-    <span className={s.badge}>
-      <AdminHammer size={12} />
-      <span className={s.text}>{t("profile.profileCard.admin")}</span>
-    </span>
+    <Tooltip text={t("profile.profileCard.adminTip")} side="top">
+      <span className={s.badge} tabIndex={0} data-testid="admin-badge">
+        <AdminHammer size={12} />
+        <span className={s.text}>{t("profile.profileCard.admin")}</span>
+      </span>
+    </Tooltip>
   );
 }

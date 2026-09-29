@@ -916,7 +916,7 @@ export class FormatSurface {
     let make: ((b: TextBlock) => TextBlock) | null = null;
     const list = (ordered: boolean, task: boolean, checked: boolean, start: number | null) => (b: TextBlock): TextBlock => ({ ...b, kind: "li", wrap: b.wrap === "quote" ? null : b.wrap, list: { ordered, task, checked, indent: 0, start } });
     let m: RegExpExecArray | null;
-    if (/^[-*+]$/.test(before)) make = list(false, false, false, null);
+    if (/^[-*]$/.test(before)) make = list(false, false, false, null);
     else if ((m = /^(\d{1,9})[.)]$/.exec(before))) make = list(true, false, false, Number(m[1]) === 1 ? null : Number(m[1]));
     else if (/^\[ ?\]$/.test(before)) make = list(false, true, false, null);
     else if (/^\[[xX]\]$/.test(before)) make = list(false, true, true, null);

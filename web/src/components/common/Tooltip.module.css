@@ -1,8 +1,10 @@
 .wrap { position: relative; display: inline-flex; }
-/* drawn on the page itself, so nothing it labels can clip or cover it: a dark bubble with an arrow, as Discord's */
+/* drawn on the page itself, so nothing it labels can clip or cover it: a bubble
+   with an arrow, in a shade of the surface it came from (Tooltip's tooltipPaint),
+   with a faint edge for when it lands on a surface of that same shade */
 .tip {
   position: fixed; z-index: var(--z-tooltip); max-width: 260px; padding: 7px 12px;
-  background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: var(--tooltip-shadow);
+  background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tooltip-text) 10%, transparent), var(--tooltip-shadow);
   font-size: 14px; font-weight: 600; line-height: 18px; text-align: center; white-space: normal; overflow-wrap: break-word;
   border-radius: 6px; pointer-events: none; animation: tipIn 110ms ease-out;
 }

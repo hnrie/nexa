@@ -130,7 +130,8 @@
 .user { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; margin-top: 2px; font-size: 14px; line-height: 20px; color: var(--text); }
 .card[data-variant="modal"] .user { font-size: 16px; line-height: 22px; }
 .sep { color: var(--text); }
-.pronouns { cursor: default; }
+/* words like the rest of the line, with the text cursor they have */
+.pronouns { cursor: text; }
 .chip { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--profile-chip); color: var(--text-strong); font-size: 12px; font-weight: 600; }
 
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

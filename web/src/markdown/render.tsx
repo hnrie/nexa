@@ -3,6 +3,7 @@ import { createContext, Fragment, useContext, useEffect, useId, useLayoutEffect,
 import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { Twemoji } from "@/components/common/Twemoji";
 import { copyText } from "@/lib/clipboard";
+import { shownInvite } from "@/lib/inviteLink";
 import { MentionGlyph } from "@/components/common/ChannelGlyph";
 import { ensureShortcodes, mightHaveShortcode, onShortcodesReady, shortcodeVersion, shortcodesReady } from "@/lib/shortcodes";
 import { formatStamp, type StampStyle } from "@/lib/time";
@@ -262,6 +263,10 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
     case "codeblock":
       return <CodeBlock lang={node.lang} text={node.text} />;
     case "link": {
+      // an invite pasted as it is reads without its key, which is most of its length; the link keeps it
+      const invite = node.masked ? null : shownInvite(node.url);
+      const words = invite ?? <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />;
+      if (ctx.inert) return <span className="md-link">{words}</span>;
       // A masked link says where it really goes, after its words, unless they
       // already name that site: the tooltip that did so shows on no phone.
       const host = node.masked ? linkHost(node.url) : null;
@@ -274,7 +279,7 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
           className="md-link"
           title={node.masked ? node.url : undefined}
         >
-          <RenderNodes nodes={node.children} ctx={ctx} jumbo={jumbo} />
+          {words}
           {shows ? <span className="md-link-host" dir="ltr">{host}</span> : null}
         </a>
       );
@@ -292,15 +297,19 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
         default:
           return <RoleMention id={node.id} ctx={ctx} />;
       }
+    // In a box the pointer lands on rather than the picture (see Twemoji's
+    // boxClassName), which EmojiDetails names; a copy takes the picture's alt text.
     case "emoji":
       return (
-        <img
-          className={jumbo ? "md-emoji md-emoji-jumbo" : "md-emoji"}
-          src={ctx.emojiUrl(node.id, node.animated, 48)}
-          alt={":" + node.name + ":"}
-          title={":" + node.name + ":"}
-          draggable={false}
-        />
+        <span
+          className={jumbo ? "md-emoji-box md-emoji-box-jumbo" : "md-emoji-box"}
+          data-emoji-card="custom"
+          data-emoji-id={node.id}
+          data-emoji-name={node.name}
+          data-emoji-animated={node.animated ? "true" : undefined}
+        >
+          <img className={jumbo ? "md-emoji md-emoji-jumbo" : "md-emoji"} src={ctx.emojiUrl(node.id, node.animated, 48)} alt={":" + node.name + ":"} draggable={false} />
+        </span>
       );
     case "unicodeEmoji":
       return (
@@ -308,6 +317,7 @@ function renderNode(node: Node, ctx: RenderCtx, jumbo: boolean): ReactNode {
           text={node.text}
           className={jumbo ? "md-emoji md-emoji-jumbo" : "md-emoji"}
           fallbackClassName={jumbo ? "md-emoji-unicode md-emoji-jumbo" : "md-emoji-unicode"}
+          boxClassName={jumbo ? "md-emoji-box md-emoji-box-jumbo" : "md-emoji-box"}
         />
       );
     case "timestamp":
@@ -480,6 +490,14 @@ function Spoiler(props: { ctx: RenderCtx; children: ReactNode }): JSX.Element {
   const [revealed, setRevealed] = useState(false);
   const open = props.ctx.revealSpoilers === true || revealed;
   const inner = <span className="md-spoiler-inner">{props.children}</span>;
+  // a preview keeps a spoiler covered, and does not offer to uncover it
+  if (props.ctx.inert && !open) {
+    return (
+      <span className="md-spoiler" data-revealed="false" role="img" aria-label={t("render.spoilerHidden")}>
+        {inner}
+      </span>
+    );
+  }
   if (open) {
     return (
       <span className="md-spoiler" data-revealed="true">
@@ -526,6 +544,7 @@ function pressed(e: KeyboardEvent): boolean {
 function UserMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
   const user = props.ctx.users[props.id];
   const name = user ? user.display_name || user.username || t("render.unknownUser") : t("render.unknownUser");
+  if (props.ctx.inert) return <span className="md-mention">{"@" + name}</span>;
   return (
     <span
       className="md-mention"
@@ -552,6 +571,13 @@ function ChannelMention(props: { id: string; ctx: RenderCtx }): JSX.Element {
     );
   }
   const name = channel.name;
+  if (props.ctx.inert) {
+    return (
+      <span className="md-mention">
+        <MentionGlyph channel={channel} />{name}
+      </span>
+    );
+  }
   return (
     <span className="md-mention" role="button" tabIndex={0} onClick={() => props.ctx.onChannelClick?.(props.id)} onKeyDown={(e) => pressed(e) && props.ctx.onChannelClick?.(props.id)}>
       <MentionGlyph channel={channel} />{name}

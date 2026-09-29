@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import { schemeOf } from "@/lib/look/derive";
 import { tokenStyle, type TokenMap } from "@/lib/look/tokens";
 import s from "./Look.module.css";
 
@@ -8,8 +10,10 @@ import s from "./Look.module.css";
  * on this element, so the picture is the theme and not a guess at it.
  */
 export function ThemeMiniature({ tokens, className }: { tokens: TokenMap; className?: string }) {
+  // the rail's shade is the theme's own sidebar mixed with black, by as much as that theme's scheme mixes it (tokens.css)
+  const style = { ...tokenStyle(tokens), "--rail-shade": schemeOf(tokens["bg-raised"]) === "light" ? "95%" : "78%" } as CSSProperties;
   return (
-    <span className={[s.mini, className ?? ""].join(" ")} style={tokenStyle(tokens)} aria-hidden="true">
+    <span className={[s.mini, className ?? ""].join(" ")} style={style} aria-hidden="true">
       <span className={s.miniRail}>
         <i className={s.miniLogo} />
         <i />

@@ -1,4 +1,4 @@
-import { mightHaveShortcode } from "./shortcodes";
+import { emojiShortcode, ensureShortcodes, mightHaveShortcode, onShortcodesReady, shortcodesReady } from "./shortcodes";
 
 describe("whether a message could hold a :shortcode:", () => {
   it("says yes for a name between colons", () => {
@@ -14,5 +14,33 @@ describe("whether a message could hold a :shortcode:", () => {
     expect(mightHaveShortcode("re: the plan")).toBe(false);
     expect(mightHaveShortcode("note: one: two")).toBe(false);
     expect(mightHaveShortcode("no colons at all")).toBe(false);
+  });
+});
+
+describe("the name an emoji goes by", () => {
+  beforeAll(async () => {
+    if (shortcodesReady()) return;
+    const ready = new Promise<void>((resolve) => onShortcodesReady(resolve));
+    ensureShortcodes();
+    await ready;
+  });
+
+  it("is the one that types it", () => {
+    expect(emojiShortcode("\u{1F600}")).toBe("grinning");
+    expect(emojiShortcode("\u{1F602}")).toBe("joy");
+  });
+
+  it("does not care whether the variation selector is there", () => {
+    expect(emojiShortcode("\u2764\uFE0F")).toBe("heart");
+    expect(emojiShortcode("\u2764")).toBe("heart");
+  });
+
+  it("names a skin tone, and the name brings the same emoji back", () => {
+    const name = emojiShortcode("\u{1F44B}\u{1F3FD}");
+    expect(name).toBe("wave_tone3");
+  });
+
+  it("has nothing for what is not an emoji", () => {
+    expect(emojiShortcode("abc")).toBeUndefined();
   });
 });

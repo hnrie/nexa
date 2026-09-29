@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api/client";
 import { bannerUrl, users as usersApi } from "@/api/users";
 import { ImageCropModal } from "@/components/common/ImageCropModal";
@@ -6,7 +6,8 @@ import { ProfileCard } from "@/components/profile/ProfileCard";
 import { profileTheme } from "@/lib/avatarColor";
 import { Button } from "@/components/common/Button";
 import { CustomColorIcon } from "./CustomColorIcon";
-import { Field, TextArea, TextInput } from "@/components/common/TextInput";
+import { AboutMeEditor, aboutToEdit, aboutToSave } from "./AboutMeEditor";
+import { Field, TextInput } from "@/components/common/TextInput";
 import { useAuth } from "@/stores/auth";
 import { useUI } from "@/stores/ui";
 import s from "./Settings.module.css";
@@ -29,7 +30,8 @@ export default function ProfilePage() {
   const toast = useUI((u) => u.toast);
   const [displayName, setDisplayName] = useState(me?.display_name ?? "");
   const [pronouns, setPronouns] = useState(me?.pronouns ?? "");
-  const [about, setAbout] = useState(me?.about_me ?? "");
+  // written with custom emoji as their :name:, saved with them as the emoji (AboutMeEditor)
+  const [about, setAbout] = useState(() => aboutToEdit(me?.about_me ?? ""));
   const [accent, setAccent] = useState<string | null>(hexOf(me?.accent_color));
   const [accent2, setAccent2] = useState<string | null>(hexOf(me?.accent_color_2));
   const [crop, setCrop] = useState<{ file: File; kind: "avatar" | "banner" } | null>(null);
@@ -42,27 +44,30 @@ export default function ProfilePage() {
     if (!me) return;
     setDisplayName(me.display_name);
     setPronouns(me.pronouns);
-    setAbout(me.about_me);
+    setAbout(aboutToEdit(me.about_me));
     setAccent(hexOf(me.accent_color));
     setAccent2(hexOf(me.accent_color_2));
   }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const savedAbout = me?.about_me ?? "";
+  const loadedAbout = useMemo(() => aboutToEdit(savedAbout), [savedAbout]);
+  const aboutOut = useMemo(() => aboutToSave(about), [about]);
 
   if (!me) return null;
   const currentAccent = hexOf(me.accent_color);
   const currentAccent2 = hexOf(me.accent_color_2);
-  const dirty = displayName !== me.display_name || pronouns !== me.pronouns || about !== me.about_me || accent !== currentAccent || accent2 !== currentAccent2;
+  const dirty = displayName !== me.display_name || pronouns !== me.pronouns || about !== loadedAbout || accent !== currentAccent || accent2 !== currentAccent2;
   const hex = (v: string | null) => (v ? parseInt(v.slice(1), 16) : null);
   const themeCss = profileTheme(hex(accent), hex(accent2), me.id);
 
   const save = async () => {
     setSaving(true);
     try {
-      const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: about, accent_color: hex(accent), accent_color_2: hex(accent2) });
+      const u = await usersApi.patchMe({ display_name: displayName.trim(), pronouns: pronouns.trim(), about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2) });
       setMe(u);
       // the server trims and cleans what it stores, so take its copy back or the form stays "unsaved"
       setDisplayName(u.display_name);
       setPronouns(u.pronouns);
-      setAbout(u.about_me);
+      setAbout(aboutToEdit(u.about_me));
       setAccent(hexOf(u.accent_color));
       setAccent2(hexOf(u.accent_color_2));
       toast(t("settings.profile.profileSaved"), "success");
@@ -75,7 +80,7 @@ export default function ProfilePage() {
   const reset = () => {
     setDisplayName(me.display_name);
     setPronouns(me.pronouns);
-    setAbout(me.about_me);
+    setAbout(loadedAbout);
     setAccent(currentAccent);
     setAccent2(currentAccent2);
   };
@@ -150,16 +155,16 @@ export default function ProfilePage() {
               <HexInput value={accent2} fallback="#eb459e" label={t("settings.profile.secondColourHex")} testId="accent2-hex" disabled={!accent} onChange={setAccent2} />
             </div>
           </div>
-          {/* counts down as it is typed, as the channel topic does, rather than only naming the cap */}
-          <Field label={t("settings.profile.aboutMe")} hint={t("settings.profile.aboutHintLeft", { count: ABOUT_MAX - about.length })}>
-            <TextArea value={about} onChange={(e) => setAbout(e.target.value)} rows={6} maxLength={ABOUT_MAX} placeholder={t("settings.profile.tellPeopleAboutYourself")} />
+          {/* counts down as it is typed, as the channel topic does, rather than only naming the cap; a custom emoji counts as saved */}
+          <Field as="div" label={t("settings.profile.aboutMe")} hint={t("settings.profile.aboutHintLeft", { count: ABOUT_MAX - aboutOut.length })}>
+            <AboutMeEditor value={about} onChange={setAbout} max={ABOUT_MAX} placeholder={t("settings.profile.tellPeopleAboutYourself")} label={t("settings.profile.aboutMe")} />
           </Field>
         </div>
         <div className={s.preview}>
           <div className={s.h5} style={{ marginTop: 0 }}>{t("settings.profile.preview")}</div>
           {/* the profile exactly as others will see it, theme and all, with the changes not yet saved */}
           <div className={s.previewCard} data-testid="profile-preview">
-            <ProfileCard userId={me.id} variant="panel" preview={{ display_name: displayName || me.display_name, pronouns, about_me: about, accent_color: hex(accent), accent_color_2: hex(accent2) }} />
+            <ProfileCard userId={me.id} variant="panel" preview={{ display_name: displayName || me.display_name, pronouns, about_me: aboutOut, accent_color: hex(accent), accent_color_2: hex(accent2) }} />
           </div>
         </div>
       </div>

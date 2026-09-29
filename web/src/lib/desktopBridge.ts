@@ -180,9 +180,28 @@ export interface EvilionDesktop {
   openScreenSettings?(): Promise<void>;
   restartApp?(): Promise<void>;
   onWindowState?(cb: (state: WindowState) => void): () => void;
+  /**
+   * Pastes into whatever the page has focused, as the app's own Paste does,
+   * for Nexa's right-click menu on text (app 1.0.6 and later). The page may
+   * not read the clipboard itself (the app's permissions.ts), so this is how
+   * that menu pastes. Resolves false when the app refused: it pastes only
+   * straight after a right click and a click, or the keys that do the same.
+   */
+  paste?(): Promise<boolean>;
 }
 
 export function desktopBridge(): EvilionDesktop | null {
   if (typeof window === "undefined") return null;
   return (window as Window & { evilionDesktop?: EvilionDesktop }).evilionDesktop ?? null;
+}
+
+/**
+ * The desktop app from before it could paste for the page (1.0.5 and older).
+ * There a text box keeps the app's own right-click menu, whose Paste works,
+ * and the spell checking that menu offers spellings from (lib/textMenu,
+ * lib/spell), until the app is updated.
+ */
+export function legacyTextMenu(): boolean {
+  const bridge = desktopBridge();
+  return !!bridge && typeof bridge.paste !== "function";
 }

@@ -36,10 +36,14 @@
 .md-mention { display: inline; padding: 0 2px; border-radius: 3px; background: var(--mention-bg); color: var(--mention-fg); font-weight: 500; cursor: default; unicode-bidi: plaintext; }
 .md-mention[role="button"] { cursor: pointer; }
 .md-mention[role="button"]:hover { background: var(--mention-bg-hover); color: var(--mention-fg); }
-.md-emoji { display: inline-block; width: 1.375em; height: 1.375em; vertical-align: bottom; object-fit: contain; margin: 0 0.05em; }
+/* An emoji's picture fills a box of its own and lets the pointer through to it:
+   pressed on a picture, a browser starts no selection, and a drag has to be
+   able to start on an emoji for it to be copied with the words around it. */
+.md-emoji-box { display: inline-block; width: 1.375em; height: 1.375em; margin: 0 0.05em; vertical-align: bottom; line-height: 0; }
+.md-emoji-box.md-emoji-box-jumbo { width: var(--jumbo-size, 48px); height: var(--jumbo-size, 48px); margin: 0 calc(var(--jumbo-size, 48px) * 0.05); vertical-align: middle; }
+.md-emoji-box > .md-emoji { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .md-emoji-unicode { font-size: 1.15em; line-height: 1; vertical-align: -0.1em; }
-.md-emoji-jumbo, .md-emoji-unicode.md-emoji-jumbo { font-size: var(--jumbo-size, 48px); line-height: 1.15; width: auto; height: auto; vertical-align: middle; }
-img.md-emoji-jumbo { width: var(--jumbo-size, 48px); height: var(--jumbo-size, 48px); }
+.md-emoji-unicode.md-emoji-jumbo { font-size: var(--jumbo-size, 48px); line-height: 1.15; vertical-align: middle; }
 /* set apart, so a date in another script does not decide the direction of the sentence around it */
 .md-timestamp { padding: 0 2px; border-radius: 3px; background: var(--bg-active); unicode-bidi: isolate; }
 .md-list { margin: 4px 0; padding-inline-start: 24px; }

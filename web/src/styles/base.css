@@ -48,7 +48,8 @@ code, pre, kbd { font-family: var(--font-mono); }
 .captcha-cancel { min-height: 40px; padding: 0 16px; border-radius: var(--radius-xs); color: var(--text-muted); }
 .captcha-cancel:hover { color: var(--text); background: var(--bg-hover); }
 
-.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* for a screen reader only: never copied along with the words around it, where it would print what nobody sees */
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; -webkit-user-select: none; user-select: none; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /*
@@ -76,3 +77,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 }
 [data-reduced-motion="true"] *, [data-reduced-motion="true"] *::before, [data-reduced-motion="true"] *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 [data-reduced-motion="true"] [role="status"] > i, [data-reduced-motion="true"] button > [aria-hidden="true"] > i { animation: breathe 1.6s ease-in-out infinite !important; transform: none !important; }
+
+/* Misspelled words in a contenteditable box, marked by Nexa's own checker
+   (components/common/SpellLines.tsx); a textarea gets the same line from a layer. */
+::highlight(nexa-spelling) { text-decoration-line: underline; text-decoration-style: wavy; text-decoration-color: var(--text-danger); text-decoration-thickness: 1.5px; text-decoration-skip-ink: none; text-underline-offset: 2px; }

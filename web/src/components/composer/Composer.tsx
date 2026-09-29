@@ -33,6 +33,10 @@ import { rankPeople, recentSpeakers } from "./rankPeople";
 import { servers as serversApi } from "@/api/servers";
 import { useShownName } from "@/components/chat/useShownName";
 import { createLinkPreviews } from "./linkPreviews";
+import { closeShortcode, typedColon } from "./shortcodeTyping";
+import { MessagePreview } from "./MessagePreview";
+import { ReplyWords, useReplyWords } from "@/components/chat/ReplyWords";
+import { useRenderCtx } from "@/lib/markdownCtx";
 import { mentionScope, sendMessage, sendWithFiles, type SendOptions } from "./send";
 import { canCreatePoll, plusButton, type PlusOption } from "./plusMenu";
 import { menuAnchor } from "@/components/common/ContextMenu";
@@ -47,6 +51,8 @@ import { formatShortDuration } from "@/lib/time";
 import { MAX_MESSAGE_LENGTH, pasteOverflows, tooLong, tooLongMessage } from "./limit";
 import { MessageCounter } from "./MessageCounter";
 import { applyWrap, formatShortcut } from "./wrapShortcut";
+import { SpellLines, useSpellActive } from "@/components/common/SpellLines";
+import { useTextMenu } from "@/lib/textMenu";
 /** How many files one message carries. */
 const MAX_FILES = 10;
 // a stable empty tray, so a conversation with nothing in it does not re-render on every change to another
@@ -113,6 +119,10 @@ export function Composer({ channel }: { channel: Channel }) {
   const settingsLoaded = useSettings((st) => st.loaded);
   const tone = useSettings((st) => st.settings.skinTone);
   const spellcheck = useSettings((st) => st.settings.spellcheck !== false);
+  /** Nexa's own spell checker, which takes over from the browser's (components/common/SpellLines). */
+  const ownSpelling = useSpellActive();
+  /** A Send button on a computer too, switched from the box's right-click menu or from settings. */
+  const sendButton = useSettings((st) => st.settings.sendButton);
   const msgs = useMessages((m) => m.channels[channel.id]);
   const serverState = useServers((st) => (channel.server_id ? st.byId[channel.server_id] : undefined));
   const isServer = !!channel.server_id;
@@ -163,6 +173,8 @@ export function Composer({ channel }: { channel: Channel }) {
   // which is what the setting promises.
   const linkPreviews = useSettings((st) => st.settings.linkPreviews);
   const [previews] = useState(createLinkPreviews);
+  /** The eye: the message drawn as it will look once sent, above the box, as it is typed. */
+  const [preview, setPreview] = useState(false);
   /** Something the box has to say: a paste too long for a message, files that did not fit. */
   const [notice, setNotice] = useState<Notice | null>(null);
 
@@ -192,6 +204,10 @@ export function Composer({ channel }: { channel: Channel }) {
   });
   useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
   useKeepFocused(taRef);
+  // the box's right-click menu has the switch for the Send button
+  useTextMenu(taRef, {
+    extra: () => [{ id: "sendButton", label: tr_("textMenu.showSendButton"), checked: sendButton, toggle: true, onSelect: () => useSettings.getState().patch({ sendButton: !sendButton }) }],
+  });
 
   const name = channelDisplayName(channel, users, me?.id);
   const placeholder = channel.type === "dm" ? tr_("composer.composer.messageUser", { name }) : isServer ? tr_("composer.composer.messageChannel", { name }) : tr_("composer.composer.messageGroup", { name });
@@ -351,13 +367,24 @@ export function Composer({ channel }: { channel: Channel }) {
   const refreshAcRef = useRef(refreshAc);
   refreshAcRef.current = refreshAc;
 
+  /** Whether this server has a custom emoji of its own by that name, which a typed :name: becomes when it is sent. */
+  const ownEmoji = (name: string) => !!channel.server_id && (useExpressions.getState().emojis[channel.server_id] ?? []).some((em) => em.name.toLowerCase() === name);
+
   const onChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
+    let value = e.target.value;
+    let caret = e.target.selectionStart ?? value.length;
+    // a :name: typed out in full becomes its emoji as its closing colon goes in
+    const closed = typedColon(e.nativeEvent) ? closeShortcode(value, caret, tone, ownEmoji) : null;
+    if (closed) {
+      value = closed.value;
+      caret = closed.caret;
+      const at = caret;
+      requestAnimationFrame(() => taRef.current?.setSelectionRange(at, at));
+    }
     touched.current = true;
     setText(value);
     persistDraft(value);
-    const caret = e.target.selectionStart ?? value.length;
-    lastSelect.current = `${caret}:${e.target.selectionEnd}:${value}`;
+    lastSelect.current = `${caret}:${closed ? caret : e.target.selectionEnd}:${value}`;
     refreshAc(value, caret);
     const now = Date.now();
     if (value.trim() && now - lastTyping.current > TYPING_INTERVAL) {
@@ -617,6 +644,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const replyShown = useShownName(channel.id, replyTarget?.hook ? undefined : replyTarget?.author_id);
   // a webhook's message is answered by the name it was sent with
   const replyName = replyTarget?.hook ? replyTarget.hook.name : replyShown;
+  const replyWords = useReplyWords(replyTarget);
+  const replyCtx = useRenderCtx();
 
   if (!canSend) {
     return (
@@ -730,9 +759,14 @@ export function Composer({ channel }: { channel: Channel }) {
           <button type="button" className={[s.closeBtn, s.noticeClose].join(" ")} aria-label={tr_("composer.composer.dismiss")} onClick={() => setNotice(null)}><X size={16} /></button>
         </div>
       ) : null}
+      {preview ? <MessagePreview text={text} channelId={channel.id} onClose={() => setPreview(false)} /> : null}
       {replyTarget ? (
         <div className={s.replyBar}>
-          <span className={s.replyWho}><Tr id="composer.replyingTo" values={{ name: <b dir="auto">{replyName}</b> }} /></span>
+          <span className={s.replyWho}>
+            <Tr id="composer.replyingTo" values={{ name: <b dir="auto">{replyName}</b> }} />
+            {/* what is being answered, so it can be seen while writing */}
+            <span className={s.replyWords} dir="auto"><ReplyWords words={replyWords} ctx={replyCtx} /></span>
+          </span>
           <span className={s.replyBtns}>
             {replyTarget.author_id !== me?.id && !replyTarget.webhook_id ? (
               <button className={s.pingBtn} data-on={replyTo?.ping} aria-pressed={!!replyTo?.ping} aria-label={tr_("composer.composer.replyPing")} title={tr_("composer.composer.replyPing")} onClick={() => replyTo && setReplyTo({ ...replyTo, ping: !replyTo.ping })}>{replyTo?.ping ? tr_("composer.composer.pingOn") : tr_("composer.composer.pingOff")}</button>
@@ -822,13 +856,17 @@ export function Composer({ channel }: { channel: Channel }) {
           }}
           placeholder={placeholder}
           rows={1}
-          spellCheck={spellcheck}
+          spellCheck={spellcheck && !ownSpelling}
+          data-spell={ownSpelling ? "" : undefined}
+          data-markdown=""
           aria-label={placeholder}
         />
+        <SpellLines target={taRef} text={text} />
         <div className={s.btns}>
+          <button type="button" className={s.iconBtn} data-on={preview} aria-pressed={preview} aria-label={preview ? tr_("composer.preview.hide") : tr_("composer.preview.show")} title={preview ? tr_("composer.preview.hide") : tr_("composer.preview.show")} onClick={() => setPreview((v) => !v)} data-testid="preview-toggle"><Eye size={22} /></button>
           <button type="button" className={s.iconBtn} data-on={formatting} aria-label={tr_("composer.format.open")} title={tr_("composer.format.open")} onClick={() => setFormatting(true)} onPointerEnter={preloadFormatEditor} onFocus={preloadFormatEditor} data-testid="format-open"><Type size={22} /></button>
           <button className={s.iconBtn} data-on={picker} data-picker-toggle={picker || undefined} aria-label={tr_("composer.composer.selectEmoji")} onClick={() => setPicker((v) => !v)}><Smile size={24} /></button>
-          <button className={[s.iconBtn, s.send, s.sendMobile].join(" ")} aria-label={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)}><SendHorizontal size={22} /></button>
+          <button className={[s.iconBtn, s.send, s.sendMobile, sendButton ? s.sendShown : ""].join(" ")} aria-label={tr_("composer.composer.sendMessage")} title={tr_("composer.composer.sendMessage")} onClick={() => void send()} disabled={remaining > 0 || (!text.trim() && files.length === 0)} data-testid="send-button"><SendHorizontal size={22} /></button>
         </div>
       </div>
       <MessageCounter text={text} className={s.counter} />
@@ -851,6 +889,19 @@ function wantsKeyboard(el: Element | null): boolean {
 /** Somewhere else on the page is holding the keyboard on purpose. */
 function inOwnLayer(el: Element | null): boolean {
   return !!el?.closest("[role=dialog], [data-modal-layer], [role=menu], [role=listbox]");
+}
+
+/**
+ * Whether the page has something selected to copy. Chromium leaves a
+ * picture's alt text out of a selection's text, so a selection of nothing but
+ * emoji read as nothing, and the box took the keyboard back and threw it away.
+ */
+export function somethingSelected(): boolean {
+  const sel = document.getSelection();
+  if (!sel || sel.isCollapsed) return false;
+  if (sel.toString()) return true;
+  for (let i = 0; i < sel.rangeCount; i++) if (sel.getRangeAt(i).cloneContents().querySelector("img[alt]:not([alt=''])")) return true;
+  return false;
 }
 
 /**
@@ -877,7 +928,7 @@ export function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>, enabl
       if (e.button !== 0) return;
       const target = e.target as Element | null;
       if (wantsKeyboard(target) || inOwnLayer(target)) return;
-      if (document.getSelection()?.toString()) return;
+      if (somethingSelected()) return;
       if (wantsKeyboard(document.activeElement) && inOwnLayer(document.activeElement)) return;
       focus();
     };

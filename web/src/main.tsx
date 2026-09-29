@@ -5,6 +5,7 @@ import App from "./App";
 import { installCrashReporting } from "./lib/crashReport";
 import { loadCaptchaConfig } from "./lib/captcha";
 import { installLongPress } from "./lib/longPress";
+import { installTextMenu } from "./lib/textMenu";
 import { installKeyboardInset } from "./lib/keyboardInset";
 import { applyRememberedAppearance } from "./lib/theme";
 import { initSafeMode } from "./lib/look/safeMode";
@@ -37,6 +38,8 @@ if (import.meta.env.PROD && "serviceWorker" in navigator) {
 
 installCrashReporting();
 installLongPress();
+// a text box's right-click menu on a computer: spellings, the clipboard, formatting
+installTextMenu();
 // whether the actions bots abuse need a captcha here, known before anyone signs in
 void loadCaptchaConfig();
 installKeyboardInset();

@@ -241,7 +241,8 @@ const fixtures: Fixture[] = [
   { name: "a tab nests", src: "- a\n\t- b", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")]])]])] },
   { name: "backing out two levels", src: "- a\n  - b\n    - c\n- d", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b"), list(false, 1, [[t("c")]])]])], [t("d")]])] },
   { name: "a less indented item joins the list it is still inside", src: "- a\n    - b\n  - c", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")], [t("c")]])]])] },
-  { name: "plus bullets", src: "+ a\n+ b", ast: [list(false, 1, [[t("a")], [t("b")]])] },
+  // someone writing "+ and add answer" meant a plus, not a bullet
+  { name: "a plus is not a bullet", src: "+ a\n+ b", ast: [para(t("+ a"), br, t("+ b"))] },
   { name: "ordered with a parenthesis", src: "1) a\n2) b", ast: [list(true, 1, [[t("a")], [t("b")]])] },
   { name: "ordered inside ordered", src: "1. a\n   1. b\n2. c", ast: [list(true, 1, [[t("a"), list(true, 1, [[t("b")]])], [t("c")]])] },
   { name: "a bullet list then an ordered one in the same item", src: "- a\n  - b\n  1. c", ast: [list(false, 1, [[t("a"), list(false, 1, [[t("b")]]), list(true, 1, [[t("c")]])]])] },

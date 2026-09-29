@@ -12,6 +12,14 @@
 /* the dot of a set of choices, filled on the one in use */
 .radio { flex: none; width: 14px; height: 14px; margin-inline-start: 12px; border-radius: 50%; border: 2px solid currentColor; opacity: 0.7; }
 .radio[data-on="true"] { opacity: 1; background: radial-gradient(circle, currentColor 0 3px, transparent 3.5px); }
+/* a tick box for an item that switches one thing on and off, filled while it is on */
+.tick { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-inline-start: 12px; border-radius: 4px; border: 2px solid currentColor; opacity: 0.7; }
+.tick[data-on="true"] { opacity: 1; border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
+.item:hover:not(:disabled) .tick[data-on="true"], .item:focus-visible .tick[data-on="true"] { border-color: var(--on-brand); background: var(--on-brand); color: var(--brand); }
+/* the keys that do the same, quiet at the end */
+.keys { flex: none; margin-inline-start: auto; padding-inline-start: 24px; font-size: 12px; font-weight: 400; color: var(--text-muted); white-space: nowrap; }
+.item:hover:not(:disabled) .keys, .item:focus-visible .keys { color: inherit; opacity: 0.85; }
+.strong { font-weight: 700; color: var(--text-strong); }
 .danger { color: var(--text-danger); }
 .danger:hover:not(:disabled), .danger:focus-visible { background: var(--danger); color: var(--on-danger); }
 .sep { height: 1px; margin: 4px; background: var(--border); }
