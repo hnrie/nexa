@@ -1088,11 +1088,26 @@ func (s *Store) NexaSeen(ctx context.Context, uid ids.ID) (int64, error) {
 	return at, err
 }
 
-// SetNexaSeen moves the member's Nexa read position forward to at.
-func (s *Store) SetNexaSeen(ctx context.Context, uid ids.ID, at int64) error {
-	_, err := s.db.W.ExecContext(ctx, `INSERT INTO nexa_reads (user_id, seen_at) VALUES (?, ?)
-		ON CONFLICT (user_id) DO UPDATE SET seen_at = `+s.db.Dialect.Greatest("nexa_reads.seen_at", "excluded.seen_at"), int64(uid), at)
-	return err
+// MarkNexaRead reads the member's whole Nexa conversation up to at: its
+// notices and announcements, and every line the team had written by then in
+// their case threads and bug reports. The conversation counts all of those as
+// one, and a thread that only opening it could read kept the count up however
+// often the conversation itself was read.
+func (s *Store) MarkNexaRead(ctx context.Context, uid ids.ID, at int64) error {
+	upTo := func(table, key string) string {
+		return s.db.Dialect.Greatest("member_read_id", `(SELECT coalesce(max(m.id), 0) FROM `+table+` m WHERE m.`+key+` AND m.created_at <= ?)`)
+	}
+	return s.Tx(ctx, func(tx *db.Tx) error {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO nexa_reads (user_id, seen_at) VALUES (?, ?)
+			ON CONFLICT (user_id) DO UPDATE SET seen_at = `+s.db.Dialect.Greatest("nexa_reads.seen_at", "excluded.seen_at"), int64(uid), at); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE mod_cases SET member_read_id = `+upTo("mod_messages", "case_id = mod_cases.id")+` WHERE user_id = ?`, at, int64(uid)); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `UPDATE bug_reports SET member_read_id = `+upTo("bug_messages", "report_id = bug_reports.id")+` WHERE user_id = ?`, at, int64(uid))
+		return err
+	})
 }
 
 // NexaUnread counts what is waiting for the member from Nexa: notices and

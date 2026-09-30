@@ -1,4 +1,4 @@
-const PALETTE = ["#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#82838b"];
+const PALETTE = ["#5865f2", "#3d9e60", "#fdb833", "#da3e44", "#eb459f", "#8b5cf6"];
 
 export function avatarColor(id: string): string {
   let h = 0;

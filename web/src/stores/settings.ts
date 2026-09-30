@@ -7,6 +7,7 @@ import { fromStreamQuality, isShareFps, isShareResolution } from "@/voice/shareQ
 import { sanitizeRail, type RailLayout } from "@/lib/railLayout";
 import { EMPTY_DM_LIST, sanitizeDMList, type DMListLayout } from "@/lib/dmLayout";
 import type { CustomCss, CustomTheme, PluginEntry } from "@/lib/look/types";
+import { sanitizeUsage, type EmojiUsage } from "@/lib/emojiUsage";
 
 /** A classic theme, "system", or the id of a gallery preset or a custom theme (lib/look). */
 export type Theme = "dark" | "light" | "ash" | "onyx" | "system" | (string & {});
@@ -84,6 +85,14 @@ export interface Settings {
   sidebarWidth: number;
   showMembers: boolean;
   recentEmoji: string[];
+  /**
+   * Suggest emoji by what this account uses: a bare ":" offers the ones it
+   * uses most, and a few letters find the one it usually means, matched
+   * inside names too (lib/emojiSuggest.ts). Off, suggestions go by name alone.
+   */
+  smartEmoji: boolean;
+  /** How much, and how lately, each emoji was used (lib/emojiUsage.ts); only counted while smartEmoji is on. */
+  emojiUsage: EmojiUsage;
   favoriteGifs: FavoriteGif[];
   skinTone: number;
   /**
@@ -170,6 +179,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sidebarWidth: 240,
   showMembers: true,
   recentEmoji: [],
+  smartEmoji: true,
+  emojiUsage: {},
   favoriteGifs: [],
   skinTone: 0,
   notifications: { desktop: false, app: true, sounds: true, perChannel: {}, muted: [], preview: "full" },
@@ -238,6 +249,9 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
     plugins: Array.isArray(inc.plugins) ? inc.plugins : base.plugins,
 
     whatsNewSeen: typeof inc.whatsNewSeen === "string" || inc.whatsNewSeen === null ? inc.whatsNewSeen : base.whatsNewSeen,
+
+    smartEmoji: typeof inc.smartEmoji === "boolean" ? inc.smartEmoji : base.smartEmoji,
+    emojiUsage: "emojiUsage" in inc ? sanitizeUsage(inc.emojiUsage) : base.emojiUsage,
 
     spellWords: Array.isArray(inc.spellWords) ? inc.spellWords.filter((w): w is string => typeof w === "string" && w.length > 0 && w.length <= 64).slice(-2000) : base.spellWords,
     sendButton: typeof inc.sendButton === "boolean" ? inc.sendButton : base.sendButton,

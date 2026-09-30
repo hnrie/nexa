@@ -22,16 +22,26 @@ function coarsePointer(): boolean {
 
 const GAP = 8;
 
+/** The ink a bubble is mixed toward: nearly black, in Nexa's own violet. */
+const INK = "#120d1d";
+/** What a bubble over a panel that is black already is mixed toward instead. */
+const GLOW = "#b9aee0";
+
 /**
- * A tooltip's colours: a shade of whatever its trigger sits on, a little
- * lighter over a dark surface and a little darker over a light one, so it
- * belongs to the panel it came from (a profile card's own colours included)
- * rather than being the same black box on every one of them. The words on it
- * are whichever of black and white reads on that shade.
+ * A tooltip's colours: the panel it came from, taken most of the way to a
+ * deep ink. The bubble stands out crisply from its panel yet still belongs to
+ * it, violet over Nexa's own panels and rose over a rose profile card, and a
+ * panel that is black already gets a lighter step of itself instead. The
+ * words are whichever of black and white reads on it, which is nearly always
+ * white.
+ *
+ * It used to be a shade one step darker than a light panel, which on the
+ * light theme's white and pale panels came out as a pale grey box.
  */
 export function tooltipPaint(el: Element): { bg: string; fg: string } {
   const under = toHex(surfaceOf(el).bg);
-  const bg = luminance(under) < 0.18 ? mixOk(under, "#ffffff", 0.14) : mixOk(under, "#000000", 0.08);
+  const l = luminance(under);
+  const bg = l < 0.01 ? mixOk(under, GLOW, 0.2) : mixOk(under, INK, l > 0.18 ? 0.84 : 0.58);
   return { bg, fg: readableOn(bg) };
 }
 

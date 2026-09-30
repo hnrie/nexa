@@ -42,8 +42,8 @@ export interface TransportEvents {
 }
 
 export interface VoiceTransport {
+  /** The voice to send: a copy of the microphone that voiceSend.ts silences between phrases, never taken away for them. */
   setLocalAudio(track: MediaStreamTrack | null): void;
-  setAudioGate(open: boolean): void;
   setLocalVideo(track: MediaStreamTrack | null): void;
   setLocalScreen(stream: MediaStream | null, bitrate?: number): void;
   addPeer(userId: string): void;

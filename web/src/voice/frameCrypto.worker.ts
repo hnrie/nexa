@@ -161,6 +161,14 @@ function transformer({ op, kind, id, voice = false, codec }: StreamOptions): Tra
         await keysReady;
         const data = new Uint8Array(frame.data);
         const clear = clearBytes(kind, kind === "video" && frame.type === "key");
+        // An empty frame is DTX's way of sending nothing at all through a
+        // pause (voice/opus.ts), and the browser only leaves it unsent while
+        // it stays empty. Sealed, it became a packet of its own every 20 ms.
+        // It carries nothing to protect, so it goes on as it is.
+        if (op === "encrypt" && data.length === 0) {
+          controller.enqueue(frame);
+          return;
+        }
         if (op === "encrypt") {
           const key = keys.get(sendIndex);
           if (!key) {

@@ -1,6 +1,6 @@
 /* The whole window dims so the card is the only thing to aim at, and the card
    itself ignores the pointer: the drop is handled on the window. */
-.scrim { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, 0.62); backdrop-filter: blur(2px); pointer-events: none; animation: fade 120ms ease-out; }
+.scrim { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 24px; background: var(--bg-overlay); backdrop-filter: blur(2px); pointer-events: none; animation: fade 120ms ease-out; }
 .card { display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(420px, 100%); padding: 40px 32px; border-radius: var(--radius-md); border: 2px dashed color-mix(in srgb, var(--on-brand) 55%, transparent); background: var(--brand); color: var(--on-brand); box-shadow: var(--shadow-high); text-align: center; animation: rise 160ms cubic-bezier(0.2, 0.9, 0.3, 1); }
 .art { position: relative; display: flex; }
 .mark { color: var(--on-brand); }

@@ -58,9 +58,10 @@ function roleStyle(role: Role): CSSProperties | undefined {
 /**
  * The suggestions above the message box. `kind` is what is being typed: the
  * @everyone and @here rows are offered while typing a mention, so they read
- * as mentions there, not as commands.
+ * as mentions there, not as commands. `heading` names the whole list in place
+ * of its groups, as the emoji used most do.
  */
-export function Autocomplete({ kind, items, index, onHover, onPick, tone }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number }) {
+export function Autocomplete({ kind, items, index, onHover, onPick, tone, heading: title }: { kind: string; items: AcItem[]; index: number; onHover: (i: number) => void; onPick: (i: number) => void; tone: number; heading?: string | undefined }) {
   const listRef = useRef<HTMLDivElement>(null);
   // The list scrolls when it is taller than the room above the keyboard, so the
   // highlighted row is kept in view. Only the list itself is scrolled:
@@ -78,8 +79,8 @@ export function Autocomplete({ kind, items, index, onHover, onPick, tone }: { ki
   return (
     <div ref={listRef} id={AC_LIST_ID} className={s.ac} role="listbox" onMouseDown={(e) => e.preventDefault()}>
       {items.map((it, i) => {
-        const group = groupOf(it, kind);
-        const heading = i === 0 || groupOf(items[i - 1]!, kind) !== group ? <div className={s.acHead} aria-hidden="true">{group}</div> : null;
+        const group = title ?? groupOf(it, kind);
+        const heading = i === 0 || (!title && groupOf(items[i - 1]!, kind) !== group) ? <div className={s.acHead} aria-hidden="true">{group}</div> : null;
         return (
           <Fragment key={keyOf(it)}>
             {heading}

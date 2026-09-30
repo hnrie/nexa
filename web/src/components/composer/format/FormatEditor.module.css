@@ -2,7 +2,7 @@
    above the keyboard on a phone. The writing page is the chat's own
    background with the chat's own type, so what is written looks as it will
    when it is sent. */
-.sheet { background: var(--bg-surface); }
+.sheet { background: var(--bg-floating); }
 .sheet > * { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .frame { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; max-height: min(84vh, 760px); }
 

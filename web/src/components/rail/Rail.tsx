@@ -22,7 +22,7 @@ import { useSettings } from "@/stores/settings";
 import { useUI } from "@/stores/ui";
 import { useUsers } from "@/stores/users";
 import { dmMenuItems } from "@/components/sidebar/dmMenu";
-import { nexaListed } from "@/components/sidebar/dmArrange";
+import { nexaListed, nexaMenuItems } from "@/components/sidebar/dmArrange";
 import { serverMenuItems } from "@/components/sidebar/serverMenu";
 import { menuPoint } from "@/components/sidebar/ServerSidebar";
 import { lastChannelOf } from "@/stores/serverNav";
@@ -366,6 +366,10 @@ export function Rail() {
                   onClick={() => {
                     nav("/channels/@me/nexa");
                     useUI.getState().setLeftOpen(false);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    openContextMenu({ ...menuPoint(e), label: "Nexa", items: nexaMenuItems(nav) });
                   }}
                 >
                   <NexaAvatar size={48} />

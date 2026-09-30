@@ -51,3 +51,51 @@ func TestStaffReplyIsNexaActivity(t *testing.T) {
 		t.Errorf("latest after a staff reply: %v, before it: %v", after, before)
 	}
 }
+
+// Reading the Nexa conversation reads everything it counts as waiting: its
+// notices, and what the team wrote in the member's case threads and bug
+// reports. A thread only opening it could read kept the conversation's count
+// up however often the conversation itself was read.
+func TestNexaSeenReadsThreads(t *testing.T) {
+	_, ts := newTestServer(t)
+	modTok, _ := register(t, ts, "owner")
+	tok, id := register(t, ts, "member")
+	c := mustAct(t, ts, modTok, id, map[string]any{"action": "mute", "reason": "please be kind", "duration_ms": 3600000})
+	if res, body := do(t, ts, "POST", "/api/v1/moderation/cases/"+c["id"].(string)+"/messages", modTok, map[string]any{"body": "Just checking in."}); res.StatusCode != 201 {
+		t.Fatalf("staff reply in the case: %d %v", res.StatusCode, body)
+	}
+	report := mustBug(t, ts, tok, bugBody("The button"))
+	if res, body := do(t, ts, "POST", "/api/v1/moderation/bugs/"+report["id"].(string)+"/messages", modTok, map[string]any{"body": "Thanks, looking into it."}); res.StatusCode != 201 {
+		t.Fatalf("staff reply in the report: %d %v", res.StatusCode, body)
+	}
+	// the notice, the reply in its thread and the reply to the report
+	if st := meNexa(t, ts, tok); st["unread"].(float64) != 3 {
+		t.Fatalf("unread before reading: %v", st["unread"])
+	}
+	if res, _ := do(t, ts, "POST", "/api/v1/nexa/seen", tok, nil); res.StatusCode != 204 {
+		t.Fatal("seen")
+	}
+	if st := meNexa(t, ts, tok); st["unread"].(float64) != 0 {
+		t.Errorf("unread after reading the conversation: %v", st["unread"])
+	}
+	if _, body := do(t, ts, "GET", "/api/v1/nexa/cases/"+c["id"].(string), tok, nil); body["case"].(map[string]any)["unread"].(float64) != 0 {
+		t.Errorf("case thread still unread: %v", body["case"])
+	}
+	if _, body := do(t, ts, "GET", "/api/v1/bugs/"+report["id"].(string), tok, nil); body["report"].(map[string]any)["unread"].(float64) != 0 {
+		t.Errorf("bug report still unread: %v", body["report"])
+	}
+	// something the team writes afterwards is news again
+	if res, body := do(t, ts, "POST", "/api/v1/moderation/bugs/"+report["id"].(string)+"/messages", modTok, map[string]any{"body": "Fixed in the next version."}); res.StatusCode != 201 {
+		t.Fatalf("second staff reply: %d %v", res.StatusCode, body)
+	}
+	if st := meNexa(t, ts, tok); st["unread"].(float64) != 1 {
+		t.Errorf("unread after a new reply: %v", st["unread"])
+	}
+	// and reading up to a moment before it leaves it waiting
+	if res, _ := do(t, ts, "POST", "/api/v1/nexa/seen", tok, map[string]any{"at": 1}); res.StatusCode != 204 {
+		t.Fatal("seen at a moment")
+	}
+	if st := meNexa(t, ts, tok); st["unread"].(float64) != 1 {
+		t.Errorf("reading up to an earlier moment read a later reply: %v", st["unread"])
+	}
+}

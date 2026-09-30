@@ -12,6 +12,7 @@
 import type { VoiceState } from "@/api/types";
 import { FrameCrypto } from "./e2ee";
 import { VP8 } from "./frameSize";
+import { tunedRemote } from "./opus";
 import { Playback } from "./playback";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { MediaKind, SignalPayload, TransportEvents, VoiceTransport } from "./transport";
@@ -87,7 +88,6 @@ export class MeshTransport implements VoiceTransport {
   private early = new Map<string, SignalPayload[]>();
   private playback: Playback;
   private screenBitrate = 5_000_000;
-  private audioGateOpen = true;
   private closed = false;
   /** The peers this device has been connected to, so losing them reads as reconnecting rather than a first connect. */
   private upBefore = new Set<string>();
@@ -117,17 +117,6 @@ export class MeshTransport implements VoiceTransport {
     for (const t of this.audioStream.getTracks()) this.audioStream.removeTrack(t);
     if (track) this.audioStream.addTrack(track);
     for (const p of this.peers.values()) this.syncSenders(p);
-  }
-
-  /**
-   * Voice activity's gate: while shut the senders carry nothing, but the
-   * track itself stays live so the local meter can still hear speech start.
-   */
-  setAudioGate(open: boolean): void {
-    if (this.audioGateOpen === open) return;
-    this.audioGateOpen = open;
-    if (!this.audioTrack) return;
-    for (const p of this.peers.values()) if (p.audioSender) void p.audioSender.replaceTrack(open ? this.audioTrack : null).catch(() => {});
   }
 
   setLocalVideo(track: MediaStreamTrack | null): void {
@@ -348,7 +337,7 @@ export class MeshTransport implements VoiceTransport {
         const offerCollision = desc.type === "offer" && (peer.makingOffer || pc.signalingState !== "stable");
         peer.ignoreOffer = !peer.polite && offerCollision;
         if (peer.ignoreOffer) return;
-        await pc.setRemoteDescription(desc);
+        await pc.setRemoteDescription(tunedRemote(desc));
         for (const c of peer.pendingCandidates.splice(0)) await pc.addIceCandidate(c).catch(() => {});
         if (desc.type === "offer") {
           await pc.setLocalDescription();
@@ -423,14 +412,11 @@ export class MeshTransport implements VoiceTransport {
 
   private syncSenders(peer: Peer): void {
     const pc = peer.pc;
-    // audio: one sender, replaced in place so renegotiation is rare
+    // audio: one sender, replaced in place so renegotiation is rare; a
+    // silence between phrases is the track's own (voiceSend.ts), never a gap
     if (this.audioTrack) {
-      const sent = this.audioGateOpen ? this.audioTrack : null;
-      if (peer.audioSender) void peer.audioSender.replaceTrack(sent);
-      else {
-        peer.audioSender = pc.addTrack(this.audioTrack, this.audioStream);
-        if (!sent) void peer.audioSender.replaceTrack(null);
-      }
+      if (peer.audioSender) void peer.audioSender.replaceTrack(this.audioTrack);
+      else peer.audioSender = pc.addTrack(this.audioTrack, this.audioStream);
     } else if (peer.audioSender) {
       void peer.audioSender.replaceTrack(null);
     }

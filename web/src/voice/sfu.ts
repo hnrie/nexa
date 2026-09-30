@@ -11,8 +11,8 @@ import { voice as voiceApi, type SfuDescription } from "@/api/voice";
 import type { VoiceState } from "@/api/types";
 import { FrameCrypto, voiceKeysFor, voiceKeysVersion, type VoiceKeys } from "./e2ee";
 import { CopyPlanner, LOSS_ONE_COPY } from "./copyPlanner";
+import { tunedRemote } from "./opus";
 import { Playback } from "./playback";
-import { PlayoutDelay } from "./playoutDelay";
 import { MAX_SHARE_BPS, MIN_SHARE_BPS } from "./shareQuality";
 import type { SignalPayload, TransportEvents, VoiceTransport } from "./transport";
 import { VP8 } from "./frameSize";
@@ -32,8 +32,6 @@ interface Pulled {
   mid: string;
   /** The received track, once it has arrived. */
   track: MediaStreamTrack | null;
-  /** Its receiver, so its buffer can be kept short while the link is clean. */
-  receiver?: RTCRtpReceiver;
   /** This receiver's name in the frame crypto worker, new for every receiver. */
   cryptoId?: string;
   /** When the track arrived, whether any of its frames reached the worker yet, and whether one opened. */
@@ -204,7 +202,6 @@ export class SfuTransport implements VoiceTransport {
   private connecting = false;
 
   private audioTrack: MediaStreamTrack | null = null;
-  private audioGateOpen = true;
   private videoTrack: MediaStreamTrack | null = null;
   private screen: MediaStream | null = null;
   private screenBitrate = 5_000_000;
@@ -232,8 +229,6 @@ export class SfuTransport implements VoiceTransport {
   private refusedPulls = new Map<string, { tag: string; count: number }>();
   private bypassTimer: ReturnType<typeof setInterval>;
   private receiverSeq = 0;
-  /** Keeps each voice's buffer as short as its link allows, so a call is a conversation. */
-  private readonly playout = new PlayoutDelay();
   /** How often each person's track of each kind has been pulled again for skipping decryption. */
   private repulls = new Map<string, number>();
   /** Refused pulls in a row, kept apart from `failures`: a publisher still connecting is expected, not a fault. */
@@ -481,13 +476,12 @@ export class SfuTransport implements VoiceTransport {
     // All of this belongs to the connection that has just gone. A new one
     // hands out mids from 0 again, so keeping any of it means the fresh
     // receiver on a recycled mid is judged by the dead one's history: three
-    // repulls already spent, a jitter buffer left at the old one's setting.
+    // repulls already spent, losses it never had.
     this.repulls.clear();
     this.lossSeen.clear();
     this.lossTold.clear();
     this.pullRetries = 0;
     this.refusedPulls.clear();
-    this.playout.clear();
     this.present();
     for (const id of this.peers) this.events.onPeerState(id, this.pc.connectionState);
     this.events.onConnection?.(this.everUp ? "reconnecting" : "connecting");
@@ -564,7 +558,7 @@ export class SfuTransport implements VoiceTransport {
         const res = await voiceApi.sfuRestart({ session_id: session, offer: description(pc.localDescription), mid, kind: anchor }, timeout());
         this.live(pc);
         if (!res.answer) throw new Error("no answer to the ICE restart");
-        await pc.setRemoteDescription(res.answer);
+        await pc.setRemoteDescription(tunedRemote(res.answer));
         this.iceRestarts++;
       } catch (err) {
         if (err instanceof Stale) throw err;
@@ -581,7 +575,7 @@ export class SfuTransport implements VoiceTransport {
   private trackFor(kind: PubKind): MediaStreamTrack | null {
     switch (kind) {
       case "audio":
-        return this.audioGateOpen ? this.audioTrack : null;
+        return this.audioTrack;
       case "video":
         return this.videoTrack;
       case "screen":
@@ -651,7 +645,7 @@ export class SfuTransport implements VoiceTransport {
       );
       this.live(pc);
       if (!res.answer) throw new Error("no answer to the offer");
-      await pc.setRemoteDescription(res.answer);
+      await pc.setRemoteDescription(tunedRemote(res.answer));
       this.live(pc);
       failed = res.failed;
     } catch (err) {
@@ -675,14 +669,6 @@ export class SfuTransport implements VoiceTransport {
     const tr = this.senders.audio;
     if (tr) void tr.sender.replaceTrack(this.trackFor("audio")).catch(() => {});
     else if (track) this.publish(["audio"]);
-  }
-
-  /** Voice activity's gate: while shut the sender carries nothing, but the track stays live for the meter. */
-  setAudioGate(open: boolean): void {
-    if (this.audioGateOpen === open) return;
-    this.audioGateOpen = open;
-    const tr = this.senders.audio;
-    if (tr && this.audioTrack) void tr.sender.replaceTrack(open ? this.audioTrack : null).catch(() => {});
   }
 
   setLocalVideo(track: MediaStreamTrack | null): void {
@@ -787,17 +773,6 @@ export class SfuTransport implements VoiceTransport {
       };
       const seen = this.lossSeen.get(s.mid) ?? [];
       const last = seen[seen.length - 1];
-      // How this voice arrived over the last second, for its buffer: a clean
-      // link plays sooner, and any trouble hands the decision straight back.
-      if (last && p.receiver && counts.received >= last.received) {
-        const got = counts.received - last.received;
-        const missed = Math.max(0, counts.lost - last.lost);
-        const played = counts.samples - last.samples;
-        this.playout.observe(s.mid, p.receiver, {
-          loss: got + missed > 0 ? missed / (got + missed) : 0,
-          conceal: played > 0 ? Math.max(0, counts.concealed - last.concealed) / played : 0,
-        }, now);
-      }
       // counters that went back are a new stream: what came before says nothing about it
       const kept = last && counts.received >= last.received ? seen : [];
       this.lossSeen.set(s.mid, [...kept, counts].slice(-LOSS_CHECKS_KEPT));
@@ -924,7 +899,7 @@ export class SfuTransport implements VoiceTransport {
       this.byMid.set(p.mid, p);
     }
     if (res.offer) {
-      await pc.setRemoteDescription(res.offer);
+      await pc.setRemoteDescription(tunedRemote(res.offer));
       this.live(pc);
       const answer = await pc.createAnswer();
       this.live(pc);
@@ -946,7 +921,6 @@ export class SfuTransport implements VoiceTransport {
       if (this.pulled.get(slot(p.userId, p.kind)) === p) this.pulled.delete(slot(p.userId, p.kind));
       this.byMid.delete(p.mid);
       // the mid is handed back and can be used again, so nothing keyed on it may outlive this track
-      this.playout.forget(p.mid);
       this.lossSeen.delete(p.mid);
       pc.getTransceivers().find((t) => t.mid === p.mid)?.stop();
     }
@@ -958,7 +932,7 @@ export class SfuTransport implements VoiceTransport {
     const res = await voiceApi.sfuClose({ session_id: session, mids: list.map((p) => p.mid), offer: description(pc.localDescription) }, timeout());
     this.live(pc);
     if (!res.answer) throw new Error("no answer to closing tracks");
-    await pc.setRemoteDescription(res.answer);
+    await pc.setRemoteDescription(tunedRemote(res.answer));
     this.live(pc);
   }
 
@@ -982,7 +956,6 @@ export class SfuTransport implements VoiceTransport {
     }
     if (!p) return;
     p.track = e.track;
-    p.receiver = e.receiver;
     p.cryptoId = cryptoId;
     p.arrivedAt = Date.now();
     p.seen = false;

@@ -24,14 +24,14 @@
 /* In place of a checkbox, while a group is still being put together: someone who joins groups only from a link */
 .linkOnly {
   flex: none; display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
-  border-radius: 999px; background: var(--bg-raised); color: var(--text-muted);
+  border-radius: 999px; background: var(--bg-base); color: var(--text-muted);
   font-size: 12px; font-weight: 600; white-space: nowrap; cursor: help;
 }
 .linkOnly:hover { color: var(--text); }
 .linkOnly:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* Select Friends: a group cannot start with a Link Only friend picked */
-.warn { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg-raised); color: var(--text); font-size: 13px; line-height: 1.4; }
+.warn { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg-base); color: var(--text); font-size: 13px; line-height: 1.4; }
 .warn svg { flex: none; margin-top: 1px; color: var(--warning); }
 
 @media (max-width: 767px) { .user { display: none; } }

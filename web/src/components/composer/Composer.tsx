@@ -25,7 +25,9 @@ import { StickerPicker } from "@/components/pickers/StickerPicker";
 import { emojiToken, searchCustomEmoji, searchPackEmoji, useExpressions } from "@/stores/expressions";
 import { expressions as expressionsApi } from "@/api/expressions";
 import { extractUrls } from "@/markdown";
-import { emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone } from "@/components/pickers/emojiIndex";
+import { allEmoji, emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone, type EmojiEntry } from "@/components/pickers/emojiIndex";
+import { noteEmojiUse, suggestEmoji, type EmojiCandidate } from "@/lib/emojiSuggest";
+import { emojiKeysIn } from "@/lib/emojiUsage";
 import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem, AC_LIST_ID, acOptionId } from "./Autocomplete";
 import { commands, runCommand } from "./commands";
@@ -76,9 +78,15 @@ type AcKind = "user" | "emoji" | "command" | "channel";
 /** What the box has to say above itself, until it is dealt with. */
 type Notice = { kind: "long"; text: string; start: number; end: number } | { kind: "files"; dropped: string[] };
 
-/** The word being typed at the caret, when it asks for suggestions: @someone, #channel (in a server), :emoji or a /command. */
-function acToken(text: string, caret: number, channels: boolean): { kind: AcKind; query: string; start: number } | null {
+/**
+ * The word being typed at the caret, when it asks for suggestions: @someone,
+ * #channel (in a server), :emoji or a /command. With smart emoji suggestions
+ * a bare ":" starting a word asks too, for the emoji used most. One letter
+ * after it asks nothing, so ":D" and ":P" still send as they are.
+ */
+export function acToken(text: string, caret: number, channels: boolean, smartEmoji = false): { kind: AcKind; query: string; start: number } | null {
   const before = text.slice(0, caret);
+  if (smartEmoji && /(?:^|\s):$/.test(before)) return { kind: "emoji", query: "", start: caret - 1 };
   // names in any script: someone called Émile or سارة is found by typing their name
   const m = /(?:^|\s)(@[\p{L}\p{N}_.-]*|#[\p{L}\p{N}_-]*|:[\w+-]{2,}|^\/\w*)$/iu.exec(before);
   if (!m) return null;
@@ -89,6 +97,14 @@ function acToken(text: string, caret: number, channels: boolean): { kind: AcKind
   if (token.startsWith(":")) return { kind: "emoji", query: token.slice(1).toLowerCase(), start };
   if (start === 0 && token.startsWith("/")) return { kind: "command", query: token.slice(1).toLowerCase(), start };
   return null;
+}
+
+/** Unicode's emoji as suggestions, made once for the set. */
+let unicodeCandidates: { from: EmojiEntry[]; list: EmojiCandidate[] } | null = null;
+function unicodeEmojiCandidates(): EmojiCandidate[] {
+  const all = allEmoji();
+  if (unicodeCandidates?.from !== all) unicodeCandidates = { from: all, list: all.map((entry) => ({ kind: "emoji", entry })) };
+  return unicodeCandidates.list;
 }
 
 /** Matches that start with what was typed come before ones that only contain it. */
@@ -148,7 +164,8 @@ export function Composer({ channel }: { channel: Channel }) {
   const files = useUploads((u) => u.trays[channel.id]) ?? NO_FILES;
   const [picker, setPicker] = useState(false);
   const [formatting, setFormatting] = useState(false);
-  const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: AcKind } | null>(null);
+  /** The suggestions showing; `frequent` when they are the emoji used most, offered for a bare ":". */
+  const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: AcKind; frequent?: boolean } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -262,7 +279,8 @@ export function Composer({ channel }: { channel: Channel }) {
   }, [settingsLoaded]);
 
   const refreshAc = useCallback((value: string, caret: number) => {
-    const tok = acToken(value, caret, !!serverState);
+    const smart = useSettings.getState().settings.smartEmoji;
+    const tok = acToken(value, caret, !!serverState, smart);
     if (!tok) return setAc(null);
     let items: AcItem[] = [];
     if (tok.kind === "user") {
@@ -325,6 +343,22 @@ export function Composer({ channel }: { channel: Channel }) {
       const ex = useExpressions.getState();
       // this server's own emoji first: its :name: is the one a message here gets
       const sid = channel.server_id;
+      if (smart) {
+        // one list of everything, ranked by how well it matches and by how much this account uses it
+        const st = useSettings.getState().settings;
+        const packEmoji = Object.values(ex.packs)
+          .filter((p) => p.kind === "emoji")
+          .flatMap((p) => p.stickers.map((r) => ({ id: r.id, server_id: "", name: r.name, blob_id: r.blob_id, animated: r.animated, creator_id: r.creator_id, created_at: r.created_at })));
+        const candidates: EmojiCandidate[] = [
+          ...(sid ? (ex.emojis[sid] ?? []) : []).map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji, own: true })),
+          ...Object.entries(ex.emojis).filter(([id]) => id !== sid).flatMap(([, list]) => list.map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji }))),
+          ...packEmoji.map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji })),
+          ...unicodeEmojiCandidates(),
+        ];
+        items = suggestEmoji({ query: tok.query, candidates, usage: st.emojiUsage, recent: st.recentEmoji, now: Date.now() }).map((c) => (c.kind === "emoji" ? { kind: "emoji", entry: c.entry } : { kind: "customEmoji", emoji: c.emoji }));
+        setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind, frequent: !tok.query } : null);
+        return;
+      }
       const others = Object.fromEntries(Object.entries(ex.emojis).filter(([id]) => id !== sid));
       const own = sid ? searchCustomEmoji({ [sid]: ex.emojis[sid] ?? [] }, tok.query, 4) : [];
       const custom = [...own, ...searchCustomEmoji(others, tok.query, 4 - own.length)].map((e) => ({ kind: "customEmoji" as const, emoji: e }));
@@ -562,6 +596,8 @@ export function Composer({ channel }: { channel: Channel }) {
     }
     sendAsIs.current = null;
     if (!body && files.length === 0) return false;
+    // the emoji it uses (a server's by their :name: too) count towards the ones suggested first
+    if (body) noteEmojiUse(emojiKeysIn(extractMentions(body, {}, { emoji: mentionScope(channel.id).emoji ?? [] }).text));
     const channelId = channel.id;
     const opts: SendOptions = takeReply();
     // The box empties now rather than when the send is through, so anything
@@ -706,7 +742,7 @@ export function Composer({ channel }: { channel: Channel }) {
   return (
     <div className={s.wrap}>
       <DropOverlay name={name} hash={!!channel.server_id} onFiles={(list) => takeFiles.current?.(list)} disabled={!canSend || selecting} />
-      {ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} /> : null}
+      {ac ? <Autocomplete kind={ac.kind} items={ac.items} index={ac.index} onHover={(i) => setAc({ ...ac, index: i })} onPick={pickAc} tone={tone} heading={ac.frequent ? tr_("composer.autocomplete.frequentlyUsed") : undefined} /> : null}
       {formatting ? (
         <Suspense fallback={null}>
           <FormatEditor

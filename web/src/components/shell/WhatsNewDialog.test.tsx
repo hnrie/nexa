@@ -98,10 +98,10 @@ describe("What's New", () => {
   });
 
   it("shows an account that saw the first release of a day only what came after it", () => {
-    signIn(OLD, { seen: "2026-09-26" });
+    signIn(OLD, { seen: "2026-09-27" });
     render(<WhatsNew />);
-    expect(screen.getByText("Who Can Message You")).toBeTruthy();
-    expect(screen.queryByText("Search Every Conversation")).toBeNull();
+    expect(screen.getByText("A Right-Click Menu for Text")).toBeTruthy();
+    expect(screen.queryByText("Create Polls")).toBeNull();
   });
 
   it("puts the releases of one day under one date", () => {

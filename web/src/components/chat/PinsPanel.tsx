@@ -3,18 +3,21 @@ import { useEffect, useId, useRef, useState } from "react";
 import { channels as channelsApi } from "@/api/channels";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { users as usersApi } from "@/api/users";
+import { Avatar } from "@/components/common/Avatar";
 import { decryptForStore, type DecryptedMessage } from "@/lib/decrypt";
-import { formatTimestamp } from "@/lib/time";
-import { Markdown } from "@/markdown";
-import { useRenderCtx } from "@/lib/markdownCtx";
+import { formatFull, formatTimestamp } from "@/lib/time";
+import { RenderCtxProvider, useRenderCtx } from "@/lib/markdownCtx";
+import { useChannels } from "@/stores/channels";
 import { useMessages } from "@/stores/messages";
+import { memberColor, useServers } from "@/stores/servers";
 import { useUI } from "@/stores/ui";
-import { useUsers, displayName } from "@/stores/users";
+import { useUsers } from "@/stores/users";
 import { canPin } from "./messageMenu";
+import { MessageBody } from "./MessageItem";
 import { messageFate, useBlockRules } from "@/lib/blocked";
-import { hookText } from "@/lib/webhookMessage";
-import { pollWords } from "@/lib/poll";
 import { useLayerPresence } from "./useLayerPresence";
+import { useShownName } from "./useShownName";
+import { HookAvatar, HookTags } from "./webhook/HookHeader";
 import s from "./Chat.module.css";
 
 import { t } from "@/i18n";
@@ -42,16 +45,64 @@ function usePinSignal(channelId: string): string {
 }
 
 /**
+ * One pinned message, drawn the way the conversation draws it: who, when, and
+ * all of what it says and carries, however long. Jump goes to it in the
+ * conversation, and Unpin sits beside it for those who may.
+ */
+function PinnedMessage({ msg, collapsed, unpinning, onJump, onUnpin }: { msg: DecryptedMessage; collapsed: boolean; unpinning: boolean; onJump: () => void; onUnpin: (() => void) | null }) {
+  const hook = msg.hook;
+  const avatarId = useUsers((u) => u.byId[msg.author_id]?.avatar_id ?? null);
+  const shownName = useShownName(msg.channel_id, hook ? undefined : msg.author_id);
+  const name = hook ? hook.name : shownName;
+  const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
+  const color = useServers((st) => (serverId && st.byId[serverId] && !msg.webhook_id ? memberColor(st.byId[serverId], msg.author_id) : undefined));
+  const openModal = useUI((u) => u.openModal);
+  const whoId = useId();
+  return (
+    <article className={s.pinCard} aria-labelledby={whoId} data-testid="pinned-message" data-pin={msg.id}>
+      <span className={s.pinAvatar} aria-hidden="true">
+        {hook && msg.webhook_id ? <HookAvatar hook={hook} webhookId={msg.webhook_id} /> : <Avatar id={msg.author_id} avatarId={avatarId} name={name} size={40} />}
+      </span>
+      <div className={s.pinMain}>
+        <div className={s.headerRow} id={whoId}>
+          {hook ? (
+            <span className={s.pinName} dir="auto">{name}</span>
+          ) : (
+            <button type="button" className={s.author} style={color ? { color } : undefined} onClick={() => openModal("profile", { userId: msg.author_id })} dir="auto">
+              {name}
+            </button>
+          )}
+          {hook ? <HookTags /> : null}
+          <time className={s.time} dateTime={new Date(msg.created_at).toISOString()} title={formatFull(msg.created_at)}>
+            {formatTimestamp(msg.created_at)}
+          </time>
+        </div>
+        {collapsed ? <div className={s.content}><span className={s.waiting}>{t("people.blocked.replyPreview")}</span></div> : <MessageBody msg={msg} name={name} />}
+      </div>
+      <div className={s.pinActions}>
+        <button type="button" className={s.pinJump} onClick={onJump} data-testid="pin-jump">
+          {t("chat.pins.jump")}
+        </button>
+        {onUnpin ? (
+          <button type="button" className={s.pinRemove} aria-label={t("chat.pins.unpinThisMessage")} title={t("chat.pins.unpin")} disabled={unpinning} onClick={onUnpin} data-testid="pin-remove">
+            <PinOff size={16} />
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+/**
  * The pinned messages, in a panel over the chat. It is a dialog: focus goes
- * into it and back to where it was, Escape closes it, and each pin is a
- * button that goes to the message.
+ * into it and back to where it was, and Escape closes it. Each pin is drawn
+ * as the message it is, with a way to it.
  */
 export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: () => void }) {
   const [pins, setPins] = useState<DecryptedMessage[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [unpinning, setUnpinning] = useState<string | null>(null);
-  const users = useUsers((u) => u.byId);
   const setJumpTo = useUI((u) => u.setJumpTo);
   const ctx = useRenderCtx();
   const ref = useRef<HTMLDivElement>(null);
@@ -100,6 +151,8 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
       const target = e.target as Element;
       // the header's own pin button toggles the popup shut on its click
       if (target.closest?.('[data-pop-toggle="pins"]')) return;
+      // and what a pin opens over the app (a picture, a profile, a menu) is not somewhere else
+      if (!target.closest?.("#root")) return;
       if (ref.current && !ref.current.contains(target)) closeRef.current();
     };
     const onKey = (e: KeyboardEvent) => {
@@ -131,36 +184,32 @@ export function PinsPanel({ channelId, onClose }: { channelId: string; onClose: 
             <button className={s.loadRetry} onClick={() => setAttempt((n) => n + 1)} data-testid="pins-retry">{t("chat.messageList.tryAgain")}</button>
           </div>
         ) : shownPins === null ? <div className={s.pinEmpty}>{t("chat.pins.loading")}</div> : shownPins.length === 0 ? <div className={s.pinEmpty}>{t("chat.pins.thisChannelDoesnTHaveAny")}</div> : null}
-        {shownPins?.map((m) => (
-          <div key={m.id} className={s.pinItem}>
-            <button type="button" className={s.pinJump} onClick={() => { setJumpTo({ channelId, messageId: m.id }); onClose(); }}>
-              <span className={s.pinHead}>
-                <span className={s.pinAuthor} dir="auto">{m.hook?.name ?? displayName(users[m.author_id])}</span>
-                <span className={s.time}>{formatTimestamp(m.created_at)}</span>
-              </span>
-              <span className={s.pinText} dir="auto">{fates.get(m.id) === "collapse" ? t("people.blocked.replyPreview") : m.payload?.t ? <Markdown source={m.payload.t} ctx={ctx} inline /> : m.payload?.poll ? pollWords(m.payload.poll).replace(/\n/g, " ") : m.hook && hookText(m.hook) ? <Markdown source={hookText(m.hook)} ctx={ctx} inline /> : m.payload?.att?.length ? t("chat.pins.attachment") : t("chat.pins.encrypted")}</span>
-            </button>
-            {canPin(m) ? (
-              <button
-                className={s.pinRemove}
-                aria-label={t("chat.pins.unpinThisMessage")}
-                title={t("chat.pins.unpin")}
-                disabled={unpinning === m.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setUnpinning(m.id);
-                  channelsApi
-                    .unpin(channelId, m.id)
-                    .then(() => setPins((cur) => (cur ?? []).filter((x) => x.id !== m.id)))
-                    .catch((err) => useUI.getState().toast(err instanceof Error ? err.message : t("chat.pins.thatMessageCouldNotBeUnpinned"), "error"))
-                    .finally(() => setUnpinning(null));
-                }}
-              >
-                <PinOff size={15} />
-              </button>
-            ) : null}
-          </div>
-        ))}
+        <RenderCtxProvider value={ctx}>
+          {shownPins?.map((m) => (
+            <PinnedMessage
+              key={m.id}
+              msg={m}
+              collapsed={fates.get(m.id) === "collapse"}
+              unpinning={unpinning === m.id}
+              onJump={() => {
+                setJumpTo({ channelId, messageId: m.id });
+                onClose();
+              }}
+              onUnpin={
+                canPin(m)
+                  ? () => {
+                      setUnpinning(m.id);
+                      channelsApi
+                        .unpin(channelId, m.id)
+                        .then(() => setPins((cur) => (cur ?? []).filter((x) => x.id !== m.id)))
+                        .catch((err) => useUI.getState().toast(err instanceof Error ? err.message : t("chat.pins.thatMessageCouldNotBeUnpinned"), "error"))
+                        .finally(() => setUnpinning(null));
+                    }
+                  : null
+              }
+            />
+          ))}
+        </RenderCtxProvider>
       </div>
     </div>
   );

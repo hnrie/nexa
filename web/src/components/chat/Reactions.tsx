@@ -7,6 +7,8 @@ import { Tooltip } from "@/components/common/Tooltip";
 import { ExpressionPicker } from "@/components/pickers/ExpressionPicker";
 import { emojiByUnicode, emojiLoaded } from "@/components/pickers/emojiIndex";
 import type { EmojiPick } from "@/components/pickers/EmojiPicker";
+import { noteEmojiUse } from "@/lib/emojiSuggest";
+import { reactionKey } from "@/lib/emojiUsage";
 import { useAuth } from "@/stores/auth";
 import { emojiReactionKey } from "@/stores/expressions";
 import { useMessages, type DecryptedMessage } from "@/stores/messages";
@@ -59,7 +61,10 @@ export async function toggleReaction(msg: DecryptedMessage, emoji: string): Prom
   store.setReaction(msg.channel_id, msg.id, emoji, me.id, !has, true);
   try {
     if (has) await messagesApi.unreact(msg.channel_id, msg.id, emoji);
-    else await messagesApi.react(msg.channel_id, msg.id, emoji);
+    else {
+      await messagesApi.react(msg.channel_id, msg.id, emoji);
+      noteEmojiUse([reactionKey(emoji)]);
+    }
   } catch (err) {
     store.setReaction(msg.channel_id, msg.id, emoji, me.id, has, true);
     useUI.getState().toast(err instanceof Error ? err.message : t("chat.reactions.couldNotReact"), "error");

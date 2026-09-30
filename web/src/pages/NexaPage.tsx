@@ -1,5 +1,5 @@
 import { Info, LockOpen, Megaphone } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import type { FeedItem, People } from "@/api/moderation";
 import { Button } from "@/components/common/Button";
@@ -11,11 +11,13 @@ import { ReportBugButton } from "@/components/bugs/ReportBugButton";
 import { PageHeaderButtons } from "@/components/shell/PageHeader";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { fullDate } from "@/lib/moderation";
-import { formatTimestamp } from "@/lib/time";
+import { formatDateDivider, formatTimestamp, sameDay } from "@/lib/time";
 import { Markdown } from "@/markdown";
 import { useNexa } from "@/stores/nexa";
+import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import s from "@/components/nexa/Nexa.module.css";
+import chat from "@/components/chat/Chat.module.css";
 
 /**
  * The Nexa conversation: what the moderation team has sent this account —
@@ -29,16 +31,28 @@ export default function NexaPage() {
   const loading = useNexa((n) => n.feedLoading);
   const people = useNexa((n) => n.people);
   const unread = useNexa((n) => n.state?.unread ?? 0);
+  const focused = useUI((u) => u.focused);
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
+  const readHere = useRef(false);
 
   useEffect(() => {
     if (feed === null) void useNexa.getState().loadFeed().catch(() => undefined);
   }, [feed]);
-  // looking at the conversation is reading it
+  // Looking at the conversation is reading it, the threads it counts included,
+  // as it is for any conversation: only while it is in front of someone. The
+  // threads keep their counts on screen until the page is left.
   useEffect(() => {
-    if (feed !== null && unread > 0) useNexa.getState().markSeen();
-  }, [feed, unread]);
+    if (feed === null || unread === 0 || !focused) return;
+    readHere.current = true;
+    useNexa.getState().markSeen({ keepMarks: true });
+  }, [feed, unread, focused]);
+  useEffect(
+    () => () => {
+      if (readHere.current) useNexa.getState().clearMarks();
+    },
+    [],
+  );
 
   const newest = feed?.[feed.length - 1];
   const newestKey = newest ? `${newest.kind}:${newest.at}` : "";
@@ -97,15 +111,28 @@ export default function NexaPage() {
         ) : feed.length === 0 ? (
           <p className={s.empty}>{t("nexa.empty")}</p>
         ) : (
-          feed.map((it) =>
-            isBugItem(it) ? (
-              <FeedFrame key={it.kind === "bug" ? `bug${it.bug.id}` : `bugline${it.message.id}`} kind={it.kind} kindLabel={bugFeedKind(it)} at={it.at}>
-                <BugFeedEntry item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/bugs/${id}`)} />
-              </FeedFrame>
+          feed.map((it, i) => {
+            const prev = feed[i - 1];
+            // a line with the date wherever a new day starts, as in any conversation
+            const day = !prev || !sameDay(prev.at, it.at) ? (
+              <div className={chat.dateDivider} role="separator" data-testid="nexa-date">
+                <span>{formatDateDivider(it.at)}</span>
+              </div>
+            ) : null;
+            return isBugItem(it) ? (
+              <Fragment key={it.kind === "bug" ? `bug${it.bug.id}` : `bugline${it.message.id}`}>
+                {day}
+                <FeedFrame kind={it.kind} kindLabel={bugFeedKind(it)} at={it.at}>
+                  <BugFeedEntry item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/bugs/${id}`)} />
+                </FeedFrame>
+              </Fragment>
             ) : (
-              <FeedEntry key={it.kind === "announcement" ? `a${it.announcement.id}` : `${it.kind}${it.case.id}`} item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/cases/${id}`)} />
-            ),
-          )
+              <Fragment key={it.kind === "announcement" ? `a${it.announcement.id}` : `${it.kind}${it.case.id}`}>
+                {day}
+                <FeedEntry item={it} people={people} onOpen={(id) => nav(`/channels/@me/nexa/cases/${id}`)} />
+              </Fragment>
+            );
+          })
         )}
       </div>
       <p className={s.systemFooter} role="note">

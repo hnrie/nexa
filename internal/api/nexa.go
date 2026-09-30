@@ -467,8 +467,9 @@ func (s *Server) handleNexaFeed(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, map[string]any{"items": items, "has_more": more, "people": s.people(ctx, who...)})
 }
 
-// handleNexaSeen records that the member looked at their Nexa conversation up
-// to a moment (now, unless they say otherwise).
+// handleNexaSeen records that the member read their Nexa conversation up to a
+// moment (now, unless they say otherwise): what it shows, and the case threads
+// and bug reports it counts as waiting.
 func (s *Server) handleNexaSeen(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
 	var req struct {
@@ -484,7 +485,7 @@ func (s *Server) handleNexaSeen(w http.ResponseWriter, r *http.Request) {
 	if req.At <= 0 || req.At > now {
 		req.At = now
 	}
-	if err := s.Store.SetNexaSeen(r.Context(), me.ID, req.At); err != nil {
+	if err := s.Store.MarkNexaRead(r.Context(), me.ID, req.At); err != nil {
 		WriteError(w, err)
 		return
 	}

@@ -5,7 +5,8 @@
 .hashInput svg { position: absolute; inset-inline-start: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .hashInput input { padding-inline-start: 32px; }
 .types { display: flex; flex-direction: column; gap: 8px; }
-.type { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-raised); cursor: pointer; color: var(--text); }
+/* boxes inside a dialog are a step below it: the page's own colour, darker than the dialog in either theme */
+.type { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-base); cursor: pointer; color: var(--text); }
 .type[data-on="true"] { background: var(--bg-selected); }
 .type input { accent-color: var(--brand); width: 18px; height: 18px; margin-inline-start: auto; }
 .typeIcon { display: flex; color: var(--text-muted); }
@@ -17,15 +18,15 @@
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sep { height: 1px; background: var(--border); margin: 4px 0; }
 .radioList { display: flex; flex-direction: column; gap: 6px; }
-.radio { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-raised); cursor: pointer; color: var(--text); font-size: 15px; }
+.radio { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-base); cursor: pointer; color: var(--text); font-size: 15px; }
 .radio[data-on="true"] { outline: 2px solid var(--brand); }
 .radio input { accent-color: var(--brand); width: 18px; height: 18px; }
 .center { text-align: center; }
 .big { font-size: 24px; font-weight: 600; color: var(--text-strong); margin: 0; }
-.serverRow { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-xs); background: var(--bg-raised); }
+.serverRow { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--radius-xs); background: var(--bg-base); }
 .serverIcon { width: 48px; height: 48px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); font-weight: 600; overflow: hidden; flex: none; }
 .serverIcon img { width: 100%; height: 100%; object-fit: cover; }
-.keyNote { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-raised); font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+.keyNote { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--radius-xs); background: var(--bg-base); font-size: 13px; color: var(--text-muted); line-height: 1.4; }
 .keyNote svg { flex: none; color: var(--positive); margin-top: 1px; }
 .keyNote[data-warn="true"] svg { color: var(--warning); }
 @media (max-width: 767px) { .row2 { grid-template-columns: 1fr; } }

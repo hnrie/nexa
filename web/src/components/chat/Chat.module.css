@@ -103,7 +103,7 @@
    English message in an Arabic interface keeps its question mark at the end
    of the sentence and starts at the left, as in every app that shows the two
    side by side, and an Arabic one in English starts at the right. */
-.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-h4), .content :global(.md-h5), .content :global(.md-h6), .content :global(.md-subtext), .pinText { unicode-bidi: plaintext; text-align: start; }
+.content :global(.md-paragraph), .content :global(.md-quote), .content :global(.md-list-item), .content :global(.md-h1), .content :global(.md-h2), .content :global(.md-h3), .content :global(.md-h4), .content :global(.md-h5), .content :global(.md-h6), .content :global(.md-subtext) { unicode-bidi: plaintext; text-align: start; }
 .waiting { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); font-style: italic; font-size: 15px; }
 .replyLine { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; height: 22px; font-size: 14px; color: var(--text-muted); position: relative; cursor: pointer; }
 /* the spine hooks up from the avatar column into this line; the avatar sits below it */
@@ -249,27 +249,36 @@ button.sysName:hover { text-decoration: underline; }
 @media (pointer: coarse) { .newPill { min-height: 36px; } }
 .jumpBtn { position: absolute; inset-inline-end: 24px; bottom: 8px; z-index: 3; width: 36px; height: 36px; border-radius: 50%; background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-medium); display: flex; align-items: center; justify-content: center; }
 /* placed inside .body, which already starts below the header, call banner and voice view */
-.pinsPop { position: absolute; top: 4px; inset-inline-end: 8px; z-index: 40; width: 420px; max-width: calc(100vw - 16px); max-height: min(70vh, calc(100% - 8px)); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); overflow: hidden; }
+.pinsPop { position: absolute; top: 4px; inset-inline-end: 8px; z-index: 40; width: 480px; max-width: calc(100vw - 16px); max-height: min(80vh, calc(100% - 8px)); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); overflow: hidden; }
 .pinsHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-block: 8px; padding-inline: 16px 8px; font-size: 16px; font-weight: 600; color: var(--text-strong); border-bottom: 1px solid var(--border-subtle); }
 .popClose { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--radius-xs); color: var(--icon); }
 .popClose:hover { background: var(--bg-hover); color: var(--text); }
-.pinsList { overflow-y: auto; overscroll-behavior: contain; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.pinsList { overflow-y: auto; overscroll-behavior: contain; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .pinsPop:focus { outline: none; }
 .pinsTitle { margin: 0; font-size: 16px; font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pinItem { position: relative; border-radius: var(--radius-xs); background: var(--bg-surface); }
-.pinItem:hover { background: var(--bg-active); }
-/* the whole pin is the way to the message; Unpin sits in its corner */
-.pinJump { display: flex; flex-direction: column; width: 100%; padding-block: 8px; padding-inline: 12px 36px; border-radius: inherit; text-align: start; color: inherit; }
-.pinJump:focus-visible { outline-offset: -2px; }
-.pinHead { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 14px; min-width: 0; }
-.pinAuthor { font-weight: 600; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pinText { display: block; font-size: 14px; color: var(--text); max-height: 66px; overflow: hidden; }
-.pinRemove { position: absolute; top: 4px; inset-inline-end: 4px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); opacity: 0; transition: opacity var(--transition), background var(--transition), color var(--transition); }
-.pinItem:hover .pinRemove, .pinRemove:focus-visible { opacity: 1; }
-.pinRemove:hover { background: var(--danger); color: #fff; }
+/* Each pin is the message it is, whole, on a card of its own: avatar, name and
+   time, then everything it says and carries, as the conversation draws it. */
+.pinCard { position: relative; display: flex; gap: 12px; padding: 12px 14px 14px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border-subtle); transition: border-color var(--transition); }
+.pinCard:hover, .pinCard:focus-within { border-color: var(--border-strong); }
+.pinAvatar { flex: none; display: flex; width: 40px; height: 40px; border-radius: 50%; }
+.pinMain { flex: 1; min-width: 0; }
+/* the name and time leave room for Jump and Unpin in the corner */
+.pinMain > .headerRow { padding-inline-end: 100px; margin-bottom: 2px; }
+.headerRow > .pinName { flex: 0 1 auto; font-size: 16px; font-weight: 500; color: var(--text-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pinActions { position: absolute; top: 10px; inset-inline-end: 10px; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity var(--transition); }
+.pinCard:hover .pinActions, .pinCard:focus-within .pinActions { opacity: 1; }
+/* A touch screen has no hover: they are always there, on a row of their own
+   under the message rather than over the end of its name. */
+@media (hover: none) {
+  .pinCard { flex-wrap: wrap; row-gap: 8px; }
+  .pinActions { position: static; opacity: 1; width: 100%; justify-content: flex-end; }
+  .pinMain > .headerRow { padding-inline-end: 0; }
+}
+.pinJump { height: 26px; padding: 0 10px; border-radius: var(--radius-xs); background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text); font-size: 13px; font-weight: 600; }
+.pinJump:hover { background: var(--brand); border-color: transparent; color: var(--on-brand); }
+.pinRemove { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--text-muted); transition: background var(--transition), color var(--transition); }
+.pinRemove:hover { background: var(--danger); color: var(--on-danger); }
 .pinRemove:disabled { opacity: 0.5; }
-/* A touch screen has no hover, so the button is simply always there. */
-@media (hover: none) { .pinRemove { opacity: 1; } }
 .pinEmpty { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
 /* picking messages to delete: every row moves over for a round check in the gutter */
 .composerSlot { flex: none; display: flex; flex-direction: column; }
@@ -300,7 +309,7 @@ button.sysName:hover { text-decoration: underline; }
 .compact .headerRow { display: inline; margin-inline-end: 6px; }
 .compact .content { display: inline; }
 .compact .gutterTime { opacity: 1; top: 4px; }
-.membersBackdrop { position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.5); }
+.membersBackdrop { position: fixed; inset: 0; z-index: 39; background: var(--bg-overlay); }
 /* a tablet standing up fits six finger-sized buttons beside the name only at a phone's spacing */
 @media (min-width: 768px) and (max-width: 1099px) and (pointer: coarse) { .header { gap: 4px; } }
 /* In a narrow header the name holds its width, up to a third of the header,
@@ -413,4 +422,5 @@ button.sysName:hover { text-decoration: underline; }
   .retry { height: 32px; padding: 0 12px; }
   .popClose { width: 40px; height: 40px; }
   .pinRemove { width: 36px; height: 36px; }
+  .pinJump { height: 36px; padding: 0 14px; }
 }

@@ -78,6 +78,19 @@ export function closeNexa(nav?: (path: string) => void): void {
   settings.patch({ nexaClosed: nexa.state?.latest || Date.now(), ...(dmList !== settings.settings.dmList ? { dmList } : {}) });
 }
 
+/**
+ * The Nexa conversation's menu: read it, arrange it (where the list is there
+ * to arrange, with the moves it offers), and close it.
+ */
+export function nexaMenuItems(nav: (path: string) => void, arrange?: { moves: ContextMenuItem[] }): ContextMenuItem[] {
+  const unread = (useNexa.getState().state?.unread ?? 0) > 0;
+  return [
+    { id: "read", label: t("sidebar.dmMenu.markAsRead"), disabled: !unread, onSelect: () => useNexa.getState().markSeen(), separatorAfter: true },
+    ...(arrange ? dmArrangeItems(NEXA_ID, arrange.moves) : []),
+    { id: "close", label: t("sidebar.dMSidebar.closeDm"), onSelect: () => closeNexa(nav) },
+  ];
+}
+
 /** Asks for a name and makes a group, with `ids` in it. */
 export async function newGroup(ids: string[] = []): Promise<void> {
   const name = await promptText(t("organize.dm.newGroupTitle"), { label: t("organize.dm.groupName"), maxLength: GROUP_NAME_MAX, hint: t("organize.dm.groupHint") }, t("organize.dm.createGroup"));

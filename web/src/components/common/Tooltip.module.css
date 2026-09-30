@@ -1,7 +1,7 @@
 .wrap { position: relative; display: inline-flex; }
 /* drawn on the page itself, so nothing it labels can clip or cover it: a bubble
-   with an arrow, in a shade of the surface it came from (Tooltip's tooltipPaint),
-   with a faint edge for when it lands on a surface of that same shade */
+   with an arrow, in a deep ink of the surface it came from (Tooltip's tooltipPaint),
+   with a faint edge for when it lands on a surface close to its own shade */
 .tip {
   position: fixed; z-index: var(--z-tooltip); max-width: 260px; padding: 7px 12px;
   background: var(--tooltip-bg); color: var(--tooltip-text); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tooltip-text) 10%, transparent), var(--tooltip-shadow);

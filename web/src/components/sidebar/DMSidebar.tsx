@@ -26,7 +26,7 @@ import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { badgeText, conversationCount } from "@/lib/unread";
 import { useSettings } from "@/stores/settings";
 import { closeDM, dmMenuItems } from "./dmMenu";
-import { changeDMList, closeNexa, dmArrangeItems, dmGroupMenuItems, groupName, nexaListed } from "./dmArrange";
+import { changeDMList, closeNexa, dmGroupMenuItems, groupName, nexaListed, nexaMenuItems } from "./dmArrange";
 import { menuPoint } from "./ServerSidebar";
 import { NexaAvatar, OfficialBadge } from "@/components/nexa/NexaBits";
 import { useNexa } from "@/stores/nexa";
@@ -225,7 +225,7 @@ export function DMSidebar() {
 
   const openRowMenu = (e: MouseEvent, id: string) => {
     e.preventDefault();
-    const items: ContextMenuItem[] = id === NEXA_ID ? [...dmArrangeItems(NEXA_ID, reorder.menuItems(NEXA_ID)), { id: "close", label: t("sidebar.dMSidebar.closeDm"), onSelect: () => closeNexa(nav) }] : dmMenuItems(id, { nav, openModal, moves: reorder.menuItems(id) });
+    const items: ContextMenuItem[] = id === NEXA_ID ? nexaMenuItems(nav, { moves: reorder.menuItems(NEXA_ID) }) : dmMenuItems(id, { nav, openModal, moves: reorder.menuItems(id) });
     openContextMenu({ ...menuPoint(e), label: rowName(id), items });
   };
 

@@ -53,7 +53,14 @@ interface NexaStore {
   onAnnouncementGone: (id: string) => void;
   reply: (caseId: string, body: string) => Promise<void>;
   markThreadRead: (caseId: string) => void;
-  markSeen: () => void;
+  /**
+   * Reads the whole conversation: its notices and announcements, and what the
+   * team wrote in the account's case threads and bug reports. `keepMarks`
+   * leaves the threads' unread counts showing in the conversation, for the
+   * page that is reading it right now; clearMarks takes them off after.
+   */
+  markSeen: (opts?: { keepMarks?: boolean }) => void;
+  clearMarks: () => void;
   ack: (caseId: string) => Promise<void>;
   loadBugThread: (reportId: string) => Promise<BugThread>;
   /** A report of this account's moved: sent from another device, answered, or given a new status. */
@@ -114,6 +121,13 @@ export function bugIntoFeed(feed: FeedItem[] | null, report: MemberBug, lines: B
     else if (m.kind === "system" && m.event === "status") items.push({ kind: "bug_status", at: m.created_at, bug: report, message: m });
   }
   return mergeFeed(feed, items);
+}
+
+/** An item of the conversation with the unread counts of the thread it is about taken off. */
+function withoutMarks(it: FeedItem): FeedItem {
+  if ((it.kind === "notice" || it.kind === "lift") && it.case.unread) return { ...it, case: { ...it.case, unread: 0 } };
+  if ((it.kind === "bug" || it.kind === "bug_reply" || it.kind === "bug_status") && it.bug.unread) return { ...it, bug: { ...it.bug, unread: 0 } };
+  return it;
 }
 
 function appendLines<M extends { id: string }>(existing: M[], lines: M[]): M[] {
@@ -242,10 +256,24 @@ export const useNexa = create<NexaStore>()((set, get) => ({
     void nexaApi.read(caseId, last.id).catch(() => undefined);
   },
 
-  markSeen: () => {
+  markSeen: (opts) => {
     const st = get().state;
     if (!st || st.unread === 0) return;
-    void nexaApi.seen().catch(() => undefined);
+    // the count goes at once; the server's own word follows as nexa_state
+    const read = { ...st, unread: 0 };
+    set({ state: read });
+    if (!opts?.keepMarks) get().clearMarks();
+    void nexaApi.seen().catch(() => {
+      if (get().state === read) set({ state: st });
+    });
+  },
+
+  clearMarks: () => {
+    set((s) => ({
+      feed: s.feed ? s.feed.map(withoutMarks) : s.feed,
+      threads: Object.fromEntries(Object.entries(s.threads).map(([id, t]) => [id, t.case.unread ? { ...t, case: { ...t.case, unread: 0 } } : t])),
+      bugThreads: Object.fromEntries(Object.entries(s.bugThreads).map(([id, t]) => [id, t.report.unread ? { ...t, report: { ...t.report, unread: 0 } } : t])),
+    }));
   },
 
   ack: async (caseId) => {

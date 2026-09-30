@@ -24,15 +24,16 @@ vi.mock("./media", () => ({
   sentStream: (_ctx: unknown, mic: unknown) => ({ stream: mic, gain: null, source: null }),
   LevelMeter: class {
     level() {
-      return 0;
+      return meter.level;
     }
     close() {}
   },
 }));
+// what the microphone's meter hears, for voice activity
+const meter = vi.hoisted(() => ({ level: 0 }));
 // the peer-to-peer transport, as a set of calls to look at
 const transport = vi.hoisted(() => ({
   setLocalAudio: vi.fn(),
-  setAudioGate: vi.fn(),
   setLocalVideo: vi.fn(),
   setLocalScreen: vi.fn(),
   addPeer: vi.fn(),
@@ -64,8 +65,20 @@ vi.mock("./mesh", () => ({
 }));
 
 function micStream() {
-  const track = { enabled: true, readyState: "live", onended: null, stop: vi.fn() };
-  return { track, stream: { getAudioTracks: () => [track], getTracks: () => [track] } as unknown as MediaStream };
+  // the call is handed a copy of the microphone's track, which it silences on its own
+  const copies: { enabled: boolean; stop: ReturnType<typeof vi.fn> }[] = [];
+  const track = {
+    enabled: true,
+    readyState: "live",
+    onended: null,
+    stop: vi.fn(),
+    clone: () => {
+      const c = { enabled: true, stop: vi.fn() };
+      copies.push(c);
+      return c;
+    },
+  };
+  return { track, copies, stream: { getAudioTracks: () => [track], getTracks: () => [track] } as unknown as MediaStream };
 }
 
 function state(channel: string): VoiceState {
@@ -110,24 +123,58 @@ describe("the call engine", () => {
     vi.mocked(getMic).mockRejectedValueOnce(new DOMException("denied", "NotAllowedError"));
     await join("c1", ice, () => true, vi.fn());
     expect(useVoice.getState().micBlocked).toBe(true);
-    const { stream, track } = micStream();
+    const { stream, copies } = micStream();
     vi.mocked(getMic).mockResolvedValueOnce(stream);
     await retryMic();
     expect(useVoice.getState().micBlocked).toBe(false);
-    expect(transport.setLocalAudio).toHaveBeenLastCalledWith(track);
+    expect(transport.setLocalAudio).toHaveBeenLastCalledWith(copies[0]);
   });
 
   it("sends with push to talk only while the button or key is held, on every device", async () => {
     useSettings.setState((s) => ({ settings: { ...s.settings, voice: { ...s.settings.voice, mode: "ptt" } } }));
-    const { stream, track } = micStream();
+    const { stream, track, copies } = micStream();
     vi.mocked(getMic).mockResolvedValue(stream);
     await join("c1", ice, () => true, vi.fn());
     applyTransmit();
     expect(track.enabled).toBe(false);
+    expect(copies[0]!.enabled).toBe(false);
     setPttHeld(true);
     expect(track.enabled).toBe(true);
+    expect(copies[0]!.enabled).toBe(true);
     expect(useVoice.getState().pttHeld).toBe(true);
     setPttHeld(false);
     expect(track.enabled).toBe(false);
+    expect(copies[0]!.enabled).toBe(false);
+  });
+
+  it("silences its voice between phrases instead of taking it off the call", async () => {
+    vi.useFakeTimers();
+    try {
+      meter.level = 0;
+      const { stream, track, copies } = micStream();
+      vi.mocked(getMic).mockResolvedValue(stream);
+      await join("c1", ice, () => true, vi.fn());
+      const sent = copies[0]!;
+      expect(transport.setLocalAudio).toHaveBeenCalledWith(sent);
+      vi.advanceTimersByTime(100);
+      expect(sent.enabled).toBe(false);
+      // speech is heard within a reading or two, and let through at once
+      meter.level = 0.5;
+      vi.advanceTimersByTime(40);
+      expect(sent.enabled).toBe(true);
+      // it stays through a short pause, and goes quiet after
+      meter.level = 0;
+      vi.advanceTimersByTime(200);
+      expect(sent.enabled).toBe(true);
+      vi.advanceTimersByTime(400);
+      expect(sent.enabled).toBe(false);
+      // the microphone itself stays on for the meter, and the call never lost its track
+      expect(track.enabled).toBe(true);
+      expect(transport.setLocalAudio).not.toHaveBeenCalledWith(null);
+      leave(false);
+      expect(sent.stop).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

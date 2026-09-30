@@ -5,7 +5,7 @@ import { useChannels } from "@/stores/channels";
 import { useNexa } from "@/stores/nexa";
 import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
 import type { ContextMenuItem } from "@/stores/ui";
-import { changeDMList, closeNexa, dmArrangeItems, dmGroupMenuItems, forgetConversation, nexaListed } from "./dmArrange";
+import { changeDMList, closeNexa, dmArrangeItems, dmGroupMenuItems, forgetConversation, nexaListed, nexaMenuItems } from "./dmArrange";
 import { pinDM } from "@/lib/dmLayout";
 
 const dm = (id: string) => ({ id, type: "dm", recipient_ids: [], last_message_id: null }) as unknown as Channel;
@@ -46,6 +46,26 @@ describe("the Nexa conversation", () => {
     expect(seen).toHaveBeenCalled();
     expect(useSettings.getState().settings.nexaClosed).toBe(1234);
     expect(layout().pins).toEqual(["10"]);
+  });
+});
+
+describe("the Nexa conversation's menu", () => {
+  it("reads it, arranges it where there is a list, and closes it", () => {
+    const seen = vi.spyOn(nexaApi, "seen").mockResolvedValue(undefined as never);
+    useNexa.setState({ state: { latest: 1234, unread: 2 } as NexaState });
+    const nav = vi.fn();
+    const items = nexaMenuItems(nav, { moves: [] });
+    expect(ids(items)).toEqual(["read", "pin", "add-to-group", "close"]);
+    items[0]!.onSelect?.();
+    expect(seen).toHaveBeenCalled();
+    expect(useNexa.getState().state?.unread).toBe(0);
+    // from the server rail there is no list to arrange
+    expect(ids(nexaMenuItems(nav))).toEqual(["read", "close"]);
+  });
+
+  it("cannot read what is already read", () => {
+    useNexa.setState({ state: { latest: 1234, unread: 0 } as NexaState });
+    expect(nexaMenuItems(vi.fn())[0]!.disabled).toBe(true);
   });
 });
 

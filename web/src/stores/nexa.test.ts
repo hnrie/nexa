@@ -102,6 +102,39 @@ describe("the Nexa conversation", () => {
     expect(useNexa.getState().threads["5"]!.messages.map((m) => m.id)).toEqual(["10", "20", "30"]);
   });
 
+  it("reads the whole conversation at once, thread counts and all", () => {
+    const c = kase("5", { unread: 1 });
+    useNexa.setState({ state: state({ unread: 3 }), feed: [{ kind: "notice", at: 5000, case: c }], threads: { "5": { case: c, messages: [line("10")] } } });
+    useNexa.getState().markSeen();
+    // the count goes before the server answers, and so do the threads' own
+    expect(useNexa.getState().state?.unread).toBe(0);
+    const it0 = useNexa.getState().feed![0]!;
+    expect(it0.kind === "notice" && it0.case.unread).toBe(0);
+    expect(useNexa.getState().threads["5"]!.case.unread).toBe(0);
+    expect(calls).toContain("POST /nexa/seen");
+  });
+
+  it("keeps the threads' counts on the page reading it until it is left", () => {
+    const c = kase("5", { unread: 1 });
+    useNexa.setState({ state: state({ unread: 2 }), feed: [{ kind: "notice", at: 5000, case: c }] });
+    useNexa.getState().markSeen({ keepMarks: true });
+    expect(useNexa.getState().state?.unread).toBe(0);
+    const kept = useNexa.getState().feed![0]!;
+    expect(kept.kind === "notice" && kept.case.unread).toBe(1);
+    useNexa.getState().clearMarks();
+    const cleared = useNexa.getState().feed![0]!;
+    expect(cleared.kind === "notice" && cleared.case.unread).toBe(0);
+  });
+
+  it("puts the count back when the server could not be told", async () => {
+    api.request = <T>(): Promise<T> => Promise.reject(new Error("offline"));
+    useNexa.setState({ state: state({ unread: 2 }) });
+    useNexa.getState().markSeen();
+    expect(useNexa.getState().state?.unread).toBe(0);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(useNexa.getState().state?.unread).toBe(2);
+  });
+
   it("marks a thread read up to its newest line", () => {
     const c = kase("5", { unread: 2 });
     useNexa.setState({ threads: { "5": { case: c, messages: [line("10"), line("11")] } } });

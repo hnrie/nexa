@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { BadgeCheck, Bug, ClipboardCopy, Eye, EyeOff, FolderPlus, Headphones, House, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Newspaper, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, Bug, ClipboardCopy, Eye, EyeOff, FolderPlus, Headphones, House, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Newspaper, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,15 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-09-29.2",
+    items: [
+      { icon: AudioLines, title: "whatsNew.r202609292.callsTitle", body: "whatsNew.r202609292.callsBody" },
+      { icon: Sparkles, title: "whatsNew.r202609292.emojiTitle", body: "whatsNew.r202609292.emojiBody" },
+      { icon: Pin, title: "whatsNew.r202609292.pinsTitle", body: "whatsNew.r202609292.pinsBody" },
+      { icon: Palette, title: "whatsNew.r202609292.themesTitle", body: "whatsNew.r202609292.themesBody" },
+    ],
+  },
   {
     id: "2026-09-29",
     items: [

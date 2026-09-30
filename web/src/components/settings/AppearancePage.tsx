@@ -179,6 +179,7 @@ export default function AppearancePage() {
         </div>
       ) : null}
       <Toggle checked={st.sendButton} onChange={(v) => patch({ sendButton: v })} label={tr_("settings.appearance.sendButton")} description={tr_("settings.appearance.sendButtonHint")} />
+      <Toggle checked={st.smartEmoji} onChange={(v) => patch({ smartEmoji: v })} label={tr_("settings.appearance.smartEmoji")} description={tr_("settings.appearance.smartEmojiHint")} />
     </div>
   );
 }

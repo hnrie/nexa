@@ -2,7 +2,7 @@
    as its list; once searched, a steady height so switching tabs does not make
    it jump; on a phone, the whole screen. */
 .top { align-self: flex-start; margin-top: min(10vh, 88px); }
-.box { --search-bg: var(--bg-surface); display: flex; flex-direction: column; max-height: calc(100dvh - 2 * min(10vh, 88px)); min-height: 0; overflow: hidden; border-radius: var(--radius-md); background: var(--search-bg); box-shadow: var(--shadow-high); container-type: inline-size; }
+.box { --search-bg: var(--bg-floating); display: flex; flex-direction: column; max-height: calc(100dvh - 2 * min(10vh, 88px)); min-height: 0; overflow: hidden; border-radius: var(--radius-md); background: var(--search-bg); box-shadow: var(--shadow-high); container-type: inline-size; }
 .tall .box { height: min(760px, calc(100dvh - 2 * min(10vh, 88px))); }
 
 .inputRow { flex: none; display: flex; align-items: center; gap: 4px; padding: 12px 12px 10px; }

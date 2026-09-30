@@ -28,6 +28,7 @@ import { SfuTransport } from "./sfu";
 import { shareBitrate } from "./shareQuality";
 import { SpeakingGate } from "./speaking";
 import type { TransportEvents, VoiceTransport } from "./transport";
+import { VoiceSend } from "./voiceSend";
 
 import { t as tr_ } from "@/i18n";
 
@@ -37,6 +38,8 @@ interface Session {
   /** The raw capture; what peers get is the gain-staged copy. */
   mic: MediaStream | null;
   micRaw: MediaStream | null;
+  /** What the call carries of the microphone, silenced between phrases rather than taken away. */
+  send: VoiceSend;
   inputGain: GainNode | null;
   inputSource: MediaStreamAudioSourceNode | null;
   meter: LevelMeter | null;
@@ -73,6 +76,14 @@ let qualityTimer: ReturnType<typeof setInterval> | null = null;
 const QUALITY_EVERY_MS = 3000;
 /** How long voice activity keeps the mic open after speech drops, so word endings and short pauses get through. */
 const VAD_HOLD_MS = 400;
+/**
+ * How often voice activity listens. Whatever is said before it hears speech
+ * start never goes out, so a slow check cut the start off every phrase: at
+ * 80 ms it clipped up to a syllable and made each one late by as much.
+ */
+const VAD_EVERY_MS = 20;
+/** The level meter on screen only needs every few of those readings. */
+const LEVEL_EVERY = 4;
 /**
  * How often a call asks for its relay credentials again. A fetch only goes out
  * once the ones in hand are old enough (see session.ts), and the transport
@@ -184,8 +195,9 @@ export function applyTransmit(): void {
   if (!session?.mic) return;
   const on = shouldTransmit();
   for (const t of session.mic.getAudioTracks()) t.enabled = on;
-  // The gate pauses the senders rather than the track, so the meter keeps hearing the mic and can open it again.
-  session.transport.setAudioGate(gateOpen());
+  // The call's copy of the mic is silenced rather than taken away (voiceSend.ts), and the meter,
+  // which listens to the mic itself, keeps hearing it and can open the copy again.
+  session.send.setOpen(on && gateOpen());
 }
 
 /** Push to talk: the key or the button went down or came up. */
@@ -218,8 +230,7 @@ function rebuildInput(s: Session): void {
   disconnectInput(s);
   if (s.mic && s.mic !== s.micRaw) s.mic.getTracks().forEach((t) => t.stop());
   s.mic = withInputGain(s, s.micRaw);
-  const track = s.mic.getAudioTracks()[0] ?? null;
-  s.transport.setLocalAudio(track);
+  s.transport.setLocalAudio(s.send.track(s.mic.getAudioTracks()[0] ?? null));
   startMeter(s);
   applyTransmit();
 }
@@ -285,7 +296,7 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
     },
   };
   const transport: VoiceTransport = ice.sfu ? new SfuTransport(myId, channelId, ice.servers, events) : new MeshTransport(myId, ice.servers, events);
-  s = { channelId, transport, mic: null, micRaw: null, inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
+  s = { channelId, transport, mic: null, micRaw: null, send: new VoiceSend(), inputGain: null, inputSource: null, meter: null, meterTimer: null, camera: null, screen: null, cameraPending: false, screenPending: false, micRetrying: false, noiseFloor: 0.01, pttHeld: false, vadOpen: false, vadHoldUntil: 0, speaking: new SpeakingGate(), announced: false, iceTimer: null, cleanups: [] };
   session = s;
   useVoice.getState().setConnection("connecting");
   releaseCall ??= holdReload("call");
@@ -316,8 +327,7 @@ export async function join(channelId: string, ice: { servers: RTCIceServer[]; sf
       // Better to say so than to carry a microphone nobody is talking into.
       useUI.getState().toast(tr_("session.theMicrophoneYouPickedIsNot"), "error");
     }
-    const track = s.mic.getAudioTracks()[0] ?? null;
-    transport.setLocalAudio(track);
+    transport.setLocalAudio(s.send.track(s.mic.getAudioTracks()[0] ?? null));
     startMeter(s);
   }
   const voiceStore = useVoice.getState();
@@ -408,6 +418,7 @@ export function leave(notify: boolean): void {
   stopMeter(s);
   disconnectInput(s);
   s.transport.close();
+  s.send.stop();
   s.mic?.getTracks().forEach((t) => t.stop());
   s.micRaw?.getTracks().forEach((t) => t.stop());
   s.camera?.getTracks().forEach((t) => t.stop());
@@ -476,10 +487,11 @@ function startMeter(s: Session): void {
   const ctx = audioContext();
   s.meter = new LevelMeter(ctx, s.mic);
   const myId = me() ?? "";
+  let tick = 0;
   s.meterTimer = setInterval(() => {
     if (!s.meter) return;
     const level = s.meter.level();
-    useVoice.getState().setLevel(level);
+    if (tick++ % LEVEL_EVERY === 0) useVoice.getState().setLevel(level);
     const v = useSettings.getState().settings.voice;
     let threshold: number;
     if (v.autoSensitivity) {
@@ -498,7 +510,7 @@ function startMeter(s: Session): void {
     const loud = s.speaking.update(level > threshold, now);
     const speaking = shouldTransmit() && gateOpen() && loud;
     useVoice.getState().setSpeaking(myId, speaking);
-  }, 80);
+  }, VAD_EVERY_MS);
 }
 
 function stopMeter(s: Session): void {
@@ -532,7 +544,7 @@ async function swapMic(s: Session, failure: string | null): Promise<void> {
     s.micRaw = next;
     s.mic = withInputGain(s, next);
     watchMic(s);
-    s.transport.setLocalAudio(s.mic.getAudioTracks()[0] ?? null);
+    s.transport.setLocalAudio(s.send.track(s.mic.getAudioTracks()[0] ?? null));
     startMeter(s);
     applyTransmit();
     // a microphone that works again is no longer "blocked": the button and

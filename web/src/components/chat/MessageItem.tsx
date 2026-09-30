@@ -146,7 +146,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   const openModal = useUI((u) => u.openModal);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const dev = useSettings((st) => st.settings.developerMode);
-  const ctx = useRowRenderCtx();
   const serverId = useChannels((c) => c.byId[msg.channel_id]?.server_id ?? null);
   // the author's colour only, so a change to anyone else in the server leaves this row alone
   const color = useServers((st) => (serverId && st.byId[serverId] && !msg.webhook_id ? memberColor(st.byId[serverId], msg.author_id) : undefined));
@@ -166,15 +165,6 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
   // someone blocked does not ping, even in a run of theirs opened to read
   const authorBlocked = useRelationships((r) => r.byUser[msg.author_id]?.type === "blocked");
   const mentioned = !!me && msg.author_id !== me.id && !authorBlocked && mentionsMe(msg, me.id);
-  const imagePreviews = useSettings((st) => st.settings.imagePreviews);
-  const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
-  // a GIF or picture link shows only the picture, the way an uploaded one does
-  const mediaOnly = !!embeds && imagePreviews && isOnlyMediaLinks(msg.payload?.t ?? "", embeds);
-  const text = mediaOnly ? "" : (msg.payload?.t ?? "");
-  const nodes = useMemo(() => (text ? parse(text) : []), [text]);
-  // A message of nothing but emoji draws them big, all at one size: shrinking
-  // them as there were more made two messages side by side look mismatched.
-  const jumbo = useMemo(() => nodes.length > 0 && isEmojiOnly(nodes), [nodes]);
 
   const openMenu = useCallback((x: number, y: number, image?: ImageTarget | null, anchor?: ContextMenuState["anchor"]) => {
     setMenuOpen(true);
@@ -300,41 +290,59 @@ export const MessageItem = memo(function MessageItem({ msg, groupStart, pending,
           <span className="visually-hidden" id={whoId}>{t("chat.messageItem.whoWhen", { name, time: formatTimestamp(msg.created_at) })}</span>
         </>
       )}
-      {editing ? (
-        <EditMessage msg={msg} />
-      ) : (
-        <div id={bodyId} className={[s.content, jumbo ? s.jumbo : ""].join(" ")}>
-          {msg.decryptError === "no_key" ? (
-            <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
-          ) : msg.decryptError === "bad" ? (
-            <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.thisMessageCouldNotBeDecrypted")}</span>
-          ) : (
-            <>
-              {text ? <Markdown source={text} ctx={ctx} jumbo={jumbo} /> : null}
-              {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>{t("chat.messageItem.edited")}</span> : null}
-            </>
-          )}
-          {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
-          {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
-          {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
-          {embeds ? <Embeds list={embeds} /> : null}
-          {hook ? <HookBody msg={msg} from={name} /> : null}
-          {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
-          {pending === "failed" ? (
-            <div className={s.failedRow}>
-              <span>{t("chat.messageItem.messageFailedToSend")}</span>
-              <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> {t("chat.messageItem.retry")}</button>
-              <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>{t("chat.messageItem.delete")}</button>
-            </div>
-          ) : null}
-        </div>
-      )}
+      {editing ? <EditMessage msg={msg} /> : <MessageBody msg={msg} name={name} id={bodyId} pending={pending} upload={upload} />}
       {!pending ? <Reactions msg={msg} pickerAnchor={picker} onOpenPicker={setPicker} onPickerClose={() => setPicker(null)} /> : null}
       {!pending && !editing && !selecting && (active || menuOpen) ? <RowToolbar msg={msg} pinned={pinned} dev={dev} setPicker={setPicker} openMenu={openMenu} /> : null}
       {dev && !pending ? <span hidden data-dev-id={msg.id} /> : null}
     </div>
   );
 });
+
+/**
+ * What a message says and carries: its words, sticker, poll, files, link
+ * previews, a webhook's embeds and invites. The same wherever the message is
+ * shown, in the conversation and in its pins alike.
+ */
+export function MessageBody({ msg, name, id, pending, upload }: { msg: DecryptedMessage; name: string; id?: string; pending?: "sending" | "failed" | undefined; upload?: PendingUpload | undefined }) {
+  const ctx = useRowRenderCtx();
+  const hook = msg.hook;
+  const imagePreviews = useSettings((st) => st.settings.imagePreviews);
+  const embeds = msg.payload?.embeds?.length && !(msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) ? (msg.payload.embeds as UnfurlResult[]) : null;
+  // a GIF or picture link shows only the picture, the way an uploaded one does
+  const mediaOnly = !!embeds && imagePreviews && isOnlyMediaLinks(msg.payload?.t ?? "", embeds);
+  const text = mediaOnly ? "" : (msg.payload?.t ?? "");
+  const nodes = useMemo(() => (text ? parse(text) : []), [text]);
+  // A message of nothing but emoji draws them big, all at one size: shrinking
+  // them as there were more made two messages side by side look mismatched.
+  const jumbo = useMemo(() => nodes.length > 0 && isEmojiOnly(nodes), [nodes]);
+  return (
+    <div id={id} className={[s.content, jumbo ? s.jumbo : ""].join(" ")}>
+      {msg.decryptError === "no_key" ? (
+        <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.waitingForTheEncryptionKey")}</span>
+      ) : msg.decryptError === "bad" ? (
+        <span className={s.waiting}><Lock size={14} /> {t("chat.messageItem.thisMessageCouldNotBeDecrypted")}</span>
+      ) : (
+        <>
+          {text ? <Markdown source={text} ctx={ctx} jumbo={jumbo} /> : null}
+          {msg.edited_at ? <span className={s.edited} title={formatFull(msg.edited_at)}>{t("chat.messageItem.edited")}</span> : null}
+        </>
+      )}
+      {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
+      {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
+      {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
+      {embeds ? <Embeds list={embeds} /> : null}
+      {hook ? <HookBody msg={msg} from={name} /> : null}
+      {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
+      {pending === "failed" ? (
+        <div className={s.failedRow}>
+          <span>{t("chat.messageItem.messageFailedToSend")}</span>
+          <button className={s.retry} onClick={() => void retryPending(msg.channel_id, msg.id)} data-testid="retry-send"><RotateCw size={13} /> {t("chat.messageItem.retry")}</button>
+          <button className={s.retry} data-danger="true" onClick={() => discardPending(msg.channel_id, msg.id)}>{t("chat.messageItem.delete")}</button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * The toolbar over a row, in a component of its own: holding Shift changes

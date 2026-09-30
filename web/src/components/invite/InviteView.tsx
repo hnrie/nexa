@@ -101,7 +101,7 @@ function Icon({ target }: { target: InviteTarget }) {
       {target.icon && failed !== target.icon ? (
         <img src={target.icon} alt="" draggable={false} onError={() => setFailed(target.icon)} />
       ) : (
-        <span className={s.initials} style={color ? ({ "--icon-color": color } as CSSProperties) : undefined}>{initials(target.name)}</span>
+        <span className={s.initials} style={color ? ({ "--icon-color": color, "--icon-text": "#fff" } as CSSProperties) : undefined}>{initials(target.name)}</span>
       )}
     </span>
   );

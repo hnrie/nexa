@@ -57,7 +57,7 @@ describe("sharing a theme as a file", () => {
   });
 
   it("takes a bare list of colours, keeping what differs from the classic theme", () => {
-    const back = importTheme(JSON.stringify({ name: "Plain", colors: { "--bg-raised": "#fefefe", text: "#101010", "bg-surface": "#ebeced" } }), "Imported");
+    const back = importTheme(JSON.stringify({ name: "Plain", colors: { "--bg-raised": "#fefefe", text: "#101010", "bg-surface": "#eae8f3" } }), "Imported");
     expect(back.ok).toBe(true);
     if (!back.ok) return;
     expect(back.theme.source).toEqual({ kind: "preset", id: "light" });
