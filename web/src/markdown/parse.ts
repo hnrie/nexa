@@ -101,11 +101,12 @@ export function misleadingLabel(label: string, url: string): boolean {
 /**
  * An emoji in running text. A symbol that is text by default — ©, ®, ™, ↔,
  * ▶ — is only an emoji when it asks to be one, with U+FE0F or a skin tone,
- * so "Nexa™" keeps its trademark sign rather than growing a picture
+ * or when a joiner makes it part of a sequence (🏳‍🌈 with its U+FE0F left
+ * out), so "Nexa™" keeps its trademark sign rather than growing a picture
  * mid-word. Characters drawn as emoji by default need nothing.
  */
 const RE_UNICODE_EMOJI =
-  /(?:\p{RI}\p{RI}|[0-9#*]\u{FE0F}?\u{20E3}|(?:(?=\p{Extended_Pictographic})\p{Emoji_Presentation}(?:\u{FE0F}|\p{Emoji_Modifier})?|\p{Extended_Pictographic}(?:\u{FE0F}\p{Emoji_Modifier}?|\p{Emoji_Modifier}))(?:\u{200D}\p{Extended_Pictographic}(?:\u{FE0F}|\p{Emoji_Modifier})?)*)/uy;
+  /(?:\p{RI}\p{RI}|[0-9#*]\u{FE0F}?\u{20E3}|(?:(?=\p{Extended_Pictographic})\p{Emoji_Presentation}(?:\u{FE0F}|\p{Emoji_Modifier})?|\p{Extended_Pictographic}(?:\u{FE0F}\p{Emoji_Modifier}?|\p{Emoji_Modifier}|(?=\u{200D}\p{Extended_Pictographic})))(?:\u{200D}\p{Extended_Pictographic}(?:\u{FE0F}|\p{Emoji_Modifier})?)*)/uy;
 
 const BLOCK_TYPES = new Set(["paragraph", "quote", "heading", "subtext", "list", "codeblock", "hr", "table", "alert", "details", "footnotes"]);
 

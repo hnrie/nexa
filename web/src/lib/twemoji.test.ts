@@ -57,6 +57,21 @@ describe("the list of pictures", () => {
     vi.unstubAllGlobals();
   });
 
+  it("finds a joined emoji sent without its U+FE0F under the name it is filed by", async () => {
+    vi.resetModules();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(["1f3f3-fe0f-200d-1f308", "1f441-200d-1f5e8", "1f469-200d-2764-fe0f-200d-1f468"]))));
+    const tw = await import("./twemoji");
+    const ready = new Promise<void>((r) => tw.onTwemojiIndexReady(r));
+    tw.ensureTwemojiIndex();
+    await ready;
+    // the rainbow flag is filed with its selector, the eye in a speech bubble without
+    expect(tw.twemojiFiles("\u{1F3F3}\u200D\u{1F308}")).toEqual(["1f3f3-fe0f-200d-1f308"]);
+    expect(tw.twemojiFiles("\u{1F3F3}\uFE0F\u200D\u{1F308}")).toEqual(["1f3f3-fe0f-200d-1f308"]);
+    expect(tw.twemojiFiles("\u{1F441}\uFE0F\u200D\u{1F5E8}\uFE0F")).toEqual(["1f441-200d-1f5e8"]);
+    expect(tw.twemojiFiles("\u{1F469}\u200D\u2764\u200D\u{1F468}")).toEqual(["1f469-200d-2764-fe0f-200d-1f468"]);
+    vi.unstubAllGlobals();
+  });
+
   it("tries the pictures anyway if the list cannot be had", async () => {
     vi.resetModules();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));

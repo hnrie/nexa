@@ -116,11 +116,23 @@ export function onTwemojiIndexReady(fn: () => void): () => void {
 /**
  * Twemoji is not quite consistent about the variation selector inside joined
  * sequences: the rainbow flag keeps it, the eye in a speech bubble does not.
- * Rather than encode the exceptions, offer both spellings; once the list of
- * artwork is known, only the spellings that exist are offered at all.
+ * And some senders leave it out where Unicode puts it (🏳‍🌈 for 🏳️‍🌈).
+ * Rather than encode the exceptions, offer the spelling as sent, without the
+ * selectors and with every one in place; once the list of artwork is known,
+ * only the spellings that exist are offered at all.
  */
 export function twemojiCandidates(text: string): string[] {
   return twemojiFiles(text).map((c) => `${TWEMOJI_BASE}/${c}.svg`);
+}
+
+/** A symbol that is text unless it asks to be an emoji (❤, 🏳), and what asks: U+FE0F or a skin tone. */
+const TEXT_BY_DEFAULT = /(?=\p{Extended_Pictographic})\P{Emoji_Presentation}/u;
+const ASKS = /[\u{FE0F}\p{Emoji_Modifier}]/u;
+
+/** A joined sequence with U+FE0F after each part that is text by default and has none. */
+function spelledOut(text: string): string {
+  const chars = [...text];
+  return chars.map((ch, i) => (TEXT_BY_DEFAULT.test(ch) && !ASKS.test(chars[i + 1] ?? "") ? ch + "\uFE0F" : ch)).join("");
 }
 
 /** The artwork files an emoji may be drawn from (names without the extension), best first. */
@@ -129,8 +141,10 @@ export function twemojiFiles(text: string): string[] {
   const first = twemojiCode(text);
   if (first) codes.push(first);
   if (text.includes(ZWJ)) {
-    const stripped = twemojiCode(text.replace(VARIATION, ""));
-    if (stripped && stripped !== first) codes.push(stripped);
+    for (const spelling of [text.replace(VARIATION, ""), spelledOut(text)]) {
+      const code = twemojiCode(spelling);
+      if (code && !codes.includes(code)) codes.push(code);
+    }
   }
   const known = available;
   return known ? codes.filter((c) => known.has(c)) : codes;

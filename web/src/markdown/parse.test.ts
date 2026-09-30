@@ -215,6 +215,8 @@ const fixtures: Fixture[] = [
   { name: "a text symbol with FE0F is an emoji", src: "❤️", ast: [para(uni("❤️"))] },
   { name: "a text symbol with a skin tone is an emoji", src: "✌\u{1F3FD}", ast: [para(uni("✌\u{1F3FD}"))] },
   { name: "a flag made of a text symbol and FE0F is one emoji", src: "\u{1F3F3}️‍\u{1F308}", ast: [para(uni("\u{1F3F3}️‍\u{1F308}"))] },
+  { name: "a joined sequence missing its FE0F is still one emoji", src: "\u{1F3F3}\u200D\u{1F308} \u{1F441}\u200D\u{1F5E8}", ast: [para(uni("\u{1F3F3}\u200D\u{1F308}"), t(" "), uni("\u{1F441}\u200D\u{1F5E8}"))] },
+  { name: "a text symbol joined to a letter stays text", src: "©\u200Da", ast: [para(t("©\u200Da"))] },
   { name: "a lone skin tone is not an emoji", src: "\u{1F3FD}", ast: [para(t("\u{1F3FD}"))] },
 
   // --- timestamps ---------------------------------------------------------
