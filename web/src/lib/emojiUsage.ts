@@ -86,6 +86,28 @@ export function emojiKeysIn(text: string): string[] {
   return [...out];
 }
 
+/**
+ * Usage learned from messages already sent: every emoji a message used counts
+ * once, as a use at the time it was sent, so an old habit weighs less than a
+ * new one. A score already known for an emoji stays where it is higher, so a
+ * message counted when it was sent is not counted twice.
+ */
+export function usageFromHistory(existing: EmojiUsage, messages: readonly { text: string; at: number }[], now: number): EmojiUsage {
+  const learned = new Map<string, number>();
+  for (const m of messages) {
+    const weight = 0.5 ** (Math.max(0, now - m.at) / HALF_LIFE_MS);
+    for (const key of emojiKeysIn(m.text)) learned.set(key, (learned.get(key) ?? 0) + weight);
+  }
+  const out: EmojiUsage = { ...existing };
+  for (const [key, s] of learned) {
+    if (s > scoreOf(out[key], now)) out[key] = { s, at: now };
+  }
+  const all = Object.entries(out);
+  if (all.length <= KEEP) return out;
+  all.sort((a, b) => scoreOf(b[1], now) - scoreOf(a[1], now));
+  return Object.fromEntries(all.slice(0, KEEP));
+}
+
 /** Reads a stored copy defensively: whatever an older or damaged copy holds, only well-formed entries come through. */
 export function sanitizeUsage(v: unknown): EmojiUsage {
   if (typeof v !== "object" || v === null || Array.isArray(v)) return {};

@@ -1,12 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Emoji } from "@/api/types";
 import type { EmojiEntry } from "@/components/pickers/emojiIndex";
-import { nameMatch, STARTER_EMOJI, suggestEmoji, useBoost, wordsOf, type EmojiCandidate } from "./emojiSuggest";
+import { DEFAULT_SETTINGS, useSettings } from "@/stores/settings";
+import { learnEmojiHistory, nameMatch, STARTER_EMOJI, SUGGESTIONS, suggestEmoji, useBoost, wordsOf, type EmojiCandidate } from "./emojiSuggest";
 import { customKey, unicodeKey, withUse } from "./emojiUsage";
 
-const entry = (unicode: string, shortcodes: string[], label: string, tags: string[] = []): EmojiCandidate => ({
+const search = vi.hoisted(() => ({ mode: "disk" as string, docs: [] as { id: string; t: string; ts: number }[] }));
+vi.mock("@/search/indexer", () => ({
+  useSearchIndex: { getState: () => ({ mode: search.mode }) },
+  querySearch: vi.fn(async () => ({ counts: {}, total: search.docs.length, docs: search.docs })),
+}));
+
+const entry = (unicode: string, shortcodes: string[], label: string, tags: string[] = [], group = 0): EmojiCandidate => ({
   kind: "emoji",
-  entry: { unicode, hexcode: "", label, group: 0, tags, shortcodes } as EmojiEntry,
+  entry: { unicode, hexcode: "", label, group, tags, shortcodes } as EmojiEntry,
 });
 const custom = (name: string, blob: string, own = false): EmojiCandidate => ({ kind: "customEmoji", emoji: { id: `e${blob}`, server_id: "s", name, blob_id: blob, animated: false } as Emoji, own });
 
@@ -21,7 +28,7 @@ const set: EmojiCandidate[] = [
   entry("🎧", ["headphones"], "headphone"),
   entry("🤕", ["face_with_head_bandage"], "face with head-bandage"),
   entry("💔", ["broken_heart"], "broken heart"),
-  entry("👍", ["thumbsup", "+1", "thumbs_up"], "thumbs up"),
+  entry("👍", ["+1", "thumbsup", "thumbs_up"], "thumbs up"),
   entry("😂", ["joy"], "face with tears of joy", ["laugh"]),
   entry("🔥", ["fire"], "fire"),
 ];
@@ -50,7 +57,30 @@ describe("suggesting emoji", () => {
   it("goes by how well names match when nothing has been used", () => {
     const out = suggestEmoji({ query: "hea", candidates: set, usage: {}, recent: [], now });
     expect(names(out)[0]).toBe("heart");
-    expect(out.length).toBeLessThanOrEqual(8);
+    expect(out.length).toBeLessThanOrEqual(SUGGESTIONS);
+  });
+
+  it("finds a name by any of its words, so broken_heart is among the first for :hea and :heart", () => {
+    for (const query of ["hea", "heart"]) {
+      const out = suggestEmoji({ query, candidates: set, usage: {}, recent: [], now });
+      expect(names(out).indexOf("broken_heart"), query).toBeGreaterThanOrEqual(0);
+      expect(names(out).indexOf("broken_heart"), query).toBeLessThan(5);
+    }
+    // what is common everywhere goes ahead of what is not, among matches as good
+    const out = suggestEmoji({ query: "heart", candidates: set, usage: {}, recent: [], now });
+    expect(names(out).indexOf("broken_heart")).toBeLessThan(names(out).indexOf("gift_heart"));
+  });
+
+  it("says which code matched, where it is not the emoji's first", () => {
+    const out = suggestEmoji({ query: "thu", candidates: set, usage: {}, recent: [], now });
+    expect(out[0]!.kind === "emoji" && out[0]!.entry.unicode).toBe("👍");
+    expect(out[0]!.name).toBe("thumbsup");
+  });
+
+  it("keeps a country's flag behind other matches for a short query", () => {
+    const list = [entry("🇹🇻", ["flag-tv", "tv"], "flag: Tuvalu", [], 9), entry("🌷", ["tulip"], "tulip"), ...set];
+    const out = suggestEmoji({ query: "tu", candidates: list, usage: {}, recent: [], now });
+    expect(out.map((c) => c.name).indexOf("tulip")).toBeLessThan(out.map((c) => c.name).indexOf("flag-tv"));
   });
 
   it("puts the emoji someone uses first, so :hea finds their broken heart", () => {
@@ -89,5 +119,42 @@ describe("suggesting emoji", () => {
     expect(useBoost(1)).toBeGreaterThan(0);
     expect(useBoost(10)).toBeGreaterThan(useBoost(1));
     expect(useBoost(1e9)).toBe(70);
+  });
+});
+
+describe("learning from what was already sent", () => {
+  beforeEach(() => {
+    search.mode = "disk";
+    search.docs = [];
+    useSettings.setState({ loaded: true, settings: { ...DEFAULT_SETTINGS }, key: new Uint8Array(32) });
+  });
+
+  it("counts the emoji of this account's own messages, once, and offers them first", async () => {
+    const now = Date.now();
+    search.docs = [
+      { id: "3", t: "ugh 💔💔", ts: now - 1000 },
+      { id: "2", t: "so sad 💔", ts: now - 60_000 },
+      { id: "1", t: "fine 👍", ts: now - 120_000 },
+    ];
+    expect(await learnEmojiHistory("me")).toBe(true);
+    const st = useSettings.getState().settings;
+    expect(st.emojiLearned).toBe(true);
+    const out = suggestEmoji({ query: "hea", candidates: set, usage: st.emojiUsage, recent: [], now });
+    expect(out[0]!.name).toBe("broken_heart");
+    // and not again
+    search.docs = [{ id: "4", t: "🔥🔥🔥", ts: now }];
+    expect(await learnEmojiHistory("me")).toBe(false);
+    expect(useSettings.getState().settings.emojiUsage[unicodeKey("🔥")]).toBeUndefined();
+  });
+
+  it("waits for the index to open, and learns nothing while smart suggestions are off", async () => {
+    search.mode = "opening";
+    search.docs = [{ id: "1", t: "💔", ts: Date.now() }];
+    expect(await learnEmojiHistory("me")).toBe(false);
+    expect(useSettings.getState().settings.emojiLearned).toBe(false);
+    search.mode = "disk";
+    useSettings.setState((s) => ({ settings: { ...s.settings, smartEmoji: false } }));
+    expect(await learnEmojiHistory("me")).toBe(false);
+    expect(useSettings.getState().settings.emojiUsage).toEqual({});
   });
 });

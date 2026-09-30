@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customKey, emojiKeysIn, HALF_LIFE_MS, KEEP, rankedKeys, reactionKey, sanitizeUsage, scoreOf, unicodeKey, withUse } from "./emojiUsage";
+import { customKey, emojiKeysIn, HALF_LIFE_MS, KEEP, rankedKeys, reactionKey, sanitizeUsage, scoreOf, unicodeKey, usageFromHistory, withUse } from "./emojiUsage";
 
 describe("emoji usage", () => {
   it("counts every skin tone of an emoji as the same one", () => {
@@ -34,6 +34,16 @@ describe("emoji usage", () => {
     const keys = emojiKeysIn("hi 😂😂 and <:party:77> **🔥** `🙃`\n```\n🙃\n```");
     expect(keys).toEqual([unicodeKey("😂"), customKey("77"), unicodeKey("🔥")]);
     expect(emojiKeysIn("")).toEqual([]);
+  });
+
+  it("learns from messages already sent: once a message, the older the lighter, and never less than known", () => {
+    const now = 10 * HALF_LIFE_MS;
+    const u = usageFromHistory({}, [{ text: "💔💔 again", at: now }, { text: "💔", at: now - HALF_LIFE_MS }, { text: "👍", at: now - 2 * HALF_LIFE_MS }], now);
+    expect(scoreOf(u[unicodeKey("💔")], now)).toBeCloseTo(1.5);
+    expect(scoreOf(u[unicodeKey("👍")], now)).toBeCloseTo(0.25);
+    // a score counted as it was sent stays where it is higher
+    const known = withUse(withUse({}, ["👍"], now), ["👍"], now);
+    expect(scoreOf(usageFromHistory(known, [{ text: "👍", at: now }], now)[unicodeKey("👍")], now)).toBeCloseTo(2);
   });
 
   it("reads a stored copy defensively", () => {

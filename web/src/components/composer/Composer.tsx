@@ -26,7 +26,7 @@ import { emojiToken, searchCustomEmoji, searchPackEmoji, useExpressions } from "
 import { expressions as expressionsApi } from "@/api/expressions";
 import { extractUrls } from "@/markdown";
 import { allEmoji, emojiLoaded, loadEmoji, preloadEmoji, searchEmoji, withTone, type EmojiEntry } from "@/components/pickers/emojiIndex";
-import { noteEmojiUse, suggestEmoji, type EmojiCandidate } from "@/lib/emojiSuggest";
+import { learnEmojiHistory, noteEmojiUse, suggestEmoji, type EmojiCandidate } from "@/lib/emojiSuggest";
 import { emojiKeysIn } from "@/lib/emojiUsage";
 import { channelDisplayName } from "@/lib/names";
 import { Autocomplete, type AcItem, AC_LIST_ID, acOptionId } from "./Autocomplete";
@@ -346,6 +346,14 @@ export function Composer({ channel }: { channel: Channel }) {
       if (smart) {
         // one list of everything, ranked by how well it matches and by how much this account uses it
         const st = useSettings.getState().settings;
+        // the first time, what this account already sent is counted too, and the list follows
+        if (!st.emojiLearned && me?.id) {
+          const forChannel = channelRef.current;
+          void learnEmojiHistory(me.id).then((learned) => {
+            const ta = taRef.current;
+            if (learned && ta && channelRef.current === forChannel) refreshAcRef.current(ta.value, ta.selectionStart ?? ta.value.length);
+          });
+        }
         const packEmoji = Object.values(ex.packs)
           .filter((p) => p.kind === "emoji")
           .flatMap((p) => p.stickers.map((r) => ({ id: r.id, server_id: "", name: r.name, blob_id: r.blob_id, animated: r.animated, creator_id: r.creator_id, created_at: r.created_at })));
@@ -355,7 +363,7 @@ export function Composer({ channel }: { channel: Channel }) {
           ...packEmoji.map((emoji): EmojiCandidate => ({ kind: "customEmoji", emoji })),
           ...unicodeEmojiCandidates(),
         ];
-        items = suggestEmoji({ query: tok.query, candidates, usage: st.emojiUsage, recent: st.recentEmoji, now: Date.now() }).map((c) => (c.kind === "emoji" ? { kind: "emoji", entry: c.entry } : { kind: "customEmoji", emoji: c.emoji }));
+        items = suggestEmoji({ query: tok.query, candidates, usage: st.emojiUsage, recent: st.recentEmoji, now: Date.now() }).map((c) => (c.kind === "emoji" ? { kind: "emoji", entry: c.entry, name: c.name } : { kind: "customEmoji", emoji: c.emoji }));
         setAc(items.length ? { items, index: 0, start: tok.start, kind: tok.kind, frequent: !tok.query } : null);
         return;
       }

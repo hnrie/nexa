@@ -13,7 +13,8 @@ export type AcItem =
   | { kind: "user"; user: PublicUser }
   | { kind: "role"; role: Role }
   | { kind: "channel"; channel: Channel; category?: string | undefined }
-  | { kind: "emoji"; entry: EmojiEntry }
+  /** `name` is the code that matched what was typed, where it is not the emoji's first. */
+  | { kind: "emoji"; entry: EmojiEntry; name?: string }
   | { kind: "customEmoji"; emoji: Emoji }
   | { kind: "command"; name: string; desc: string };
 
@@ -106,7 +107,7 @@ export function Autocomplete({ kind, items, index, onHover, onPick, tone, headin
               ) : it.kind === "emoji" ? (
                 <>
                   <Twemoji text={withTone(it.entry, tone)} className={s.acEmojiImg} fallbackClassName={s.acEmoji} />
-                  <span className={s.acName}>:{it.entry.shortcodes[0] ?? it.entry.label}:</span>
+                  <span className={s.acName}>:{it.name ?? it.entry.shortcodes[0] ?? it.entry.label}:</span>
                 </>
               ) : it.kind === "customEmoji" ? (
                 <>

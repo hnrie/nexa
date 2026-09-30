@@ -93,6 +93,8 @@ export interface Settings {
   smartEmoji: boolean;
   /** How much, and how lately, each emoji was used (lib/emojiUsage.ts); only counted while smartEmoji is on. */
   emojiUsage: EmojiUsage;
+  /** The emoji this account had already sent before smart suggestions came have been counted (lib/emojiSuggest.ts learnEmojiHistory). */
+  emojiLearned: boolean;
   favoriteGifs: FavoriteGif[];
   skinTone: number;
   /**
@@ -181,6 +183,7 @@ export const DEFAULT_SETTINGS: Settings = {
   recentEmoji: [],
   smartEmoji: true,
   emojiUsage: {},
+  emojiLearned: false,
   favoriteGifs: [],
   skinTone: 0,
   notifications: { desktop: false, app: true, sounds: true, perChannel: {}, muted: [], preview: "full" },
@@ -252,6 +255,7 @@ function mergeSettings(base: Settings, incoming: unknown): Settings {
 
     smartEmoji: typeof inc.smartEmoji === "boolean" ? inc.smartEmoji : base.smartEmoji,
     emojiUsage: "emojiUsage" in inc ? sanitizeUsage(inc.emojiUsage) : base.emojiUsage,
+    emojiLearned: typeof inc.emojiLearned === "boolean" ? inc.emojiLearned : base.emojiLearned,
 
     spellWords: Array.isArray(inc.spellWords) ? inc.spellWords.filter((w): w is string => typeof w === "string" && w.length > 0 && w.length <= 64).slice(-2000) : base.spellWords,
     sendButton: typeof inc.sendButton === "boolean" ? inc.sendButton : base.sendButton,
