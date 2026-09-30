@@ -249,7 +249,7 @@ def server_flow(srv, alice, bob, phone):
     a.goto(srv.base + "/channels/@me", wait_until="networkidle")
     a.click("button[aria-label='Add a Server']")
     a.fill("[data-testid=server-name]", "Test Server")
-    a.click("button:has-text('Create')")
+    a.click("[role=dialog] button:has-text('Create')")
     a.wait_for_url("**/channels/*/*", timeout=20000)
     a.wait_for_selector("textarea[aria-label='Message #general']", timeout=15000)
     alice.send("first message in general")

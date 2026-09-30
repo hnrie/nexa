@@ -121,7 +121,7 @@ try:
         a.goto(srv.base + "/channels/@me", wait_until="networkidle")
         a.click("button[aria-label='Add a Server']")
         a.fill("[data-testid=server-name]", "Calls")
-        a.click("button:has-text('Create')")
+        a.click("[role=dialog] button:has-text('Create')")
         a.wait_for_selector("textarea[aria-label='Message #general']", timeout=20000)
         server_id = a.url.split("/channels/")[1].split("/")[0]
         alice_id = api(a, "GET", "/users/@me")["body"]["id"]
