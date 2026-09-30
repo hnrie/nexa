@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -281,6 +282,67 @@ func TestDuplicateAttachmentIsAttachedOnce(t *testing.T) {
 		t.Errorf("ref count after delete: %v %+v", err, b)
 	}
 	_ = tokB
+}
+
+// A picture's small copy goes with the message as an attachment of its own,
+// so the same people can fetch it, but it is not one of the message's ten
+// files: one copy per file at most, none alone, and small enough to be one.
+func TestPicturePreviewsRideAlongButAreNotFiles(t *testing.T) {
+	_, ts := newTestServer(t)
+	tokA, _ := register(t, ts, "alice")
+	tokB, idB := register(t, ts, "bob")
+	_, body := do(t, ts, "POST", "/api/v1/users/@me/channels", tokA, map[string]any{"recipient_ids": []string{idB}})
+	dm := body["id"].(string)
+	createEpoch(t, ts, tokA, dm)
+	upload := func(n int) string {
+		t.Helper()
+		res, raw := rawPost(t, ts.URL+"/api/v1/channels/"+dm+"/attachments", tokA, "application/octet-stream", bytes.Repeat([]byte{7}, n))
+		if res.StatusCode != 201 {
+			t.Fatalf("upload: %d %s", res.StatusCode, raw)
+		}
+		var up map[string]any
+		_ = json.Unmarshal(raw, &up)
+		return up["blob_id"].(string)
+	}
+	file := func(id string) map[string]any { return map[string]any{"blob_id": id, "size": 100} }
+	preview := func(id string) map[string]any { return map[string]any{"blob_id": id, "size": 100, "preview": true} }
+
+	// ten files, each with its copy, is a message of ten files
+	var att []map[string]any
+	for i := 0; i < 10; i++ {
+		att = append(att, file(upload(100)), preview(upload(100)))
+	}
+	res, body := sendMsg(t, ts, tokA, dm, dm, 0, "", "p1", map[string]any{"attachments": att})
+	if res.StatusCode != 201 || len(body["attachments"].([]any)) != 20 {
+		t.Fatalf("ten pictures with their copies: %d %v", res.StatusCode, body)
+	}
+	// the other side of the conversation can fetch a copy like any file in it
+	req, _ := http.NewRequest("GET", ts.URL+"/media/attachments/"+att[1]["blob_id"].(string), nil)
+	req.Header.Set("Authorization", "Bearer "+tokB)
+	if got, err := http.DefaultClient.Do(req); err != nil || got.StatusCode != 200 {
+		t.Fatalf("bob fetching the copy: %v %v", err, got)
+	} else {
+		got.Body.Close()
+	}
+
+	// a copy on its own, or more copies than files, is not a preview of anything
+	lone := upload(100)
+	if res, body := sendMsg(t, ts, tokA, dm, dm, 0, "", "p2", map[string]any{"attachments": []map[string]any{preview(lone)}}); res.StatusCode != 400 || errCode(body) != "bad_attachment" {
+		t.Errorf("a copy alone: %d %v", res.StatusCode, body)
+	}
+	// nor is a big file called a copy to get past the limit
+	big := upload(3 << 20)
+	if res, body := sendMsg(t, ts, tokA, dm, dm, 0, "", "p3", map[string]any{"attachments": []map[string]any{file(upload(100)), preview(big)}}); res.StatusCode != 400 || errCode(body) != "bad_attachment" {
+		t.Errorf("a big file passed off as a copy: %d %v", res.StatusCode, body)
+	}
+	// and eleven files are still one too many
+	att = nil
+	for i := 0; i < 11; i++ {
+		att = append(att, file(upload(100)))
+	}
+	if res, body := sendMsg(t, ts, tokA, dm, dm, 0, "", "p4", map[string]any{"attachments": att}); res.StatusCode != 400 || errCode(body) != "too_many_attachments" {
+		t.Errorf("eleven files: %d %v", res.StatusCode, body)
+	}
 }
 
 // Several messages go in one request, and only when every one of them is the

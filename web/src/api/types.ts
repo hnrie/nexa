@@ -737,7 +737,8 @@ export interface SendMessageRequest {
   mentions: Snowflake[];
   mention_roles?: Snowflake[];
   mention_everyone?: boolean;
-  attachments?: { blob_id: Snowflake; size: number }[];
+  /** `preview` marks a picture's small copy (lib/pictureCopy.ts), which does not count as a file of its own. */
+  attachments?: { blob_id: Snowflake; size: number; preview?: boolean }[];
   /** Client-generated idempotency key for the send. */
   nonce: string;
   flags?: number;

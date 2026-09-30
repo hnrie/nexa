@@ -4,6 +4,9 @@ import { decryptFile } from "@/crypto/file";
 import { CHUNK, FRAME_LEN, HEADER_LEN, encryptChunks, encryptedSize } from "@/crypto/fileChunks";
 import { ApiError } from "@/api/client";
 import { fitsUploadLimit, setUploadLimits, uploadStaged, type PieceJob, type PieceSender, type Staged } from "./attachments";
+import { lookAtPicture } from "./pictureCopy";
+
+vi.mock("./pictureCopy", async (orig) => ({ ...(await orig<typeof import("./pictureCopy")>()), lookAtPicture: vi.fn(async () => ({})) }));
 
 const MiB = 1024 * 1024;
 
@@ -85,6 +88,47 @@ afterEach(() => {
 });
 
 describe("uploadStaged", () => {
+  /** Sends each request's body to a list, answering with a blob id of its own. */
+  function recorder() {
+    const bodies: Uint8Array[] = [];
+    const jobs: PieceJob[] = [];
+    const send: PieceSender = async (job) => {
+      jobs.push(job);
+      const body = await bodyOf(job);
+      bodies.push(body);
+      return { blob_id: `b${bodies.length}`, size: body.length };
+    };
+    return { bodies, jobs, send, bodyFor: (id: string) => bodies[Number(id.slice(1)) - 1]! };
+  }
+
+  it("measures a picture and sends its small copy beside it, under a key of its own", async () => {
+    const copyBytes = pattern(5000);
+    vi.mocked(lookAtPicture).mockResolvedValueOnce({ w: 4032, h: 3024, copy: { blob: new Blob([copyBytes], { type: "image/webp" }), type: "image/webp", w: 1280, h: 960 } });
+    const data = pattern(300 * 1024);
+    const photo = new File([data], "cat.jpg", { type: "image/jpeg" });
+    const { send, bodyFor } = recorder();
+    const { meta } = await uploadStaged("c1", { ...staged(data), file: photo, name: "cat.jpg" }, () => undefined, send);
+    expect(meta).toMatchObject({ w: 4032, h: 3024, type: "image/jpeg" });
+    expect(meta.preview).toMatchObject({ type: "image/webp", w: 1280, h: 960, size: 5000 });
+    expect(meta.preview!.blob_id).not.toBe(meta.blob_id);
+    expect(meta.preview!.key).not.toBe(meta.key);
+    expect(await same(bodyFor(meta.blob_id), meta.key, data)).toBe(true);
+    expect(await same(bodyFor(meta.preview!.blob_id), meta.preview!.key, copyBytes)).toBe(true);
+  });
+
+  it("sends a picture without its copy when the copy will not go up", async () => {
+    vi.mocked(lookAtPicture).mockResolvedValueOnce({ w: 10, h: 10, copy: { blob: new Blob([pattern(100)], { type: "image/webp" }), type: "image/webp", w: 5, h: 5 } });
+    const data = pattern(4000);
+    const { send } = recorder();
+    const picky: PieceSender = async (job, onProgress, signal) => {
+      if (job.file.type === "image/webp") throw new ApiError(500, "internal", "no");
+      return send(job, onProgress, signal);
+    };
+    const { meta } = await uploadStaged("c1", { ...staged(data), file: new File([data], "a.png", { type: "image/png" }) }, () => undefined, picky);
+    expect(meta.preview).toBeUndefined();
+    expect(meta).toMatchObject({ w: 10, h: 10 });
+  });
+
   it("sends a file that fits in one request as one request", async () => {
     const data = pattern(CHUNK + 10);
     const { server, send } = fakeServer();

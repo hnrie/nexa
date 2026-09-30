@@ -3,7 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { DecryptError } from "@/crypto/keys";
 import type { AttachmentMeta } from "@/crypto/message";
 import { saveAttachment } from "@/lib/download";
-import { INLINE_MAX, acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
+import { setFullSource } from "@/lib/imageActions";
+import { INLINE_MAX, PRIORITY, acquire, attachmentObjectURL, cachedURL, prioritize, release } from "@/lib/mediaCache";
+import { copyOf } from "@/lib/pictureCopy";
+import { watchPlace, type ScreenPlace } from "@/hooks/useNearScreen";
 import { formatBytes } from "@/lib/time";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
@@ -23,8 +26,6 @@ export { fitMedia };
  * message would otherwise download and decrypt all of it.
  */
 const AUTO_LOAD_MAX = 25 * 1024 * 1024;
-/** How near the screen a picture or clip has to come before it is fetched. */
-const NEAR = "600px 0px";
 /**
  * How far off screen a loaded one may drift before it lets go of its
  * decrypted copy. Kept while mounted, every picture scrolled past stayed in
@@ -39,24 +40,55 @@ type LoadError = "load" | "decrypt";
 /**
  * Decrypts an attachment while it is near the screen (`auto`) or once asked
  * to (`load`), and lets go of it again when it is far away — unless it is
- * playing, which it goes on doing out of view.
+ * playing, which it goes on doing out of view. What is on screen is fetched
+ * before what is only near it (lib/mediaCache.ts).
  */
 function useDecrypted(att: AttachmentMeta, ref: RefObject<HTMLElement | null>, auto: boolean): { url: string | null; error: LoadError | null; wanted: boolean; load: () => void; retry: () => void } {
   const [url, setUrl] = useState<string | null>(cachedURL(att.blob_id) ?? null);
   const [error, setError] = useState<LoadError | null>(null);
   const [wanted, setWanted] = useState(false);
   const started = useRef(false);
+  /** Where it is: on screen, near it, or far. Asked for by hand counts as on screen. */
+  const place = useRef<ScreenPlace>("far");
+  /**
+   * Withdraws this one's wait for the download under way. The download stops
+   * once nothing else is waiting on it: a conversation left behind must not
+   * keep the line busy ahead of the one opened.
+   */
+  const stop = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      stop.current?.abort();
+      started.current = false;
+    },
+    [],
+  );
+  // Another file in the same place (a picture's copy giving way to the
+  // picture): start again, and let whatever was on its way for the old one go.
+  const shownId = useRef(att.blob_id);
+  useEffect(() => {
+    if (shownId.current === att.blob_id) return;
+    shownId.current = att.blob_id;
+    stop.current?.abort();
+    started.current = false;
+    setUrl(cachedURL(att.blob_id) ?? null);
+    setError(null);
+  }, [att.blob_id]);
   useEffect(() => {
     if (!wanted || url || error || started.current) return;
     started.current = true;
+    const ctrl = new AbortController();
+    stop.current = ctrl;
     // Not dropped when the effect runs again: a render that only rebuilt the
     // attachment's object must not orphan the download it already started.
-    attachmentObjectURL(att)
+    attachmentObjectURL(att, ctrl.signal, place.current === "visible" ? PRIORITY.visible : PRIORITY.near)
       .then((u) => {
+        if (ctrl.signal.aborted) return;
         started.current = false;
         setUrl(u);
       })
       .catch((err: unknown) => {
+        if (ctrl.signal.aborted) return;
         // a dropped connection is worth another try, which clearing the error starts
         started.current = false;
         setError(err instanceof DecryptError ? "decrypt" : "load");
@@ -76,20 +108,18 @@ function useDecrypted(att: AttachmentMeta, ref: RefObject<HTMLElement | null>, a
   // Near and far are measured against the message list that scrolls, not the
   // window: seen from the window, everything the list has scrolled out of its
   // box is clipped away, however near it is.
-  // near the screen: wanted, when it loads by itself
+  // near the screen: wanted, when it loads by itself; on it, wanted sooner
+  const id = att.blob_id;
   useEffect(() => {
     const el = ref.current;
     if (!auto || !el) return;
-    if (typeof IntersectionObserver === "undefined") {
+    return watchPlace(el, el.closest("[data-scroller]"), (where) => {
+      place.current = where;
+      if (where === "far") return;
       setWanted(true);
-      return;
-    }
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setWanted(true);
-    }, { root: el.closest("[data-scroller]"), rootMargin: NEAR });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref, auto]);
+      if (where === "visible") prioritize(id, PRIORITY.visible);
+    });
+  }, [ref, auto, id]);
   // far from it: let go, unless it is playing
   useEffect(() => {
     const el = ref.current;
@@ -104,7 +134,10 @@ function useDecrypted(att: AttachmentMeta, ref: RefObject<HTMLElement | null>, a
     io.observe(el);
     return () => io.disconnect();
   }, [ref, url]);
-  const load = useCallback(() => setWanted(true), []);
+  const load = useCallback(() => {
+    place.current = "visible";
+    setWanted(true);
+  }, []);
   const retry = useCallback(() => setError(null), []);
   return { url, error, wanted, load, retry };
 }
@@ -165,8 +198,17 @@ export function mosaicLayout(n: number): Tile[] {
 
 function ImageAttachment({ att, onOpen, tile }: { att: AttachmentMeta; onOpen: () => void; tile?: Tile }) {
   const ref = useRef<HTMLDivElement>(null);
-  const auto = att.size <= AUTO_LOAD_MAX;
-  const { url, error, wanted, load, retry } = useDecrypted(att, ref, auto);
+  // A big picture shows the small copy its sender made (lib/pictureCopy.ts),
+  // which comes down in a moment whatever the picture's own size. A copy that
+  // turns out unreadable gives way to the picture itself.
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copy = useMemo(() => (copyFailed ? null : copyOf(att)), [att, copyFailed]);
+  const shown = copy ?? att;
+  const auto = !!copy || att.size <= AUTO_LOAD_MAX;
+  const { url, error, wanted, load, retry } = useDecrypted(shown, ref, auto);
+  useEffect(() => {
+    if (copy && error === "decrypt") setCopyFailed(true);
+  }, [copy, error]);
   const [revealed, setRevealed] = useState(!att.spoiler);
   const dims = fitMedia(att.w, att.h);
   const open = () => {
@@ -182,6 +224,12 @@ function ImageAttachment({ att, onOpen, tile }: { att: AttachmentMeta; onOpen: (
       {url ? (
         // the picture is the way into the viewer, for a keyboard as for a pointer
         <img
+          // drawn off the main thread, so a screenful of pictures arriving together does not stall scrolling
+          decoding="async"
+          // copying or saving it takes the picture itself, not its copy
+          ref={(el) => {
+            if (el) setFullSource(el, copy ? () => attachmentObjectURL(att, undefined, PRIORITY.open) : null);
+          }}
           src={url}
           alt={att.alt || att.name}
           width={dims.width}

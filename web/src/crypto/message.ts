@@ -28,6 +28,20 @@ export interface Aad {
   authorId: string;
 }
 
+/**
+ * A picture's small copy, made by its sender for the chat to show in its
+ * place (lib/pictureCopy.ts): a file of its own, encrypted under its own key.
+ */
+export interface AttachmentPreview {
+  blob_id: string;
+  /** base64 of the copy's own AES key. */
+  key: string;
+  size: number;
+  type: string;
+  w: number;
+  h: number;
+}
+
 export interface AttachmentMeta {
   blob_id: string;
   name: string;
@@ -39,6 +53,8 @@ export interface AttachmentMeta {
   key: string;
   spoiler?: boolean;
   duration?: number;
+  /** A big picture's small copy, shown in the chat until the picture is opened. */
+  preview?: AttachmentPreview;
   /**
    * A webhook's file: stored as it was sent, not encrypted, so it downloads
    * as it is and `key` is empty.
@@ -145,6 +161,24 @@ function isNum(x: unknown): x is number {
   return typeof x === "number" && Number.isFinite(x);
 }
 
+/** What a picture's copy may be: a still picture every browser shows, and small. */
+const PREVIEW_TYPES = new Set(["image/webp", "image/jpeg", "image/png"]);
+const PREVIEW_MAX = 2 * 1024 * 1024;
+
+/**
+ * A copy is fetched by its address and shown by its type, so both are held
+ * to what a copy can be: a number, and a picture. Anything else leaves the
+ * picture to show at its full size, as it did before copies.
+ */
+function sanitizePreview(x: unknown): AttachmentPreview | undefined {
+  if (!isObj(x)) return undefined;
+  const { blob_id, key, size, type, w, h } = x;
+  if (typeof blob_id !== "string" || !/^\d{1,20}$/.test(blob_id) || typeof key !== "string" || typeof type !== "string" || !PREVIEW_TYPES.has(type)) return undefined;
+  if (typeof size !== "number" || !Number.isSafeInteger(size) || size <= 0 || size > PREVIEW_MAX) return undefined;
+  if (!isNum(w) || !isNum(h) || w <= 0 || h <= 0) return undefined;
+  return { blob_id, key, size, type, w, h };
+}
+
 function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (!isObj(x)) return null;
   const { blob_id, name, type, key, size, w, h, duration, spoiler } = x;
@@ -155,6 +189,8 @@ function sanitizeAttachment(x: unknown): AttachmentMeta | null {
   if (isNum(h)) a.h = h;
   if (isNum(duration)) a.duration = duration;
   if (typeof spoiler === "boolean") a.spoiler = spoiler;
+  const preview = type.startsWith("image/") ? sanitizePreview(x["preview"]) : undefined;
+  if (preview) a.preview = preview;
   // a message sealed by a person holds only encrypted files, whatever it says
   return a;
 }

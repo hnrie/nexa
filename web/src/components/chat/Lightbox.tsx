@@ -2,7 +2,7 @@ import { ChevronLeft, ChevronRight, Download, ExternalLink, MessageSquare, X, Zo
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AttachmentMeta } from "@/crypto/message";
-import { acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
+import { PRIORITY, acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
 import { useUI } from "@/stores/ui";
 import { Spinner } from "@/components/common/Spinner";
 import { useFocusTrap } from "@/components/common/useFocusTrap";
@@ -26,8 +26,12 @@ export interface LightboxItem {
 /** How far one press of an arrow moves a zoomed picture, as a share of the view. */
 const PAN_STEP = 0.1;
 
-/** The address of the picture on show, decrypted if need be and held while it is. */
-function useItemSrc(item: LightboxItem): { src: string | null; failed: boolean } {
+/**
+ * The address of the picture on show, decrypted if need be and held while it
+ * is, and meanwhile `copy`: the small copy the chat showed of it, if it has
+ * one here already, to look at until the picture itself arrives.
+ */
+function useItemSrc(item: LightboxItem): { src: string | null; failed: boolean; copy: string | null } {
   const att = item.att;
   const [url, setUrl] = useState<string | null>(() => item.src ?? (att ? (cachedURL(att.blob_id) ?? null) : null));
   const [failed, setFailed] = useState(false);
@@ -39,7 +43,8 @@ function useItemSrc(item: LightboxItem): { src: string | null; failed: boolean }
     setUrl(have ?? null);
     if (have) return;
     let alive = true;
-    attachmentObjectURL(att)
+    // the one thing the person is waiting on goes ahead of everything else
+    attachmentObjectURL(att, undefined, PRIORITY.open)
       .then((u) => alive && setUrl(u))
       .catch(() => alive && setFailed(true));
     return () => {
@@ -51,7 +56,15 @@ function useItemSrc(item: LightboxItem): { src: string | null; failed: boolean }
     if (!acquire(att.blob_id, url)) return;
     return () => release(att.blob_id, url);
   }, [url, att, item.src]);
-  return { src: url, failed };
+  const copyId = item.src ? undefined : att?.preview?.blob_id;
+  const [copy, setCopy] = useState<string | null>(null);
+  useEffect(() => {
+    const u = copyId ? cachedURL(copyId) : undefined;
+    if (!copyId || !u || !acquire(copyId, u)) return setCopy(null);
+    setCopy(u);
+    return () => release(copyId, u);
+  }, [copyId]);
+  return { src: url, failed, copy };
 }
 
 /**
@@ -65,7 +78,7 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
   const count = items.length;
   const [index, setIndex] = useState(() => Math.min(Math.max(0, start), Math.max(0, count - 1)));
   const item = items[index] ?? items[0]!;
-  const { src, failed } = useItemSrc(item);
+  const { src, failed, copy } = useItemSrc(item);
   const openContextMenu = useUI((u) => u.openContextMenu);
   const [scale, setScale] = useState(1);
   const zoom = useRef<ZoomPanHandle>(null);
@@ -162,15 +175,19 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
           </div>
         ) : (
         <ZoomPan key={index} className={s.stage} handle={zoom} onZoom={setScale} onIdleClick={onClose}>
-          {src ? (
+          {src || copy ? (
+            // the copy first, then the picture itself in the same place once it is here
             <img
-              src={src}
+              src={src ?? copy!}
               alt={item.name}
               draggable={false}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src, name: item.name }) });
+                const att = item.att;
+                // copied and saved whole, even while the copy is what shows
+                const full = !src && att ? () => attachmentObjectURL(att, undefined, PRIORITY.open) : undefined;
+                openContextMenu({ x: e.clientX, y: e.clientY, items: imageMenuItems({ src: src ?? copy!, name: item.name, ...(full ? { full } : {}) }) });
               }}
             />
           ) : (
@@ -179,6 +196,7 @@ export function Lightbox({ items, start = 0, onClose }: { items: LightboxItem[];
         </ZoomPan>
         )}
       </div>
+      {!src && copy && !failed && !video ? <span className={s.fullLoading} aria-hidden="true"><Spinner size={18} /></span> : null}
       {count > 1 && index > 0 ? (
         <button type="button" className={[s.side, s.prev].join(" ")} aria-label={t("chat.lightbox.previous")} title={t("chat.lightbox.previous")} onClick={(e) => { stop(e); step(-1); }}>
           <ChevronLeft size={28} />

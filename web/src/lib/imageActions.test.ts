@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { imageNameFromUrl, imageTarget, withExtension } from "./imageActions";
+import { imageNameFromUrl, imageTarget, setFullSource, withExtension } from "./imageActions";
 
 describe("imageTarget", () => {
   it("finds the picture under the pointer, and nothing elsewhere", () => {
@@ -12,6 +12,20 @@ describe("imageTarget", () => {
     expect(imageTarget(document.getElementById("text"))).toBeNull();
     expect(imageTarget(document.getElementById("bare"))).toBeNull();
     expect(imageTarget(null)).toBeNull();
+  });
+});
+
+describe("pictures shown from their small copy", () => {
+  it("copy and save the picture itself, not the copy", async () => {
+    document.body.innerHTML = `<img id="copy" data-image-src="blob:copy" data-image-name="cat.jpg">`;
+    const el = document.getElementById("copy")!;
+    setFullSource(el, () => Promise.resolve("blob:full"));
+    const target = imageTarget(el)!;
+    expect(target.src).toBe("blob:copy");
+    await expect(target.full!()).resolves.toBe("blob:full");
+    // showing the picture itself again, it has nothing else to offer
+    setFullSource(el, null);
+    expect(imageTarget(el)).toEqual({ src: "blob:copy", name: "cat.jpg" });
   });
 });
 

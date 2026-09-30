@@ -30,6 +30,8 @@
 .stage[data-zoomed="true"] { cursor: grab; }
 .stage[data-zoomed="true"]:active { cursor: grabbing; }
 .pending { color: rgba(255, 255, 255, 0.8); font-size: 14px; }
+/* the picture's small copy is showing while the picture itself comes down */
+.fullLoading { position: absolute; left: 50%; bottom: max(28px, calc(env(safe-area-inset-bottom) + 16px)); transform: translateX(-50%); display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); pointer-events: none; }
 
 /* the neighbours in the same message */
 .side { position: absolute; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(0, 0, 0, 0.55); color: #fff; }

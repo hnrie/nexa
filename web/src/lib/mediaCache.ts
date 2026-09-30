@@ -2,6 +2,7 @@ import { channels as channelsApi } from "@/api/channels";
 import { b64 } from "@/crypto/bytes";
 import { decryptFile, encryptedSize } from "@/crypto/file";
 import type { AttachmentMeta } from "@/crypto/message";
+import { LoadQueue, loadSlots, type Ticket } from "./loadQueue";
 
 import { t } from "@/i18n";
 interface Entry {
@@ -24,11 +25,24 @@ export const INLINE_MAX = 256 * 1024 * 1024;
 /** One download several viewers may be waiting on. */
 interface Job {
   promise: Promise<string>;
-  /** Wired into the request; fired only once every viewer has given up. */
-  ctrl: AbortController;
+  /** Its place in the queue; cancelled (and the request with it) only once every viewer has given up. */
+  ticket: Ticket<string>;
+  /** The most urgent any viewer asked for (lower goes sooner). */
+  priority: number;
   waiting: number;
   done: boolean;
 }
+
+/**
+ * How urgent a download is: the picture being opened, then what is on
+ * screen, then what is about to be. Opening a conversation full of pictures
+ * used to start them all at once, sharing the connection evenly, so the ones
+ * in view came no sooner than the ones a screen away.
+ */
+export const PRIORITY = { open: -1, visible: 0, near: 1 } as const;
+
+/** Downloads wait their turn here, a few at a time (loadQueue.ts). */
+const queue = new LoadQueue(() => loadSlots());
 
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Job>();
@@ -75,8 +89,12 @@ export function playableType(type: string | undefined): string {
   return PLAYABLE_AS[base] || type;
 }
 
-/** Downloads, decrypts and caches an attachment as an object URL. */
-export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): Promise<string> {
+/**
+ * Downloads, decrypts and caches an attachment as an object URL. `priority`
+ * says how soon it is needed (PRIORITY); a download already waiting moves up
+ * when someone needs it sooner.
+ */
+export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal, priority: number = PRIORITY.near): Promise<string> {
   const hit = cache.get(att.blob_id);
   if (hit) {
     hit.last = Date.now();
@@ -84,31 +102,59 @@ export function attachmentObjectURL(att: AttachmentMeta, signal?: AbortSignal): 
   }
   if (att.size > INLINE_MAX) return Promise.reject(new Error(t("mediaCache.thatFileIsTooLargeTo")));
   const pending = inflight.get(att.blob_id);
-  if (pending) return join(pending, signal);
-  const ctrl = new AbortController();
-  const job: Job = { promise: undefined as unknown as Promise<string>, ctrl, waiting: 0, done: false };
+  if (pending) {
+    prioritize(att.blob_id, priority);
+    return join(pending, signal);
+  }
   const gen = generation;
-  job.promise = (async () => {
-    try {
-      // a webhook's file came unencrypted and downloads as it is
-      const body = await channelsApi.downloadAttachment(att.blob_id, ctrl.signal, att.plain ? att.size : encryptedSize(att.size));
-      const plain = att.plain ? body : await decryptFile(body, b64.dec(att.key));
-      // Signed out or locked while it was on its way: the file belonged to that
-      // session, and caching it now would hand it to whoever comes next.
-      if (gen !== generation) throw new DOMException("Aborted", "AbortError");
-      const typed = new Blob([plain], { type: playableType(att.type) });
-      const url = URL.createObjectURL(typed);
-      cache.set(att.blob_id, { url, size: typed.size, last: Date.now(), refs: 0 });
-      total += typed.size;
-      evict(att.blob_id);
-      return url;
-    } finally {
-      job.done = true;
-      if (inflight.get(att.blob_id) === job) inflight.delete(att.blob_id);
-    }
-  })();
+  const ticket = queue.add(priority, async (stop) => {
+    // a webhook's file came unencrypted and downloads as it is
+    const body = await channelsApi.downloadAttachment(att.blob_id, stop, att.plain ? att.size : encryptedSize(att.size));
+    const plain = att.plain ? body : await decryptFile(body, b64.dec(att.key));
+    // Signed out or locked while it was on its way: the file belonged to that
+    // session, and caching it now would hand it to whoever comes next.
+    if (gen !== generation) throw new DOMException("Aborted", "AbortError");
+    const typed = new Blob([plain], { type: playableType(att.type) });
+    const url = URL.createObjectURL(typed);
+    cache.set(att.blob_id, { url, size: typed.size, last: Date.now(), refs: 0 });
+    total += typed.size;
+    evict(att.blob_id);
+    return url;
+  });
+  const job: Job = { promise: undefined as unknown as Promise<string>, ticket, priority, waiting: 0, done: false };
+  job.promise = ticket.promise.finally(() => {
+    job.done = true;
+    if (inflight.get(att.blob_id) === job) inflight.delete(att.blob_id);
+  });
+  // a caller that drops the promise must not see an unhandled rejection
+  job.promise.catch(() => undefined);
   inflight.set(att.blob_id, job);
   return join(job, signal);
+}
+
+/** Moves a download that is still waiting up the queue, when what shows it comes into view. */
+export function prioritize(blobId: string, priority: number): void {
+  const job = inflight.get(blobId);
+  if (!job || priority >= job.priority) return;
+  job.priority = priority;
+  job.ticket.setPriority(priority);
+}
+
+/** Files bigger than this are not kept from a send: they would push everything else out. */
+const SEED_MAX = 25 * 1024 * 1024;
+
+/**
+ * Keeps a file this device has just sent as if it had been downloaded and
+ * decrypted, so the message it went with shows it at once rather than
+ * fetching back what was uploaded a moment ago.
+ */
+export function seedMedia(blobId: string, file: Blob, type: string): void {
+  if (cache.has(blobId) || file.size > SEED_MAX || typeof URL.createObjectURL !== "function") return;
+  const typed = new Blob([file], { type: playableType(type) });
+  const url = URL.createObjectURL(typed);
+  cache.set(blobId, { url, size: typed.size, last: Date.now(), refs: 0 });
+  total += typed.size;
+  evict(blobId);
 }
 
 /**
@@ -127,7 +173,7 @@ function join(job: Job, signal?: AbortSignal): Promise<string> {
     left = true;
     signal?.removeEventListener("abort", onAbort);
     job.waiting -= 1;
-    if (!job.done && job.waiting <= 0) job.ctrl.abort();
+    if (!job.done && job.waiting <= 0) job.ticket.cancel();
   };
   const onAbort = (): void => {
     leave();
@@ -185,7 +231,7 @@ export function release(blobId: string, url: string): void {
 export function clearMediaCache(): void {
   generation += 1;
   // downloads under way stop too, rather than finishing into the cache after it was cleared
-  for (const job of inflight.values()) job.ctrl.abort();
+  for (const job of inflight.values()) job.ticket.cancel();
   inflight.clear();
   for (const e of cache.values()) URL.revokeObjectURL(e.url);
   cache.clear();

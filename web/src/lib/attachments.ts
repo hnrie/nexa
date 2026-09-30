@@ -2,8 +2,10 @@ import { ApiError, api, errorFrom } from "@/api/client";
 import { uploads as uploadsApi } from "@/api/uploads";
 import { b64 } from "@/crypto/bytes";
 import { FRAME_LEN, HEADER_LEN, chunkCount, encryptChunks, encryptedSize, frameOffset, newBaseIv, newFileKey } from "@/crypto/fileChunks";
-import type { AttachmentMeta } from "@/crypto/message";
+import type { AttachmentMeta, AttachmentPreview } from "@/crypto/message";
 import { holdReload } from "./busy";
+import { seedMedia } from "./mediaCache";
+import { lookAtPicture, type PictureCopy, type PictureLook } from "./pictureCopy";
 import { scrubFile } from "./scrubMetadata";
 import type { PieceReply, PieceRequest } from "./upload.worker";
 
@@ -36,6 +38,11 @@ export function fitsUploadLimit(size: number): boolean {
   return encryptedSize(size) <= limits.max;
 }
 
+/** Whether a file of `size` bytes goes up in one request, rather than in pieces. */
+export function goesInOneRequest(size: number): boolean {
+  return encryptedSize(size) <= limits.single;
+}
+
 export interface Staged {
   id: string;
   file: File;
@@ -57,18 +64,6 @@ export async function stage(file: File): Promise<Staged> {
   seq += 1;
   const preview = clean.type.startsWith("image/") || clean.type.startsWith("video/") ? URL.createObjectURL(clean) : null;
   return { id: `f${seq}`, file: clean, name: file.name, spoiler: false, preview, progress: 0, error: null };
-}
-
-async function imageDims(file: File): Promise<{ w: number; h: number } | null> {
-  if (!file.type.startsWith("image/") || typeof createImageBitmap !== "function") return null;
-  try {
-    const bmp = await createImageBitmap(file);
-    const out = { w: bmp.width, h: bmp.height };
-    bmp.close();
-    return out;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -211,6 +206,18 @@ function worthAnotherTry(err: unknown): boolean {
 }
 
 /**
+ * Encrypts and sends a picture's small copy (lib/pictureCopy.ts): a file of
+ * its own, under a key of its own, in one request.
+ */
+async function sendCopy(channelId: string, copy: PictureCopy, send: PieceSender, signal?: AbortSignal): Promise<{ meta: AttachmentPreview; blob: Blob }> {
+  const key = newFileKey();
+  const baseIv = newBaseIv();
+  const job: PieceJob = { method: "POST", path: `/channels/${channelId}/attachments`, file: copy.blob, key, baseIv, first: 0, count: chunkCount(copy.blob.size), skip: 0 };
+  const res = (await send(job, () => undefined, signal)) as { blob_id: string; size: number };
+  return { meta: { blob_id: res.blob_id, key: b64.enc(key), size: copy.blob.size, type: copy.type, w: copy.w, h: copy.h }, blob: copy.blob };
+}
+
+/**
  * Encrypts and uploads a staged file, returning the metadata that rides inside the message.
  *
  * A small file goes up as one request, tried a second time if the connection
@@ -218,6 +225,9 @@ function worthAnotherTry(err: unknown): boolean {
  * time, each stretch encrypted only as it is sent, resuming where it stopped.
  * Either way the work happens in a worker that is ended afterwards, so memory
  * holds one request's worth at most, however big the file is.
+ *
+ * Meanwhile a picture is measured and, when it is big, a small copy of it is
+ * made and sent beside it for the chat to show.
  */
 export async function uploadStaged(channelId: string, st: Staged, onProgress: (p: number) => void, send: PieceSender = sendInWorker, signal?: AbortSignal): Promise<{ meta: AttachmentMeta; blob_id: string; size: number }> {
   if (!fitsUploadLimit(st.file.size)) throw new Error(t("attachments.overServerLimit", { limit: formatSize(limits.max) }));
@@ -225,8 +235,13 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
   const key = newFileKey();
   const baseIv = newBaseIv();
   let res: { blob_id: string; size: number };
+  let seen: PictureLook;
+  let copy: Awaited<ReturnType<typeof sendCopy>> | null;
   // a new version of the app waits for the upload rather than reloading over it
   const release = holdReload("upload");
+  const look = lookAtPicture(st.file);
+  // a copy that does not make it up only leaves the picture to be shown at its full size
+  const copied = look.then((found) => (found.copy ? sendCopy(channelId, found.copy, send, signal) : null)).catch(() => null);
   try {
     // One request up to the server's single-request limit, pieces only above it:
     // the owner chose fewer requests over resuming mid-file for files that fit in one.
@@ -247,16 +262,21 @@ export async function uploadStaged(channelId: string, st: Staged, onProgress: (p
     } else {
       res = await uploadInPieces(st.file, key, baseIv, (sent) => onProgress(sent / total), send, signal);
     }
+    [seen, copy] = await Promise.all([look, copied]);
   } finally {
     release();
   }
-  const dims = await imageDims(st.file);
+  if (signal?.aborted) throw cancelled();
   const meta: AttachmentMeta = { blob_id: res.blob_id, name: st.name || st.file.name, type: st.file.type || "application/octet-stream", size: st.file.size, key: b64.enc(key) };
-  if (dims) {
-    meta.w = dims.w;
-    meta.h = dims.h;
+  if (seen.w && seen.h) {
+    meta.w = seen.w;
+    meta.h = seen.h;
   }
+  if (copy) meta.preview = copy.meta;
   if (st.spoiler) meta.spoiler = true;
+  // what was just sent is on this device already, so showing it here takes no download
+  if (/^(image|video|audio)\//.test(meta.type)) seedMedia(res.blob_id, st.file, meta.type);
+  if (copy) seedMedia(copy.meta.blob_id, copy.blob, copy.meta.type);
   return { meta, blob_id: res.blob_id, size: res.size };
 }
 

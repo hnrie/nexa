@@ -355,7 +355,8 @@ export const api = {
       }
 
       watch();
-      xhr.send(body as XMLHttpRequestBodyInit);
+      // bytes go as a Blob: Chromium is many times slower sending them as they are (see upload.worker.ts)
+      xhr.send(body instanceof Blob ? body : new Blob([body as BlobPart]));
     });
   },
 };

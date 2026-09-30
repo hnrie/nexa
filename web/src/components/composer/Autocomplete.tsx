@@ -5,6 +5,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { Twemoji } from "@/components/common/Twemoji";
 import type { EmojiEntry } from "@/components/pickers/emojiIndex";
 import { withTone } from "@/components/pickers/emojiIndex";
+import { pointerMoved } from "@/lib/pointerMoved";
 import { Fragment, useEffect, useRef, type CSSProperties } from "react";
 import s from "./Composer.module.css";
 import { t } from "@/i18n";
@@ -85,7 +86,8 @@ export function Autocomplete({ kind, items, index, onHover, onPick, tone, headin
         return (
           <Fragment key={keyOf(it)}>
             {heading}
-            <button className={s.acRow} id={acOptionId(i)} data-selected={i === index} role="option" aria-selected={i === index} onMouseEnter={() => onHover(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i)}>
+            {/* only a mouse that moves picks a row: the list changes under a still one with every letter typed */}
+            <button className={s.acRow} id={acOptionId(i)} data-selected={i === index} role="option" aria-selected={i === index} onMouseMove={(e) => i !== index && pointerMoved(e.nativeEvent) && onHover(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(i)}>
               {it.kind === "user" ? (
                 <>
                   <Avatar id={it.user.id} avatarId={it.user.avatar_id} name={it.user.display_name} size={24} />

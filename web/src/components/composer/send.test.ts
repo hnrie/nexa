@@ -160,6 +160,61 @@ describe("sending with files", () => {
     expect(body.attachments?.map((a) => a.blob_id)).toEqual(["b1", "b2"]);
   });
 
+  it("sends a few files at once, and the message lists them in the order they were picked", async () => {
+    const ups = new Map<string, ReturnType<typeof deferred<ReturnType<typeof blob>>>>();
+    vi.mocked(uploadStaged).mockReset();
+    vi.mocked(uploadStaged).mockImplementation(async (_ch, f) => {
+      const d = deferred<ReturnType<typeof blob>>();
+      ups.set(f.id, d);
+      return d.promise;
+    });
+    const done = sendWithFiles("9", "", [file("a"), file("b"), file("c"), file("d")]);
+    await new Promise((r) => setTimeout(r, 0));
+    // three go up together; the fourth waits for one of them
+    expect([...ups.keys()]).toEqual(["a", "b", "c"]);
+    ups.get("c")!.resolve(blob("bc"));
+    await new Promise((r) => setTimeout(r, 0));
+    expect([...ups.keys()]).toEqual(["a", "b", "c", "d"]);
+    ups.get("d")!.resolve(blob("bd"));
+    ups.get("b")!.resolve(blob("bb"));
+    ups.get("a")!.resolve(blob("ba"));
+    await done;
+    const body = vi.mocked(messagesApi.send).mock.calls.at(-1)![1] as { attachments?: { blob_id: string }[] };
+    expect(body.attachments?.map((a) => a.blob_id)).toEqual(["ba", "bb", "bc", "bd"]);
+  });
+
+  it("sends a big file on its own, after the small ones", async () => {
+    const order: string[] = [];
+    let going = 0;
+    let most = 0;
+    vi.mocked(uploadStaged).mockReset();
+    vi.mocked(uploadStaged).mockImplementation(async (_ch, f) => {
+      order.push(f.id);
+      most = Math.max(most, ++going);
+      await new Promise((r) => setTimeout(r, 5));
+      going--;
+      return blob(`b${f.id}`);
+    });
+    const big: Staged = { ...file("big"), file: new File([new Uint8Array(17 * 1024 * 1024)], "big.bin") };
+    await sendWithFiles("9", "", [big, file("a"), file("b")]);
+    expect(order).toEqual(["a", "b", "big"]);
+    expect(most).toBe(2);
+    const body = vi.mocked(messagesApi.send).mock.calls.at(-1)![1] as { attachments?: { blob_id: string }[] };
+    expect(body.attachments?.map((a) => a.blob_id)).toEqual(["bbig", "ba", "bb"]);
+  });
+
+  it("sends a picture's small copy with it, marked as one", async () => {
+    const preview = { blob_id: "c1", key: "ck", size: 900, type: "image/webp", w: 1280, h: 960 };
+    vi.mocked(uploadStaged).mockReset();
+    vi.mocked(uploadStaged).mockResolvedValue({ ...blob("b1"), meta: { ...blob("b1").meta, preview } });
+    await sendWithFiles("9", "", [file("a")]);
+    const body = vi.mocked(messagesApi.send).mock.calls.at(-1)![1] as { attachments?: { blob_id: string; preview?: boolean }[] };
+    expect(body.attachments).toEqual([
+      { blob_id: "b1", size: 1 },
+      { blob_id: "c1", size: expect.any(Number), preview: true },
+    ]);
+  });
+
   it("keeps every conversation's unsent messages through a reconnect", async () => {
     vi.mocked(uploadStaged).mockImplementation(() => new Promise(() => undefined));
     void sendWithFiles("9", "big file", [file("a")]);

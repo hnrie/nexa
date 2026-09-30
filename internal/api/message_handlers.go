@@ -32,6 +32,12 @@ const (
 	maxAttachments   = 10
 	maxNonce         = 64
 	maxEmojiLen      = 64
+	// maxPreviewBytes bounds a picture's small copy: its sender makes it at
+	// most 1 MiB before encryption, so the chat can show it in place of the
+	// picture itself (web/src/lib/pictureCopy.ts). Anything bigger is a file
+	// passed off as a copy to get past maxAttachments. Each copy is an upload
+	// of its own, which is why the upload limiter allows two per file.
+	maxPreviewBytes = 2 << 20
 	// maxBulkDelete bounds one bulk delete; the client sends bigger selections in batches.
 	maxBulkDelete = 100
 	// A person's poll has 2 to 10 answers and runs from an hour to two weeks.
@@ -105,6 +111,10 @@ type messageBody struct {
 	Attachments     []struct {
 		BlobID ids.ID `json:"blob_id"`
 		Size   int64  `json:"size"`
+		// Preview marks a picture's small copy, made by its sender for the
+		// chat to show. It is attached like any file, so the same people can
+		// fetch it, but it does not count as one of the message's files.
+		Preview bool `json:"preview"`
 	} `json:"attachments"`
 	Nonce string `json:"nonce"`
 	Flags int64  `json:"flags"`
@@ -366,8 +376,21 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if len(body.Attachments) > maxAttachments {
+	files, previews := 0, 0
+	for _, a := range body.Attachments {
+		if a.Preview {
+			previews++
+		} else {
+			files++
+		}
+	}
+	if files > maxAttachments {
 		WriteError(w, E(http.StatusBadRequest, "too_many_attachments", "At most 10 files per message."))
+		return
+	}
+	// at most one small copy for each file, and none on their own
+	if previews > files {
+		WriteError(w, E(http.StatusBadRequest, "bad_attachment", "A message has at most one preview for each of its files."))
 		return
 	}
 	if !s.isDM(ch) && body.MentionEveryone && s.ChannelAccess != nil {
@@ -413,6 +436,10 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 		b, err := s.Store.BlobByID(ctx, a.BlobID)
 		if err != nil || b.Kind != "attachment" || b.OwnerID == nil || *b.OwnerID != me.ID {
 			WriteError(w, E(http.StatusBadRequest, "bad_attachment", "One of the attachments is not yours or does not exist."))
+			return
+		}
+		if a.Preview && b.Size > maxPreviewBytes {
+			WriteError(w, E(http.StatusBadRequest, "bad_attachment", "A preview is too large to be one."))
 			return
 		}
 		if _, err := s.Store.AttachmentByBlob(ctx, a.BlobID); err == nil {

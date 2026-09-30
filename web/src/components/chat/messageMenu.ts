@@ -73,8 +73,9 @@ export function imageMenuItems(image: ImageTarget): ContextMenuItem[] {
   // a browser's own refusal says nothing useful; the helpers' own errors do
   const failed = (err: unknown, fallback: string) => ui.toast(err instanceof Error && !(err instanceof DOMException) && err.message ? err.message : fallback, "error");
   return [
-    { id: "copy-image", label: t("chat.messageMenu.copyImage"), onSelect: () => void copyImage(image.src).then(() => ui.toast(t("chat.messageMenu.imageCopied"), "success"), (err: unknown) => failed(err, t("chat.messageMenu.couldNotCopyThePicture"))) },
-    { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void saveImage(image.src, image.name).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) },
+    // a picture shown from its small copy is copied and saved whole
+    { id: "copy-image", label: t("chat.messageMenu.copyImage"), onSelect: () => void copyImage(image.full ? image.full() : image.src).then(() => ui.toast(t("chat.messageMenu.imageCopied"), "success"), (err: unknown) => failed(err, t("chat.messageMenu.couldNotCopyThePicture"))) },
+    { id: "save-image", label: t("chat.messageMenu.saveImage"), onSelect: () => void (image.full ? image.full() : Promise.resolve(image.src)).then((src) => saveImage(src, image.name)).catch((err: unknown) => failed(err, t("chat.messageMenu.couldNotSaveThePicture"))) },
   ];
 }
 

@@ -4,10 +4,24 @@ import { t } from "@/i18n";/**
  * on pictures in chats and in the picture viewer.
  */
 
-/** A picture a menu was opened on: where its full-size image is, and what to call it when saved. */
+/**
+ * A picture a menu was opened on: where its image is, and what to call it
+ * when saved. `full` fetches the picture itself where what shows is its small
+ * copy (lib/pictureCopy.ts), which copying and saving must not hand over.
+ */
 export interface ImageTarget {
   src: string;
   name: string;
+  full?: () => Promise<string>;
+}
+
+/** Pictures on screen that show a small copy, and how to get the picture itself. */
+const fullSources = new WeakMap<Element, () => Promise<string>>();
+
+/** Says how to get the picture a copy on screen stands for; null when it shows the picture itself. */
+export function setFullSource(el: Element, load: (() => Promise<string>) | null): void {
+  if (load) fullSources.set(el, load);
+  else fullSources.delete(el);
 }
 
 /**
@@ -21,7 +35,8 @@ export function imageTarget(target: EventTarget | null): ImageTarget | null {
   const el = target.closest<HTMLElement>("[data-image-src]");
   const src = el?.dataset["imageSrc"];
   if (!el || !src) return null;
-  return { src, name: el.dataset["imageName"] || "image" };
+  const full = fullSources.get(el);
+  return { src, name: el.dataset["imageName"] || "image", ...(full ? { full } : {}) };
 }
 
 /**
@@ -102,13 +117,14 @@ function download(href: string, name: string): void {
 /**
  * Puts the picture on the clipboard. Safari only lets a page write to the
  * clipboard during the click itself, so the clipboard item is made at once
- * and handed the picture when it is ready.
+ * and handed the picture when it is ready (a picture shown from its copy may
+ * still have to be fetched whole).
  */
-export function copyImage(src: string): Promise<void> {
+export function copyImage(src: string | Promise<string>): Promise<void> {
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
     return Promise.reject(new Error(t("imageActions.thisBrowserCanTCopyPictures")));
   }
-  return navigator.clipboard.write([new ClipboardItem({ "image/png": toPng(src) })]);
+  return navigator.clipboard.write([new ClipboardItem({ "image/png": Promise.resolve(src).then(toPng) })]);
 }
 
 /**

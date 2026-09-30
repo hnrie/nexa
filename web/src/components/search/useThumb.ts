@@ -2,18 +2,21 @@
  * A picture for a search result, decrypted on this device like any other.
  *
  * Files are end-to-end encrypted and the server has no thumbnails to give, so
- * a thumbnail is the picture itself, fetched and decrypted once it nears the
- * screen and let go of when it scrolls far away. Big files are left alone
- * until someone opens them.
+ * a thumbnail is the small copy its sender made of a big picture
+ * (lib/pictureCopy.ts), or else the picture itself, fetched and decrypted
+ * once it nears the screen and let go of when it scrolls far away. Big files
+ * without a copy are left alone until someone opens them.
  */
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { AttachmentMeta } from "@/crypto/message";
 import { acquire, attachmentObjectURL, cachedURL, release } from "@/lib/mediaCache";
+import { copyOf } from "@/lib/pictureCopy";
 
 /** Pictures up to this size load by themselves, as they do in the chat. */
 export const THUMB_MAX = 25 * 1024 * 1024;
 
-export function useThumb(att: AttachmentMeta | null, ref: RefObject<HTMLElement | null>): { url: string | null; failed: boolean; tooBig: boolean } {
+export function useThumb(original: AttachmentMeta | null, ref: RefObject<HTMLElement | null>): { url: string | null; failed: boolean; tooBig: boolean } {
+  const att = useMemo(() => (original ? (copyOf(original) ?? original) : null), [original]);
   const [url, setUrl] = useState<string | null>(att ? (cachedURL(att.blob_id) ?? null) : null);
   const [failed, setFailed] = useState(false);
   const [near, setNear] = useState(false);

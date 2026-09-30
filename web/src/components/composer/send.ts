@@ -2,7 +2,8 @@ import { ApiError } from "@/api/client";
 import { messages as messagesApi } from "@/api/messages";
 import type { SendMessageRequest } from "@/api/types";
 import { encryptMessage, type AttachmentMeta, type MessagePayload, type PollPayload } from "@/crypto/message";
-import { sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
+import { goesInOneRequest, sendInWorker, uploadStaged, type Staged } from "@/lib/attachments";
+import { encryptedSize } from "@/crypto/fileChunks";
 import { holdReload } from "@/lib/busy";
 import { decryptForStore } from "@/lib/decrypt";
 import { nonce as newNonce, tmpId } from "@/lib/ids";
@@ -246,6 +247,49 @@ function speedometer(): (bytes: number, now: number) => number {
   };
 }
 
+/**
+ * How many of a message's files go up at once. One at a time, every file
+ * waited out the round trip and the server's write of the one before it,
+ * with the connection idle meanwhile: ten screenshots took several times
+ * as long as their bytes did.
+ */
+const FILES_AT_ONCE = 3;
+
+/**
+ * Files bigger than this go up on their own, after the rest. Each one going
+ * up holds its encrypted request in memory, and three big ones at once would
+ * be more than a phone can spare.
+ */
+const TOGETHER_MAX = 16 * 1024 * 1024;
+
+/**
+ * Runs `upload` over the files that still have to go up, a few at once. After
+ * one fails no more are started; the ones already going are let finish, so a
+ * retry has less to send, and then the first failure is thrown.
+ */
+async function uploadAll(files: Staged[], upload: (f: Staged) => Promise<void>): Promise<void> {
+  const together = files.filter((f) => f.file.size <= TOGETHER_MAX && goesInOneRequest(f.file.size));
+  const alone = files.filter((f) => !together.includes(f));
+  let failed: { err: unknown } | null = null;
+  const lanes = async (list: Staged[], width: number) => {
+    let next = 0;
+    const lane = async () => {
+      while (!failed && next < list.length) {
+        const f = list[next++]!;
+        try {
+          await upload(f);
+        } catch (err) {
+          failed ??= { err };
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(width, list.length) }, lane));
+  };
+  await lanes(together, FILES_AT_ONCE);
+  await lanes(alone, 1);
+  if (failed) throw (failed as { err: unknown }).err;
+}
+
 async function uploadThenSend(channelId: string, meId: string, tmp: string, nonce: string, w: Written, opts: SendOptions): Promise<void> {
   const job = uploading.get(tmp);
   if (!job) return;
@@ -264,24 +308,33 @@ async function uploadThenSend(channelId: string, meId: string, tmp: string, nonc
     const cur = pendingOf(channelId, tmp);
     if (cur?.upload) store().updatePending(channelId, tmp, { upload: { ...cur.upload, loaded: Math.min(loaded, total), speed: bytesPerSecond } });
   };
+  // how far each file has got; one that went up before a failure counts in full
+  const loaded = new Map<string, number>();
+  const progress = () => {
+    let n = 0;
+    for (const f of job.files) n += job.sent.has(f.id) ? f.file.size : (loaded.get(f.id) ?? 0);
+    show(n);
+  };
   const release = holdReload("upload");
-  const ups: Awaited<ReturnType<typeof uploadStaged>>[] = [];
+  let ups: Awaited<ReturnType<typeof uploadStaged>>[];
   try {
-    let before = 0;
-    for (const f of job.files) {
-      // a file that went up before one after it failed is not sent again on the retry
-      const had = job.sent.get(f.id);
-      if (had) {
-        ups.push(had);
-        before += f.file.size;
-        continue;
-      }
-      const done = before;
-      const up = await uploadStaged(channelId, f, (p) => show(done + p * f.file.size), sendInWorker, stop.signal);
+    // a file that went up before another failed is not sent again on the retry
+    const todo = job.files.filter((f) => !job.sent.has(f.id));
+    await uploadAll(todo, async (f) => {
+      const up = await uploadStaged(
+        channelId,
+        f,
+        (p) => {
+          loaded.set(f.id, p * f.file.size);
+          progress();
+        },
+        sendInWorker,
+        stop.signal,
+      );
       job.sent.set(f.id, up);
-      ups.push(up);
-      before += f.file.size;
-    }
+    });
+    // in the order they were picked, whichever finished first
+    ups = job.files.map((f) => job.sent.get(f.id)!);
   } catch (err) {
     // stopped on purpose: the message went with it
     if (stop.signal.aborted) return;
@@ -328,7 +381,8 @@ async function deliver(channelId: string, meId: string, w: Written, tmp: string,
     }
     if (everyone) body.mention_everyone = true;
     if (roles.length) body.mention_roles = roles;
-    if (opts.attachments?.length) body.attachments = opts.attachments.map((a) => ({ blob_id: a.blob_id, size: a.size }));
+    // a picture's small copy goes with it, marked as one so it does not count as a file of its own
+    if (opts.attachments?.length) body.attachments = opts.attachments.flatMap((a) => [{ blob_id: a.blob_id, size: a.size }, ...(a.meta.preview ? [{ blob_id: a.meta.preview.blob_id, size: encryptedSize(a.meta.preview.size), preview: true }] : [])]);
     if (opts.flags) body.flags = opts.flags;
     if (payload.poll) body.poll = pollRequest(payload.poll);
     const sent = await messagesApi.send(channelId, body);

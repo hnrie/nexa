@@ -56,5 +56,9 @@ scope.onmessage = (e) => {
   xhr.onabort = () => scope.postMessage({ type: "failed" });
   xhr.onloadend = () => clearTimeout(stall);
   watch();
-  xhr.send(job.body);
+  // As a Blob, not the bytes themselves. Chromium (and so the desktop app)
+  // took most of a second over every 28 MB sent as an ArrayBuffer, long after
+  // the last byte had reached the server; wrapped in a Blob the same bytes go
+  // in a few milliseconds, and no browser is slower for it.
+  xhr.send(new Blob([job.body]));
 };

@@ -174,7 +174,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		limAuthUsr: ratelimit.New(ratelimit.Every(5, time.Minute), 5, 10*time.Minute),
 		limReg:     ratelimit.New(ratelimit.Every(10, time.Hour), 10, 2*time.Hour),
 		limMsg:     ratelimit.New(ratelimit.Every(5, 5*time.Second), 5, 5*time.Minute),
-		limUpload:  ratelimit.New(ratelimit.Every(60, time.Minute), 60, time.Hour),
+		limUpload:  ratelimit.New(ratelimit.Every(120, time.Minute), 120, time.Hour),
 		limUnfurl:  ratelimit.New(ratelimit.Every(30, time.Minute), 30, 10*time.Minute),
 		// The media proxy fetches from somewhere else on the caller's behalf,
 		// so an unmetered one is both a way to exhaust Nexa's

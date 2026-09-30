@@ -56,6 +56,32 @@ describe("useKeepFocused", () => {
     expect(document.activeElement).toBe(screen.getByLabelText("Focused pane"));
   });
 
+  it("puts the caret back quietly after a click elsewhere, but not for a letter typed", () => {
+    const hush = vi.fn();
+    function Quiet() {
+      const ref = useRef<HTMLTextAreaElement>(null);
+      useKeepFocused(ref, true, hush);
+      return (
+        <>
+          <button>Elsewhere</button>
+          <textarea ref={ref} aria-label="Message" />
+        </>
+      );
+    }
+    render(<Quiet />);
+    const button = screen.getByRole("button");
+    const box = screen.getByLabelText("Message");
+    button.focus();
+    button.dispatchEvent(new MouseEvent("pointerup", { bubbles: true, button: 0 }));
+    expect(document.activeElement).toBe(box);
+    expect(hush).toHaveBeenCalledTimes(1);
+    // a letter typed with the focus elsewhere is being written, so it shows
+    button.focus();
+    fireEvent.keyDown(document.activeElement!, { key: "h" });
+    expect(document.activeElement).toBe(box);
+    expect(hush).toHaveBeenCalledTimes(1);
+  });
+
   it("leaves a selection of nothing but emoji where it is, to be copied", () => {
     render(
       <>

@@ -1,5 +1,6 @@
 import { ChevronUp, CirclePlus, SendHorizontal, Smile, X, Eye, EyeOff, Trash2, Timer, Type, File as FileIcon } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type SyntheticEvent } from "react";
+import { flushSync } from "react-dom";
 import { lazyPage } from "@/lib/lazyChunk";
 import type { Channel } from "@/api/types";
 import { gateway } from "@/gateway/session";
@@ -167,6 +168,12 @@ export function Composer({ channel }: { channel: Channel }) {
   /** The suggestions showing; `frequent` when they are the emoji used most, offered for a bare ":". */
   const [ac, setAc] = useState<{ items: AcItem[]; index: number; start: number; kind: AcKind; frequent?: boolean } | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * The box was put in focus for you (a conversation opened, a click somewhere
+   * else in the app) rather than by you: it takes whatever is typed, but shows
+   * no caret and no glow until you start.
+   */
+  const [quiet, setQuiet] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   // a phone keeps the box as wide as it can: formatting, the preview and emoji wait behind one button
@@ -236,7 +243,9 @@ export function Composer({ channel }: { channel: Channel }) {
     return () => window.removeEventListener("ec:insert-text", onInsert);
   });
   useAutosize(taRef, text, Math.floor((typeof window !== "undefined" ? window.innerHeight : 800) * 0.5));
-  useKeepFocused(taRef);
+  // drawn at once, so the glow never shows for a frame before it is taken back
+  const hush = useCallback(() => flushSync(() => setQuiet(true)), []);
+  useKeepFocused(taRef, true, hush);
   // the box's right-click menu has the switch for the Send button
   useTextMenu(taRef, {
     extra: () => [{ id: "sendButton", label: tr_("textMenu.showSendButton"), checked: sendButton, toggle: true, onSelect: () => useSettings.getState().patch({ sendButton: !sendButton }) }],
@@ -256,7 +265,7 @@ export function Composer({ channel }: { channel: Channel }) {
     setNotice(null);
     setFormatting(false);
     // On a touch screen a focus right after the tap that opened the conversation raises the keyboard over it.
-    if (window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => taRef.current?.focus(), 0);
+    if (window.matchMedia?.("(pointer: fine)")?.matches) setTimeout(() => focusQuietly(taRef.current, hush), 0);
     return () => {
       // the last words typed before leaving are still waiting on the save timer
       if (draftTimer.current) {
@@ -429,6 +438,7 @@ export function Composer({ channel }: { channel: Channel }) {
   const ownEmoji = (name: string) => !!channel.server_id && (useExpressions.getState().emojis[channel.server_id] ?? []).some((em) => em.name.toLowerCase() === name);
 
   const onChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setQuiet(false);
     let value = e.target.value;
     let caret = e.target.selectionStart ?? value.length;
     // a :name: typed out in full becomes its emoji as its closing colon goes in
@@ -639,6 +649,7 @@ export function Composer({ channel }: { channel: Channel }) {
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (quiet && showsCaret(e)) setQuiet(false);
     // Keys pressed while an input method is composing (Japanese, Chinese,
     // Korean…) belong to it: Enter confirms the word, arrows pick one. Safari
     // sends that Enter after composition ends, marked only by keyCode 229.
@@ -870,7 +881,7 @@ export function Composer({ channel }: { channel: Channel }) {
         </div>
         </div>
       ) : null}
-      <div className={s.box}>
+      <div className={s.box} data-quiet={quiet || undefined} onPointerDown={() => setQuiet(false)}>
         <input ref={fileRef} type="file" multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
         {plus.kind === "none" ? (
           <span className={s.attachSpacer} />
@@ -900,7 +911,11 @@ export function Composer({ channel }: { channel: Channel }) {
           onChange={onChange}
           onKeyDown={onKeyDown}
           onSelect={onSelect}
-          onBlur={() => setAc(null)}
+          onBlur={() => {
+            setAc(null);
+            setQuiet(false);
+          }}
+          onCompositionStart={() => setQuiet(false)}
           onPaste={(e) => {
             const cd = e.clipboardData;
             const pasted = cd.getData("text/plain");
@@ -968,6 +983,26 @@ export function Composer({ channel }: { channel: Channel }) {
   );
 }
 
+/**
+ * Whether a key pressed in a quietly focused box is you using it: writing,
+ * deleting or moving the caret. A shortcut, or Escape, leaves it quiet.
+ */
+function showsCaret(e: KeyboardEvent<HTMLTextAreaElement>): boolean {
+  if (e.ctrlKey || e.metaKey || e.altKey) return false;
+  if (e.key.length === 1) return true;
+  return ["Backspace", "Delete", "Enter", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key);
+}
+
+/**
+ * Puts the caret in the box without showing it. `hush` marks the box quiet
+ * first, so it is ready to type in and lights up only once it is typed in.
+ */
+function focusQuietly(ta: HTMLTextAreaElement | null, hush: () => void): void {
+  if (!ta || ta.disabled || document.activeElement === ta) return;
+  hush();
+  ta.focus({ preventScroll: true });
+}
+
 /** True for anything that wants the keyboard for itself. */
 function wantsKeyboard(el: Element | null): boolean {
   if (!el) return false;
@@ -999,11 +1034,17 @@ export function somethingSelected(): boolean {
  * rather than nowhere. Another text field, a dialog or a picker keeps what it
  * takes until you click away from it.
  *
+ * A click elsewhere puts it back quietly (`hush`): the box takes the keyboard
+ * without showing a caret or lighting up, as if nothing had happened, until
+ * something is typed into it.
+ *
  * Only the box of the pane in focus does this: with two conversations side by
  * side both boxes listened, the second one mounted won every time, and words
  * meant for the conversation being read went to the other one.
  */
-export function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>, enabled = true): void {
+export function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>, enabled = true, hush?: () => void): void {
+  const hushRef = useRef(hush);
+  hushRef.current = hush;
   useEffect(() => {
     if (!enabled) return;
     // On a touch screen this would summon the keyboard over and over.
@@ -1019,7 +1060,7 @@ export function useKeepFocused(ref: RefObject<HTMLTextAreaElement | null>, enabl
       if (wantsKeyboard(target) || inOwnLayer(target)) return;
       if (somethingSelected()) return;
       if (wantsKeyboard(document.activeElement) && inOwnLayer(document.activeElement)) return;
-      focus();
+      focusQuietly(ref.current, () => hushRef.current?.());
     };
     const onKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;

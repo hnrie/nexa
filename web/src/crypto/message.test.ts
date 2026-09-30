@@ -173,6 +173,27 @@ describe("encryptMessage / decryptMessage", () => {
     });
   });
 
+  it("keeps a picture's small copy only when it is one", async () => {
+    const copy = { blob_id: "77", key: "ck", size: 9000, type: "image/webp", w: 1280, h: 960 };
+    const pic = { blob_id: "b1", name: "a.jpg", type: "image/jpeg", size: 4_000_000, key: "k" };
+    const forged = {
+      att: [
+        { ...pic, preview: copy },
+        // fetched by its address, so the address is a number and nothing else
+        { ...pic, blob_id: "b2", preview: { ...copy, blob_id: "../../api/v1/users/@me" } },
+        // shown by its type, so the type is a picture's
+        { ...pic, blob_id: "b3", preview: { ...copy, type: "text/html" } },
+        { ...pic, blob_id: "b4", preview: { ...copy, size: 50 * 1024 * 1024 } },
+        { ...pic, blob_id: "b5", preview: { ...copy, w: 0 } },
+        // only a picture has a copy
+        { ...pic, blob_id: "b6", type: "application/zip", preview: copy },
+      ],
+    };
+    const env = await forgeEnvelope(utf8.enc(JSON.stringify(forged)));
+    const out = await decryptMessage(key, env, aad);
+    expect(out.att?.map((a) => a.preview ?? null)).toEqual([copy, null, null, null, null, null]);
+  });
+
   it("keeps everything a link's card draws, with only web addresses and known words in it", async () => {
     const card = {
       url: "https://e.x/post",
