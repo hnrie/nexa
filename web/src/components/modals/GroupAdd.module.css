@@ -1,6 +1,6 @@
 /* The friends list in a group's invite menu, and the Send Join Request button and Link Only label it shares with Select Friends. */
 .adder { display: flex; flex-direction: column; gap: 8px; }
-.heading { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
+.heading { margin: 0; font-size: 13px; font-weight: 650; color: var(--text-subtle); }
 .list { list-style: none; margin: 0; padding: 0; max-height: 232px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 8px; border-radius: var(--radius-xs); }
 .row:hover { background: var(--bg-hover); }
@@ -31,7 +31,7 @@
 .linkOnly:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 
 /* Select Friends: a group cannot start with a Link Only friend picked */
-.warn { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 8px 10px; border-radius: var(--radius-xs); background: var(--bg-base); color: var(--text); font-size: 13px; line-height: 1.4; }
+.warn { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 0; padding: 9px 12px; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--bg-base) 60%, var(--bg-floating)); box-shadow: inset 0 0 0 1px var(--border-subtle); color: var(--text); font-size: 13px; line-height: 1.4; }
 .warn svg { flex: none; margin-top: 1px; color: var(--warning); }
 
 @media (max-width: 767px) { .user { display: none; } }

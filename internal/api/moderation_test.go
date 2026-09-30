@@ -870,3 +870,77 @@ func modID(s string) ids.ID {
 	}
 	return id
 }
+
+// The grid says how each account looks right now: online with what they are
+// doing, offline when they are away or have chosen to look it, and the Online
+// filter keeps to the first.
+func TestModGridPresence(t *testing.T) {
+	_, ts := newTestServer(t)
+	ownTok, _ := register(t, ts, "owner")
+	songTok, songID := register(t, ts, "listener")
+	hidTok, hidID := register(t, ts, "hidden")
+	_, awayID := register(t, ts, "away")
+	if res, body := do(t, ts, "PATCH", "/api/v1/users/@me", songTok, map[string]any{"status_text": "on repeat", "status_emoji": "🎧"}); res.StatusCode != 200 {
+		t.Fatalf("status: %d %v", res.StatusCode, body)
+	}
+	if res, body := do(t, ts, "PATCH", "/api/v1/users/@me", hidTok, map[string]any{"presence_pref": "invisible"}); res.StatusCode != 200 {
+		t.Fatalf("invisible: %d %v", res.StatusCode, body)
+	}
+	song := connectGW(t, ts, songTok)
+	connectGW(t, ts, hidTok)
+	b, _ := json.Marshal(map[string]any{"op": "activities", "d": map[string]any{"activities": []map[string]any{{"name": "Spotify", "type": 2, "details": "Never Gonna Give You Up", "state": "Rick Astley"}}}})
+	if err := song.ws.Write(context.Background(), websocket.MessageText, b); err != nil {
+		t.Fatal(err)
+	}
+
+	presence := func(show string) map[string]map[string]any {
+		t.Helper()
+		res, body := do(t, ts, "GET", "/api/v1/moderation/users?show="+show, ownTok, nil)
+		if res.StatusCode != 200 {
+			t.Fatalf("grid %s: %d %v", show, res.StatusCode, body)
+		}
+		out := map[string]map[string]any{}
+		for _, u := range body["users"].([]any) {
+			m := u.(map[string]any)
+			p, _ := m["presence"].(map[string]any)
+			p["status_text"] = m["status_text"]
+			out[m["id"].(string)] = p
+		}
+		return out
+	}
+	// activities are resolved a moment after they arrive
+	var all map[string]map[string]any
+	for i := 0; i < 50; i++ {
+		all = presence("all")
+		if acts, _ := all[songID]["activities"].([]any); len(acts) == 1 {
+			break
+		}
+		time.Sleep(40 * time.Millisecond)
+	}
+	if p := all[songID]; p["status"] != "online" || p["status_text"] != "on repeat" {
+		t.Fatalf("listener: %v", p)
+	}
+	if acts, _ := all[songID]["activities"].([]any); len(acts) != 1 || acts[0].(map[string]any)["state"] != "Rick Astley" {
+		t.Fatalf("listener's song: %v", all[songID])
+	}
+	if p := all[hidID]; p["status"] != "offline" || p["activities"] != nil {
+		t.Fatalf("invisible looks online: %v", p)
+	}
+	if p := all[awayID]; p["status"] != "offline" {
+		t.Fatalf("away: %v", p)
+	}
+
+	online := presence("online")
+	if _, ok := online[songID]; !ok || len(online) != 1 {
+		t.Fatalf("online filter: %v", online)
+	}
+
+	// one account's page carries it too
+	res, body := do(t, ts, "GET", "/api/v1/moderation/users/"+songID, ownTok, nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("user: %d %v", res.StatusCode, body)
+	}
+	if p, _ := body["user"].(map[string]any)["presence"].(map[string]any); p["status"] != "online" {
+		t.Fatalf("user presence: %v", body["user"])
+	}
+}

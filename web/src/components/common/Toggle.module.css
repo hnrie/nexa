@@ -1,13 +1,14 @@
-.row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border-subtle); cursor: pointer; }
 .row[data-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 .text { display: flex; flex-direction: column; gap: 4px; }
-.label { font-size: 16px; font-weight: 500; color: var(--text); }
-.desc { font-size: 14px; color: var(--text-muted); }
-.switch { position: relative; width: 40px; height: 24px; flex: none; border-radius: 12px; background: var(--status-offline); transition: background-color var(--transition); }
-.switch[data-on="true"] { background: var(--positive); }
+.label { font-size: 15.5px; font-weight: 550; color: var(--text); }
+.desc { font-size: 13.5px; line-height: 1.4; color: var(--text-muted); }
+/* off, a groove sunk into the panel; on, lit in the accent */
+.switch { position: relative; width: 42px; height: 24px; flex: none; border-radius: 12px; background: color-mix(in srgb, var(--status-offline) 55%, var(--bg-input)); box-shadow: inset 0 1px 3px color-mix(in srgb, var(--shade) 55%, transparent), inset 0 0 0 1px var(--border-subtle); transition: background var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out); }
+.switch[data-on="true"] { background: var(--grad-brand); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18), 0 0 0 1px color-mix(in srgb, var(--brand) 60%, transparent), 0 4px 12px -4px color-mix(in srgb, var(--brand) 70%, transparent); }
 .switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
 /* the real control is invisible, so the switch shows where keyboard focus is */
 .switch:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform var(--transition); pointer-events: none; }
-.switch[data-on="true"] .knob { transform: translateX(16px); }
-[dir="rtl"] .switch[data-on="true"] .knob { transform: translateX(-16px); }
+.knob { position: absolute; top: 3px; inset-inline-start: 3px; width: 18px; height: 18px; border-radius: 50%; background: linear-gradient(180deg, #ffffff, #eeeaf4); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(0, 0, 0, 0.08); transition: transform 260ms var(--ease-spring); pointer-events: none; }
+.switch[data-on="true"] .knob { transform: translateX(18px); }
+[dir="rtl"] .switch[data-on="true"] .knob { transform: translateX(-18px); }

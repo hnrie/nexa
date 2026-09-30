@@ -11,7 +11,7 @@ import s from "./Look.module.css";
  */
 export function ThemeMiniature({ tokens, className }: { tokens: TokenMap; className?: string }) {
   // the rail's shade is the theme's own sidebar mixed with black, by as much as that theme's scheme mixes it (tokens.css)
-  const style = { ...tokenStyle(tokens), "--rail-shade": schemeOf(tokens["bg-raised"]) === "light" ? "95%" : "78%" } as CSSProperties;
+  const style = { ...tokenStyle(tokens), "--rail-shade": schemeOf(tokens["bg-raised"]) === "light" ? "93%" : "70%" } as CSSProperties;
   return (
     <span className={[s.mini, className ?? ""].join(" ")} style={style} aria-hidden="true">
       <span className={s.miniRail}>

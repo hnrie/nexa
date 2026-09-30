@@ -9,7 +9,7 @@ import { channels as channelsApi } from "@/api/channels";
 import { relationships as relApi } from "@/api/relationships";
 import { confirmRemoveFriend, openBlockDialog, sendFriendRequest, unblockUser, useBusyWith } from "@/lib/friendship";
 import type { PublicUser } from "@/api/types";
-import { bannerUrl, iconUrl, users as usersApi } from "@/api/users";
+import { avatarUrl, bannerUrl, iconUrl, users as usersApi } from "@/api/users";
 import { ActivityList } from "@/components/activity/ActivityCard";
 import { Avatar } from "@/components/common/Avatar";
 import { AdminBadge, OwnerBadge } from "@/components/common/OwnerBadge";
@@ -21,6 +21,7 @@ import { KeyStatusChip } from "./KeyVerify";
 import { RelationshipBar, relationshipLine } from "./RelationshipBar";
 import { profileTheme, profileThemeOf } from "@/lib/avatarColor";
 import { copyText } from "@/lib/clipboard";
+import { useDominantColor } from "@/lib/dominantColor";
 import { formatShortDate } from "@/lib/time";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { Markdown } from "@/markdown";
@@ -135,6 +136,12 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
     if (noteOpen) noteRef.current?.focus();
   }, [noteOpen]);
 
+  // A profile without colours of its own takes a glow from its banner, or its
+  // picture: every card then looks like the person's own, not like the next one.
+  const themed = !!user && !!profileThemeOf(user.accent_color, user.accent_color_2);
+  const tintFrom = !user || themed ? null : (bannerUrl(user.banner_id, 64) ?? avatarUrl(user.avatar_id, 64));
+  const tint = useDominantColor(tintFrom);
+
   if (!user) return null;
   // the system account is not a person, and says so
   if (isSystemAccount(user.flags)) return <NexaProfile variant={variant} onClose={onClose} />;
@@ -147,7 +154,8 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
   const interactive = !preview;
   const avatarSize = panel ? 80 : 120;
 
-  const cardStyle = { "--av": `${avatarSize}px`, ...(theme ? { "--profile-top": theme.top, "--profile-bottom": theme.bottom } : {}) } as CSSProperties;
+  const colours: Record<string, string> = theme ? { "--profile-top": theme.top, "--profile-bottom": theme.bottom } : tint ? { "--profile-tint": tint } : {};
+  const cardStyle = { "--av": `${avatarSize}px`, ...colours } as CSSProperties;
   // with a theme and no picture the banner is see-through, so the gradient runs unbroken from the top
   const bannerStyle: CSSProperties = banner ? { backgroundImage: `url(${banner})` } : { background: theme ? "transparent" : profileTheme(user.accent_color, null, user.id) };
 
@@ -215,7 +223,7 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
   );
 
   return (
-    <div className={s.card} data-variant={variant} data-themed={theme?.text} style={cardStyle} data-testid={`profile-${variant}`}>
+    <div className={s.card} data-variant={variant} data-themed={theme?.text} data-tinted={!theme && tint ? "" : undefined} style={cardStyle} data-testid={`profile-${variant}`}>
       <div className={s.top}>
         <div className={s.banner} style={bannerStyle} />
         <div className={s.bannerBtns}>
@@ -326,82 +334,85 @@ export function ProfileCard({ userId, variant, onClose, preview }: Props) {
           </button>
         ) : null}
 
-        {interactive && !isMe && (noteOpen || note) ? (
-          <div className={s.section}>
-            <h3>{t("profile.profileCard.note")}</h3>
-            <textarea
-              ref={noteRef}
-              className={s.note}
-              value={note}
-              maxLength={256}
-              rows={2}
-              placeholder={t("profile.profileCard.clickToAddANote")}
-              aria-label={t("profile.profileCard.note")}
-              onChange={(e) => setNote(e.target.value)}
-              onBlur={() => setNoteOpen(false)}
-            />
-          </div>
-        ) : null}
-
-        {activities.length ? <ActivityList activities={activities} /> : null}
-
-        {user.about_me ? (
-          <div className={s.section}>
-            <div ref={bioRef} className={s.about} data-clamp={panel || undefined} data-overflow={(panel && bioClamped) || undefined}>
-              <Markdown source={user.about_me} ctx={ctx} />
+        <div className={s.sheet}>
+          {interactive && !isMe && (noteOpen || note) ? (
+            <div className={s.section}>
+              <h3>{t("profile.profileCard.note")}</h3>
+              <textarea
+                ref={noteRef}
+                className={s.note}
+                value={note}
+                maxLength={256}
+                rows={2}
+                placeholder={t("profile.profileCard.clickToAddANote")}
+                aria-label={t("profile.profileCard.note")}
+                onChange={(e) => setNote(e.target.value)}
+                onBlur={() => setNoteOpen(false)}
+              />
             </div>
-            {panel && bioClamped && interactive ? (
-              <button className={s.moreLink} onClick={viewFull} data-testid="view-full-bio">{t("profile.profileCard.viewFullBio")}</button>
+          ) : null}
+
+          {activities.length ? <ActivityList activities={activities} /> : null}
+
+          {user.about_me ? (
+            <div className={s.section}>
+              <h3>{t("settings.profile.aboutMe")}</h3>
+              <div ref={bioRef} className={s.about} data-clamp={panel || undefined} data-overflow={(panel && bioClamped) || undefined}>
+                <Markdown source={user.about_me} ctx={ctx} />
+              </div>
+              {panel && bioClamped && interactive ? (
+                <button className={s.moreLink} onClick={viewFull} data-testid="view-full-bio">{t("profile.profileCard.viewFullBio")}</button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {user.public_key && interactive ? (
+            <div className={s.section} data-testid="profile-key">
+              <h3>{t("encryption.encryptionKey")}</h3>
+              <p><KeyStatusChip userId={userId} onClick={() => openModal("verifyKey", { userId })} /></p>
+            </div>
+          ) : null}
+
+          <div className={s.sinceRow}>
+            <div className={s.section}>
+              <h3>{t("profile.profileCard.memberSince")}</h3>
+              <p>{dateOf(user.created_at)}</p>
+            </div>
+            {friend && !isMe && rel.created_at ? (
+              <div className={s.section} data-testid="friends-since">
+                <h3>{t("profile.profileCard.friendsSince")}</h3>
+                <p>{dateOf(rel.created_at)}</p>
+              </div>
             ) : null}
           </div>
-        ) : null}
 
-        {user.public_key && interactive ? (
-          <div className={s.section} data-testid="profile-key">
-            <h3>{t("encryption.encryptionKey")}</h3>
-            <p><KeyStatusChip userId={userId} onClick={() => openModal("verifyKey", { userId })} /></p>
-          </div>
-        ) : null}
-
-        <div className={s.sinceRow}>
-          <div className={s.section}>
-            <h3>{t("profile.profileCard.memberSince")}</h3>
-            <p>{dateOf(user.created_at)}</p>
-          </div>
-          {friend && !isMe && rel.created_at ? (
-            <div className={s.section} data-testid="friends-since">
-              <h3>{t("profile.profileCard.friendsSince")}</h3>
-              <p>{dateOf(rel.created_at)}</p>
+          {!panel && showMutual && mutualServers.length > 0 ? (
+            <div className={s.section}>
+              <h3>{t("profile.profileCard.mutualServersCount", { count: mutualServers.length })}</h3>
+              {mutualServers.map((id) => {
+                const server = servers[id]!.server;
+                const icon = iconUrl(server.icon_id, 32);
+                return (
+                  <button key={id} className={s.listItem} onClick={() => { onClose?.(); nav(`/channels/${id}`); }}>
+                    {icon ? <img className={s.listIcon} src={icon} alt="" /> : <span className={s.listInitial}>{server.name.slice(0, 1).toUpperCase()}</span>}
+                    <span>{server.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          {!panel && showMutual && mutual.friends.length > 0 ? (
+            <div className={s.section}>
+              <h3>{t("profile.profileCard.mutualFriendsCount", { count: mutual.friends.length })}</h3>
+              {mutual.friends.map((id) => (
+                <button key={id} className={s.listItem} onClick={() => openModal("profile", { userId: id })}>
+                  <Avatar id={id} avatarId={users[id]?.avatar_id ?? null} name={displayName(users[id])} size={32} />
+                  <span>{displayName(users[id])}</span>
+                </button>
+              ))}
             </div>
           ) : null}
         </div>
-
-        {!panel && showMutual && mutualServers.length > 0 ? (
-          <div className={s.section}>
-            <h3>{t("profile.profileCard.mutualServersCount", { count: mutualServers.length })}</h3>
-            {mutualServers.map((id) => {
-              const server = servers[id]!.server;
-              const icon = iconUrl(server.icon_id, 32);
-              return (
-                <button key={id} className={s.listItem} onClick={() => { onClose?.(); nav(`/channels/${id}`); }}>
-                  {icon ? <img className={s.listIcon} src={icon} alt="" /> : <span className={s.listInitial}>{server.name.slice(0, 1).toUpperCase()}</span>}
-                  <span>{server.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
-        {!panel && showMutual && mutual.friends.length > 0 ? (
-          <div className={s.section}>
-            <h3>{t("profile.profileCard.mutualFriendsCount", { count: mutual.friends.length })}</h3>
-            {mutual.friends.map((id) => (
-              <button key={id} className={s.listItem} onClick={() => openModal("profile", { userId: id })}>
-                <Avatar id={id} avatarId={users[id]?.avatar_id ?? null} name={displayName(users[id])} size={32} />
-                <span>{displayName(users[id])}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
 
         {interactive && panel ? (
           <button className={s.fullBtn} onClick={viewFull} data-testid="view-full-profile">{t("profile.profileCard.viewFullProfile")}</button>

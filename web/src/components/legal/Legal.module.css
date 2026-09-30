@@ -55,9 +55,10 @@
 .item {
   padding: 12px 14px;
   margin: 0 0 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-low);
 }
 .item .body:last-child,
 .item .list:last-child {
@@ -71,9 +72,10 @@
 .lines {
   margin: 0 0 12px;
   padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-low);
   font-size: 14.5px;
   line-height: 1.7;
   color: var(--text);
@@ -119,9 +121,10 @@
 .toc {
   margin: 4px 0 22px;
   padding: 12px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-low);
 }
 .toc ol {
   margin: 0;
@@ -193,11 +196,9 @@
   align-items: center;
   gap: 6px;
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
-  letter-spacing: 0.02em;
   color: var(--text-brand);
-  text-transform: uppercase;
 }
 .news .list {
   margin: 0;
@@ -217,9 +218,10 @@
   display: flex;
   gap: 10px;
   padding: 12px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 0 var(--edge-light), var(--shadow-low);
 }
 .hlIcon {
   flex: none;
@@ -365,10 +367,9 @@
 }
 .aboutLabel {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
 }
 .rows {

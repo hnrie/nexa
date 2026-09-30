@@ -1,5 +1,5 @@
 import type { Activity } from "@/api/types";
-import { activityLine, activityProgress, formatClock, activityHeading } from "./activity";
+import { activityLine, activityParts, activityProgress, formatClock, activityHeading } from "./activity";
 
 const song: Activity = { name: "Music Player", type: 2, details: "Never Gonna Give You Up", state: "Rick Astley", created_at: 0, timestamps: { start: 1_000_000, end: 1_213_000 } };
 
@@ -16,6 +16,18 @@ describe("activity text", () => {
     expect(activityLine({ ...song, status_display_type: 2 })).toBe("Listening to Never Gonna Give You Up");
     // falls back to the name when that text is missing
     expect(activityLine({ name: "Game", type: 0, status_display_type: 2, created_at: 0 })).toBe("Playing Game");
+  });
+
+  it("names the artists of a Spotify song, not the app", () => {
+    const spotify: Activity = { ...song, name: "Spotify", state: "Rick Astley, Stock Aitken Waterman", source: "discord" };
+    expect(activityLine(spotify)).toBe("Listening to Rick Astley, Stock Aitken Waterman");
+    expect(activityParts({ ...spotify, name: "spotify" }).name).toBe("Rick Astley, Stock Aitken Waterman");
+    // what the program asks for still wins, and a song without artists keeps the app's name
+    expect(activityLine({ ...spotify, status_display_type: 0 })).toBe("Listening to Spotify");
+    expect(activityLine({ ...spotify, status_display_type: 2 })).toBe("Listening to Never Gonna Give You Up");
+    expect(activityLine({ ...spotify, state: undefined })).toBe("Listening to Spotify");
+    // another player keeps its own name unless it asks
+    expect(activityParts(song).name).toBe("Music Player");
   });
 
   it("heads the card with the kind and the app", () => {

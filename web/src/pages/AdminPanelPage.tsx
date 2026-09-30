@@ -102,6 +102,7 @@ export default function AdminPanelPage() {
               onClick={() => nav(`${BASE}/${x.id}`)}
               onKeyDown={onKey}
               data-testid={`tab-${x.id}`}
+              title={tab === x.id ? undefined : x.label}
             >
               {x.icon}
               <span className={m.tabLabel}>{x.label}</span>

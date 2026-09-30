@@ -12,8 +12,10 @@ import { profileTheme } from "@/lib/avatarColor";
 import { describeError } from "@/lib/errors";
 import { actionIcon, fieldLabel, formatSpan, fullDate, relativeTo, severity, SPAN } from "@/lib/moderation";
 import { formatBytes } from "@/lib/time";
+import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
+import { modStatus } from "./ModStatus";
 import m from "./Moderation.module.css";
 
 const MAX_REASON = 1000;
@@ -123,6 +125,8 @@ function DurationPicker({ presets, value, onChange, max, permanent }: { presets:
  */
 export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUser; onClose: () => void; onDone: (c: StaffCase) => void; initial?: ModAction }) {
   const toast = useUI((u) => u.toast);
+  const live = usePresence((p) => p.byUser[user.id]);
+  const presence = modStatus(user, live);
   const [action, setAction] = useState<ModAction | null>(initial ?? null);
   const [reason, setReason] = useState("");
   const [images, setImages] = useState({ avatar: !!user.avatar_id, banner: !user.avatar_id && !!user.banner_id });
@@ -229,7 +233,7 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
               <ArrowLeft size={20} className={m.flip} />
             </button>
           ) : null}
-          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={40} />
+          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={40} status={presence.status} />
           <div style={{ minWidth: 0 }}>
             <h2 className={m.modalTitle}>{action ? actionTitle(action) : t("moderation.moderateNamed", { name: user.display_name })}</h2>
             <div className={m.modalTarget}>

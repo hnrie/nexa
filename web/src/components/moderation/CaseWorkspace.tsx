@@ -12,9 +12,11 @@ import { describeError } from "@/lib/errors";
 import { actionIcon, actionLabel, caseStanding, FLAG_ADMIN, FLAG_DELETED, personName, relativeTo, severity, systemLineText } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
+import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { t } from "@/i18n";
 import { ModerateModal } from "./ModerateModal";
+import { modStatus, StatusSummary } from "./ModStatus";
 import m from "./Moderation.module.css";
 import { LoadError } from "@/components/common/LoadError";
 
@@ -370,6 +372,8 @@ export function UserCasesView() {
   const [people, setPeople] = useState<People>({});
   const [failed, setFailed] = useState(false);
   const [moderating, setModerating] = useState(false);
+  // their presence as it changes, when this account can see it; the page's own copy otherwise
+  const live = usePresence((p) => p.byUser[userId]);
   // Whether the panel is wide enough to show a case beside the list. Its own
   // width, as its layout goes by (Moderation.module.css), not the window's: a
   // tablet held upright is a wide window with a phone-sized panel in it.
@@ -435,6 +439,7 @@ export function UserCasesView() {
     );
   }
   const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
+  const st = modStatus(user, live);
   return (
     <>
       <div className={m.userHeader} data-testid="user-cases-header">
@@ -442,7 +447,7 @@ export function UserCasesView() {
           <ChevronLeft size={18} className={m.flip} />
         </button>
         <div className={m.userWho}>
-          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={48} />
+          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={48} status={deleted ? null : st.status} />
           <div className={m.userNames}>
             <span className={m.userName}>
               <span>{deleted ? t("nexa.deletedUser") : user.display_name}</span>
@@ -452,6 +457,7 @@ export function UserCasesView() {
               {deleted ? t("moderation.user.deleted") : `@${user.username}`} · {t("moderation.casesCount", { count: cases.length })}
               {standing.length ? ` · ${standing.join(" · ")}` : ""}
             </span>
+            {!deleted ? <StatusSummary st={st} compact /> : null}
           </div>
         </div>
         <div className={m.userActions}>

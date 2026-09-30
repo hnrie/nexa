@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, Bug, ClipboardCopy, Eye, EyeOff, FolderPlus, Headphones, House, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Newspaper, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, Bug, ClipboardCopy, Eye, EyeOff, FolderPlus, Headphones, House, IdCard, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Music, Newspaper, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,14 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-09-30",
+    items: [
+      { icon: Sparkles, title: "whatsNew.r20260930.lookTitle", body: "whatsNew.r20260930.lookBody" },
+      { icon: IdCard, title: "whatsNew.r20260930.profilesTitle", body: "whatsNew.r20260930.profilesBody" },
+      { icon: Music, title: "whatsNew.r20260930.spotifyTitle", body: "whatsNew.r20260930.spotifyBody" },
+    ],
+  },
   {
     id: "2026-09-29.2",
     items: [

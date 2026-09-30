@@ -30,10 +30,10 @@ export interface ThemeDraft {
  * run time — these are not, because they live in a stylesheet.
  */
 export const SURFACE_BG: Record<ClassicTheme, string> = {
-  dark: "#3b3847",
+  dark: "#2b2636",
   light: "#eae8f3",
-  ash: "#2a2733",
-  onyx: "#16151d",
+  ash: "#27282e",
+  onyx: "#16141b",
 };
 
 /** How much of the accent a mention pill is tinted with, resting and hovered. */
@@ -187,7 +187,7 @@ export function applyTheme(s: Appearance, draft?: ThemeDraft | null): void {
   root.dataset["reducedMotion"] = s.reducedMotion ? "true" : "false";
   root.dataset["underlineLinks"] = s.underlineLinks || look.underlineLinks ? "true" : "false";
   const meta = document.querySelector('meta[name="theme-color"]');
-  const bar = look.tokens ? toHex(parseColour(look.tokens["bg-base"])?.rgb ?? [0, 0, 0]) : look.classic === "light" ? "#f4f2fb" : look.classic === "onyx" ? "#000000" : look.classic === "ash" ? "#1a1821" : "#2c2936";
+  const bar = look.tokens ? toHex(parseColour(look.tokens["bg-base"])?.rgb ?? [0, 0, 0]) : look.classic === "light" ? "#f4f2fb" : look.classic === "onyx" ? "#000000" : look.classic === "ash" ? "#18191d" : "#1c1825";
   if (meta) meta.setAttribute("content", bar);
 }
 

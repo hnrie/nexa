@@ -16,7 +16,7 @@
 .editor { min-width: 0; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .headText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.title { margin: 0; font-size: 20px; font-weight: 600; color: var(--text-strong); }
+.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 21px; font-weight: 800; letter-spacing: -0.015em; color: var(--text-strong); }
 .sub { font-size: 14px; color: var(--text-muted); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; margin-top: 16px; }
@@ -39,7 +39,7 @@
 .cellBtn { display: flex; padding: 4px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; }
 .cellBtn:hover { background: var(--brand); color: var(--on-brand); }
 .cellBtn[data-danger="true"]:hover { background: var(--danger); }
-.coverBadge { position: absolute; top: 6px; inset-inline-start: 6px; padding: 2px 6px; border-radius: var(--radius-xs); background: var(--brand); color: var(--on-brand); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.coverBadge { position: absolute; top: 6px; inset-inline-start: 6px; padding: 2px 8px; border-radius: 999px; background: var(--grad-brand); color: var(--on-brand); font-size: 11px; font-weight: 700; box-shadow: 0 2px 6px color-mix(in srgb, var(--brand) 50%, transparent); }
 .dropzone { margin-top: 16px; padding: 24px; border: 2px dashed var(--border-strong); border-radius: var(--radius-sm); text-align: center; color: var(--text-muted); font-size: 14px; cursor: pointer; }
 .dropzone:hover { color: var(--text); border-color: var(--text-muted); }
 .dropzone[data-over="true"] { border-color: var(--brand); color: var(--text); background: var(--bg-hover); }

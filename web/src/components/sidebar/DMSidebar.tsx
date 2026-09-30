@@ -1,4 +1,4 @@
-import { ChevronDown, Lock, MessageCircle, MoreHorizontal, Pin, Plus, Shield, Users, X } from "lucide-react";
+import { ChevronDown, Lock, MessageCircle, MoreHorizontal, Pin, Plus, Search, Shield, Users, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar } from "@/components/common/Avatar";
 import { menuAnchor } from "@/components/common/ContextMenu";
@@ -25,6 +25,7 @@ import { iconUrl } from "@/api/users";
 import { subchatMenuItems } from "@/components/chat/SubchatPanel";
 import { badgeText, conversationCount } from "@/lib/unread";
 import { useSettings } from "@/stores/settings";
+import { modKeys } from "@/lib/textMenu";
 import { closeDM, dmMenuItems } from "./dmMenu";
 import { changeDMList, closeNexa, dmGroupMenuItems, groupName, nexaListed, nexaMenuItems } from "./dmArrange";
 import { menuPoint } from "./ServerSidebar";
@@ -435,7 +436,11 @@ export function DMSidebar() {
   return (
     <div className={s.sidebar} onDragEnd={endDrag}>
       <div className={s.search}>
-        <button className={s.searchBtn} onClick={() => setQuickSwitcher(true)}>{t("sidebar.dMSidebar.findOrStartAConversation")}</button>
+        <button className={s.searchBtn} onClick={() => setQuickSwitcher(true)}>
+          <Search size={15} className={s.searchIcon} aria-hidden="true" />
+          <span className={s.searchText}>{t("sidebar.dMSidebar.findOrStartAConversation")}</span>
+          <kbd className={s.searchKeys} aria-hidden="true">{modKeys("K")}</kbd>
+        </button>
       </div>
       <div className={s.scroll}>
         {reorder.live}

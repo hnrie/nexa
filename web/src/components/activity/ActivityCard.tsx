@@ -1,7 +1,8 @@
 import { Gamepad2, Music, Radio, Trophy, Tv } from "lucide-react";
+import type { CSSProperties } from "react";
 import type { Activity } from "@/api/types";
 import { useNow } from "@/hooks/useNow";
-import { activityHeading, activityProgress, formatClock } from "@/lib/activity";
+import { activityHeading, activityProgress, formatClock, isSpotify } from "@/lib/activity";
 import s from "./Activity.module.css";
 
 import { t } from "@/i18n";
@@ -14,8 +15,11 @@ function Linked({ href, className, title, children }: { href?: string | undefine
   );
 }
 
+/** The picture for a kind of activity: a song, a stream, a video, a match, or a game. */
+const kindIcon = (type: Activity["type"]) => (type === 1 ? Radio : type === 2 ? Music : type === 3 ? Tv : type === 5 ? Trophy : Gamepad2);
+
 function Fallback({ type }: { type: Activity["type"] }) {
-  const Icon = type === 1 ? Radio : type === 2 ? Music : type === 3 ? Tv : type === 5 ? Trophy : Gamepad2;
+  const Icon = kindIcon(type);
   return <span className={s.fallback}><Icon size={32} /></span>;
 }
 
@@ -41,9 +45,19 @@ export function ActivityCard({ activity: a }: { activity: Activity }) {
     const party = a.party?.size ? t("activity.activityCard.partySize", { count: a.party.size[0], max: a.party.size[1] }) : "";
     if (a.state || party) lines.push({ text: [a.state ?? "", party].filter(Boolean).join(" "), href: a.state_url });
   }
+  const KindIcon = kindIcon(a.type);
+  // the art, blurred far out behind the card, tints it with whatever is playing
+  const ambient = large ? ({ "--art": `url(${JSON.stringify(large)})` } as CSSProperties) : undefined;
   return (
-    <div className={s.card} data-testid="activity-card">
+    <div className={s.card} data-testid="activity-card" style={ambient}>
+      {large ? <span className={s.ambient} aria-hidden="true" /> : null}
       <h4 className={s.heading}>
+        {/* a song part way through is playing: its note gives way to bars that move */}
+        {a.type === 2 && clock?.kind === "progress" && clock.fraction < 1 ? (
+          <span className={s.eq} data-spotify={isSpotify(a) || undefined} aria-hidden="true"><i /><i /><i /></span>
+        ) : (
+          <KindIcon size={13} className={s.headingIcon} aria-hidden="true" />
+        )}
         {activityHeading(a)}
         {a.source === "discord" ? <span className={s.source}>{t("activity.activityCard.fromDiscord")}</span> : null}
       </h4>

@@ -1,21 +1,22 @@
 /* The page is the scroller, since body hides overflow: a long description or a
    big sticker grid scrolls here. Auto margins centre the wordmark and the card
    when they fit, as on the sign-in pages these links lead to and from. */
-.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
-.brand { margin-top: auto; flex-shrink: 0; display: flex; color: var(--text-strong); border-radius: var(--radius-xs); }
+.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: radial-gradient(70% 55% at 50% -8%, color-mix(in srgb, var(--brand) 32%, transparent), transparent 72%), radial-gradient(45% 40% at 88% 108%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 70%), var(--bg-canvas); overflow-y: auto; overscroll-behavior: contain; }
+.brand { margin-top: auto; flex-shrink: 0; display: flex; color: var(--text-strong); border-radius: var(--radius-xs); filter: drop-shadow(0 6px 24px color-mix(in srgb, var(--brand) 55%, transparent)); animation: rise 520ms var(--ease-out) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 .brand:hover { text-decoration: none; }
-.card { margin-bottom: auto; flex-shrink: 0; width: 100%; max-width: 440px; padding: 32px; border-radius: var(--radius-md); background: var(--bg-raised); box-shadow: var(--shadow-high); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.card { margin-bottom: auto; flex-shrink: 0; width: 100%; max-width: 440px; padding: 34px 32px 30px; border-radius: var(--radius-xl); background: color-mix(in srgb, var(--bg-raised) 86%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2); box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--panel-edge), var(--shadow-high), 0 40px 100px -40px color-mix(in srgb, var(--brand) 55%, transparent); display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; animation: rise 520ms var(--ease-out) 60ms both; }
 .wide { max-width: 640px; }
 /* An invite brings its own frame (components/invite): its banner runs to the
    card's edges, so the page gives it only a width, its corners and a shadow. */
-.invite { margin-bottom: auto; flex-shrink: 0; width: 100%; max-width: 440px; border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-high); }
+.invite { margin-bottom: auto; flex-shrink: 0; width: 100%; max-width: 440px; border-radius: var(--radius-xl); overflow: hidden; box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--panel-edge), var(--shadow-high), 0 40px 100px -40px color-mix(in srgb, var(--brand) 55%, transparent); animation: rise 520ms var(--ease-out) 60ms both; }
 .waiting { display: flex; justify-content: center; padding: 8px 0; }
-@media (max-width: 480px) { .card { padding: 24px 20px; } }
+@media (max-width: 480px) { .card { padding: 26px 20px 22px; border-radius: var(--radius-lg); } .invite { border-radius: var(--radius-lg); } }
 .kicker { margin: 0; font-size: 14px; color: var(--text-muted); }
-.iconBox { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--bg-surface); color: var(--text-strong); font-size: 24px; font-weight: 600; overflow: hidden; margin: 8px 0; }
+.iconBox { width: 80px; height: 80px; border-radius: 24px; display: flex; align-items: center; justify-content: center; background: var(--sheen), var(--bg-surface); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-medium); color: var(--text-strong); font-size: 24px; font-weight: 700; overflow: hidden; margin: 8px 0; }
 .iconBox [data-sticker-media] { width: 100%; height: 100%; object-fit: cover; }
 .iconBox[data-invalid="true"] { background: var(--danger); color: var(--on-danger); font-size: 40px; }
-.title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere; }
+.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 26px; font-weight: 820; letter-spacing: -0.02em; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
 .sub { margin: 0; font-size: 16px; color: var(--text-muted); overflow-wrap: anywhere; }
 .link { color: var(--link); font-size: 14px; }
 /* A pack of three stickers sits in the middle like everything else on the

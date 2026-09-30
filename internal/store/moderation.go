@@ -1225,13 +1225,20 @@ type ModUser struct {
 	LastSeenAt   *int64       `json:"last_seen_at"`
 	Mute         *Restriction `json:"mute"`
 	Ban          *Restriction `json:"ban"`
+	// PresencePref is what they chose to look like (online, idle, dnd or
+	// invisible), which decides the presence the grid shows beside them.
+	PresencePref string `json:"-"`
 }
 
 // ModUserFilter narrows and orders the grid.
 type ModUserFilter struct {
 	Query string
-	// Show is all, muted, banned, staff, cases (has an open case) or disabled.
+	// Show is all, online, muted, banned, staff, cases (has an open case) or
+	// disabled. "online" is the accounts in Online that have not chosen to
+	// look offline.
 	Show string
+	// Online is who has a connection open, for Show "online".
+	Online []ids.ID
 	// Sort is newest, oldest or name. Cursor is the last id (newest, oldest)
 	// or username (name) of the page before.
 	Sort   string
@@ -1263,6 +1270,16 @@ func (s *Store) ModUsers(ctx context.Context, f ModUserFilter) ([]*ModUser, erro
 		args = append(args, FlagDisabled)
 	case "cases":
 		where = append(where, `EXISTS (SELECT 1 FROM mod_cases c WHERE c.user_id = u.id AND c.status = 'open')`)
+	case "online":
+		// someone invisible looks offline here too, as they do everywhere else
+		if len(f.Online) == 0 {
+			return []*ModUser{}, nil
+		}
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(f.Online)), ",")
+		where = append(where, `u.id IN (`+marks+`)`, `u.presence_pref != 'invisible'`)
+		for _, id := range f.Online {
+			args = append(args, int64(id))
+		}
 	}
 	if q := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(f.Query), "@")); q != "" {
 		if len(q) > maxSearchQuery {
@@ -1299,7 +1316,7 @@ func (s *Store) ModUsers(ctx context.Context, f ModUserFilter) ([]*ModUser, erro
 	}
 	args = append(args, f.Limit)
 	rows, err := s.db.R.QueryContext(ctx, `SELECT u.id, u.username, u.display_name, u.avatar_id, u.banner_id, substr(u.about_me, 1, `+itoa64(aboutExcerpt)+`), u.pronouns,
-		u.accent_color, u.accent_color_2, u.status_text, u.status_emoji, u.status_expires_at, u.flags, u.created_at,
+		u.accent_color, u.accent_color_2, u.status_text, u.status_emoji, u.status_expires_at, u.flags, u.created_at, u.presence_pref,
 		(SELECT count(*) FROM mod_cases c WHERE c.user_id = u.id),
 		(SELECT count(*) FROM mod_cases c WHERE c.user_id = u.id AND c.status = 'open'),
 		(SELECT count(*) FROM mod_cases c WHERE c.user_id = u.id AND c.status = 'open' AND c.awaiting = 'staff'),
@@ -1319,7 +1336,7 @@ func (s *Store) ModUsers(ctx context.Context, f ModUserFilter) ([]*ModUser, erro
 		var avatar, banner, accent, accent2, statusExp, seen sql.NullInt64
 		var muteCase, muteExp, muteAt, banCase, banExp, banAt sql.NullInt64
 		if err := rows.Scan(&m.ID, &m.Username, &m.DisplayName, &avatar, &banner, &m.AboutMe, &m.Pronouns,
-			&accent, &accent2, &m.StatusText, &m.StatusEmoji, &statusExp, &m.AdminFlags, &m.CreatedAt,
+			&accent, &accent2, &m.StatusText, &m.StatusEmoji, &statusExp, &m.AdminFlags, &m.CreatedAt, &m.PresencePref,
 			&m.CaseCount, &m.OpenCases, &m.AwaitingCase, &seen,
 			&muteCase, &muteExp, &muteAt, &banCase, &banExp, &banAt); err != nil {
 			return nil, err

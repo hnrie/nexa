@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
+	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/store"
 )
@@ -116,6 +117,26 @@ type modUserView struct {
 	Ban           *restrictionView `json:"ban"`
 	// Blocked is why this moderator cannot act on the account ("" when they can).
 	Blocked string `json:"blocked"`
+	// Presence is how the account looks to everyone right now: online, idle,
+	// do not disturb or offline (as someone invisible looks), and what they
+	// are doing. Their custom status is in the profile fields, kept even
+	// while they are away.
+	Presence *modPresence `json:"presence,omitempty"`
+}
+
+// modPresence is an account's presence as the panel shows it.
+type modPresence struct {
+	Status     string             `json:"status"`
+	Activities []gateway.Activity `json:"activities,omitempty"`
+}
+
+// presenceFor is u's presence as anyone else sees it, or nil without a gateway.
+func (s *Server) presenceFor(ctx context.Context, u *store.User) *modPresence {
+	if s.modHub == nil {
+		return nil
+	}
+	p := s.modHub.PresenceOf(ctx, u)
+	return &modPresence{Status: p.Status, Activities: p.Activities}
 }
 
 func (s *Server) handleModUsers(w http.ResponseWriter, r *http.Request) {
@@ -127,6 +148,9 @@ func (s *Server) handleModUsers(w http.ResponseWriter, r *http.Request) {
 		limit = 60
 	}
 	f := store.ModUserFilter{Query: q.Get("q"), Show: q.Get("show"), Sort: q.Get("sort"), Cursor: q.Get("cursor"), Limit: limit, Now: time.Now().UnixMilli()}
+	if f.Show == "online" && s.modHub != nil {
+		f.Online = s.modHub.OnlineUsers()
+	}
 	list, err := s.Store.ModUsers(ctx, f)
 	if err != nil {
 		WriteError(w, err)
@@ -137,6 +161,7 @@ func (s *Server) handleModUsers(w http.ResponseWriter, r *http.Request) {
 	for _, m := range list {
 		v := modUserView{PublicUser: m.PublicUser, AdminFlags: m.AdminFlags, CaseCount: m.CaseCount, OpenCases: m.OpenCases, AwaitingCases: m.AwaitingCase, LastSeenAt: m.LastSeenAt,
 			Mute: shortRestriction(m.Mute), Ban: shortRestriction(m.Ban)}
+		v.Presence = s.presenceFor(ctx, &store.User{ID: m.ID, PresencePref: m.PresencePref, StatusText: m.StatusText, StatusEmoji: m.StatusEmoji, StatusExpiresAt: m.StatusExpiresAt})
 		switch {
 		case m.ID == me.ID:
 			v.Blocked = blockSelf
@@ -186,7 +211,7 @@ func (s *Server) modTarget(w http.ResponseWriter, r *http.Request) *store.User {
 
 func (s *Server) modUserDetail(ctx context.Context, me, u *store.User) (modUserView, error) {
 	now := time.Now().UnixMilli()
-	v := modUserView{PublicUser: u.Public(), AdminFlags: u.Flags, Blocked: s.moderationBlock(ctx, me, u)}
+	v := modUserView{PublicUser: u.Public(), AdminFlags: u.Flags, Blocked: s.moderationBlock(ctx, me, u), Presence: s.presenceFor(ctx, u)}
 	if seen, err := s.Store.LastSeen(ctx, u.ID); err == nil {
 		v.LastSeenAt = seen
 	}

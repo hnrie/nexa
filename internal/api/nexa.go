@@ -734,6 +734,7 @@ func (s *Server) WireModeration(hub *gateway.Hub) {
 	if hub == nil {
 		return
 	}
+	s.modHub = hub
 	hub.Restricted = func(ctx context.Context, uid ids.ID) (bool, bool) {
 		mute, ban, err := s.Store.ActiveRestrictions(ctx, uid, time.Now().UnixMilli())
 		if err != nil {

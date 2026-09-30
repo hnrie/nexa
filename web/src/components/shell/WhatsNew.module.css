@@ -9,8 +9,8 @@
   top: 0;
   z-index: 1;
   height: 16px;
-  margin: -16px -16px 0;
-  background: var(--bg-surface);
+  margin: -16px -20px 0;
+  background: var(--bg-floating);
   transition: box-shadow 120ms ease;
 }
 .edge[data-on] { box-shadow: 0 1px 0 var(--border-subtle); }
@@ -53,14 +53,30 @@
 
 .icon {
   flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-brand);
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--on-brand);
+  background: var(--grad-brand);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 6px 16px -6px color-mix(in srgb, var(--brand) 80%, transparent);
+}
+/* each feature comes in after the one before it, once, as the dialog opens */
+.item {
+  animation: itemIn 420ms var(--ease-out) both;
+}
+.item:nth-child(2) { animation-delay: 60ms; }
+.item:nth-child(3) { animation-delay: 120ms; }
+.item:nth-child(4) { animation-delay: 180ms; }
+.item:nth-child(5) { animation-delay: 240ms; }
+.item:nth-child(n + 6) { animation-delay: 300ms; }
+@keyframes itemIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 .text {
@@ -71,8 +87,8 @@
 .itemTitle {
   margin: 0 0 3px;
   padding-top: 1px;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 15.5px;
+  font-weight: 700;
   line-height: 1.35;
   color: var(--text-strong);
   overflow-wrap: anywhere;
@@ -88,6 +104,7 @@
 }
 
 @media (max-width: 767px) {
+  .edge { margin: -16px -16px 0; }
   .items { gap: 16px; }
   .item { gap: 12px; }
   .icon { width: 32px; height: 32px; }

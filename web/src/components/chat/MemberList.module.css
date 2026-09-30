@@ -1,8 +1,9 @@
 /* beside the conversation it takes the sidebar's colour, so the conversation stands out between the two */
 .list { width: var(--members-w); flex: none; border-inline-start: 1px solid var(--border-subtle); overflow-y: auto; overscroll-behavior: contain; padding: 8px 8px 16px; background: var(--bg-base); }
-.head { height: 40px; padding: 18px 8px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-channel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row { display: flex; align-items: center; gap: 12px; height: 42px; margin: 1px 0; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text-channel); width: 100%; text-align: start; }
+.head { height: 40px; padding: 18px 8px 4px 10px; font-size: 12.5px; font-weight: 650; letter-spacing: 0.01em; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row { display: flex; align-items: center; gap: 12px; height: 46px; margin: 2px 0; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text-channel); width: 100%; text-align: start; transition: background-color var(--transition), color var(--transition); }
 .row:hover { background: var(--bg-hover); color: var(--text); }
+.row:active { background: var(--bg-selected); }
 /* Offline is said by the avatar: a hollow ring instead of a filled dot, and a
    dimmer picture. The name keeps its own colour, because --text-channel at 40%
    composites to 1.9:1 and half the member list of a busy server is offline. */
@@ -10,16 +11,16 @@
 .row[data-offline="true"]:hover > :first-child { opacity: 1; }
 .row[data-offline="true"] .sub { color: var(--text-channel); }
 .text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
-.name { display: flex; align-items: center; gap: 4px; font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sub { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name { display: flex; align-items: center; gap: 4px; font-size: 15.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crown { color: var(--warning); flex: none; }
 /* On phones, tablets and narrow windows the list slides in from the right over
    the conversation (ChatView's useIsNarrow). It is mounted as it opens, so the
    slide-in is an animation; the slide-out is the transition. */
 @media (max-width: 1099px) {
-  .list { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; z-index: 40; width: min(300px, 84vw); border-inline-start: 1px solid var(--border); background: var(--bg-raised); box-shadow: var(--shadow-high); transform: translateX(100%); transition: transform 200ms ease; padding-top: 12px; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .list { position: fixed; top: 0; inset-inline-end: 0; bottom: 0; z-index: 40; width: min(300px, 84vw); border-inline-start: 0; background: var(--bg-base); box-shadow: inset 1px 0 0 var(--panel-edge), var(--shadow-high); transform: translateX(100%); transition: transform 260ms var(--ease-out); padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); border-start-start-radius: var(--radius-lg); border-end-start-radius: var(--radius-lg); }
   [dir="rtl"] .list { transform: translateX(-100%); }
-  .list[data-open="true"], [dir="rtl"] .list[data-open="true"] { transform: none; animation: slideIn 200ms ease; }
+  .list[data-open="true"], [dir="rtl"] .list[data-open="true"] { transform: none; animation: slideIn 260ms var(--ease-out); }
   [dir="rtl"] .list[data-open="true"] { animation-name: slideInRtl; }
 }
 @keyframes slideIn { from { transform: translateX(100%); } }

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CLASSIC_CSS, TOKENS, TOKEN_GROUPS, normaliseColour } from "./tokens";
+import { contrastIssues } from "./contrast";
+import { CLASSIC, CLASSIC_CSS, TOKENS, TOKEN_GROUPS, normaliseColour } from "./tokens";
 
 /** The custom properties a block of tokens.css declares, by name without the dashes. */
 function block(css: string, selector: string): Record<string, string> {
@@ -38,6 +39,13 @@ describe("the classic themes' tokens", () => {
     const missing = colours.map(([k]) => k).filter((k) => !(TOKENS as readonly string[]).includes(k) && k !== "scroll-track");
     expect(missing).toEqual([]);
   });
+
+  // held to the rules the gallery's presets and the theme builder are held to
+  for (const theme of Object.keys(sheets)) {
+    it(`read at AA or better wherever ${theme}'s text is drawn`, () => {
+      expect(contrastIssues(CLASSIC[theme as keyof typeof CLASSIC])).toEqual([]);
+    });
+  }
 
   it("list each token once", () => {
     const all = TOKEN_GROUPS.flatMap((g) => g.tokens as readonly string[]);

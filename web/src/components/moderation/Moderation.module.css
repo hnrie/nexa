@@ -17,9 +17,12 @@
   height: var(--header-h);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-subtle);
+  gap: 10px;
+  padding: 0 14px 0 18px;
+  background: var(--sheen);
+  box-shadow: 0 1px 0 var(--border-subtle), 0 8px 16px -14px color-mix(in srgb, var(--shade) 90%, transparent);
+  position: relative;
+  z-index: 2;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -29,58 +32,74 @@
 .title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
+  gap: 9px;
+  font-family: var(--font-display);
+  font-stretch: 108%;
+  font-size: 16.5px;
+  font-weight: 780;
+  letter-spacing: -0.005em;
   color: var(--text-strong);
-  padding-inline-end: 12px;
-  margin-inline-end: 4px;
+  padding-inline-end: 14px;
+  margin-inline-end: 2px;
   border-inline-end: 1px solid var(--border);
   white-space: nowrap;
 }
 .title svg {
   color: var(--text-brand);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--brand) 60%, transparent));
 }
+/* the tabs are one segmented control: a well, with the open tab lifted out of it */
 .tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: var(--bg-input);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 45%, transparent), inset 0 0 0 1px var(--border-subtle);
 }
 .tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: var(--radius-xs);
-  color: var(--text-subtle);
-  font-size: 15px;
-  font-weight: 500;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9px;
+  color: var(--text-muted);
+  font-size: 14.5px;
+  font-weight: 600;
   white-space: nowrap;
+  transition: background-color var(--transition), color var(--transition), box-shadow var(--transition);
 }
 .tab svg {
   flex: none;
 }
 .tab:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-.tab[data-selected="true"] {
-  background: var(--bg-selected);
   color: var(--text-strong);
 }
+.tab[data-selected="true"] {
+  background: var(--sheen), var(--bg-surface);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low);
+}
+.tab[data-selected="true"] svg {
+  color: var(--text-brand);
+}
 .badge {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--danger);
+  min-width: 19px;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--grad-danger);
   color: var(--on-danger);
   font-size: 11px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--danger) 40%, transparent);
 }
 .body {
   flex: 1;
@@ -102,34 +121,37 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 12px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .search {
   position: relative;
-  flex: 1 1 260px;
-  max-width: 420px;
+  flex: 1 1 240px;
+  max-width: 380px;
   display: flex;
   align-items: center;
 }
 .search svg {
   position: absolute;
-  inset-inline-start: 11px;
+  inset-inline-start: 12px;
   color: var(--text-muted);
   pointer-events: none;
 }
 .search input {
   width: 100%;
-  height: 38px;
-  padding-inline: 36px 12px;
+  height: 40px;
+  padding-inline: 38px 12px;
   border-radius: var(--radius-sm);
   background: var(--bg-input);
   color: var(--text);
   font-size: 15px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent);
   outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 .search input:focus {
-  border-color: var(--brand);
+  border-color: color-mix(in srgb, var(--focus-ring) 75%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), var(--ring-glow);
 }
 .chips {
   display: flex;
@@ -140,27 +162,32 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 15px;
-  border: 1px solid var(--border);
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 16px;
+  background: var(--bg-surface);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle);
   color: var(--text-subtle);
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition), transform 90ms var(--ease-out);
 }
 .chip:hover {
-  background: var(--bg-hover);
-  color: var(--text);
+  color: var(--text-strong);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-strong);
+}
+.chip:active {
+  transform: scale(0.97);
 }
 .chip[data-selected="true"] {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--grad-brand);
   color: var(--on-brand);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--glow-brand);
 }
 .chip[data-tone="danger"][data-selected="true"] {
-  background: var(--danger);
-  border-color: var(--danger);
+  background: var(--grad-danger);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 6px 18px -8px color-mix(in srgb, var(--danger) 80%, transparent);
 }
 .sort {
   margin-inline-start: auto;
@@ -168,10 +195,8 @@
   min-width: 150px;
 }
 .count {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 650;
   color: var(--text-muted);
   margin: 0 0 10px;
 }
@@ -180,49 +205,67 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 18px;
 }
+/* each account is a card standing on the panel: lifted, lit along its top edge, rising a little under the pointer */
 .card {
+  --card-bg: color-mix(in oklab, var(--bg-surface) 55%, var(--bg-raised));
   position: relative;
   display: flex;
   flex-direction: column;
-  border-radius: var(--radius-md);
-  background: var(--bg-raised);
-  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--sheen), var(--card-bg);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium);
   overflow: hidden;
-  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+  transition: box-shadow var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
   min-width: 0;
+  animation: cardRise 360ms var(--ease-out) both;
+}
+@keyframes cardRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 .card:hover {
-  border-color: var(--border);
-  box-shadow: var(--shadow-medium);
+  transform: translateY(-2px);
+  box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--border), var(--shadow-high);
 }
 .card[data-state="banned"] {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--danger) 55%, transparent), 0 10px 30px -14px color-mix(in srgb, var(--danger) 55%, transparent);
 }
 .card[data-state="muted"] {
-  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--warning) 50%, transparent), 0 10px 30px -14px color-mix(in srgb, var(--warning) 45%, transparent);
 }
 .cardBanner {
-  height: 72px;
+  position: relative;
+  height: 88px;
   background-size: cover;
   background-position: center;
   flex: none;
 }
+/* the banner dims towards the card, so it sits in it rather than on it */
+.cardBanner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.28));
+}
 .cardAvatarWrap {
   position: absolute;
-  top: 36px;
+  top: 44px;
   inset-inline-start: 14px;
-  padding: 4px;
+  padding: 5px;
   border-radius: 50%;
-  background: var(--bg-raised);
+  background: var(--card-bg);
   line-height: 0;
+  box-shadow: 0 8px 18px -8px color-mix(in srgb, var(--shade) 70%, transparent);
 }
 .cardFlags {
   position: absolute;
-  top: 8px;
-  inset-inline-end: 8px;
+  top: 10px;
+  inset-inline-end: 10px;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
@@ -234,40 +277,46 @@
   align-items: center;
   gap: 4px;
   height: 22px;
-  padding: 0 8px;
+  padding: 0 9px;
   border-radius: 11px;
   font-size: 11.5px;
   font-weight: 700;
   color: #fff;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(6px);
+  background: rgba(10, 6, 20, 0.55);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 8px rgba(0, 0, 0, 0.25);
   white-space: nowrap;
 }
 .flag[data-tone="danger"] {
-  background: var(--danger);
+  background: var(--grad-danger);
+  color: var(--on-danger);
 }
 .flag[data-tone="warn"] {
   background: color-mix(in srgb, var(--warning) 92%, #000);
-  color: #1a1400;
+  color: var(--on-warning);
 }
 .flag[data-tone="muted"] {
-  background: var(--status-offline);
+  background: color-mix(in srgb, var(--status-offline) 70%, #000);
 }
 .cardBody {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 44px 14px 14px;
+  gap: 7px;
+  padding: 44px 16px 16px;
   flex: 1;
   min-width: 0;
 }
 .cardName {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-size: 17.5px;
+  font-weight: 800;
+  letter-spacing: -0.012em;
   color: var(--text-strong);
 }
 .cardNameText {
@@ -280,20 +329,116 @@
   align-items: center;
   gap: 3px;
   height: 20px;
-  padding: 0 6px;
-  border-radius: 5px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-family: var(--font);
+  font-stretch: 100%;
   font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0;
   color: var(--text-brand);
   background: color-mix(in srgb, var(--brand) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent);
   flex: none;
 }
 .cardUser {
+  margin-top: -3px;
   font-size: 13.5px;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* how they look right now: the presence, then the status they wrote, then what they are doing */
+.statusBox {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  margin-top: 3px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--bg-base) 55%, var(--card-bg, var(--bg-raised)));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 30%, transparent), inset 0 0 0 1px var(--border-subtle);
+}
+.statusBox[data-compact] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 5px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+.presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.presence i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-offline);
+  flex: none;
+}
+.presence[data-status="online"] {
+  color: var(--status-online);
+}
+.presence[data-status="online"] i {
+  background: var(--status-online);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-online) 22%, transparent), 0 0 8px var(--status-online);
+}
+.presence[data-status="idle"] {
+  color: var(--status-idle);
+}
+.presence[data-status="idle"] i {
+  background: var(--status-idle);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-idle) 22%, transparent);
+}
+.presence[data-status="dnd"] {
+  color: var(--status-dnd);
+}
+.presence[data-status="dnd"] i {
+  background: var(--status-dnd);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-dnd) 22%, transparent);
+}
+.custom,
+.activity {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+.custom {
+  color: var(--text);
+}
+.customEmoji {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  object-fit: contain;
+}
+.customText,
+.activityText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.activity {
+  color: var(--text-subtle);
+  font-weight: 550;
+}
+.activity > :first-child {
+  flex: none;
 }
 .cardAbout {
   margin: 2px 0 0;
@@ -314,21 +459,22 @@
 .cardMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px 12px;
   font-size: 12.5px;
   color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: auto;
+  padding-top: 4px;
 }
 .cardMeta span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   white-space: nowrap;
 }
 .cardActions {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .cardActions > :not(.iconBtn) {
   flex: 1;
@@ -358,28 +504,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
   color: var(--icon);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  background: var(--sheen), var(--bg-surface);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border);
+  transition: background var(--transition), color var(--transition);
 }
 .iconBtn:hover {
-  color: var(--text);
-  background: var(--bg-active);
+  color: var(--text-strong);
+  background: var(--sheen), linear-gradient(var(--bg-active), var(--bg-active)), var(--bg-surface);
 }
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 25%, transparent);
   flex: none;
+  animation: dotPulse 2s var(--ease-in-out) infinite;
+}
+@keyframes dotPulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--danger) 8%, transparent);
+  }
 }
 .skeleton {
-  height: 250px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(90deg, var(--bg-raised) 0%, var(--bg-surface) 50%, var(--bg-raised) 100%);
+  height: 300px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, var(--bg-surface) 0%, color-mix(in oklab, var(--bg-surface), var(--text-strong) 5%) 50%, var(--bg-surface) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge);
 }
 @keyframes shimmer {
   from {
@@ -408,8 +563,10 @@
   color: var(--text-placeholder);
 }
 .emptyTitle {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-size: 17px;
+  font-weight: 780;
   color: var(--text-strong);
 }
 .sentinel {
@@ -475,15 +632,17 @@
   gap: 10px;
   width: 100%;
   padding: 10px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   text-align: start;
   color: var(--text);
+  transition: background-color var(--transition), box-shadow var(--transition);
 }
 .caseItem:hover {
   background: var(--bg-hover);
 }
 .caseItem[data-selected="true"] {
-  background: var(--bg-selected);
+  background: var(--sheen), var(--bg-selected);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 1px 2px color-mix(in srgb, var(--shade) 35%, transparent);
 }
 .caseIcon {
   flex: none;
@@ -643,9 +802,9 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px 16px;
-  padding: 14px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-raised);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 7%, transparent), transparent), var(--bg-raised);
 }
 .userWho {
   display: flex;
@@ -662,9 +821,12 @@
 .userName {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 18px;
-  font-weight: 700;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.012em;
   color: var(--text-strong);
   min-width: 0;
 }
@@ -693,8 +855,10 @@
   color: var(--text-muted);
 }
 .logWrap {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
+  --log-bg: color-mix(in oklab, var(--bg-surface) 40%, var(--bg-raised));
+  border-radius: var(--radius-lg);
+  background: var(--log-bg);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium);
   overflow-x: auto;
 }
 /* fixed columns, so the reason gets the room and names truncate instead */
@@ -722,13 +886,12 @@
   top: 0;
   z-index: 1;
   text-align: start;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
   padding: 10px 12px;
-  background: var(--bg-raised);
+  background: var(--log-bg);
   border-bottom: 1px solid var(--border-subtle);
   white-space: nowrap;
 }
@@ -812,18 +975,20 @@ td.logReason {
   align-items: start;
 }
 .panel {
-  border-radius: var(--radius-md);
-  background: var(--bg-raised);
-  border: 1px solid var(--border-subtle);
-  padding: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--sheen), color-mix(in oklab, var(--bg-surface) 55%, var(--bg-raised));
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium);
+  padding: 18px;
 }
 .panelTitle {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 0 0 4px;
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-size: 17px;
+  font-weight: 780;
   color: var(--text-strong);
 }
 .panelHint {
@@ -865,10 +1030,10 @@ td.logReason {
   gap: 12px;
 }
 .annCard {
-  border-radius: var(--radius-md);
-  background: var(--bg-raised);
-  border: 1px solid var(--border-subtle);
-  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--sheen), color-mix(in oklab, var(--bg-surface) 55%, var(--bg-raised));
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium);
+  padding: 16px 18px;
 }
 .annHead {
   display: flex;
@@ -908,8 +1073,10 @@ td.logReason {
   flex-direction: column;
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-high);
+  background: var(--bg-floating);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high);
+  overflow: hidden;
 }
 .modalTop {
   display: flex;
@@ -920,8 +1087,11 @@ td.logReason {
 }
 .modalTitle {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-stretch: var(--display-stretch);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--text-strong);
 }
 .modalTarget {
@@ -977,8 +1147,8 @@ td.logReason {
   align-items: center;
   gap: 8px;
   padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-  background: var(--bg-raised);
-  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in oklab, var(--bg-base) 55%, var(--bg-floating));
+  box-shadow: inset 0 1px 0 var(--border-subtle);
 }
 .modalFoot .grow {
   flex: 1;
@@ -989,10 +1159,9 @@ td.logReason {
   gap: 8px;
 }
 .sectionLabel {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--text-muted);
 }
 /* the label that holds the username to type, which capitals would misspell */
@@ -1013,12 +1182,13 @@ td.logReason {
   gap: 12px;
   width: 100%;
   padding: 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-raised);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--sheen), var(--bg-surface);
+  box-shadow: inset 0 1px 0 var(--edge-light);
   text-align: start;
   color: var(--text);
-  transition: border-color var(--transition), background-color var(--transition);
+  transition: border-color var(--transition), background-color var(--transition), transform var(--dur) var(--ease-out), box-shadow var(--transition);
 }
 .actionTile[data-tone="warn"] {
   --tone: var(--warning);
@@ -1027,8 +1197,10 @@ td.logReason {
   --tone: var(--danger);
 }
 .actionTile:hover:not(:disabled) {
-  border-color: var(--tone);
-  background: var(--bg-hover);
+  border-color: color-mix(in srgb, var(--tone) 70%, transparent);
+  background: var(--sheen), color-mix(in srgb, var(--tone) 8%, var(--bg-surface));
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 8px 20px -12px color-mix(in srgb, var(--tone) 70%, transparent);
 }
 .actionTile[data-selected="true"] {
   border-color: var(--tone);
@@ -1077,9 +1249,9 @@ td.logReason {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-raised);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
   cursor: pointer;
   min-width: 0;
   flex: 1 1 200px;
@@ -1193,9 +1365,9 @@ td.logReason {
   gap: 6px;
 }
 .quick button {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 13px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 14px;
   font-size: 12.5px;
   color: var(--text-subtle);
   background: var(--bg-surface);
@@ -1218,7 +1390,7 @@ td.logReason {
   }
 }
 /* not room for every tab's name in one row: the open tab keeps its name, the others show their icon */
-@container panel (max-width: 1000px) {
+@container panel (max-width: 1240px) {
   .tab:not([data-selected="true"]) {
     min-width: 40px;
     justify-content: center;
@@ -1309,9 +1481,9 @@ td.logReason {
     gap: 10px;
   }
   .logCard {
-    border-radius: var(--radius-md);
-    background: var(--bg-raised);
-    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--sheen), color-mix(in oklab, var(--bg-surface) 55%, var(--bg-raised));
+    box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low);
     padding: 12px 14px;
     display: flex;
     flex-direction: column;

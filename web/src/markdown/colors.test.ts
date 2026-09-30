@@ -4,10 +4,10 @@ import { COLOR_NAMES, colorToken, cssColor, formatColorSpec, paintColor, PALETTE
 
 /** Every panel of every built-in theme, with the text colour it carries (tokens.css). */
 const THEMES: Record<string, { panels: string[]; text: string }> = {
-  dark: { panels: ["#2c2936", "#322f3d", "#3b3847", "#363342"], text: "#f3f3f7" },
+  dark: { panels: ["#1c1825", "#221d2b", "#2b2636", "#282331"], text: "#f0edf7" },
   light: { panels: ["#f4f2fb", "#ffffff", "#eae8f3"], text: "#2e2c37" },
-  ash: { panels: ["#1a1821", "#211f29", "#272430", "#2a2733"], text: "#f0eff4" },
-  onyx: { panels: ["#000000", "#14121a", "#16151d"], text: "#d8d6dc" },
+  ash: { panels: ["#18191d", "#1d1e23", "#27282e", "#24252b"], text: "#eeeef1" },
+  onyx: { panels: ["#000000", "#141218", "#16141b"], text: "#dcdae0" },
 };
 
 const rgb = (hex: string): Rgb => parseHex(hex)!;

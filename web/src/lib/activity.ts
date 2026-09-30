@@ -27,9 +27,19 @@ function lineFor(type: number, name: string): string {
   }
 }
 
-/** The name an activity shows: whichever field the program asked to be shown. */
+/** Spotify, which Discord passes on with the song in `details` and its artists in `state`. */
+export function isSpotify(a: Activity): boolean {
+  return a.type === 2 && a.name.trim().toLowerCase() === "spotify";
+}
+
+/**
+ * The name an activity shows: whichever field the program asked to be shown.
+ * A Spotify song that asks for nothing in particular shows its artists, since
+ * "Spotify" under someone's name says only which app is playing.
+ */
 export function activityParts(a: Activity): { name: string } {
-  const text = a.status_display_type === 1 ? a.state : a.status_display_type === 2 ? a.details : undefined;
+  const shown = a.status_display_type ?? (isSpotify(a) ? 1 : 0);
+  const text = shown === 1 ? a.state : shown === 2 ? a.details : undefined;
   return { name: text || a.name };
 }
 

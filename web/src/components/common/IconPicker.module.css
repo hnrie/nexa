@@ -1,10 +1,11 @@
 .wrap { position: relative; width: 80px; height: 80px; flex: none; }
-.icon { position: relative; width: 80px; height: 80px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--bg-active); border: 2px dashed var(--border-strong); color: var(--text-strong); }
+.icon { position: relative; width: 80px; height: 80px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--brand) 16%, var(--bg-active)), var(--bg-active)); border: 2px dashed color-mix(in srgb, var(--brand) 45%, var(--border-strong)); color: var(--text-strong); transition: border-color var(--transition), transform var(--dur) var(--ease-spring); }
+.icon:not(:disabled):hover { border-color: var(--brand); transform: scale(1.04); }
 .icon[data-square] { border-radius: 30%; }
 .icon:disabled { cursor: default; border-style: solid; }
 .icon img { width: 100%; height: 100%; object-fit: cover; }
 .initials { font-size: 26px; font-weight: 700; }
-.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; opacity: 0; transition: opacity var(--transition); }
+.overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: rgba(10, 6, 20, 0.55); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); color: #fff; font-size: 11.5px; font-weight: 700; opacity: 0; transition: opacity var(--transition); }
 .icon:not(:disabled):hover .overlay, .icon:focus-visible .overlay { opacity: 1; }
 /* without an icon yet the upload hint stays in view */
 .icon:not(:has(img)) .overlay { opacity: 1; background: transparent; color: var(--text-muted); }

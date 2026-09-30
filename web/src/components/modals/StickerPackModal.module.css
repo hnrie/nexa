@@ -2,12 +2,12 @@
 .top { display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: var(--radius-sm); background: var(--bg-surface); }
 .big { width: 120px; height: 120px; flex: none; object-fit: contain; }
 .info { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.stickerName { font-size: 18px; font-weight: 700; color: var(--text-strong); overflow-wrap: anywhere; }
+.stickerName { font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 19px; font-weight: 800; letter-spacing: -0.012em; color: var(--text-strong); overflow-wrap: anywhere; }
 .creator { font-size: 14px; color: var(--text-muted); }
 .creatorLink { color: var(--text); font-weight: 600; }
 .creatorLink:hover { text-decoration: underline; }
 .desc { font-size: 14px; color: var(--text-muted); line-height: 1.4; overflow-wrap: anywhere; }
-.label { margin: 16px 0 8px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-subtle); }
+.label { margin: 16px 0 8px; font-size: 13px; font-weight: 650; letter-spacing: 0.005em; color: var(--text-subtle); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; max-height: min(44vh, 360px); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
 .tile { aspect-ratio: 1; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-surface); display: flex; align-items: center; justify-content: center; }
 .tile:hover { background: var(--bg-hover); }

@@ -1,31 +1,38 @@
-.overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: var(--bg-overlay); animation: fadeIn 120ms ease-out; padding: 16px; }
-/* A dialog floats over the app, so it is drawn in the floating colour and its
-   footer in the page's own: lighter than the page in a dark theme and white in
-   a light one. The surface colour it had is darker than the page in a light
-   theme, which gave every dialog a grey body over a white footer. */
-.card { max-width: 100%; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); animation: pop 160ms ease-out; outline: none; overflow: hidden; }
+/* The page falls back behind a soft blur, and the dialog comes up out of it. */
+.overlay { position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: var(--bg-overlay); -webkit-backdrop-filter: blur(6px) saturate(1.1); backdrop-filter: blur(6px) saturate(1.1); animation: fadeIn 180ms var(--ease-out); padding: 16px; }
+/* A dialog floats over the app, so it is drawn in the floating colour, lit
+   along its top edge, with a hairline round it for a theme whose panels are
+   black already. Its footer is a shelf a step below the body. */
+.card { --glyph-cut: var(--bg-floating); max-width: 100%; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-lg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); animation: pop 240ms var(--ease-out); outline: none; overflow: hidden; }
 /* The dialog itself takes focus only so a screen reader starts inside it; a
    ring round the whole card says nothing a keyboard user needs to know. */
 .card:focus-visible { outline: none; }
 .bare { background: transparent; box-shadow: none; }
-.header { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 0; }
-.title { margin: 0; font-size: 20px; font-weight: 600; color: var(--text-strong); }
-.close { color: var(--text-muted); display: inline-flex; padding: 4px; border-radius: var(--radius-xs); }
-.close:hover { color: var(--text); background: var(--bg-hover); }
-.body { padding: 16px; overflow: auto; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 0; }
+.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 21px; font-weight: 780; letter-spacing: -0.012em; line-height: 1.2; color: var(--text-strong); }
+.close { color: var(--text-muted); display: inline-flex; padding: 6px; border-radius: var(--radius-sm); transition: background-color var(--transition), color var(--transition), transform var(--transition); }
+.close:hover { color: var(--text-strong); background: var(--bg-hover); transform: rotate(90deg); }
+.body { padding: 16px 20px 20px; overflow: auto; }
 .bareBody { overflow: auto; }
-.footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px; background: var(--bg-base); }
+.footer { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 20px; background: color-mix(in oklab, var(--bg-base) 55%, var(--bg-floating)); box-shadow: inset 0 1px 0 var(--border-subtle); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pop { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes pop { from { transform: translateY(10px) scale(0.97); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes sheetUp { from { transform: translateY(40px); opacity: 0.4; } to { transform: none; opacity: 1; } }
 /* a bottom sheet on phones: sized to the visible screen, which vh is not while the toolbars show, and clear of the home indicator */
 @media (max-width: 767px) {
   /* above the on-screen keyboard, where there is one (src/lib/keyboardInset.ts) */
   .overlay { padding: 0; padding-bottom: var(--kb-inset, 0px); align-items: flex-end; }
-  .card { width: 100% !important; max-height: 92vh; max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px)); border-radius: var(--radius-md) var(--radius-md) 0 0; }
+  .card { width: 100% !important; max-height: 92vh; max-height: min(92dvh, calc(var(--vvh, 100dvh) - 12px)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: sheetUp 280ms var(--ease-out); }
+  /* a handle, so a sheet looks like something that can be let go of */
+  .card:not(.bare)::before { content: ""; flex: none; display: block; width: 36px; height: 4px; margin: 8px auto -4px; border-radius: 2px; background: var(--border-strong); }
+  .header { padding: 16px 16px 0; }
+  .body { padding: 16px; }
+  .footer { padding: 14px 16px; }
   .body:last-child, .footer { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
   /* a centred dialog stays a card, clear of the notch, the home indicator and the keyboard */
   .overlay[data-centered] { align-items: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(max(16px, env(safe-area-inset-bottom)) + var(--kb-inset, 0px)) max(16px, env(safe-area-inset-left)); }
-  .overlay[data-centered] .card { border-radius: var(--radius-md); max-height: 100%; }
+  .overlay[data-centered] .card { border-radius: var(--radius-lg); max-height: 100%; animation: pop 240ms var(--ease-out); }
+  .overlay[data-centered] .card::before { display: none; }
   .overlay[data-centered] .body:last-child, .overlay[data-centered] .footer { padding-bottom: 16px; }
 }
 @media (pointer: coarse) { .close { padding: 10px; margin: -6px; } }

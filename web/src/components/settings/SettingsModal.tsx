@@ -1,7 +1,8 @@
+import { Bug, Download, LogOut } from "lucide-react";
 import { Suspense, useState } from "react";
 import { Spinner } from "@/components/common/Spinner";
 import { lazyPage } from "@/lib/lazyChunk";
-import { SettingsLayer, type NavGroup } from "@/components/server/SettingsLayer";
+import { NavIcon, SettingsLayer, type NavGroup } from "@/components/server/SettingsLayer";
 import { useAuth } from "@/stores/auth";
 import { desktopBridge } from "@/lib/desktopBridge";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -58,14 +59,17 @@ export default function SettingsModal({ onClose, page: initial, packId }: { onCl
       <div className={s.navGroup}>
         {/* over the settings, which stay where they were */}
         <button className={s.navItem} onClick={() => openReportBug("settings")} data-nav="report-bug">
+          <NavIcon icon={Bug} />
           <span className={s.navLabel}>{t("bugs.report")}</span>
         </button>
         {!inApp && !mobile ? (
           <button className={s.navItem} onClick={() => window.open("/download", "_blank", "noopener")} data-nav="get-app">
+            <NavIcon icon={Download} />
             <span className={s.navLabel}>{t("settings.settings.getTheDesktopApp")}</span>
           </button>
         ) : null}
         <button className={[s.navItem, s.danger].join(" ")} onClick={confirmLogout} data-nav="logout">
+          <NavIcon icon={LogOut} />
           <span className={s.navLabel}>{t("settings.settings.logOut")}</span>
         </button>
       </div>

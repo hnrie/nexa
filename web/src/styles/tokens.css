@@ -1,5 +1,6 @@
-/* Design tokens. Values measured from the 2025 Discord client (docs/design/reference);
-   colours and dimensions only — no asset is reproduced. Dark is the default theme. */
+/* Design tokens. Nexa's own palette: deep, faintly violet ink in the dark
+   themes, paper white in the light one, and depth made from light rather than
+   lines (the depth block at the end). Dark is the default theme. */
 /* The floating layers, bottom to top. Two of them once shared 200, and a toast
    raised from the picture viewer (Copy image, a failed save) was drawn under it. */
 :root {
@@ -10,25 +11,28 @@
   --z-toast: 350;
   --z-tooltip: 400;
 }
+/* Every text colour below reads at WCAG AA (4.5:1) on every panel it is drawn
+   on, lit up under the pointer or not, by the same rules the theme builder
+   holds a custom theme to (lib/look/contrast.ts; tokens.test.ts checks it). */
 :root {
-  --bg-base: #2c2936;
-  --bg-raised: #322f3d;
-  --bg-surface: #3b3847;
-  --bg-floating: #363342;
-  --bg-input: #23212c;
-  --bg-composer: #3b3847;
-  --bg-hover: rgba(153, 148, 172, 0.08);
-  --bg-selected: rgba(153, 148, 172, 0.13);
-  --bg-active: rgba(153, 148, 172, 0.17);
-  --bg-message-hover: rgba(153, 148, 172, 0.06);
-  --bg-overlay: rgba(10, 6, 20, 0.72);
-  --text: #f3f3f7;
+  --bg-base: #1c1825;
+  --bg-raised: #221d2b;
+  --bg-surface: #2b2636;
+  --bg-floating: #282331;
+  --bg-input: #15121c;
+  --bg-composer: #2b2636;
+  --bg-hover: rgba(166, 156, 196, 0.08);
+  --bg-selected: rgba(166, 156, 196, 0.13);
+  --bg-active: rgba(166, 156, 196, 0.17);
+  --bg-message-hover: rgba(166, 156, 196, 0.05);
+  --bg-overlay: rgba(6, 3, 14, 0.74);
+  --text: #f0edf7;
   --text-strong: #ffffff;
-  --text-subtle: #cbc9d3;
-  --text-muted: #adaab7;
-  --text-channel: #9c99a7;
-  --text-placeholder: #6f6d79;
-  --icon: #bbb8c6;
+  --text-subtle: #d0cadb;
+  --text-muted: #b0a8bf;
+  --text-channel: #a39bb3;
+  --text-placeholder: #928ba5;
+  --icon: #bcb4cb;
   --brand: #8000ff;
   --brand-hover: #6a00d6;
   --brand-active: #5600ac;
@@ -39,40 +43,38 @@
   --on-danger: #ffffff;
   --on-positive: #ffffff;
   --on-warning: #111214;
-  /* The accent at full strength is 1.8:1 against the palest panel it is drawn
-     on, which is fine for a fill that carries its own text but not for a 2px
-     ring around something — WCAG 1.4.11 asks a focus indicator for 3:1 — so the
-     ring carries a lighter one, at 3.5:1. lib/theme.ts works the same value out
-     for a chosen accent, against the same panel. */
-  --focus-ring: #b06bff;
-  --link: #76aff6;
-  --text-brand: #c3a0ff;
-  --mention-bg: rgba(128, 0, 255, 0.26);
-  --mention-bg-hover: rgba(128, 0, 255, 0.42);
-  --mention-fg: #ddc9ff;
-  --positive: #3d9e60;
-  --positive-hover: #2f7f4c;
+  /* The accent at full strength is too dark a ring on these panels, and WCAG
+     1.4.11 asks a focus indicator for 3:1, so the ring carries a lighter one.
+     lib/theme.ts works the same value out for a chosen accent. */
+  --focus-ring: #b77aff;
+  --link: #86b8f7;
+  --text-brand: #c6a4ff;
+  --mention-bg: rgba(128, 0, 255, 0.24);
+  --mention-bg-hover: rgba(128, 0, 255, 0.38);
+  --mention-fg: #e0d0ff;
+  --positive: #2d8550;
+  --positive-hover: #256e42;
   --warning: #fdb833;
   --text-warning: #fdb833;
-  --danger: #da3e44;
-  --danger-hover: #b5343a;
+  --danger: #d1343b;
+  --danger-hover: #b02a31;
   /* --danger as text: the fill colour reads at under 3:1 on these panels,
      which is not enough for an error message someone has to act on */
-  --text-danger: #fc8387;
-  --status-online: #3d9e60;
+  --text-danger: #ff8a8e;
+  --status-online: #46b56e;
   --status-idle: #f0b232;
-  --status-dnd: #da3e44;
-  --status-offline: #85828f;
-  --border-subtle: rgba(153, 148, 172, 0.12);
-  --border: rgba(153, 148, 172, 0.2);
-  --border-strong: rgba(153, 148, 172, 0.44);
-  --scroll-thumb: rgba(153, 148, 172, 0.28);
-  --scroll-thumb-hover: rgba(153, 148, 172, 0.45);
+  --status-dnd: #ff7075;
+  --status-offline: #a39cb1;
+  --border-subtle: rgba(166, 156, 196, 0.11);
+  --border: rgba(166, 156, 196, 0.19);
+  --border-strong: rgba(166, 156, 196, 0.4);
+  --scroll-thumb: rgba(166, 156, 196, 0.24);
+  --scroll-thumb-hover: rgba(166, 156, 196, 0.42);
   --scroll-track: transparent;
-  --spoiler: #817e8b;
-  --spoiler-revealed: #23212c;
-  --code-bg: #23212c;
-  --code-border: rgba(153, 148, 172, 0.12);
+  --spoiler: #7d768a;
+  --spoiler-revealed: #15121c;
+  --code-bg: #15121c;
+  --code-border: rgba(166, 156, 196, 0.12);
   /* Syntax highlighting is part of the palette rather than a theme bolted on
      top of it: the same eight roles are redefined per theme below, so a code
      block is never painted in colours meant for the other background. Every
@@ -84,35 +86,34 @@
   --code-title: #61afef;
   --code-type: #e5c07b;
   --code-variable: #e06c75;
-  --embed-bg: #3b3847;
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --shadow-low: 0 1px 4px rgba(0, 0, 0, 0.14);
-  --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.16);
-  --shadow-high: 0 12px 24px rgba(0, 0, 0, 0.24);
-  --tooltip-bg: #15121e;
-  --tooltip-text: #f5f4f9;
-  --tooltip-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  --embed-bg: #272231;
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --tooltip-bg: #0e0b14;
+  --tooltip-text: #f5f3fa;
+  --tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
   /* Twemoji first: its face only covers emoji code points (fonts.css), so every name, status, menu
-     and text box draws emoji with the same artwork the messages use, and letters keep Noto Sans.
-     Keycaps start with a digit, so theirs comes after Noto Sans. */
-  --font: "Twemoji Text", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+     and text box draws emoji with the same artwork the messages use, and letters keep Onest.
+     Keycaps start with a digit, so theirs comes after the letters' faces. */
+  --font: "Twemoji Text", "Onest Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-with-emoji: var(--font);
+  /* names and titles: Mona Sans, wide and heavy like the wordmark; Onest where it has no letters (Cyrillic) */
+  --font-display: "Twemoji Text", "Mona Sans Variable", "Onest Variable", "Noto Sans", "Twemoji Keycaps", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display-stretch: 115%;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --rail-w: 72px;
-  --sidebar-w: 240px;
-  --members-w: 240px;
-  --header-h: 49px;
-  --panel-h: 52px;
+  --sidebar-w: 248px;
+  --members-w: 248px;
+  --header-h: 52px;
+  --panel-h: 56px;
   --avatar-xs: 16px;
   --avatar-sm: 24px;
   --avatar-md: 32px;
   --avatar-lg: 40px;
   --avatar-xl: 80px;
-  --transition: 150ms ease;
   color-scheme: dark;
 }
 
@@ -127,39 +128,37 @@
   --bg-selected: rgba(101, 94, 125, 0.14);
   --bg-active: rgba(101, 94, 125, 0.2);
   --bg-message-hover: rgba(101, 94, 125, 0.05);
-  --bg-overlay: rgba(28, 18, 50, 0.5);
+  --bg-overlay: rgba(28, 18, 50, 0.46);
   --text: #2e2c37;
   --text-strong: #1f1c28;
   --text-subtle: #595565;
-  --text-muted: #6a6677;
-  --text-channel: #656272;
-  --text-placeholder: #878491;
+  --text-muted: #595667;
+  --text-channel: #5f5b6c;
+  --text-placeholder: #6c6877;
   --icon: #514d5f;
-  --link: #006dd4;
+  --link: #0062c0;
   --text-brand: #6a00d6;
   --focus-ring: #8000ff;
   /* A tint of the accent, not the accent itself: over white the dark theme's
-     0.26 and 0.42 leave a lavender that only very pale text sits on, and the
-     text a light page wants is the dark --mention-fg below. */
+     tints leave a lavender that only very pale text sits on, and the text a
+     light page wants is the dark --mention-fg below. */
   --mention-bg: rgba(128, 0, 255, 0.16);
   --mention-bg-hover: rgba(128, 0, 255, 0.32);
   --mention-fg: #4a1a8f;
-  --positive: #269153;
-  --positive-hover: #1f7a45;
+  --positive: #1f7d47;
+  --positive-hover: #196a3c;
   --warning: #bb7300;
   /* the fill colour reads at about 3:1 as text on the light panels */
-  --text-warning: #8a5500;
-  --danger: #d6363f;
-  --danger-hover: #b52d35;
-  --text-danger: #c33139;
-  /* The presence colours are the one part of the dark palette the light theme
-     forgot. They are not only dots: the header under a DM's name prints the
-     status in them, and #f0b232 on this page is 1.7:1. Darkened until the
-     words read, which also lifts the dots past the 3:1 a shape-bearing mark
-     needs. The call stage puts the bright ones back below. */
-  --status-online: #307d4c;
-  --status-idle: #93660b;
-  --status-dnd: #d42b35;
+  --text-warning: #7a4b00;
+  --danger: #d1343b;
+  --danger-hover: #b02a31;
+  --text-danger: #ab1e29;
+  /* The presence colours darkened until the words read: the header under a
+     DM's name prints the status in them. The call stage puts the bright ones
+     back below. */
+  --status-online: #2a7044;
+  --status-idle: #845a06;
+  --status-dnd: #c0222c;
   --status-offline: #6b6776;
   --border-subtle: rgba(141, 136, 162, 0.26);
   --border: rgba(141, 136, 162, 0.38);
@@ -178,120 +177,183 @@
   --code-type: #116329;
   --code-variable: #953800;
   --embed-bg: #f5f3fb;
-  --shadow-low: 0 1px 4px rgba(24, 16, 44, 0.08);
-  --shadow-medium: 0 4px 10px rgba(24, 16, 44, 0.09);
-  --shadow-high: 0 12px 36px rgba(24, 16, 44, 0.14);
   --tooltip-bg: #282336;
   --tooltip-text: #f7f6fa;
-  --tooltip-shadow: 0 8px 16px rgba(24, 16, 44, 0.22);
+  --tooltip-shadow: 0 10px 24px rgba(24, 16, 44, 0.24);
   color-scheme: light;
 }
 
-/* A call's stage is black in every theme, as Discord's is. In the light theme
-   its controls, tiles and labels keep the dark palette, or they come out pale
-   on black: grey buttons whose muted state barely differs and whose icons
-   vanish on hover. Only what the light theme changes is put back; the accent
-   colour carries through. */
+/* A call's stage is black in every theme. In the light theme its controls,
+   tiles and labels keep the dark palette, or they come out pale on black:
+   grey buttons whose muted state barely differs and whose icons vanish on
+   hover. Only what the light theme changes is put back; the accent colour
+   carries through. */
 [data-theme="light"] [data-dark-scope] {
-  --bg-base: #2c2936;
-  --bg-raised: #322f3d;
-  --bg-surface: #3b3847;
-  --bg-floating: #363342;
-  --bg-input: #23212c;
-  --bg-composer: #3b3847;
-  --bg-hover: rgba(153, 148, 172, 0.08);
-  --bg-selected: rgba(153, 148, 172, 0.13);
-  --bg-active: rgba(153, 148, 172, 0.17);
-  --bg-message-hover: rgba(153, 148, 172, 0.06);
-  --bg-overlay: rgba(10, 6, 20, 0.72);
-  --text: #f3f3f7;
+  --bg-base: #1c1825;
+  --bg-raised: #221d2b;
+  --bg-surface: #2b2636;
+  --bg-floating: #282331;
+  --bg-input: #15121c;
+  --bg-composer: #2b2636;
+  --bg-hover: rgba(166, 156, 196, 0.08);
+  --bg-selected: rgba(166, 156, 196, 0.13);
+  --bg-active: rgba(166, 156, 196, 0.17);
+  --bg-message-hover: rgba(166, 156, 196, 0.05);
+  --bg-overlay: rgba(6, 3, 14, 0.74);
+  --text: #f0edf7;
   --text-strong: #ffffff;
-  --text-subtle: #cbc9d3;
-  --text-muted: #adaab7;
-  --text-channel: #9c99a7;
-  --text-placeholder: #6f6d79;
-  --icon: #bbb8c6;
-  --focus-ring: #b06bff;
-  --mention-bg: rgba(128, 0, 255, 0.26);
-  --mention-bg-hover: rgba(128, 0, 255, 0.42);
-  --mention-fg: #ddc9ff;
-  --positive: #3d9e60;
-  --positive-hover: #2f7f4c;
+  --text-subtle: #d0cadb;
+  --text-muted: #b0a8bf;
+  --text-channel: #a39bb3;
+  --text-placeholder: #928ba5;
+  --icon: #bcb4cb;
+  --focus-ring: #b77aff;
+  --mention-bg: rgba(128, 0, 255, 0.24);
+  --mention-bg-hover: rgba(128, 0, 255, 0.38);
+  --mention-fg: #e0d0ff;
+  --positive: #2d8550;
+  --positive-hover: #256e42;
   --warning: #fdb833;
   --text-warning: #fdb833;
-  --danger: #da3e44;
-  --danger-hover: #b5343a;
-  /* --danger as text: the fill colour reads at under 3:1 on these panels,
-     which is not enough for an error message someone has to act on */
-  --text-danger: #fc8387;
-  --status-online: #3d9e60;
+  --danger: #d1343b;
+  --danger-hover: #b02a31;
+  --text-danger: #ff8a8e;
+  --status-online: #46b56e;
   --status-idle: #f0b232;
-  --status-dnd: #da3e44;
-  --status-offline: #85828f;
-  --border-subtle: rgba(153, 148, 172, 0.12);
-  --border: rgba(153, 148, 172, 0.2);
-  --border-strong: rgba(153, 148, 172, 0.44);
-  --scroll-thumb: rgba(153, 148, 172, 0.28);
-  --scroll-thumb-hover: rgba(153, 148, 172, 0.45);
-  --shadow-low: 0 1px 4px rgba(0, 0, 0, 0.14);
-  --shadow-medium: 0 4px 8px rgba(0, 0, 0, 0.16);
-  --shadow-high: 0 12px 24px rgba(0, 0, 0, 0.24);
+  --status-dnd: #ff7075;
+  --status-offline: #a39cb1;
+  --border-subtle: rgba(166, 156, 196, 0.11);
+  --border: rgba(166, 156, 196, 0.19);
+  --border-strong: rgba(166, 156, 196, 0.4);
+  --scroll-thumb: rgba(166, 156, 196, 0.24);
+  --scroll-thumb-hover: rgba(166, 156, 196, 0.42);
+  --shade-alpha: 1;
+  --edge-light: rgba(255, 255, 255, 0.06);
   color-scheme: dark;
 }
 
+/* Ash: graphite, with no violet in it, for anyone who wants the app quiet. */
 [data-theme="ash"] {
-  --bg-base: #1a1821;
-  --bg-raised: #211f29;
-  --bg-surface: #272430;
-  --bg-floating: #2a2733;
-  --bg-input: #131119;
-  --bg-composer: #272430;
-  --text: #f0eff4;
-  --text-muted: #9f9ca9;
-  --text-channel: #8a8794;
-  --spoiler-revealed: #1a1821;
-  --code-bg: #131119;
-  --embed-bg: #272430;
-  --text-danger: #fb5b60;
+  --bg-base: #18191d;
+  --bg-raised: #1d1e23;
+  --bg-surface: #27282e;
+  --bg-floating: #24252b;
+  --bg-input: #111215;
+  --bg-composer: #27282e;
+  --bg-hover: rgba(200, 202, 215, 0.07);
+  --bg-selected: rgba(200, 202, 215, 0.12);
+  --bg-active: rgba(200, 202, 215, 0.16);
+  --bg-message-hover: rgba(200, 202, 215, 0.045);
+  --bg-overlay: rgba(0, 0, 0, 0.72);
+  --text: #eeeef1;
+  --text-subtle: #cacbd2;
+  --text-muted: #aeafb8;
+  --text-channel: #9fa0aa;
+  --text-placeholder: #8c8e98;
+  --icon: #b6b7c0;
+  --text-danger: #ff8d90;
+  --status-offline: #a0a1ab;
+  --border-subtle: rgba(200, 202, 215, 0.1);
+  --border: rgba(200, 202, 215, 0.17);
+  --border-strong: rgba(200, 202, 215, 0.36);
+  --scroll-thumb: rgba(200, 202, 215, 0.22);
+  --scroll-thumb-hover: rgba(200, 202, 215, 0.4);
+  --spoiler: #7c7d86;
+  --spoiler-revealed: #111215;
+  --code-bg: #111215;
+  --code-border: rgba(200, 202, 215, 0.1);
+  --embed-bg: #24252b;
+  --tooltip-bg: #0b0b0d;
   color-scheme: dark;
 }
 
 [data-theme="onyx"] {
   --bg-base: #000000;
   --bg-raised: #000000;
-  --bg-surface: #14121a;
-  --bg-floating: #16151d;
-  --bg-input: #0e0c12;
-  --bg-composer: #14121a;
+  --bg-surface: #141218;
+  --bg-floating: #16141b;
+  --bg-input: #0c0b10;
+  --bg-composer: #141218;
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-selected: rgba(255, 255, 255, 0.1);
   --bg-active: rgba(255, 255, 255, 0.14);
   --bg-message-hover: rgba(255, 255, 255, 0.04);
-  --text: #d8d6dc;
+  --text: #dcdae0;
   --text-strong: #ffffff;
-  --text-muted: #8a8792;
-  --text-channel: #817e89;
+  --text-subtle: #c4c1ca;
+  --text-muted: #a19eaa;
+  --text-channel: #96939f;
+  --text-placeholder: #86838f;
   --border-subtle: rgba(255, 255, 255, 0.1);
-  --spoiler-revealed: #14121a;
-  --code-bg: #0e0c12;
-  --embed-bg: #14121a;
-  --text-danger: #fb5b60;
+  --border: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.34);
+  --spoiler-revealed: #141218;
+  --code-bg: #0c0b10;
+  --embed-bg: #121016;
   color-scheme: dark;
 }
 
 /*
- * The server rail is a step deeper than the sidebar beside it, so the two
- * never read as one flat slab: the sidebar's own colour mixed with black, a
- * little in a light theme and more in a dark one. It follows --bg-base, so
- * every preset and custom theme gets its own, and the theme gallery's pictures
- * mix theirs with --rail-shade from the theme each one shows. A sidebar that
- * is black already has no darker step, so the rail and the conversation also
- * carry a hairline edge (Rail, AppShell).
+ * Depth, worked out from whichever theme is on, so a preset, a custom theme
+ * and the four classic ones all get it the same way.
+ *
+ * Light comes from above. The app stands on a canvas a step darker than any
+ * panel (the rail sits straight on it), the panels float on it with a gutter
+ * between them, and everything raised catches the light along its top edge
+ * (--edge-light) and throws a shadow tinted with the theme's own darkness
+ * rather than a neutral grey. The accent is used as light too: a faint glow
+ * in the canvas, and a glow round whatever is pressed or chosen.
+ *
+ * A sidebar that is black already has no darker step, so the panels also
+ * carry a hairline edge (--panel-edge) that only shows where it has to.
  */
 :root {
-  --rail-shade: 78%;
+  --rail-shade: 70%;
   --bg-rail: color-mix(in oklab, var(--bg-base) var(--rail-shade), #000);
+  --bg-canvas: var(--bg-rail);
+  --canvas-glow: color-mix(in srgb, var(--brand) 13%, transparent);
+  --panel-edge: color-mix(in srgb, var(--text-strong) 6%, transparent);
+  --edge-light: rgba(255, 255, 255, 0.06);
+  --edge-light-strong: rgba(255, 255, 255, 0.11);
+  --shade-alpha: 1;
+  /* the accent as a glow, round a pressed button or a chosen tile */
+  --glow-brand: 0 0 0 1px color-mix(in srgb, var(--brand) 55%, transparent), 0 6px 22px -6px color-mix(in srgb, var(--brand) 75%, transparent);
+  --ring-glow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 28%, transparent);
+  /* a fill with the light on it: a touch brighter at the top than the bottom */
+  --grad-brand: linear-gradient(180deg, color-mix(in oklab, var(--brand), #fff 16%) 0%, var(--brand) 55%, color-mix(in oklab, var(--brand), #000 8%) 100%);
+  --grad-danger: linear-gradient(180deg, color-mix(in oklab, var(--danger), #fff 12%) 0%, var(--danger) 60%);
+  --grad-positive: linear-gradient(180deg, color-mix(in oklab, var(--positive), #fff 12%) 0%, var(--positive) 60%);
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 60%);
+  /* motion: quick to answer, soft to settle */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 300ms;
+  --transition: 160ms var(--ease-out);
+  --radius-pill: 999px;
+}
+/* Shadows are worked out where they are declared, so the call stage's dark
+   scope (above) works its own out from its own colours. */
+:root,
+[data-dark-scope] {
+  --shade: color-mix(in oklab, var(--bg-base) 30%, #000);
+  --shadow-low: 0 1px 2px color-mix(in srgb, var(--shade) calc(55% * var(--shade-alpha)), transparent);
+  --shadow-medium: 0 1px 2px color-mix(in srgb, var(--shade) calc(45% * var(--shade-alpha)), transparent), 0 6px 16px -4px color-mix(in srgb, var(--shade) calc(55% * var(--shade-alpha)), transparent);
+  --shadow-high: 0 2px 6px color-mix(in srgb, var(--shade) calc(40% * var(--shade-alpha)), transparent), 0 18px 48px -10px color-mix(in srgb, var(--shade) calc(80% * var(--shade-alpha)), transparent);
+  --shadow-panel: 0 1px 3px color-mix(in srgb, var(--shade) calc(50% * var(--shade-alpha)), transparent), 0 10px 30px -12px color-mix(in srgb, var(--shade) calc(60% * var(--shade-alpha)), transparent);
+  /* a raised thing: its lit top edge, then the shadow under it */
+  --lift: inset 0 1px 0 var(--edge-light), var(--shadow-medium);
+  --lift-low: inset 0 1px 0 var(--edge-light), var(--shadow-low);
 }
 [data-theme="light"] {
-  --rail-shade: 95%;
+  --rail-shade: 93%;
+  --canvas-glow: color-mix(in srgb, var(--brand) 9%, transparent);
+  --panel-edge: color-mix(in srgb, var(--text-strong) 7%, transparent);
+  --edge-light: rgba(255, 255, 255, 0.85);
+  --edge-light-strong: rgba(255, 255, 255, 0.95);
+  --shade: color-mix(in oklab, var(--text-strong) 70%, var(--bg-base));
+  --shade-alpha: 0.32;
+  --sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%);
 }

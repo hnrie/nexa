@@ -1,7 +1,7 @@
 .search { margin: 16px 0 12px; }
 .filters { display: flex; flex-wrap: wrap; gap: 6px; }
 /* the same selectable-option look the language picker uses, one size down */
-.filter { padding: 6px 12px; border-radius: var(--radius-xs); font-size: 14px; font-weight: 500; color: var(--text-muted); background: var(--bg-surface); border: 1px solid transparent; }
+.filter { padding: 6px 13px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface); border: 1px solid var(--border-subtle); }
 .filter:hover { background: var(--bg-active); color: var(--text); }
 .filter[data-on="true"] { border-color: var(--brand); color: var(--text-strong); background: var(--bg-active); }
 /* the number beside a heading is a count, not another word in it */
@@ -26,7 +26,7 @@
 .copyright { margin: 0; font-size: 13px; color: var(--text-subtle); white-space: pre-wrap; overflow-wrap: anywhere; }
 /* A licence is a document with its own line breaks; wrapping is fine, reflowing is
    not, and a long one scrolls rather than pushing the page wider. */
-.text { margin: 0; max-height: 320px; overflow: auto; padding: 12px; background: var(--bg-input); border-radius: var(--radius-xs); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; }
+.text { margin: 0; max-height: 320px; overflow: auto; padding: 12px; background: var(--bg-input); border-radius: var(--radius-sm); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 35%, transparent); font-family: var(--font-mono); font-size: 12px; line-height: 1.5; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; text-align: start; }
 .link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 13px; color: var(--link); }
 .link:hover { text-decoration: underline; }
 

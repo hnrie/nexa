@@ -1,14 +1,16 @@
 .field { display: flex; flex-direction: column; gap: 8px; }
-.label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--text-subtle); }
+.label { font-size: 13px; font-weight: 650; letter-spacing: 0.005em; color: var(--text-subtle); }
 .req { color: var(--text-danger); }
 .errorText { color: var(--text-danger); text-transform: none; font-weight: 500; }
 .hasError .label { color: var(--text-danger); }
 .hint { font-size: 12px; color: var(--text-muted); }
-.input { height: 40px; padding: 0 10px; background: var(--bg-input); border: 1px solid transparent; border-radius: var(--radius-xs); color: var(--text); font-size: 16px; outline: none; transition: border-color var(--transition); width: 100%; }
+/* a well sunk into the panel: its shadow falls inside, along the top */
+.input { height: 42px; padding: 0 12px; background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text); font-size: 16px; outline: none; box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent); transition: border-color var(--transition), box-shadow var(--transition); width: 100%; }
 .input::placeholder { color: var(--text-placeholder); }
-/* A text box in use shows it with a quiet edge and its caret. The accent's
-   border with the page's focus ring round it read as a stray highlight. */
-.input:focus { border-color: var(--border-strong); }
+.input:hover:not(:focus) { border-color: var(--border); }
+/* A text box in use: its edge takes the accent's light and a soft halo, one
+   ring rather than the edge and the page's focus ring together. */
+.input:focus { border-color: color-mix(in srgb, var(--focus-ring) 75%, transparent); box-shadow: inset 0 1px 2px color-mix(in srgb, var(--shade) 40%, transparent), var(--ring-glow); }
 .input:focus-visible { outline: none; }
 /* A select opens on a list drawn in the theme where the browser allows it
    (Chromium's customizable select), and on the system's own list elsewhere. */
@@ -18,8 +20,8 @@
   select.input:hover { border-color: var(--border); }
   select.input::picker-icon { color: var(--text-muted); transition: rotate var(--transition); }
   select.input:open::picker-icon { rotate: 180deg; }
-  select.input::picker(select) { margin-block: 4px; padding: 4px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--bg-floating); color: var(--text); box-shadow: var(--shadow-high); }
-  select.input option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border-radius: var(--radius-xs); font-size: 15px; cursor: pointer; }
+  select.input::picker(select) { margin-block: 6px; padding: 6px; border: 0; border-radius: var(--radius-md); background: var(--bg-floating); color: var(--text); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); }
+  select.input option { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 10px; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; }
   select.input option:hover, select.input option:focus-visible { background: var(--bg-hover); color: var(--text-strong); outline: none; }
   select.input option:checked { background: var(--bg-selected); color: var(--text-strong); font-weight: 600; }
   select.input option::checkmark { order: 1; margin-inline-start: auto; color: var(--text-brand); }
@@ -28,8 +30,8 @@
 /* the eye sits inside the box, at its end */
 .revealWrap { position: relative; display: block; width: 100%; }
 .withReveal { padding-inline-end: 44px; }
-.reveal { position: absolute; inset-block: 0; inset-inline-end: 0; width: 40px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border-radius: var(--radius-xs); }
+.reveal { position: absolute; inset-block: 0; inset-inline-end: 0; width: 42px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); border-radius: var(--radius-sm); }
 .reveal:hover { color: var(--text); }
 .reveal:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 @media (pointer: coarse) { .reveal { width: 44px; } }
-.area { height: auto; min-height: 88px; padding: 10px; resize: vertical; line-height: 1.375; }
+.area { height: auto; min-height: 88px; padding: 10px 12px; resize: vertical; line-height: 1.4; }

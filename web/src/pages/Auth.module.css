@@ -1,31 +1,36 @@
 /* The page is the scroller: body hides overflow, so a form taller than a short
    phone screen must scroll here. Auto margins centre it when it fits and let it
    start at the top when it does not. */
-.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: var(--bg-base); background-image: radial-gradient(60% 50% at 50% 0%, rgba(128, 0, 255, 0.22), transparent); overflow-y: auto; overscroll-behavior: contain; }
-.brand { margin-top: auto; flex-shrink: 0; color: var(--text-strong); display: flex; }
+/* the canvas with the accent's light coming up behind the card, and a fainter second light low on the far side */
+.page { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 24px 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: radial-gradient(70% 55% at 50% -8%, color-mix(in srgb, var(--brand) 32%, transparent), transparent 72%), radial-gradient(45% 40% at 88% 108%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 70%), var(--bg-canvas); overflow-y: auto; overscroll-behavior: contain; }
+.brand { margin-top: auto; flex-shrink: 0; color: var(--text-strong); display: flex; filter: drop-shadow(0 6px 24px color-mix(in srgb, var(--brand) 55%, transparent)); animation: rise 520ms var(--ease-out) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
 /* The legal pages make the wordmark a way home; as a link it would take the
    link colour, and the mark is meant to be the brand's own. */
 .brand a { display: flex; color: inherit; border-radius: var(--radius-xs); }
 @media (max-width: 480px) { .brand svg { height: 32px; } }
-.card { margin-bottom: auto; flex-shrink: 0; max-width: 100%; padding: 32px; background: var(--bg-raised); border-radius: var(--radius-md); box-shadow: var(--shadow-high); display: flex; flex-direction: column; gap: 20px; }
+/* a sheet of glass over the light */
+.card { margin-bottom: auto; flex-shrink: 0; max-width: 100%; padding: 34px 32px 30px; background: color-mix(in srgb, var(--bg-raised) 86%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2); border-radius: var(--radius-xl); box-shadow: inset 0 1px 0 var(--edge-light-strong), 0 0 0 1px var(--panel-edge), var(--shadow-high), 0 40px 100px -40px color-mix(in srgb, var(--brand) 55%, transparent); display: flex; flex-direction: column; gap: 20px; animation: rise 520ms var(--ease-out) 60ms both; }
 /* A phone has little width to give, and 32px of padding on each side of it is
    most of what a long German label needs. */
-@media (max-width: 480px) { .card { padding: 24px 20px; } }
-.title { margin: 0; font-size: 24px; font-weight: 600; color: var(--text-strong); text-align: center; }
-.subtitle { margin: -12px 0 0; color: var(--text-muted); text-align: center; font-size: 16px; }
+@media (max-width: 480px) { .card { padding: 26px 20px 22px; border-radius: var(--radius-lg); } .title { font-size: 25px; } }
+.title { margin: 0; font-family: var(--font-display); font-stretch: var(--display-stretch); font-size: 29px; font-weight: 820; letter-spacing: -0.022em; line-height: 1.1; color: var(--text-strong); text-align: center; }
+.subtitle { margin: -10px 0 0; color: var(--text-muted); text-align: center; font-size: 15.5px; line-height: 1.45; }
 .form { display: flex; flex-direction: column; gap: 20px; }
 .row { display: flex; gap: 12px; }
 .foot { font-size: 14px; color: var(--text-muted); }
 .foot a { color: var(--link); }
 /* two links that read as one name each: "Terms of / Service" helps nobody */
 .foot .nowrap { white-space: nowrap; }
-.error { padding: 10px 12px; border-radius: var(--radius-xs); background: rgba(218, 62, 68, 0.15); color: var(--text); font-size: 14px; border: 1px solid rgba(218, 62, 68, 0.5); }
+.error { padding: 11px 13px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--text); font-size: 14px; border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent); animation: shake 380ms var(--ease-out); }
+@keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
 /* A field and what hangs under it (a strength meter, a link), spaced as one
    field is inside, since the form's own gap is for the space between fields. */
 .group { display: flex; flex-direction: column; gap: 8px; }
 .forgot { align-self: flex-start; font-size: 14px; color: var(--link); }
 .strength { display: flex; gap: 4px; align-items: center; }
-.strength i { flex: 1; height: 4px; border-radius: 2px; background: var(--bg-active); }
+.strength i { flex: 1; height: 5px; border-radius: 3px; background: var(--bg-active); transition: background-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out); }
+.strength i[data-on="true"] { box-shadow: 0 0 8px -2px currentColor; }
 .strength i[data-on="true"] { background: var(--positive); }
 .strength[data-score="1"] i[data-on="true"] { background: var(--danger); }
 .strength[data-score="2"] i[data-on="true"] { background: var(--warning); }
@@ -37,11 +42,11 @@
 /* A recovery key breaks between its groups only (the markup offers a break
    after each dash), so no group is ever split across two lines to be copied
    out by hand wrong. */
-.recovery { font-family: var(--font-mono); font-size: 15px; line-height: 1.7; letter-spacing: 0.04em; padding: 16px; background: var(--bg-input); border-radius: var(--radius-xs); text-align: center; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; color: var(--text-strong); border: 1px solid var(--border); }
+.recovery { font-family: var(--font-mono); font-size: 15px; line-height: 1.7; letter-spacing: 0.04em; padding: 16px; background: var(--bg-input); border-radius: var(--radius-md); text-align: center; user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; color: var(--text-strong); border: 1px solid var(--border-subtle); box-shadow: inset 0 1px 3px color-mix(in srgb, var(--shade) 45%, transparent); }
 /* the call a lock left running, and the way to leave it */
-.call { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--status-online) 12%, transparent); border: 1px solid color-mix(in srgb, var(--status-online) 45%, transparent); font-size: 14px; color: var(--text); }
+.call { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--status-online) 12%, transparent); border: 1px solid color-mix(in srgb, var(--status-online) 45%, transparent); font-size: 14px; color: var(--text); }
 .call > span { flex: 1 1 200px; }
-.warn { padding: 12px; border-radius: var(--radius-xs); background: rgba(253, 184, 51, 0.12); border: 1px solid rgba(253, 184, 51, 0.5); font-size: 14px; color: var(--text); }
+.warn { padding: 12px 14px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--warning) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent); font-size: 14px; line-height: 1.45; color: var(--text); }
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; color: var(--text); cursor: pointer; }
 .check input { flex: none; margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--brand); }
 .progress { margin: 0; font-size: 14px; color: var(--text-muted); text-align: center; }

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Ban, Bell, ChevronLeft, ChevronRight, Code, Gamepad2, Gavel, IdCard, Info, KeyRound, Link, Lock, Mic, Monitor, MonitorSmartphone, Palette, Puzzle, Scale, ScrollText, Settings2, Shield, ShieldCheck, SlidersHorizontal, Smile, Sticker, Tags, Trash2, UserRound, Users, Webhook, X, type LucideIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/common/Button";
@@ -10,6 +10,38 @@ import { unlessUnsaved, useHoldUnsaved, useUnsaved } from "@/stores/unsaved";
 
 import { t } from "@/i18n";
 import { usePortalRoot } from "@/hooks/usePortalRoot";
+/** A picture for each page the settings have, by its id, the same for a user's, a server's and a channel's. */
+const NAV_ICONS: Record<string, LucideIcon> = {
+  account: UserRound,
+  profiles: IdCard,
+  privacy: ShieldCheck,
+  activity: Gamepad2,
+  blocked: Ban,
+  security: KeyRound,
+  devices: MonitorSmartphone,
+  appearance: Palette,
+  customCss: Code,
+  plugins: Puzzle,
+  voice: Mic,
+  notifications: Bell,
+  stickers: Sticker,
+  desktop: Monitor,
+  licenses: Scale,
+  about: Info,
+  admin: Shield,
+  overview: Settings2,
+  roles: Tags,
+  emoji: Smile,
+  integrations: Webhook,
+  encryption: Lock,
+  members: Users,
+  invites: Link,
+  bans: Gavel,
+  audit: ScrollText,
+  permissions: SlidersHorizontal,
+  delete: Trash2,
+};
+
 export interface NavGroup {
   /** The group's heading; without one the group is set apart by a divider instead. */
   head: string;
@@ -146,6 +178,7 @@ export function SettingsLayer({
                         data-nav={it.id}
                         onClick={mobile ? unlessUnsaved(() => open(it.id)) : here ? undefined : unlessUnsaved(() => setPage(it.id))}
                       >
+                        {NAV_ICONS[it.id] ? <NavIcon icon={NAV_ICONS[it.id]!} /> : null}
                         <span className={s.navLabel}>{it.label}</span>
                         {mobile ? <ChevronRight className={[s.navChevron, s.flip].join(" ")} size={18} aria-hidden="true" /> : null}
                       </button>
@@ -171,6 +204,15 @@ export function SettingsLayer({
       )}
     </div>,
     portalRoot,
+  );
+}
+
+/** A settings page's picture in the nav, in a small lit tile. */
+export function NavIcon({ icon: Icon }: { icon: LucideIcon }) {
+  return (
+    <span className={s.navIcon} aria-hidden="true">
+      <Icon size={16} />
+    </span>
   );
 }
 

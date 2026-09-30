@@ -1,6 +1,6 @@
 .grid { display: flex; flex-direction: column; gap: 8px; }
 .group { display: flex; flex-direction: column; }
-.groupHead { margin: 20px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--text-subtle); }
+.groupHead { margin: 22px 0 6px; font-size: 14px; font-weight: 700; color: var(--text-strong); }
 .row { padding: 12px 0; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 /* A role's switch draws its own padding and divider; wrapped in .row as well
    it drew both twice, two lines under every permission. */

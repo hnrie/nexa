@@ -13,11 +13,13 @@ import { describeError } from "@/lib/errors";
 import { FLAG_ADMIN, FLAG_DISABLED, relativeTo } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
+import { usePresence } from "@/stores/presence";
 import { useUI } from "@/stores/ui";
 import { formatStamp } from "@/lib/time";
 import { copyAndSay } from "@/lib/copyText";
 import { t } from "@/i18n";
 import { ModerateModal } from "./ModerateModal";
+import { modStatus, StatusSummary } from "./ModStatus";
 import m from "./Moderation.module.css";
 
 const PAGE = 60;
@@ -175,6 +177,7 @@ export function UserGrid() {
 
   const shows: { id: GridShow; label: string }[] = [
     { id: "all", label: t("moderation.show.all") },
+    { id: "online", label: t("moderation.show.online") },
     { id: "cases", label: t("moderation.show.cases") },
     { id: "muted", label: t("moderation.show.muted") },
     { id: "banned", label: t("moderation.show.banned") },
@@ -262,6 +265,8 @@ export function UserGrid() {
 }
 
 function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner: boolean; onModerate: () => void; onCases: () => void; onMenu: (e: MouseEvent) => void }) {
+  const live = usePresence((p) => p.byUser[u.id]);
+  const st = modStatus(u, live);
   const banner = bannerUrl(u.banner_id, 320);
   const staff = (u.admin_flags & FLAG_ADMIN) !== 0;
   const disabled = (u.admin_flags & FLAG_DISABLED) !== 0;
@@ -296,7 +301,7 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
         ) : null}
       </div>
       <div className={m.cardAvatarWrap}>
-        <Avatar id={u.id} avatarId={u.avatar_id} name={u.display_name} size={64} />
+        <Avatar id={u.id} avatarId={u.avatar_id} name={u.display_name} size={64} status={st.status} />
       </div>
       <div className={m.cardBody}>
         <div className={m.cardName}>
@@ -322,6 +327,7 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
           @{u.username}
           {u.pronouns ? ` · ${u.pronouns}` : ""}
         </span>
+        <StatusSummary st={st} />
         <p className={m.cardAbout} data-empty={!u.about_me || undefined}>
           {u.about_me || t("moderation.noAbout")}
         </p>

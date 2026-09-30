@@ -51,6 +51,22 @@
  "packages": [
   {
    "part": "web",
+   "name": "@fontsource-variable/mona-sans",
+   "version": "5.3.0",
+   "license": "OFL-1.1",
+   "url": "https://fontsource.org/fonts/mona-sans",
+   "copyright": "Copyright 2022 The Mona Sans Project Authors (https://github.com/github/mona-sans), with Reserved Font Name \"Mona\" MonaSans-Italic[wdth,wght].ttf: Copyright 2022 The Mona Sans Project Authors (https://github.com/github/mona-sans), with Reserved Font Name \"Mona\""
+  },
+  {
+   "part": "web",
+   "name": "@fontsource-variable/onest",
+   "version": "5.3.1",
+   "license": "OFL-1.1",
+   "url": "https://fontsource.org/fonts/onest",
+   "copyright": "Copyright 2021 The Onest Project Authors (https://github.com/simpals/onest)"
+  },
+  {
+   "part": "web",
    "name": "@fontsource/jetbrains-mono",
    "version": "5.3.0",
    "license": "OFL-1.1",

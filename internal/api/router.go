@@ -108,6 +108,8 @@ type Server struct {
 	Voice *voice.Registry
 	// hub is the gateway, for whether a guest is still connected (set by WireVoice).
 	hub *gateway.Hub
+	// modHub is the gateway, for the presence the moderation panel shows (set by WireModeration).
+	modHub *gateway.Hub
 	// guestAway notes when each guest was first seen with no connection.
 	guestAway guestAwayTimes
 	// Realtime sends calls through Cloudflare Realtime SFU when configured, and

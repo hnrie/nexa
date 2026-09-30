@@ -199,6 +199,21 @@ export function Composer({ channel }: { channel: Channel }) {
   /** Something the box has to say: a paste too long for a message, files that did not fit. */
   const [notice, setNotice] = useState<Notice | null>(null);
 
+  /**
+   * Puts the caret at `pos` on the next frame, once the box shows `value`,
+   * unless something has been typed since. A frame can come late (a busy page,
+   * a tab in the background), and moving the caret back then split the words
+   * typed after an emoji from the picker in two.
+   */
+  const caretOnceShown = (value: string, pos: number, focus = false) => {
+    requestAnimationFrame(() => {
+      const el = taRef.current;
+      if (!el || el.value !== value) return;
+      if (focus) el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
   useEffect(() => {
     const open = () => setPicker(true);
     window.addEventListener("ec:open-emoji", open);
@@ -215,10 +230,7 @@ export function Composer({ channel }: { channel: Channel }) {
       touched.current = true;
       setText(next);
       persistDraft(next);
-      setTimeout(() => {
-        ta?.focus();
-        ta?.setSelectionRange(caret + detail.length, caret + detail.length);
-      }, 0);
+      caretOnceShown(next, caret + detail.length, true);
     };
     window.addEventListener("ec:insert-text", onInsert);
     return () => window.removeEventListener("ec:insert-text", onInsert);
@@ -424,8 +436,7 @@ export function Composer({ channel }: { channel: Channel }) {
     if (closed) {
       value = closed.value;
       caret = closed.caret;
-      const at = caret;
-      requestAnimationFrame(() => taRef.current?.setSelectionRange(at, at));
+      caretOnceShown(value, caret);
     }
     touched.current = true;
     setText(value);
@@ -461,13 +472,7 @@ export function Composer({ channel }: { channel: Channel }) {
     setText(next);
     persistDraft(next);
     setAc(null);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (!el) return;
-      el.focus();
-      const pos = start + insert.length;
-      el.setSelectionRange(pos, pos);
-    });
+    caretOnceShown(next, start + insert.length, true);
   };
 
   /**
@@ -630,12 +635,7 @@ export function Composer({ channel }: { channel: Channel }) {
     setText(value);
     persistDraft(value);
     setAc(null);
-    requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(value.length, value.length);
-    });
+    caretOnceShown(value, value.length, true);
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {

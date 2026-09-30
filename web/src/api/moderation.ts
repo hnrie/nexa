@@ -9,7 +9,7 @@
  */
 import { api } from "./client";
 import type { BugCounts, BugMessage, MemberBug } from "./bugs";
-import type { PublicUser, Snowflake } from "./types";
+import type { Activity, PublicUser, Snowflake } from "./types";
 
 export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete";
 export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status";
@@ -172,6 +172,13 @@ export interface ModUser extends PublicUser {
   ban: Restriction | null;
   /** Why the viewer cannot act on this account ("" when they can). */
   blocked: BlockReason;
+  /**
+   * How the account looks to everyone as it was loaded: online, idle, do not
+   * disturb or offline (someone invisible looks offline here too), and what
+   * they are doing. Their custom status is the profile's own status fields,
+   * which are kept while they are away. Absent from older servers.
+   */
+  presence?: { status: "online" | "idle" | "dnd" | "offline"; activities?: Activity[] };
 }
 
 export interface ModLogEntry {
@@ -188,7 +195,7 @@ export interface ModLogEntry {
   created_at: number;
 }
 
-export type GridShow = "all" | "muted" | "banned" | "staff" | "cases" | "disabled";
+export type GridShow = "all" | "online" | "muted" | "banned" | "staff" | "cases" | "disabled";
 export type GridSort = "newest" | "oldest" | "name";
 export type CaseView = "needs_reply" | "open" | "in_effect" | "closed" | "all";
 

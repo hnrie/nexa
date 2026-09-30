@@ -9,33 +9,102 @@
    and it does cost something: the status popover over the user panel is wider
    than the sidebar on purpose, and `overflow: hidden` cut its right-hand edge
    clean off, on phones and on the desktop alike. */
-.app { display: grid; grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100%; height: 100dvh; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); background: var(--bg-base); overflow: hidden; }
-.rail { grid-column: 1; min-width: 0; min-height: 0; }
-.sidebar { grid-column: 2; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-/* the conversation is a panel of its own: a hairline down its edge and round its
-   corner keeps it apart from the sidebar where the two colours are close, or
-   both black */
-.main { grid-column: 3; min-width: 0; display: flex; flex-direction: column; background: var(--bg-raised); border-inline-start: 1px solid var(--border-subtle); border-start-start-radius: var(--radius-md); overflow: hidden; position: relative; }
+/*
+ * The rail stands on the canvas; the sidebar and the conversation float over
+ * it as two panels with a gutter between them, each lit along its top edge
+ * and throwing a soft shadow (tokens.css, the depth block). A faint glow of
+ * the accent comes up from the top corner, behind everything.
+ */
+.app {
+  --gutter: 8px;
+  display: grid;
+  grid-template-columns: var(--rail-w) var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--gutter);
+  height: 100%;
+  height: 100dvh;
+  padding-top: calc(env(safe-area-inset-top) + var(--gutter));
+  padding-bottom: var(--gutter);
+  padding-left: env(safe-area-inset-left);
+  padding-right: calc(env(safe-area-inset-right) + var(--gutter));
+  background:
+    radial-gradient(1100px 620px at -8% -12%, var(--canvas-glow), transparent 64%),
+    radial-gradient(900px 700px at 108% 110%, color-mix(in srgb, var(--canvas-glow) 55%, transparent), transparent 60%),
+    var(--bg-canvas);
+  overflow: hidden;
+}
+.rail { grid-column: 1; min-width: 0; min-height: 0; margin-top: calc(-1 * var(--gutter)); margin-bottom: calc(-1 * var(--gutter)); }
+.sidebar {
+  grid-column: 2;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border-radius: var(--radius-lg);
+  background: var(--bg-base);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-panel);
+  /* what a channel glyph's corner badge is cut out of, on this panel (ChannelGlyph) */
+  --glyph-cut: var(--bg-base);
+}
+/* the conversation is a panel of its own, the brightest thing on the canvas */
+.main {
+  grid-column: 3;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-panel);
+  overflow: hidden;
+  /* the rounded corners clip what scrolls inside, the call stage's video included */
+  isolation: isolate;
+  --glyph-cut: var(--bg-raised);
+}
 .page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .page > * { flex: 1; min-height: 0; }
 .backdrop { display: none; }
 /* in the flow, above the tabs, rather than over the top of the page: laid over
    it, it hid the chat header and most of the phone's menu button */
-.connection { flex: none; padding: 6px 12px; text-align: center; font-size: 13px; font-weight: 600; background: var(--warning); color: var(--on-warning); }
+.connection { flex: none; padding: 7px 12px; text-align: center; font-size: 13px; font-weight: 650; background: var(--warning); color: var(--on-warning); animation: connIn var(--dur-slow) var(--ease-out); }
 /* white on --danger is 4.4:1; the darker shade the palette already carries
    takes the same white to 5.6:1, and a disconnection may as well look graver */
 .connection[data-state="closed"] { background: var(--danger-hover); color: var(--on-danger); }
+@keyframes connIn { from { transform: translateY(-100%); opacity: 0; } }
 
 @media (max-width: 767px) {
-  .app { display: block; position: relative; }
+  .app { display: block; position: relative; padding: 0; padding-top: env(safe-area-inset-top); background: var(--bg-raised); }
   /* the drawer's own row, for the same reason and with the same care about
-     what hangs out of it */
-  .drawer { position: fixed; top: 0; bottom: 0; inset-inline-start: 0; z-index: 40; display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); width: calc(100% - 56px); max-width: 420px; padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-bottom: env(safe-area-inset-bottom); background: var(--bg-base); transform: translateX(-100%); transition: transform 200ms ease; box-shadow: none; }
-  [dir="rtl"] .drawer { transform: translateX(100%); padding-left: 0; padding-right: env(safe-area-inset-right); }
+     what hangs out of it; it floats over the conversation as the desktop's
+     canvas does, with the sidebar as a panel on it */
+  .drawer {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    inset-inline-start: 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    width: calc(100% - 56px);
+    max-width: 420px;
+    padding-top: calc(env(safe-area-inset-top) + 8px);
+    padding-left: env(safe-area-inset-left);
+    padding-right: 8px;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+    background: radial-gradient(520px 420px at -10% -8%, var(--canvas-glow), transparent 66%), var(--bg-canvas);
+    border-start-end-radius: var(--radius-lg);
+    border-end-end-radius: var(--radius-lg);
+    transform: translateX(-100%);
+    transition: transform 260ms var(--ease-out), box-shadow 260ms var(--ease-out);
+    box-shadow: none;
+  }
+  [dir="rtl"] .drawer { transform: translateX(100%); padding-left: 8px; padding-right: env(safe-area-inset-right); }
   .drawer[data-open="true"], [dir="rtl"] .drawer[data-open="true"] { transform: translateX(0); box-shadow: var(--shadow-high); }
-  .rail { grid-column: 1; }
+  .rail { grid-column: 1; margin: -8px 0 -8px; }
   .sidebar { grid-column: 2; height: 100%; }
-  .main { height: 100%; border-radius: 0; border-inline-start: 0; }
-  .backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: var(--bg-overlay); opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
+  .main { height: 100%; border-radius: 0; box-shadow: none; }
+  .backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: var(--bg-overlay); opacity: 0; pointer-events: none; transition: opacity 260ms var(--ease-out); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
   .backdrop[data-open="true"] { opacity: 1; pointer-events: auto; }
 }

@@ -1,7 +1,7 @@
 /* The block dialog: what blocking does, then the two choices about their messages. */
 .body { margin: 0 0 16px; font-size: 16px; line-height: 1.4; color: var(--text); }
 .choices { display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: var(--radius-sm); background: var(--bg-surface); }
-.choice { display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border-radius: var(--radius-xs); cursor: pointer; }
+.choice { display: flex; align-items: flex-start; gap: 12px; padding: 11px 13px; border-radius: var(--radius-md); cursor: pointer; }
 .choice:hover { background: var(--bg-hover); }
 /* the second choice hangs off the first, lined up under its words */
 .choice[data-nested] { padding-inline-start: 42px; }

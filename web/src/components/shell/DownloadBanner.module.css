@@ -1,14 +1,16 @@
 /* the invitation to install the desktop app, above the main column in a desktop browser */
-.banner { flex: none; display: flex; align-items: center; gap: 12px; min-height: 40px; padding-block: 4px; padding-inline: 16px 8px; background: var(--brand); color: var(--on-brand); font-size: 14px; }
+/* the accent's own band across the top of the conversation, lit from above like its buttons */
+.banner { flex: none; display: flex; align-items: center; gap: 12px; min-height: 42px; padding-block: 5px; padding-inline: 16px 8px; background: var(--grad-brand); color: var(--on-brand); font-size: 14px; box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.18); animation: bannerIn 320ms var(--ease-out); }
+@keyframes bannerIn { from { opacity: 0; transform: translateY(-6px); } }
 .icon { flex: none; display: flex; }
 .text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .text b { font-weight: 600; }
-.download { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: var(--radius-xs); background: var(--on-brand); color: var(--brand); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.download { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; border-radius: 999px; background: var(--on-brand); color: var(--brand); font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18); }
 .download:hover { background: rgba(255, 255, 255, 0.9); text-decoration: none; }
 .download:disabled { cursor: default; opacity: 0.85; }
 .other { flex: none; color: var(--on-brand); font-size: 13px; font-weight: 500; opacity: 0.9; white-space: nowrap; }
 .other:hover { opacity: 1; text-decoration: underline; }
-.close { flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-xs); color: var(--on-brand); }
+.close { flex: none; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--on-brand); }
 .close:hover { background: rgba(255, 255, 255, 0.16); }
 /* set apart from the offer by space and weight rather than a dash; a phone's
    row is tight, so there the tagline goes and the offer itself stays */

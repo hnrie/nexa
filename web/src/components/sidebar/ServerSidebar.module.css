@@ -1,8 +1,10 @@
-.sidebar { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg-base); }
-.head { flex: none; height: var(--header-h); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border-subtle); color: var(--text-strong); font-size: 16px; font-weight: 600; width: 100%; text-align: start; transition: background-color var(--transition); }
+/* the panel itself is AppShell's; its top corners are the sidebar's too, round the banner */
+.sidebar { display: flex; flex-direction: column; height: 100%; min-height: 0; background: transparent; border-radius: inherit; }
+.head { flex: none; height: var(--header-h); display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--border-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; color: var(--text-strong); font-family: var(--font-display); font-stretch: 108%; font-size: 16px; font-weight: 750; letter-spacing: -0.005em; width: 100%; text-align: start; transition: background-color var(--transition); }
 .head:hover, .head[data-open="true"] { background: var(--bg-hover); }
 .headName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; }
+.sidebar[data-banner="true"] .scroll { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .top { height: 12px; }
 /* A server banner sits at the top of the list, under the name, and scrolls
    away with it; the header floats over it until the list has passed it. */
@@ -17,15 +19,17 @@
 .sidebar[data-banner="true"] .head[data-over-banner="true"]:hover, .sidebar[data-banner="true"] .head[data-over-banner="true"][data-open="true"] { background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.4) 60%, rgba(0, 0, 0, 0)) border-box; }
 .banner { height: 138px; margin-inline: -8px; margin-bottom: 12px; background-size: cover; background-position: center; }
 .category { margin-top: 16px; }
-.catHead { position: relative; display: flex; align-items: center; justify-content: space-between; height: 24px; padding-inline-end: 4px; color: var(--text-channel); }
+.catHead { position: relative; display: flex; align-items: center; justify-content: space-between; height: 26px; padding-inline-end: 4px; color: var(--text-muted); }
 .catHead:hover { color: var(--text); }
-.catToggle { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; height: 100%; padding-inline-start: 2px; color: inherit; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; text-align: start; }
+.catToggle { display: flex; align-items: center; gap: 2px; min-width: 0; flex: 1; height: 100%; padding-inline-start: 2px; color: inherit; font-size: 12.5px; font-weight: 650; letter-spacing: 0.01em; text-align: start; }
 .catName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .catAdd { display: flex; padding: 2px; color: inherit; border-radius: var(--radius-xs); opacity: 0; }
 .catAdd:hover { color: var(--text-strong); }
-.row { position: relative; display: flex; align-items: center; height: 34px; margin: 1px 0; padding-inline-end: 4px; border-radius: var(--radius-xs); color: var(--text-channel); }
+.row { position: relative; display: flex; align-items: center; height: 36px; margin: 2px 0; padding-inline-end: 4px; border-radius: var(--radius-sm); color: var(--text-channel); transition: background-color var(--transition), color var(--transition), box-shadow var(--transition); }
 .row:hover { background: var(--bg-hover); color: var(--text); }
-.row[data-selected="true"] { background: var(--bg-selected); color: var(--text-strong); }
+/* the channel you are in is a tile lifted off the panel, its glyph in the accent */
+.row[data-selected="true"] { background: var(--sheen), var(--bg-selected); color: var(--text-strong); box-shadow: inset 0 1px 0 var(--edge-light), 0 1px 2px color-mix(in srgb, var(--shade) 35%, transparent); }
+.row[data-selected="true"] .icon { color: var(--text-brand); }
 .row[data-unread="true"] { color: var(--text-strong); }
 .row[data-unread="true"]::before { content: ""; position: absolute; inset-inline-start: -8px; top: 50%; width: 4px; height: 8px; margin-top: -4px; border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--text-strong); }
 .row[data-muted="true"] { opacity: 0.6; }
@@ -34,17 +38,19 @@
 .row[data-drop="before"]::after, .catHead[data-drop="before"]::after { top: -2px; }
 .row[data-drop="after"]::after, .catHead[data-drop="after"]::after { bottom: -2px; }
 .catHead[data-drop="into"] { box-shadow: inset 0 0 0 2px var(--brand); border-radius: var(--radius-xs); }
-.channel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; height: 100%; padding: 0 8px; color: inherit; font-size: 16px; font-weight: 500; text-align: start; }
+.channel { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 100%; padding: 0 8px; color: inherit; font-size: 15.5px; font-weight: 550; text-align: start; }
 .icon { display: flex; flex: none; color: var(--text-muted); }
 /* the colour behind a glyph's corner badge (a lock, a speaker), so it reads as cut out */
 .row { --glyph-cut: var(--bg-base); }
-.row[data-selected="true"], .row:hover { --glyph-cut: var(--bg-selected); }
+/* the row's own colour, laid over the panel's as the row draws it, so the badge's patch matches it exactly */
+.row:hover { --glyph-cut: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--bg-base); }
+.row[data-selected="true"] { --glyph-cut: linear-gradient(var(--bg-selected), var(--bg-selected)), var(--bg-base); }
 .catGlyph { margin-inline: 2px 4px; }
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: none; gap: 4px; }
 .action { display: flex; padding: 2px; color: var(--text-muted); border-radius: var(--radius-xs); }
 .action:hover { color: var(--text-strong); }
-.mention { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: var(--on-danger); font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; margin-inline-start: 4px; flex: none; }
+.mention { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--grad-danger); color: var(--on-danger); font-size: 12px; font-weight: 700; line-height: 1; display: inline-flex; align-items: center; justify-content: center; margin-inline-start: 4px; flex: none; font-variant-numeric: tabular-nums; box-shadow: 0 2px 6px color-mix(in srgb, var(--danger) 40%, transparent); }
 .empty { padding: 24px 8px; color: var(--text-muted); font-size: 14px; text-align: center; }
 .limit { margin-inline-start: auto; font-size: 12px; color: var(--text-muted); }
 /* Buttons that show on hover stay hover-only: on a touch screen iOS treats a

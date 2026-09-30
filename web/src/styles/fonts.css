@@ -1,3 +1,12 @@
+/*
+ * Onest sets everything people read and click: open, friendly letters that
+ * stay clear at the small sizes a chat is made of, with Cyrillic of its own.
+ * Mona Sans, stretched wide and heavy, is kept for names and titles, the way
+ * the wordmark's letters are wide and heavy. Noto Sans stays behind both for
+ * the scripts they do not cover, and is only fetched when one turns up.
+ */
+@import "@fontsource-variable/onest/index.css";
+@import "@fontsource-variable/mona-sans/wdth.css";
 @import "@fontsource/noto-sans/400.css";
 @import "@fontsource/noto-sans/500.css";
 @import "@fontsource/noto-sans/600.css";

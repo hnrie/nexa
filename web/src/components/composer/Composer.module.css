@@ -1,6 +1,7 @@
-.wrap { flex: none; position: relative; padding: 0 16px 24px; }
-.replyBar { display: flex; align-items: center; justify-content: space-between; height: 36px; padding: 0 16px; background: var(--bg-surface); border-radius: var(--radius-sm) var(--radius-sm) 0 0; font-size: 14px; color: var(--text-muted); }
-.replyBar + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+.wrap { flex: none; position: relative; padding: 0 16px 22px; }
+.replyBar { display: flex; align-items: center; justify-content: space-between; height: 38px; padding: 0 16px; background: color-mix(in srgb, var(--brand) 9%, var(--bg-surface)); border-radius: var(--radius-md) var(--radius-md) 0 0; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); font-size: 14px; color: var(--text-muted); animation: barIn 180ms var(--ease-out); }
+@keyframes barIn { from { opacity: 0; transform: translateY(6px); } }
+.replyBar + .box { border-radius: 0 0 var(--radius-md) var(--radius-md); }
 .replyBar b { color: var(--text); font-weight: 600; }
 .replyWho { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .replyWords { margin-inline-start: 8px; color: var(--text-muted); unicode-bidi: isolate; }
@@ -10,68 +11,74 @@
 .closeBtn { display: inline-flex; color: var(--text-muted); }
 .closeBtn:hover { color: var(--text); }
 /* the eye's preview: the message as it will look once sent, seen only by the one writing it */
-.preview { margin-bottom: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-surface); max-height: min(40vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
+.preview { margin-bottom: 8px; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); background: var(--bg-surface); max-height: min(40vh, 320px); overflow-y: auto; overscroll-behavior: contain; }
 .previewHead { display: flex; align-items: center; gap: 6px; padding: 8px 10px 0 16px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .previewNote { flex: 1; min-width: 0; }
 .previewMsg { display: flex; align-items: flex-start; gap: 16px; padding: 6px 16px 12px; }
 .previewBody { flex: 1; min-width: 0; }
 .previewName { font-size: 16px; font-weight: 500; line-height: 22px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the files waiting to go: how many of how many, then a strip that scrolls sideways */
-.trayWrap { background: var(--bg-composer); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+.trayWrap { background: var(--bg-composer); border-radius: var(--radius-md) var(--radius-md) 0 0; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle); }
 .trayHead { display: flex; justify-content: space-between; gap: 8px; padding: 10px 16px 0; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .traySize { font-weight: 500; font-variant-numeric: tabular-nums; }
 .tray { display: flex; gap: 12px; padding: 12px 16px 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
-.trayWrap + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); border-top: 1px solid var(--border-subtle); }
-.card { position: relative; width: 200px; flex: none; padding: 8px; border-radius: var(--radius-xs); background: var(--bg-surface); border: 1px solid var(--border-subtle); scroll-snap-align: start; }
+.trayWrap + .box { border-radius: 0 0 var(--radius-md) var(--radius-md); border-top: 1px solid var(--border-subtle); }
+.card { position: relative; width: 200px; flex: none; padding: 8px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-low); scroll-snap-align: start; }
 /* what the box has to say before it goes on: a paste too long for a message, files that did not fit */
-.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 40px; padding-block: 6px; padding-inline: 16px 8px; background: var(--bg-surface); border-radius: var(--radius-sm) var(--radius-sm) 0 0; border-inline-start: 3px solid var(--warning); font-size: 14px; color: var(--text); }
+.notice { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 40px; padding-block: 6px; padding-inline: 16px 8px; background: var(--bg-surface); border-radius: var(--radius-md) var(--radius-md) 0 0; border-inline-start: 3px solid var(--warning); font-size: 14px; color: var(--text); }
 .noticeText { flex: 1 1 0; min-width: 0; line-height: 1.35; overflow-wrap: anywhere; }
 .noticeActions { order: 1; flex: none; display: flex; align-items: center; gap: 6px; }
 .noticeClose { order: 2; }
-.noticeMain, .noticeAlt { min-height: 32px; padding: 0 12px; border-radius: var(--radius-xs); font-size: 13px; font-weight: 600; white-space: nowrap; }
-.noticeMain { background: var(--brand); color: var(--on-brand); }
+.noticeMain, .noticeAlt { min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.noticeMain { background: var(--grad-brand); color: var(--on-brand); }
 .noticeMain:hover { background: var(--brand-hover); }
 .noticeAlt { background: var(--bg-active); color: var(--text); }
 .noticeAlt:hover { background: var(--bg-hover); }
 /* stacked bars share one rounded outline with the box under them */
 .notice + .replyBar, .notice + .trayWrap, .replyBar + .trayWrap { border-radius: 0; }
-.notice + .box { border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
-.thumb { width: 100%; height: 130px; object-fit: contain; border-radius: var(--radius-xs); background: var(--bg-input); display: flex; align-items: center; justify-content: center; color: var(--text-muted); overflow: hidden; }
+.notice + .box { border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.thumb { width: 100%; height: 130px; object-fit: contain; border-radius: var(--radius-sm); background: var(--bg-input); display: flex; align-items: center; justify-content: center; color: var(--text-muted); overflow: hidden; }
 .thumb img, .thumb video { width: 100%; height: 100%; object-fit: contain; }
 .thumb[data-spoiler="true"] img, .thumb[data-spoiler="true"] video { filter: blur(20px); }
 .fname { margin-top: 6px; font-size: 14px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fsize { font-size: 12px; color: var(--text-muted); }
-.cardBtns { position: absolute; top: -8px; inset-inline-end: -8px; display: flex; background: var(--bg-floating); border-radius: var(--radius-xs); box-shadow: var(--shadow-low); }
+.cardBtns { position: absolute; top: -8px; inset-inline-end: -8px; display: flex; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium); overflow: hidden; }
 .cardBtn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
 .cardBtn:hover { color: var(--text); background: var(--bg-hover); }
 .cardBtn[data-on="true"] { color: var(--text-brand); }
 .cardBtn.del:hover { color: var(--danger); }
-.box { display: flex; align-items: flex-end; background: var(--bg-composer); border-radius: var(--radius-sm); min-height: 44px; }
-.attach { flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: var(--icon); }
-.attach:hover { color: var(--text); }
+/* the message box floats at the foot of the conversation, and lights up round its edge while it is written in */
+.box { display: flex; align-items: flex-end; background: var(--bg-composer); border-radius: var(--radius-md); min-height: 48px; box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-medium); transition: box-shadow var(--dur) var(--ease-out); }
+.box:focus-within { box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px color-mix(in srgb, var(--focus-ring) 45%, var(--border-subtle)), 0 0 0 4px color-mix(in srgb, var(--focus-ring) 10%, transparent), var(--shadow-medium); }
+.attach { flex: none; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; color: var(--icon); transition: color var(--transition), transform var(--dur) var(--ease-spring); }
+.attach:hover { color: var(--text-strong); transform: rotate(90deg); }
 .attach:disabled { opacity: 0.5; }
-.ta { flex: 1; min-width: 0; margin: 11px 0; padding-block: 0; padding-inline: 0 8px; background: transparent; border: 0; outline: none; resize: none; color: var(--text); font-size: 16px; line-height: 22px; font-family: var(--font-with-emoji); max-height: 50vh; }
+.ta { flex: 1; min-width: 0; margin: 13px 0; padding-block: 0; padding-inline: 0 8px; background: transparent; border: 0; outline: none; resize: none; color: var(--text); font-size: 16px; line-height: 22px; font-family: var(--font-with-emoji); max-height: 50vh; }
 /* each line takes the direction of what is typed on it: English in an Arabic interface, or the other way round */
 .ta { unicode-bidi: plaintext; }
 .ta:focus, .ta:focus-visible { outline: none; box-shadow: none; }
 .ta::placeholder { color: var(--text-placeholder); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ta:disabled { opacity: 0.6; }
-.btns { flex: none; display: flex; align-items: center; height: 44px; padding-inline-end: 6px; gap: 2px; }
-.iconBtn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--icon); border-radius: var(--radius-xs); }
-.iconBtn:hover { color: var(--text); }
-.iconBtn[data-on="true"] { color: var(--text-brand); }
-.send { color: var(--text-brand); }
+.btns { flex: none; display: flex; align-items: center; height: 48px; padding-inline-end: 6px; gap: 2px; }
+.iconBtn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--icon); border-radius: var(--radius-sm); transition: background-color var(--transition), color var(--transition), transform 90ms var(--ease-out); }
+.iconBtn:hover { color: var(--text-strong); background: var(--bg-hover); }
+.iconBtn:active { transform: scale(0.92); }
+.iconBtn[data-on="true"] { color: var(--text-brand); background: color-mix(in srgb, var(--brand) 14%, transparent); }
+/* Send: the accent's own button, round, once there is something to send */
+.send { color: var(--on-brand); background: var(--grad-brand); border-radius: 50%; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 4px 12px -4px color-mix(in srgb, var(--brand) 80%, transparent); }
+.send:hover { color: var(--on-brand); background: var(--grad-brand); filter: brightness(1.08); }
 .counter { position: absolute; inset-inline-end: 30px; bottom: 4px; font-size: 12px; color: var(--text-muted); }
 .counter[data-over="true"] { color: var(--text-danger); font-weight: 600; }
-.ac { position: absolute; inset-inline: 16px; bottom: 100%; margin-bottom: 8px; z-index: 40; background: var(--bg-floating); border-radius: var(--radius-sm); box-shadow: var(--shadow-high); border: 1px solid var(--border-subtle); padding: 8px; max-height: min(456px, 45dvh); overflow-y: auto; overscroll-behavior: contain; }
-.acHead { padding: 4px 8px 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); }
-.acRow { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 8px; border-radius: var(--radius-xs); color: var(--text); text-align: start; font-size: 15px; }
+.ac { position: absolute; inset-inline: 16px; bottom: 100%; margin-bottom: 10px; z-index: 40; background: var(--bg-floating); border-radius: var(--radius-md); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); padding: 8px; max-height: min(456px, 45dvh); overflow-y: auto; overscroll-behavior: contain; animation: acIn 160ms var(--ease-out); }
+@keyframes acIn { from { opacity: 0; transform: translateY(6px); } }
+.acHead { padding: 4px 8px 8px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); }
+.acRow { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 8px; border-radius: var(--radius-sm); color: var(--text); text-align: start; font-size: 15px; }
 /* a heading between groups (members, then roles) gets a little air above it */
 .acRow + .acHead { margin-top: 4px; }
 /* the name keeps its room (up to most of the row); the grey line after it takes what is left, on one line */
 .acName { flex: none; max-width: 65%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acIcon { flex: none; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
-.acRow[data-selected="true"] { background: var(--bg-selected); }
+.acRow[data-selected="true"] { background: color-mix(in srgb, var(--brand) 18%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 24%, transparent); }
 .acEmoji { font-size: 22px; width: 28px; text-align: center; }
 .acEmojiImg { width: 22px; height: 22px; margin: 0 3px; object-fit: contain; flex: none; }
 .acSub { flex: 1 1 0; min-width: 0; padding-inline-start: 8px; text-align: end; color: var(--text-muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -93,7 +100,7 @@
 /* every touch screen gets a send button, a tablet as much as a phone; a computer when it is asked for */
 @media (max-width: 767px), (pointer: coarse) { .sendMobile { display: flex; } }
 .sendMobile.sendShown { display: flex; }
-.send:disabled { opacity: 0.5; cursor: default; }
+.send:disabled { opacity: 1; cursor: default; background: transparent; color: var(--text-muted); box-shadow: none; filter: none; }
 .locked { align-items: center; padding: 0 16px; color: var(--text-muted); font-size: 16px; cursor: not-allowed; }
 .attachSpacer { width: 16px; flex: none; }
 .slowmode { position: absolute; inset-inline-start: 30px; bottom: 4px; pointer-events: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
