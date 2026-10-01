@@ -790,7 +790,7 @@ export interface PostPoll {
  * and drawn here as a post: who wrote it, what it says, its pictures and video.
  */
 export interface SocialPost {
-  /** What its card keys its look on: "twitter", "bluesky", "tiktok", "instagram", "reddit", "telegram", "threads", "mastodon". */
+  /** What its card keys its look on: "twitter", "bluesky", "tiktok", "instagram", "reddit", "telegram", "threads", "mastodon", "youtube". */
   platform: string;
   /** The service's name as people say it. */
   site?: string;
@@ -825,6 +825,10 @@ export interface SocialPost {
   sensitive?: boolean;
   /** A note readers added under it. */
   note?: string;
+  /** How many people follow the YouTube channel a video is on. */
+  subscribers?: number;
+  /** "now" for a stream that is on, "upcoming" for one yet to start. */
+  live?: "now" | "upcoming";
 }
 
 export interface UnfurlResult {
@@ -837,6 +841,8 @@ export interface UnfurlResult {
   image_w?: number;
   image_h?: number;
   video_id?: string;
+  /** Where in a YouTube video its link asks it to start, in seconds. */
+  video_start?: number;
   mime?: string;
   color?: string;
   author?: string;

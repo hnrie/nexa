@@ -626,20 +626,29 @@ func TestCaseThread(t *testing.T) {
 	if thread["case"].(map[string]any)["unread"].(float64) != 0 {
 		t.Errorf("still unread: %v", thread["case"])
 	}
-	// closing it, and the member writing again, opens it again
+	// a closed case is closed to everyone: the member cannot write in it or
+	// open it again by writing, and neither can staff until they reopen it
 	if res, body := do(t, ts, "POST", "/api/v1/moderation/cases/"+cid+"/close", modTok, nil); res.StatusCode != 200 || body["case"].(map[string]any)["status"] != "closed" {
 		t.Fatalf("close: %d %v", res.StatusCode, body)
 	}
 	res, body = do(t, ts, "POST", "/api/v1/nexa/cases/"+cid+"/messages", tok, map[string]any{"body": "one more thing"})
-	if res.StatusCode != 201 || body["case"].(map[string]any)["status"] != "open" {
-		t.Errorf("reply on a closed case: %d %v", res.StatusCode, body)
+	if res.StatusCode != 409 || errCode(body) != "case_closed" {
+		t.Errorf("member reply on a closed case: %d %v", res.StatusCode, body)
 	}
-	events := []string{}
-	for _, m := range body["messages"].([]any) {
-		events = append(events, m.(map[string]any)["kind"].(string)+":"+m.(map[string]any)["event"].(string))
+	if res, body := do(t, ts, "POST", "/api/v1/moderation/cases/"+cid+"/messages", mod2Tok, map[string]any{"body": "and another"}); res.StatusCode != 409 || errCode(body) != "case_closed" {
+		t.Errorf("staff reply on a closed case: %d %v", res.StatusCode, body)
 	}
-	if strings.Join(events, ",") != "system:reopened,member:" {
-		t.Errorf("lines: %v", events)
+	_, thread = do(t, ts, "GET", "/api/v1/nexa/cases/"+cid, tok, nil)
+	if thread["case"].(map[string]any)["status"] != "closed" || len(thread["messages"].([]any)) != len(msgs)+1 {
+		t.Errorf("the refused lines changed the case: %v", thread)
+	}
+	// staff open it again on purpose, and then both can write
+	if res, body := do(t, ts, "POST", "/api/v1/moderation/cases/"+cid+"/reopen", modTok, nil); res.StatusCode != 200 || body["case"].(map[string]any)["status"] != "open" {
+		t.Fatalf("reopen: %d %v", res.StatusCode, body)
+	}
+	res, body = do(t, ts, "POST", "/api/v1/nexa/cases/"+cid+"/messages", tok, map[string]any{"body": "one more thing"})
+	if res.StatusCode != 201 || body["case"].(map[string]any)["status"] != "open" || len(body["messages"].([]any)) != 1 {
+		t.Errorf("reply on a reopened case: %d %v", res.StatusCode, body)
 	}
 	// the staff's view of the user
 	_, user := do(t, ts, "GET", "/api/v1/moderation/users/"+id, modTok, nil)

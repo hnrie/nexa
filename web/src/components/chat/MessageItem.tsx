@@ -38,7 +38,7 @@ import { menuAnchor } from "@/components/common/ContextMenu";
 import { copyText } from "@/lib/clipboard";
 import { MSG_FLAG_PINNED } from "@/api/types";
 import { discardPending, retryPending } from "@/components/composer/send";
-import { buildMessageMenu, canDelete, canEdit, canPick, canPin, canReact, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
+import { buildMessageMenu, canDelete, canEdit, canRemoveEmbeds, confirmRemoveEmbeds, canPick, canPin, canReact, copyMessageLink, deleteMessageNow, markUnread, messageTimes, togglePin } from "./messageMenu";
 import { useRowActive } from "./activeRow";
 import { useShownName } from "./useShownName";
 import { HookAvatar, HookPopout, HookTags } from "./webhook/HookHeader";
@@ -331,7 +331,7 @@ export function MessageBody({ msg, name, id, pending, upload }: { msg: Decrypted
       {msg.payload?.sticker ? <StickerView sticker={msg.payload.sticker} /> : null}
       {msg.payload?.poll && !hook ? <PersonPoll msg={msg} poll={msg.payload.poll} pending={!!pending} /> : null}
       {upload ? <UploadCard channelId={msg.channel_id} tmpId={msg.id} upload={upload} failed={pending === "failed"} /> : msg.payload?.att?.length ? <Attachments list={msg.payload.att} from={name} /> : null}
-      {embeds ? <Embeds list={embeds} /> : null}
+      {embeds ? <Embeds list={embeds} onRemove={!pending && canRemoveEmbeds(msg) ? (ev) => confirmRemoveEmbeds(msg, ev.shiftKey) : undefined} /> : null}
       {hook ? <HookBody msg={msg} from={name} /> : null}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <InviteCards nodes={nodes} embeds={embeds ?? (hook?.link_embeds.length ? hook.link_embeds : null)} />}
       {msg.flags & MSG_FLAG_SUPPRESS_EMBEDS ? null : <NoteCards nodes={nodes} />}

@@ -3,8 +3,8 @@
  * the ban screen and the staff's panel all describe the same action the same
  * way — in the reader's language.
  */
-import { Ban, Eraser, ImageOff, KeyRound, Lock, LockOpen, Megaphone, MessageSquareOff, ShieldMinus, ShieldPlus, UserX, type LucideIcon } from "lucide-react";
-import type { CaseDetails, CaseMessage, MemberCase, ModAction, ModLogEntry, People, Person, ResetField } from "@/api/moderation";
+import { Ban, Eraser, ImageOff, KeyRound, Lock, LockOpen, Megaphone, MessageSquareOff, ServerCog, ShieldMinus, ShieldPlus, UserX, type LucideIcon } from "lucide-react";
+import type { CaseDetails, CaseMessage, MemberCase, ModAction, ModLogEntry, People, Person, ResetField, ServerField } from "@/api/moderation";
 import type { BugStatus } from "@/api/bugs";
 import { bugStatusLabel } from "@/lib/bugs";
 import { formatStamp } from "@/lib/time";
@@ -33,6 +33,7 @@ export function severity(action: string): Severity {
     case "mute":
     case "field_reset":
     case "avatar_remove":
+    case "server_reset":
     case "admin_revoke":
       return "warn";
     default:
@@ -46,6 +47,8 @@ export function actionIcon(action: string): LucideIcon {
       return ImageOff;
     case "field_reset":
       return Eraser;
+    case "server_reset":
+      return ServerCog;
     case "mute":
       return MessageSquareOff;
     case "ban":
@@ -77,6 +80,8 @@ export function actionLabel(action: string): string {
       return t("moderation.action.avatarRemove");
     case "field_reset":
       return t("moderation.action.fieldReset");
+    case "server_reset":
+      return t("moderation.action.serverReset");
     case "mute":
       return t("moderation.action.mute");
     case "ban":
@@ -106,7 +111,7 @@ export function actionLabel(action: string): string {
   }
 }
 
-export function fieldLabel(f: ResetField): string {
+export function fieldLabel(f: ResetField | ServerField): string {
   switch (f) {
     case "username":
       return t("moderation.field.username");
@@ -116,6 +121,16 @@ export function fieldLabel(f: ResetField): string {
       return t("moderation.field.aboutMe");
     case "pronouns":
       return t("moderation.field.pronouns");
+    case "nicknames":
+      return t("moderation.field.nicknames");
+    case "icon":
+      return t("moderation.field.serverIcon");
+    case "banner":
+      return t("moderation.field.serverBanner");
+    case "name":
+      return t("moderation.field.serverName");
+    case "description":
+      return t("moderation.field.serverDescription");
     default:
       return t("moderation.field.status");
   }
@@ -161,6 +176,8 @@ export function noticeTitle(action: ModAction, d: CaseDetails): string {
       return d.banner ? t("nexa.notice.titleBanner") : t("nexa.notice.titleAvatar");
     case "field_reset":
       return t("nexa.notice.titleFieldReset");
+    case "server_reset":
+      return t("nexa.notice.titleServerReset");
     case "mute":
       return t("nexa.notice.titleMute");
     case "ban":
@@ -177,6 +194,8 @@ export function noticeExplainer(c: Pick<MemberCase, "action" | "details" | "expi
       return t("nexa.notice.explainAvatar");
     case "field_reset":
       return c.details.fields?.includes("username") ? t("nexa.notice.explainUsername") : t("nexa.notice.explainFields");
+    case "server_reset":
+      return t("nexa.notice.explainServer", { name: c.details.server_name ?? "" });
     case "mute":
       return t("nexa.notice.explainMute");
     case "ban":
@@ -195,6 +214,31 @@ export function caseStanding(c: Pick<MemberCase, "action" | "in_effect" | "ended
     return { label: t("nexa.standing.endsIn", { when: relativeTo(c.expires_at) }), tone: c.action === "ban" ? "danger" : "warn" };
   }
   return { label: t("nexa.standing.ended"), tone: "done" };
+}
+
+/**
+ * A line of a thread as one line of plain words, for a list's preview: what
+ * the formatting says rather than its marks, and what a line of only files
+ * carries. Nothing is drawn from it, so nothing in it can run.
+ */
+export function previewText(body: string, files = 0): string {
+  const words = body
+    // a code block is its code, on one line
+    .replace(/```[^\n]*\n?([\s\S]*?)```/g, " $1 ")
+    // headings, quotes, list marks and subtext at the start of a line
+    .replace(/^[ \t]*(?:#{1,6}|>+|-#|[-*+]|\d+[.)])[ \t]+/gm, "")
+    // [words](address) is its words; <address> is the address
+    .replace(/\[([^\]\n]*)\]\([^)\s]*\)/g, "$1")
+    .replace(/<(https?:[^>\s]+)>/g, "$1")
+    // a spoiler says it is one, without saying what it hides
+    .replace(/\|\|[\s\S]*?\|\|/g, `[${t("moderation.case.spoiler")}]`)
+    // emphasis, strikes and code marks; underscores only at a word's edges, so snake_case stays
+    .replace(/(\*\*\*|\*\*|\*|~~|`)(?=\S)([\s\S]*?\S)\1/g, "$2")
+    .replace(/(^|[^\p{L}\p{N}_])(___|__|_)(?=\S)([\s\S]*?\S)\2(?![\p{L}\p{N}_])/gu, "$1$3")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (words) return words;
+  return files > 0 ? t("moderation.case.sentFiles", { count: files }) : "";
 }
 
 /** A person's name as the moderation views show it, with a stand-in when they are gone. */
@@ -241,6 +285,8 @@ export function logDetail(e: ModLogEntry): string {
       return d.duration_ms ? t("moderation.log.forSpan", { span: formatSpan(d.duration_ms) }) : "";
     case "field_reset":
       return (d.fields ?? []).map((f) => fieldLabel(f)).join(", ");
+    case "server_reset":
+      return d.server_name ? t("moderation.log.serverFields", { name: d.server_name, fields: (d.fields ?? []).map((f) => fieldLabel(f)).join(", ") }) : "";
     case "avatar_remove":
       return [d.avatar ? t("moderation.field.avatar") : "", d.banner ? t("moderation.field.banner") : ""].filter(Boolean).join(", ");
     case "delete":
@@ -257,7 +303,7 @@ export function logDetail(e: ModLogEntry): string {
 
 /** Log filters as the panel groups them. */
 export const LOG_GROUPS: Record<string, string[]> = {
-  punishments: ["avatar_remove", "field_reset", "mute", "ban", "delete", "account_delete_profile"],
+  punishments: ["avatar_remove", "field_reset", "server_reset", "mute", "ban", "delete", "account_delete_profile"],
   lifts: ["unmute", "unban"],
   announcements: ["announcement", "announcement_delete"],
   access: ["admin_grant", "admin_revoke", "account_disable", "account_enable"],

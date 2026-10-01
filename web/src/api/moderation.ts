@@ -7,12 +7,14 @@
  * is end-to-end encrypted — a case thread is a conversation with Nexa
  * itself — and the app says so wherever one is written.
  */
-import { api } from "./client";
+import { api, type UploadOptions } from "./client";
 import type { BugCounts, BugMessage, MemberBug } from "./bugs";
 import type { Activity, PublicUser, Snowflake } from "./types";
 
-export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete";
-export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status";
+export type ModAction = "avatar_remove" | "field_reset" | "mute" | "ban" | "delete" | "server_reset";
+export type ResetField = "username" | "display_name" | "about_me" | "pronouns" | "status" | "nicknames";
+/** What a server_reset can take back of what a server shows everyone. */
+export type ServerField = "icon" | "banner" | "name" | "description";
 
 /** As much of an account as the moderation views draw: a name, an avatar, a way to the profile. */
 export interface Person {
@@ -47,9 +49,13 @@ export interface PurgeCounts {
 export interface CaseDetails {
   avatar?: boolean;
   banner?: boolean;
-  fields?: ResetField[];
-  old?: Partial<Record<ResetField, string>>;
-  new?: Partial<Record<ResetField, string>>;
+  /** A field_reset's profile fields, or a server_reset's parts of the server. */
+  fields?: (ResetField | ServerField)[];
+  old?: Partial<Record<ResetField | ServerField, string>>;
+  new?: Partial<Record<ResetField | ServerField, string>>;
+  /** A server_reset's server, and what it was called when it happened. */
+  server_id?: Snowflake;
+  server_name?: string;
   duration_ms?: number;
   permanent?: boolean;
   counts?: PurgeCounts;
@@ -96,6 +102,16 @@ export interface StaffCase extends MemberCase {
 
 export type CaseEvent = "" | "lifted" | "closed" | "reopened" | "expired" | "replaced";
 
+/** A picture or recording sent in a case's thread; its address is /media/cases/{id}. */
+export interface CaseFile {
+  id: Snowflake;
+  name: string;
+  mime: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+}
+
 /** One line of a case's thread. */
 export interface CaseMessage {
   id: Snowflake;
@@ -105,6 +121,8 @@ export interface CaseMessage {
   event: CaseEvent;
   body: string;
   created_at: number;
+  /** Absent when the line has none. */
+  files?: CaseFile[];
 }
 
 /** A mute or ban in force. */
@@ -183,6 +201,35 @@ export interface ModUser extends PublicUser {
   presence?: { status: "online" | "idle" | "dnd" | "offline"; activities?: Activity[] };
 }
 
+/** A server someone owns, or goes by a nickname or a picture of their own in. */
+export interface ModMembership {
+  server_id: Snowflake;
+  name: string;
+  icon_id: Snowflake | null;
+  owner: boolean;
+  nickname: string;
+  avatar_id: Snowflake | null;
+  member_count: number;
+  joined_at: number;
+}
+
+/** A server as the panel shows it: what it shows everyone, who owns it, how many are in it. */
+export interface ModServer {
+  id: Snowflake;
+  name: string;
+  icon_id: Snowflake | null;
+  banner_id: Snowflake | null;
+  owner_id: Snowflake;
+  description: string;
+  created_at: number;
+  member_count: number;
+  channel_count: number;
+  /** Why the viewer cannot act on it: its owner is out of their reach ("" when they can). */
+  blocked: BlockReason;
+}
+
+export type ServerSort = "newest" | "oldest" | "members" | "name";
+
 export interface ModLogEntry {
   id: Snowflake;
   action: string;
@@ -217,6 +264,17 @@ interface Thread<C> {
   people: People;
 }
 
+/** One file for a case's thread, the bytes as the body, as bug report files go up. */
+function uploadCaseFile(path: string, file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">): Promise<CaseFile> {
+  const q = name ? `?name=${encodeURIComponent(name.slice(0, 120))}` : "";
+  return api.upload<CaseFile>(`${path}${q}`, file, { ...opts, headers: { "Content-Type": file.type || "application/octet-stream" } });
+}
+
+/** Where a case file is fetched from, with the bearer token; `size` asks for a picture no larger than that. */
+export function caseFileUrl(id: Snowflake, size?: number): string {
+  return api.url(`/media/cases/${id}`, size ? { size } : undefined);
+}
+
 export const nexa = {
   state(): Promise<{ state: NexaState; account: PublicUser | null }> {
     return api.request("GET", "/nexa");
@@ -230,8 +288,12 @@ export const nexa = {
   thread(caseId: Snowflake): Promise<Thread<MemberCase>> {
     return api.request("GET", `/nexa/cases/${caseId}`);
   },
-  reply(caseId: Snowflake, body: string): Promise<{ message: CaseMessage; messages: CaseMessage[]; case: MemberCase }> {
-    return api.request("POST", `/nexa/cases/${caseId}/messages`, { body });
+  reply(caseId: Snowflake, body: string, files: CaseFile[] = []): Promise<{ message: CaseMessage; messages: CaseMessage[]; case: MemberCase }> {
+    return api.request("POST", `/nexa/cases/${caseId}/messages`, { body, files: files.map((f) => ({ id: f.id, name: f.name })) });
+  },
+  /** Puts one file up for a line not sent yet. */
+  upload(file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">): Promise<CaseFile> {
+    return uploadCaseFile("/nexa/cases/attachments", file, name, opts);
   },
   read(caseId: Snowflake, messageId: Snowflake): Promise<void> {
     return api.request("POST", `/nexa/cases/${caseId}/read`, { message_id: messageId });
@@ -248,8 +310,21 @@ export const moderation = {
   users(p: { q?: string; show?: GridShow; sort?: GridSort; cursor?: string; limit?: number }): Promise<{ users: ModUser[]; next_cursor: string }> {
     return api.request("GET", "/moderation/users", undefined, { query: { q: p.q || undefined, show: p.show, sort: p.sort, cursor: p.cursor || undefined, limit: p.limit } });
   },
-  user(id: Snowflake): Promise<{ user: ModUser; cases: StaffCase[]; people: People }> {
+  user(id: Snowflake): Promise<{ user: ModUser; cases: StaffCase[]; people: People; servers?: ModMembership[] }> {
     return api.request("GET", `/moderation/users/${id}`);
+  },
+  servers(p: { q?: string; sort?: ServerSort; offset?: number; limit?: number }): Promise<{ servers: ModServer[]; people: People; total: number; has_more: boolean }> {
+    return api.request("GET", "/moderation/servers", undefined, { query: { q: p.q?.trim() || undefined, sort: p.sort, offset: p.offset || undefined, limit: p.limit } });
+  },
+  server(id: Snowflake): Promise<{ server: ModServer; cases: StaffCase[]; people: People }> {
+    return api.request("GET", `/moderation/servers/${id}`);
+  },
+  actOnServer(id: Snowflake, body: { fields: ServerField[]; reason: string }): Promise<{ case: StaffCase; people: People }> {
+    return api.request("POST", `/moderation/servers/${id}/actions`, body);
+  },
+  /** Puts one file up for a staff line not sent yet. */
+  upload(file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">): Promise<CaseFile> {
+    return uploadCaseFile("/moderation/cases/attachments", file, name, opts);
   },
   purgePreview(id: Snowflake): Promise<PurgeCounts> {
     return api.request("GET", `/moderation/users/${id}/purge-preview`);
@@ -263,8 +338,8 @@ export const moderation = {
   thread(caseId: Snowflake): Promise<Thread<StaffCase>> {
     return api.request("GET", `/moderation/cases/${caseId}`);
   },
-  reply(caseId: Snowflake, body: string): Promise<{ message: CaseMessage; messages: CaseMessage[]; case: StaffCase }> {
-    return api.request("POST", `/moderation/cases/${caseId}/messages`, { body });
+  reply(caseId: Snowflake, body: string, files: CaseFile[] = []): Promise<{ message: CaseMessage; messages: CaseMessage[]; case: StaffCase }> {
+    return api.request("POST", `/moderation/cases/${caseId}/messages`, { body, files: files.map((f) => ({ id: f.id, name: f.name })) });
   },
   lift(caseId: Snowflake, reason: string): Promise<{ case: StaffCase }> {
     return api.request("POST", `/moderation/cases/${caseId}/lift`, { reason });

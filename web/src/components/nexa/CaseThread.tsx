@@ -1,6 +1,8 @@
-import { CircleCheck, CircleDot, Clock, History, LockOpen, RotateCcw, SendHorizontal, ShieldAlert, type LucideIcon } from "lucide-react";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import type { CaseMessage, ModAction, People } from "@/api/moderation";
+import { CircleCheck, CircleDot, Clock, Film, History, ImagePlus, Lock, LockOpen, RotateCcw, SendHorizontal, ShieldAlert, X, type LucideIcon } from "lucide-react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+import type { UploadOptions } from "@/api/client";
+import type { CaseFile, CaseMessage, ModAction, People } from "@/api/moderation";
+import { BugGallery } from "@/components/bugs/BugReportCard";
 import { Avatar } from "@/components/common/Avatar";
 import { describeError } from "@/lib/errors";
 import { useRenderCtx } from "@/lib/markdownCtx";
@@ -17,8 +19,16 @@ export const MAX_CASE_MESSAGE = 2000;
 /** Lines from the same writer this close together share one header. */
 const GROUP_GAP = 7 * 60_000;
 
+/** How many files one line carries; the server holds a line to the same. */
+export const MAX_CASE_FILES = 4;
+/** What a thread takes: pictures and short recordings, as bug reports do. */
+const FILE_TYPES = "image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime";
+
 /** A line of a thread: a moderation case's, or a bug report's, which has the same shape. */
-export type ThreadLine = Pick<CaseMessage, "id" | "author_id" | "kind" | "body" | "created_at"> & { event: string };
+export type ThreadLine = Pick<CaseMessage, "id" | "author_id" | "kind" | "body" | "created_at"> & { event: string; files?: CaseFile[] | undefined };
+
+/** Puts one file up for a line not sent yet; a thread without it takes words alone. */
+export type CaseUpload = (file: Blob, name: string, opts?: Pick<UploadOptions, "onProgress" | "signal">) => Promise<CaseFile>;
 
 interface Props {
   messages: ThreadLine[];
@@ -28,12 +38,14 @@ interface Props {
   action?: ModAction;
   /** Shown above the first line: the case itself. */
   header?: ReactNode;
-  /** Sends a line; the composer is left out without it. */
-  onSend?: (body: string) => Promise<void>;
+  /** Sends a line and the files that go with it; the composer is left out without it. */
+  onSend?: (body: string, files: CaseFile[]) => Promise<void>;
+  /** Lets the composer add pictures and recordings. */
+  upload?: CaseUpload | undefined;
   /** Said over the composer, about who reads what is written here. */
   composerNote?: ReactNode;
-  /** Replaces the composer with this sentence when writing is not possible. */
-  closedNote?: string;
+  /** Replaces the composer when writing is not possible: a sentence, and maybe a way to change that. */
+  closedNote?: ReactNode;
   /** Called when the newest line is on screen, so it can be marked read. */
   onSeen?: () => void;
   /** What the empty thread and the composer say, when not a case's words. */
@@ -45,7 +57,7 @@ interface Props {
  * A case's thread: the member, the staff (who write as Nexa, with their own
  * name shown), and a line for everything that happened to the case.
  */
-export function CaseThread({ messages, people, perspective, action, header, onSend, composerNote, closedNote, onSeen, emptyNote, placeholder }: Props) {
+export function CaseThread({ messages, people, perspective, action, header, onSend, upload, composerNote, closedNote, onSeen, emptyNote, placeholder }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const seenRef = useRef(onSeen);
@@ -97,7 +109,13 @@ export function CaseThread({ messages, people, perspective, action, header, onSe
           })}
         </ol>
       </div>
-      {onSend ? <Composer onSend={onSend} note={composerNote} placeholder={placeholder} /> : closedNote ? <p className={s.threadClosed}>{closedNote}</p> : null}
+      {onSend ? (
+        <Composer onSend={onSend} upload={upload} note={composerNote} placeholder={placeholder} />
+      ) : closedNote ? (
+        <div className={s.threadClosed} data-testid="case-locked">
+          {closedNote}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -156,9 +174,16 @@ function Line({ m, people, perspective, grouped }: { m: ThreadLine; people: Peop
             </time>
           </div>
         ) : null}
-        <div className={s.lineText}>
-          <Markdown source={m.body} ctx={ctx} />
-        </div>
+        {m.body ? (
+          <div className={s.lineText} dir="auto">
+            <Markdown source={m.body} ctx={ctx} />
+          </div>
+        ) : null}
+        {m.files?.length ? (
+          <div className={s.lineFiles}>
+            <BugGallery files={m.files} from={name} kind="cases" />
+          </div>
+        ) : null}
       </div>
     </li>
   );
@@ -183,14 +208,31 @@ function SystemLine({ m, people, action, perspective }: { m: ThreadLine; people:
   );
 }
 
-function Composer({ onSend, note, placeholder = t("nexa.thread.placeholder") }: { onSend: (body: string) => Promise<void>; note?: ReactNode; placeholder?: string | undefined }) {
+/** A file picked for the next line, on its way up or there. */
+interface Staged {
+  key: string;
+  file: File;
+  /** The picture itself, for its tile, until it is sent or dropped. */
+  preview: string | null;
+  progress: number;
+  done?: CaseFile;
+  failed?: string;
+  abort: AbortController;
+}
+
+function Composer({ onSend, upload, note, placeholder = t("nexa.thread.placeholder") }: { onSend: (body: string, files: CaseFile[]) => Promise<void>; upload: CaseUpload | undefined; note?: ReactNode; placeholder?: string | undefined }) {
   const toast = useUI((u) => u.toast);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [staged, setStaged] = useState<Staged[]>([]);
+  const [dragging, setDragging] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   const coarse = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
   const length = [...text].length;
   const over = length > MAX_CASE_MESSAGE;
+  const uploading = staged.some((f) => !f.done && !f.failed);
+  const ready = staged.filter((f) => f.done);
 
   useLayoutEffect(() => {
     const el = area.current;
@@ -199,13 +241,62 @@ function Composer({ onSend, note, placeholder = t("nexa.thread.placeholder") }: 
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [text]);
 
+  // what is still staged when the thread closes is let go: its uploads stop, its pictures are freed
+  const stagedRef = useRef(staged);
+  stagedRef.current = staged;
+  useEffect(
+    () => () => {
+      for (const f of stagedRef.current) {
+        f.abort.abort();
+        if (f.preview) URL.revokeObjectURL(f.preview);
+      }
+    },
+    [],
+  );
+
+  const add = (files: File[]) => {
+    if (!upload || !files.length) return;
+    const room = MAX_CASE_FILES - staged.length;
+    if (room <= 0) {
+      toast(t("nexa.thread.tooManyFiles", { count: MAX_CASE_FILES }), "error");
+      return;
+    }
+    const accepted = files.filter((f) => FILE_TYPES.split(",").includes(f.type));
+    if (accepted.length < files.length) toast(t("nexa.thread.fileType"), "error");
+    if (accepted.length > room) toast(t("nexa.thread.tooManyFiles", { count: MAX_CASE_FILES }), "error");
+    for (const file of accepted.slice(0, room)) {
+      const key = `${file.name}:${file.size}:${Math.random().toString(36).slice(2)}`;
+      const item: Staged = { key, file, preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : null, progress: 0, abort: new AbortController() };
+      setStaged((cur) => [...cur, item]);
+      upload(file, file.name, { signal: item.abort.signal, onProgress: (loaded, total) => setStaged((cur) => cur.map((x) => (x.key === key ? { ...x, progress: total ? loaded / total : 0 } : x))) })
+        .then((done) => setStaged((cur) => cur.map((x) => (x.key === key ? { ...x, done, progress: 1 } : x))))
+        .catch((err: unknown) => {
+          if (item.abort.signal.aborted) return;
+          setStaged((cur) => cur.map((x) => (x.key === key ? { ...x, failed: describeError(err, t("nexa.thread.uploadFailed")) } : x)));
+        });
+    }
+  };
+
+  const drop = (key: string) => {
+    setStaged((cur) => {
+      const gone = cur.find((x) => x.key === key);
+      if (gone) {
+        gone.abort.abort();
+        if (gone.preview) URL.revokeObjectURL(gone.preview);
+      }
+      return cur.filter((x) => x.key !== key);
+    });
+  };
+
   const send = async () => {
     const body = text.trim();
-    if (!body || over || busy) return;
+    if ((!body && !ready.length) || over || busy || uploading) return;
     setBusy(true);
     try {
-      await onSend(body);
+      await onSend(body, ready.map((f) => f.done!));
       setText("");
+      for (const f of staged) if (f.preview) URL.revokeObjectURL(f.preview);
+      setStaged([]);
     } catch (err) {
       toast(describeError(err, t("nexa.thread.couldNotSend")), "error");
     } finally {
@@ -221,15 +312,70 @@ function Composer({ onSend, note, placeholder = t("nexa.thread.placeholder") }: 
     }
   };
 
+  // a screenshot pasted or dropped in goes with the next line
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    if (!upload) return;
+    const files = [...e.clipboardData.files];
+    if (!files.length) return;
+    e.preventDefault();
+    add(files);
+  };
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    if (!upload) return;
+    e.preventDefault();
+    setDragging(false);
+    add([...e.dataTransfer.files]);
+  };
+
+  const canSend = (!!text.trim() || ready.length > 0) && !over && !busy && !uploading;
   return (
-    <div className={s.composer}>
+    <div
+      className={s.composer}
+      data-dragging={dragging || undefined}
+      onDragOver={upload ? (e) => { if ([...e.dataTransfer.types].includes("Files")) { e.preventDefault(); setDragging(true); } } : undefined}
+      onDragLeave={upload ? () => setDragging(false) : undefined}
+      onDrop={upload ? onDrop : undefined}
+    >
       {note ? <p className={s.composerNote}>{note}</p> : null}
+      {staged.length ? (
+        <ul className={s.staged} aria-label={t("nexa.thread.filesToSend")} data-testid="case-staged">
+          {staged.map((f) => (
+            <li key={f.key} className={s.stagedItem} data-failed={!!f.failed || undefined} title={f.failed ?? f.file.name}>
+              {f.preview ? <img src={f.preview} alt="" draggable={false} /> : <Film size={22} aria-hidden="true" />}
+              {!f.done && !f.failed ? <span className={s.stagedBar} style={{ inlineSize: `${Math.round(f.progress * 100)}%` }} aria-hidden="true" /> : null}
+              <button type="button" className={s.stagedRemove} onClick={() => drop(f.key)} aria-label={t("nexa.thread.removeFile", { name: f.file.name })}>
+                <X size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <div className={s.composerBox} data-over={over || undefined}>
+        {upload ? (
+          <>
+            <button type="button" className={s.attach} onClick={() => picker.current?.click()} disabled={busy || staged.length >= MAX_CASE_FILES} aria-label={t("nexa.thread.addFiles")} title={t("nexa.thread.addFiles")} data-testid="case-attach">
+              <ImagePlus size={20} />
+            </button>
+            <input
+              ref={picker}
+              type="file"
+              accept={FILE_TYPES}
+              multiple
+              hidden
+              onChange={(e) => {
+                add([...(e.target.files ?? [])]);
+                e.target.value = "";
+              }}
+              data-testid="case-file-input"
+            />
+          </>
+        ) : null}
         <textarea
           ref={area}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKey}
+          onPaste={onPaste}
           rows={1}
           placeholder={placeholder}
           aria-label={placeholder}
@@ -237,10 +383,23 @@ function Composer({ onSend, note, placeholder = t("nexa.thread.placeholder") }: 
           disabled={busy}
         />
         {length > MAX_CASE_MESSAGE - 200 ? <span className={s.counter} data-over={over || undefined}>{MAX_CASE_MESSAGE - length}</span> : null}
-        <button type="button" className={s.send} onClick={() => void send()} disabled={!text.trim() || over || busy} aria-label={t("nexa.thread.send")} data-testid="case-send">
+        <button type="button" className={s.send} onClick={() => void send()} disabled={!canSend} aria-label={t("nexa.thread.send")} data-testid="case-send">
           <SendHorizontal size={20} />
         </button>
       </div>
     </div>
+  );
+}
+
+/** What stands where the composer was, once nobody can write in a case. */
+export function ClosedNote({ text, action }: { text: string; action?: ReactNode }) {
+  return (
+    <>
+      <span className={s.closedText}>
+        <Lock size={15} aria-hidden="true" />
+        {text}
+      </span>
+      {action}
+    </>
   );
 }

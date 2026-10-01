@@ -9,7 +9,7 @@
  * one that day. Its keys are whatsNew.r20260926.<name>Title and ...Body: the
  * id without its dashes and dots.
  */
-import { AudioLines, BadgeCheck, Bug, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Headphones, House, IdCard, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Music, Newspaper, NotebookPen, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
+import { AudioLines, BadgeCheck, Bug, CircleX, ClipboardCopy, CloudUpload, Eye, EyeOff, FolderPlus, Headphones, House, IdCard, ImagePlus, Images, Keyboard, LayoutGrid, Link, MapPinOff, MessageSquareDashed, MessageSquarePlus, MousePointerClick, Music, Newspaper, NotebookPen, Palette, PanelsTopLeft, Pin, Puzzle, RefreshCw, Reply, Search, SendHorizontal, ServerCog, Shapes, ShieldCheck, SlidersHorizontal, Smartphone, Smile, Sparkles, SpellCheck, Sticker, StickyNote, TvMinimalPlay, Type, UserCheck, UserPen, Users, UsersRound, Vote, Webhook, type LucideIcon } from "lucide-react";
 
 export interface WhatsNewItem {
   icon: LucideIcon;
@@ -25,6 +25,16 @@ export interface Release {
 
 /** Newest first. */
 export const RELEASES: Release[] = [
+  {
+    id: "2026-10-01",
+    items: [
+      { icon: TvMinimalPlay, title: "whatsNew.r20261001.youtubeTitle", body: "whatsNew.r20261001.youtubeBody" },
+      { icon: CircleX, title: "whatsNew.r20261001.removeTitle", body: "whatsNew.r20261001.removeBody" },
+      { icon: Smartphone, title: "whatsNew.r20261001.phoneTitle", body: "whatsNew.r20261001.phoneBody" },
+      { icon: ImagePlus, title: "whatsNew.r20261001.casesTitle", body: "whatsNew.r20261001.casesBody" },
+      { icon: ServerCog, title: "whatsNew.r20261001.serversTitle", body: "whatsNew.r20261001.serversBody" },
+    ],
+  },
   {
     id: "2026-09-30.3",
     items: [

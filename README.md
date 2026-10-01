@@ -93,6 +93,11 @@ and for restart/stop/update/backup commands.
   end-to-end encrypted. The URL's token is stored as a SHA-256 hash, and sealed with the
   server secret so managers can copy the URL again. Pictures linked from elsewhere load
   through the signed media proxy, so readers never contact the sender's hosts.
+- **Nothing a person links learns this server's address.** Link previews, the media
+  proxy and the YouTube player fetch through Cloudflare WARP's local SOCKS5 proxy
+  (`internal/egress`, `EGRESS_PROXY`), names included, so a site someone links sees
+  Cloudflare. WARP runs in proxy mode, not as a tunnel for the whole machine; chatd
+  keeps it connected, and with it down those requests fail instead of going direct.
 - **Realtime.** Clients hold one WebSocket; the hub fans events out to the members who
   may see them and tracks presence and typing. Heartbeats every 25 s keep Cloudflare
   from dropping idle sockets.

@@ -122,10 +122,13 @@ func (f *Fetcher) guardedDial(ctx context.Context, network, addr string) (net.Co
 	if err != nil {
 		return nil, err
 	}
-	d := net.Dialer{Timeout: 5 * time.Second}
+	dial := (&net.Dialer{Timeout: 5 * time.Second}).DialContext
+	if f.Dial != nil {
+		dial = f.Dial
+	}
 	var lastErr error
 	for _, ip := range ips {
-		conn, err := d.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+		conn, err := dial(ctx, network, net.JoinHostPort(ip.String(), port))
 		if err == nil {
 			return conn, nil
 		}

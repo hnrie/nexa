@@ -96,6 +96,18 @@ else
   fi
 fi
 
+# 4b. WARP as a local proxy for what people can make chatd fetch (link
+# previews, the media proxy, the YouTube player); the rest of the machine's
+# traffic goes out as usual. An older setup kept WARP up as a tunnel for the
+# whole machine with a unit of its own; chatd keeps the proxy up now.
+if [ "$OS" != Darwin ] && [ -f /etc/systemd/system/warp-autoconnect.service ]; then
+  todo "retiring warp-autoconnect.service (WARP no longer tunnels the whole machine)"
+  doit systemctl disable --now warp-autoconnect.service
+  doit rm -f /etc/systemd/system/warp-autoconnect.service
+  doit systemctl daemon-reload
+fi
+if [ "$CHECK" = 1 ]; then bash "$ROOT/deploy/warp-proxy.sh" --check; else bash "$ROOT/deploy/warp-proxy.sh"; fi
+
 # 5. start / restart
 wait_healthy() {
   for i in $(seq 1 30); do

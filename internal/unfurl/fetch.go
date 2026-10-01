@@ -12,6 +12,7 @@ import (
 	_ "image/png"
 	"io"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -63,8 +64,10 @@ type Result struct {
 	ImageW      int    `json:"image_w,omitempty"`
 	ImageH      int    `json:"image_h,omitempty"`
 	VideoID     string `json:"video_id,omitempty"`
-	Mime        string `json:"mime,omitempty"`
-	Color       string `json:"color,omitempty"`
+	// VideoStart is where in a YouTube video its link asks it to start, in seconds.
+	VideoStart int    `json:"video_start,omitempty"`
+	Mime       string `json:"mime,omitempty"`
+	Color      string `json:"color,omitempty"`
 	// Author and its link, where the page names one.
 	Author    string `json:"author,omitempty"`
 	AuthorURL string `json:"author_url,omitempty"`
@@ -105,6 +108,10 @@ type Fetcher struct {
 	MaxBytes  int64
 	UserAgent string
 	Resolver  Resolver
+	// Dial, when set, opens every connection the fetcher makes (internal/egress
+	// puts them through a proxy, so the sites a person names never see this
+	// server's address). It is given the address already checked to be public.
+	Dial      func(ctx context.Context, network, addr string) (net.Conn, error)
 	Transport http.RoundTripper
 	// ParentHost is the host this app is served from. Twitch's player refuses
 	// to open without it; nothing else uses it.

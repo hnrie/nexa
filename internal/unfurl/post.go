@@ -101,6 +101,10 @@ type Post struct {
 	Sensitive bool `json:"sensitive,omitempty"`
 	// Note is a note readers added under the post (X's community notes).
 	Note string `json:"note,omitempty"`
+	// Subscribers is how many people follow the channel a YouTube video is on.
+	Subscribers int64 `json:"subscribers,omitempty"`
+	// Live is "now" for a stream that is on, "upcoming" for one yet to start.
+	Live string `json:"live,omitempty"`
 }
 
 // PostMedia is one picture or video of a post.
@@ -199,6 +203,11 @@ func (p *postRef) link() string {
 		return "https://www.threads.com/@" + p.user + "/post/" + p.id
 	case "mastodon":
 		return "https://" + p.host + "/@" + p.user + "/" + p.id
+	case "youtube":
+		if p.kind == "shorts" {
+			return "https://www.youtube.com/shorts/" + p.id
+		}
+		return "https://www.youtube.com/watch?v=" + p.id
 	}
 	return ""
 }
@@ -249,6 +258,10 @@ func init() {
 		name: "Threads", color: "#8a8d91", icon: "https://www.threads.com/favicon.ico",
 		sources: []postSource{threadsEmbed, threadsAtmosphere}, expiring: true,
 	}
+	postSites["youtube"] = &postSite{
+		name: "YouTube", color: "#ff0033", icon: "https://www.youtube.com/favicon.ico",
+		sources: []postSource{youtubeInnertube, youtubeOEmbed},
+	}
 	postSites["mastodon"] = &postSite{
 		name: "Mastodon", color: "#6364ff", icon: "https://joinmastodon.org/favicon-32x32.png",
 		sources: []postSource{mastodonAPI, mastodonAtmosphere},
@@ -268,6 +281,7 @@ var postHosts = map[string]string{
 	"eeinstagram.com": "instagram", "vxinstagram.com": "instagram", "uuinstagram.com": "instagram",
 	"reddit.com": "reddit", "rxddit.com": "reddit", "vxreddit.com": "reddit", "redditez.com": "reddit", "rxyddit.com": "reddit",
 	"threads.net": "threads", "threads.com": "threads", "fixthreads.net": "threads", "vxthreads.net": "threads",
+	"youtube.com": "youtube", "youtube-nocookie.com": "youtube", "koutube.com": "youtube",
 }
 
 // Hosts that mean a service only under their exact name: their subdomains
@@ -276,6 +290,7 @@ var postHostsExact = map[string]string{
 	"redd.it": "reddit",
 	"t.me":    "telegram", "telegram.me": "telegram", "telegram.dog": "telegram",
 	"fx-t.me": "telegram", "txlegram.me": "telegram", "txlegram.org": "telegram",
+	"youtu.be": "youtube", "koutu.be": "youtube",
 }
 
 var (
@@ -384,6 +399,8 @@ func postRefOf(u *url.URL) *postRef {
 		if m := telegramPathRe.FindStringSubmatch(path); m != nil {
 			return &postRef{platform: "telegram", user: m[1], id: m[2]}
 		}
+	case "youtube":
+		return youtubeRefOf(u)
 	case "threads":
 		if m := threadsPathRe.FindStringSubmatch(path); m != nil {
 			return &postRef{platform: "threads", user: m[1], id: m[2]}
@@ -428,7 +445,12 @@ func (f *Fetcher) postResult(ctx context.Context, link *url.URL) *Result {
 	if site.expiring {
 		p = p.named(ref.link())
 	}
-	return p.result(link.String(), site)
+	r := p.result(link.String(), site)
+	if ref.platform == "youtube" {
+		// played in YouTube's own player, through this server
+		r.Type, r.VideoID, r.VideoStart, r.PlayerSite = "youtube", ref.id, youtubeStart(link), "YouTube"
+	}
+	return r
 }
 
 // readPost asks a post's sources in turn and returns the first that answers
@@ -649,7 +671,10 @@ func (p *Post) tidy() {
 			p.Poll = nil
 		}
 	}
-	p.Replies, p.Reposts, p.Likes, p.Views = max(0, p.Replies), max(0, p.Reposts), max(0, p.Likes), max(0, p.Views)
+	p.Replies, p.Reposts, p.Likes, p.Views, p.Subscribers = max(0, p.Replies), max(0, p.Reposts), max(0, p.Likes), max(0, p.Views), max(0, p.Subscribers)
+	if p.Live != "now" && p.Live != "upcoming" {
+		p.Live = ""
+	}
 	if p.Created < 0 {
 		p.Created = 0
 	}

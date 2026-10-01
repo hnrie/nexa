@@ -18,6 +18,9 @@ const (
 	ActionMute         = "mute"
 	ActionBan          = "ban"
 	ActionDelete       = "delete"
+	// ActionServerReset takes back what a server shows everyone (its icon,
+	// banner, name or description). Its case is its owner's.
+	ActionServerReset = "server_reset"
 )
 
 // What else staff do that the log records, without a case of its own.
@@ -109,6 +112,8 @@ type ModMessage struct {
 	Event     string `json:"event"`
 	Body      string `json:"body"`
 	CreatedAt int64  `json:"created_at"`
+	// Files are the pictures and recordings sent with the line.
+	Files []CaseFile `json:"files,omitempty"`
 }
 
 // Restriction is a mute or ban in force on an account.
@@ -362,7 +367,11 @@ func (s *Store) ModMessages(ctx context.Context, caseID, after ids.ID, limit int
 		}
 		out = append(out, m)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	return out, s.withCaseFiles(ctx, out)
 }
 
 func insertModMessageTx(ctx context.Context, tx *db.Tx, m *ModMessage) error {
@@ -377,11 +386,12 @@ func insertModMessageTx(ctx context.Context, tx *db.Tx, m *ModMessage) error {
 	return err
 }
 
-// AddModMessage writes one line to a case's thread and moves the case along:
-// whoever wrote is no longer the one being waited on, and a member writing on
-// a closed case opens it again — an appeal is never lost behind a closed door.
-// The system lines this adds (a reopening) come back after the message.
-func (s *Store) AddModMessage(ctx context.Context, caseID, author ids.ID, kind, body string) (*ModMessage, []*ModMessage, *ModCase, error) {
+// AddModMessage writes one line to a case's thread, with the files it names,
+// and moves the case along: whoever wrote is no longer the one being waited
+// on. A closed case is closed to everyone: staff closed it, and only staff
+// opening it again lets anyone write in it (ErrCaseClosed). The second value
+// is the system lines the write added, which is none today.
+func (s *Store) AddModMessage(ctx context.Context, caseID, author ids.ID, kind, body string, files []CaseFile) (*ModMessage, []*ModMessage, *ModCase, error) {
 	var msg *ModMessage
 	var extra []*ModMessage
 	var c *ModCase
@@ -394,24 +404,22 @@ func (s *Store) AddModMessage(ctx context.Context, caseID, author ids.ID, kind, 
 		if err != nil {
 			return err
 		}
+		if cur.Status == CaseClosed {
+			return ErrCaseClosed
+		}
 		now := nowMs()
 		status, awaiting := cur.Status, cur.Awaiting
 		switch kind {
 		case ModMsgMember:
 			awaiting = AwaitStaff
-			if cur.Status == CaseClosed {
-				status = CaseOpen
-				reopen := &ModMessage{CaseID: caseID, AuthorID: author, Kind: ModMsgSystem, Event: ModEventReopened, CreatedAt: now}
-				if err := insertModMessageTx(ctx, tx, reopen); err != nil {
-					return err
-				}
-				extra = append(extra, reopen)
-			}
 		case ModMsgStaff:
 			awaiting = AwaitMember
 		}
 		msg = &ModMessage{CaseID: caseID, AuthorID: author, Kind: kind, Body: body, CreatedAt: now}
 		if err := insertModMessageTx(ctx, tx, msg); err != nil {
+			return err
+		}
+		if err := attachCaseFilesTx(ctx, tx, msg, files); err != nil {
 			return err
 		}
 		closedAt, closedBy := any(nullInt64(cur.ClosedAt)), any(nullID(cur.ClosedBy))
@@ -532,7 +540,12 @@ func (s *Store) LastModMessages(ctx context.Context, caseIDs []ids.ID) (map[ids.
 			return nil, err
 		}
 	}
-	return out, nil
+	// a preview of a line that is only a picture says so
+	list := make([]*ModMessage, 0, len(out))
+	for _, m := range out {
+		list = append(list, m)
+	}
+	return out, s.withCaseFiles(ctx, list)
 }
 
 // --- actions ----------------------------------------------------------------
@@ -628,6 +641,8 @@ type ModFieldReset struct {
 	// Status clears the custom status and writes StatusText in its place.
 	Status     bool
 	StatusText string
+	// Nicknames clears the nickname the account goes by in every server.
+	Nicknames bool
 	// HeldUsername is the name the reset took off the account.
 	HeldUsername string
 }
@@ -656,7 +671,7 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 		set("status_emoji", "")
 		set("status_expires_at", nil)
 	}
-	if len(sets) == 0 {
+	if len(sets) == 0 && !f.Nicknames {
 		return errors.New("field reset: nothing to reset")
 	}
 	set("updated_at", nowMs())
@@ -677,6 +692,11 @@ func (s *Store) ModResetFields(ctx context.Context, c *ModCase, f ModFieldReset,
 		}
 		if n, _ := res.RowsAffected(); n == 0 {
 			return ErrNotFound
+		}
+		if f.Nicknames {
+			if _, err := tx.ExecContext(ctx, `UPDATE server_members SET nickname = '' WHERE user_id = ? AND nickname <> ''`, int64(c.UserID)); err != nil {
+				return err
+			}
 		}
 		if err := openCaseTx(ctx, tx, c, log); err != nil {
 			return err

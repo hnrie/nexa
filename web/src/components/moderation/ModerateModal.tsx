@@ -1,6 +1,6 @@
 import { ArrowLeft, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { moderation as modApi, type ActionRequest, type ModAction, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
+import { moderation as modApi, type ActionRequest, type ModAction, type ModMembership, type ModUser, type PurgeCounts, type ResetField, type StaffCase } from "@/api/moderation";
 import { bannerUrl } from "@/api/users";
 import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
@@ -118,19 +118,35 @@ function DurationPicker({ presets, value, onChange, max, permanent }: { presets:
   );
 }
 
+/** What a dialog opened from one field of a profile starts with chosen. */
+export interface ModeratePreset {
+  fields?: ResetField[];
+  images?: { avatar: boolean; banner: boolean };
+}
+
+interface ModerateProps {
+  user: ModUser;
+  onClose: () => void;
+  onDone: (c: StaffCase) => void;
+  initial?: ModAction | undefined;
+  preset?: ModeratePreset | undefined;
+  /** The servers they own or have a server profile in, where it is known: which nicknames a reset would clear. */
+  servers?: ModMembership[] | undefined;
+}
+
 /**
  * Taking an action against an account: pick it, set it up, say why. The
  * reason goes to the member, word for word, with the moderator's name — so
  * the dialog says so beside the box it is typed in.
  */
-export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUser; onClose: () => void; onDone: (c: StaffCase) => void; initial?: ModAction }) {
+export function ModerateModal({ user, onClose, onDone, initial, preset, servers }: ModerateProps) {
   const toast = useUI((u) => u.toast);
   const live = usePresence((p) => p.byUser[user.id]);
   const presence = modStatus(user, live);
   const [action, setAction] = useState<ModAction | null>(initial ?? null);
   const [reason, setReason] = useState("");
-  const [images, setImages] = useState({ avatar: !!user.avatar_id, banner: !user.avatar_id && !!user.banner_id });
-  const [fields, setFields] = useState<ResetField[]>([]);
+  const [images, setImages] = useState(preset?.images ?? { avatar: !!user.avatar_id, banner: !user.avatar_id && !!user.banner_id });
+  const [fields, setFields] = useState<ResetField[]>(preset?.fields ?? []);
   const [muteFor, setMuteFor] = useState<number | "permanent">(SPAN.DAY);
   const [banFor, setBanFor] = useState<number | "permanent">(SPAN.WEEK);
   const [confirm, setConfirm] = useState("");
@@ -152,12 +168,15 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
     };
   }, [action, preview, user.id]);
 
+  const nicknamed = servers?.filter((x) => x.nickname);
   const values: Record<ResetField, string> = {
     username: `@${user.username}`,
     display_name: user.display_name,
     about_me: user.about_me,
     pronouns: user.pronouns,
     status: [user.status_emoji, user.status_text].filter(Boolean).join(" "),
+    // without the list, the server says whether there are any
+    nicknames: nicknamed ? nicknamed.map((x) => `${x.name}: ${x.nickname}`).join(", ") : t("moderation.form.everyServer"),
   };
   const trimmed = reason.trim();
   const reasonOk = [...trimmed].length >= 3 && [...reason].length <= MAX_REASON;
@@ -303,8 +322,8 @@ export function ModerateModal({ user, onClose, onDone, initial }: { user: ModUse
             <div className={m.section}>
               <span className={m.sectionLabel}>{t("moderation.form.whatToReset")}</span>
               <div className={m.choiceRow}>
-                {(["username", "display_name", "about_me", "pronouns", "status"] as ResetField[]).map((f) => {
-                  const empty = f !== "username" && f !== "display_name" && !values[f];
+                {(["username", "display_name", "about_me", "pronouns", "status", "nicknames"] as ResetField[]).map((f) => {
+                  const empty = f === "nicknames" ? !!nicknamed && nicknamed.length === 0 : f !== "username" && f !== "display_name" && !values[f];
                   return (
                     <label key={f} className={m.pick} data-checked={fields.includes(f)} data-disabled={empty} data-testid={`field-${f}`}>
                       <input type="checkbox" checked={fields.includes(f)} disabled={empty} onChange={() => toggleField(f)} />

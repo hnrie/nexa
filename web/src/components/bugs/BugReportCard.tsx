@@ -6,7 +6,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { Lightbox, type LightboxItem } from "@/components/chat/Lightbox";
 import { VideoPlayer } from "@/components/chat/VideoPlayer";
 import { PersonChip } from "@/components/nexa/NexaBits";
-import { bugFileURL, useBugFileURL } from "@/lib/bugMedia";
+import { bugFileURL, type PrivateFileKind, useBugFileURL } from "@/lib/bugMedia";
 import { bugFileName, bugNumber, bugStatusLabel, bugStatusTone, contextRows, isBugVideo } from "@/lib/bugs";
 import { useRenderCtx } from "@/lib/markdownCtx";
 import { fullDate } from "@/lib/moderation";
@@ -103,7 +103,7 @@ function FactRow({ label, value }: { label: string; value: string }) {
  * A report's files: pictures as thumbnails that open full size in the
  * picture viewer, and a recording as a tile that loads and plays in place.
  */
-export function BugGallery({ files, from }: { files: BugFile[]; from?: string | undefined }) {
+export function BugGallery({ files, from, kind = "bugs" }: { files: BugFile[]; from?: string | undefined; kind?: PrivateFileKind }) {
   const toast = useUI((u) => u.toast);
   const [viewer, setViewer] = useState<{ items: LightboxItem[]; start: number } | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
@@ -115,7 +115,7 @@ export function BugGallery({ files, from }: { files: BugFile[]; from?: string | 
   const openPicture = async (f: BugFile) => {
     setOpening(f.id);
     try {
-      const urls = await Promise.all(pictures.map((p) => bugFileURL(p.id)));
+      const urls = await Promise.all(pictures.map((p) => bugFileURL(p.id, undefined, kind)));
       setViewer({ items: pictures.map((p, i) => ({ name: bugFileName(p), type: p.mime, src: urls[i], from })), start: pictures.indexOf(f) });
     } catch {
       toast(t("bugs.card.fileFailed"), "error");
@@ -131,7 +131,7 @@ export function BugGallery({ files, from }: { files: BugFile[]; from?: string | 
           isBugVideo(f.mime) ? (
             playing === f.id ? (
               <li key={f.id} className={s.player}>
-                <PlayingVideo file={f} />
+                <PlayingVideo file={f} kind={kind} />
               </li>
             ) : (
               <li key={f.id}>
@@ -145,7 +145,7 @@ export function BugGallery({ files, from }: { files: BugFile[]; from?: string | 
             )
           ) : (
             <li key={f.id}>
-              <Thumb file={f} busy={opening === f.id} onOpen={() => void openPicture(f)} />
+              <Thumb file={f} kind={kind} busy={opening === f.id} onOpen={() => void openPicture(f)} />
             </li>
           ),
         )}
@@ -155,8 +155,8 @@ export function BugGallery({ files, from }: { files: BugFile[]; from?: string | 
   );
 }
 
-function Thumb({ file, busy, onOpen }: { file: BugFile; busy: boolean; onOpen: () => void }) {
-  const { url, failed, retry } = useBugFileURL(file.id, 512);
+function Thumb({ file, kind, busy, onOpen }: { file: BugFile; kind: PrivateFileKind; busy: boolean; onOpen: () => void }) {
+  const { url, failed, retry } = useBugFileURL(file.id, 512, true, kind);
   return (
     <button type="button" className={s.shot} onClick={failed ? retry : onOpen} aria-label={failed ? t("bugs.card.retryPicture", { name: bugFileName(file) }) : t("bugs.card.openPicture", { name: bugFileName(file) })} data-testid="bug-thumb">
       {url ? <img src={url} alt="" draggable={false} /> : failed ? <ImageOff size={22} aria-hidden="true" /> : <Spinner size={18} />}
@@ -169,8 +169,8 @@ function Thumb({ file, busy, onOpen }: { file: BugFile; busy: boolean; onOpen: (
   );
 }
 
-function PlayingVideo({ file }: { file: BugFile }) {
-  const { url, failed, retry } = useBugFileURL(file.id, undefined);
+function PlayingVideo({ file, kind }: { file: BugFile; kind: PrivateFileKind }) {
+  const { url, failed, retry } = useBugFileURL(file.id, undefined, true, kind);
   if (failed) {
     return (
       <button type="button" className={[s.shot, s.shotVideo].join(" ")} onClick={retry}>

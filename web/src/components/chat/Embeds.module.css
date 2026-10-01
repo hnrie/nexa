@@ -1,9 +1,21 @@
-.embeds { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; align-items: flex-start; }
+/* every preview is held to the message's width: a fixed-size picture or player inside one never pushes the chat sideways on a phone */
+.embeds { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; align-items: flex-start; max-width: 100%; min-width: 0; }
+.item { position: relative; max-width: 100%; min-width: 0; }
+.item > * { max-width: 100%; }
+/* the x that takes a message's previews away, for its author and moderators, shown on hover; a touch screen has Remove Embeds in the message's menu instead */
+.remove { position: absolute; top: 6px; inset-inline-end: 6px; z-index: 2; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.62); color: #fff; opacity: 0; transition: opacity 120ms ease, background 120ms ease; }
+.remove:hover { background: var(--danger); }
+.remove:focus-visible { opacity: 1; outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+/* a picture's star sits in that corner, so the x stands beside it */
+.item:has(> .media) .remove { inset-inline-end: 40px; }
+@media (hover: hover) { .item:hover .remove { opacity: 1; } }
+@media (hover: none) { .remove { display: none; } }
+@media (prefers-reduced-motion: reduce) { .remove { transition: none; } }
 /* a link's preview: a lit card with the site's colour as a bar down its start */
-.card { position: relative; max-width: 516px; padding-block: 10px 14px; padding-inline: 13px 16px; border-radius: var(--radius-md); background: var(--sheen), var(--embed-bg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); border-inline-start: 4px solid var(--brand); display: flex; flex-direction: column; gap: 6px; }
+.card { position: relative; box-sizing: border-box; max-width: min(516px, 100%); min-width: 0; padding-block: 10px 14px; padding-inline: 13px 16px; border-radius: var(--radius-md); background: var(--sheen), var(--embed-bg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--border-subtle), var(--shadow-low); border-inline-start: 4px solid var(--brand); display: flex; flex-direction: column; gap: 6px; }
 .cardRow { display: flex; gap: 16px; align-items: flex-start; }
 .cardText { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
-.site { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 12px; color: var(--text-muted); }
+.site { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; min-width: 0; font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
 .site a { color: inherit; }
 .site a:hover { text-decoration: underline; }
 .favicon { width: 14px; height: 14px; border-radius: 3px; object-fit: contain; flex: none; }

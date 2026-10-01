@@ -16,10 +16,11 @@ const HOSTS = new Set([
   "instagram.com", "ddinstagram.com", "kkinstagram.com", "instagramez.com", "eeinstagram.com", "vxinstagram.com", "uuinstagram.com",
   "reddit.com", "rxddit.com", "vxreddit.com", "redditez.com", "rxyddit.com",
   "threads.net", "threads.com", "fixthreads.net", "vxthreads.net",
+  "youtube.com", "youtube-nocookie.com", "koutube.com",
 ]);
 
 /** Services under their exact name only: a subdomain of these is something else (i.redd.it is a picture). */
-const EXACT_HOSTS = new Set(["redd.it", "t.me", "telegram.me", "telegram.dog", "fx-t.me", "txlegram.me", "txlegram.org"]);
+const EXACT_HOSTS = new Set(["redd.it", "t.me", "telegram.me", "telegram.dog", "fx-t.me", "txlegram.me", "txlegram.org", "youtu.be", "koutu.be"]);
 
 /** A Mastodon post is known by the shape of its address, on whatever server. */
 const RE_MASTODON = /^\/(?:@[A-Za-z0-9_]{1,64}(?:@[A-Za-z0-9.-]{1,255})?\/\d{10,24}|users\/[A-Za-z0-9_]{1,64}\/statuses\/\d{10,24})\/?$/;

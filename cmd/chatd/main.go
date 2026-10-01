@@ -26,9 +26,11 @@ import (
 	"evilion.xyz/chat/internal/cache"
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/db"
+	"evilion.xyz/chat/internal/egress"
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
+	"evilion.xyz/chat/internal/rpcapps"
 	"evilion.xyz/chat/internal/store"
 	"evilion.xyz/chat/internal/unfurl"
 )
@@ -122,6 +124,15 @@ func main() {
 	if u, err := url.Parse(cfg.PublicURL); err == nil {
 		srv.Unfurl.Fetcher.ParentHost = u.Hostname()
 	}
+	// What a person can make this server fetch goes out through the proxy.
+	out, warp := setupEgress(cfg, log)
+	if out != nil {
+		srv.Egress = out
+		srv.Unfurl.Fetcher.Dial = out.DialContext
+		srv.Unfurl.Fetcher.Resolver = out.Resolver()
+		srv.Apps = rpcapps.New()
+		srv.Apps.Client.Transport = out.Transport()
+	}
 	hub := gateway.New(st, srv.Auth, log, cfg.PublicURL)
 	srv.Bcast = hub
 	srv.WireServers(hub)
@@ -142,6 +153,16 @@ func main() {
 	srv.StartDiscord(ctx)
 	// whatever deleted accounts still own goes, now and every hour after
 	srv.StartAccountSweep(ctx)
+	if warp != nil {
+		go func() {
+			if err := warp.Ensure(ctx); err != nil {
+				log.Error("warp proxy is not running; link previews and the media proxy are refused until it is", "err", err)
+			} else {
+				log.Info("warp proxy ready", "port", warp.Port)
+			}
+			warp.Keep(ctx, time.Minute)
+		}()
+	}
 	// what runs beside the requests, waited for at shutdown: the meter
 	// writes its last minute of usage as it stops
 	var loops sync.WaitGroup
@@ -205,6 +226,37 @@ func main() {
 // the process holding the sockets, and REDIS_URL shares nothing but the rate
 // limits. Said where the operator will look, rather than letting two
 // processes each quietly serve half of every conversation.
+// setupEgress is the proxy for requests a person can point this server at, and
+// the WARP client to keep running for it when that is what serves it. With
+// EGRESS_PROXY=off both are nil and those requests go out directly.
+func setupEgress(cfg config.Config, log *slog.Logger) (*egress.Proxy, *egress.Warp) {
+	switch cfg.EgressProxy {
+	case "off":
+		log.Warn("EGRESS_PROXY=off: link previews and the media proxy show this server's address to the sites people link")
+		return nil, nil
+	case "warp":
+		w := &egress.Warp{CLI: egress.FindWarpCLI(), Port: cfg.WarpProxyPort, Log: log}
+		p, err := w.Proxy()
+		if err != nil {
+			log.Error("warp proxy", "err", err)
+			os.Exit(1)
+		}
+		if w.CLI == "" {
+			// still through the port, so nothing goes out directly while it is missing
+			log.Error("warp-cli is not installed: link previews and the media proxy are refused until it is (run deploy/warp-proxy.sh)")
+			return p, nil
+		}
+		return p, w
+	default:
+		p, err := egress.Parse(cfg.EgressProxy)
+		if err != nil {
+			log.Error("EGRESS_PROXY", "err", err)
+			os.Exit(1)
+		}
+		return p, nil
+	}
+}
+
 func processWarning(cfg config.Config) string {
 	if cfg.NodeID == 0 {
 		return ""

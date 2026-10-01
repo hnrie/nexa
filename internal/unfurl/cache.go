@@ -114,6 +114,7 @@ func (s *Service) MediaFetcher() *Fetcher {
 	f := &Fetcher{Timeout: 20 * time.Second, MaxBytes: 25 << 20, UserAgent: defaultUserAgent}
 	if base != nil {
 		f.Resolver = base.Resolver
+		f.Dial = base.Dial
 		f.Transport = base.Transport
 		if base.UserAgent != "" {
 			f.UserAgent = base.UserAgent

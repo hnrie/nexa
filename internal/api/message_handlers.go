@@ -476,7 +476,9 @@ func (s *Server) handleMessageCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
-	ch, me := s.channel(w, r, NeedSend)
+	// Removing a message's embeds is moderation as much as editing, so it
+	// needs only sight of the channel; new words need Send, checked below.
+	ch, me := s.channel(w, r, NeedView)
 	if ch == nil {
 		return
 	}
@@ -496,9 +498,9 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(body.Ciphertext) == 0 || string(body.Ciphertext) == "null" {
-		// flags-only edit (e.g. suppress embeds); a webhook's message has no
-		// author here to do it, so whoever may delete it may do it instead
-		if m.AuthorID != me.ID && (m.WebhookID == nil || !s.canDeleteOthers(r, ch, me)) {
+		// flags-only edit (e.g. suppress embeds): the author, or whoever may
+		// delete the message, which covers a webhook's that has no author here
+		if m.AuthorID != me.ID && !s.canDeleteOthers(r, ch, me) {
 			WriteError(w, ErrForbidden)
 			return
 		}
@@ -508,6 +510,10 @@ func (s *Server) handleMessageEdit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		if ok, err := s.canAccess(r, me, ch, NeedSend); err != nil || !ok {
+			WriteError(w, E(http.StatusForbidden, "missing_permission", "You do not have permission to do that here."))
+			return
+		}
 		if m.AuthorID != me.ID || m.Type != "default" && m.Type != "reply" {
 			WriteError(w, ErrForbidden)
 			return

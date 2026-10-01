@@ -259,6 +259,33 @@ describe("a social post in a link's card", () => {
     expect(await open(post)).toEqual(post);
   });
 
+  it("keeps a YouTube video's channel, whether it is live, and where its link starts it", async () => {
+    const post = {
+      platform: "youtube",
+      site: "YouTube",
+      url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      name: "Rick Astley",
+      handle: "RickAstleyYT",
+      avatar: "/media/proxy/1-s/YXZhdGFy",
+      verified: true,
+      title: "Never Gonna Give You Up",
+      media: [{ kind: "video", thumb: "/media/proxy/1-s/cG9zdGVy", w: 1280, h: 720, duration: 213 }],
+      likes: 19_000_000,
+      views: 1_800_000_000,
+      subscribers: 4_550_000,
+      live: "now",
+    };
+    expect(await open(post)).toEqual(post);
+    expect(await open({ ...post, live: "maybe" })).not.toHaveProperty("live");
+    expect(await open({ ...post, subscribers: -5 })).not.toHaveProperty("subscribers");
+    const card = async (start: unknown) => {
+      const env = await forgeEnvelope(utf8.enc(JSON.stringify({ t: "x", embeds: [{ url: "https://youtu.be/dQw4w9WgXcQ", type: "youtube", video_id: "dQw4w9WgXcQ", video_start: start }] })));
+      return (await decryptMessage(key, env, aad)).embeds?.[0] as Record<string, unknown>;
+    };
+    expect((await card(65))["video_start"]).toBe(65);
+    for (const bad of [0, -1, 86_401, "65"]) expect(await card(bad)).not.toHaveProperty("video_start");
+  });
+
   it("lets nothing through that is not a web address, a known word, or of a sane size", async () => {
     const got = await open({
       platform: "twitter",

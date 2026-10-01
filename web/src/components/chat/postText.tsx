@@ -19,6 +19,7 @@ const PROFILE: Record<string, (name: string) => string> = {
   instagram: (n) => `https://www.instagram.com/${n}/`,
   threads: (n) => `https://www.threads.com/@${n}`,
   telegram: (n) => `https://t.me/${n}`,
+  youtube: (n) => `https://www.youtube.com/@${n}`,
 };
 
 const TAG: Record<string, (tag: string) => string> = {
@@ -26,6 +27,7 @@ const TAG: Record<string, (tag: string) => string> = {
   tiktok: (tag) => `https://www.tiktok.com/tag/${encodeURIComponent(tag)}`,
   instagram: (tag) => `https://www.instagram.com/explore/tags/${encodeURIComponent(tag)}/`,
   threads: (tag) => `https://www.threads.com/search?q=${encodeURIComponent(tag)}&serp_type=tags`,
+  youtube: (tag) => `https://www.youtube.com/hashtag/${encodeURIComponent(tag.toLowerCase())}`,
 };
 
 /**

@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
-import { CaseThread } from "@/components/nexa/CaseThread";
+import { nexa as nexaApi } from "@/api/moderation";
+import { CaseThread, ClosedNote } from "@/components/nexa/CaseThread";
 import { NexaAvatar } from "@/components/nexa/NexaBits";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
 import { caseStanding, noticeTitle } from "@/lib/moderation";
@@ -67,12 +68,14 @@ export default function NexaCasePage() {
           perspective="member"
           action={thread.case.action}
           header={<NoticeCard c={thread.case} people={people} perspective="member" />}
-          onSend={thread.case.action === "delete" ? undefined : (body) => useNexa.getState().reply(caseId, body)}
+          // a closed case is closed until the team opens it again: nothing can be written in it
+          onSend={thread.case.action === "delete" || thread.case.status === "closed" ? undefined : (body, files) => useNexa.getState().reply(caseId, body, files)}
+          upload={nexaApi.upload}
+          closedNote={thread.case.status === "closed" ? <ClosedNote text={t("nexa.thread.closedMember")} /> : undefined}
           composerNote={
             <>
               <ShieldAlert size={14} aria-hidden="true" />
               {t("nexa.thread.notEncrypted")}
-              {thread.case.status === "closed" ? ` ${t("nexa.thread.closedReopens")}` : ""}
             </>
           }
           onSeen={() => useNexa.getState().markThreadRead(caseId)}

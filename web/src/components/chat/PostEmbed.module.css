@@ -27,6 +27,7 @@
 .post[data-platform="telegram"], .quote[data-platform="telegram"] { --post-tint: #29a9eb; }
 .post[data-platform="threads"], .quote[data-platform="threads"] { --post-tint: #8a8d91; }
 .post[data-platform="mastodon"], .quote[data-platform="mastodon"] { --post-tint: #6364ff; }
+.post[data-platform="youtube"], .quote[data-platform="youtube"] { --post-tint: #ff0033; }
 
 .head { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; background: var(--bg-input); box-shadow: 0 0 0 1px var(--border-subtle); }
@@ -41,6 +42,9 @@
 a.name:hover, a.handle:hover, .when:hover, .quoteWhen:hover, a.contextLink:hover { text-decoration: underline; }
 .verified { display: inline-flex; flex: none; color: var(--post-tint); }
 .handle { font-size: 13px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the handle and, for a channel, how many follow it */
+.handleRow { display: flex; align-items: baseline; gap: 0 8px; min-width: 0; flex-wrap: wrap; }
+.handleRow > .handle:not(:first-child) { flex: none; }
 /* the way out to the post: the service's icon and name on a small lit chip */
 .site { display: inline-flex; align-items: center; gap: 6px; flex: none; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-muted); background: color-mix(in srgb, var(--text-strong) 5%, transparent); box-shadow: inset 0 1px 0 var(--edge-light); transition: background var(--transition), color var(--transition); }
 a.site:hover { color: var(--text-strong); background: color-mix(in srgb, var(--text-strong) 10%, transparent); }

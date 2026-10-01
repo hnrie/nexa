@@ -285,7 +285,14 @@ func (s *Server) handleModUser(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	WriteJSON(w, http.StatusOK, map[string]any{"user": view, "cases": views, "people": s.people(ctx, who...)})
+	// where else their profile shows: the servers they own, and the ones they
+	// go by a nickname or a picture of their own in
+	servers, err := s.Store.ModMemberships(ctx, u.ID)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"user": view, "cases": views, "people": s.people(ctx, who...), "servers": servers})
 }
 
 func (s *Server) handleModPurgePreview(w http.ResponseWriter, r *http.Request) {
@@ -392,13 +399,13 @@ func (s *Server) handleModReply(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, E(http.StatusGone, "moderate_deleted", "That account has been deleted, so nobody would read a reply."))
 		return
 	}
-	body, ok := readCaseMessage(w, r)
+	line, ok := readCaseLine(w, r)
 	if !ok {
 		return
 	}
-	msg, extra, updated, err := s.Store.AddModMessage(r.Context(), c.ID, me.ID, store.ModMsgStaff, body)
+	msg, extra, updated, err := s.Store.AddModMessage(r.Context(), c.ID, me.ID, store.ModMsgStaff, line.Body, line.Files)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, caseWriteError(err))
 		return
 	}
 	lines := append(extra, msg)

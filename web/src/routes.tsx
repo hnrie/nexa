@@ -38,7 +38,9 @@ if (typeof location !== "undefined" && location.pathname.startsWith("/channels")
 const adminPanel = () => import("@/pages/AdminPanelPage");
 const AdminPanelPage = lazyPage(adminPanel);
 const AdminUsers = lazyPage(() => adminPanel().then((m) => ({ default: m.UserGrid })));
-const AdminUser = lazyPage(() => adminPanel().then((m) => ({ default: m.UserCasesView })));
+const AdminUser = lazyPage(() => adminPanel().then((m) => ({ default: m.PersonPage })));
+const AdminServers = lazyPage(() => adminPanel().then((m) => ({ default: m.ServersTab })));
+const AdminServer = lazyPage(() => adminPanel().then((m) => ({ default: m.ServerPage })));
 const AdminCases = lazyPage(() => adminPanel().then((m) => ({ default: m.CasesTab })));
 const AdminLogs = lazyPage(() => adminPanel().then((m) => ({ default: m.LogsTab })));
 const AdminAnnouncements = lazyPage(() => adminPanel().then((m) => ({ default: m.AnnouncementsTab })));
@@ -79,7 +81,10 @@ export function AppRoutes() {
                     <Route index element={<Navigate to="users" replace />} />
                     <Route path="users" element={<AdminUsers />} />
                     <Route path="users/:userId" element={<AdminUser />} />
+                    <Route path="users/:userId/cases" element={<AdminUser />} />
                     <Route path="users/:userId/cases/:caseId" element={<AdminUser />} />
+                    <Route path="servers" element={<AdminServers />} />
+                    <Route path="servers/:serverId" element={<AdminServer />} />
                     <Route path="cases" element={<AdminCases />} />
                     <Route path="cases/:caseId" element={<AdminCases />} />
                     <Route path="logs" element={<AdminLogs />} />

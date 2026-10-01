@@ -64,6 +64,25 @@ Settings live in `chatd.env` (documented in `chatd.env.example`); restart after
 editing. The database is `data/chat.db` (SQLite, WAL mode) and uploads live in
 `data/media/`.
 
+## The WARP proxy
+
+Link previews, the media proxy and the YouTube player fetch whatever people link,
+so they go out through Cloudflare WARP's local SOCKS5 proxy (`EGRESS_PROXY=warp`)
+and the sites see Cloudflare's address instead of this machine's. WARP runs in
+proxy mode, so the rest of the machine (the tunnel, SSH, updates) goes out as
+usual. `deploy/warp-proxy.sh` installs the WARP client when it is missing (apt or
+dnf on Linux, Homebrew or Cloudflare's package on macOS) and sets it up; the
+installer and `make run` run it. chatd puts WARP back in proxy mode and reconnects
+it at start and whenever its port stops answering, so nothing else needs to keep
+it up. While it is down those requests fail rather than going direct; the log
+says so.
+
+```
+bash deploy/warp-proxy.sh --check     # what WARP is doing now
+warp-cli --accept-tos status          # connected?
+warp-cli --accept-tos mode warp       # a laptop that wants its whole-machine WARP back
+```
+
 ## Logs
 
 Under systemd chatd writes to the journal, which rotates and caps itself. Under

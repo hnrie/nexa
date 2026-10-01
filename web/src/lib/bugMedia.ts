@@ -1,14 +1,16 @@
 /**
- * The screenshots and recordings sent with bug reports, as addresses a page
- * can show. They are not public, so an <img src> cannot fetch them: the
- * server wants this session's token, which only a request made here can
- * carry. Each is fetched once, kept as an object URL while something shows it,
- * and let go a while after nothing does.
+ * The screenshots and recordings sent with bug reports and in moderation
+ * cases, as addresses a page can show. They are not public, so an <img src>
+ * cannot fetch them: the server wants this session's token, which only a
+ * request made here can carry. Each is fetched once, kept as an object URL
+ * while something shows it, and let go a while after nothing does.
  */
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
-import { bugs as bugsApi } from "@/api/bugs";
 import { playableType } from "@/lib/mediaCache";
+
+/** Whose files: a bug report's (/media/bugs/{id}) or a case thread's (/media/cases/{id}). */
+export type PrivateFileKind = "bugs" | "cases";
 
 interface Entry {
   url: string;
@@ -24,8 +26,12 @@ const KEEP = 24;
 const cache = new Map<string, Entry>();
 const inflight = new Map<string, Promise<string>>();
 
-function keyOf(id: string, size?: number): string {
-  return size ? `${id}@${size}` : id;
+function keyOf(id: string, size: number | undefined, kind: PrivateFileKind): string {
+  return `${kind}/${size ? `${id}@${size}` : id}`;
+}
+
+function fileUrl(id: string, size: number | undefined, kind: PrivateFileKind): string {
+  return api.url(`/media/${kind}/${id}`, size ? { size } : undefined);
 }
 
 function drop(k: string, e: Entry): void {
@@ -38,9 +44,9 @@ function trim(): void {
   for (const [k, e] of idle.slice(0, Math.max(0, idle.length - KEEP))) drop(k, e);
 }
 
-/** Fetches a report file, or a picture's thumbnail no larger than `size`, as an object URL. */
-export function bugFileURL(id: string, size?: number): Promise<string> {
-  const k = keyOf(id, size);
+/** Fetches a report or case file, or a picture's thumbnail no larger than `size`, as an object URL. */
+export function bugFileURL(id: string, size?: number, kind: PrivateFileKind = "bugs"): Promise<string> {
+  const k = keyOf(id, size, kind);
   const token = api.getToken();
   const hit = cache.get(k);
   if (hit && hit.token === token) {
@@ -52,8 +58,8 @@ export function bugFileURL(id: string, size?: number): Promise<string> {
   if (pending) return pending;
   const job = (async () => {
     try {
-      const res = await api.fetchImpl(bugsApi.fileUrl(id, size), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-      if (!res.ok) throw new Error(`bug file ${id}: ${res.status}`);
+      const res = await api.fetchImpl(fileUrl(id, size, kind), { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) throw new Error(`${kind} file ${id}: ${res.status}`);
       const raw = await res.blob();
       // the session changed while it was on its way: it belonged to that one
       if (api.getToken() !== token) throw new DOMException("Aborted", "AbortError");
@@ -71,16 +77,16 @@ export function bugFileURL(id: string, size?: number): Promise<string> {
 }
 
 /** Keeps a fetched URL from being let go while something shows it; pair with releaseBugFile. */
-export function holdBugFile(id: string, size: number | undefined, url: string): boolean {
-  const e = cache.get(keyOf(id, size));
+export function holdBugFile(id: string, size: number | undefined, url: string, kind: PrivateFileKind = "bugs"): boolean {
+  const e = cache.get(keyOf(id, size, kind));
   if (!e || e.url !== url) return false;
   e.refs += 1;
   e.last = Date.now();
   return true;
 }
 
-export function releaseBugFile(id: string, size: number | undefined, url: string): void {
-  const e = cache.get(keyOf(id, size));
+export function releaseBugFile(id: string, size: number | undefined, url: string, kind: PrivateFileKind = "bugs"): void {
+  const e = cache.get(keyOf(id, size, kind));
   if (!e || e.url !== url || e.refs === 0) return;
   e.refs -= 1;
   e.last = Date.now();
@@ -93,8 +99,8 @@ export function clearBugFiles(): void {
   inflight.clear();
 }
 
-/** A report file as an object URL, fetched when `enabled`, held while the component shows it. */
-export function useBugFileURL(id: string, size: number | undefined, enabled = true): { url: string | null; failed: boolean; retry: () => void } {
+/** A report or case file as an object URL, fetched when `enabled`, held while the component shows it. */
+export function useBugFileURL(id: string, size: number | undefined, enabled = true, kind: PrivateFileKind = "bugs"): { url: string | null; failed: boolean; retry: () => void } {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -103,17 +109,17 @@ export function useBugFileURL(id: string, size: number | undefined, enabled = tr
     let alive = true;
     let held: string | null = null;
     setFailed(false);
-    bugFileURL(id, size)
+    bugFileURL(id, size, kind)
       .then((u) => {
         if (!alive) return;
-        if (holdBugFile(id, size, u)) held = u;
+        if (holdBugFile(id, size, u, kind)) held = u;
         setUrl(u);
       })
       .catch(() => alive && setFailed(true));
     return () => {
       alive = false;
-      if (held) releaseBugFile(id, size, held);
+      if (held) releaseBugFile(id, size, held, kind);
     };
-  }, [id, size, enabled, attempt]);
+  }, [id, size, enabled, attempt, kind]);
   return { url, failed, retry: () => setAttempt((n) => n + 1) };
 }

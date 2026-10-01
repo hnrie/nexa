@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"evilion.xyz/chat/internal/auth"
@@ -23,7 +24,7 @@ type modActionReq struct {
 		Avatar bool `json:"avatar"`
 		Banner bool `json:"banner"`
 	} `json:"images"`
-	// field_reset: username, display_name, about_me, pronouns, status
+	// field_reset: username, display_name, about_me, pronouns, status, nicknames
 	Fields []string `json:"fields"`
 	// mute and ban: how long; a ban can be permanent instead
 	DurationMS int64 `json:"duration_ms"`
@@ -48,8 +49,9 @@ const (
 	maxKeptOldValue = 2000
 )
 
-// resetFields are the profile fields a field_reset can take back.
-var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status"}
+// resetFields are the profile fields a field_reset can take back. Nicknames
+// are the names the account goes by in its servers, all of them at once.
+var resetFields = []string{"username", "display_name", "about_me", "pronouns", "status", "nicknames"}
 
 // readReason checks a moderator's reason, which the member reads.
 func readReason(w http.ResponseWriter, raw string) (string, bool) {
@@ -174,7 +176,7 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 	var fields []string
 	for _, f := range req.Fields {
 		if !OneOf(f, resetFields...) {
-			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only the username, display name, about me, pronouns and custom status can be reset."))
+			WriteError(w, E(http.StatusBadRequest, "unknown_field", "Only the username, display name, about me, pronouns, custom status and server nicknames can be reset."))
 			return
 		}
 		if !chosen[f] {
@@ -186,7 +188,21 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 		WriteError(w, E(http.StatusBadRequest, "nothing_selected", "Choose at least one field to reset."))
 		return
 	}
-	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == ""}
+	// the servers they go by a nickname in, which a nickname reset clears
+	var nicknamed []store.ModMembership
+	if chosen["nicknames"] {
+		all, err := s.Store.ModMemberships(ctx, target.ID)
+		if err != nil {
+			WriteError(w, err)
+			return
+		}
+		for _, m := range all {
+			if m.Nickname != "" {
+				nicknamed = append(nicknamed, m)
+			}
+		}
+	}
+	empty := map[string]bool{"about_me": target.AboutMe == "", "pronouns": target.Pronouns == "", "status": target.StatusText == "" && target.StatusEmoji == "", "nicknames": len(nicknamed) == 0}
 	for _, f := range fields {
 		if empty[f] {
 			WriteError(w, E(http.StatusBadRequest, "field_empty", "That field is already empty, so there is nothing to reset."))
@@ -223,6 +239,14 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 				// rather than left saying MODERATOR_REMOVED for days
 				f.Status = true
 				oldVals[field], newVals[field] = clipRunes(target.StatusEmoji+" "+target.StatusText, maxKeptOldValue), ""
+			case "nicknames":
+				// cleared, so each server shows their name again
+				f.Nicknames = true
+				var was []string
+				for _, m := range nicknamed {
+					was = append(was, m.Name+": "+m.Nickname)
+				}
+				oldVals[field], newVals[field] = clipRunes(strings.Join(was, "\n"), maxKeptOldValue), ""
 			}
 		}
 		c.Details = mustJSON(map[string]any{"fields": fields, "old": oldVals, "new": newVals})
@@ -239,6 +263,11 @@ func (s *Server) actResetFields(w http.ResponseWriter, r *http.Request, target *
 	}
 	if updated, err := s.Store.UserByID(ctx, target.ID); err == nil {
 		s.Bcast.UserUpdated(updated)
+	}
+	for _, m := range nicknamed {
+		if mem, err := s.Store.Member(ctx, m.ServerID, target.ID); err == nil {
+			s.emitServer(ctx, m.ServerID, "member_update", mem)
+		}
 	}
 	s.actionDone(w, ctx, c, log)
 }

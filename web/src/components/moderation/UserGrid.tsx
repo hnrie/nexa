@@ -10,7 +10,7 @@ import { Spinner } from "@/components/common/Spinner";
 import { Tooltip } from "@/components/common/Tooltip";
 import { profileTheme } from "@/lib/avatarColor";
 import { describeError } from "@/lib/errors";
-import { FLAG_ADMIN, FLAG_DISABLED, relativeTo } from "@/lib/moderation";
+import { FLAG_ADMIN, FLAG_DISABLED, previewText, relativeTo } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { usePresence } from "@/stores/presence";
@@ -240,7 +240,8 @@ export function UserGrid() {
               u={u}
               owner={u.id === ownerId}
               onModerate={() => setModerating(u)}
-              onCases={() => nav(`/channels/@admin/users/${u.id}`)}
+              onCases={() => nav(`/channels/@admin/users/${u.id}/cases`)}
+              onProfile={() => nav(`/channels/@admin/users/${u.id}`)}
               onMenu={(e) => menu(e, u)}
             />
           ))}
@@ -264,7 +265,7 @@ export function UserGrid() {
   );
 }
 
-function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner: boolean; onModerate: () => void; onCases: () => void; onMenu: (e: MouseEvent) => void }) {
+function UserCard({ u, owner, onModerate, onCases, onProfile, onMenu }: { u: ModUser; owner: boolean; onModerate: () => void; onCases: () => void; onProfile: () => void; onMenu: (e: MouseEvent) => void }) {
   const live = usePresence((p) => p.byUser[u.id]);
   const st = modStatus(u, live);
   const banner = bannerUrl(u.banner_id, 320);
@@ -305,7 +306,9 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
       </div>
       <div className={m.cardBody}>
         <div className={m.cardName}>
-          <span className={m.cardNameText}>{u.display_name}</span>
+          <button type="button" className={[m.cardNameText, m.cardNameLink].join(" ")} onClick={onProfile} data-testid="card-profile">
+            {u.display_name}
+          </button>
           {owner ? (
             <span className={m.staffBadge} title={t("profile.profileCard.owner")}>
               <Crown size={12} aria-hidden="true" />
@@ -328,8 +331,9 @@ function UserCard({ u, owner, onModerate, onCases, onMenu }: { u: ModUser; owner
           {u.pronouns ? ` · ${u.pronouns}` : ""}
         </span>
         <StatusSummary st={st} />
-        <p className={m.cardAbout} data-empty={!u.about_me || undefined}>
-          {u.about_me || t("moderation.noAbout")}
+        {/* plain words, whatever formatting the about me has: the full profile shows it formatted */}
+        <p className={m.cardAbout} data-empty={!u.about_me || undefined} dir="auto">
+          {u.about_me ? previewText(u.about_me) : t("moderation.noAbout")}
         </p>
         <div className={m.cardMeta}>
           <span>

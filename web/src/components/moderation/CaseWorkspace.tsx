@@ -6,10 +6,10 @@ import { Avatar } from "@/components/common/Avatar";
 import { Button } from "@/components/common/Button";
 import { Spinner } from "@/components/common/Spinner";
 import { promptText } from "@/components/modals/PromptModal";
-import { CaseThread } from "@/components/nexa/CaseThread";
+import { CaseThread, ClosedNote } from "@/components/nexa/CaseThread";
 import { NoticeCard } from "@/components/nexa/NoticeCard";
 import { describeError } from "@/lib/errors";
-import { actionIcon, actionLabel, caseStanding, FLAG_ADMIN, FLAG_DELETED, personName, relativeTo, severity, systemLineText } from "@/lib/moderation";
+import { actionIcon, actionLabel, caseStanding, FLAG_ADMIN, FLAG_DELETED, personName, previewText, relativeTo, severity, systemLineText } from "@/lib/moderation";
 import { formatRelative } from "@/lib/time";
 import { useModEvents, useModeration } from "@/stores/moderation";
 import { usePresence } from "@/stores/presence";
@@ -40,16 +40,16 @@ function byActivity(a: StaffCase, b: StaffCase): number {
   return b.last_activity_at - a.last_activity_at || (BigInt(b.id) > BigInt(a.id) ? 1 : -1);
 }
 
-/** One line of the thread as a preview in a list. */
+/** One line of the thread as a preview in a list: plain words, whatever formatting it had. */
 function preview(c: StaffCase, people: People): string {
   const last = c.last_message;
-  if (!last) return c.reason;
+  if (!last) return previewText(c.reason);
   if (last.kind === "system") return systemLineText(last, people, c.action, "staff");
-  const who = last.kind === "staff" ? personName(people[last.author_id]) : personName(people[last.author_id]) || c.target_display_name;
-  return `${who}: ${last.body}`;
+  const who = personName(people[last.author_id]) || c.target_display_name;
+  return `${who}: ${previewText(last.body, last.files?.length ?? 0)}`;
 }
 
-function CaseList({ cases, people, selected, onPick, showTarget }: { cases: StaffCase[]; people: People; selected?: string; onPick: (id: string) => void; showTarget: boolean }) {
+export function CaseList({ cases, people, selected, onPick, showTarget }: { cases: StaffCase[]; people: People; selected?: string; onPick: (id: string) => void; showTarget: boolean }) {
   return (
     <ul className={m.caseList} data-testid="case-list">
       {cases.map((c) => {
@@ -100,7 +100,7 @@ function CaseList({ cases, people, selected, onPick, showTarget }: { cases: Staf
  * took away), its thread, and what can be done about it — reply as Nexa, lift
  * the mute or ban, close it or open it again.
  */
-function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: { caseId: string; onBack: () => void; onChanged: (c: StaffCase) => void; showMember?: boolean }) {
+export function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: { caseId: string; onBack: () => void; onChanged: (c: StaffCase) => void; showMember?: boolean }) {
   const nav = useNavigate();
   const toast = useUI((u) => u.toast);
   const mergePeople = useModeration((s) => s.mergePeople);
@@ -204,22 +204,22 @@ function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: { caseI
         <span className={m.paneActions}>
           {/* on the member's own page the way to it goes nowhere */}
           {!gone && showMember ? (
-            <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${c.user_id}`)}>
-              <UserRound size={15} aria-hidden="true" /> {personName(target)}
+            <Button size="sm" variant="ghost" onClick={() => nav(`/channels/@admin/users/${c.user_id}`)} aria-label={t("moderation.case.openPerson", { name: personName(target) })} title={personName(target)}>
+              <UserRound size={15} aria-hidden="true" /> <span className={m.btnLabel}>{personName(target)}</span>
             </Button>
           ) : null}
           {c.in_effect ? (
-            <Button size="sm" variant="positive" disabled={busy} onClick={() => void lift()} data-testid="case-lift">
-              <LockOpen size={15} aria-hidden="true" /> {c.action === "ban" ? t("moderation.case.liftBan") : t("moderation.case.liftMute")}
+            <Button size="sm" variant="positive" disabled={busy} onClick={() => void lift()} data-testid="case-lift" aria-label={c.action === "ban" ? t("moderation.case.liftBan") : t("moderation.case.liftMute")}>
+              <LockOpen size={15} aria-hidden="true" /> <span className={m.btnLabel}>{c.action === "ban" ? t("moderation.case.liftBan") : t("moderation.case.liftMute")}</span>
             </Button>
           ) : null}
           {c.status === "open" ? (
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(true)} data-testid="case-close">
-              <CircleCheck size={15} aria-hidden="true" /> {t("moderation.case.close")}
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(true)} data-testid="case-close" aria-label={t("moderation.case.close")}>
+              <CircleCheck size={15} aria-hidden="true" /> <span className={m.btnLabel}>{t("moderation.case.close")}</span>
             </Button>
           ) : (
-            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(false)} data-testid="case-reopen">
-              <RotateCcw size={15} aria-hidden="true" /> {t("moderation.case.reopen")}
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(false)} data-testid="case-reopen" aria-label={t("moderation.case.reopen")}>
+              <RotateCcw size={15} aria-hidden="true" /> <span className={m.btnLabel}>{t("moderation.case.reopen")}</span>
             </Button>
           )}
         </span>
@@ -230,16 +230,32 @@ function StaffCasePane({ caseId, onBack, onChanged, showMember = true }: { caseI
         perspective="staff"
         action={c.action}
         header={<NoticeCard c={c} people={data.people} perspective="staff" />}
+        // a closed case is closed to staff too, until one of them opens it again
         onSend={
-          gone
+          gone || c.status === "closed"
             ? undefined
-            : async (body) => {
-                const r = await modApi.reply(caseId, body);
+            : async (body, files) => {
+                const r = await modApi.reply(caseId, body, files);
                 apply(r.case, r.messages);
               }
         }
+        upload={modApi.upload}
+        placeholder={t("moderation.case.replyPlaceholder")}
         composerNote={t("moderation.case.replyNote", { name: personName(target) })}
-        closedNote={gone ? t("moderation.case.goneNote") : undefined}
+        closedNote={
+          gone ? (
+            <ClosedNote text={t("moderation.case.goneNote")} />
+          ) : c.status === "closed" ? (
+            <ClosedNote
+              text={t("moderation.case.closedNote")}
+              action={
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void setClosed(false)} data-testid="case-reopen-locked">
+                  <RotateCcw size={15} aria-hidden="true" /> {t("moderation.case.reopen")}
+                </Button>
+              }
+            />
+          ) : undefined
+        }
       />
     </>
   );
@@ -357,146 +373,5 @@ export function CasesTab() {
         )}
       </div>
     </div>
-  );
-}
-
-/** One account's cases: who they are and where they stand, and every case about them. */
-export function UserCasesView() {
-  const { userId = "", caseId } = useParams();
-  const nav = useNavigate();
-  const openModal = useUI((u) => u.openModal);
-  const mergePeople = useModeration((s) => s.mergePeople);
-  const ownerId = useModeration((s) => s.ownerId);
-  const [user, setUser] = useState<ModUser | null>(null);
-  const [cases, setCases] = useState<StaffCase[] | null>(null);
-  const [people, setPeople] = useState<People>({});
-  const [failed, setFailed] = useState(false);
-  const [moderating, setModerating] = useState(false);
-  // their presence as it changes, when this account can see it; the page's own copy otherwise
-  const live = usePresence((p) => p.byUser[userId]);
-  // Whether the panel is wide enough to show a case beside the list. Its own
-  // width, as its layout goes by (Moderation.module.css), not the window's: a
-  // tablet held upright is a wide window with a phone-sized panel in it.
-  const [roomy, setRoomy] = useState(() => typeof window !== "undefined" && window.innerWidth >= 768);
-  useLayoutEffect(() => {
-    const panel = document.querySelector<HTMLElement>("[data-testid=admin-panel]");
-    if (!panel || typeof ResizeObserver === "undefined") return;
-    const measure = () => setRoomy(panel.clientWidth > 767);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(panel);
-    return () => ro.disconnect();
-  }, []);
-
-  const load = useCallback(async () => {
-    try {
-      const r = await modApi.user(userId);
-      setUser(r.user);
-      setCases(r.cases);
-      setPeople(r.people);
-      mergePeople(r.people);
-    } catch {
-      setFailed(true);
-    }
-  }, [userId, mergePeople]);
-
-  useEffect(() => {
-    setUser(null);
-    setCases(null);
-    setFailed(false);
-    void load();
-  }, [load]);
-
-  useModEvents((e) => {
-    if (e.type === "case" && e.case.user_id === userId) void load();
-  });
-
-  // straight to the newest case where there is room for it, so the page is never empty
-  const newest = cases?.[0]?.id;
-  const selected = caseId ?? (roomy ? newest : undefined);
-  const standing = useMemo(() => {
-    const out: string[] = [];
-    if (user?.ban) out.push(user.ban.expires_at ? t("moderation.state.bannedUntil", { when: relativeTo(user.ban.expires_at) }) : t("moderation.state.bannedForever"));
-    if (user?.mute) out.push(user.mute.expires_at ? t("moderation.state.mutedUntil", { when: relativeTo(user.mute.expires_at) }) : t("moderation.state.muted"));
-    return out;
-  }, [user]);
-
-  if (failed) {
-    return (
-      <div className={m.empty}>
-        <p>{t("moderation.user.missing")}</p>
-        <Button size="sm" variant="secondary" onClick={() => nav("/channels/@admin/users")}>
-          {t("moderation.backToUsers")}
-        </Button>
-      </div>
-    );
-  }
-  if (!user || !cases) {
-    return (
-      <div className={m.loadingRow}>
-        <Spinner label={t("chat.pins.loading")} />
-      </div>
-    );
-  }
-  const deleted = (user.admin_flags & FLAG_DELETED) !== 0;
-  const st = modStatus(user, live);
-  return (
-    <>
-      <div className={m.userHeader} data-testid="user-cases-header">
-        <button type="button" className={m.iconBtn} onClick={() => nav("/channels/@admin/users")} aria-label={t("moderation.backToUsers")}>
-          <ChevronLeft size={18} className={m.flip} />
-        </button>
-        <div className={m.userWho}>
-          <Avatar id={user.id} avatarId={user.avatar_id} name={user.display_name} size={48} status={deleted ? null : st.status} />
-          <div className={m.userNames}>
-            <span className={m.userName}>
-              <span>{deleted ? t("nexa.deletedUser") : user.display_name}</span>
-              {user.id === ownerId ? <span className={m.staffBadge}>{t("profile.profileCard.owner")}</span> : (user.admin_flags & FLAG_ADMIN) !== 0 ? <span className={m.staffBadge}>{t("moderation.staff")}</span> : null}
-            </span>
-            <span className={m.userSub}>
-              {deleted ? t("moderation.user.deleted") : `@${user.username}`} · {t("moderation.casesCount", { count: cases.length })}
-              {standing.length ? ` · ${standing.join(" · ")}` : ""}
-            </span>
-            {!deleted ? <StatusSummary st={st} compact /> : null}
-          </div>
-        </div>
-        <div className={m.userActions}>
-          {!deleted ? (
-            <Button size="sm" variant="ghost" onClick={() => openModal("profile", { userId: user.id })}>
-              <UserRound size={15} aria-hidden="true" /> {t("moderation.menu.profile")}
-            </Button>
-          ) : null}
-          {!user.blocked && !deleted ? (
-            <Button size="sm" onClick={() => setModerating(true)} data-testid="user-moderate">
-              <Gavel size={15} aria-hidden="true" /> {t("moderation.moderate")}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      {cases.length === 0 ? (
-        <div className={m.empty}>
-          <FolderOpen size={40} aria-hidden="true" />
-          <span className={m.emptyTitle}>{t("moderation.user.noCases")}</span>
-          <span>{t("moderation.user.noCasesHint")}</span>
-        </div>
-      ) : (
-        <div className={m.workspace} data-open={!!caseId} style={{ flex: 1 }}>
-          <div className={m.listCol}>
-            <CaseList cases={cases} people={people} selected={selected} onPick={(id) => nav(`/channels/@admin/users/${userId}/cases/${id}`)} showTarget={false} />
-          </div>
-          <div className={m.pane}>
-            {selected ? (
-              <StaffCasePane key={selected} caseId={selected} showMember={false} onBack={() => nav(`/channels/@admin/users/${userId}`)} onChanged={(c) => setCases((cur) => cur?.map((x) => (x.id === c.id ? c : x)) ?? cur)} />
-            ) : (
-              <div className={m.paneEmpty}>
-                <FolderOpen size={40} aria-hidden="true" />
-                <span className={m.emptyTitle}>{t("moderation.case.pick")}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {moderating ? <ModerateModal user={user} onClose={() => setModerating(false)} onDone={(c) => (c.action === "delete" ? void load() : nav(`/channels/@admin/users/${userId}/cases/${c.id}`))} /> : null}
-    </>
   );
 }

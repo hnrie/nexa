@@ -200,7 +200,7 @@ export function sanitizeAttachment(x: unknown): AttachmentMeta | null {
 // and video player were kept out of this list when they were added, so no
 // message ever showed them: whatever is not here is thrown away on arrival.
 const EMBED_STRINGS = ["url", "type", "title", "description", "site_name", "image", "video_id", "mime", "color", "invite_code", "author", "author_url", "icon", "media", "media_mime", "player", "player_site", "banner"];
-const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count", "published_at", "media_w", "media_h"];
+const EMBED_NUMBERS = ["image_w", "image_h", "member_count", "online_count", "published_at", "media_w", "media_h", "video_start"];
 /** Fields that only mean something as one of a few words. */
 const EMBED_CHOICES: Record<string, readonly string[]> = { media_kind: ["video", "audio"], image_layout: ["large", "thumbnail"] };
 
@@ -230,6 +230,8 @@ export function sanitizeEmbed(e: Obj): Obj {
     if (typeof v === "string" && (!EMBED_LINKS.has(k) || webLink(v))) out[k] = v;
   }
   for (const k of EMBED_NUMBERS) if (isNum(e[k])) out[k] = e[k];
+  // a YouTube video starts at most a day in, where its link says
+  if (isNum(out["video_start"]) && !(out["video_start"] > 0 && out["video_start"] <= 86400)) delete out["video_start"];
   for (const [k, allowed] of Object.entries(EMBED_CHOICES)) {
     const v = e[k];
     if (typeof v === "string" && allowed.includes(v)) out[k] = v;
@@ -251,7 +253,7 @@ function cap(v: string, n: number): string {
 // The sender's app made the card, so a sender can write anything into it.
 const POST_TEXTS: Record<string, number> = { platform: 20, site: 40, name: 256, handle: 256, community: 256, title: 300, text: 4000, reply_to: 256, note: 2048 };
 const POST_ADDRESSES = ["url", "author_url", "avatar", "community_url"];
-const POST_COUNTS = ["created", "replies", "reposts", "likes", "views"];
+const POST_COUNTS = ["created", "replies", "reposts", "likes", "views", "subscribers"];
 const POST_MEDIA_KINDS = ["photo", "video", "gif"];
 const MAX_ADDRESS = 8192;
 const MAX_POST_MEDIA = 10;
@@ -294,6 +296,7 @@ function sanitizePost(x: unknown, quoted: boolean): Obj | undefined {
     if (isNum(v) && v > 0) out[k] = v;
   }
   for (const k of ["verified", "sensitive"]) if (x[k] === true) out[k] = true;
+  if (x["live"] === "now" || x["live"] === "upcoming") out["live"] = x["live"];
   if (Array.isArray(x["media"])) {
     const media = x["media"].slice(0, MAX_POST_MEDIA).map(sanitizePostMedia).filter((m): m is Obj => !!m);
     if (media.length) out["media"] = media;

@@ -1,7 +1,7 @@
 NEXA - PRIVACY POLICY
 Site: chat.evilion.xyz
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-09-28
+Effective: 2026-10-01
 
 This policy lists exactly what Nexa holds. It is written against the
 actual database, so if something is not listed here, there is no place
@@ -11,10 +11,14 @@ for it and nothing to hand over.
 
 - Your messages, files, and calls are encrypted end to end. Nobody who
   runs Nexa can read them, and nobody monitors what you do in a chat.
-- What the owner and staff can see is your public profile, public
-  images, the delivery details the server needs (who sent what,
-  where, and when), and moderation records: the actions taken on an
-  account, and the case threads with Nexa that go with them.
+- What the owner and staff can see is your public profile, what
+  servers show everyone, public images, the delivery details the
+  server needs (who sent what, where, and when), and moderation
+  records: the actions taken on an account or a server, and the case
+  threads with Nexa that go with them.
+- Links you share are previewed by the server through Cloudflare, so
+  the sites never see your address, and YouTube videos play through
+  the server, so YouTube never learns who is watching.
 - No email, no phone number, no real name, no payment details, no
   location, no contacts, no analytics, and no push tokens are ever
   collected.
@@ -48,10 +52,15 @@ a) Profile information (public by design, typed by you): username,
    accent colors, custom status and expiry, presence preference, DM
    privacy setting, per server nicknames and pictures, account ID,
    creation and last change times, and admin and disabled flags. None
-   of this is identity checked.
+   of this is identity checked. Servers are public in the same way: a
+   server's name, icon, banner, and description, its owner, and when
+   it was made. Staff see these with how many members and channels a
+   server has (the numbers, not the channels), but never what is said
+   inside it.
 
 b) Public images (stored as uploaded, can be handed over if ordered):
-   profile pictures, banners, server icons, custom emoji, stickers.
+   profile pictures, banners, server icons and banners, custom emoji,
+   stickers.
 
 c) Delivery details (needed to send and notify, not content): message
    ID, channel, author, type, timestamps, edit time, reply target,
@@ -87,12 +96,15 @@ f) Login checks (values not handed over, listed to close the point):
 
 g) Moderation records (not end-to-end encrypted, kept as the record
    of how Nexa is moderated):
-   - Moderation cases: which action was taken on an account, the
-     reason, which member of staff took it, when, how long it lasts,
-     and the values a reset replaced (for example the old username).
-   - Case threads: the messages between a member and staff in a
-     moderation case, stored in readable form and readable by every
-     member of staff.
+   - Moderation cases: which action was taken on an account or on a
+     server (a server's case belongs to its owner), the reason, which
+     member of staff took it, when, how long it lasts, and the values
+     a reset replaced (for example the old username, or a server's
+     old name and description).
+   - Case threads: the messages, pictures, and videos between a member
+     and staff in a moderation case, stored in readable form and
+     readable by every member of staff. Only the member and staff can
+     open the pictures and videos. A closed case keeps its thread.
    - The moderation log: an append-only record of every staff action
      (who, to whom, what, why, and when), with the names as they were
      at the time. Nobody can edit or delete it.
@@ -139,10 +151,21 @@ decrypted.
   decrypts them, and the communities and channels you share with
   them.
 - The owner and the staff they appoint see sections 3a to 3i. Staff
-  use a moderation panel that shows public profiles, when accounts
-  were last active, moderation cases and their threads, the log, and
-  announcements. It shows nothing that is encrypted, because nothing
-  here can decrypt it.
+  use a moderation panel that shows public profiles, what servers
+  show everyone, when accounts were last active, moderation cases and
+  their threads, the log, and announcements. It shows nothing that is
+  encrypted, because nothing here can decrypt it.
+- Link previews, pictures linked from elsewhere, and YouTube videos
+  are fetched by the Nexa server, not by your device, and the server
+  fetches them through Cloudflare's WARP network. The sites see a
+  Cloudflare address, never yours and never the server's, and nothing
+  from your device reaches them. A YouTube video plays in YouTube's
+  own player, loaded through the server the same way, in a frame that
+  cannot reach anything else in the app: YouTube is told the video is
+  shown on chat.evilion.xyz, as any site that shows one says, but not
+  who is watching, and it gets no cookies. Nothing ties a fetch to who
+  asked for it, and a preview is kept in memory for at most an hour so
+  the same link is not fetched twice.
 - No third parties, no advertisers, and no analytics companies.
   Nothing is sold or shared, except as forced by a valid legal order
   (see Terms section 5), and even then only what exists above.

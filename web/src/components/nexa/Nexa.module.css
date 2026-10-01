@@ -258,28 +258,69 @@
 }
 .fieldValue {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
 }
-.oldValue {
-  color: var(--text-muted);
-  text-decoration: line-through;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* what a reset took away, for the staff: whole and formatted, under what it says now */
+.was {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--danger) 7%, var(--bg-input));
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--danger) 55%, transparent);
 }
-.fieldArrow {
+.wasLabel {
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--text-muted);
-  flex: none;
+}
+.wasValue {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-subtle);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+.wasValue[data-rich="true"] {
+  white-space: normal;
+}
+.wasValue[data-open="true"] {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.wasMore {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.wasMore:hover {
+  color: var(--text);
+  text-decoration: underline;
 }
 .newValue {
   font-family: var(--font-mono);
   font-size: 13px;
   color: var(--text-strong);
   overflow-wrap: anywhere;
+}
+/* "Cleared", "Removed": a word about the field, not a value it holds */
+.newValue[data-word="true"] {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
 }
 .callout {
   margin: 0;
@@ -537,12 +578,28 @@
   overflow-wrap: anywhere;
 }
 .threadClosed {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
   margin: 0;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--border-subtle);
   font-size: 14px;
   color: var(--text-muted);
   text-align: center;
+}
+/* a closed case: the lock and the sentence, then the way to open it again where there is one */
+.closedText {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 60ch;
+}
+.closedText svg {
+  flex: none;
 }
 
 .composer {
@@ -591,6 +648,102 @@
 }
 .composerBox textarea::placeholder {
   color: var(--text-placeholder);
+}
+/* the line's pictures and recordings, under its words */
+.lineFiles {
+  margin-top: 6px;
+  max-width: 100%;
+}
+.attach {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin-inline-start: -8px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--icon);
+}
+.attach:hover:not(:disabled) {
+  color: var(--text-strong);
+  background: var(--bg-hover);
+}
+.attach:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* the files picked for the next line, each with its upload's progress */
+.staged {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.stagedItem {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+.stagedItem img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.stagedItem[data-failed] {
+  box-shadow: 0 0 0 2px var(--danger);
+}
+.stagedItem[data-failed] img {
+  opacity: 0.45;
+}
+.stagedBar {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: 0;
+  height: 4px;
+  background: var(--brand);
+  transition: inline-size 120ms linear;
+}
+.stagedRemove {
+  position: absolute;
+  top: 4px;
+  inset-inline-end: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.66);
+}
+.stagedRemove:hover {
+  background: var(--danger);
+}
+/* a file held over the thread: where it will land */
+.composer[data-dragging] .composerBox {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 30%, transparent);
+}
+@media (pointer: coarse) {
+  .attach {
+    width: 40px;
+    height: 40px;
+  }
+  .stagedRemove {
+    width: 28px;
+    height: 28px;
+  }
 }
 .counter {
   flex: none;

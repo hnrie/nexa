@@ -1,7 +1,7 @@
 NEXA - TERMS OF SERVICE
 Site: chat.evilion.xyz
 Contact the owner (nora) here: evilionx3@proton.me
-Effective: 2026-09-28
+Effective: 2026-10-01
 
 These Terms are the agreement between you and the owner of Nexa.
 They are short on purpose and written in plain language. The Privacy
@@ -16,8 +16,9 @@ software works, not a promise that could be quietly waived later.
 
 The owner and a team of moderators (called staff in these Terms) keep
 Nexa running. Staff only ever work with the small part of Nexa that is
-not encrypted: public profiles, community membership, moderation
-cases, and the delivery details the server needs to work.
+not encrypted: public profiles, what servers show everyone (their
+names, icons, banners, and descriptions), community membership,
+moderation cases, and the delivery details the server needs to work.
 
 2. YOUR ACCOUNT
 
@@ -32,7 +33,10 @@ cases, and the delivery details the server needs to work.
 - One person per account. Please do not share your password, sell
   your account, or use someone else's.
 - Your username, display name, profile picture, banner, about me,
-  pronouns, and custom status are public. Everyone can see them.
+  pronouns, custom status, and the nicknames you use in servers are
+  public. Everyone who can see them can see them as they are.
+- If you own a server, its name, icon, banner, and description are
+  public in the same way.
 
 3. ENCRYPTION AND PRIVACY
 
@@ -60,8 +64,9 @@ Please keep Nexa decent. These rules apply everywhere on it:
      work as your own.
   3. No gore or extreme graphic content. Do not post graphic images
      or video of severe injury, death, or cruelty.
-  4. No hate or harassment. Usernames, display names, profile
-     pictures, banners, and other profile fields must not be racist,
+  4. No hate or harassment. Usernames, display names, nicknames,
+     profile pictures, banners, other profile fields, and server
+     names, icons, banners, and descriptions must not be racist,
      homophobic, transphobic, or otherwise hateful toward a protected
      group. Slurs, dehumanizing attacks, and harassment for someone's
      race, ethnicity, sex, gender identity, sexual orientation,
@@ -75,9 +80,10 @@ Please keep Nexa decent. These rules apply everywhere on it:
 5. HOW MODERATION WORKS
 
 What staff can see is limited by the encryption. They moderate what is
-public (profiles and public images) and what is reported to them. If
-someone you talk to shows staff something you sent them, staff can act
-on it. Nobody goes looking through chats, because nobody here can.
+public (profiles, what servers show everyone, and public images) and
+what is reported to them. If someone you talk to shows staff something
+you sent them, staff can act on it. Nobody goes looking through chats
+or inside servers, because nobody here can.
 
 When a rule is broken, staff can:
 
@@ -88,6 +94,13 @@ When a rule is broken, staff can:
   moderator_removed_ followed by a random code, because usernames are
   lowercase. Your old username keeps signing you in, and nobody else
   can register it.
+- Clear the nicknames an account uses in its servers.
+- Take down parts of what a server shows everyone: its icon, banner,
+  name, or description. Pictures are removed, the name is replaced
+  with MODERATOR_REMOVED_ followed by a random code, and the
+  description is cleared. The server's owner gets the notice and the
+  case, and can set new ones that follow the rules. Staff never see
+  the channels, messages, or files inside a server.
 - Mute an account for a set time. A muted account can still read
   everything, but cannot send messages, react, join calls, or change
   its profile until the mute ends.
@@ -105,8 +118,10 @@ Every action is taken for a reason, and you are told:
 - You get a notice from Nexa, both as a message and as a pop-up,
   with the reason and the name of the member of staff who acted.
 - Each notice opens a private case thread with the moderation team,
-  where you can ask questions or appeal. Staff can lift a mute or a
-  ban early.
+  where you can ask questions or appeal, and send pictures or videos.
+  Staff can lift a mute or a ban early.
+- When staff close a case, it stays readable, but nobody can write in
+  it until staff open it again.
 - Every staff action is recorded in an append-only log that cannot be
   edited or deleted, so what was done, by whom, and why stays on
   record.
@@ -123,9 +138,10 @@ here has a way to read them.
   sends moderation notices and announcements. Nobody can message Nexa
   directly or add it as a friend.
 - Moderation case threads are a conversation with the moderation
-  team. They are not end-to-end encrypted, every member of staff can
-  read them, and they are kept as part of the moderation record, even
-  after an account is deleted.
+  team. They are not end-to-end encrypted, including the pictures and
+  videos sent in them, every member of staff can read them, and they
+  are kept as part of the moderation record, even after an account is
+  deleted.
 - Announcements go to everyone and show which member of staff wrote
   them.
 - Nexa and staff will never ask for your password or your recovery
@@ -134,9 +150,10 @@ here has a way to read them.
 7. THINGS YOU POST
 
 - What you write and upload stays yours.
-- Public things (usernames, display names, profile pictures, banners,
-  server names and icons, custom emoji, stickers) are stored as
-  uploaded and are visible to everyone.
+- Public things (usernames, display names, nicknames, profile
+  pictures, banners, server names, icons, banners, and descriptions,
+  custom emoji, stickers) are stored as uploaded and are visible to
+  everyone.
 - Encrypted things (messages and files) stay readable only to the
   people holding the conversation key. Deleting a message deletes its
   server row.

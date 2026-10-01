@@ -12,6 +12,7 @@ import (
 	"evilion.xyz/chat/internal/auth"
 	"evilion.xyz/chat/internal/config"
 	"evilion.xyz/chat/internal/discordsync"
+	"evilion.xyz/chat/internal/egress"
 	"evilion.xyz/chat/internal/gateway"
 	"evilion.xyz/chat/internal/ids"
 	"evilion.xyz/chat/internal/media"
@@ -77,6 +78,7 @@ type Server struct {
 	limUpload  *ratelimit.Limiter
 	limUnfurl  *ratelimit.Limiter
 	limProxy   *ratelimit.Limiter
+	limYouTube *ratelimit.Limiter
 	limRefresh *ratelimit.Limiter
 	limVoice   *ratelimit.Limiter
 	limGuest   *ratelimit.Limiter
@@ -102,6 +104,9 @@ type Server struct {
 
 	// Unfurl produces link previews for senders (nil disables the route body).
 	Unfurl *unfurl.Service
+	// Egress is the proxy that requests a person can point this server at go
+	// out through (internal/egress); nil sends them out directly.
+	Egress *egress.Proxy
 	// Apps looks up Discord Rich Presence applications for activities.
 	Apps *rpcapps.Cache
 	// activityHub resolves activity previews the way the gateway shows them.
@@ -186,6 +191,10 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 		// so an unmetered one is both a way to exhaust Nexa's
 		// bandwidth and a way to aim Nexa at someone else's.
 		limProxy: ratelimit.New(ratelimit.Every(120, time.Minute), 60, 10*time.Minute),
+		// YouTube's player through /yt/, per address: a video asks for its
+		// page and scripts at once and then a piece every few seconds, and a
+		// household may watch a few at a time
+		limYouTube: ratelimit.New(ratelimit.Every(1200, time.Minute), 400, 10*time.Minute),
 		// re-signing old media links, per account: a conversation scrolled
 		// back through asks once per screenful, up to a hundred links a time
 		limRefresh: ratelimit.New(ratelimit.Every(60, time.Minute), 30, 10*time.Minute),
@@ -256,7 +265,7 @@ func NewServer(cfg config.Config, st *store.Store, log *slog.Logger, bc Broadcas
 func (s *Server) limiters() map[string]*ratelimit.Limiter {
 	return map[string]*ratelimit.Limiter{
 		"generic": s.limGeneric, "auth-ip": s.limAuthIP, "auth-user": s.limAuthUsr, "register": s.limReg, "message": s.limMsg,
-		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "refresh": s.limRefresh, "voice": s.limVoice,
+		"upload": s.limUpload, "unfurl": s.limUnfurl, "proxy": s.limProxy, "youtube": s.limYouTube, "refresh": s.limRefresh, "voice": s.limVoice,
 		"guest": s.limGuest, "rotate": s.limRotate, "password": s.limPass, "profile": s.limProfile, "expressions": s.limExpr,
 		"import": s.limImport, "crash": s.limCrash, "bug": s.limBug, "bug-file": s.limBugFile,
 		"webhook": s.limHook, "webhook-channel": s.limHookCh, "webhook-manage": s.limHookMgr, "poll-vote": s.limVote, "discord": s.limDiscord,

@@ -62,7 +62,10 @@ licenses:
 
 # Runs the server from source. It used to build bin/chatd first, which is the
 # deploy (see server above): trying the server out replaced the live binary.
+# WARP's local proxy carries link previews and the media proxy; the script
+# installs the WARP client first on a machine that has never had it
 run:
+	bash deploy/warp-proxy.sh
 	$(GO) run ./cmd/chatd
 
 # What builds leave lying around, and nothing else. bin/ and web/dist are not

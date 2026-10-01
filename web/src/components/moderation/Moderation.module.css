@@ -322,6 +322,18 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* the name is the way to the person's whole profile */
+.cardNameLink {
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: start;
+}
+.cardNameLink:hover,
+.cardNameLink:focus-visible {
+  text-decoration: underline;
+}
 .staffBadge {
   display: inline-flex;
   align-items: center;
@@ -792,6 +804,42 @@
 
 /* --- a user's cases --------------------------------------------------------------- */
 
+/* a person's page: their profile, or their cases, one at a time */
+.subTabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.subTabs::-webkit-scrollbar {
+  display: none;
+}
+.subTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color var(--transition), color var(--transition);
+}
+.subTab:hover {
+  color: var(--text-strong);
+  background: var(--bg-hover);
+}
+.subTab[data-selected="true"] {
+  color: var(--text-strong);
+  background: var(--bg-selected);
+  box-shadow: inset 0 1px 0 var(--edge-light);
+}
 .userHeader {
   flex: none;
   display: flex;
@@ -1424,21 +1472,51 @@ td.logReason {
     height: 36px;
     padding: 0 10px;
   }
-  .tab[data-selected="true"] {
-    flex: 1 1 auto;
+  /* every tab keeps its name: the strip scrolls sideways instead of hiding them */
+  .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tab:not([data-selected="true"]) {
     min-width: 0;
   }
-  .tab[data-selected="true"] .tabLabel {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
   .tab:not([data-selected="true"]) .tabLabel {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+  }
+  /* a case's buttons say what they do with their icon and their label for a screen reader */
+  .paneActions .btnLabel {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+  .subTabs {
+    padding: 8px 12px;
+  }
+  /* a case's header on one row: back, its title cut short where it must, its buttons */
+  .paneHeader {
+    flex-wrap: nowrap;
+    padding: 8px 10px;
+  }
+  .paneTitle {
+    flex: 1 1 auto;
+  }
+  .paneTitle > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .paneActions {
+    flex-wrap: nowrap;
   }
   .scroll {
     padding: 14px 12px 24px;

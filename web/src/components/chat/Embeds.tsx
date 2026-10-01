@@ -1,5 +1,5 @@
-import { Play } from "lucide-react";
-import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Play, X } from "lucide-react";
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { UnfurlResult } from "@/api/types";
 import { trimUrl } from "@/markdown/parse";
 import { FavoriteButton } from "./FavoriteButton";
@@ -10,6 +10,7 @@ import { Lightbox } from "./Lightbox";
 import { AudioPlayer } from "./AudioPlayer";
 import { PostEmbed } from "./PostEmbed";
 import { VideoPlayer } from "./VideoPlayer";
+import { isYouTubeID, YouTubeVideo } from "./YouTubePlayer";
 import c from "./Chat.module.css";
 import s from "./Embeds.module.css";
 import { imageNameFromUrl } from "@/lib/imageActions";
@@ -91,13 +92,25 @@ function ImageEmbed({ e }: { e: UnfurlResult }) {
  * address (internal/unfurl/players.go); this list is the second lock, so a
  * preview that ever came from somewhere else still cannot run a page here.
  */
-const PLAYER_HOSTS = new Set(["www.youtube-nocookie.com", "player.vimeo.com", "player.twitch.tv", "clips.twitch.tv", "www.dailymotion.com", "streamable.com", "www.loom.com"]);
+const PLAYER_HOSTS = new Set(["player.vimeo.com", "player.twitch.tv", "clips.twitch.tv", "www.dailymotion.com", "streamable.com", "www.loom.com"]);
 
-function playerSrc(e: UnfurlResult): string | null {
-  const raw = e.player ?? (e.video_id ? `https://www.youtube-nocookie.com/embed/${encodeURIComponent(e.video_id)}?autoplay=1&rel=0` : null);
-  if (!raw) return null;
+/** A YouTube video's id, from the card or from a player address the server built before players went through it. */
+function youtubeID(e: UnfurlResult): string | null {
+  if (isYouTubeID(e.video_id)) return e.video_id;
   try {
-    const u = new URL(raw);
+    const u = new URL(e.player ?? "");
+    const m = /^\/embed\/([A-Za-z0-9_-]{11})$/.exec(u.pathname);
+    return u.host === "www.youtube-nocookie.com" && m ? m[1]! : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A player in another site's frame, for the sites both ends agree on. YouTube goes through this server instead. */
+function playerSrc(e: UnfurlResult): string | null {
+  if (!e.player) return null;
+  try {
+    const u = new URL(e.player);
     return u.protocol === "https:" && PLAYER_HOSTS.has(u.host) ? u.toString() : null;
   } catch {
     return null;
@@ -255,9 +268,20 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
   const [play, setPlay] = useState(false);
   const image = useMediaSrc(e.image);
   const media = useMediaSrc(e.media);
-  const src = playerSrc(e);
+  const yt = youtubeID(e);
+  const src = yt ? null : playerSrc(e);
   const big = !!e.image && (e.image_layout === "large" || (e.image_layout !== "thumbnail" && (e.image_w ?? 0) >= 400));
   const title = e.title ? <a className={s.title} href={e.url} target="_blank" rel="noopener noreferrer" dir="auto">{e.title}</a> : null;
+  if (yt) {
+    return (
+      <div className={s.card} style={e.color ? { borderInlineStartColor: e.color } : undefined}>
+        <CardHead e={e} />
+        {title}
+        {e.description ? <Description text={e.description} /> : null}
+        <YouTubeVideo id={yt} title={e.title ?? t("perms.video")} poster={image} start={e.video_start} w={e.image_w} h={e.image_h} />
+      </div>
+    );
+  }
   if (src) {
     return (
       <div className={s.card} style={e.color ? { borderInlineStartColor: e.color } : undefined}>
@@ -306,23 +330,43 @@ function LinkEmbed({ e }: { e: UnfurlResult }) {
   );
 }
 
-export function Embeds({ list }: { list: UnfurlResult[] }) {
+/** One preview, drawn the way its kind is, or null when there is nothing to draw. */
+function embedFor(e: UnfurlResult, imagePreviews: boolean): ReactNode {
+  if (!e || typeof e !== "object" || typeof e.url !== "string") return null;
+  // a social post is drawn as a post; without one of those it is a link like any other
+  if (e.post && typeof e.post === "object") return <PostEmbed e={e} />;
+  if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed e={e} /> : null;
+  // played through this server's proxy, so the host of the file never sees who is watching
+  if (e.type === "video") return imagePreviews ? <VideoEmbed e={e} /> : null;
+  if (e.type === "youtube") return <LinkEmbed e={e} />;
+  // drawn by InviteCards, which also covers invite links that came without a card
+  if (e.type === "invite") return null;
+  if (e.title || e.description || e.player || e.media) return <LinkEmbed e={e} />;
+  return null;
+}
+
+/**
+ * A message's link previews. `onRemove`, for the author and whoever may
+ * delete the message, puts a small x on each one that takes them all away.
+ */
+export function Embeds({ list, onRemove }: { list: UnfurlResult[]; onRemove?: ((ev: MouseEvent) => void) | undefined }) {
   const imagePreviews = useSettings((st) => st.settings.imagePreviews);
   if (list.every((e) => e?.type === "invite")) return null;
   return (
     <div className={s.embeds}>
       {list.slice(0, 5).map((e, i) => {
-        if (!e || typeof e !== "object" || typeof e.url !== "string") return null;
-        // a social post is drawn as a post; without one of those it is a link like any other
-        if (e.post && typeof e.post === "object") return <PostEmbed key={i} e={e} />;
-        if (e.type === "image" || e.type === "gif") return imagePreviews ? <ImageEmbed key={i} e={e} /> : null;
-        // played through this server's proxy, so the host of the file never sees who is watching
-        if (e.type === "video") return imagePreviews ? <VideoEmbed key={i} e={e} /> : null;
-        if (e.type === "youtube") return <LinkEmbed key={i} e={e} />;
-        // drawn by InviteCards, which also covers invite links that came without a card
-        if (e.type === "invite") return null;
-        if (e.title || e.description || e.player || e.media) return <LinkEmbed key={i} e={e} />;
-        return null;
+        const body = embedFor(e, imagePreviews);
+        if (!body) return null;
+        return (
+          <div key={i} className={s.item}>
+            {body}
+            {onRemove ? (
+              <button type="button" className={s.remove} onClick={onRemove} aria-label={t("chat.embeds.removeEmbeds")} title={t("chat.embeds.removeEmbeds")} data-testid="remove-embeds">
+                <X size={14} strokeWidth={2.5} />
+              </button>
+            ) : null}
+          </div>
+        );
       })}
     </div>
   );

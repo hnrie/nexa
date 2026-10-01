@@ -546,27 +546,6 @@ func (s *Server) handleNexaCase(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, http.StatusOK, out)
 }
 
-// readCaseMessage checks what a member or staff wrote in a thread.
-func readCaseMessage(w http.ResponseWriter, r *http.Request) (string, bool) {
-	var req struct {
-		Body string `json:"body"`
-	}
-	if err := ReadJSON(w, r, &req, 32<<10); err != nil {
-		WriteError(w, err)
-		return "", false
-	}
-	body, ok := CleanText(req.Body, maxCaseMessage)
-	if !ok {
-		WriteError(w, E(http.StatusBadRequest, "too_long", "Messages here are at most 2000 characters."))
-		return "", false
-	}
-	if body == "" {
-		WriteError(w, E(http.StatusBadRequest, "empty_message", "Write something first."))
-		return "", false
-	}
-	return body, true
-}
-
 // handleNexaReply is the member writing in their own case's thread.
 func (s *Server) handleNexaReply(w http.ResponseWriter, r *http.Request) {
 	c, me := s.memberCaseFor(w, r)
@@ -578,13 +557,13 @@ func (s *Server) handleNexaReply(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, ErrRateLimited)
 		return
 	}
-	body, ok := readCaseMessage(w, r)
+	line, ok := readCaseLine(w, r)
 	if !ok {
 		return
 	}
-	msg, extra, updated, err := s.Store.AddModMessage(r.Context(), c.ID, me.ID, store.ModMsgMember, body)
+	msg, extra, updated, err := s.Store.AddModMessage(r.Context(), c.ID, me.ID, store.ModMsgMember, line.Body, line.Files)
 	if err != nil {
-		WriteError(w, err)
+		WriteError(w, caseWriteError(err))
 		return
 	}
 	lines := append(extra, msg)

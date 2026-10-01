@@ -1,0 +1,499 @@
+/* A person's or a server's page in the moderation panel: on one side the
+   public face as everyone sees it, on the other every part of it anyone can
+   see, each with the way to take it down. The face is drawn with the same
+   light and depth as the app's own profiles and cards. Looking at a field
+   lights its part up on the face. */
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px 32px;
+}
+.sheet {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+  max-width: 1120px;
+}
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* --- the public face ------------------------------------------------------------ */
+
+.face {
+  --face-bg: color-mix(in oklab, var(--bg-surface) 55%, var(--bg-raised));
+  position: sticky;
+  top: 0;
+  border-radius: var(--radius-lg);
+  background: var(--sheen), var(--face-bg);
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-medium);
+  overflow: hidden;
+  min-width: 0;
+}
+/* what the card is: said on the banner, small, where it never covers the picture */
+.faceCaption {
+  position: absolute;
+  z-index: 1;
+  top: 10px;
+  inset-inline-start: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: #fff;
+  background: rgba(10, 6, 18, 0.55);
+  backdrop-filter: blur(6px);
+}
+.faceBanner {
+  position: relative;
+  height: 120px;
+  background-size: cover;
+  background-position: center;
+}
+.faceBanner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.3));
+}
+.faceBody {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 18px 18px;
+}
+.faceAvatar {
+  margin-top: -48px;
+  align-self: flex-start;
+  padding: 6px;
+  border-radius: 50%;
+  background: var(--face-bg);
+  line-height: 0;
+  box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--shade) 70%, transparent);
+}
+.faceAvatar[data-square] {
+  border-radius: 30%;
+}
+.faceNames {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.faceName {
+  align-self: flex-start;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.faceHandle {
+  font-size: 14px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.faceStatus {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 11px;
+  border-radius: 14px;
+  font-size: 14px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--text-strong) 6%, transparent);
+  box-shadow: inset 0 1px 0 var(--edge-light);
+  overflow-wrap: anywhere;
+}
+.faceSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+.faceLabel {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.faceText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.faceAbout {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
+}
+.faceAbout[data-open="true"] {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.faceEmpty {
+  margin: 0;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+.more {
+  align-self: flex-start;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.more:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.emoji {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* the part a field row is about, lit while the row is looked at: a ring of the
+   accent's light around it, so it reads on any banner or picture */
+.face [data-hl] {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 22%, transparent);
+  transition: outline-color 120ms ease, box-shadow 120ms ease;
+}
+.faceBanner[data-hl] {
+  outline-offset: -3px;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--brand) 16%, transparent);
+}
+.faceAvatar[data-hl] {
+  border-radius: 50%;
+}
+.faceSection[data-hl] {
+  border-radius: var(--radius-xs);
+}
+@media (prefers-reduced-motion: reduce) {
+  .face [data-hl] {
+    transition: none;
+  }
+}
+
+/* --- the fields, and the panels beside the face ---------------------------------- */
+
+.panel {
+  border-radius: var(--radius-lg);
+  background: var(--sheen), color-mix(in oklab, var(--bg-surface) 40%, var(--bg-raised));
+  box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-low);
+  overflow: hidden;
+  min-width: 0;
+}
+.panelHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 18px 10px;
+}
+.panelTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.panelHint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.panelEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 18px 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.rows {
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(110px, 150px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  min-height: 52px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border-subtle);
+  transition: background var(--transition);
+}
+.row:hover,
+.row:focus-within {
+  background: var(--bg-hover);
+}
+.rowLabel {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+.rowValue {
+  min-width: 0;
+  font-size: 14.5px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.row[data-empty] .rowValue {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.rowAction {
+  justify-self: end;
+}
+.clip2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.bannerThumb {
+  display: block;
+  width: 120px;
+  max-width: 100%;
+  aspect-ratio: 3 / 1;
+  border-radius: var(--radius-xs);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 0 1px var(--border-subtle);
+}
+.nickList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nickList li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.nickServer {
+  flex: none;
+  max-width: 50%;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nick {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* a server, or the person who owns one, as a row that opens it */
+.serverRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: start;
+  color: var(--text);
+  transition: background var(--transition);
+}
+.serverRow:hover,
+.serverRow:focus-visible {
+  background: var(--bg-hover);
+}
+.serverText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.serverName {
+  font-weight: 650;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.serverMeta {
+  flex: none;
+  max-width: 100%;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.serverText .serverMeta {
+  flex: 1;
+}
+[dir="rtl"] .flip {
+  transform: scaleX(-1);
+}
+
+/* facts about the account or server, two to a row where there is room */
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+  padding: 2px 18px 16px;
+}
+.facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.facts dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+.facts dd {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  margin-inline-start: -6px;
+  border-radius: var(--radius-xs);
+  color: var(--text);
+}
+.copy code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.copy:hover {
+  background: var(--bg-hover);
+}
+
+/* --- the servers grid ------------------------------------------------------------- */
+
+.total {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+/* a server's icon on its card sits in a rounded tile, as servers do in the rail */
+.cardIcon {
+  display: block;
+  line-height: 0;
+}
+.ownerChip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 2px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-subtle);
+  background: color-mix(in srgb, var(--text-strong) 5%, transparent);
+  box-shadow: inset 0 1px 0 var(--edge-light);
+}
+.ownerChip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ownerChip:hover {
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--text-strong) 10%, transparent);
+}
+
+/* --- small panels: one column, the face first ------------------------------------- */
+
+@container panel (max-width: 900px) {
+  .sheet {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* not sticky in one column, but still what the caption on its banner is placed by */
+  .face {
+    position: relative;
+  }
+}
+@container panel (max-width: 767px) {
+  .scroll {
+    padding: 14px 12px 24px;
+  }
+  /* the field's name over its value, the button beside them */
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label action" "value action";
+    row-gap: 4px;
+    padding: 10px 14px;
+  }
+  .rowLabel {
+    grid-area: label;
+  }
+  .rowValue {
+    grid-area: value;
+  }
+  .rowAction {
+    grid-area: action;
+  }
+  .panelHead {
+    padding: 12px 14px 8px;
+  }
+  .serverRow {
+    padding: 10px 14px;
+  }
+  .facts {
+    padding: 2px 14px 14px;
+  }
+}
+@media (pointer: coarse) {
+  .rowAction {
+    min-height: 40px;
+  }
+}

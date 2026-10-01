@@ -7,6 +7,7 @@ import { formatCompact, formatFull, formatPercent, formatShortDate } from "@/lib
 import { Lightbox, type LightboxItem } from "./Lightbox";
 import { postText } from "./postText";
 import { VideoPlayer } from "./VideoPlayer";
+import { isYouTubeID, YouTubeVideo } from "./YouTubePlayer";
 import s from "./PostEmbed.module.css";
 
 /**
@@ -20,6 +21,12 @@ import s from "./PostEmbed.module.css";
  * not loaded at all. No markup from the site reaches the page either; the
  * card is built here from plain fields.
  */
+
+/** The video a YouTube post's card plays, and where its link asks it to start. */
+interface YouTubeRef {
+  id: string;
+  start?: number | undefined;
+}
 
 /** The size a lone picture or a tile grid takes at most. */
 const MEDIA_W = 484;
@@ -121,12 +128,27 @@ function Loop({ src, poster, alt }: { src: string; poster: string | undefined; a
  * cannot (a stream, a site that keeps its files) shows its picture, which
  * opens the post.
  */
-function Media({ post, link, compact }: { post: SocialPost; link: string | undefined; compact: boolean }) {
+function Media({ post, link, compact, video }: { post: SocialPost; link: string | undefined; compact: boolean; video?: YouTubeRef | undefined }) {
   const src = useMediaLinks();
   const [covered, setCovered] = useState(!!post.sensitive);
   const [viewing, setViewing] = useState<number | null>(null);
   const media = post.media ?? [];
   const site = post.site ?? "";
+  // a YouTube video plays here, in YouTube's player fetched through this server
+  if (video && media[0]?.kind === "video") {
+    const m = media[0];
+    return (
+      <div className={s.media} data-covered={covered} data-compact={compact}>
+        <YouTubeVideo id={video.id} title={post.title || m.alt || site} poster={src(m.thumb)} start={video.start} duration={m.duration} live={post.live} w={m.w} h={m.h} />
+        {covered ? (
+          <button type="button" className={s.cover} onClick={() => setCovered(false)}>
+            <span>{t("chat.post.sensitive")}</span>
+            <span className={s.coverShow}>{t("chat.post.show")}</span>
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   const players: PostMedia[] = [];
   const tiles: PostMedia[] = [];
@@ -295,7 +317,7 @@ function Counts({ post }: { post: SocialPost }) {
   );
 }
 
-function PostView({ post, icon, link, quoted }: { post: SocialPost; icon: string | undefined; link: string | undefined; quoted: boolean }) {
+function PostView({ post, icon, link, quoted, video }: { post: SocialPost; icon: string | undefined; link: string | undefined; quoted: boolean; video?: YouTubeRef | undefined }) {
   const src = useMediaLinks();
   const reddit = post.platform === "reddit";
   // Reddit is read by where a post is, then who wrote it; everywhere else by who.
@@ -325,7 +347,12 @@ function PostView({ post, icon, link, quoted }: { post: SocialPost; icon: string
               </span>
             ) : null}
           </span>
-          {second ? outside(reddit ? post.author_url : undefined, s.handle, <bdi>{second}</bdi>) : null}
+          {second || post.subscribers ? (
+            <span className={s.handleRow}>
+              {second ? outside(reddit ? post.author_url : undefined, s.handle, <bdi>{second}</bdi>) : null}
+              {post.subscribers ? <span className={s.handle}>{t("chat.post.subscribers", { count: post.subscribers, n: formatCompact(post.subscribers) })}</span> : null}
+            </span>
+          ) : null}
         </div>
         {quoted ? (
           date && outside(link, s.quoteWhen, date)
@@ -348,12 +375,14 @@ function PostView({ post, icon, link, quoted }: { post: SocialPost; icon: string
         </div>
       ) : null}
       {post.title ? <div className={s.title} dir="auto">{post.title}</div> : null}
+      {/* a video's description is long and mostly links: the video comes first, its words after */}
+      {video ? <Media post={post} link={link} compact={quoted} video={video} /> : null}
       {text ? (
-        <Fold lines={quoted ? 4 : 10} signature={text}>
+        <Fold lines={quoted ? 4 : video ? 3 : 10} signature={text}>
           {words}
         </Fold>
       ) : null}
-      <Media post={post} link={link} compact={quoted} />
+      {video ? null : <Media post={post} link={link} compact={quoted} />}
       {post.poll ? <Poll poll={post.poll} /> : null}
       {post.note ? (
         <div className={s.note}>
@@ -382,9 +411,10 @@ function PostView({ post, icon, link, quoted }: { post: SocialPost; icon: string
 export function PostEmbed({ e }: { e: UnfurlResult }) {
   const post = e.post;
   if (!post) return null;
+  const video = post.platform === "youtube" && isYouTubeID(e.video_id) ? { id: e.video_id, start: e.video_start } : undefined;
   return (
     <article className={s.post} data-platform={post.platform} data-testid="post-embed">
-      <PostView post={post} icon={e.icon} link={post.url ?? e.url} quoted={false} />
+      <PostView post={post} icon={e.icon} link={post.url ?? e.url} quoted={false} video={video} />
     </article>
   );
 }

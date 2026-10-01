@@ -1,6 +1,6 @@
 import { channels as channelsApi } from "@/api/channels";
 import { BULK_DELETE_MAX, messages as messagesApi } from "@/api/messages";
-import { MSG_FLAG_PINNED } from "@/api/types";
+import { MSG_FLAG_PINNED, MSG_FLAG_SUPPRESS_EMBEDS } from "@/api/types";
 import { humanizeMentions, type HumanNames } from "@/components/composer/mentions";
 import { copyText } from "@/lib/clipboard";
 import { compareIds } from "@/lib/ids";
@@ -33,6 +33,32 @@ export function canDelete(msg: DecryptedMessage): boolean {
   // Manage Messages lets moderators and the server owner remove anyone's message
   if (ch.server_id) return canI(useServers.getState().byId[ch.server_id], P.MANAGE_MESSAGES, ch.id);
   return ch.type === "group_dm" && ch.owner_id === me.id;
+}
+
+/** Whether this person may take a message's previews away: its author, or whoever may delete it. */
+export function canRemoveEmbeds(msg: DecryptedMessage): boolean {
+  return !msg.type.startsWith("system_") && canDelete(msg);
+}
+
+/** Takes a message's previews away, or brings them back. */
+export function setEmbedsHidden(msg: DecryptedMessage, hidden: boolean): void {
+  const flags = hidden ? msg.flags | MSG_FLAG_SUPPRESS_EMBEDS : msg.flags & ~MSG_FLAG_SUPPRESS_EMBEDS;
+  void messagesApi
+    .edit(msg.channel_id, msg.id, { flags: flags & MSG_FLAG_SUPPRESS_EMBEDS })
+    .then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags))
+    .catch(() => useUI.getState().toast(t("chat.messageMenu.couldNotUpdateEmbeds"), "error"));
+}
+
+/** Asks before removing a message's previews; Shift skips the question, as it does for Delete. */
+export function confirmRemoveEmbeds(msg: DecryptedMessage, skip = false): void {
+  if (skip) return setEmbedsHidden(msg, true);
+  useUI.getState().openModal("confirm", {
+    title: t("chat.embeds.removeTitle"),
+    body: t("chat.embeds.removeBody"),
+    confirmLabel: t("chat.embeds.removeConfirm"),
+    danger: true,
+    onConfirm: () => setEmbedsHidden(msg, true),
+  });
 }
 
 /** Anyone in a DM may pin; a server channel needs Manage Messages, as the server requires. */
@@ -105,9 +131,9 @@ export function buildMessageMenu(msg: DecryptedMessage, hooks: MenuHooks, image?
     },
   });
   items.push({ id: "unread", label: t("chat.messageItem.markUnread"), onSelect: () => markUnread(msg) });
-  if (msg.payload?.embeds?.length && useAuth.getState().me?.id === msg.author_id) {
-    const suppressed = (msg.flags & 4) !== 0;
-    items.push({ id: "embeds", label: suppressed ? t("chat.messageMenu.showEmbeds") : t("chat.messageMenu.removeEmbeds"), onSelect: () => void messagesApi.edit(msg.channel_id, msg.id, { flags: suppressed ? 0 : 4 }).then((m) => useMessages.getState().setFlags(msg.channel_id, msg.id, m.flags)).catch(() => ui.toast(t("chat.messageMenu.couldNotUpdateEmbeds"), "error")) });
+  if ((msg.payload?.embeds?.length || msg.hook?.link_embeds.length) && canRemoveEmbeds(msg)) {
+    const suppressed = (msg.flags & MSG_FLAG_SUPPRESS_EMBEDS) !== 0;
+    items.push({ id: "embeds", label: suppressed ? t("chat.messageMenu.showEmbeds") : t("chat.messageMenu.removeEmbeds"), onSelect: () => setEmbedsHidden(msg, !suppressed) });
   }
   items.push({ id: "link", label: t("chat.messageItem.copyMessageLink"), onSelect: () => copyMessageLink(msg), separatorAfter: dev || canDelete(msg) });
   if (dev) items.push({ id: "id", label: t("chat.messageItem.copyMessageId"), onSelect: () => void copyText(msg.id, t("clipboard.idCopied")), separatorAfter: canDelete(msg) });

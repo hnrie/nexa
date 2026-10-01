@@ -1,8 +1,11 @@
-import { ArrowRight, Clock, MessagesSquare } from "lucide-react";
-import type { MemberCase, People, ResetField, StaffCase } from "@/api/moderation";
+import { Clock, MessagesSquare, Server } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import type { CaseDetails, MemberCase, People, ResetField, ServerField, StaffCase } from "@/api/moderation";
 import { Button } from "@/components/common/Button";
+import { useRenderCtx } from "@/lib/markdownCtx";
 import { actionIcon, caseStanding, fieldLabel, formatSpan, fullDate, noticeExplainer, noticeTitle, relativeTo, severity } from "@/lib/moderation";
 import { formatBytes, formatTimestamp } from "@/lib/time";
+import { Markdown } from "@/markdown";
 import { t } from "@/i18n";
 import { PersonChip } from "./NexaBits";
 import s from "./Nexa.module.css";
@@ -20,6 +23,73 @@ interface Props {
 
 function isStaffCase(c: MemberCase | StaffCase): c is StaffCase {
   return "user_id" in c;
+}
+
+/** Fields whose words are formatted where people read them, so they are shown formatted here too. */
+const RICH = new Set<ResetField | ServerField>(["about_me", "description"]);
+
+/**
+ * What a field said before a reset took it, for the staff: in full, as
+ * people saw it, folding after a few lines until asked for the rest.
+ */
+function WasValue({ field, value }: { field: ResetField | ServerField; value: string }) {
+  const ctx = useRenderCtx();
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [folds, setFolds] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || open) return;
+    setFolds(el.scrollHeight > el.clientHeight + 1);
+  }, [value, open]);
+  return (
+    <div className={s.was}>
+      <span className={s.wasLabel}>{t("nexa.notice.was")}</span>
+      <div ref={ref} className={s.wasValue} data-open={open} data-rich={RICH.has(field) || undefined}>
+        {RICH.has(field) ? <Markdown source={value} ctx={ctx} /> : field === "username" ? `@${value}` : value}
+      </div>
+      {folds || open ? (
+        <button type="button" className={s.wasMore} aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          {open ? t("chat.embeds.showLess") : t("nexa.notice.showAll")}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** What a field reads now: the stand-in a reset wrote, or that it was removed or cleared. */
+function nowValue(f: ResetField | ServerField, d: CaseDetails): string {
+  switch (f) {
+    case "status":
+    case "nicknames":
+    case "description":
+      return t("nexa.notice.cleared");
+    case "icon":
+    case "banner":
+      return t("nexa.notice.removedShort");
+    case "username":
+      return `@${d.new?.username ?? ""}`;
+    default:
+      return d.new?.[f] ?? "";
+  }
+}
+
+/** The fields a reset took, each with what it says now, and, for the staff, what it said before. */
+function ChangedFields({ d, staff, label }: { d: CaseDetails; staff: boolean; label: string }) {
+  if (!d.fields?.length) return null;
+  return (
+    <div className={s.fields} role="table" aria-label={label}>
+      {d.fields.map((f) => (
+        <div className={s.fieldRow} role="row" key={f}>
+          <span className={s.fieldName} role="cell">{fieldLabel(f)}</span>
+          <span className={s.fieldValue} role="cell">
+            <span className={s.newValue} data-word={f === "status" || f === "nicknames" || f === "description" || f === "icon" || f === "banner" || undefined}>{nowValue(f, d)}</span>
+            {staff && d.old?.[f] ? <WasValue field={f} value={d.old[f]!} /> : null}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -54,7 +124,7 @@ export function NoticeCard({ c, people, perspective, onOpenThread, bare = false 
 
       <section className={s.reason}>
         <span className={s.label}>{t("nexa.notice.reason")}</span>
-        <p className={s.reasonText}>{c.reason}</p>
+        <p className={s.reasonText} dir="auto">{c.reason}</p>
       </section>
 
       {c.action === "avatar_remove" ? (
@@ -63,23 +133,18 @@ export function NoticeCard({ c, people, perspective, onOpenThread, bare = false 
         </p>
       ) : null}
 
-      {c.action === "field_reset" && d.fields?.length ? (
-        <div className={s.fields} role="table" aria-label={t("nexa.notice.resetFields")}>
-          {d.fields.map((f: ResetField) => (
-            <div className={s.fieldRow} role="row" key={f}>
-              <span className={s.fieldName} role="cell">{fieldLabel(f)}</span>
-              <span className={s.fieldValue} role="cell">
-                {staff && d.old?.[f] ? (
-                  <>
-                    <span className={s.oldValue} title={d.old[f]}>{d.old[f]}</span>
-                    <ArrowRight size={14} aria-hidden="true" className={[s.fieldArrow, s.flip].join(" ")} />
-                  </>
-                ) : null}
-                <span className={s.newValue}>{f === "status" ? t("nexa.notice.cleared") : f === "username" ? `@${d.new?.[f] ?? ""}` : d.new?.[f]}</span>
-              </span>
-            </div>
-          ))}
-        </div>
+      {c.action === "field_reset" ? <ChangedFields d={d} staff={staff} label={t("nexa.notice.resetFields")} /> : null}
+
+      {c.action === "server_reset" ? (
+        <>
+          {d.server_name ? (
+            <p className={s.detailLine}>
+              <Server size={14} aria-hidden="true" />
+              <span>{t("nexa.notice.serverNamed", { name: d.server_name })}</span>
+            </p>
+          ) : null}
+          <ChangedFields d={d} staff={staff} label={t("nexa.notice.serverFields")} />
+        </>
       ) : null}
 
       {c.action === "field_reset" && d.fields?.includes("username") && d.new?.username ? (

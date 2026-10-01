@@ -84,6 +84,14 @@ type Config struct {
 	// with no key in it to protect, and guests learn members' addresses, so
 	// it is off unless asked for (development and tests).
 	GuestLinksP2P bool
+	// EgressProxy is where the requests a person can point this server at
+	// (link previews, the media proxy, the YouTube player) go out, so the
+	// sites they name never learn this server's address: "warp" (Cloudflare
+	// WARP's local proxy, which chatd keeps in proxy mode and connected),
+	// a "socks5://host:port", or "off" to send them out directly.
+	EgressProxy string
+	// WarpProxyPort is the port WARP's proxy listens on, on 127.0.0.1.
+	WarpProxyPort int
 	LogLevel      string
 	// LogFile, when set, is where chatd writes its log instead of stdout,
 	// starting a new file past 10 MB and keeping five old ones. It is for a
@@ -110,6 +118,8 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxStickerBytes:   5 << 20,
 		Registration:      "open",
 		RealtimeMonthlyGB: 1000,
+		EgressProxy:       "warp",
+		WarpProxyPort:     40000,
 		LogLevel:          "info",
 		SessionTTL:        90 * 24 * time.Hour,
 	}
@@ -146,6 +156,7 @@ func Load(getenv func(string) string) (Config, error) {
 	str("TURNSTILE_SECRET_KEY", &c.TurnstileSecretKey)
 	str("REALTIME_APP_ID", &c.RealtimeAppID)
 	str("REALTIME_APP_SECRET", &c.RealtimeAppSecret)
+	str("EGRESS_PROXY", &c.EgressProxy)
 	str("LOG_LEVEL", &c.LogLevel)
 	str("LOG_FILE", &c.LogFile)
 	c.GuestLinksP2P = strings.TrimSpace(getenv("GUEST_LINKS_P2P")) == "1"
@@ -180,6 +191,20 @@ func Load(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("NODE_ID: expected 0..%d, got %q", ids.MaxNode, v)
 		}
 		c.NodeID = n
+	}
+	if v := strings.TrimSpace(getenv("WARP_PROXY_PORT")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 65535 {
+			return c, fmt.Errorf("WARP_PROXY_PORT: expected 1..65535, got %q", v)
+		}
+		c.WarpProxyPort = n
+	}
+	switch ep := strings.ToLower(c.EgressProxy); {
+	case ep == "warp", ep == "off":
+		c.EgressProxy = ep
+	case strings.HasPrefix(ep, "socks5://"), strings.HasPrefix(ep, "socks5h://"):
+	default:
+		return c, fmt.Errorf("EGRESS_PROXY: expected warp, off or socks5://host:port, got %q", c.EgressProxy)
 	}
 	if v := strings.TrimSpace(getenv("SESSION_TTL_DAYS")); v != "" {
 		n, err := strconv.Atoi(v)

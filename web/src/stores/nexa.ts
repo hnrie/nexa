@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { create } from "zustand";
-import { nexa as nexaApi, type Announcement, type CaseMessage, type FeedItem, type MemberCase, type NexaState, type People, type Restriction } from "@/api/moderation";
+import { nexa as nexaApi, type Announcement, type CaseFile, type CaseMessage, type FeedItem, type MemberCase, type NexaState, type People, type Restriction } from "@/api/moderation";
 import { bugs as bugsApi, type BugMessage, type MemberBug } from "@/api/bugs";
 import { clearBugFiles } from "@/lib/bugMedia";
 
@@ -51,7 +51,7 @@ interface NexaStore {
   onCase: (c: MemberCase, messages: CaseMessage[], people: People, st: NexaState) => void;
   onAnnouncement: (a: Announcement, people: People) => void;
   onAnnouncementGone: (id: string) => void;
-  reply: (caseId: string, body: string) => Promise<void>;
+  reply: (caseId: string, body: string, files?: CaseFile[]) => Promise<void>;
   markThreadRead: (caseId: string) => void;
   /**
    * Reads the whole conversation: its notices and announcements, and what the
@@ -236,8 +236,8 @@ export const useNexa = create<NexaStore>()((set, get) => ({
     set((s) => ({ feed: s.feed ? s.feed.filter((it) => !(it.kind === "announcement" && it.announcement.id === id)) : s.feed }));
   },
 
-  reply: async (caseId, body) => {
-    const r = await nexaApi.reply(caseId, body);
+  reply: async (caseId, body, files = []) => {
+    const r = await nexaApi.reply(caseId, body, files);
     set((s) => {
       const open = s.threads[caseId];
       return {
