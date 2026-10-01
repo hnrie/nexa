@@ -49,7 +49,7 @@
    swiped down it goes, pulled up a long one shows all of itself (lib/sheetDrag.ts). */
 @media (max-width: 767px) {
   .backdrop { display: block; position: fixed; inset: 0; z-index: calc(var(--z-menu) - 1); background: var(--bg-overlay); animation: dimIn 180ms var(--ease-out); }
-  .menu[data-sheet] { left: 0 !important; right: 0 !important; top: auto !important; bottom: var(--kb-inset, 0px) !important; width: 100%; max-width: none; min-width: 0; max-height: min(78dvh, calc(var(--vvh, 100dvh) - 48px)); padding: 18px 8px calc(8px + env(safe-area-inset-bottom)); border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: sheetIn 260ms var(--ease-out); }
+  .menu[data-sheet] { left: 0 !important; right: 0 !important; top: auto !important; bottom: var(--kb-inset, 0px) !important; width: 100%; max-width: none; min-width: 0; max-height: min(78dvh, calc(var(--vvh, 100dvh) - 48px)); padding: 18px 8px calc(8px + max(0px, env(safe-area-inset-bottom) - var(--kb-inset, 0px))); border-radius: var(--radius-lg) var(--radius-lg) 0 0; animation: sheetIn 260ms var(--ease-out); }
   .menu[data-sheet][data-expanded] { max-height: none; height: calc(var(--vvh, 100dvh) - env(safe-area-inset-top)); border-radius: 0; }
   .menu[data-sheet] .grip { display: block; position: absolute; top: 7px; left: 50%; translate: -50% 0; width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); }
   .menu[data-sheet] .sheetTitle { display: block; padding: 2px 12px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

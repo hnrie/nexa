@@ -1,5 +1,5 @@
 /* The settings stand on the app's canvas: the nav straight on it, the page a panel floating beside it. */
-.layer { position: fixed; inset: 0; z-index: 100; display: flex; background: radial-gradient(900px 560px at 8% -10%, var(--canvas-glow), transparent 66%), var(--bg-canvas); animation: fadeIn 200ms var(--ease-out); }
+.layer { position: fixed; inset: 0; z-index: 100; display: flex; padding-bottom: var(--kb-inset, 0px); background: radial-gradient(900px 560px at 8% -10%, var(--canvas-glow), transparent 66%), var(--bg-canvas); animation: fadeIn 200ms var(--ease-out); }
 @keyframes fadeIn { from { opacity: 0; transform: scale(1.015); } to { opacity: 1; transform: none; } }
 .navWrap { flex: 1 0 236px; display: flex; justify-content: flex-end; background: transparent; overflow-y: auto; }
 .nav { width: 236px; padding-block: 48px; padding-inline: 16px 12px; display: flex; flex-direction: column; gap: 2px; }

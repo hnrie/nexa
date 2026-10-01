@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const backdropStyle = dragging ? { opacity: dragX / drawerWidth(), pointerEvents: "none" as const, transition: "none" } : undefined;
 
   return (
-    <div className={s.app} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+    <div className={s.app} data-keyboard-fit="" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
       {mobile ? (
         <>
           <div className={s.backdrop} data-open={leftOpen || dragging} style={backdropStyle} onClick={() => setLeftOpen(false)} />

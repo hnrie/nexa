@@ -1,11 +1,12 @@
 /* The page falls back behind a soft blur, and the dialog comes up out of it. */
 /* --sheet-dim falls from 1 as a phone's sheet is swiped away (lib/sheetDrag.ts), taking the dim and the blur with it */
 @property --sheet-dim { syntax: "<number>"; inherits: false; initial-value: 1; }
-.overlay { --sheet-dim: 1; position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg-overlay) calc(var(--sheet-dim) * 100%), transparent); -webkit-backdrop-filter: blur(calc(var(--sheet-dim) * 6px)) saturate(1.1); backdrop-filter: blur(calc(var(--sheet-dim) * 6px)) saturate(1.1); animation: fadeIn 180ms var(--ease-out); padding: 16px; }
+/* It keeps clear of an on-screen keyboard, which on a tablet lies over the lower half of it (src/lib/keyboardInset.ts). */
+.overlay { --sheet-dim: 1; position: fixed; inset: 0; z-index: var(--z-modal); display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--bg-overlay) calc(var(--sheet-dim) * 100%), transparent); -webkit-backdrop-filter: blur(calc(var(--sheet-dim) * 6px)) saturate(1.1); backdrop-filter: blur(calc(var(--sheet-dim) * 6px)) saturate(1.1); animation: fadeIn 180ms var(--ease-out); padding: 16px; padding-bottom: calc(16px + var(--kb-inset, 0px)); }
 /* A dialog floats over the app, so it is drawn in the floating colour, lit
    along its top edge, with a hairline round it for a theme whose panels are
    black already. Its footer is a shelf a step below the body. */
-.card { --glyph-cut: var(--bg-floating); max-width: 100%; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-lg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); animation: pop 240ms var(--ease-out); outline: none; overflow: hidden; }
+.card { --glyph-cut: var(--bg-floating); max-width: 100%; max-height: calc(100vh - 32px); max-height: min(calc(100dvh - 32px), calc(var(--vvh, 100dvh) - 32px)); display: flex; flex-direction: column; background: var(--bg-floating); border-radius: var(--radius-lg); box-shadow: inset 0 1px 0 var(--edge-light), 0 0 0 1px var(--panel-edge), var(--shadow-high); animation: pop 240ms var(--ease-out); outline: none; overflow: hidden; }
 /* The dialog itself takes focus only so a screen reader starts inside it; a
    ring round the whole card says nothing a keyboard user needs to know. */
 .card:focus-visible { outline: none; }
@@ -36,7 +37,7 @@
   .header { padding: 16px 16px 0; }
   .body { padding: 16px; }
   .footer { padding: 14px 16px; }
-  .body:last-child, .footer { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .body:last-child, .footer { padding-bottom: calc(16px + max(0px, env(safe-area-inset-bottom) - var(--kb-inset, 0px))); }
   /* a centred dialog stays a card, clear of the notch, the home indicator and the keyboard */
   .overlay[data-centered] { align-items: center; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(max(16px, env(safe-area-inset-bottom)) + var(--kb-inset, 0px)) max(16px, env(safe-area-inset-left)); }
   .overlay[data-centered] .card { border-radius: var(--radius-lg); max-height: 100%; animation: pop 240ms var(--ease-out); }

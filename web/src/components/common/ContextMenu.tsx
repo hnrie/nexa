@@ -103,6 +103,8 @@ export function ContextMenuHost() {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [sub, setSub] = useState<Sub | null>(null);
   const [subPos, setSubPos] = useState<{ x: number; y: number } | null>(null);
+  // On a phone the menu is a sheet across the bottom, swiped down to put away.
+  const [sheet] = useState(sheetsHere);
   const subId = useId();
   const portalRoot = usePortalRoot();
   // What the menu was opened from. A menu portals to the body, so without this
@@ -272,7 +274,10 @@ export function ContextMenuHost() {
       if (Math.abs(window.innerWidth - width) > 1) close();
     };
     const onScroll = (e: Event) => {
-      if (inside(e.target)) return;
+      // Behind a sheet nothing can be scrolled by hand. What moves there is
+      // the app settling as the keyboard goes away, which it does whenever a
+      // menu is opened while typing (lib/keyboardInset.ts says when).
+      if (sheet || inside(e.target) || document.documentElement.hasAttribute("data-keyboard-moving")) return;
       close();
     };
     // Escape belongs to the menu while it is open, and to nothing else. The
@@ -320,10 +325,8 @@ export function ContextMenuHost() {
       window.removeEventListener("resize", onResize);
       document.removeEventListener("scroll", onScroll, true);
     };
-  }, [menu, close, sub, closeSub, stops, moveTo]);
+  }, [menu, close, sub, closeSub, stops, moveTo, sheet]);
 
-  // On a phone the menu is a sheet across the bottom, swiped down to put away.
-  const [sheet] = useState(sheetsHere);
   useEffect(() => {
     const el = ref.current;
     if (!menu || !el || !sheet) return;

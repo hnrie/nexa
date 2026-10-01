@@ -309,6 +309,48 @@ describe("ContextMenuHost submenus", () => {
   });
 });
 
+describe("ContextMenuHost and what moves behind it", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.documentElement.removeAttribute("data-keyboard-moving");
+  });
+
+  it("closes when what it was opened over is scrolled away", async () => {
+    render(<ContextMenuHost />);
+    open();
+    await settle();
+    fireEvent.scroll(document.body);
+    expect(useUI.getState().contextMenu).toBeNull();
+  });
+
+  it("stays open while it is scrolled itself", async () => {
+    render(<ContextMenuHost />);
+    open();
+    await settle();
+    fireEvent.scroll(screen.getByRole("menu"));
+    expect(useUI.getState().contextMenu).not.toBeNull();
+  });
+
+  it("stays open while the app settles under a keyboard that is leaving", async () => {
+    render(<ContextMenuHost />);
+    open();
+    await settle();
+    // opened while typing: the menu takes the focus, the keyboard goes, and the lists behind find their new height
+    document.documentElement.setAttribute("data-keyboard-moving", "");
+    fireEvent.scroll(document.body);
+    expect(useUI.getState().contextMenu).not.toBeNull();
+  });
+
+  it("stays open as a sheet on a phone, where nothing behind it can be scrolled by hand", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("max-width: 767px"), media: q, addEventListener() {}, removeEventListener() {} }));
+    render(<ContextMenuHost />);
+    open();
+    await settle();
+    fireEvent.scroll(document.body);
+    expect(useUI.getState().contextMenu).not.toBeNull();
+  });
+});
+
 describe("ContextMenuHost items", () => {
   it("shows an item that switches something on and off as a tick box, with its keys", async () => {
     render(<ContextMenuHost />);

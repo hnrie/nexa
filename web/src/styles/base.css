@@ -14,6 +14,16 @@ body {
   text-rendering: optimizeLegibility;
   font-optical-sizing: auto;
 }
+/* With a phone's keyboard up the app is fitted above it (lib/keyboardInset.ts)
+   and there is nothing behind it to see, but a finger on the header could
+   still drag the whole page up and down. The lists inside still scroll, and a
+   pinch still zooms. */
+:root[data-keyboard] body { touch-action: pinch-zoom; }
+/* Safari sometimes slides the page up under the keyboard and will not let it
+   be put back. Everything is then moved down by as much, to where the screen
+   is: the app, and what is fixed over it (sheets, menus, settings), which a
+   transformed body carries along. */
+:root[data-keyboard-slid] body { transform: translateY(var(--vv-top, 0px)); }
 /* numbers that line up in counts, clocks and badges */
 time, [data-numeric] { font-variant-numeric: tabular-nums; }
 #root { height: 100%; }

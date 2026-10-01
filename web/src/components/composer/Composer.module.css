@@ -89,7 +89,8 @@
    line of its own under the box rather than being hidden: it is how one learns
    a message is too long before Send refuses it. The tray shows more files. */
 @media (max-width: 767px) {
-  .wrap { padding: 0 8px 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  /* the room left for the home indicator is not needed while the keyboard is over it */
+  .wrap { padding: 0 8px 8px; padding-bottom: max(8px, calc(env(safe-area-inset-bottom) - var(--kb-inset, 0px))); }
   .counter { position: static; display: block; margin: 4px 8px 0; text-align: end; }
   .card { width: 150px; }
   .thumb { height: 100px; }
