@@ -3,3 +3,5 @@ playwright>=1.50
 fonttools[woff]>=4.50
 picosvg>=0.22
 skia-pathops>=0.8
+# tools/ios_sim.py
+websocket-client>=1.8
